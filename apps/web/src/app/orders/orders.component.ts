@@ -1,5 +1,6 @@
 import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { formatKes, formatKesInput } from '../core/money';
 import { OrderLineWithProduct, OrderWithCustomer, Payment, PosService } from '../pos/pos.service';
@@ -18,7 +19,7 @@ import { IconComponent } from '../shared/ui/icon.component';
 import { StatBarComponent } from '../shared/ui/stat-bar.component';
 import { MoneyComponent } from '../shared/ui/money.component';
 
-const ALL_STATUSES = ['completed', 'voided', 'draft', 'pending_payment'];
+const ALL_STATUSES = ['completed', 'voided', 'draft', 'expired', 'pending_payment'];
 
 /**
  * Sales history — the canonical sales screen. Defaults to "today" with realtime
@@ -29,6 +30,7 @@ const ALL_STATUSES = ['completed', 'voided', 'draft', 'pending_payment'];
   selector: 'app-orders',
   imports: [
     ReactiveFormsModule,
+    RouterLink,
     PageLayoutComponent,
     EmptyStateComponent,
     ListSearchBarComponent,
@@ -45,47 +47,71 @@ const ALL_STATUSES = ['completed', 'voided', 'draft', 'pending_payment'];
     <app-page
       title="Sales"
       subtitle="Review completed sales, cashier handoffs, proformas, refunds, and voids."
+      [wide]="true"
     >
       @if (isLive()) {
         <span actions class="badge badge-success gap-1">
-          <span class="h-2 w-2 animate-pulse rounded-full bg-success"></span>
+          <app-icon name="heroSignal" size="sm" class="animate-pulse" />
           Live
         </span>
       }
-      <button actions appButton variant="ghost" [loading]="loading()" (click)="load()">
-        <app-icon name="heroArrowPath" /> Refresh
+      <button
+        actions
+        appButton
+        variant="ghost"
+        [iconOnly]="true"
+        [loading]="loading()"
+        type="button"
+        title="Refresh sales"
+        aria-label="Refresh sales"
+        (click)="load()"
+      >
+        <app-icon name="heroArrowPath" />
       </button>
 
-      <app-list-search-bar placeholder="Search sale code or customer…" [(searchQuery)]="query">
+      @if (error()) {
+        <div role="alert" class="alert alert-error mb-3 text-sm">
+          <app-icon name="heroExclamationTriangle" />
+          <span>{{ error() }}</span>
+        </div>
+      }
+      @if (warning()) {
+        <div role="status" class="alert alert-warning mb-3 text-sm">
+          <app-icon name="heroExclamationTriangle" />
+          <span>{{ warning() }}</span>
+        </div>
+      }
+
+      <app-list-search-bar
+        placeholder="Search sale code or customer…"
+        [searchQuery]="query()"
+        (searchQueryChange)="onSearch($event)"
+      >
         <app-stat-bar summary [stats]="salesStats()" />
-        <div filters class="flex flex-wrap items-end gap-2">
-          <app-form-field label="Status">
-            <select class="select select-bordered select-sm" [formControl]="status">
+        <div filters class="grid gap-2 sm:grid-cols-2 lg:flex lg:flex-wrap lg:items-end">
+          <app-form-field label="Status" class="sm:col-span-2 lg:w-44">
+            <select class="select select-bordered select-sm w-full" [formControl]="status">
               <option value="all">All</option>
               <option value="completed">Completed</option>
               <option value="voided">Voided</option>
               <option value="draft">Draft (proforma)</option>
+              <option value="expired">Expired proforma</option>
               <option value="pending_payment">Cashier queue</option>
             </select>
           </app-form-field>
-          <app-form-field label="From">
-            <input type="date" class="input input-bordered input-sm" [formControl]="from" />
+          <app-form-field label="From" class="lg:w-40">
+            <input type="date" class="input input-bordered input-sm w-full" [formControl]="from" />
           </app-form-field>
-          <app-form-field label="To">
-            <input type="date" class="input input-bordered input-sm" [formControl]="to" />
+          <app-form-field label="To" class="lg:w-40">
+            <input type="date" class="input input-bordered input-sm w-full" [formControl]="to" />
           </app-form-field>
-          <button appButton type="button" (click)="apply()">Apply</button>
-          <button appButton variant="ghost" type="button" (click)="setToday()">Today</button>
-          <button appButton variant="ghost" type="button" (click)="setWeek()">7 days</button>
+          <div class="flex flex-wrap items-center gap-2 sm:col-span-2">
+            <button appButton type="button" (click)="apply()">Apply filters</button>
+            <button appButton variant="ghost" type="button" (click)="setToday()">Today</button>
+            <button appButton variant="ghost" type="button" (click)="setWeek()">7 days</button>
+          </div>
         </div>
       </app-list-search-bar>
-
-      @if (error()) {
-        <p class="my-2 text-sm text-error">{{ error() }}</p>
-      }
-      @if (warning()) {
-        <p class="my-2 text-sm text-warning">{{ warning() }}</p>
-      }
 
       @if (orders().length === 0) {
         <div class="mt-3">
@@ -117,7 +143,18 @@ const ALL_STATUSES = ['completed', 'voided', 'draft', 'pending_payment'];
                   <span class="ml-auto font-bold tabular-nums"
                     ><app-money [cents]="order.total"
                   /></span>
-                  @if (order.status !== 'voided' && order.status !== 'draft') {
+                  @if (order.status === 'pending_payment') {
+                    <a appButton variant="soft" size="sm" routerLink="/pos/cashier">
+                      <app-icon name="heroBanknotes" />
+                      Collect payment
+                    </a>
+                  } @else if (order.status === 'draft') {
+                    <a appButton variant="outline" size="sm" routerLink="/pos/proformas">
+                      <app-icon name="heroDocumentText" />
+                      Open proforma
+                    </a>
+                  }
+                  @if (order.status === 'completed') {
                     <button class="btn btn-error btn-outline btn-sm" (click)="startVoid(order.id)">
                       Void
                     </button>
@@ -212,7 +249,7 @@ const ALL_STATUSES = ['completed', 'voided', 'draft', 'pending_payment'];
                         {{ noPaymentsMessage(order) }}
                       </p>
                     }
-                    @if (printerEnabled()) {
+                    @if (printerEnabled() && order.status === 'completed') {
                       <button class="btn btn-outline btn-xs mt-2" (click)="printOrder(order.id)">
                         Print receipt
                       </button>
@@ -325,7 +362,7 @@ const ALL_STATUSES = ['completed', 'voided', 'draft', 'pending_payment'];
                     </td>
                     <td class="table-number"><app-money [cents]="order.total" /></td>
                     <td class="table-actions" (click)="$event.stopPropagation()">
-                      @if (printerEnabled()) {
+                      @if (printerEnabled() && order.status === 'completed') {
                         <button
                           appButton
                           variant="ghost"
@@ -336,8 +373,30 @@ const ALL_STATUSES = ['completed', 'voided', 'draft', 'pending_payment'];
                         >
                           <app-icon name="heroPrinter" />
                         </button>
+                      } @else if (order.status === 'pending_payment') {
+                        <a
+                          appButton
+                          variant="ghost"
+                          [iconOnly]="true"
+                          routerLink="/pos/cashier"
+                          title="Collect payment"
+                          aria-label="Collect payment"
+                        >
+                          <app-icon name="heroBanknotes" />
+                        </a>
+                      } @else if (order.status === 'draft') {
+                        <a
+                          appButton
+                          variant="ghost"
+                          [iconOnly]="true"
+                          routerLink="/pos/proformas"
+                          title="Open proforma"
+                          aria-label="Open proforma"
+                        >
+                          <app-icon name="heroDocumentText" />
+                        </a>
                       }
-                      @if (order.status !== 'voided' && order.status !== 'draft') {
+                      @if (order.status === 'completed') {
                         <button
                           appButton
                           variant="ghost"
@@ -537,6 +596,7 @@ export class OrdersComponent implements OnInit, OnDestroy {
   protected readonly to = new FormControl(this.todayIso(), { nonNullable: true });
 
   private channel: RealtimeChannel | null = null;
+  private searchTimer: ReturnType<typeof setTimeout> | null = null;
 
   /** Live when the range covers today (the old Today's Sales behaviour). */
   protected readonly isLive = computed(
@@ -553,7 +613,7 @@ export class OrdersComponent implements OnInit, OnDestroy {
     return [
       { label: 'Matching sales', value: this.totalItems() },
       {
-        label: 'Page value',
+        label: 'Sales value on page',
         value: formatKes(completed.reduce((sum, order) => sum + order.total, 0)),
       },
       { label: 'Completed on page', value: completed.length, tone: 'success' as const },
@@ -582,6 +642,14 @@ export class OrdersComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     if (this.channel) void this.pos.client.removeChannel(this.channel);
+    if (this.searchTimer) clearTimeout(this.searchTimer);
+  }
+
+  protected onSearch(query: string): void {
+    this.query.set(query);
+    this.page.set(1);
+    if (this.searchTimer) clearTimeout(this.searchTimer);
+    this.searchTimer = setTimeout(() => void this.load(), 250);
   }
 
   protected async apply(): Promise<void> {
@@ -604,6 +672,7 @@ export class OrdersComponent implements OnInit, OnDestroy {
   protected async load(): Promise<void> {
     this.loading.set(true);
     try {
+      await this.pos.expireProformas();
       const statuses = this.status.value === 'all' ? ALL_STATUSES : [this.status.value];
       const since = new Date(`${this.from.value}T00:00:00`).toISOString();
       const untilDate = new Date(`${this.to.value}T00:00:00`);
@@ -733,7 +802,7 @@ export class OrdersComponent implements OnInit, OnDestroy {
   protected async printOrder(orderId: string): Promise<void> {
     try {
       const [{ order, meta }, company] = await Promise.all([
-        this.receiptData.buildOrderData(orderId),
+        this.receiptData.buildReceiptData(orderId),
         this.receiptData.companyPrintInfo(),
       ]);
       await this.print.printOrder(order, company.name, company.logoUrl, meta);
@@ -752,6 +821,8 @@ export class OrdersComponent implements OnInit, OnDestroy {
         return 'Cashier queue';
       case 'draft':
         return 'Proforma';
+      case 'expired':
+        return 'Expired proforma';
       case 'completed':
         return 'Completed';
       case 'voided':
@@ -764,6 +835,7 @@ export class OrdersComponent implements OnInit, OnDestroy {
   protected paymentLabel(order: OrderWithCustomer): string {
     if (order.status === 'pending_payment') return 'Awaiting payment';
     if (order.status === 'draft') return 'Not posted';
+    if (order.status === 'expired') return 'Expired';
     if (order.status === 'voided') return 'Voided';
     return order.is_credit_sale ? 'Credit' : 'Paid';
   }
@@ -771,6 +843,7 @@ export class OrdersComponent implements OnInit, OnDestroy {
   protected noPaymentsMessage(order: OrderWithCustomer): string {
     if (order.status === 'pending_payment') return 'Awaiting payment in the cashier queue.';
     if (order.status === 'draft') return 'No payments on this proforma.';
+    if (order.status === 'expired') return 'This proforma expired without being converted.';
     if (order.is_credit_sale) return 'Credit sale — no payment collected.';
     return 'No payments recorded.';
   }

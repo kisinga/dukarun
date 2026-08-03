@@ -10,7 +10,7 @@ const LIMIT_KEYS = [
   ['maxAdmins', 'Max team members'],
   ['maxProducts', 'Max products'],
   ['maxStockLocations', 'Max stock locations'],
-  ['maxOrdersPerMonth', 'Max orders/mo'],
+  ['maxOrdersPerMonth', 'Max sales/mo'],
   ['smsPerPeriod', 'SMS/mo'],
 ] as const;
 

@@ -40,12 +40,25 @@ type SalesChartPoint = DailySummary & { day: string; revenue: number; heightPerc
         [class.badge-success]="liveConnected()"
         [class.badge-warning]="!liveConnected()"
       >
-        <span class="h-2 w-2 rounded-full bg-current"></span>
+        <app-icon
+          [name]="liveConnected() ? 'heroSignal' : 'heroSignalSlash'"
+          size="sm"
+          [class.animate-pulse]="!liveConnected()"
+        />
         {{ liveConnected() ? 'Live' : 'Connecting' }}
       </span>
-      <button actions appButton variant="ghost" [loading]="loading()" (click)="refresh()">
+      <button
+        actions
+        appButton
+        variant="ghost"
+        [iconOnly]="true"
+        [loading]="loading()"
+        type="button"
+        title="Refresh dashboard"
+        aria-label="Refresh dashboard"
+        (click)="refresh()"
+      >
         <app-icon name="heroArrowPath" />
-        Refresh
       </button>
 
       <div class="space-y-6">
@@ -75,7 +88,7 @@ type SalesChartPoint = DailySummary & { day: string; revenue: number; heightPerc
               sub="Completed sales"
             />
             <app-stat-card
-              label="Orders"
+              label="Sales"
               [value]="initialLoading() ? '—' : String(today()?.orders ?? 0)"
               sub="Completed checkouts"
             />
@@ -168,7 +181,7 @@ type SalesChartPoint = DailySummary & { day: string; revenue: number; heightPerc
                     <p class="type-title tabular-nums">{{ fmt(weekRevenue()) }}</p>
                   </div>
                   <p class="type-caption text-right">
-                    {{ weekOrders() }} orders · {{ fmt(weekMargin()) }} margin
+                    {{ weekOrders() }} sales · {{ fmt(weekMargin()) }} margin
                   </p>
                 </div>
 
@@ -219,7 +232,7 @@ type SalesChartPoint = DailySummary & { day: string; revenue: number; heightPerc
                       <thead>
                         <tr>
                           <th>Day</th>
-                          <th class="text-right">Orders</th>
+                          <th class="text-right">Sales</th>
                           <th class="text-right">Revenue</th>
                           <th class="text-right">Margin</th>
                         </tr>

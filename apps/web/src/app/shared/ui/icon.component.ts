@@ -9,6 +9,7 @@ import { NgIcon } from '@ng-icons/core';
   selector: 'app-icon',
   imports: [NgIcon],
   template: `<ng-icon [name]="name()" [size]="px()" />`,
+  host: { class: 'inline-flex shrink-0 items-center justify-center leading-none' },
 })
 export class IconComponent {
   /** Registered heroicon name, e.g. 'heroPlus'. */

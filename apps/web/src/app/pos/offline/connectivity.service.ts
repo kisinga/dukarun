@@ -12,6 +12,8 @@ export class ConnectivityService {
     typeof navigator === 'undefined' ? true : navigator.onLine
   );
   private readonly manualOverride = signal<boolean | null>(null);
+  /** Bumped when a suspended/mobile tab becomes active again. */
+  readonly resumeTick = signal(0);
 
   readonly online = computed(() => this.manualOverride() ?? this.browserOnline());
 
@@ -19,6 +21,12 @@ export class ConnectivityService {
     if (typeof window !== 'undefined') {
       window.addEventListener('online', () => this.browserOnline.set(true));
       window.addEventListener('offline', () => this.browserOnline.set(false));
+      window.addEventListener('focus', () => this.resumeTick.update(value => value + 1));
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+          this.resumeTick.update(value => value + 1);
+        }
+      });
     }
   }
 

@@ -23,12 +23,13 @@ interface Tender {
   selector: 'app-checkout-panel',
   imports: [FormsModule, ButtonComponent, FormFieldComponent, IconComponent, MoneyComponent],
   template: `
-    <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 md:p-4">
+    <dialog
+      class="modal modal-open"
+      aria-labelledby="checkout-heading"
+      (cancel)="$event.preventDefault(); cancelled.emit()"
+    >
       <div
-        class="flex h-full max-h-dvh w-full max-w-full flex-col overflow-hidden rounded-none border border-base-300/60 bg-base-100 shadow-overlay md:h-auto md:max-h-[90vh] md:w-full md:max-w-xl md:rounded-box"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="checkout-heading"
+        class="modal-box flex flex-col overflow-hidden border border-base-300/60 bg-base-100 p-0 md:w-full md:max-w-xl"
       >
         <header
           class="flex items-start justify-between gap-4 border-b border-base-300/60 p-4 md:px-6 md:py-5"
@@ -54,41 +55,52 @@ interface Tender {
         </header>
 
         <div class="flex-1 overflow-y-auto p-4 md:p-6">
-          <p class="type-heading mb-2">Payment method</p>
-          <div
-            class="grid grid-cols-2 gap-2 sm:grid-cols-4"
-            role="tablist"
-            aria-label="Payment method"
-          >
-            @for (method of methods(); track method) {
-              <button
-                appButton
-                [variant]="!isSplit() && mode() === method ? 'soft' : 'outline'"
-                size="md"
-                type="button"
-                role="tab"
-                [attr.aria-selected]="!isSplit() && mode() === method"
-                (click)="setMode(method)"
+          <section aria-labelledby="payment-method-heading">
+            <p id="payment-method-heading" class="type-heading mb-2">Payment method</p>
+            <div class="rounded-box bg-base-200 p-1">
+              <div
+                class="grid grid-cols-2 gap-1 sm:grid-cols-4"
+                role="tablist"
+                aria-label="Payment method"
               >
-                {{ methodLabel(method) }}
-              </button>
+                @for (method of methods(); track method) {
+                  <button
+                    appButton
+                    [variant]="!isSplit() && mode() === method ? 'soft' : 'ghost'"
+                    size="md"
+                    type="button"
+                    role="tab"
+                    class="w-full"
+                    [attr.aria-selected]="!isSplit() && mode() === method"
+                    (click)="setMode(method)"
+                  >
+                    {{ methodLabel(method) }}
+                  </button>
+                }
+                <button
+                  appButton
+                  [variant]="mode() === 'credit' ? 'soft' : 'ghost'"
+                  size="md"
+                  type="button"
+                  role="tab"
+                  class="w-full"
+                  [disabled]="!creditAllowed()"
+                  [attr.aria-selected]="mode() === 'credit'"
+                  [attr.title]="
+                    creditAllowed() ? null : 'Customer approval or available credit is required'
+                  "
+                  (click)="setMode('credit')"
+                >
+                  Credit
+                </button>
+              </div>
+            </div>
+            @if (!creditAllowed()) {
+              <p class="type-caption mt-2">
+                Credit requires a selected customer with available credit.
+              </p>
             }
-            <button
-              appButton
-              [variant]="mode() === 'credit' ? 'soft' : 'outline'"
-              size="md"
-              type="button"
-              role="tab"
-              [disabled]="!creditAllowed()"
-              [attr.aria-selected]="mode() === 'credit'"
-              [attr.title]="
-                creditAllowed() ? null : 'Customer approval or available credit is required'
-              "
-              (click)="setMode('credit')"
-            >
-              Credit
-            </button>
-          </div>
+          </section>
 
           @if (mode() === 'credit') {
             <div class="mt-4 rounded-box bg-info/10 p-4">
@@ -98,7 +110,7 @@ interface Tender {
               </p>
             </div>
           } @else {
-            <div class="mt-5 flex flex-col gap-4">
+            <div class="mt-4 flex flex-col gap-4">
               @if (isSplit()) {
                 <div class="flex items-start justify-between gap-3">
                   <div>
@@ -171,14 +183,17 @@ interface Tender {
 
               @if (mode() === 'cash' && tenders().length === 1) {
                 <div>
-                  <p class="type-heading mb-2">Cash received</p>
-                  <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  <p class="type-heading">Cash received</p>
+                  <p class="type-caption mt-1">Choose a common amount or enter it below.</p>
+                  <div class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
                     @for (amount of cashSuggestions(); track amount) {
                       <button
                         appButton
                         [variant]="paidCents() === amount ? 'soft' : 'outline'"
                         size="md"
                         type="button"
+                        class="w-full"
+                        [attr.aria-pressed]="paidCents() === amount"
                         (click)="useCashAmount(amount)"
                       >
                         @if (amount === total()) {
@@ -216,7 +231,10 @@ interface Tender {
                         </button>
                       </div>
                     }
-                    <div class="grid items-start gap-3" [class.sm:grid-cols-2]="!isSplit()">
+                    <div
+                      class="grid items-start gap-3"
+                      [class.sm:grid-cols-2]="!isSplit() && tender.method !== 'cash'"
+                    >
                       @if (isSplit()) {
                         <app-form-field label="Method">
                           <select
@@ -235,13 +253,21 @@ interface Tender {
                           </select>
                         </app-form-field>
                       }
-                      <app-form-field label="Amount (KES)">
+                      <app-form-field
+                        [label]="
+                          !isSplit() && tender.method === 'cash'
+                            ? 'Amount received (KES)'
+                            : 'Amount (KES)'
+                        "
+                      >
                         <input
                           type="text"
                           inputmode="numeric"
-                          class="input input-bordered min-h-11 w-full"
+                          class="input input-bordered min-h-11 w-full font-semibold tabular-nums"
+                          autocomplete="off"
                           [ngModel]="tender.amountText"
                           (ngModelChange)="patchTenderAmount($index, $event)"
+                          (focus)="selectAmount($event)"
                         />
                       </app-form-field>
                       @if (tender.method !== 'cash') {
@@ -260,32 +286,15 @@ interface Tender {
                 }
               </div>
 
-              @if (isSplit() || tenders().length < methods().length) {
-                <div class="flex flex-wrap gap-2">
-                  @if (isSplit() && tenders().length > 2) {
-                    <button
-                      appButton
-                      variant="outline"
-                      size="sm"
-                      type="button"
-                      (click)="splitEvenly()"
-                    >
-                      Split evenly
-                    </button>
-                  }
-                  @if (tenders().length < methods().length) {
-                    <button appButton variant="ghost" size="md" type="button" (click)="addTender()">
-                      <app-icon name="heroPlus" />
-                      {{ isSplit() ? 'Add payment method' : 'Split payment' }}
-                    </button>
-                  }
-                </div>
-              }
-
-              <div class="rounded-box bg-base-200 px-4 py-3" aria-live="polite">
+              <div
+                class="rounded-box border border-base-300/60 bg-base-200/50 px-4 py-3"
+                aria-live="polite"
+              >
                 <div class="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <p class="type-caption">{{ isSplit() ? 'Allocated' : 'Paid' }}</p>
+                    <p class="type-caption">
+                      {{ isSplit() ? 'Allocated' : mode() === 'cash' ? 'Received' : 'Paid' }}
+                    </p>
                     <p
                       class="font-semibold"
                       [class.text-error]="
@@ -302,7 +311,7 @@ interface Tender {
                   @if (changeCents() > 0) {
                     <div class="text-right">
                       <p class="type-caption">Change to give</p>
-                      <p class="text-lg font-bold text-success">
+                      <p class="type-hero text-success">
                         <app-money [cents]="changeCents()" />
                       </p>
                     </div>
@@ -338,6 +347,36 @@ interface Tender {
                   ></progress>
                 }
               </div>
+
+              @if (isSplit() || tenders().length < methods().length) {
+                <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                  @if (isSplit() && tenders().length > 2) {
+                    <button
+                      appButton
+                      variant="outline"
+                      size="md"
+                      type="button"
+                      class="w-full sm:w-auto"
+                      (click)="splitEvenly()"
+                    >
+                      Split evenly
+                    </button>
+                  }
+                  @if (tenders().length < methods().length) {
+                    <button
+                      appButton
+                      variant="outline"
+                      size="md"
+                      type="button"
+                      class="w-full sm:w-auto"
+                      (click)="addTender()"
+                    >
+                      <app-icon name="heroPlus" />
+                      {{ isSplit() ? 'Add payment method' : 'Split payment' }}
+                    </button>
+                  }
+                </div>
+              }
             </div>
           }
 
@@ -374,7 +413,10 @@ interface Tender {
           </button>
         </footer>
       </div>
-    </div>
+      <form method="dialog" class="modal-backdrop">
+        <button type="button" aria-label="Close payment" (click)="cancelled.emit()">close</button>
+      </form>
+    </dialog>
   `,
 })
 export class CheckoutPanelComponent {
@@ -538,11 +580,16 @@ export class CheckoutPanelComponent {
       ]),
     ]
       .filter(amount => amount >= total)
-      .sort((a, b) => a - b);
+      .sort((a, b) => a - b)
+      .slice(0, 4);
   });
 
   protected useCashAmount(amount: number): void {
     this.patchTender(0, { amountText: this.amountText(amount) });
+  }
+
+  protected selectAmount(event: FocusEvent): void {
+    (event.target as HTMLInputElement).select();
   }
 
   /** Cash change when a single cash tender covers (or exceeds) the total. */

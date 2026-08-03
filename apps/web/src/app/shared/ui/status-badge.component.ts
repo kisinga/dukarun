@@ -39,6 +39,7 @@ export const ORDER_STATUS_MAP: Record<string, BadgeType> = {
   completed: 'success',
   voided: 'error',
   draft: 'neutral',
+  expired: 'error',
   pending_payment: 'warning',
 };
 

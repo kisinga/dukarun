@@ -24,8 +24,13 @@ import { NgIcon } from '@ng-icons/core';
         }
         <h1 class="type-title truncate">
           {{ title() }}
-          @if (badge(); as b) {
-            <span class="badge badge-warning ml-1 align-middle">{{ b }}</span>
+          @if (badge() !== undefined && badge() !== null) {
+            <span
+              class="badge ml-1 align-middle"
+              [class.badge-ghost]="badge() === 0 || badge() === '0'"
+              [class.badge-warning]="badge() !== 0 && badge() !== '0'"
+              >{{ badge() }}</span
+            >
           }
         </h1>
         @if (subtitle()) {
@@ -33,7 +38,10 @@ import { NgIcon } from '@ng-icons/core';
         }
       </div>
       <div class="ml-auto flex flex-wrap items-center justify-end gap-2">
-        <ng-content select="[actions]"></ng-content>
+        <!-- PageLayout already selects [actions] before forwarding them. Direct users of
+             PageHeader project only header actions, so filtering a second time would drop
+             forwarded nodes. -->
+        <ng-content></ng-content>
       </div>
     </div>
   `,

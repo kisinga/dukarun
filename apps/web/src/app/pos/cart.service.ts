@@ -1,5 +1,6 @@
-import { Injectable, computed, effect, signal } from '@angular/core';
-import { offlineDb, type PersistedCart } from './offline/offline-db';
+import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
+import { SupabaseService } from '../core/supabase.service';
+import { offlineDb, offlineScopeKey, type PersistedCart } from './offline/offline-db';
 import { variantLabel, type SaleLineInput, type Variant } from './pos.service';
 
 export interface CartLine {
@@ -12,6 +13,7 @@ export interface CartLine {
 
 @Injectable({ providedIn: 'root' })
 export class CartService {
+  private readonly supabase = inject(SupabaseService);
   readonly lines = signal<CartLine[]>([]);
   /** null = Walk-in customer (sent as null customer_id to the RPCs). */
   readonly customerId = signal<string | null>(null);
@@ -24,19 +26,27 @@ export class CartService {
   );
   readonly isEmpty = computed(() => this.lines().length === 0);
 
-  /** True once the persisted cart has been restored from IndexedDB. */
-  private restored = false;
+  /** Scope that has completed its IndexedDB restore. */
+  private readonly restoredScope = signal<string | null>(null);
+  private readonly activeScope = signal<string | null>(null);
 
   constructor() {
-    void this.restore().then(() => {
-      this.restored = true;
+    effect(() => {
+      const identity = this.supabase.offlineIdentity();
+      const key = identity ? offlineScopeKey(identity) : null;
+      untracked(() => void this.switchScope(key));
     });
     // Persist the in-progress cart on every change so a refresh or a
     // mid-sale connectivity drop doesn't lose it.
     effect(() => {
-      if (!this.restored) return;
+      const identity = this.supabase.offlineIdentity();
+      if (!identity) return;
+      const key = offlineScopeKey(identity);
+      if (this.restoredScope() !== key || this.activeScope() !== key) return;
       const persisted: PersistedCart = {
-        key: 'current',
+        key,
+        company_id: identity.companyId,
+        user_id: identity.userId,
         lines: this.lines(),
         customerId: this.customerId(),
         customerName: this.customerName(),
@@ -46,17 +56,25 @@ export class CartService {
     });
   }
 
-  private async restore(): Promise<void> {
+  private async switchScope(key: string | null): Promise<void> {
+    if (this.activeScope() === key) return;
+    this.activeScope.set(key);
+    this.restoredScope.set(null);
+    this.reset();
+    if (!key) return;
     try {
       const db = await offlineDb();
-      const saved = await db.get('cart', 'current');
-      if (!saved) return;
-      this.lines.set(saved.lines);
-      this.customerId.set(saved.customerId);
-      this.customerName.set(saved.customerName);
-      this.draftId.set(saved.draftId);
+      const saved = await db.get('cart', key);
+      if (saved && this.activeScope() === key) {
+        this.lines.set(saved.lines);
+        this.customerId.set(saved.customerId);
+        this.customerName.set(saved.customerName);
+        this.draftId.set(saved.draftId);
+      }
     } catch {
       // Persistence is best-effort; an empty cart beats a crashed app.
+    } finally {
+      if (this.activeScope() === key) this.restoredScope.set(key);
     }
   }
 
@@ -136,6 +154,10 @@ export class CartService {
   }
 
   clear(): void {
+    this.reset();
+  }
+
+  private reset(): void {
     this.lines.set([]);
     this.customerId.set(null);
     this.customerName.set('Walk-in');

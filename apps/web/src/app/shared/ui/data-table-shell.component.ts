@@ -6,6 +6,7 @@ import { Component, input } from '@angular/core';
  */
 @Component({
   selector: 'app-data-table-shell',
+  host: { class: 'block' },
   template: `
     <section
       class="data-table-shell overflow-hidden rounded-box border border-base-300/70 bg-base-100"

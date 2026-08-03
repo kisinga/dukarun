@@ -138,7 +138,7 @@ const SUB_TYPE: Record<string, BadgeType> = {
                             <dd class="tabular-nums">{{ counts()?.members ?? '…' }}</dd>
                           </div>
                           <div class="flex justify-between">
-                            <dt class="text-base-content/60">Orders</dt>
+                            <dt class="text-base-content/60">Sales</dt>
                             <dd class="tabular-nums">{{ counts()?.orders ?? '…' }}</dd>
                           </div>
                           <div class="flex justify-between">

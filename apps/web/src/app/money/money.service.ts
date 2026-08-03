@@ -30,7 +30,7 @@ export type CustomerStatementRow = {
 };
 
 export type ReconAccountWithParent = ReconAccount & {
-  reconciliations: Pick<Reconciliation, 'scope' | 'scope_ref_id' | 'created_at'> | null;
+  reconciliations: Pick<Reconciliation, 'id' | 'scope' | 'scope_ref_id' | 'created_at'> | null;
 };
 
 export type AgingInfo = {
@@ -207,11 +207,24 @@ export class MoneyService {
     const keys = sessionIds.flatMap(id => [`${id}:opening`, `${id}:closing`]);
     const { data, error } = await this.db
       .from('reconciliation_accounts')
-      .select('*, reconciliations!inner(scope, scope_ref_id, created_at)')
+      .select('*, reconciliations!inner(id, scope, scope_ref_id, created_at)')
       .eq('reconciliations.scope', 'cash-session')
       .in('reconciliations.scope_ref_id', keys);
     if (error) throw error;
     return data;
+  }
+
+  /** Only variance lines from this reconciliation remain reversible. */
+  async latestReconciliationId(): Promise<string | null> {
+    const { data, error } = await this.db
+      .from('reconciliations')
+      .select('id')
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) throw error;
+    return data?.id ?? null;
   }
 
   /** Recent reconciliations with their account rows (periods screen variance review). */
@@ -222,6 +235,7 @@ export class MoneyService {
       .from('reconciliations')
       .select('*, reconciliation_accounts(*)')
       .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
       .limit(limit);
     if (error) throw error;
     return data;

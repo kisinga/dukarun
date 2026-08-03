@@ -27,33 +27,33 @@ const VALUE_TONE: Record<string, string> = {
 @Component({
   selector: 'app-stat-bar',
   template: `
-    <div class="flex flex-wrap items-center gap-2">
+    <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
       @for (s of stats(); track s.label) {
         @if (s.filter) {
           <button
             type="button"
             (click)="select.emit(s.filter!)"
             [attr.aria-pressed]="!!s.active"
-            class="inline-flex cursor-pointer items-center gap-2 rounded-full border px-4 py-2 transition-colors"
+            class="inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 transition-colors"
             [class]="
               s.active
                 ? 'border-base-content/25 bg-base-200'
                 : 'border-base-300 bg-base-100 hover:bg-base-200/60'
             "
           >
-            <span class="text-base font-bold leading-none tabular-nums" [class]="toneClass(s)">{{
+            <span class="text-sm font-bold leading-none tabular-nums" [class]="toneClass(s)">{{
               s.value
             }}</span>
-            <span class="text-sm leading-none text-base-content/60">{{ s.label }}</span>
+            <span class="text-xs leading-none text-base-content/60">{{ s.label }}</span>
           </button>
         } @else {
           <span
-            class="inline-flex items-center gap-2 rounded-full border border-base-300 bg-base-100 px-4 py-2"
+            class="inline-flex items-baseline gap-1.5 border-r border-base-300 pr-4 last:border-r-0 last:pr-0"
           >
-            <span class="text-base font-bold leading-none tabular-nums" [class]="toneClass(s)">{{
+            <span class="text-sm font-bold leading-none tabular-nums" [class]="toneClass(s)">{{
               s.value
             }}</span>
-            <span class="text-sm leading-none text-base-content/60">{{ s.label }}</span>
+            <span class="text-xs leading-none text-base-content/60">{{ s.label }}</span>
           </span>
         }
       }

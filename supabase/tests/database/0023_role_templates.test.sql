@@ -32,7 +32,7 @@ select ok(
     'ApproveCustomerCredit', 'ManageCustomerCreditLimit', 'ReverseOrder',
     'OverrideCustomerBalance', 'SettleOrder', 'ManageSupplierCreditPurchases',
     'ViewFinancials', 'ManageReconciliation', 'CloseAccountingPeriod',
-    'CreateInterAccountTransfer', 'ManageTeam'
+    'CreateInterAccountTransfer', 'ManageTeam', 'ViewAuditTrail'
   ]::text[] from public.roles where is_template and name = 'Manager'),
   'Manager template permissions are a valid subset'
 );

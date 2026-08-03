@@ -1,6 +1,5 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
-import { NgIcon } from '@ng-icons/core';
 import { Company, SupabaseService } from '../core/supabase.service';
 import { PermissionsService } from '../core/permissions.service';
 import { ThemeService } from '../core/theme.service';
@@ -8,6 +7,10 @@ import { ApprovalsService } from '../approvals/approvals.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CashierSessionService } from '../core/cashier-session.service';
 import { SyncService } from '../pos/offline/sync.service';
+import { IconComponent } from '../shared/ui/icon.component';
+import { CashierSessionDialogService } from '../core/cashier-session-dialog.service';
+import { CashierSessionModalComponent } from '../money/cashier/cashier-session-modal.component';
+import { OrderQueueCountsService } from '../pos/order-queue-counts.service';
 
 interface NavItem {
   route: string;
@@ -31,7 +34,13 @@ interface NavSection {
 
 @Component({
   selector: 'app-shell',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, NgIcon],
+  imports: [
+    RouterOutlet,
+    RouterLink,
+    RouterLinkActive,
+    IconComponent,
+    CashierSessionModalComponent,
+  ],
   template: `
     <div class="drawer lg:drawer-open">
       <input id="app-drawer" type="checkbox" class="drawer-toggle" />
@@ -41,7 +50,7 @@ interface NavSection {
         <div class="navbar sticky top-0 z-40 min-h-16 border-b border-base-300 bg-base-100 px-4">
           <div class="flex-none lg:hidden">
             <label for="app-drawer" class="btn btn-square btn-ghost btn-sm" aria-label="Open menu">
-              <ng-icon name="heroBars3" size="1.25rem" />
+              <app-icon name="heroBars3" size="lg" />
             </label>
           </div>
 
@@ -56,7 +65,7 @@ interface NavSection {
                 [title]="syncStatusLabel()"
                 [attr.aria-label]="syncStatusLabel()"
               >
-                <ng-icon
+                <app-icon
                   [name]="
                     sync.syncing()
                       ? 'heroArrowPath'
@@ -64,7 +73,7 @@ interface NavSection {
                         ? 'heroExclamationTriangle'
                         : 'heroArrowPath'
                   "
-                  size="1.25rem"
+                  size="lg"
                   [class.animate-spin]="sync.syncing()"
                   [class.text-error]="sync.failedCount() > 0"
                   [class.text-warning]="sync.failedCount() === 0"
@@ -87,7 +96,7 @@ interface NavSection {
               class="btn btn-square btn-ghost btn-sm indicator min-h-11 min-w-11"
               title="Notifications"
             >
-              <ng-icon name="heroBell" size="1.25rem" />
+              <app-icon name="heroBell" size="lg" />
               @if (notifications.unreadCount() > 0) {
                 <span class="badge indicator-item badge-primary badge-xs">
                   {{ notifications.unreadCount() }}
@@ -95,32 +104,55 @@ interface NavSection {
               }
             </a>
 
-            <!-- Till status -->
-            <a
-              routerLink="/money/cashier"
-              class="badge badge-md min-h-0 cursor-pointer gap-1.5 border-0 px-3 py-2 font-semibold"
-              [class.badge-success]="cashierSession.isOpen()"
-              [class.badge-ghost]="!cashierSession.isOpen()"
-              [title]="cashierSession.isOpen() ? 'Till open — cashier sessions' : 'No open till'"
+            <!-- Global one-click till action -->
+            <button
+              type="button"
+              class="btn btn-sm min-h-11 gap-2 px-3"
+              [class.btn-primary]="!cashierSession.loading() && !cashierSession.isOpen()"
+              [class.btn-success]="!cashierSession.loading() && cashierSession.isOpen()"
+              [class.btn-outline]="cashierSession.isOpen()"
+              [class.btn-ghost]="cashierSession.loading()"
+              [title]="
+                cashierSession.isOpen() ? 'Count and close the till' : 'Count and open the till'
+              "
+              [attr.aria-label]="
+                cashierSession.isOpen() ? 'Open till closing dialog' : 'Open till opening dialog'
+              "
+              (click)="cashierDialog.show()"
             >
-              <span
-                class="h-2 w-2 shrink-0 rounded-full"
-                [class.bg-success]="cashierSession.isOpen()"
-                [class.animate-pulse]="cashierSession.isOpen()"
-                [class.bg-base-content/30]="!cashierSession.isOpen()"
-              ></span>
-              {{ cashierSession.isOpen() ? 'till open' : 'till closed' }}
-            </a>
+              <app-icon
+                [name]="
+                  cashierSession.loading()
+                    ? 'heroArrowPath'
+                    : cashierSession.isOpen()
+                      ? 'heroLockClosed'
+                      : 'heroLockOpen'
+                "
+                [class.animate-spin]="cashierSession.loading()"
+              />
+              <span class="hidden sm:inline">
+                @if (cashierSession.loading()) {
+                  Checking till
+                } @else {
+                  {{ cashierSession.isOpen() ? 'Close till' : 'Open till' }}
+                }
+              </span>
+            </button>
 
             <button
               class="btn btn-ghost btn-sm min-h-11 min-w-11"
               [title]="theme.theme() === 'light' ? 'Switch to dark mode' : 'Switch to light mode'"
               (click)="theme.toggle()"
             >
-              <ng-icon [name]="theme.theme() === 'light' ? 'heroMoon' : 'heroSun'" />
+              <app-icon [name]="theme.theme() === 'light' ? 'heroMoon' : 'heroSun'" />
             </button>
-            <button class="btn btn-ghost btn-sm min-h-11" title="Sign out" (click)="signOut()">
-              <ng-icon name="heroArrowRightOnRectangle" />
+            <button
+              class="btn btn-ghost btn-sm min-h-11"
+              title="Sign out"
+              [disabled]="sync.syncing()"
+              (click)="requestSignOut()"
+            >
+              <app-icon name="heroArrowRightOnRectangle" />
             </button>
           </div>
         </div>
@@ -142,29 +174,30 @@ interface NavSection {
               [routerLinkActiveOptions]="{ exact: true }"
               class="bottom-nav-item"
             >
-              <span class="bottom-nav-ico"><ng-icon name="heroHome" size="1.25rem" /></span>
+              <span class="bottom-nav-ico"><app-icon name="heroHome" size="lg" /></span>
               <span class="bottom-nav-label">Home</span>
             </a>
             <a routerLink="/pos/sell" routerLinkActive="bottom-nav-active" class="bottom-nav-item">
-              <span class="bottom-nav-ico"><ng-icon name="heroShoppingCart" size="1.25rem" /></span>
+              <span class="bottom-nav-ico"><app-icon name="heroShoppingCart" size="lg" /></span>
               <span class="bottom-nav-label">Sell</span>
             </a>
             <a routerLink="/sales" routerLinkActive="bottom-nav-active" class="bottom-nav-item">
               <span class="bottom-nav-ico"
-                ><ng-icon name="heroClipboardDocumentList" size="1.25rem"
+                ><app-icon name="heroClipboardDocumentList" size="lg"
               /></span>
               <span class="bottom-nav-label">Sales</span>
             </a>
-            <a
-              routerLink="/money/cashier"
-              routerLinkActive="bottom-nav-active"
+            <button
+              type="button"
               class="bottom-nav-item"
+              [class.bottom-nav-active]="cashierDialog.visible()"
+              (click)="cashierDialog.show()"
             >
-              <span class="bottom-nav-ico"><ng-icon name="heroBanknotes" size="1.25rem" /></span>
-              <span class="bottom-nav-label">Money</span>
-            </a>
+              <span class="bottom-nav-ico"><app-icon name="heroBanknotes" size="lg" /></span>
+              <span class="bottom-nav-label">Till</span>
+            </button>
             <label for="app-drawer" class="bottom-nav-item cursor-pointer">
-              <span class="bottom-nav-ico"><ng-icon name="heroBars3" size="1.25rem" /></span>
+              <span class="bottom-nav-ico"><app-icon name="heroBars3" size="lg" /></span>
               <span class="bottom-nav-label">More</span>
             </label>
           </div>
@@ -202,7 +235,7 @@ interface NavSection {
                     (click)="closeDrawer()"
                     class="nav-item"
                   >
-                    <ng-icon [name]="item.icon" />
+                    <app-icon [name]="item.icon" />
                     <span class="flex-1">{{ item.label }}</span>
                     @if (item.badge && item.badge() > 0) {
                       <span class="badge badge-warning badge-sm">{{ item.badge() }}</span>
@@ -214,19 +247,64 @@ interface NavSection {
           </div>
 
           <div class="border-t border-base-300 p-2">
+            @if (perms.has('ViewAuditTrail')) {
+              <a
+                routerLink="/settings/audit-trail"
+                routerLinkActive="nav-item-active"
+                (click)="closeDrawer()"
+                class="nav-item"
+              >
+                <app-icon name="heroClipboardDocumentList" />
+                <span>Audit trail</span>
+              </a>
+            }
             <a
               routerLink="/settings"
               routerLinkActive="nav-item-active"
+              [routerLinkActiveOptions]="{ exact: true }"
               (click)="closeDrawer()"
               class="nav-item"
             >
-              <ng-icon name="heroCog6Tooth" />
+              <app-icon name="heroCog6Tooth" />
               <span>Settings</span>
             </a>
             <div class="mt-1 text-center text-xs text-base-content/30">v2.0.0</div>
           </div>
         </aside>
       </div>
+
+      <app-cashier-session-modal />
+
+      @if (signOutWarning()) {
+        <div
+          class="modal modal-open"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="signout-title"
+        >
+          <div class="modal-box max-w-md">
+            <h2 id="signout-title" class="type-heading">Sign out with sales waiting?</h2>
+            <p class="mt-2 text-sm text-base-content/70">
+              {{ pendingSyncCount() }} sale(s) will remain safely on this device. They are tied to
+              this account and will resume syncing only when this account signs in again.
+            </p>
+            <div class="modal-action">
+              <button class="btn btn-ghost" type="button" (click)="signOutWarning.set(false)">
+                Stay signed in
+              </button>
+              <button class="btn btn-warning" type="button" (click)="signOut()">
+                Sign out anyway
+              </button>
+            </div>
+          </div>
+          <button
+            class="modal-backdrop"
+            type="button"
+            aria-label="Cancel signing out"
+            (click)="signOutWarning.set(false)"
+          ></button>
+        </div>
+      }
     </div>
   `,
 })
@@ -238,12 +316,15 @@ export class ShellComponent implements OnInit {
   protected readonly approvals = inject(ApprovalsService);
   protected readonly notifications = inject(NotificationsService);
   protected readonly cashierSession = inject(CashierSessionService);
+  protected readonly cashierDialog = inject(CashierSessionDialogService);
   protected readonly sync = inject(SyncService);
+  protected readonly orderQueueCounts = inject(OrderQueueCountsService);
 
   protected readonly company = signal<Company | null>(null);
   protected readonly pendingSyncCount = computed(
     () => this.sync.queuedCount() + this.sync.failedCount()
   );
+  protected readonly signOutWarning = signal(false);
 
   protected readonly sections: NavSection[] = [
     {
@@ -253,9 +334,19 @@ export class ShellComponent implements OnInit {
       label: 'Operations',
       items: [
         { route: '/pos/sell', label: 'Sell', icon: 'heroShoppingCart' },
-        { route: '/pos/cashier', label: 'Cashier Queue', icon: 'heroQueueList' },
+        {
+          route: '/pos/cashier',
+          label: 'Cashier Queue',
+          icon: 'heroQueueList',
+          badge: () => this.orderQueueCounts.cashierQueue(),
+        },
         { route: '/sales', label: 'Sales', icon: 'heroClipboardDocumentList' },
-        { route: '/pos/proformas', label: 'Proformas', icon: 'heroDocumentText' },
+        {
+          route: '/pos/proformas',
+          label: 'Proformas',
+          icon: 'heroDocumentText',
+          badge: () => this.orderQueueCounts.proformas(),
+        },
         { route: '/products', label: 'Products', icon: 'heroCube' },
         { route: '/purchases', label: 'Purchases', icon: 'heroTruck' },
         {
@@ -337,7 +428,17 @@ export class ShellComponent implements OnInit {
     if (toggle) toggle.checked = false;
   }
 
+  protected requestSignOut(): void {
+    if (this.sync.syncing()) return;
+    if (this.pendingSyncCount() > 0) {
+      this.signOutWarning.set(true);
+      return;
+    }
+    void this.signOut();
+  }
+
   protected async signOut(): Promise<void> {
+    this.signOutWarning.set(false);
     await this.supabase.client.auth.signOut();
     await this.router.navigate(['/login']);
   }

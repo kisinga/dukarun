@@ -1,5 +1,5 @@
 import { Component, inject, signal, viewChild } from '@angular/core';
-import { PageHeaderComponent } from '../../shared/ui/page-header.component';
+import { PageLayoutComponent } from '../../shared/ui/page-layout.component';
 import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
 import { DeleteConfirmationModalComponent } from '../../shared/ui/delete-confirmation-modal.component';
 import { formatKes } from '../../core/money';
@@ -17,87 +17,96 @@ import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
 @Component({
   selector: 'app-pending-sync',
   imports: [
-    PageHeaderComponent,
+    PageLayoutComponent,
     EmptyStateComponent,
     StatusBadgeComponent,
     DeleteConfirmationModalComponent,
   ],
   template: `
-    <main class="dashboard-main min-h-screen bg-base-200 p-4">
-      <div class="page">
-        <app-page-header
-          title="Pending Sync"
-          subtitle="Posted when you're back online. Until then they're only on this device — not in Today's Sales, not in the books."
-        >
-          @if (!connectivity.online()) {
-            <span actions class="badge badge-warning">Offline</span>
-          }
-          <button
-            actions
-            class="btn btn-primary btn-sm ml-auto"
-            [disabled]="!connectivity.online() || sync.syncing() || sync.queuedCount() === 0"
-            (click)="syncNow()"
-          >
-            {{ sync.syncing() ? 'Syncing…' : 'Sync now' }}
-          </button>
-        </app-page-header>
+    <app-page
+      title="Pending Sync"
+      [badge]="sync.entries().length"
+      subtitle="Posted when you're back online. Until then they're only on this device — not in Today's Sales, not in the books."
+    >
+      @if (!connectivity.online()) {
+        <span actions class="badge badge-warning">Offline</span>
+      }
+      <button
+        actions
+        class="btn btn-primary btn-sm ml-auto"
+        [disabled]="!connectivity.online() || sync.syncing() || sync.queuedCount() === 0"
+        (click)="syncNow()"
+      >
+        {{ sync.syncing() ? 'Syncing…' : 'Sync now' }}
+      </button>
 
-        @if (notice()) {
-          <p class="mb-2 text-sm text-success">{{ notice() }}</p>
-        }
+      @if (notice()) {
+        <p class="mb-2 text-sm text-success">{{ notice() }}</p>
+      }
 
-        @if (sync.entries().length === 0) {
-          <app-empty-state
-            icon="heroCheckCircle"
-            title="Nothing waiting"
-            description="All sales are synced."
-          />
-        } @else {
-          <div class="flex flex-col gap-2">
-            @for (entry of sync.entries(); track entry.client_ref) {
-              <div
-                class="card bg-base-100"
-                [class.border]="entry.status === 'failed'"
-                [class.border-error]="entry.status === 'failed'"
-              >
-                <div class="card-body p-4">
-                  <div class="flex flex-wrap items-center gap-3">
-                    <span class="font-mono text-sm">{{ shortRef(entry.client_ref) }}</span>
-                    <span class="text-sm text-base-content/60">
-                      queued {{ time(entry.queued_at) }}
-                    </span>
-                    <span class="text-sm">{{ entry.lines.length }} item(s)</span>
-                    <app-status-badge
-                      [type]="entry.status === 'failed' ? 'error' : 'warning'"
-                      [label]="entry.status === 'failed' ? 'failed' : 'awaiting sync'"
-                    />
-                    <span class="ml-auto font-bold tabular-nums">{{ fmt(total(entry)) }}</span>
-                    @if (entry.status === 'failed') {
-                      <button class="btn btn-outline btn-sm" (click)="retry(entry.client_ref)">
-                        Retry
-                      </button>
-                      <button
-                        class="btn btn-error btn-outline btn-sm"
-                        (click)="startDiscard(entry)"
-                      >
-                        Discard
-                      </button>
-                    }
-                  </div>
-                  @if (entry.status === 'failed' && entry.error) {
-                    <p class="mt-2 text-sm text-error">{{ entry.error }}</p>
-                    <p class="text-xs text-base-content/60">
-                      The server rejected this sale — it was never posted. Retry after fixing the
-                      cause (e.g. stock), or discard it.
-                    </p>
+      @if (sync.legacyEntryCount() > 0) {
+        <div role="alert" class="alert alert-warning mb-3 text-sm">
+          <span>
+            {{ sync.legacyEntryCount() }} sale(s) from an older app version remain safely on this
+            device. They are quarantined because their company could not be verified and will not
+            sync automatically.
+          </span>
+        </div>
+      }
+
+      @if (sync.entries().length === 0) {
+        <app-empty-state
+          icon="heroCheckCircle"
+          [title]="
+            sync.legacyEntryCount() > 0 ? 'Nothing waiting for this account' : 'Nothing waiting'
+          "
+          [description]="
+            sync.legacyEntryCount() > 0
+              ? 'Older quarantined sales need manual recovery before they can be posted.'
+              : 'All sales are synced.'
+          "
+        />
+      } @else {
+        <div class="flex flex-col gap-2">
+          @for (entry of sync.entries(); track entry.client_ref) {
+            <div
+              class="card bg-base-100"
+              [class.border]="entry.status === 'failed'"
+              [class.border-error]="entry.status === 'failed'"
+            >
+              <div class="card-body p-4">
+                <div class="flex flex-wrap items-center gap-3">
+                  <span class="font-mono text-sm">{{ shortRef(entry.client_ref) }}</span>
+                  <span class="text-sm text-base-content/60">
+                    queued {{ time(entry.queued_at) }}
+                  </span>
+                  <span class="text-sm">{{ entry.lines.length }} item(s)</span>
+                  <app-status-badge
+                    [type]="entry.status === 'failed' ? 'error' : 'warning'"
+                    [label]="entry.status === 'failed' ? 'failed' : 'awaiting sync'"
+                  />
+                  <span class="ml-auto font-bold tabular-nums">{{ fmt(total(entry)) }}</span>
+                  @if (entry.status === 'failed') {
+                    <button class="btn btn-outline btn-sm" (click)="retry(entry.client_ref)">
+                      Retry
+                    </button>
+                    <button class="btn btn-error btn-outline btn-sm" (click)="startDiscard(entry)">
+                      Discard
+                    </button>
                   }
                 </div>
+                @if (entry.status === 'failed' && entry.error) {
+                  <p class="mt-2 text-sm text-error">{{ entry.error }}</p>
+                  <p class="text-xs text-base-content/60">
+                    The server rejected this sale — it was never posted. Retry after fixing the
+                    cause (e.g. stock), or discard it.
+                  </p>
+                }
               </div>
-            }
-          </div>
-        }
-      </div>
-
+            </div>
+          }
+        </div>
+      }
       <app-delete-confirmation-modal
         [data]="discardData()"
         title="Discard queued sale?"
@@ -106,7 +115,7 @@ import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
         confirmButtonText="Discard"
         (confirm)="confirmDiscard()"
       />
-    </main>
+    </app-page>
   `,
 })
 export class PendingSyncComponent {

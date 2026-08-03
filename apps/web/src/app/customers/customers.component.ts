@@ -55,6 +55,7 @@ type CreditOrder = {
     <app-page
       title="Customers"
       subtitle="Manage customer details, credit access, balances, and repayment history."
+      [wide]="true"
     >
       <button
         actions
@@ -149,15 +150,13 @@ type CreditOrder = {
       }
 
       <!-- Shared list summary and search toolbar -->
-      <div class="mb-4">
-        <app-list-search-bar
-          placeholder="Search name or phone…"
-          [searchQuery]="query()"
-          (searchQueryChange)="query.set($event); customerPage.set(1)"
-        >
-          <app-stat-bar summary [stats]="customerStats()" />
-        </app-list-search-bar>
-      </div>
+      <app-list-search-bar
+        placeholder="Search name or phone…"
+        [searchQuery]="query()"
+        (searchQueryChange)="query.set($event); customerPage.set(1)"
+      >
+        <app-stat-bar summary [stats]="customerStats()" />
+      </app-list-search-bar>
 
       <!-- List -->
       @if (filtered().length === 0) {
@@ -758,6 +757,7 @@ export class CustomersComponent implements OnInit {
     this.email.setValue(c.email ?? '');
     this.notes.setValue(c.notes ?? '');
     this.formOpen.set(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   protected closeForm(): void {
@@ -899,7 +899,7 @@ export class CustomersComponent implements OnInit {
       );
       this.adjustmentAmount.setValue('');
       this.adjustmentReason.setValue('');
-      this.notice.set('Customer balance adjusted');
+      this.notice.set('Amount owed to us adjusted');
       await this.load();
       this.statement.set(await this.money.customerStatement(customerId));
     } catch (error) {

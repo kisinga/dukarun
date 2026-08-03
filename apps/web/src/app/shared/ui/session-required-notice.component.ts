@@ -1,10 +1,10 @@
-import { Component, input } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { Component, inject, input } from '@angular/core';
+import { CashierSessionDialogService } from '../../core/cashier-session-dialog.service';
 import { IconComponent } from './icon.component';
 
 @Component({
   selector: 'app-session-required-notice',
-  imports: [RouterLink, IconComponent],
+  imports: [IconComponent],
   template: `
     <div
       role="alert"
@@ -17,11 +17,18 @@ import { IconComponent } from './icon.component';
         <p class="font-semibold">Cashier session required</p>
         <p class="text-base-content/70">Open a session before {{ action() }}.</p>
       </div>
-      <a routerLink="/money/cashier" class="link shrink-0 font-semibold">Open session</a>
+      <button
+        type="button"
+        class="link min-h-11 shrink-0 font-semibold"
+        (click)="cashierDialog.show()"
+      >
+        Open session
+      </button>
     </div>
   `,
 })
 export class SessionRequiredNoticeComponent {
+  protected readonly cashierDialog = inject(CashierSessionDialogService);
   readonly action = input('recording this transaction');
   readonly compact = input(false);
 }

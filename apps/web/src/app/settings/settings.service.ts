@@ -20,6 +20,7 @@ export interface CompanySettings {
   public_whatsapp_number: string | null;
   notification_category_preferences: Record<string, boolean> | null;
   enable_printer: boolean;
+  proforma_validity_days: number;
   low_stock_threshold: number;
   cashier_flow_enabled: boolean;
   batch_expiry_enabled: boolean;
@@ -37,6 +38,7 @@ const SELECT_COLUMNS = [
   'public_whatsapp_number',
   'notification_category_preferences',
   'enable_printer',
+  'proforma_validity_days',
   'low_stock_threshold',
   'cashier_flow_enabled',
   'batch_expiry_enabled',

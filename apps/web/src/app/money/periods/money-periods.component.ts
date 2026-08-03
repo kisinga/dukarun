@@ -1,11 +1,13 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormControl, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { parseKesToCents } from '../../core/money';
+import { PermissionsService } from '../../core/permissions.service';
 import { ButtonComponent } from '../../shared/ui/button.component';
 import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
 import { FormFieldComponent } from '../../shared/ui/form-field.component';
 import { MoneyComponent } from '../../shared/ui/money.component';
 import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
+import { IconComponent } from '../../shared/ui/icon.component';
 import {
   AccountingPeriod,
   CashierAccount,
@@ -25,21 +27,47 @@ import {
     MoneyComponent,
     EmptyStateComponent,
     StatusBadgeComponent,
+    IconComponent,
   ],
   template: `
-    <div class="mb-3 flex items-center justify-end">
-      <button appButton variant="ghost" (click)="load()">Refresh</button>
+    <div class="mb-3 flex items-start gap-3">
+      <div>
+        <h2 class="section-title">Accounting periods</h2>
+        <p class="type-caption mt-1">
+          Reconcile controlled accounts, review variances, and lock completed periods.
+        </p>
+      </div>
+      <button
+        appButton
+        variant="ghost"
+        [iconOnly]="true"
+        class="ml-auto"
+        [loading]="loading()"
+        type="button"
+        title="Refresh accounting periods"
+        aria-label="Refresh accounting periods"
+        (click)="load()"
+      >
+        <app-icon name="heroArrowPath" />
+      </button>
     </div>
 
     @if (error()) {
-      <p class="mb-2 text-sm text-error">{{ error() }}</p>
+      <div role="alert" class="alert alert-error mb-3 text-sm">
+        <app-icon name="heroExclamationTriangle" />
+        <span>{{ error() }}</span>
+      </div>
     }
     @if (notice()) {
-      <p class="mb-2 text-sm text-success">{{ notice() }}</p>
+      <div role="status" class="alert alert-success mb-3 text-sm">
+        <app-icon name="heroCheckCircle" />
+        <span>{{ notice() }}</span>
+      </div>
     }
 
     @if (lock(); as l) {
       <div class="alert alert-warning mb-4">
+        <app-icon name="heroLockClosed" />
         <span
           >Books are locked through <strong>{{ l.lock_end_date }}</strong
           >.</span
@@ -126,7 +154,10 @@ import {
     </div>
 
     <!-- Recent reconciliations (variance review) -->
-    <h2 class="section-title mb-2">Recent reconciliations</h2>
+    <h2 class="section-title mb-2">Reconciliation history</h2>
+    <p class="type-caption mb-3">
+      A variance can only be reverted before the next opening, closing, or reconciliation.
+    </p>
     @if (recons().length === 0) {
       <p class="mb-4 text-sm text-base-content/60">No reconciliations recorded yet.</p>
     } @else {
@@ -168,7 +199,16 @@ import {
                               {{ date(ra.reviewed_at) }}
                             </span>
                           } @else if (ra.variance !== 0) {
-                            @if (revertingFor() === ra.id) {
+                            @if (!perms.has('ManageReconciliation')) {
+                              <span class="type-caption">Manager review</span>
+                            } @else if (!canRevert(recon.id)) {
+                              <span
+                                class="type-caption"
+                                title="A newer opening, closing, or reconciliation has occurred"
+                              >
+                                Review window closed
+                              </span>
+                            } @else if (revertingFor() === ra.id) {
                               <div class="flex items-center justify-end gap-1">
                                 <input
                                   type="text"
@@ -248,6 +288,7 @@ import {
 })
 export class MoneyPeriodsComponent implements OnInit {
   private readonly money = inject(MoneyService);
+  protected readonly perms = inject(PermissionsService);
 
   protected readonly accounts = signal<CashierAccount[]>([]);
   protected readonly periods = signal<AccountingPeriod[]>([]);
@@ -259,9 +300,11 @@ export class MoneyPeriodsComponent implements OnInit {
   protected readonly recons = signal<
     (Reconciliation & { reconciliation_accounts: ReconAccount[] })[]
   >([]);
+  protected readonly latestReconciliationId = signal<string | null>(null);
   protected readonly revertingFor = signal<string | null>(null);
   protected readonly revertReason = new FormControl('', { nonNullable: true });
   protected readonly busy = signal(false);
+  protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
 
@@ -270,21 +313,26 @@ export class MoneyPeriodsComponent implements OnInit {
   }
 
   protected async load(): Promise<void> {
+    this.loading.set(true);
     try {
-      const [accounts, periods, lock, recons] = await Promise.all([
+      const [accounts, periods, lock, recons, latestReconciliationId] = await Promise.all([
         this.money.cashierAccounts(),
         this.money.periods(),
         this.money.periodLock(),
         this.money.recentReconciliations(),
+        this.money.latestReconciliationId(),
       ]);
       this.accounts.set(accounts);
       this.periods.set(periods);
       this.lock.set(lock);
       this.recons.set(recons);
+      this.latestReconciliationId.set(latestReconciliationId);
       for (const a of accounts) this.declared[a.account_code] ??= '';
       this.error.set(null);
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Failed to load');
+    } finally {
+      this.loading.set(false);
     }
   }
 
@@ -348,6 +396,10 @@ export class MoneyPeriodsComponent implements OnInit {
   protected startRevert(reconAccountId: string): void {
     this.revertingFor.set(reconAccountId);
     this.revertReason.setValue('');
+  }
+
+  protected canRevert(reconciliationId: string): boolean {
+    return reconciliationId === this.latestReconciliationId();
   }
 
   protected async confirmRevert(reconAccountId: string): Promise<void> {

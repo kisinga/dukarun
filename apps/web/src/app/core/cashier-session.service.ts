@@ -1,7 +1,8 @@
 import { Injectable, computed, signal } from '@angular/core';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { Database } from '@dukarun/shared-types';
-import { SupabaseService } from './supabase.service';
+import { SupabaseService, type AppIdentity } from './supabase.service';
+import { offlineDb, offlineScopeKey } from '../pos/offline/offline-db';
 
 type CashierSession = Database['public']['Tables']['cashier_sessions']['Row'];
 
@@ -11,8 +12,11 @@ export class CashierSessionService {
   readonly session = signal<CashierSession | null>(null);
   readonly loading = signal(false);
   readonly isOpen = computed(() => this.session() !== null);
+  readonly usingCachedState = signal(false);
+  readonly lastConfirmedAt = signal<string | null>(null);
 
   private started = false;
+  private activeScope: string | null = null;
   private refreshPromise: Promise<void> | null = null;
   private channel: RealtimeChannel | null = null;
   private pollTimer: ReturnType<typeof setInterval> | null = null;
@@ -20,6 +24,8 @@ export class CashierSessionService {
   constructor(private readonly supabase: SupabaseService) {}
 
   async start(): Promise<void> {
+    const identity = await this.activateScope();
+    if (!identity) return;
     if (this.started) {
       try {
         await this.refresh();
@@ -36,37 +42,50 @@ export class CashierSessionService {
     }
 
     try {
-      const company = await this.supabase.currentCompany();
-      if (company) {
-        this.channel = this.supabase.client
-          .channel(`cashier-session:${company.id}`)
-          .on(
-            'postgres_changes',
-            {
-              event: '*',
-              schema: 'public',
-              table: 'cashier_sessions',
-              filter: `company_id=eq.${company.id}`,
-            },
-            () => void this.refresh()
-          )
-          .subscribe();
-      }
+      this.channel = this.supabase.client
+        .channel(`cashier-session:${identity.companyId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'cashier_sessions',
+            filter: `company_id=eq.${identity.companyId}`,
+          },
+          () => void this.refresh().catch(() => undefined)
+        )
+        .subscribe();
     } catch {
       // Polling below remains the fallback if subscription setup fails.
     }
 
     // Realtime is the fast path; polling covers suspended tabs and reconnects.
-    this.pollTimer = setInterval(() => void this.refresh(), 30_000);
+    this.pollTimer = setInterval(() => void this.refresh().catch(() => undefined), 30_000);
   }
 
-  refresh(): Promise<void> {
+  async refresh(): Promise<void> {
+    const identity = await this.activateScope();
+    if (!identity) throw new Error('Sign in again to confirm the cashier session.');
     if (this.refreshPromise) return this.refreshPromise;
     this.loading.set(true);
-    this.refreshPromise = this.load().finally(() => {
-      this.loading.set(false);
-      this.refreshPromise = null;
-    });
+    const key = offlineScopeKey(identity);
+    this.refreshPromise = this.load(identity, key)
+      .catch(async error => {
+        if (this.session() && this.cachedSessionIsCurrent()) {
+          this.usingCachedState.set(true);
+        } else {
+          this.session.set(null);
+          this.usingCachedState.set(false);
+          this.lastConfirmedAt.set(null);
+          const db = await offlineDb();
+          await db.delete('cashier', key);
+        }
+        throw error;
+      })
+      .finally(() => {
+        this.loading.set(false);
+        this.refreshPromise = null;
+      });
     return this.refreshPromise;
   }
 
@@ -80,13 +99,97 @@ export class CashierSessionService {
     if (!this.isOpen()) throw new Error(`Open a cashier session before ${action}.`);
   }
 
-  private async load(): Promise<void> {
+  cachedStatusLabel(): string {
+    const confirmedAt = this.lastConfirmedAt();
+    if (!confirmedAt) return 'Till status is cached';
+    return `Till last confirmed ${new Date(confirmedAt).toLocaleTimeString('en-KE', {
+      timeZone: 'Africa/Nairobi',
+      hour: '2-digit',
+      minute: '2-digit',
+    })}`;
+  }
+
+  private async load(identity: AppIdentity, key: string): Promise<void> {
     const { data, error } = await this.supabase.client
       .from('cashier_sessions')
       .select('*')
       .eq('status', 'open')
       .maybeSingle();
     if (error) throw error;
+    if (this.activeScope !== key) return;
     this.session.set(data);
+    this.usingCachedState.set(false);
+    const db = await offlineDb();
+    if (data) {
+      const confirmedAt = new Date().toISOString();
+      this.lastConfirmedAt.set(confirmedAt);
+      await db.put('cashier', {
+        key,
+        company_id: identity.companyId,
+        user_id: identity.userId,
+        session: data,
+        confirmed_at: confirmedAt,
+      });
+    } else {
+      this.lastConfirmedAt.set(null);
+      await db.delete('cashier', key);
+    }
+  }
+
+  private async activateScope(): Promise<AppIdentity | null> {
+    const identity = this.supabase.offlineIdentity();
+    const key = identity ? offlineScopeKey(identity) : null;
+    if (this.activeScope === key) return identity;
+    if (this.refreshPromise) {
+      try {
+        await this.refreshPromise;
+      } catch {
+        // The old account's refresh is allowed to finish before switching.
+      }
+      return this.activateScope();
+    }
+
+    if (this.channel) void this.supabase.client.removeChannel(this.channel);
+    if (this.pollTimer) clearInterval(this.pollTimer);
+    this.channel = null;
+    this.pollTimer = null;
+    this.started = false;
+    this.activeScope = key;
+    this.session.set(null);
+    this.usingCachedState.set(false);
+    this.lastConfirmedAt.set(null);
+
+    if (!identity || !key) return null;
+    try {
+      const db = await offlineDb();
+      const snapshot = await db.get('cashier', key);
+      if (
+        snapshot &&
+        snapshot.session.status === 'open' &&
+        snapshot.session.company_id === identity.companyId &&
+        this.nairobiDay(snapshot.confirmed_at) === this.nairobiDay(new Date().toISOString())
+      ) {
+        this.session.set(snapshot.session);
+        this.usingCachedState.set(true);
+        this.lastConfirmedAt.set(snapshot.confirmed_at);
+      } else if (snapshot) {
+        await db.delete('cashier', key);
+      }
+    } catch {
+      // A missing/unavailable local snapshot fails closed.
+    }
+    return identity;
+  }
+
+  private nairobiDay(value: string): string {
+    return new Date(value).toLocaleDateString('en-CA', { timeZone: 'Africa/Nairobi' });
+  }
+
+  private cachedSessionIsCurrent(): boolean {
+    const confirmedAt = this.lastConfirmedAt();
+    return (
+      confirmedAt !== null &&
+      this.nairobiDay(confirmedAt) === this.nairobiDay(new Date().toISOString())
+    );
   }
 }

@@ -10,8 +10,7 @@ export type MembershipWithRole = Membership & {
   roles: Pick<Role, 'name' | 'permissions'> | null;
 };
 
-/** The 14 assignable permissions (role editor checkboxes). */
-export { ALL_PERMISSIONS } from '../core/permissions.service';
+export { ALL_PERMISSIONS, PERMISSION_LABELS } from '../core/permissions.service';
 
 @Injectable({ providedIn: 'root' })
 export class TeamService {

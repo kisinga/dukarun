@@ -8,6 +8,7 @@ import { PosService, Variant, variantLabel } from '../pos/pos.service';
 import { ButtonComponent } from '../shared/ui/button.component';
 import { FormFieldComponent } from '../shared/ui/form-field.component';
 import { PageLayoutComponent } from '../shared/ui/page-layout.component';
+import { IconComponent } from '../shared/ui/icon.component';
 
 const ADJUSTMENT_REASONS = [
   'Stock count correction',
@@ -21,25 +22,34 @@ const ADJUSTMENT_REASONS = [
 
 @Component({
   selector: 'app-stock-adjustments',
-  imports: [ReactiveFormsModule, FormFieldComponent, ButtonComponent, PageLayoutComponent],
+  imports: [
+    ReactiveFormsModule,
+    FormFieldComponent,
+    ButtonComponent,
+    PageLayoutComponent,
+    IconComponent,
+  ],
   template: `
     <app-page
       title="Adjust stock"
       subtitle="Correct inventory from a physical count. Selling prices are never changed here."
+      [wide]="true"
     >
-      <div class="mx-auto max-w-2xl space-y-3">
+      <div class="space-y-3">
         @if (error()) {
           <div role="alert" class="alert alert-error text-sm">
+            <app-icon name="heroExclamationTriangle" />
             <span>{{ error() }}</span>
           </div>
         }
         @if (notice()) {
           <div role="status" class="alert alert-success text-sm">
+            <app-icon name="heroCheckCircle" />
             <span>{{ notice() }}</span>
           </div>
         }
 
-        <section class="card overflow-visible bg-base-100">
+        <section class="card overflow-hidden bg-base-100">
           <div class="border-b border-base-300/70 p-4 sm:p-6">
             <div class="mb-3 flex items-start gap-3">
               <span
@@ -68,27 +78,34 @@ const ADJUSTMENT_REASONS = [
                 </button>
               </div>
             } @else {
-              <div class="relative">
-                <input
-                  type="search"
-                  class="input input-bordered min-h-11 w-full"
-                  placeholder="Search product, SKU, or barcode"
-                  autocomplete="off"
-                  [formControl]="search"
-                />
-                @if (searching()) {
-                  <span
-                    class="loading loading-spinner loading-sm absolute right-3 top-1/2 -translate-y-1/2"
-                    aria-label="Searching"
-                  ></span>
-                }
+              <div>
+                <div class="relative">
+                  <input
+                    type="search"
+                    class="input input-bordered min-h-11 w-full"
+                    placeholder="Search product, SKU, or barcode"
+                    autocomplete="off"
+                    [formControl]="search"
+                  />
+                  @if (searching()) {
+                    <span
+                      class="loading loading-spinner loading-sm absolute right-3 top-1/2 -translate-y-1/2"
+                      aria-label="Searching"
+                    ></span>
+                  }
+                </div>
                 @if (results().length > 0) {
                   <ul
-                    class="menu absolute inset-x-0 z-20 mt-1 max-h-64 overflow-auto rounded-box border border-base-300 bg-base-100 p-1 shadow-overlay"
+                    class="mt-2 max-h-64 w-full divide-y divide-base-300 overflow-auto rounded-field border border-base-300 bg-base-100"
+                    aria-label="Product search results"
                   >
                     @for (variant of results(); track variant.variant_id) {
                       <li>
-                        <button type="button" (click)="pick(variant)">
+                        <button
+                          type="button"
+                          class="flex min-h-14 w-full items-center px-3 py-2 text-left transition-colors hover:bg-base-200 focus-visible:bg-base-200 focus-visible:outline-none"
+                          (click)="pick(variant)"
+                        >
                           <span class="min-w-0 flex-1 text-left">
                             <span class="block truncate text-sm font-medium">{{
                               label(variant)
@@ -109,8 +126,11 @@ const ADJUSTMENT_REASONS = [
           </div>
 
           @if (selected()) {
-            <form (submit)="$event.preventDefault(); saveAdjustment()">
-              <div class="border-b border-base-300/70 p-4 sm:p-6">
+            <form
+              class="lg:grid lg:grid-cols-2"
+              (submit)="$event.preventDefault(); saveAdjustment()"
+            >
+              <div class="border-b border-base-300/70 p-4 sm:p-6 lg:border-r lg:border-base-300/70">
                 <div class="mb-4 flex items-start gap-3">
                   <span
                     class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-content"
@@ -213,7 +233,7 @@ const ADJUSTMENT_REASONS = [
               </div>
 
               <div
-                class="flex flex-col gap-3 border-t border-base-300/70 bg-base-200/50 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-6"
+                class="flex flex-col gap-3 border-t border-base-300/70 bg-base-200/50 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:col-span-2"
               >
                 <p class="text-sm text-base-content/65">
                   Final count:
@@ -233,10 +253,6 @@ const ADJUSTMENT_REASONS = [
                 </button>
               </div>
             </form>
-          } @else {
-            <div class="p-6 text-center text-sm text-base-content/55">
-              Search for a product to continue.
-            </div>
           }
         </section>
       </div>

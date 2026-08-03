@@ -88,17 +88,13 @@ interface ParsedPurchaseLine {
   template: `
     <app-page
       [title]="isPurchasePage() ? 'Purchases' : 'Suppliers'"
+      [wide]="true"
       [subtitle]="
         isPurchasePage()
           ? 'Receive stock with the pricing and supplier context needed to buy well.'
           : 'Manage supplier relationships, balances, and purchasing performance.'
       "
     >
-      @if (isPurchasePage()) {
-        <a actions appButton variant="ghost" routerLink="/suppliers">
-          <app-icon name="heroTruck" /> Suppliers
-        </a>
-      }
       <button
         actions
         appButton
@@ -106,16 +102,28 @@ interface ParsedPurchaseLine {
         [iconOnly]="true"
         [loading]="loading()"
         type="button"
-        title="Refresh suppliers"
-        aria-label="Refresh suppliers"
+        [title]="isPurchasePage() ? 'Refresh purchases' : 'Refresh suppliers'"
+        [attr.aria-label]="isPurchasePage() ? 'Refresh purchases' : 'Refresh suppliers'"
         (click)="load()"
       >
         <app-icon name="heroArrowPath" />
       </button>
+      @if (isPurchasePage()) {
+        <a actions appButton variant="secondary" routerLink="/suppliers">
+          <app-icon name="heroTruck" /> Suppliers
+        </a>
+      }
+      @if (isPurchasePage()) {
+        <button actions appButton type="button" (click)="startPurchase()">
+          <app-icon name="heroPlus" /> Record purchase
+        </button>
+      }
       @if (!isPurchasePage()) {
         <a actions appButton variant="secondary" routerLink="/purchases">
-          <app-icon name="heroPlus" /> New purchase
+          <app-icon name="heroShoppingCart" /> New purchase
         </a>
+      }
+      @if (!isPurchasePage()) {
         <button actions appButton type="button" (click)="startSupplierCreate()">
           <app-icon name="heroPlus" /> Add supplier
         </button>
@@ -219,15 +227,13 @@ interface ParsedPurchaseLine {
       }
 
       @if (!isPurchasePage()) {
-        <div class="mb-4">
-          <app-list-search-bar
-            placeholder="Search supplier name, phone, or email…"
-            [searchQuery]="supplierQuery()"
-            (searchQueryChange)="supplierQuery.set($event)"
-          >
-            <app-stat-bar summary [stats]="supplierSummary()" />
-          </app-list-search-bar>
-        </div>
+        <app-list-search-bar
+          placeholder="Search supplier name, phone, or email…"
+          [searchQuery]="supplierQuery()"
+          (searchQueryChange)="supplierQuery.set($event)"
+        >
+          <app-stat-bar summary [stats]="supplierSummary()" />
+        </app-list-search-bar>
 
         @if (filteredSuppliers().length === 0) {
           <app-empty-state
@@ -351,9 +357,12 @@ interface ParsedPurchaseLine {
         }
       }
 
-      <div class="grid gap-4">
-        @if (isPurchasePage()) {
-          <section class="card bg-base-100">
+      <div
+        class="grid gap-4"
+        [class.mb-4]="isPurchasePage() && (purchaseFormOpen() || drafts().length > 0)"
+      >
+        @if (isPurchasePage() && purchaseFormOpen()) {
+          <section id="purchase-form" class="card bg-base-100">
             <div class="card-body p-4">
               <div class="flex items-start justify-between gap-3">
                 <div>
@@ -565,8 +574,8 @@ interface ParsedPurchaseLine {
                           purchasePaymentMode.value === 'paid'
                             ? 'Pay the full amount from an account now.'
                             : purchasePaymentMode.value === 'partial'
-                              ? 'Pay part now and add only the balance to this supplier.'
-                              : "Add the full amount to this supplier's balance."
+                              ? 'Pay part now and add only the remainder to what we owe this supplier.'
+                              : 'Add the full amount to what we owe this supplier.'
                         }}
                       </p>
                     </div>
@@ -934,8 +943,8 @@ interface ParsedPurchaseLine {
                       <strong><app-money [cents]="purchaseBalanceDue()" /></strong> will become
                       money we owe {{ selectedSupplierName() }}.
                     } @else {
-                      This is recorded as <strong>paid now</strong>; the supplier balance will not
-                      change.
+                      This is recorded as <strong>paid now</strong>; what we owe the supplier will
+                      not change.
                     }
                   </p>
                 </div>
@@ -982,11 +991,9 @@ interface ParsedPurchaseLine {
                   >
                     {{ activeDraftId() ? 'Update draft' : 'Save draft' }}
                   </button>
-                  @if (activeDraftId()) {
-                    <button appButton variant="ghost" type="button" (click)="clearPurchaseForm()">
-                      Close draft
-                    </button>
-                  }
+                  <button appButton variant="ghost" type="button" (click)="closePurchaseForm()">
+                    {{ activeDraftId() ? 'Close draft' : 'Cancel' }}
+                  </button>
                 </div>
               </form>
             </div>
@@ -1023,7 +1030,7 @@ interface ParsedPurchaseLine {
             <section class="card bg-base-100 lg:hidden">
               <div class="card-body p-4">
                 <div class="flex items-center justify-between gap-2">
-                  <h2 class="section-title">Supplier balances</h2>
+                  <h2 class="section-title">What we owe suppliers</h2>
                   <span class="type-caption">Money we owe suppliers</span>
                 </div>
                 @if (filteredSuppliers().length === 0) {
@@ -1193,122 +1200,124 @@ interface ParsedPurchaseLine {
       </div>
 
       @if (isPurchasePage()) {
-        <section class="mt-6">
-          <div class="mb-2 flex flex-wrap items-end justify-between gap-2">
-            <div>
-              <h2 class="section-title">Recent purchases</h2>
-              <p class="type-caption mt-1">Paid-now purchases do not create a supplier balance.</p>
-            </div>
-          </div>
-          @if (purchases().length === 0) {
+        <section>
+          <app-list-search-bar
+            placeholder="Search supplier or reference…"
+            [searchQuery]="purchaseQuery()"
+            (searchQueryChange)="purchaseQuery.set($event); purchasePage.set(1)"
+          >
+            <app-stat-bar summary [stats]="purchaseSummary()" />
+          </app-list-search-bar>
+
+          @if (filteredPurchases().length === 0) {
             <app-empty-state
               icon="heroBanknotes"
-              title="No purchases recorded"
-              description="Record a purchase above to add supplier stock."
+              [title]="purchaseQuery() ? 'No matching purchases' : 'No purchases recorded'"
+              [description]="
+                purchaseQuery()
+                  ? 'Try a different supplier name or reference.'
+                  : 'Record a purchase from the page header to add supplier stock.'
+              "
             />
           } @else {
-            <div class="card overflow-hidden bg-base-100">
-              <div class="overflow-x-auto">
-                <table class="table table-sm">
-                  <thead>
+            <app-data-table-shell
+              title="Purchase history"
+              [description]="filteredPurchases().length + ' matching purchases'"
+            >
+              <table class="table table-sm">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Supplier</th>
+                    <th>Payment</th>
+                    <th>Reference</th>
+                    <th class="text-right">Total</th>
+                    <th class="text-right">Status</th>
+                    <th class="text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (p of pagedPurchases(); track p.id) {
                     <tr>
-                      <th>Date</th>
-                      <th>Supplier</th>
-                      <th>Payment</th>
-                      <th>Reference</th>
-                      <th class="text-right">Total</th>
-                      <th class="text-right">Status</th>
-                      <th class="text-right">Actions</th>
+                      <td class="whitespace-nowrap text-sm">{{ time(p.created_at) }}</td>
+                      <td class="font-medium">{{ supplierName(p.supplier_id) }}</td>
+                      <td class="text-sm">{{ p.is_credit ? 'Pay later' : 'Paid now' }}</td>
+                      <td class="type-caption">{{ p.reference || '—' }}</td>
+                      <td class="text-right font-semibold">
+                        <app-money [cents]="p.total_cost" [masked]="!perms.has('ViewFinancials')" />
+                      </td>
+                      <td class="text-right">
+                        <app-status-badge
+                          [type]="purchaseStatusType(p)"
+                          [label]="purchaseStatusLabel(p)"
+                        />
+                      </td>
+                      <td class="whitespace-nowrap text-right">
+                        @if (printerEnabled()) {
+                          <button appButton variant="ghost" (click)="printPurchase(p.id)">
+                            Print PO
+                          </button>
+                        }
+                        @if (p.is_credit && p.paid < p.total_cost && perms.has('ViewFinancials')) {
+                          <button appButton variant="ghost" (click)="startPurchasePayment(p)">
+                            Pay
+                          </button>
+                        }
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    @for (p of pagedPurchases(); track p.id) {
-                      <tr>
-                        <td class="whitespace-nowrap text-sm">{{ time(p.created_at) }}</td>
-                        <td class="font-medium">{{ supplierName(p.supplier_id) }}</td>
-                        <td class="text-sm">{{ p.is_credit ? 'Pay later' : 'Paid now' }}</td>
-                        <td class="type-caption">{{ p.reference || '—' }}</td>
-                        <td class="text-right font-semibold">
-                          <app-money
-                            [cents]="p.total_cost"
-                            [masked]="!perms.has('ViewFinancials')"
-                          />
-                        </td>
-                        <td class="text-right">
-                          <app-status-badge
-                            [type]="purchaseStatusType(p)"
-                            [label]="purchaseStatusLabel(p)"
-                          />
-                        </td>
-                        <td class="whitespace-nowrap text-right">
-                          @if (printerEnabled()) {
-                            <button appButton variant="ghost" (click)="printPurchase(p.id)">
-                              Print PO
+                    @if (payPurchaseId() === p.id) {
+                      <tr class="row-detail">
+                        <td colspan="8">
+                          <form
+                            (submit)="$event.preventDefault(); paySelectedPurchase()"
+                            class="flex flex-wrap items-end gap-2"
+                          >
+                            <app-form-field label="Amount (KES)"
+                              ><input
+                                class="input input-bordered input-sm w-32"
+                                [formControl]="selectedPayAmount" /></app-form-field
+                            ><app-form-field label="Pay from"
+                              ><select
+                                class="select select-bordered select-sm"
+                                [formControl]="selectedPayAccount"
+                              >
+                                @for (a of accounts(); track a.code) {
+                                  <option [value]="a.code">{{ a.name }}</option>
+                                }
+                              </select></app-form-field
+                            ><button
+                              appButton
+                              type="submit"
+                              [disabled]="busy() || !cashierSession.isOpen()"
+                            >
+                              Record payment</button
+                            ><button
+                              appButton
+                              variant="ghost"
+                              type="button"
+                              (click)="payPurchaseId.set(null)"
+                            >
+                              Cancel
                             </button>
-                          }
-                          @if (
-                            p.is_credit && p.paid < p.total_cost && perms.has('ViewFinancials')
-                          ) {
-                            <button appButton variant="ghost" (click)="startPurchasePayment(p)">
-                              Pay
-                            </button>
-                          }
+                          </form>
                         </td>
                       </tr>
-                      @if (payPurchaseId() === p.id) {
-                        <tr class="row-detail">
-                          <td colspan="8">
-                            <form
-                              (submit)="$event.preventDefault(); paySelectedPurchase()"
-                              class="flex flex-wrap items-end gap-2"
-                            >
-                              <app-form-field label="Amount (KES)"
-                                ><input
-                                  class="input input-bordered input-sm w-32"
-                                  [formControl]="selectedPayAmount" /></app-form-field
-                              ><app-form-field label="Pay from"
-                                ><select
-                                  class="select select-bordered select-sm"
-                                  [formControl]="selectedPayAccount"
-                                >
-                                  @for (a of accounts(); track a.code) {
-                                    <option [value]="a.code">{{ a.name }}</option>
-                                  }
-                                </select></app-form-field
-                              ><button
-                                appButton
-                                type="submit"
-                                [disabled]="busy() || !cashierSession.isOpen()"
-                              >
-                                Record payment</button
-                              ><button
-                                appButton
-                                variant="ghost"
-                                type="button"
-                                (click)="payPurchaseId.set(null)"
-                              >
-                                Cancel
-                              </button>
-                            </form>
-                          </td>
-                        </tr>
-                      }
                     }
-                  </tbody>
-                </table>
-              </div>
-              <div class="p-3 pt-0">
-                <app-pagination
-                  [currentPage]="purchasePage()"
-                  [totalPages]="purchaseTotalPages()"
-                  [totalItems]="purchases().length"
-                  [itemsPerPage]="purchasePageSize()"
-                  itemLabel="purchases"
-                  [showItemsPerPage]="true"
-                  (pageChange)="purchasePage.set($event)"
-                  (itemsPerPageChange)="purchasePageSize.set($event); purchasePage.set(1)"
-                />
-              </div>
+                  }
+                </tbody>
+              </table>
+            </app-data-table-shell>
+            <div class="mt-3">
+              <app-pagination
+                [currentPage]="purchasePage()"
+                [totalPages]="purchaseTotalPages()"
+                [totalItems]="filteredPurchases().length"
+                [itemsPerPage]="purchasePageSize()"
+                itemLabel="purchases"
+                [showItemsPerPage]="true"
+                (pageChange)="purchasePage.set($event)"
+                (itemsPerPageChange)="purchasePageSize.set($event); purchasePage.set(1)"
+              />
             </div>
           }
         </section>
@@ -1333,12 +1342,14 @@ export class SuppliersComponent implements OnInit, OnDestroy {
   protected readonly variants = signal<Variant[]>([]);
   protected readonly label = variantLabel;
   protected readonly purchases = signal<PurchaseRow[]>([]);
+  protected readonly purchaseQuery = signal('');
   protected readonly purchasePage = signal(1);
   protected readonly purchasePageSize = signal(10);
   protected readonly drafts = signal<PurchaseDraft[]>([]);
   protected readonly performance = signal<SupplierVariantPerformance[]>([]);
   protected readonly locations = signal<StockLocation[]>([]);
   protected readonly activeDraftId = signal<string | null>(null);
+  protected readonly purchaseFormOpen = signal(false);
   protected readonly createOpen = signal(false);
   protected readonly editingSupplier = signal<SupplierWithAp | null>(null);
 
@@ -1422,13 +1433,47 @@ export class SuppliersComponent implements OnInit, OnDestroy {
       tone: this.openCreditPurchases() > 0 ? ('warning' as const) : ('neutral' as const),
     },
   ]);
+  protected readonly filteredPurchases = computed(() => {
+    const query = this.purchaseQuery().trim().toLowerCase();
+    if (!query) return this.purchases();
+    return this.purchases().filter(purchase =>
+      [this.supplierName(purchase.supplier_id), purchase.reference]
+        .filter(Boolean)
+        .some(value => value!.toLowerCase().includes(query))
+    );
+  });
+  protected readonly purchaseSummary = computed(() => {
+    const purchases = this.purchases();
+    const value = purchases.reduce((sum, purchase) => sum + purchase.total_cost, 0);
+    const outstanding = purchases.reduce(
+      (sum, purchase) => sum + Math.max(0, purchase.total_cost - purchase.paid),
+      0
+    );
+    return [
+      { label: 'Purchases', value: purchases.length },
+      {
+        label: 'Purchase value',
+        value: this.perms.has('ViewFinancials') ? this.fmt(value) : 'Hidden',
+      },
+      {
+        label: 'Still to pay',
+        value: this.perms.has('ViewFinancials') ? this.fmt(outstanding) : 'Hidden',
+        tone: outstanding > 0 ? ('warning' as const) : ('neutral' as const),
+      },
+      {
+        label: 'Drafts',
+        value: this.drafts().length,
+        tone: this.drafts().length > 0 ? ('warning' as const) : ('neutral' as const),
+      },
+    ];
+  });
   protected readonly purchaseTotalPages = computed(() =>
-    Math.max(1, Math.ceil(this.purchases().length / this.purchasePageSize()))
+    Math.max(1, Math.ceil(this.filteredPurchases().length / this.purchasePageSize()))
   );
   protected readonly pagedPurchases = computed(() => {
     const page = Math.min(this.purchasePage(), this.purchaseTotalPages());
     const start = (page - 1) * this.purchasePageSize();
-    return this.purchases().slice(start, start + this.purchasePageSize());
+    return this.filteredPurchases().slice(start, start + this.purchasePageSize());
   });
 
   private liveChannel: RealtimeChannel | null = null;
@@ -1811,6 +1856,7 @@ export class SuppliersComponent implements OnInit, OnDestroy {
         );
       }
       this.clearPurchaseForm();
+      this.purchaseFormOpen.set(false);
       await this.load();
       this.notice.set(
         mode === 'paid'
@@ -1852,6 +1898,7 @@ export class SuppliersComponent implements OnInit, OnDestroy {
   }
 
   protected openDraft(draft: PurchaseDraft): void {
+    this.purchaseFormOpen.set(true);
     this.activeDraftId.set(draft.id);
     this.purchaseSupplier.setValue(draft.supplier_id);
     this.purchaseReference.setValue(draft.reference ?? '');
@@ -1883,13 +1930,14 @@ export class SuppliersComponent implements OnInit, OnDestroy {
               this.variants().find(v => v.variant_id === line['variant_id'])?.price
             ),
     }));
+    this.scrollToPurchaseForm();
   }
 
   protected async cancelDraft(id: string): Promise<void> {
     if (!window.confirm('Cancel this purchase draft?')) return;
     try {
       await this.money.cancelPurchaseDraft(id);
-      if (this.activeDraftId() === id) this.clearPurchaseForm();
+      if (this.activeDraftId() === id) this.closePurchaseForm();
       await this.load();
     } catch (error) {
       this.error.set(error instanceof Error ? error.message : 'Cancel failed');
@@ -1904,6 +1952,24 @@ export class SuppliersComponent implements OnInit, OnDestroy {
     this.purchasePaymentMode.setValue('paid');
     this.purchaseAmountPaid.setValue('');
     this.lines = [this.emptyLine()];
+  }
+
+  protected startPurchase(): void {
+    if (!this.purchaseFormOpen()) this.clearPurchaseForm();
+    this.purchaseFormOpen.set(true);
+    this.scrollToPurchaseForm();
+  }
+
+  protected closePurchaseForm(): void {
+    this.clearPurchaseForm();
+    this.purchaseFormOpen.set(false);
+  }
+
+  private scrollToPurchaseForm(): void {
+    setTimeout(
+      () => document.getElementById('purchase-form')?.scrollIntoView({ behavior: 'smooth' }),
+      0
+    );
   }
 
   protected startPurchasePayment(purchase: PurchaseRow): void {

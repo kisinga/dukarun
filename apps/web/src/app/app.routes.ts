@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/auth.guard';
+import { permissionGuard } from './core/permission.guard';
 
 export const routes: Routes = [
   {
@@ -73,7 +74,8 @@ export const routes: Routes = [
           },
           {
             path: 'credit',
-            redirectTo: '/customers',
+            loadComponent: () =>
+              import('./money/credit/money-credit.component').then(m => m.MoneyCreditComponent),
           },
           {
             path: 'suppliers',
@@ -139,6 +141,12 @@ export const routes: Routes = [
         path: 'approvals',
         loadComponent: () =>
           import('./approvals/approvals.component').then(m => m.ApprovalsComponent),
+      },
+      {
+        path: 'settings/audit-trail',
+        canActivate: [permissionGuard],
+        data: { permission: 'ViewAuditTrail' },
+        loadComponent: () => import('./audit/audit.component').then(m => m.AuditComponent),
       },
       {
         path: 'settings',

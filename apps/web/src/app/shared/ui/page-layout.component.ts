@@ -13,7 +13,11 @@ import { PageHeaderComponent } from './page-header.component';
   host: { '[attr.title]': 'null' },
   template: `
     <main class="dashboard-main min-h-screen bg-base-200 p-4">
-      <div class="page" [class.page-wide]="wide()">
+      <div
+        class="page"
+        [class.page-wide]="wide() || workspace()"
+        [class.page-workspace]="workspace()"
+      >
         @if (title(); as t) {
           <app-page-header
             [title]="t"
@@ -41,4 +45,6 @@ export class PageLayoutComponent {
   readonly backLabel = input('Back');
   /** Widen the content wrapper to max-w-7xl (dashboard, reports, dense tables). */
   readonly wide = input(false);
+  /** Task-focused counter canvas (Sell): wide shell with documented responsive work surfaces. */
+  readonly workspace = input(false);
 }

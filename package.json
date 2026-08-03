@@ -18,7 +18,7 @@
     "dev:super-admin": "npm start -w @dukarun/super-admin",
     "build:super-admin": "npm run build -w @dukarun/super-admin",
     "build:active": "npm run build:web && npm run build:storefront && npm run build:super-admin",
-    "check:web": "npm run design-guard -w @dukarun/web && npm run build:web",
+    "check:web": "npm run design-guard -w @dukarun/web && npm run offline-safety-guard -w @dukarun/web && npm run build:web",
     "test": "npm run build:active",
     "prepare": "node -e \"if (process.env.CI === 'true' || process.env.HUSKY === '0') process.exit(0); require('child_process').execSync('npx husky install', {stdio:'inherit'})\"",
     "sb": "supabase",

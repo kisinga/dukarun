@@ -1,12 +1,5 @@
 import { Component, input, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { provideIcons } from '@ng-icons/core';
-import {
-  heroChevronDown,
-  heroChevronUp,
-  heroMinus,
-  heroPencilSquare,
-} from '@ng-icons/heroicons/outline';
 import { type CartLine } from '../cart.service';
 import { ButtonComponent } from '../../shared/ui/button.component';
 import { IconComponent } from '../../shared/ui/icon.component';
@@ -19,7 +12,6 @@ import { MoneyComponent } from '../../shared/ui/money.component';
 @Component({
   selector: 'app-sell-cart-line',
   imports: [FormsModule, ButtonComponent, IconComponent, MoneyComponent],
-  providers: [provideIcons({ heroChevronDown, heroChevronUp, heroMinus, heroPencilSquare })],
   host: { class: 'block min-w-0' },
   template: `
     <article
@@ -27,19 +19,6 @@ import { MoneyComponent } from '../../shared/ui/money.component';
       [class.sale-line--floor-rejected]="floorRejected()"
     >
       <div class="sale-line-summary flex min-w-0 items-start gap-2">
-        <button
-          appButton
-          variant="ghost"
-          size="sm"
-          [iconOnly]="true"
-          type="button"
-          class="shrink-0 text-base-content/50 hover:text-error"
-          [attr.aria-label]="'Remove ' + label()"
-          (click)="removed.emit()"
-        >
-          <app-icon name="heroXMark" />
-        </button>
-
         <div class="min-w-0 flex-1 pt-0.5">
           <p class="truncate text-sm font-semibold">{{ label() }}</p>
           <div class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -55,15 +34,106 @@ import { MoneyComponent } from '../../shared/ui/money.component';
           </div>
         </div>
 
-        <div class="shrink-0 pt-0.5 text-right">
-          <p class="type-caption">Line total</p>
-          <p class="font-bold"><app-money [cents]="lineTotal()" /></p>
-        </div>
+        <button
+          appButton
+          variant="ghost"
+          size="sm"
+          [iconOnly]="true"
+          type="button"
+          class="shrink-0 text-base-content/50 hover:text-error"
+          [attr.aria-label]="'Remove ' + label()"
+          (click)="removed.emit()"
+        >
+          <app-icon name="heroXMark" />
+        </button>
       </div>
 
       <div
-        class="sale-line-controls mt-2 grid grid-cols-[minmax(7.75rem,0.8fr)_minmax(9rem,1.2fr)] gap-2 border-t border-base-content/15 pt-2 sm:grid-cols-2 sm:gap-3 sm:pt-3"
+        class="sale-line-controls mt-2 grid grid-cols-[minmax(9rem,1.2fr)_minmax(7.75rem,0.8fr)] gap-2 border-t border-base-content/15 pt-2 sm:gap-3 sm:pt-3"
       >
+        <div>
+          <div class="mb-1 flex items-center justify-between gap-1">
+            <p class="type-caption">Price each</p>
+            @if (overridden()) {
+              <button
+                type="button"
+                class="link link-hover text-xs text-base-content/60"
+                (click)="priceReset.emit()"
+              >
+                Reset
+              </button>
+            }
+          </div>
+          <div class="join flex w-full">
+            @if (canOverridePrice()) {
+              <button
+                appButton
+                variant="outline"
+                size="md"
+                [iconOnly]="true"
+                type="button"
+                class="join-item"
+                [class.border-error]="floorRejected()"
+                [class.text-error]="floorRejected()"
+                [attr.aria-label]="'Reduce price of ' + label()"
+                [attr.aria-describedby]="floorRejected() ? floorMessageId() : null"
+                (click)="priceStep.emit(-1)"
+              >
+                <app-icon name="heroChevronDown" />
+              </button>
+            }
+            @if (canOverridePrice()) {
+              <button
+                appButton
+                variant="outline"
+                size="md"
+                type="button"
+                class="join-item min-w-0 flex-1 rounded-none px-1 text-sm font-bold tabular-nums sm:px-2"
+                [attr.aria-label]="'Edit price for ' + label()"
+                (click)="priceEdit.emit()"
+              >
+                <app-money [cents]="effectivePrice()" />
+                <app-icon name="heroPencilSquare" size="sm" class="hidden sm:inline-flex" />
+              </button>
+            } @else {
+              <p
+                class="flex min-h-11 min-w-0 flex-1 items-center justify-center rounded-field border border-base-content/15 bg-base-200/40 px-2 text-sm font-bold tabular-nums"
+              >
+                <app-money [cents]="effectivePrice()" />
+              </p>
+            }
+            @if (canOverridePrice()) {
+              <button
+                appButton
+                variant="outline"
+                size="md"
+                [iconOnly]="true"
+                type="button"
+                class="join-item"
+                [attr.aria-label]="'Increase price of ' + label()"
+                (click)="priceStep.emit(1)"
+              >
+                <app-icon name="heroChevronUp" />
+              </button>
+            }
+          </div>
+          @if (overridden()) {
+            <p class="mt-0.5 truncate text-right text-xs text-base-content/50">
+              Base <app-money [cents]="line().unitPrice" />
+            </p>
+          }
+          @if (floorRejected()) {
+            <p
+              [id]="floorMessageId()"
+              class="mt-1 text-right text-xs font-medium text-error"
+              aria-live="assertive"
+            >
+              {{ hasWholesaleFloor() ? 'Wholesale floor' : 'Minimum price' }}
+              <app-money [cents]="minimumPrice()" />
+            </p>
+          }
+        </div>
+
         <div>
           <p class="type-caption mb-1">Quantity</p>
           <div class="join flex w-full">
@@ -102,84 +172,18 @@ import { MoneyComponent } from '../../shared/ui/money.component';
             </button>
           </div>
         </div>
+      </div>
 
+      <div
+        class="sale-line-total mt-2 flex items-center justify-between gap-3 border-t border-base-content/15 pt-2"
+      >
         <div>
-          <div class="mb-1 flex items-center justify-between gap-1">
-            <p class="type-caption">Price each</p>
-            @if (overridden()) {
-              <button
-                type="button"
-                class="link link-hover text-xs text-base-content/60"
-                (click)="priceReset.emit()"
-              >
-                Reset
-              </button>
-            }
-          </div>
-          <div class="join flex w-full">
-            @if (canOverridePrice()) {
-              <button
-                appButton
-                variant="outline"
-                size="md"
-                [iconOnly]="true"
-                type="button"
-                class="join-item"
-                [class.border-error]="floorRejected()"
-                [class.text-error]="floorRejected()"
-                [attr.aria-label]="'Reduce price of ' + label()"
-                [attr.aria-describedby]="floorRejected() ? floorMessageId() : null"
-                (click)="priceStep.emit(-1)"
-              >
-                <app-icon name="heroChevronDown" />
-              </button>
-            }
-            <button
-              appButton
-              variant="outline"
-              size="md"
-              type="button"
-              class="join-item min-w-0 flex-1 rounded-none px-1 text-sm font-bold tabular-nums sm:px-2"
-              [class.cursor-default]="!canOverridePrice()"
-              [attr.aria-label]="canOverridePrice() ? 'Edit price for ' + label() : null"
-              (click)="requestPriceEdit()"
-            >
-              <app-money [cents]="effectivePrice()" />
-              @if (canOverridePrice()) {
-                <app-icon name="heroPencilSquare" size="sm" class="hidden sm:inline-flex" />
-              }
-            </button>
-            @if (canOverridePrice()) {
-              <button
-                appButton
-                variant="outline"
-                size="md"
-                [iconOnly]="true"
-                type="button"
-                class="join-item"
-                [attr.aria-label]="'Increase price of ' + label()"
-                (click)="priceStep.emit(1)"
-              >
-                <app-icon name="heroChevronUp" />
-              </button>
-            }
-          </div>
-          @if (overridden()) {
-            <p class="mt-0.5 truncate text-right text-xs text-base-content/50">
-              Base <app-money [cents]="line().unitPrice" />
-            </p>
-          }
-          @if (floorRejected()) {
-            <p
-              [id]="floorMessageId()"
-              class="mt-1 text-right text-xs font-medium text-error"
-              aria-live="assertive"
-            >
-              {{ hasWholesaleFloor() ? 'Wholesale floor' : 'Minimum price' }}
-              <app-money [cents]="minimumPrice()" />
-            </p>
-          }
+          <p class="type-caption">Line total</p>
+          <p class="text-xs text-base-content/50">{{ line().quantity }} × price each</p>
         </div>
+        <p class="type-heading shrink-0 tabular-nums">
+          <app-money [cents]="lineTotal()" />
+        </p>
       </div>
     </article>
   `,
@@ -219,7 +223,7 @@ import { MoneyComponent } from '../../shared/ui/money.component';
     @container (min-width: 46rem) {
       .sale-line {
         display: grid;
-        grid-template-columns: minmax(15rem, 1fr) minmax(21rem, 24rem);
+        grid-template-columns: minmax(12rem, 1fr) minmax(21rem, 24rem) minmax(6.5rem, auto);
         align-items: end;
         gap: 1.25rem;
       }
@@ -229,10 +233,18 @@ import { MoneyComponent } from '../../shared/ui/money.component';
       }
 
       .sale-line-controls {
-        grid-template-columns: 8.5rem minmax(11.75rem, 1fr);
+        grid-template-columns: minmax(11.75rem, 1fr) 8.5rem;
         margin-top: 0;
         padding-top: 0;
         border-top: 0;
+      }
+
+      .sale-line-total {
+        display: block;
+        margin-top: 0;
+        padding-top: 0;
+        border-top: 0;
+        text-align: right;
       }
     }
   `,
@@ -277,9 +289,5 @@ export class SellCartLineComponent {
   protected emitQuantity(event: Event): void {
     const quantity = Number((event.target as HTMLInputElement).value);
     if (Number.isFinite(quantity)) this.quantityChanged.emit(quantity);
-  }
-
-  protected requestPriceEdit(): void {
-    if (this.canOverridePrice()) this.priceEdit.emit();
   }
 }

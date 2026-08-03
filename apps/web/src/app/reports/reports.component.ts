@@ -4,7 +4,7 @@ import { formatKes } from '../core/money';
 import { PosService, variantLabel } from '../pos/pos.service';
 import { EmptyStateComponent } from '../shared/ui/empty-state.component';
 import { PaginationComponent } from '../shared/ui/pagination.component';
-import { PageHeaderComponent } from '../shared/ui/page-header.component';
+import { PageLayoutComponent } from '../shared/ui/page-layout.component';
 import { DailySummary, ReportsService } from './reports.service';
 
 type Tab = 'sales' | 'products' | 'customers' | 'inventory';
@@ -36,278 +36,274 @@ type InventoryRow = {
 
 @Component({
   selector: 'app-reports',
-  imports: [ReactiveFormsModule, PageHeaderComponent, EmptyStateComponent, PaginationComponent],
+  imports: [ReactiveFormsModule, PageLayoutComponent, EmptyStateComponent, PaginationComponent],
   template: `
-    <main class="dashboard-main min-h-screen bg-base-200 p-4">
-      <div class="page">
-        <app-page-header title="Reports" />
-
-        <!-- Date range -->
-        <div class="card mb-4 bg-base-100">
-          <div class="card-body flex-row flex-wrap items-end gap-3 p-4">
-            <label class="form-control">
-              <span class="label-text text-xs">From</span>
-              <input type="date" class="input input-bordered input-sm" [formControl]="from" />
-            </label>
-            <label class="form-control">
-              <span class="label-text text-xs">To</span>
-              <input type="date" class="input input-bordered input-sm" [formControl]="to" />
-            </label>
-            <button class="btn btn-primary btn-sm min-h-11" (click)="load()">Apply</button>
-            <span class="type-caption ml-auto">Figures refresh hourly.</span>
-          </div>
+    <app-page title="Reports" [wide]="true">
+      <!-- Date range -->
+      <div class="card mb-4 bg-base-100">
+        <div class="card-body flex-row flex-wrap items-end gap-3 p-4">
+          <label class="form-control">
+            <span class="label-text text-xs">From</span>
+            <input type="date" class="input input-bordered input-sm" [formControl]="from" />
+          </label>
+          <label class="form-control">
+            <span class="label-text text-xs">To</span>
+            <input type="date" class="input input-bordered input-sm" [formControl]="to" />
+          </label>
+          <button class="btn btn-primary btn-sm min-h-11" (click)="load()">Apply</button>
+          <span class="type-caption ml-auto">Figures refresh hourly.</span>
         </div>
+      </div>
 
-        @if (error()) {
-          <p class="mb-2 text-sm text-error">{{ error() }}</p>
-        }
+      @if (error()) {
+        <p class="mb-2 text-sm text-error">{{ error() }}</p>
+      }
 
-        <div role="tablist" class="tabs tabs-boxed mb-4">
-          <a
-            role="tab"
-            class="tab min-h-11"
-            [class.tab-active]="tab() === 'sales'"
-            (click)="tab.set('sales')"
-            >Sales</a
-          >
-          <a
-            role="tab"
-            class="tab min-h-11"
-            [class.tab-active]="tab() === 'products'"
-            (click)="tab.set('products')"
-            >Products</a
-          >
-          <a
-            role="tab"
-            class="tab min-h-11"
-            [class.tab-active]="tab() === 'customers'"
-            (click)="tab.set('customers')"
-            >Customers</a
-          >
-          <a
-            role="tab"
-            class="tab min-h-11"
-            [class.tab-active]="tab() === 'inventory'"
-            (click)="tab.set('inventory')"
-            >Inventory</a
-          >
-        </div>
+      <div role="tablist" class="tabs tabs-boxed mb-4">
+        <a
+          role="tab"
+          class="tab min-h-11"
+          [class.tab-active]="tab() === 'sales'"
+          (click)="tab.set('sales')"
+          >Sales</a
+        >
+        <a
+          role="tab"
+          class="tab min-h-11"
+          [class.tab-active]="tab() === 'products'"
+          (click)="tab.set('products')"
+          >Products</a
+        >
+        <a
+          role="tab"
+          class="tab min-h-11"
+          [class.tab-active]="tab() === 'customers'"
+          (click)="tab.set('customers')"
+          >Customers</a
+        >
+        <a
+          role="tab"
+          class="tab min-h-11"
+          [class.tab-active]="tab() === 'inventory'"
+          (click)="tab.set('inventory')"
+          >Inventory</a
+        >
+      </div>
 
-        <!-- Sales tab -->
-        @if (tab() === 'sales') {
-          @if (summary().length === 0) {
-            <app-empty-state
-              [compact]="true"
-              icon="heroBanknotes"
-              title="No sales in this range"
-              description="Daily revenue, COGS, and margin appear here."
-            />
-          } @else {
-            <div class="card bg-base-100">
-              <div class="table-scroll">
-                <table class="table table-sm">
-                  <thead>
+      <!-- Sales tab -->
+      @if (tab() === 'sales') {
+        @if (summary().length === 0) {
+          <app-empty-state
+            [compact]="true"
+            icon="heroBanknotes"
+            title="No sales in this range"
+            description="Daily revenue, COGS, and margin appear here."
+          />
+        } @else {
+          <div class="card bg-base-100">
+            <div class="table-scroll">
+              <table class="table table-sm">
+                <thead>
+                  <tr>
+                    <th>Day</th>
+                    <th class="text-right">Sales</th>
+                    <th class="text-right">Revenue</th>
+                    <th class="text-right">COGS</th>
+                    <th class="text-right">Margin</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (d of pagedSummary(); track d.day) {
                     <tr>
-                      <th>Day</th>
-                      <th class="text-right">Orders</th>
-                      <th class="text-right">Revenue</th>
-                      <th class="text-right">COGS</th>
-                      <th class="text-right">Margin</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    @for (d of pagedSummary(); track d.day) {
-                      <tr>
-                        <td class="text-sm">{{ d.day }}</td>
-                        <td class="text-right">{{ d.orders }}</td>
-                        <td class="text-right">{{ fmt(d.revenue ?? 0) }}</td>
-                        <td class="text-right">{{ fmt(d.cogs ?? 0) }}</td>
-                        <td
-                          class="text-right font-medium"
-                          [class.text-success]="(d.margin ?? 0) > 0"
-                          [class.text-error]="(d.margin ?? 0) < 0"
-                        >
-                          {{ fmt(d.margin ?? 0) }}
-                        </td>
-                      </tr>
-                    }
-                    <tr class="font-semibold">
-                      <td>Total</td>
-                      <td class="text-right">{{ totals().orders }}</td>
-                      <td class="text-right">{{ fmt(totals().revenue) }}</td>
-                      <td class="text-right">{{ fmt(totals().cogs) }}</td>
+                      <td class="text-sm">{{ d.day }}</td>
+                      <td class="text-right">{{ d.orders }}</td>
+                      <td class="text-right">{{ fmt(d.revenue ?? 0) }}</td>
+                      <td class="text-right">{{ fmt(d.cogs ?? 0) }}</td>
                       <td
-                        class="text-right"
-                        [class.text-success]="totals().margin > 0"
-                        [class.text-error]="totals().margin < 0"
+                        class="text-right font-medium"
+                        [class.text-success]="(d.margin ?? 0) > 0"
+                        [class.text-error]="(d.margin ?? 0) < 0"
                       >
-                        {{ fmt(totals().margin) }}
+                        {{ fmt(d.margin ?? 0) }}
                       </td>
                     </tr>
-                  </tbody>
-                </table>
-              </div>
-              <div class="p-3">
-                <app-pagination
-                  [currentPage]="page()"
-                  [totalPages]="totalPages()"
-                  [totalItems]="summary().length"
-                  [itemsPerPage]="pageSize"
-                  itemLabel="days"
-                  (pageChange)="page.set($event)"
-                />
-              </div>
+                  }
+                  <tr class="font-semibold">
+                    <td>Total</td>
+                    <td class="text-right">{{ totals().orders }}</td>
+                    <td class="text-right">{{ fmt(totals().revenue) }}</td>
+                    <td class="text-right">{{ fmt(totals().cogs) }}</td>
+                    <td
+                      class="text-right"
+                      [class.text-success]="totals().margin > 0"
+                      [class.text-error]="totals().margin < 0"
+                    >
+                      {{ fmt(totals().margin) }}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
-          }
-        }
-
-        <!-- Products tab -->
-        @if (tab() === 'products') {
-          @if (products().length === 0) {
-            <app-empty-state
-              [compact]="true"
-              icon="heroCube"
-              title="No product sales in this range"
-              description="Variants rank here by revenue once you sell."
-            />
-          } @else {
-            <div class="card bg-base-100">
-              <div class="table-scroll">
-                <table class="table table-sm">
-                  <thead>
-                    <tr>
-                      <th>Variant</th>
-                      <th class="text-right">Qty</th>
-                      <th class="text-right">Revenue</th>
-                      <th class="text-right">COGS</th>
-                      <th class="text-right">Margin</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    @for (p of products(); track p.variantId) {
-                      <tr>
-                        <td class="text-sm font-medium">{{ p.label }}</td>
-                        <td class="text-right">{{ p.quantity }}</td>
-                        <td class="text-right">{{ fmt(p.revenue) }}</td>
-                        <td class="text-right">{{ fmt(p.cogs) }}</td>
-                        <td
-                          class="text-right font-medium"
-                          [class.text-success]="p.margin > 0"
-                          [class.text-error]="p.margin < 0"
-                        >
-                          {{ fmt(p.margin) }}
-                        </td>
-                      </tr>
-                    }
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          }
-        }
-
-        <!-- Customers tab -->
-        @if (tab() === 'customers') {
-          @if (customers().length === 0) {
-            <app-empty-state
-              [compact]="true"
-              icon="heroUsers"
-              title="No customer sales in this range"
-              description="Customers rank here by revenue, with their AR movement."
-            />
-          } @else {
-            <div class="card bg-base-100">
-              <div class="table-scroll">
-                <table class="table table-sm">
-                  <thead>
-                    <tr>
-                      <th>Customer</th>
-                      <th class="text-right">Orders</th>
-                      <th class="text-right">Revenue</th>
-                      <th class="text-right">AR Δ</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    @for (c of customers(); track c.customerId) {
-                      <tr>
-                        <td class="text-sm font-medium">{{ c.name }}</td>
-                        <td class="text-right">{{ c.orders }}</td>
-                        <td class="text-right">{{ fmt(c.revenue) }}</td>
-                        <td
-                          class="text-right font-medium"
-                          [class.text-error]="c.arDelta > 0"
-                          [class.text-success]="c.arDelta < 0"
-                        >
-                          {{ fmt(c.arDelta) }}
-                        </td>
-                      </tr>
-                    }
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          }
-        }
-
-        @if (tab() === 'inventory') {
-          <div class="mb-3 grid gap-2 sm:grid-cols-3">
-            <div class="card bg-base-100">
-              <div class="card-body p-3">
-                <span class="type-caption">Stock at cost</span
-                ><strong class="text-xl">{{ fmt(inventoryTotals().cost) }}</strong>
-              </div>
-            </div>
-            <div class="card bg-base-100">
-              <div class="card-body p-3">
-                <span class="type-caption">Potential retail</span
-                ><strong class="text-xl">{{ fmt(inventoryTotals().retail) }}</strong>
-              </div>
-            </div>
-            <div class="card bg-base-100">
-              <div class="card-body p-3">
-                <span class="type-caption">Potential margin</span
-                ><strong class="text-xl text-success">{{ fmt(inventoryTotals().margin) }}</strong>
-              </div>
+            <div class="p-3">
+              <app-pagination
+                [currentPage]="page()"
+                [totalPages]="totalPages()"
+                [totalItems]="summary().length"
+                [itemsPerPage]="pageSize"
+                itemLabel="days"
+                (pageChange)="page.set($event)"
+              />
             </div>
           </div>
-          @if (inventory().length === 0) {
-            <app-empty-state
-              [compact]="true"
-              icon="heroArchiveBox"
-              title="No stock valuation"
-              description="Opening stock and received purchases appear here."
-            />
-          } @else {
-            <div class="card overflow-hidden bg-base-100">
-              <div class="table-scroll">
-                <table class="table table-sm">
-                  <thead>
-                    <tr>
-                      <th>Variant</th>
-                      <th class="text-right">On hand</th>
-                      <th class="text-right">Cost value</th>
-                      <th class="text-right">Retail value</th>
-                      <th class="text-right">Potential margin</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    @for (row of inventory(); track row.variantId) {
-                      <tr>
-                        <td class="font-medium">{{ row.label }}</td>
-                        <td class="text-right">{{ row.stock }}</td>
-                        <td class="text-right">{{ fmt(row.value) }}</td>
-                        <td class="text-right">{{ fmt(row.retailValue) }}</td>
-                        <td class="text-right text-success">{{ fmt(row.potentialMargin) }}</td>
-                      </tr>
-                    }
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          }
         }
-      </div>
-    </main>
+      }
+
+      <!-- Products tab -->
+      @if (tab() === 'products') {
+        @if (products().length === 0) {
+          <app-empty-state
+            [compact]="true"
+            icon="heroCube"
+            title="No product sales in this range"
+            description="Variants rank here by revenue once you sell."
+          />
+        } @else {
+          <div class="card bg-base-100">
+            <div class="table-scroll">
+              <table class="table table-sm">
+                <thead>
+                  <tr>
+                    <th>Variant</th>
+                    <th class="text-right">Qty</th>
+                    <th class="text-right">Revenue</th>
+                    <th class="text-right">COGS</th>
+                    <th class="text-right">Margin</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (p of products(); track p.variantId) {
+                    <tr>
+                      <td class="text-sm font-medium">{{ p.label }}</td>
+                      <td class="text-right">{{ p.quantity }}</td>
+                      <td class="text-right">{{ fmt(p.revenue) }}</td>
+                      <td class="text-right">{{ fmt(p.cogs) }}</td>
+                      <td
+                        class="text-right font-medium"
+                        [class.text-success]="p.margin > 0"
+                        [class.text-error]="p.margin < 0"
+                      >
+                        {{ fmt(p.margin) }}
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+        }
+      }
+
+      <!-- Customers tab -->
+      @if (tab() === 'customers') {
+        @if (customers().length === 0) {
+          <app-empty-state
+            [compact]="true"
+            icon="heroUsers"
+            title="No customer sales in this range"
+            description="Customers rank here by revenue, with their AR movement."
+          />
+        } @else {
+          <div class="card bg-base-100">
+            <div class="table-scroll">
+              <table class="table table-sm">
+                <thead>
+                  <tr>
+                    <th>Customer</th>
+                    <th class="text-right">Sales</th>
+                    <th class="text-right">Revenue</th>
+                    <th class="text-right">AR Δ</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (c of customers(); track c.customerId) {
+                    <tr>
+                      <td class="text-sm font-medium">{{ c.name }}</td>
+                      <td class="text-right">{{ c.orders }}</td>
+                      <td class="text-right">{{ fmt(c.revenue) }}</td>
+                      <td
+                        class="text-right font-medium"
+                        [class.text-error]="c.arDelta > 0"
+                        [class.text-success]="c.arDelta < 0"
+                      >
+                        {{ fmt(c.arDelta) }}
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+        }
+      }
+
+      @if (tab() === 'inventory') {
+        <div class="mb-3 grid gap-2 sm:grid-cols-3">
+          <div class="card bg-base-100">
+            <div class="card-body p-3">
+              <span class="type-caption">Stock at cost</span
+              ><strong class="text-xl">{{ fmt(inventoryTotals().cost) }}</strong>
+            </div>
+          </div>
+          <div class="card bg-base-100">
+            <div class="card-body p-3">
+              <span class="type-caption">Potential retail</span
+              ><strong class="text-xl">{{ fmt(inventoryTotals().retail) }}</strong>
+            </div>
+          </div>
+          <div class="card bg-base-100">
+            <div class="card-body p-3">
+              <span class="type-caption">Potential margin</span
+              ><strong class="text-xl text-success">{{ fmt(inventoryTotals().margin) }}</strong>
+            </div>
+          </div>
+        </div>
+        @if (inventory().length === 0) {
+          <app-empty-state
+            [compact]="true"
+            icon="heroArchiveBox"
+            title="No stock valuation"
+            description="Opening stock and received purchases appear here."
+          />
+        } @else {
+          <div class="card overflow-hidden bg-base-100">
+            <div class="table-scroll">
+              <table class="table table-sm">
+                <thead>
+                  <tr>
+                    <th>Variant</th>
+                    <th class="text-right">On hand</th>
+                    <th class="text-right">Cost value</th>
+                    <th class="text-right">Retail value</th>
+                    <th class="text-right">Potential margin</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (row of inventory(); track row.variantId) {
+                    <tr>
+                      <td class="font-medium">{{ row.label }}</td>
+                      <td class="text-right">{{ row.stock }}</td>
+                      <td class="text-right">{{ fmt(row.value) }}</td>
+                      <td class="text-right">{{ fmt(row.retailValue) }}</td>
+                      <td class="text-right text-success">{{ fmt(row.potentialMargin) }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+        }
+      }
+    </app-page>
   `,
 })
 export class ReportsComponent implements OnInit {

@@ -66,6 +66,58 @@ const RULES = [
       'Icon sizes are 0.875rem (sm), 1rem (md), 1.25rem (lg), 2.5rem (xl decorative) — use <app-icon size="…">.',
   },
   {
+    id: 'hand-built-status-dot',
+    exts: ['.html', '.ts'],
+    re: /<span[^>]*class="(?=[^"]*\bh-2\b)(?=[^"]*\bw-2\b)(?=[^"]*\brounded-full\b)[^"]*"[^>]*>\s*<\/span>/g,
+    message:
+      'Hand-built status dots are banned — use a registered semantic Heroicon through <app-icon>.',
+  },
+  {
+    id: 'page-shell-bypass',
+    exts: ['.ts'],
+    re: /<main class="dashboard-main min-h-screen bg-base-200 p-4">/g,
+    exclude: ['shared/ui/page-layout.component.ts'],
+    message:
+      'Routed dashboard pages must use <app-page>; only PageLayoutComponent owns dashboard-main and .page.',
+  },
+  {
+    id: 'direct-page-header',
+    exts: ['.ts'],
+    re: /<app-page-header[\s>]/g,
+    exclude: ['shared/ui/page-layout.component.ts'],
+    message:
+      'Pages must pass title/subtitle/actions through <app-page>, not render PageHeaderComponent directly.',
+  },
+  {
+    id: 'page-width-override',
+    exts: ['.ts'],
+    re: /class="mx-auto max-w-(?:sm|md|lg|xl|2xl|3xl|4xl|5xl|6xl|7xl)\b/g,
+    message:
+      'Do not center a second max-width wrapper inside a page; use <app-page> or [wide]="true".',
+  },
+  {
+    id: 'manual-list-toolbar-spacing',
+    exts: ['.ts'],
+    re: /<app-list-search-bar[^>]*class="[^"]*\b(?:m[trblxy]?|space-y)-/g,
+    exclude: ['shared/ui/list-search-bar.component.ts'],
+    message:
+      'ListSearchBar owns its block layout, padding, and bottom rhythm — do not add page-level spacing classes to it.',
+  },
+  {
+    id: 'visible-refresh-label',
+    exts: ['.ts'],
+    re: /<button\b[^>]*>\s*(?:<app-icon[^>]*\/>\s*)?Refresh\s*<\/button>/g,
+    message:
+      'Refresh controls are ghost icon-only actions with title/aria-label and loading state — do not render a visible Refresh label.',
+  },
+  {
+    id: 'pagination-inside-table-shell',
+    exts: ['.ts'],
+    re: /<app-pagination\b[^>]*\btableFooter\b/g,
+    message:
+      'Primary list pagination sits outside DataTableShell with mt-3 so desktop tables and mobile cards share one rhythm.',
+  },
+  {
     id: 'hardcoded-hex',
     exts: ['.scss', '.css'],
     re: /#[0-9a-fA-F]{3,8}\b/g,
@@ -97,12 +149,12 @@ function countMatches(content, re) {
 
 const args = process.argv.slice(2);
 const seed = args.includes('--seed');
-const fileArgs = args.filter((a) => a !== '--seed');
+const fileArgs = args.filter(a => a !== '--seed');
 
 let files;
 if (fileArgs.length > 0) {
   files = fileArgs
-    .map((f) => {
+    .map(f => {
       const resolved = path.resolve(process.cwd(), f);
       if (fs.existsSync(resolved)) return resolved;
       // lint-staged passes repo-root-relative paths like "apps/web/src/..."
@@ -113,7 +165,7 @@ if (fileArgs.length > 0) {
 } else {
   files = [...walk(APP)];
 }
-files = files.filter((f) => f.startsWith(APP));
+files = files.filter(f => f.startsWith(APP));
 
 const allowlist = loadAllowlist();
 const newAllowlist = {};
@@ -125,6 +177,7 @@ for (const rule of RULES) {
   for (const file of files) {
     if (!rule.exts.includes(path.extname(file))) continue;
     const rel = path.relative(APP, file);
+    if (rule.exclude?.includes(rel)) continue;
     const content = fs.readFileSync(file, 'utf8');
     const count = countMatches(content, rule.re);
     if (count === 0) continue;
@@ -154,7 +207,7 @@ for (const rule of RULES) {
 if (seed) {
   // Merge: keep existing entries only for files NOT scanned in this run
   // (scanned files with zero matches are dropped — the allowlist must shrink).
-  const scanned = new Set(files.map((f) => path.relative(APP, f)));
+  const scanned = new Set(files.map(f => path.relative(APP, f)));
   for (const [ruleId, entries] of Object.entries(allowlist)) {
     if (!newAllowlist[ruleId]) newAllowlist[ruleId] = {};
     for (const [rel, count] of Object.entries(entries)) {
@@ -170,6 +223,31 @@ if (seed) {
 }
 
 for (const n of notes) console.log(n);
+
+// Heroicons fail silently when a literal name is used without being added to
+// the global registry. Keep the check outside the ratchet: every icon name in
+// touched templates/code must be registered, with no legacy allowance.
+if (!seed) {
+  const configPath = path.join(APP, 'app.config.ts');
+  const config = fs.readFileSync(configPath, 'utf8');
+  const registryBody = config.match(/provideIcons\(\{([\s\S]*?)\}\)/)?.[1] ?? '';
+  const registered = new Set(registryBody.match(/hero[A-Z][A-Za-z0-9]*/g) ?? []);
+  const missingByFile = new Map();
+  for (const file of files) {
+    if (!['.html', '.ts'].includes(path.extname(file)) || file === configPath) continue;
+    const content = fs.readFileSync(file, 'utf8');
+    const names = [...content.matchAll(/['"](hero[A-Z][A-Za-z0-9]*)['"]/g)].map(match => match[1]);
+    const missing = [...new Set(names.filter(name => !registered.has(name)))];
+    if (missing.length > 0) missingByFile.set(path.relative(APP, file), missing);
+  }
+  for (const [file, names] of missingByFile) {
+    failures++;
+    console.error(
+      `✖ [unregistered-icon] ${file}: ${names.join(', ')}\n    Register every Heroicon in provideIcons({ … }) in app.config.ts.`
+    );
+  }
+}
+
 if (failures > 0) {
   console.error(
     `\ndesign-guard: ${failures} file(s) violate The Counter rules. See docs/DESIGN_SYSTEM.md.`

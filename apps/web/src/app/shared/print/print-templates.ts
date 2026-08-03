@@ -11,6 +11,7 @@ export interface OrderData {
   state: string;
   createdAt: string;
   updatedAt: string;
+  expiresAt?: string | null;
   orderPlacedAt?: string | null;
   total: number;
   totalWithTax: number;
@@ -240,6 +241,7 @@ export class Receipt52mmTemplate extends PrintTemplate {
       : this.formatDate(order.createdAt);
     const total = order.totalWithTax;
     const docType = printMeta?.documentType ?? 'receipt';
+    const validUntil = order.expiresAt ? this.formatDate(order.expiresAt) : null;
     const showPayment = docType !== 'proforma' && docType !== 'cashier-slip';
     const paymentMethod = showPayment ? (printMeta?.paymentMethodName ?? 'N/A') : '';
     const name = companyName?.trim() || 'Your Company';
@@ -253,6 +255,7 @@ export class Receipt52mmTemplate extends PrintTemplate {
                     <p class="receipt-meta">
                         <span>Order: ${order.code}</span><br>
                         <span>Date: ${date}</span>
+                        ${docType === 'proforma' && validUntil ? `<br><span>Valid until: ${validUntil}</span>` : ''}
                     </p>
                 </div>
                 ${!isWalkIn ? `<div class="customer-info"><strong>Customer:</strong> ${customerName}</div>` : ''}
@@ -422,6 +425,7 @@ export class Receipt80mmTemplate extends PrintTemplate {
       : this.formatDate(order.createdAt);
     const total = order.totalWithTax;
     const docType = printMeta?.documentType ?? 'receipt';
+    const validUntil = order.expiresAt ? this.formatDate(order.expiresAt) : null;
     const showPayment = docType !== 'proforma' && docType !== 'cashier-slip';
     const paymentMethod = showPayment ? (printMeta?.paymentMethodName ?? 'N/A') : '';
     const name = companyName?.trim() || 'Your Company';
@@ -435,6 +439,7 @@ export class Receipt80mmTemplate extends PrintTemplate {
                     <p class="receipt-meta">
                         <span>Order: ${order.code}</span><br>
                         <span>Date: ${date}</span>
+                        ${docType === 'proforma' && validUntil ? `<br><span>Valid until: ${validUntil}</span>` : ''}
                     </p>
                 </div>
                 ${!isWalkIn ? `<div class="customer-info"><strong>Customer:</strong> ${customerName}</div>` : ''}
@@ -603,6 +608,7 @@ export class A4Template extends PrintTemplate {
       : this.formatDate(order.createdAt);
     const total = order.totalWithTax;
     const docType = printMeta?.documentType ?? 'invoice';
+    const validUntil = order.expiresAt ? this.formatDate(order.expiresAt) : null;
     const header =
       docType === 'proforma'
         ? 'PROFORMA INVOICE'
@@ -630,8 +636,9 @@ export class A4Template extends PrintTemplate {
                     </div>
                     <div class="invoice-meta">
                         <h2>${header}</h2>
-                        <p><strong>Order #:</strong> ${order.code}</p>
+                        <p><strong>Sale #:</strong> ${order.code}</p>
                         <p><strong>Date:</strong> ${date}</p>
+                        ${docType === 'proforma' && validUntil ? `<p><strong>Valid until:</strong> ${validUntil}</p>` : ''}
                         <p><strong>Status:</strong> ${this.getStatusLabel(order.state)}</p>
                     </div>
                 </div>

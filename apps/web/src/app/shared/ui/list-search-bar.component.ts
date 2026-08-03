@@ -8,13 +8,11 @@ import { NgIcon } from '@ng-icons/core';
 @Component({
   selector: 'app-list-search-bar',
   imports: [NgIcon],
+  host: { class: 'mb-4 block' },
   template: `
-    <section class="card flex flex-col gap-3 bg-base-100 p-3 sm:p-4">
-      <ng-content select="[summary]" />
-      <ng-content select="[badges]" />
-
-      <div class="flex flex-col gap-3 lg:flex-row lg:items-end">
-        <div class="relative min-w-0 flex-1 lg:max-w-md">
+    <section class="card flex flex-col gap-3 bg-base-100 p-4">
+      <div class="flex flex-col gap-3 lg:flex-row lg:items-center">
+        <div class="relative min-w-0 lg:w-80 lg:flex-none xl:w-96">
           <ng-icon
             name="heroMagnifyingGlass"
             size="1rem"
@@ -39,10 +37,15 @@ import { NgIcon } from '@ng-icons/core';
           }
         </div>
 
-        <div class="min-w-0 lg:ml-auto">
-          <ng-content select="[filters]" />
+        <div class="min-w-0 flex-1">
+          <ng-content select="[summary]" />
         </div>
       </div>
+
+      <div class="-mx-4 border-t border-base-300/60 px-4 pt-3 empty:hidden">
+        <ng-content select="[filters]" />
+      </div>
+      <ng-content select="[badges]" />
     </section>
   `,
 })

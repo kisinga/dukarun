@@ -1,47 +1,104 @@
 import { Component, OnInit, computed, inject, signal, viewChild } from '@angular/core';
-import { PageHeaderComponent } from '../shared/ui/page-header.component';
+import { PageLayoutComponent } from '../shared/ui/page-layout.component';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { normalizeKenyanPhone } from '../core/phone';
-import { ALL_PERMISSIONS, MembershipWithRole, Role, TeamService } from './team.service';
+import {
+  ALL_PERMISSIONS,
+  MembershipWithRole,
+  PERMISSION_LABELS,
+  Role,
+  TeamService,
+} from './team.service';
 import { StatusBadgeComponent } from '../shared/ui/status-badge.component';
 import { DeleteConfirmationModalComponent } from '../shared/ui/delete-confirmation-modal.component';
 import { EntityAvatarComponent } from '../shared/ui/entity-avatar.component';
 import { PaginationComponent } from '../shared/ui/pagination.component';
 import { EntitlementsService } from '../core/entitlements.service';
 import { RouterLink } from '@angular/router';
+import { ButtonComponent } from '../shared/ui/button.component';
+import { IconComponent } from '../shared/ui/icon.component';
+import { DataTableShellComponent } from '../shared/ui/data-table-shell.component';
+import { FormFieldComponent } from '../shared/ui/form-field.component';
+import { ListSearchBarComponent } from '../shared/ui/list-search-bar.component';
+import { StatBarComponent } from '../shared/ui/stat-bar.component';
+import { EmptyStateComponent } from '../shared/ui/empty-state.component';
 
 @Component({
   selector: 'app-team',
   imports: [
     ReactiveFormsModule,
-    PageHeaderComponent,
+    PageLayoutComponent,
     StatusBadgeComponent,
     DeleteConfirmationModalComponent,
     EntityAvatarComponent,
     PaginationComponent,
     RouterLink,
+    ButtonComponent,
+    IconComponent,
+    DataTableShellComponent,
+    FormFieldComponent,
+    ListSearchBarComponent,
+    StatBarComponent,
+    EmptyStateComponent,
   ],
   template: `
-    <main class="dashboard-main min-h-screen bg-base-200 p-4">
-      <div class="page">
-        <app-page-header title="Team">
-          <button actions class="btn btn-ghost btn-sm ml-auto" (click)="load()">Refresh</button>
-        </app-page-header>
+    <app-page
+      title="Team"
+      subtitle="Manage member access, account status, roles, and permissions."
+      [wide]="true"
+    >
+      <button
+        actions
+        appButton
+        variant="ghost"
+        [iconOnly]="true"
+        [loading]="loading()"
+        type="button"
+        title="Refresh team"
+        aria-label="Refresh team"
+        (click)="load()"
+      >
+        <app-icon name="heroArrowPath" />
+      </button>
+      <button actions appButton type="button" (click)="memberFormOpen.set(true)">
+        <app-icon name="heroPlus" /> Add member
+      </button>
 
-        @if (error()) {
-          <p class="mb-2 text-sm text-error">{{ error() }}</p>
-        }
-        @if (notice()) {
-          <p class="mb-2 text-sm text-success">{{ notice() }}</p>
-        }
+      @if (error()) {
+        <div role="alert" class="alert alert-error mb-3 text-sm">
+          <app-icon name="heroExclamationTriangle" />
+          <span>{{ error() }}</span>
+        </div>
+      }
+      @if (notice()) {
+        <div role="status" class="alert alert-success mb-3 text-sm">
+          <app-icon name="heroCheckCircle" />
+          <span>{{ notice() }}</span>
+        </div>
+      }
 
-        <!-- Add member -->
+      <!-- Add member -->
+      @if (memberFormOpen()) {
         <div class="card mb-4 bg-base-100">
           <div class="card-body p-4">
-            <h2 class="card-title text-lg">Add member</h2>
-            <p class="text-xs text-base-content/60">
-              The person must have logged in at least once before they can be added.
-            </p>
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <h2 class="section-title">Add member</h2>
+                <p class="type-caption mt-1">
+                  The person must have logged in at least once before they can be added.
+                </p>
+              </div>
+              <button
+                appButton
+                variant="ghost"
+                [iconOnly]="true"
+                type="button"
+                aria-label="Close add member form"
+                (click)="memberFormOpen.set(false)"
+              >
+                <app-icon name="heroXMark" />
+              </button>
+            </div>
             @if (!canAddMember()) {
               <div class="alert mt-2 border border-warning/20 bg-warning/5 text-sm">
                 <span class="flex-1">
@@ -53,73 +110,98 @@ import { RouterLink } from '@angular/router';
             }
             <form
               (submit)="$event.preventDefault(); addMember()"
-              class="mt-2 flex flex-wrap items-end gap-3"
+              class="mt-3 grid items-end gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_auto]"
             >
-              <label class="form-control">
-                <span class="label-text">Phone</span>
+              <app-form-field label="Phone" [required]="true">
                 <input
                   type="tel"
-                  class="input input-bordered input-sm"
+                  class="input input-bordered input-sm w-full"
                   placeholder="0712 345 678"
                   [formControl]="memberPhone"
                 />
-              </label>
-              <label class="form-control">
-                <span class="label-text">Role</span>
-                <select class="select select-bordered select-sm" [formControl]="memberRole">
+              </app-form-field>
+              <app-form-field label="Role" [required]="true">
+                <select class="select select-bordered select-sm w-full" [formControl]="memberRole">
                   @for (r of roles(); track r.id) {
                     <option [value]="r.id">{{ r.name }}</option>
                   }
                 </select>
-              </label>
+              </app-form-field>
               <button
+                appButton
                 type="submit"
-                class="btn btn-primary btn-sm"
+                size="sm"
                 [disabled]="busy() || roles().length === 0 || !canAddMember()"
+                [loading]="busy()"
               >
-                {{ busy() ? 'Adding…' : 'Add member' }}
+                Add member
               </button>
             </form>
           </div>
         </div>
+      }
 
-        <!-- Members -->
-        <h2 class="mb-2 text-lg font-semibold">Members</h2>
-        <div class="card mb-4 bg-base-100">
-          <div class="table-scroll">
+      <!-- Members -->
+      <app-list-search-bar
+        placeholder="Search member, role, or status…"
+        [searchQuery]="memberQuery()"
+        (searchQueryChange)="memberQuery.set($event); memberPage.set(1)"
+      >
+        <app-stat-bar summary [stats]="teamStats()" />
+      </app-list-search-bar>
+
+      @if (filteredMembers().length === 0) {
+        <app-empty-state
+          [compact]="true"
+          icon="heroUsers"
+          [title]="memberQuery() ? 'No matching members' : 'No team members yet'"
+          description="Add a member from the page header."
+        />
+      } @else {
+        <div class="hidden lg:block">
+          <app-data-table-shell
+            title="Members"
+            [description]="filteredMembers().length + ' members'"
+          >
             <table class="table table-sm">
               <thead>
                 <tr>
                   <th>User</th>
                   <th>Role</th>
                   <th>Status</th>
-                  <th class="hidden sm:table-cell">Joined</th>
-                  <th></th>
+                  <th>Joined</th>
+                  <th class="text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 @for (m of pagedMembers(); track m.id) {
                   <tr>
                     <td>
-                      <div class="flex items-center gap-2">
+                      <div class="table-entity">
                         <app-entity-avatar size="sm" [firstName]="m.roles?.name ?? '?'" />
-                        <span class="font-mono text-xs" [title]="m.user_id">
-                          User …{{ shortId(m.user_id) }}
-                        </span>
+                        <div>
+                          <p class="table-primary font-mono" [title]="m.user_id">
+                            User …{{ shortId(m.user_id) }}
+                          </p>
+                          <p class="table-secondary">Team member</p>
+                        </div>
                       </div>
                     </td>
                     <td>{{ m.roles?.name ?? '—' }}</td>
                     <td>
                       <app-status-badge
+                        size="xs"
                         [type]="memberStatusType(m.authorization_status)"
                         [label]="m.authorization_status"
                       />
                     </td>
-                    <td class="hidden text-xs sm:table-cell">{{ date(m.created_at) }}</td>
-                    <td class="whitespace-nowrap text-right">
+                    <td>{{ date(m.created_at) }}</td>
+                    <td class="table-actions">
                       @if (m.authorization_status === 'disabled') {
                         <button
-                          class="btn btn-success btn-outline btn-xs"
+                          appButton
+                          variant="outline"
+                          size="sm"
                           [disabled]="busy() || !canAddMember()"
                           (click)="setStatus(m, 'approved')"
                         >
@@ -127,7 +209,9 @@ import { RouterLink } from '@angular/router';
                         </button>
                       } @else {
                         <button
-                          class="btn btn-warning btn-outline btn-xs"
+                          appButton
+                          variant="outline"
+                          size="sm"
                           [disabled]="busy()"
                           (click)="setStatus(m, 'disabled')"
                         >
@@ -135,7 +219,10 @@ import { RouterLink } from '@angular/router';
                         </button>
                       }
                       <button
-                        class="btn btn-error btn-outline btn-xs"
+                        appButton
+                        variant="ghost"
+                        size="sm"
+                        class="ml-1 text-error"
                         [disabled]="busy()"
                         (click)="startRemove(m)"
                       >
@@ -146,96 +233,163 @@ import { RouterLink } from '@angular/router';
                 }
               </tbody>
             </table>
-          </div>
-          <div class="p-3 pt-0">
-            <app-pagination
-              [currentPage]="memberPage()"
-              [totalPages]="memberTotalPages()"
-              [totalItems]="members().length"
-              [itemsPerPage]="memberPageSize()"
-              itemLabel="members"
-              [showItemsPerPage]="true"
-              (pageChange)="memberPage.set($event)"
-              (itemsPerPageChange)="memberPageSize.set($event); memberPage.set(1)"
-            />
-          </div>
+          </app-data-table-shell>
         </div>
 
-        <!-- Roles -->
-        <div class="mb-2 flex items-center justify-between">
-          <h2 class="text-lg font-semibold">Roles</h2>
-          <button class="btn btn-ghost btn-sm" (click)="startRoleCreate()">+ New role</button>
-        </div>
-
-        @if (roleFormOpen()) {
-          <div class="card mb-4 bg-base-100">
-            <div class="card-body p-4">
-              <h3 class="card-title text-base">
-                {{ editingRole() ? 'Edit ' + editingRole()!.name : 'New role' }}
-              </h3>
-              <form (submit)="$event.preventDefault(); saveRole()" class="mt-2 flex flex-col gap-3">
-                <label class="form-control max-w-xs">
-                  <span class="label-text">Name *</span>
-                  <input
-                    type="text"
-                    class="input input-bordered input-sm"
-                    [formControl]="roleName"
-                  />
-                </label>
-                <div class="grid grid-cols-2 gap-1 sm:grid-cols-3">
-                  @for (perm of allPermissions; track perm) {
-                    <label class="label cursor-pointer justify-start gap-2 py-0">
-                      <input
-                        type="checkbox"
-                        class="checkbox checkbox-sm"
-                        [checked]="rolePermissions().has(perm)"
-                        (change)="togglePermission(perm)"
-                      />
-                      <span class="label-text text-xs">{{ perm }}</span>
-                    </label>
-                  }
-                </div>
-                <div class="flex gap-2">
-                  <button
-                    type="submit"
-                    class="btn btn-primary btn-sm"
-                    [disabled]="busy() || roleName.value.trim().length === 0"
-                  >
-                    {{ busy() ? 'Saving…' : editingRole() ? 'Save role' : 'Create role' }}
-                  </button>
-                  <button type="button" class="btn btn-ghost btn-sm" (click)="closeRoleForm()">
-                    Cancel
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        }
-
-        <div class="flex flex-col gap-2">
-          @for (r of roles(); track r.id) {
+        <div class="flex flex-col gap-2 lg:hidden">
+          @for (m of pagedMembers(); track m.id) {
             <div class="card bg-base-100">
-              <div class="card-body p-4">
+              <div class="card-body gap-3 p-4">
                 <div class="flex items-center gap-3">
-                  <span class="font-semibold">{{ r.name }}</span>
-                  @if (r.is_template) {
-                    <span class="badge badge-xs badge-outline">template</span>
-                  }
-                  <button class="btn btn-ghost btn-xs ml-auto" (click)="startRoleEdit(r)">
-                    Edit
-                  </button>
+                  <app-entity-avatar size="sm" [firstName]="m.roles?.name ?? '?'" />
+                  <div class="min-w-0 flex-1">
+                    <p class="font-mono text-sm font-semibold" [title]="m.user_id">
+                      User …{{ shortId(m.user_id) }}
+                    </p>
+                    <p class="type-caption mt-0.5">{{ m.roles?.name ?? 'No role' }}</p>
+                  </div>
+                  <app-status-badge
+                    size="xs"
+                    [type]="memberStatusType(m.authorization_status)"
+                    [label]="m.authorization_status"
+                  />
                 </div>
-                <div class="mt-1 flex flex-wrap gap-1">
-                  @for (perm of r.permissions; track perm) {
-                    <span class="badge badge-xs badge-ghost">{{ perm }}</span>
+                <div class="flex items-center gap-2 border-t border-base-300/60 pt-3">
+                  <span class="type-caption">Joined {{ date(m.created_at) }}</span>
+                  @if (m.authorization_status === 'disabled') {
+                    <button
+                      appButton
+                      variant="outline"
+                      size="sm"
+                      class="ml-auto"
+                      [disabled]="busy() || !canAddMember()"
+                      (click)="setStatus(m, 'approved')"
+                    >
+                      Enable
+                    </button>
+                  } @else {
+                    <button
+                      appButton
+                      variant="outline"
+                      size="sm"
+                      class="ml-auto"
+                      [disabled]="busy()"
+                      (click)="setStatus(m, 'disabled')"
+                    >
+                      Disable
+                    </button>
                   }
+                  <button
+                    appButton
+                    variant="ghost"
+                    size="sm"
+                    class="text-error"
+                    [disabled]="busy()"
+                    (click)="startRemove(m)"
+                  >
+                    Remove
+                  </button>
                 </div>
               </div>
             </div>
           }
         </div>
+
+        <div class="mt-3 mb-6">
+          <app-pagination
+            [currentPage]="memberPage()"
+            [totalPages]="memberTotalPages()"
+            [totalItems]="filteredMembers().length"
+            [itemsPerPage]="memberPageSize()"
+            itemLabel="members"
+            [showItemsPerPage]="true"
+            (pageChange)="memberPage.set($event)"
+            (itemsPerPageChange)="memberPageSize.set($event); memberPage.set(1)"
+          />
+        </div>
+      }
+
+      <!-- Roles -->
+      <div class="mb-2 flex items-center justify-between">
+        <div>
+          <h2 class="section-title">Roles</h2>
+          <p class="type-caption mt-1">Permission bundles assigned to team members.</p>
+        </div>
+        <button appButton variant="outline" size="sm" (click)="startRoleCreate()">
+          <app-icon name="heroPlus" /> New role
+        </button>
       </div>
 
+      @if (roleFormOpen()) {
+        <div class="card mb-4 bg-base-100">
+          <div class="card-body p-4">
+            <h3 class="card-title text-base">
+              {{ editingRole() ? 'Edit ' + editingRole()!.name : 'New role' }}
+            </h3>
+            <form (submit)="$event.preventDefault(); saveRole()" class="mt-3 flex flex-col gap-3">
+              <app-form-field label="Role name" [required]="true" class="max-w-xs">
+                <input type="text" class="input input-bordered input-sm" [formControl]="roleName" />
+              </app-form-field>
+              <div class="grid grid-cols-2 gap-1 sm:grid-cols-3">
+                @for (perm of allPermissions; track perm) {
+                  <label class="label cursor-pointer justify-start gap-2 py-0">
+                    <input
+                      type="checkbox"
+                      class="checkbox checkbox-sm"
+                      [checked]="rolePermissions().has(perm)"
+                      (change)="togglePermission(perm)"
+                    />
+                    <span class="label-text text-xs">{{ permissionLabels[perm] }}</span>
+                  </label>
+                }
+              </div>
+              <div class="flex gap-2">
+                <button
+                  appButton
+                  type="submit"
+                  size="sm"
+                  [loading]="busy()"
+                  [disabled]="busy() || roleName.value.trim().length === 0"
+                >
+                  {{ editingRole() ? 'Save role' : 'Create role' }}
+                </button>
+                <button appButton variant="ghost" type="button" size="sm" (click)="closeRoleForm()">
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      }
+
+      <div class="grid gap-2 md:grid-cols-2">
+        @for (r of roles(); track r.id) {
+          <div class="card bg-base-100">
+            <div class="card-body p-4">
+              <div class="flex items-center gap-3">
+                <span class="font-semibold">{{ r.name }}</span>
+                @if (r.is_template) {
+                  <span class="badge badge-xs badge-outline">template</span>
+                }
+                <button
+                  appButton
+                  variant="ghost"
+                  size="sm"
+                  class="ml-auto"
+                  (click)="startRoleEdit(r)"
+                >
+                  <app-icon name="heroPencilSquare" /> Edit
+                </button>
+              </div>
+              <div class="mt-1 flex flex-wrap gap-1">
+                @for (perm of r.permissions; track perm) {
+                  <span class="badge badge-xs badge-ghost">{{ permissionLabel(perm) }}</span>
+                }
+              </div>
+            </div>
+          </div>
+        }
+      </div>
       <app-delete-confirmation-modal
         [data]="removeData()"
         title="Remove team member?"
@@ -244,7 +398,7 @@ import { RouterLink } from '@angular/router';
         confirmButtonText="Remove"
         (confirm)="confirmRemove()"
       />
-    </main>
+    </app-page>
   `,
 })
 export class TeamComponent implements OnInit {
@@ -252,17 +406,30 @@ export class TeamComponent implements OnInit {
   protected readonly entitlements = inject(EntitlementsService);
 
   protected readonly allPermissions = ALL_PERMISSIONS;
+  protected readonly permissionLabels = PERMISSION_LABELS;
   protected readonly members = signal<MembershipWithRole[]>([]);
   protected readonly roles = signal<Role[]>([]);
+  protected readonly memberFormOpen = signal(false);
+  protected readonly memberQuery = signal('');
   protected readonly memberPage = signal(1);
   protected readonly memberPageSize = signal(10);
+  protected readonly filteredMembers = computed(() => {
+    const query = this.memberQuery().trim().toLowerCase();
+    if (!query) return this.members();
+    return this.members().filter(member =>
+      [member.user_id, member.roles?.name ?? '', member.authorization_status]
+        .join(' ')
+        .toLowerCase()
+        .includes(query)
+    );
+  });
   protected readonly memberTotalPages = computed(() =>
-    Math.max(1, Math.ceil(this.members().length / this.memberPageSize()))
+    Math.max(1, Math.ceil(this.filteredMembers().length / this.memberPageSize()))
   );
   protected readonly pagedMembers = computed(() => {
     const page = Math.min(this.memberPage(), this.memberTotalPages());
     const start = (page - 1) * this.memberPageSize();
-    return this.members().slice(start, start + this.memberPageSize());
+    return this.filteredMembers().slice(start, start + this.memberPageSize());
   });
   protected readonly removingMember = signal<MembershipWithRole | null>(null);
   private readonly deleteModal = viewChild(DeleteConfirmationModalComponent);
@@ -276,12 +443,27 @@ export class TeamComponent implements OnInit {
   protected readonly rolePermissions = signal<Set<string>>(new Set());
 
   protected readonly busy = signal(false);
+  protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
+
+  protected permissionLabel(permission: string): string {
+    return PERMISSION_LABELS[permission as keyof typeof PERMISSION_LABELS] ?? permission;
+  }
   protected readonly memberLimit = computed(() => this.entitlements.limit('maxAdmins'));
   protected readonly activeMemberCount = computed(
     () => this.members().filter(member => member.authorization_status === 'approved').length
   );
+  protected readonly teamStats = computed(() => [
+    { label: 'Members', value: this.members().length },
+    { label: 'Active', value: this.activeMemberCount(), tone: 'success' as const },
+    {
+      label: 'Pending',
+      value: this.members().filter(member => member.authorization_status === 'pending').length,
+      tone: 'warning' as const,
+    },
+    { label: 'Roles', value: this.roles().length },
+  ]);
   protected readonly canAddMember = computed(() => {
     const limit = this.memberLimit();
     return limit === null || this.activeMemberCount() < limit;
@@ -292,6 +474,7 @@ export class TeamComponent implements OnInit {
   }
 
   protected async load(): Promise<void> {
+    this.loading.set(true);
     try {
       const [members, roles] = await Promise.all([this.team.memberships(), this.team.roles()]);
       this.members.set(members);
@@ -301,6 +484,8 @@ export class TeamComponent implements OnInit {
       await this.entitlements.refresh();
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Failed to load team');
+    } finally {
+      this.loading.set(false);
     }
   }
 
@@ -317,6 +502,7 @@ export class TeamComponent implements OnInit {
       await this.team.addTeamMember(phone, this.memberRole.value);
       this.notice.set(`Added ${phone}`);
       this.memberPhone.setValue('');
+      this.memberFormOpen.set(false);
       await this.load();
     } catch (err) {
       // user_not_registered is the common one — show verbatim.

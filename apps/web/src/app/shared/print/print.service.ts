@@ -56,6 +56,10 @@ export class PrintService {
     printMeta?: PrintMeta,
     templateId?: PrintFormat
   ): Promise<void> {
+    const documentType = printMeta?.documentType ?? 'receipt';
+    if (documentType === 'receipt' && order.state !== 'Fulfilled') {
+      throw new Error('Receipt unavailable — complete payment before printing.');
+    }
     const template = this.templates.get(templateId ?? this.format());
     if (!template) return;
     const html = template.render(order, companyLogo, companyName, printMeta);

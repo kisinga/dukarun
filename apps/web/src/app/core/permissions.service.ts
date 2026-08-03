@@ -1,7 +1,7 @@
 import { Injectable, effect, inject, signal } from '@angular/core';
 import { SupabaseService } from './supabase.service';
 
-/** The 14 assignable permissions (role editor checkboxes; mirrored in the DB role templates). */
+/** Assignable permissions (role editor checkboxes; mirrored in the DB role templates). */
 export const ALL_PERMISSIONS = [
   'ManageApprovals',
   'OverridePrice',
@@ -17,9 +17,28 @@ export const ALL_PERMISSIONS = [
   'CloseAccountingPeriod',
   'CreateInterAccountTransfer',
   'ManageTeam',
+  'ViewAuditTrail',
 ] as const;
 
 export type Permission = (typeof ALL_PERMISSIONS)[number];
+
+export const PERMISSION_LABELS: Record<Permission, string> = {
+  ManageApprovals: 'Manage approvals',
+  OverridePrice: 'Override prices',
+  ManageStockAdjustments: 'Manage stock adjustments',
+  ApproveCustomerCredit: 'Approve customer credit',
+  ManageCustomerCreditLimit: 'Manage customer credit limits',
+  ReverseOrder: 'Reverse sales',
+  OverrideCustomerBalance: 'Override customer balances',
+  SettleOrder: 'Settle sales',
+  ManageSupplierCreditPurchases: 'Manage supplier credit',
+  ViewFinancials: 'View financials',
+  ManageReconciliation: 'Manage reconciliation',
+  CloseAccountingPeriod: 'Close accounting periods',
+  CreateInterAccountTransfer: 'Transfer between accounts',
+  ManageTeam: 'Manage team',
+  ViewAuditTrail: 'View audit trail',
+};
 
 /**
  * Current user's permission set (The Counter — people see only what their role allows).

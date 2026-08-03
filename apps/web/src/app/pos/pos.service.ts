@@ -300,15 +300,22 @@ export class PosService {
 
   /** Full active catalog for the offline snapshot (IndexedDB cache). */
   async fetchActiveVariants(): Promise<Variant[]> {
-    const { data, error } = await this.client
-      .from('variant_catalog')
-      .select('*')
-      .eq('variant_active', true)
-      .eq('product_active', true)
-      .order('product_name')
-      .limit(500);
-    if (error) throw error;
-    return data;
+    const pageSize = 500;
+    const products: Variant[] = [];
+    for (let from = 0; ; from += pageSize) {
+      const { data, error } = await this.client
+        .from('variant_catalog')
+        .select('*')
+        .eq('variant_active', true)
+        .eq('product_active', true)
+        .order('product_name')
+        .order('variant_name')
+        .order('variant_id')
+        .range(from, from + pageSize - 1);
+      if (error) throw error;
+      products.push(...data);
+      if (data.length < pageSize) return products;
+    }
   }
 
   // --- Product images (bucket: product-images, public) ---
@@ -600,6 +607,13 @@ export class PosService {
     const { data, error } = await this.client.rpc('delete_proforma', {
       p_order_id: orderId,
     });
+    if (error) throw rpcError(error);
+    return data;
+  }
+
+  /** Mark this company's unconverted, past-due proformas as expired. */
+  async expireProformas(): Promise<number> {
+    const { data, error } = await this.client.rpc('expire_proformas');
     if (error) throw rpcError(error);
     return data;
   }

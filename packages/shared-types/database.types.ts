@@ -340,6 +340,7 @@ export type Database = {
           notification_category_preferences: Json | null;
           paystack_customer_code: string | null;
           paystack_subscription_code: string | null;
+          proforma_validity_days: number;
           public_slug: string | null;
           public_storefront_enabled: boolean;
           public_whatsapp_number: string | null;
@@ -379,6 +380,7 @@ export type Database = {
           notification_category_preferences?: Json | null;
           paystack_customer_code?: string | null;
           paystack_subscription_code?: string | null;
+          proforma_validity_days?: number;
           public_slug?: string | null;
           public_storefront_enabled?: boolean;
           public_whatsapp_number?: string | null;
@@ -418,6 +420,7 @@ export type Database = {
           notification_category_preferences?: Json | null;
           paystack_customer_code?: string | null;
           paystack_subscription_code?: string | null;
+          proforma_validity_days?: number;
           public_slug?: string | null;
           public_storefront_enabled?: boolean;
           public_whatsapp_number?: string | null;
@@ -789,6 +792,7 @@ export type Database = {
       };
       inventory_movements: {
         Row: {
+          actor: string | null;
           batch_id: string | null;
           company_id: string;
           created_at: string;
@@ -803,6 +807,7 @@ export type Database = {
           variant_id: string;
         };
         Insert: {
+          actor?: string | null;
           batch_id?: string | null;
           company_id: string;
           created_at?: string;
@@ -817,6 +822,7 @@ export type Database = {
           variant_id: string;
         };
         Update: {
+          actor?: string | null;
           batch_id?: string | null;
           company_id?: string;
           created_at?: string;
@@ -1288,6 +1294,7 @@ export type Database = {
           created_at: string;
           created_by: string | null;
           customer_id: string | null;
+          expires_at: string;
           id: string;
           is_credit_sale: boolean;
           status: string;
@@ -1306,6 +1313,7 @@ export type Database = {
           created_at?: string;
           created_by?: string | null;
           customer_id?: string | null;
+          expires_at?: string;
           id?: string;
           is_credit_sale?: boolean;
           status?: string;
@@ -1324,6 +1332,7 @@ export type Database = {
           created_at?: string;
           created_by?: string | null;
           customer_id?: string | null;
+          expires_at?: string;
           id?: string;
           is_credit_sale?: boolean;
           status?: string;
@@ -2996,6 +3005,41 @@ export type Database = {
         Returns: string;
       };
       apply_role_template: { Args: { p_template_id: string }; Returns: string };
+      list_audit_actors: {
+        Args: never;
+        Returns: {
+          phone: string | null;
+          role_name: string | null;
+          user_id: string;
+        }[];
+      };
+      list_audit_events: {
+        Args: {
+          p_action?: string;
+          p_actor?: string;
+          p_area?: string;
+          p_from?: string;
+          p_limit?: number;
+          p_offset?: number;
+          p_search?: string;
+        };
+        Returns: {
+          actor_id: string | null;
+          actor_phone: string | null;
+          actor_role: string | null;
+          after_data: Json;
+          area: string;
+          before_data: Json;
+          entity_id: string | null;
+          entity_type: string;
+          event_id: string;
+          event_source: string;
+          occurred_at: string;
+          operation: string;
+          reason: string | null;
+          total_count: number;
+        }[];
+      };
       approve_request: {
         Args: { p_approval_id: string; p_reason?: string };
         Returns: string;
@@ -3116,6 +3160,7 @@ export type Database = {
         Args: { p_approval_id: string; p_reason?: string };
         Returns: string;
       };
+      expire_proformas: { Args: never; Returns: number };
       do_void: {
         Args: { p_order_id: string; p_reason: string };
         Returns: string;

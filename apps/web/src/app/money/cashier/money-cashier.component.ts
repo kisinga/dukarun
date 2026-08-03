@@ -1,6 +1,12 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
-import { FormControl, FormsModule, ReactiveFormsModule } from '@angular/forms';
-import { parseKesToCents } from '../../core/money';
+import { Component, OnInit, effect, inject, signal } from '@angular/core';
+import { FormControl, ReactiveFormsModule } from '@angular/forms';
+import { CashierSessionDialogService } from '../../core/cashier-session-dialog.service';
+import { PermissionsService } from '../../core/permissions.service';
+import { ButtonComponent } from '../../shared/ui/button.component';
+import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
+import { IconComponent } from '../../shared/ui/icon.component';
+import { MoneyComponent } from '../../shared/ui/money.component';
+import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
 import {
   CashierAccount,
   CashierSession,
@@ -8,118 +14,104 @@ import {
   ReconAccountWithParent,
   SessionWithCounts,
 } from '../money.service';
-import { PrintService } from '../../shared/print/print.service';
-import { ReceiptDataService } from '../../shared/print/receipt-data.service';
-import { ButtonComponent } from '../../shared/ui/button.component';
-import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
-import { FormFieldComponent } from '../../shared/ui/form-field.component';
-import { MoneyComponent } from '../../shared/ui/money.component';
-import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
-import { CashierSessionService } from '../../core/cashier-session.service';
 
 @Component({
   selector: 'app-money-cashier',
   imports: [
-    FormsModule,
     ReactiveFormsModule,
-    FormFieldComponent,
     ButtonComponent,
     MoneyComponent,
     EmptyStateComponent,
     StatusBadgeComponent,
+    IconComponent,
   ],
   template: `
-    <div class="mb-3 flex items-center justify-end">
-      <button appButton variant="ghost" (click)="load()">Refresh</button>
+    <div class="mb-3 flex flex-wrap items-start gap-3">
+      <div>
+        <h2 class="section-title">Cashier sessions</h2>
+        <p class="type-caption mt-1">Review session history and recent count variances.</p>
+      </div>
+      <button
+        appButton
+        variant="ghost"
+        [iconOnly]="true"
+        class="ml-auto"
+        type="button"
+        title="Refresh cashier sessions"
+        aria-label="Refresh cashier sessions"
+        (click)="load()"
+      >
+        <app-icon name="heroArrowPath" />
+      </button>
     </div>
 
     @if (error()) {
-      <p class="mb-2 text-sm text-error">{{ error() }}</p>
+      <div role="alert" class="alert alert-error mb-3 text-sm">
+        <app-icon name="heroExclamationTriangle" />
+        <span>{{ error() }}</span>
+      </div>
     }
     @if (notice()) {
-      <p class="mb-2 text-sm text-success">{{ notice() }}</p>
-    }
-    @if (lastClosedSessionId(); as sid) {
-      @if (printerEnabled()) {
-        <button appButton variant="outline" class="mb-4 min-h-11" (click)="printSlip(sid)">
-          Print cashier slip
-        </button>
-      }
+      <div role="status" class="alert alert-success mb-3 text-sm">
+        <app-icon name="heroCheckCircle" />
+        <span>{{ notice() }}</span>
+      </div>
     }
 
-    <!-- Current open session / open-close forms -->
     <div class="card mb-4 bg-base-100">
-      <div class="card-body p-4">
-        @if (openSession(); as session) {
-          <h2 class="section-title mb-2">Open session</h2>
-          <p class="text-sm text-base-content/70">Opened {{ time(session.opened_at) }}</p>
-
-          <h3 class="mt-4 font-semibold">Close session — blind count</h3>
-          <p class="text-xs text-base-content/60">
-            This count is blind — you won't see the expected amount. Count what's actually in the
-            drawer and enter it per account.
-          </p>
-          <div class="mt-2 flex flex-col gap-2">
-            @for (account of accounts(); track account.account_code) {
-              <app-form-field [label]="account.label + ' (' + account.account_code + ')'">
-                <input
-                  type="text"
-                  inputmode="numeric"
-                  class="input input-bordered input-sm w-full"
-                  placeholder="0"
-                  [(ngModel)]="declared[account.account_code]"
-                />
-              </app-form-field>
-            }
-            <button
-              appButton
-              variant="error"
-              class="mt-2 self-start"
-              [loading]="busy()"
-              (click)="closeSession(session.id)"
-            >
-              Close session
-            </button>
+      <div class="flex flex-wrap items-center gap-3 p-4">
+        <div
+          class="flex h-10 w-10 shrink-0 items-center justify-center rounded-field"
+          [class.bg-success/10]="openSession()"
+          [class.text-success]="openSession()"
+          [class.bg-base-200]="!openSession()"
+          [class.text-base-content/50]="!openSession()"
+        >
+          <app-icon [name]="openSession() ? 'heroLockOpen' : 'heroLockClosed'" size="lg" />
+        </div>
+        <div class="min-w-0">
+          <div class="flex flex-wrap items-center gap-2">
+            <h3 class="text-sm font-semibold">
+              {{ openSession() ? 'Till is open' : 'Till is closed' }}
+            </h3>
+            <app-status-badge
+              size="xs"
+              [type]="openSession() ? 'success' : 'neutral'"
+              [label]="openSession() ? 'Open' : 'Closed'"
+            />
           </div>
-        } @else {
-          <h2 class="section-title mb-2">No open session</h2>
-          <p class="text-sm text-base-content/70">
-            Declare the opening float per account to start a session.
-          </p>
-          <div class="mt-2 flex flex-col gap-2">
-            @for (account of accounts(); track account.account_code) {
-              <app-form-field [label]="account.label + ' (' + account.account_code + ')'">
-                <input
-                  type="text"
-                  inputmode="numeric"
-                  class="input input-bordered input-sm w-full"
-                  placeholder="0"
-                  [(ngModel)]="declared[account.account_code]"
-                />
-              </app-form-field>
+          <p class="type-caption mt-0.5">
+            @if (openSession(); as session) {
+              Opened {{ time(session.opened_at) }} · {{ accounts().length }} controlled
+              {{ accounts().length === 1 ? 'account' : 'accounts' }}
+            } @else {
+              No active cashier session.
             }
-            <button
-              appButton
-              size="md"
-              class="mt-2 self-start"
-              [loading]="busy()"
-              [disabled]="accounts().length === 0"
-              (click)="openNewSession()"
-            >
-              Open session
-            </button>
-          </div>
-        }
+          </p>
+        </div>
+        <button
+          appButton
+          class="ml-auto"
+          [variant]="openSession() ? 'outline' : 'primary'"
+          type="button"
+          [disabled]="accounts().length === 0"
+          (click)="cashierDialog.show()"
+        >
+          <app-icon [name]="openSession() ? 'heroLockClosed' : 'heroLockOpen'" />
+          {{ openSession() ? 'Close session' : 'Open session' }}
+        </button>
       </div>
     </div>
 
-    <!-- Recent sessions -->
     <h2 class="section-title mb-2">Recent sessions</h2>
+    <p class="type-caption mb-3">
+      A variance can only be reverted before the next opening, closing, or reconciliation.
+    </p>
     @if (sessions().length === 0) {
       <app-empty-state
         icon="heroBanknotes"
         title="No sessions yet"
-        description="Open a session above to start counting the till."
+        description="Use the Till action to open the first cashier session."
       />
     } @else {
       <div class="flex flex-col gap-2">
@@ -136,31 +128,33 @@ import { CashierSessionService } from '../../core/cashier-session.service';
                 }
               </div>
               @if (session.cash_drawer_counts.length > 0) {
-                <table class="table table-sm mt-2">
-                  <thead>
-                    <tr>
-                      <th>Count</th>
-                      <th class="text-right">Declared</th>
-                      <th class="text-right">Expected</th>
-                      <th class="text-right">Variance</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    @for (count of session.cash_drawer_counts; track count.id) {
+                <div class="table-scroll">
+                  <table class="table table-sm mt-2">
+                    <thead>
                       <tr>
-                        <td>{{ count.count_type }}</td>
-                        <td class="text-right"><app-money [cents]="count.declared_cash" /></td>
-                        <td class="text-right"><app-money [cents]="count.expected_cash" /></td>
-                        <td
-                          class="text-right font-semibold"
-                          [class.text-error]="count.variance !== 0"
-                        >
-                          <app-money [cents]="count.variance" />
-                        </td>
+                        <th>Count</th>
+                        <th class="text-right">Declared</th>
+                        <th class="text-right">Expected</th>
+                        <th class="text-right">Variance</th>
                       </tr>
-                    }
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      @for (count of session.cash_drawer_counts; track count.id) {
+                        <tr>
+                          <td>{{ count.count_type }}</td>
+                          <td class="text-right"><app-money [cents]="count.declared_cash" /></td>
+                          <td class="text-right"><app-money [cents]="count.expected_cash" /></td>
+                          <td
+                            class="text-right font-semibold"
+                            [class.text-error]="count.variance !== 0"
+                          >
+                            <app-money [cents]="count.variance" />
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
               }
               @if (reconFor(session.id).length > 0) {
                 <h3 class="type-heading mt-3">Variance review</h3>
@@ -194,7 +188,16 @@ import { CashierSessionService } from '../../core/cashier-session.service';
                                 {{ date(ra.reviewed_at) }}
                               </span>
                             } @else if (ra.variance !== 0) {
-                              @if (revertingFor() === ra.id) {
+                              @if (!perms.has('ManageReconciliation')) {
+                                <span class="type-caption">Manager review</span>
+                              } @else if (!canRevert(ra)) {
+                                <span
+                                  class="type-caption"
+                                  title="A newer opening, closing, or reconciliation has occurred"
+                                >
+                                  Review window closed
+                                </span>
+                              } @else if (revertingFor() === ra.id) {
                                 <div class="flex items-center justify-end gap-1">
                                   <input
                                     type="text"
@@ -241,26 +244,28 @@ import { CashierSessionService } from '../../core/cashier-session.service';
   `,
 })
 export class MoneyCashierComponent implements OnInit {
-  private readonly cashierSessionState = inject(CashierSessionService);
   private readonly money = inject(MoneyService);
-  private readonly receiptData = inject(ReceiptDataService);
-  private readonly print = inject(PrintService);
+  protected readonly perms = inject(PermissionsService);
+  protected readonly cashierDialog = inject(CashierSessionDialogService);
 
   protected readonly accounts = signal<CashierAccount[]>([]);
   protected readonly openSession = signal<CashierSession | null>(null);
   protected readonly sessions = signal<SessionWithCounts[]>([]);
-  protected readonly declared: Record<string, string> = {};
+  protected readonly reconAccounts = signal<ReconAccountWithParent[]>([]);
+  protected readonly latestReconciliationId = signal<string | null>(null);
+  protected readonly revertingFor = signal<string | null>(null);
+  protected readonly revertReason = new FormControl('', { nonNullable: true });
   protected readonly busy = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
-  protected readonly printerEnabled = signal(false);
-  protected readonly lastClosedSessionId = signal<string | null>(null);
-  protected readonly reconAccounts = signal<ReconAccountWithParent[]>([]);
-  protected readonly revertingFor = signal<string | null>(null);
-  protected readonly revertReason = new FormControl('', { nonNullable: true });
+
+  constructor() {
+    effect(() => {
+      if (this.cashierDialog.completed() > 0) void this.load();
+    });
+  }
 
   async ngOnInit(): Promise<void> {
-    this.printerEnabled.set(await this.receiptData.printerEnabled());
     await this.load();
   }
 
@@ -271,65 +276,29 @@ export class MoneyCashierComponent implements OnInit {
         this.money.openSession(),
         this.money.recentSessions(),
       ]);
+      const [reconAccounts, latestReconciliationId] = await Promise.all([
+        this.money.sessionReconAccounts(sessions.map(session => session.id)),
+        this.money.latestReconciliationId(),
+      ]);
       this.accounts.set(accounts);
       this.openSession.set(open);
       this.sessions.set(sessions);
-      this.reconAccounts.set(await this.money.sessionReconAccounts(sessions.map(x => x.id)));
-      // Pre-fill zeroes for any new account.
-      for (const a of accounts) this.declared[a.account_code] ??= '0';
+      this.reconAccounts.set(reconAccounts);
+      this.latestReconciliationId.set(latestReconciliationId);
       this.error.set(null);
-    } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Failed to load sessions');
-    }
-  }
-
-  protected async openNewSession(): Promise<void> {
-    await this.submit(decls => this.money.openCashierSession(decls), 'Session opened');
-  }
-
-  protected async closeSession(sessionId: string): Promise<void> {
-    const done = await this.submit(
-      decls => this.money.closeCashierSession(sessionId, decls),
-      'Session closed'
-    );
-    if (done) this.lastClosedSessionId.set(sessionId);
-  }
-
-  private async submit(
-    action: (decls: { account_code: string; declared: number }[]) => Promise<string>,
-    successMessage: string
-  ): Promise<boolean> {
-    const decls: { account_code: string; declared: number }[] = [];
-    for (const account of this.accounts()) {
-      const cents = parseKesToCents(this.declared[account.account_code] ?? '');
-      if (cents === null) {
-        this.error.set(`Enter a valid amount for ${account.label}`);
-        return false;
-      }
-      decls.push({ account_code: account.account_code, declared: cents });
-    }
-    this.busy.set(true);
-    this.error.set(null);
-    this.notice.set(null);
-    try {
-      await action(decls);
-      this.notice.set(successMessage);
-      for (const a of this.accounts()) this.declared[a.account_code] = '0';
-      await this.load();
-      await this.cashierSessionState.refresh();
-      return true;
-    } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Request failed');
-      return false;
-    } finally {
-      this.busy.set(false);
+    } catch (error) {
+      this.error.set(error instanceof Error ? error.message : 'Failed to load sessions');
     }
   }
 
   protected reconFor(sessionId: string): ReconAccountWithParent[] {
-    return this.reconAccounts().filter(ra =>
-      ra.reconciliations?.scope_ref_id.startsWith(`${sessionId}:`)
+    return this.reconAccounts().filter(account =>
+      account.reconciliations?.scope_ref_id.startsWith(`${sessionId}:`)
     );
+  }
+
+  protected canRevert(account: ReconAccountWithParent): boolean {
+    return account.reconciliations?.id === this.latestReconciliationId();
   }
 
   protected startRevert(reconAccountId: string): void {
@@ -346,8 +315,8 @@ export class MoneyCashierComponent implements OnInit {
       this.notice.set('Variance reverted and marked reviewed');
       this.revertingFor.set(null);
       await this.load();
-    } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Revert failed');
+    } catch (error) {
+      this.error.set(error instanceof Error ? error.message : 'Revert failed');
     } finally {
       this.busy.set(false);
     }
@@ -359,18 +328,6 @@ export class MoneyCashierComponent implements OnInit {
 
   protected date(iso: string): string {
     return new Date(iso).toLocaleDateString('en-KE', { month: 'short', day: 'numeric' });
-  }
-
-  protected async printSlip(sessionId: string): Promise<void> {
-    try {
-      const [{ order, meta }, company] = await Promise.all([
-        this.receiptData.buildCashierSlipData(sessionId),
-        this.receiptData.companyPrintInfo(),
-      ]);
-      await this.print.printOrder(order, company.name, company.logoUrl, meta);
-    } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Print failed');
-    }
   }
 
   protected time(iso: string): string {

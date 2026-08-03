@@ -73,13 +73,32 @@ export class ReceiptDataService {
     }
   }
 
+  /** A receipt is proof of a finalized sale, so incomplete and voided orders are rejected. */
+  async buildReceiptData(orderId: string): Promise<{ order: OrderData; meta: PrintMeta }> {
+    return this.buildOrderDocumentData(orderId, 'receipt');
+  }
+
+  /** Proformas remain printable, but only as explicitly labeled draft documents. */
+  async buildProformaData(orderId: string): Promise<{ order: OrderData; meta: PrintMeta }> {
+    return this.buildOrderDocumentData(orderId, 'proforma');
+  }
+
   /** Order + lines (labeled via variant_catalog) + payments + customer → OrderData. */
-  async buildOrderData(orderId: string): Promise<{ order: OrderData; meta: PrintMeta }> {
+  private async buildOrderDocumentData(
+    orderId: string,
+    documentType: 'receipt' | 'proforma'
+  ): Promise<{ order: OrderData; meta: PrintMeta }> {
     const [order, lines, payments] = await Promise.all([
       this.pos.getOrder(orderId),
       this.pos.orderLines(orderId),
       this.pos.orderPayments(orderId),
     ]);
+    if (documentType === 'receipt' && order.status !== 'completed') {
+      throw new Error('Receipt unavailable — complete payment before printing.');
+    }
+    if (documentType === 'proforma' && order.status !== 'draft') {
+      throw new Error('This order is no longer a draft, so its proforma cannot be printed.');
+    }
     const variants = await this.pos.variantsByIds(lines.map(l => l.variant_id));
     const byId = new Map(variants.map(v => [v.variant_id, v]));
 
@@ -89,6 +108,7 @@ export class ReceiptDataService {
       state: toLegacyState(order.status),
       createdAt: order.created_at,
       updatedAt: order.updated_at,
+      expiresAt: order.expires_at,
       orderPlacedAt: order.created_at,
       total: order.total,
       totalWithTax: order.total, // prices are tax-inclusive; no split (as the old app)
@@ -128,7 +148,7 @@ export class ReceiptDataService {
     };
 
     const meta: PrintMeta = {
-      documentType: 'receipt',
+      documentType,
       paymentMethodName:
         payments.length > 0
           ? [...new Set(payments.map(p => METHOD_LABELS[p.method_code] ?? p.method_code))].join(

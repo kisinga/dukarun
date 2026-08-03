@@ -49,9 +49,9 @@ Must read on a dim, glare-struck phone screen.
 
 ### 3. Counter speed
 
-One primary action per screen, thumb-reachable.
+One primary action per screen, in the standard page-header action group.
 
-- Touch targets ≥ 44px; the primary action is bottom-anchored on mobile.
+- Touch targets ≥ 44px; keep create actions in the same header position at every breakpoint.
 - Modals are full-screen on phones — encoded globally on `.modal-box` in `styles.scss`
   (`h-full` on mobile, `md:h-auto md:max-h-[90vh]` on desktop). Don't add your own
   height handling; per-modal width via `md:max-w-*` only.
@@ -100,13 +100,15 @@ Dashboard text never exceeds 24px. The roles are encoded as Tailwind utilities i
 - Page content lives in `<app-page>` (`PageLayoutComponent`), which owns the
   `dashboard-main` + `.page` wrapper — pages add only vertical rhythm: `space-y-6`
   between sections, `gap-2`/`gap-3` within a group. Never hand-roll the
-  `dashboard-main`/`.page` boilerplate in a page template.
+  `dashboard-main`/`.page` boilerplate in a page template. Never add a second centered
+  `max-w-*` wrapper inside it; use the standard canvas or opt the page into `[wide]="true"`.
 
 ## Icons
 
-- System: `@ng-icons/heroicons` (outline), registered via `provideIcons()`. Shared icons belong
-  in `apps/web/src/app/app.config.ts`; page-only icons should be provided at the closest lazy
-  component so they do not increase the initial bundle.
+- System: `@ng-icons/heroicons` (outline), registered via `provideIcons()` in
+  `apps/web/src/app/app.config.ts` and rendered through `<app-icon>`. Registration is centralized
+  so an icon cannot work in one component scope and silently disappear in another; the design
+  guard rejects unregistered literal Heroicon names.
 - **No inline `<svg>`, no emoji, ever** — the guard rejects them.
 - Always use `<app-icon name="hero…">` (`IconComponent`) — sizes: `sm` (14px, with
   `text-xs`), `md` (16px, with `text-sm`, the default), `lg` (20px, standalone),
@@ -131,7 +133,7 @@ Compose pages from these — never hand-roll what a primitive owns:
 - **`<app-form-field label="…">`** — one field recipe (label above the control, optional
   `hint` / `error`, `required` marker). Wrap every input/select in forms; add `w-full` to
   the projected control. No bare `form-control`/`label-text` blocks.
-- **`<button appButton>`** — one button idiom: `variant="primary|secondary|soft|outline|ghost|error"`,
+- **`<button appButton>` / `<a appButton>`** — one action idiom: `variant="primary|secondary|soft|outline|ghost|error"`,
   `size="sm|md"`, `[iconOnly]` for square icon actions, and `[loading]` to swap in a spinner
   and disable. `primary` is the one page/sheet CTA; `secondary` is a quiet filled action;
   `soft` is a low-emphasis primary-tinted action; `outline` and `ghost` step down from there.
@@ -155,23 +157,42 @@ Global recipes in `styles.scss` complement them: `.card`, `.form-field` (used by
 
 Every list page is the same four blocks, top to bottom — no improvisation:
 
-1. **`<app-page title="…">`** — the shell + header. Stats strip via `app-stat-bar` pills
+1. **`<app-page title="…" [wide]="true">`** — list pages share the wide table canvas and
+   standard header. Stats strip via `app-stat-bar` pills
    (tones are money-meaning only — neutral totals, warning/error for states that need
    action; the bar's zero-guard handles the rest). **The create action lives in the
    `[actions]` slot**: one `<button appButton>` with a `heroPlus` icon ("Add Customer",
    "Record Adjustment"…). Never in the table footer, never a bare floating row.
-2. **`<app-list-search-bar>`** — the common list top bar. It hosts the compact
-   `app-stat-bar` in `[summary]`, then search + `[badges]` + `[filters]` in one responsive
-   surface. No detached stat-card grids, custom search rows, or bare `input-bordered`.
+   Header actions always follow one order: status, ghost icon-only refresh, secondary related
+   navigation, primary create. Related navigation uses a domain icon; reserve `heroPlus` for
+   the create action. Refresh includes a tooltip, accessible label, and loading state but no
+   visible text label.
+2. **`<app-list-search-bar>`** — the common list top bar. Its first row hosts the compact
+   search field and lightweight `app-stat-bar` in `[summary]`. Optional `[filters]` sit in a
+   quieter divided row below so dense filter controls never distort the shared list identity;
+   `[badges]` may wrap underneath. The primitive owns block layout, `p-4`, and `mb-4`, aligning
+   its contents with table-shell headers and cells while guaranteeing the same gap before every
+   data surface. Pages must not wrap it just to recreate that spacing. No detached stat-card
+   grids, custom search rows, or bare `input-bordered`.
 3. **Data surface** — desktop: `<app-data-table-shell>` containing a semantic table with
    row-click navigation to the detail view (no "View" buttons); mobile: a per-domain card
    component. Empty state = `<app-empty-state>`.
-4. **`<app-pagination>`** — the shared component. Primary datasets use database counts,
-   `.range()` pagination and the page-size selector. Client-side slicing is reserved for
-   already-loaded embedded detail lists. No hand-rolled `join` pagination.
+4. **`<app-pagination>`** — the shared component, placed outside the data-table shell with
+   `mt-3` so pagination has the same breathing room on table and mobile-card layouts. Primary
+   datasets use database counts, `.range()` pagination and the page-size selector. Client-side
+   slicing is reserved for already-loaded embedded detail lists. No hand-rolled `join`
+   pagination.
 
 Pages without countable state may omit stats (rare); pages whose entities originate
-elsewhere (orders from the POS) omit the create action.
+elsewhere (sales from the POS) omit the create action.
+
+### Create and edit panels
+
+Inline create/edit panels open immediately below the page header and use the same card for
+both modes. Start with a full-width title and one-line context, use a responsive 2/4-column
+field grid, then finish with primary save + ghost cancel actions on one full-width row. The
+same header action opens the panel on desktop and mobile; do not duplicate it as a FAB or
+move it into the list toolbar.
 
 **Trend/insight cards** — the legacy app used a collapsible `<app-trend-card>` for analytics
 panels on list pages; it has not been ported to `apps/web` yet. Until it is, keep analytics
@@ -200,6 +221,29 @@ the full `page-wide` canvas. It is not a narrow feed or a collection of floating
 
 Live dashboards must show the last successful refresh time, preserve existing data during a
 background refresh, and provide explicit initial loading, error, and empty states.
+
+## The Counter Workspace (Sell)
+
+Sell is an explicit workspace variant, not an exception from the design system. It uses
+`<app-page [workspace]="true">`, which keeps the standard page header, gutters, wide canvas,
+tokens, fields, buttons, money rendering, and modal shell. The workspace may use three
+counter-speed patterns that ordinary pages may not copy without adopting this variant:
+
+- a product selector grid inside the search surface instead of a data table;
+- a sticky desktop sale summary beside the working cart;
+- one fixed mobile payment bar above the global bottom navigation.
+
+The desktop and mobile payment buttons are responsive representations of the same primary
+action and are never visible together. Checkout still uses the global `.modal-box` contract;
+product tiles are interactive selectors, not nested cards. Workspace-specific layout must not
+introduce another page-width wrapper.
+
+## Cross-ledger credit view
+
+`Money → Credit` owns the read-only accounting view across customer receivables and supplier
+payables: combined exposure, net position, aging, terms, limits, and available credit. It maps
+both domains into one row model and one table. Customer/supplier creation, editing, payments, and
+history remain on their operational pages; do not duplicate those workflows inside Money.
 
 ## Navigation chrome (sidebar / bottom nav)
 
@@ -243,6 +287,6 @@ vocabulary — same meaning, same shape; different data, different cells:
 - [ ] One card recipe; no nested bordered boxes; heavy shadows only on overlays.
 - [ ] Semantic colour only with money meaning; muted text via `base-content/xx`.
 - [ ] Icons via `<app-icon>`; zero inline `<svg>`; zero emoji.
-- [ ] Pages composed via `<app-page>`; forms via `<app-form-field>`; actions via `<button appButton>`; money via `<app-money>`.
+- [ ] Pages composed via `<app-page>`; forms via `<app-form-field>`; actions via `appButton`; money via `<app-money>`.
 - [ ] Modals via the shared shell (`.modal-box`, full-screen on mobile).
 - [ ] Loading, empty, and error states present; touch targets ≥ 44px; phone layout first.

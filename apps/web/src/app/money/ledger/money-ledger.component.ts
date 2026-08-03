@@ -129,8 +129,9 @@ import { JournalEntryWithLines, LedgerAccountWithBalance, MoneyService } from '.
               }
             </tbody>
           </table>
+        </app-data-table-shell>
+        <div class="mt-3">
           <app-pagination
-            tableFooter
             [currentPage]="page()"
             [totalPages]="totalPages()"
             [totalItems]="total()"
@@ -140,7 +141,7 @@ import { JournalEntryWithLines, LedgerAccountWithBalance, MoneyService } from '.
             (pageChange)="changePage($event)"
             (itemsPerPageChange)="changePageSize($event)"
           />
-        </app-data-table-shell>
+        </div>
       }
     </div>
   `,

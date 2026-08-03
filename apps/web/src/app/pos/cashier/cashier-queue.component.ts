@@ -1,5 +1,7 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
-import { PageHeaderComponent } from '../../shared/ui/page-header.component';
+import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
+import type { RealtimeChannel } from '@supabase/supabase-js';
+import { formatKes } from '../../core/money';
+import { PageLayoutComponent } from '../../shared/ui/page-layout.component';
 import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
 import { CheckoutPanelComponent } from '../checkout/checkout-panel.component';
 import { OrderLineWithProduct, OrderWithCustomer, PaymentInput, PosService } from '../pos.service';
@@ -7,119 +9,337 @@ import { CashierSessionService } from '../../core/cashier-session.service';
 import { SessionRequiredNoticeComponent } from '../../shared/ui/session-required-notice.component';
 import { ButtonComponent } from '../../shared/ui/button.component';
 import { MoneyComponent } from '../../shared/ui/money.component';
+import { IconComponent } from '../../shared/ui/icon.component';
+import { PrintService } from '../../shared/print/print.service';
+import { ReceiptDataService } from '../../shared/print/receipt-data.service';
+import { OrderQueueCountsService } from '../order-queue-counts.service';
+import { DataTableShellComponent } from '../../shared/ui/data-table-shell.component';
+import { ListSearchBarComponent } from '../../shared/ui/list-search-bar.component';
+import { PaginationComponent } from '../../shared/ui/pagination.component';
+import { StatBarComponent } from '../../shared/ui/stat-bar.component';
+import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
 
 @Component({
   selector: 'app-cashier-queue',
   imports: [
     CheckoutPanelComponent,
-    PageHeaderComponent,
+    PageLayoutComponent,
     EmptyStateComponent,
     SessionRequiredNoticeComponent,
     ButtonComponent,
     MoneyComponent,
+    IconComponent,
+    DataTableShellComponent,
+    ListSearchBarComponent,
+    PaginationComponent,
+    StatBarComponent,
+    StatusBadgeComponent,
   ],
   template: `
-    <main class="dashboard-main min-h-screen bg-base-200 p-4">
-      <div class="page">
-        <app-page-header title="Cashier Queue">
-          <button actions appButton variant="ghost" size="sm" class="ml-auto" (click)="load()">
-            Refresh
+    <app-page
+      title="Cashier Queue"
+      subtitle="Collect payment for sales handed off from the Sell screen."
+      [badge]="orderQueueCounts.cashierQueue()"
+      [wide]="true"
+    >
+      @if (live()) {
+        <span actions class="badge badge-success gap-1">
+          <app-icon name="heroSignal" size="sm" class="animate-pulse" />
+          Live
+        </span>
+      }
+      <button
+        actions
+        appButton
+        variant="ghost"
+        [iconOnly]="true"
+        [loading]="loading()"
+        type="button"
+        title="Refresh cashier queue"
+        aria-label="Refresh cashier queue"
+        (click)="load()"
+      >
+        <app-icon name="heroArrowPath" />
+      </button>
+
+      @if (error()) {
+        <div role="alert" class="alert alert-error mb-3 text-sm">
+          <app-icon name="heroExclamationTriangle" />
+          <span>{{ error() }}</span>
+        </div>
+      }
+      @if (completedSale(); as completed) {
+        <div class="alert alert-success mb-3" aria-live="polite">
+          <app-icon name="heroCheckCircle" />
+          <div class="min-w-0 flex-1">
+            <p class="font-semibold">Payment collected</p>
+            <p class="text-sm">
+              {{ completed.code }} is complete.
+              {{ printerEnabled() ? 'The receipt is ready.' : 'The sale is finalized.' }}
+            </p>
+          </div>
+          @if (printerEnabled()) {
+            <button
+              appButton
+              variant="outline"
+              size="sm"
+              [loading]="printing()"
+              (click)="printReceipt(completed.id)"
+            >
+              <app-icon name="heroPrinter" />
+              Print receipt
+            </button>
+          }
+          <button
+            appButton
+            variant="ghost"
+            size="sm"
+            [iconOnly]="true"
+            aria-label="Dismiss completed sale"
+            (click)="completedSale.set(null)"
+          >
+            <app-icon name="heroXMark" />
           </button>
-        </app-page-header>
+        </div>
+      }
 
-        @if (error()) {
-          <p class="mb-2 text-sm text-error">{{ error() }}</p>
-        }
-        @if (notice()) {
-          <p class="mb-2 text-sm text-success">{{ notice() }}</p>
-        }
-        @if (!cashierSession.isOpen()) {
-          <app-session-required-notice action="collecting payment from the cashier queue" />
-        }
+      <app-list-search-bar
+        placeholder="Search sale code or customer…"
+        [searchQuery]="query()"
+        (searchQueryChange)="onSearch($event)"
+      >
+        <app-stat-bar summary [stats]="queueStats()" />
+      </app-list-search-bar>
 
-        @if (parked().length === 0) {
-          <app-empty-state
-            icon="heroBanknotes"
-            title="No sales waiting"
-            description="Sales sent from the Sell screen appear here until payment is collected."
-          />
-        } @else {
-          <div class="flex flex-col gap-2">
-            @for (order of parked(); track order.id) {
-              <div class="card bg-base-100">
-                <div class="card-body p-0">
-                  <div class="flex flex-wrap items-center gap-3 p-4">
-                    <div class="min-w-0">
+      @if (!cashierSession.isOpen()) {
+        <app-session-required-notice action="collecting payment from the cashier queue" />
+      }
+
+      @if (parked().length === 0) {
+        <app-empty-state
+          [compact]="query().length > 0"
+          icon="heroBanknotes"
+          [title]="query().length > 0 ? 'No matching sales' : 'No sales waiting'"
+          [description]="
+            query().length > 0
+              ? 'Try another sale code or customer name.'
+              : 'Sales sent from the Sell screen appear here until payment is collected.'
+          "
+        />
+      } @else {
+        <div class="flex flex-col gap-2 lg:hidden">
+          @for (order of parked(); track order.id) {
+            <div class="card bg-base-100">
+              <div class="card-body gap-3 p-4">
+                <div class="flex items-start justify-between gap-3">
+                  <div class="min-w-0">
+                    <div class="flex flex-wrap items-center gap-2">
                       <p class="font-mono font-semibold">{{ order.code }}</p>
-                      <p class="type-caption mt-1">
-                        {{ time(order.created_at) }} · {{ customerName(order) }}
-                      </p>
+                      <app-status-badge type="warning" label="Awaiting payment" size="xs" />
                     </div>
-                    <span class="ml-auto font-bold">
-                      <app-money [cents]="order.total" [showCurrency]="true" />
-                    </span>
-                    <button
-                      appButton
-                      variant="ghost"
-                      size="sm"
-                      type="button"
-                      [loading]="loadingLinesFor() === order.id"
-                      [attr.aria-expanded]="expandedFor() === order.id"
-                      (click)="toggleItems(order.id)"
-                    >
-                      {{ expandedFor() === order.id ? 'Hide items' : 'View items' }}
-                    </button>
-                    <button
-                      appButton
-                      size="sm"
-                      type="button"
-                      [disabled]="!cashierSession.isOpen()"
-                      (click)="startSettlement(order)"
-                    >
-                      Collect payment
-                    </button>
+                    <p class="type-caption mt-1">{{ customerName(order) }}</p>
+                    <p class="mt-1 text-xs text-warning">
+                      Waiting {{ waitLabel(order.created_at) }} · {{ time(order.created_at) }}
+                    </p>
                   </div>
+                  <span class="shrink-0 font-bold">
+                    <app-money [cents]="order.total" />
+                  </span>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2 border-t border-base-300/60 pt-3">
+                  <button
+                    appButton
+                    variant="ghost"
+                    size="sm"
+                    type="button"
+                    [loading]="loadingLinesFor() === order.id"
+                    [attr.aria-expanded]="expandedFor() === order.id"
+                    (click)="toggleItems(order.id)"
+                  >
+                    <app-icon
+                      [name]="expandedFor() === order.id ? 'heroChevronUp' : 'heroChevronDown'"
+                    />
+                    {{ expandedFor() === order.id ? 'Hide items' : 'View items' }}
+                  </button>
+                  <button
+                    appButton
+                    size="sm"
+                    class="ml-auto"
+                    type="button"
+                    [disabled]="!cashierSession.isOpen() || busy()"
+                    (click)="startSettlement(order)"
+                  >
+                    <app-icon name="heroBanknotes" />
+                    Collect payment
+                  </button>
+                </div>
+
+                @if (expandedFor() === order.id) {
+                  <div class="border-t border-base-300/60 pt-1">
+                    @if (loadingLinesFor() === order.id) {
+                      <div class="flex items-center justify-center gap-2 py-6 text-base-content/60">
+                        <span class="loading loading-spinner loading-sm"></span>
+                        <span>Loading items…</span>
+                      </div>
+                    } @else if (lines().length === 0) {
+                      <p class="py-4 text-sm text-base-content/60">No items found for this sale.</p>
+                    } @else {
+                      <ul class="divide-y divide-base-300/60" aria-label="Sale items">
+                        @for (line of lines(); track line.id) {
+                          <li class="flex items-center gap-4 py-3">
+                            <div class="min-w-0 flex-1">
+                              <p class="truncate font-medium">{{ line.label }}</p>
+                              <p class="type-caption mt-1">
+                                {{ line.quantity }} ×
+                                <app-money [cents]="line.custom_price ?? line.unit_price" />
+                              </p>
+                            </div>
+                            <span class="font-semibold">
+                              <app-money [cents]="line.line_total" />
+                            </span>
+                          </li>
+                        }
+                      </ul>
+                    }
+                  </div>
+                }
+              </div>
+            </div>
+          }
+        </div>
+
+        <div class="hidden lg:block">
+          <app-data-table-shell
+            title="Waiting for payment"
+            [description]="
+              totalItems() + ' ' + (totalItems() === 1 ? 'sale' : 'sales') + ' in queue'
+            "
+          >
+            <table class="table table-sm">
+              <thead>
+                <tr>
+                  <th>Waiting since</th>
+                  <th>Sale</th>
+                  <th>Customer</th>
+                  <th>Status</th>
+                  <th class="text-right">Amount due</th>
+                  <th class="text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (order of parked(); track order.id) {
+                  <tr
+                    role="button"
+                    tabindex="0"
+                    class="cursor-pointer"
+                    [attr.aria-expanded]="expandedFor() === order.id"
+                    (click)="toggleItems(order.id)"
+                    (keydown.enter)="toggleItems(order.id)"
+                  >
+                    <td>
+                      <p class="table-primary text-warning">{{ waitLabel(order.created_at) }}</p>
+                      <p class="table-secondary">{{ time(order.created_at) }}</p>
+                    </td>
+                    <td class="font-mono font-semibold">{{ order.code }}</td>
+                    <td>{{ customerName(order) }}</td>
+                    <td>
+                      <app-status-badge type="warning" label="Awaiting payment" size="xs" />
+                    </td>
+                    <td class="table-number"><app-money [cents]="order.total" /></td>
+                    <td class="table-actions" (click)="$event.stopPropagation()">
+                      <button
+                        appButton
+                        variant="ghost"
+                        [iconOnly]="true"
+                        [loading]="loadingLinesFor() === order.id"
+                        [attr.aria-expanded]="expandedFor() === order.id"
+                        [title]="expandedFor() === order.id ? 'Hide sale items' : 'View sale items'"
+                        [attr.aria-label]="
+                          expandedFor() === order.id ? 'Hide sale items' : 'View sale items'
+                        "
+                        (click)="toggleItems(order.id)"
+                      >
+                        <app-icon
+                          [name]="expandedFor() === order.id ? 'heroChevronUp' : 'heroChevronDown'"
+                        />
+                      </button>
+                      <button
+                        appButton
+                        size="sm"
+                        class="ml-2"
+                        type="button"
+                        [disabled]="!cashierSession.isOpen() || busy()"
+                        (click)="startSettlement(order)"
+                      >
+                        <app-icon name="heroBanknotes" />
+                        Collect payment
+                      </button>
+                    </td>
+                  </tr>
 
                   @if (expandedFor() === order.id) {
-                    <div class="border-t border-base-300/60 px-4 pb-2">
-                      @if (loadingLinesFor() === order.id) {
-                        <div
-                          class="flex items-center justify-center gap-2 py-6 text-base-content/60"
-                        >
-                          <span class="loading loading-spinner loading-sm"></span>
-                          <span>Loading items…</span>
-                        </div>
-                      } @else if (lines().length === 0) {
-                        <p class="py-4 text-sm text-base-content/60">
-                          No items found for this sale.
-                        </p>
-                      } @else {
-                        <ul class="divide-y divide-base-300/60" aria-label="Sale items">
-                          @for (line of lines(); track line.id) {
-                            <li class="flex items-center gap-4 py-3">
-                              <div class="min-w-0 flex-1">
-                                <p class="truncate font-medium">{{ line.label }}</p>
-                                <p class="type-caption mt-1">
-                                  {{ line.quantity }} ×
-                                  <app-money [cents]="line.custom_price ?? line.unit_price" />
-                                </p>
-                              </div>
-                              <span class="font-semibold">
-                                <app-money [cents]="line.line_total" />
-                              </span>
-                            </li>
-                          }
-                        </ul>
-                      }
-                    </div>
+                    <tr class="row-detail">
+                      <td colspan="6">
+                        @if (loadingLinesFor() === order.id) {
+                          <div
+                            class="flex items-center justify-center gap-2 py-6 text-base-content/60"
+                          >
+                            <span class="loading loading-spinner loading-sm"></span>
+                            <span>Loading items…</span>
+                          </div>
+                        } @else if (lines().length === 0) {
+                          <p class="py-2 text-sm text-base-content/60">
+                            No items found for this sale.
+                          </p>
+                        } @else {
+                          <table class="table table-xs">
+                            <thead>
+                              <tr>
+                                <th>Item</th>
+                                <th class="text-right">Qty</th>
+                                <th class="text-right">Unit price</th>
+                                <th class="text-right">Total</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              @for (line of lines(); track line.id) {
+                                <tr>
+                                  <td>{{ line.label }}</td>
+                                  <td class="text-right">{{ line.quantity }}</td>
+                                  <td class="table-number">
+                                    <app-money [cents]="line.custom_price ?? line.unit_price" />
+                                  </td>
+                                  <td class="table-number">
+                                    <app-money [cents]="line.line_total" />
+                                  </td>
+                                </tr>
+                              }
+                            </tbody>
+                          </table>
+                        }
+                      </td>
+                    </tr>
                   }
-                </div>
-              </div>
-            }
-          </div>
-        }
-      </div>
+                }
+              </tbody>
+            </table>
+          </app-data-table-shell>
+        </div>
 
+        <div class="mt-3">
+          <app-pagination
+            [currentPage]="page()"
+            [totalPages]="totalPages()"
+            [totalItems]="totalItems()"
+            [itemsPerPage]="pageSize()"
+            [showItemsPerPage]="true"
+            itemLabel="sales"
+            (pageChange)="changePage($event)"
+            (itemsPerPageChange)="changePageSize($event)"
+          />
+        </div>
+      }
       @if (cashierSession.isOpen() && settling(); as order) {
         <app-checkout-panel
           [total]="order.total"
@@ -131,44 +351,124 @@ import { MoneyComponent } from '../../shared/ui/money.component';
           (cancelled)="settling.set(null)"
         />
       }
-    </main>
+    </app-page>
   `,
 })
-export class CashierQueueComponent implements OnInit {
+export class CashierQueueComponent implements OnInit, OnDestroy {
   private readonly pos = inject(PosService);
+  private readonly receiptData = inject(ReceiptDataService);
+  private readonly print = inject(PrintService);
   protected readonly cashierSession = inject(CashierSessionService);
+  protected readonly orderQueueCounts = inject(OrderQueueCountsService);
 
   protected readonly parked = signal<OrderWithCustomer[]>([]);
+  protected readonly page = signal(1);
+  protected readonly pageSize = signal(20);
+  protected readonly totalItems = signal(0);
+  protected readonly query = signal('');
+  protected readonly live = signal(false);
   protected readonly expandedFor = signal<string | null>(null);
   protected readonly loadingLinesFor = signal<string | null>(null);
   protected readonly lines = signal<OrderLineWithProduct[]>([]);
   protected readonly settling = signal<OrderWithCustomer | null>(null);
   protected readonly methods = signal<string[]>(['cash', 'mpesa', 'bank']);
   protected readonly busy = signal(false);
+  protected readonly loading = signal(false);
+  protected readonly printing = signal(false);
   protected readonly error = signal<string | null>(null);
-  protected readonly notice = signal<string | null>(null);
+  protected readonly completedSale = signal<{ id: string; code: string } | null>(null);
+  protected readonly printerEnabled = signal(false);
+  protected readonly totalPages = computed(() =>
+    Math.max(1, Math.ceil(this.totalItems() / this.pageSize()))
+  );
+  protected readonly queueStats = computed(() => {
+    const rows = this.parked();
+    const oldest = rows.reduce<OrderWithCustomer | null>((current, order) => {
+      if (!current) return order;
+      return new Date(order.created_at).getTime() < new Date(current.created_at).getTime()
+        ? order
+        : current;
+    }, null);
+    return [
+      { label: 'Waiting', value: this.totalItems(), tone: 'warning' as const },
+      {
+        label: 'Value on page',
+        value: formatKes(rows.reduce((total, order) => total + order.total, 0)),
+      },
+      { label: 'Oldest on page', value: oldest ? this.waitLabel(oldest.created_at) : '—' },
+      {
+        label: 'Walk-ins on page',
+        value: rows.filter(order => order.customer_id === null).length,
+      },
+    ];
+  });
+
+  private channel: RealtimeChannel | null = null;
+  private searchTimer: ReturnType<typeof setTimeout> | null = null;
 
   async ngOnInit(): Promise<void> {
+    this.printerEnabled.set(await this.receiptData.printerEnabled());
     try {
       this.methods.set(await this.pos.enabledPaymentMethods());
     } catch {
       // keep defaults
     }
     await this.load();
+    this.channel = this.pos.client
+      .channel('cashier-queue-live')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'orders' },
+        () => void this.load()
+      )
+      .subscribe(status => this.live.set(status === 'SUBSCRIBED'));
+  }
+
+  ngOnDestroy(): void {
+    if (this.channel) void this.pos.client.removeChannel(this.channel);
+    if (this.searchTimer) clearTimeout(this.searchTimer);
+  }
+
+  protected onSearch(query: string): void {
+    this.query.set(query);
+    this.page.set(1);
+    if (this.searchTimer) clearTimeout(this.searchTimer);
+    this.searchTimer = setTimeout(() => void this.load(), 250);
   }
 
   protected async load(): Promise<void> {
+    this.loading.set(true);
+    void this.orderQueueCounts.refresh();
     try {
-      const orders = await this.pos.ordersByStatus(['pending_payment']);
-      this.parked.set(orders);
-      if (this.expandedFor() && !orders.some(order => order.id === this.expandedFor())) {
+      const result = await this.pos.ordersPage({
+        statuses: ['pending_payment'],
+        search: this.query(),
+        page: this.page(),
+        pageSize: this.pageSize(),
+      });
+      this.parked.set(result.rows);
+      this.totalItems.set(result.count);
+      if (this.expandedFor() && !result.rows.some(order => order.id === this.expandedFor())) {
         this.expandedFor.set(null);
         this.lines.set([]);
       }
       this.error.set(null);
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Failed to load queue');
+    } finally {
+      this.loading.set(false);
     }
+  }
+
+  protected async changePage(page: number): Promise<void> {
+    this.page.set(page);
+    await this.load();
+  }
+
+  protected async changePageSize(size: number): Promise<void> {
+    this.pageSize.set(size);
+    this.page.set(1);
+    await this.load();
   }
 
   protected async toggleItems(orderId: string): Promise<void> {
@@ -204,11 +504,12 @@ export class CashierQueueComponent implements OnInit {
     }
     this.busy.set(true);
     this.error.set(null);
-    this.notice.set(null);
+    this.completedSale.set(null);
+    const order = this.settling();
     try {
       await this.pos.settleOrder(orderId, payments);
       this.settling.set(null);
-      this.notice.set('Payment collected');
+      this.completedSale.set({ id: orderId, code: order?.code ?? 'Sale' });
       await this.load();
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Payment collection failed');
@@ -220,11 +521,28 @@ export class CashierQueueComponent implements OnInit {
 
   protected async startSettlement(order: OrderWithCustomer): Promise<void> {
     this.error.set(null);
+    this.completedSale.set(null);
     try {
       await this.cashierSession.assertOpen('collecting payment');
       this.settling.set(order);
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Open a cashier session first');
+    }
+  }
+
+  protected async printReceipt(orderId: string): Promise<void> {
+    this.printing.set(true);
+    this.error.set(null);
+    try {
+      const [{ order, meta }, company] = await Promise.all([
+        this.receiptData.buildReceiptData(orderId),
+        this.receiptData.companyPrintInfo(),
+      ]);
+      await this.print.printOrder(order, company.name, company.logoUrl, meta);
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Print failed');
+    } finally {
+      this.printing.set(false);
     }
   }
 
@@ -234,6 +552,21 @@ export class CashierQueueComponent implements OnInit {
   }
 
   protected time(iso: string): string {
-    return new Date(iso).toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' });
+    return new Date(iso).toLocaleString('en-KE', {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  }
+
+  protected waitLabel(iso: string): string {
+    const minutes = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 60_000));
+    if (minutes < 1) return 'Just now';
+    if (minutes < 60) return `${minutes}m`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ${minutes % 60}m`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ${hours % 24}h`;
   }
 }

@@ -8,6 +8,7 @@ import { JournalListComponent } from '../journal-list.component';
 import { JournalEntryWithLines, LedgerAccount, MoneyService } from '../money.service';
 import { CashierSessionService } from '../../core/cashier-session.service';
 import { SessionRequiredNoticeComponent } from '../../shared/ui/session-required-notice.component';
+import { IconComponent } from '../../shared/ui/icon.component';
 
 @Component({
   selector: 'app-money-transfers',
@@ -17,10 +18,27 @@ import { SessionRequiredNoticeComponent } from '../../shared/ui/session-required
     FormFieldComponent,
     ButtonComponent,
     SessionRequiredNoticeComponent,
+    IconComponent,
   ],
   template: `
-    <div class="mb-3 flex items-center justify-end">
-      <button appButton variant="ghost" (click)="load()">Refresh</button>
+    <div class="mb-3 flex items-start gap-3">
+      <div>
+        <h2 class="section-title">Transfers</h2>
+        <p class="type-caption mt-1">Move money between controlled accounts with a clear trail.</p>
+      </div>
+      <button
+        appButton
+        variant="ghost"
+        [iconOnly]="true"
+        class="ml-auto"
+        [loading]="loading()"
+        type="button"
+        title="Refresh transfers"
+        aria-label="Refresh transfers"
+        (click)="load()"
+      >
+        <app-icon name="heroArrowPath" />
+      </button>
     </div>
 
     @if (!cashierSession.isOpen()) {
@@ -114,6 +132,7 @@ export class MoneyTransfersComponent implements OnInit {
   protected readonly fee = new FormControl('', { nonNullable: true });
   protected readonly memo = new FormControl('', { nonNullable: true });
   protected readonly busy = signal(false);
+  protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
   protected readonly sameAccount = computed(
@@ -133,6 +152,7 @@ export class MoneyTransfersComponent implements OnInit {
   }
 
   protected async load(): Promise<void> {
+    this.loading.set(true);
     try {
       const [accounts, entries] = await Promise.all([
         this.money.transactableAccounts(),
@@ -145,6 +165,8 @@ export class MoneyTransfersComponent implements OnInit {
       this.error.set(null);
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Failed to load');
+    } finally {
+      this.loading.set(false);
     }
   }
 

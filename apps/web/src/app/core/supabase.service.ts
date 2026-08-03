@@ -1,4 +1,4 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, computed, signal } from '@angular/core';
 import { createClient, Session, SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@dukarun/shared-types';
 import { environment } from '../../environments/environment';
@@ -7,6 +7,12 @@ import { environment } from '../../environments/environment';
 export interface AppJwtClaims {
   company_id?: string;
   user_role?: string;
+}
+
+/** Stable browser-storage boundary for tenant and account scoped data. */
+export interface AppIdentity {
+  companyId: string;
+  userId: string;
 }
 
 export type Company = Pick<
@@ -22,6 +28,12 @@ export class SupabaseService {
   );
 
   readonly session = signal<Session | null>(null);
+  readonly offlineIdentity = computed<AppIdentity | null>(() => {
+    const session = this.session();
+    if (!session) return null;
+    const companyId = this.decodeClaims(session.access_token)?.company_id;
+    return companyId ? { companyId, userId: session.user.id } : null;
+  });
 
   constructor() {
     this.client.auth.getSession().then(({ data }) => this.session.set(data.session));
@@ -31,7 +43,10 @@ export class SupabaseService {
   /** Decode the access token payload to read custom claims (company_id, user_role). */
   claims(): AppJwtClaims | null {
     const token = this.session()?.access_token;
-    if (!token) return null;
+    return token ? this.decodeClaims(token) : null;
+  }
+
+  private decodeClaims(token: string): AppJwtClaims | null {
     try {
       const payload = token.split('.')[1];
       return JSON.parse(atob(payload)) as AppJwtClaims;
