@@ -14,7 +14,7 @@
 #   scripts/deploy-apps.sh rollback web # restore the latest backup container
 #
 # storefront is deliberately excluded: v2 apps/storefront is a placeholder;
-# the live v1 storefront keeps serving store./<tenant>.dukarun.com until then.
+# the live v1 storefront keeps serving the tenant storefront domains until then.
 #
 # Env:
 #   .env.deploy (gitignored; see .env.deploy.example) provides:

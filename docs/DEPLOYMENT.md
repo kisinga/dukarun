@@ -41,8 +41,8 @@ host blocks SMTP ports). Until set, email outbox rows fail; SMS/WhatsApp unaffec
 
 ### 3. Storefront
 
-v2 `apps/storefront` is a placeholder; v1 keeps serving store./<tenant>.dukarun.com
-until it ships. Do not redeploy storefront.
+v2 `apps/storefront` is a placeholder; v1 keeps serving the tenant storefront
+domains until it ships. Do not redeploy storefront.
 
 ## CI/CD
 

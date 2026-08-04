@@ -979,7 +979,7 @@ try {
       const reversed = o.customFieldsReversedat != null;
       const isVoided = reversed || o.state === 'Cancelled';
       const isCompleted = !isVoided && COMPLETED_STATES.includes(o.state);
-      // Real-data finding <tenant>: ArrangingPayment orders with settled payments
+      // Real-data finding (rehearsal tenant): ArrangingPayment orders with settled payments
       // or ledger postings are partial-payment ("layaway") sales — goods gone,
       // balance owed, 2-3 ledger entries posted. They migrate as pending_payment
       // credit sales. ArrangingPayment with NEITHER is an abandoned checkout.

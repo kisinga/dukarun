@@ -56,7 +56,7 @@ npm run etl:diff -- <channelId>          # deep line-by-line ledger comparison
 npm run etl:teardown -- --channel <id>   # per-company undo (dry-run default)
 ```
 
-See [V1 → V2 migration](docs/V1_V2_MIGRATION.md) for phases, gates, and wave plan.
+The migration runbook (`docs/V1_V2_MIGRATION.md`) is internal — gitignored because it references real tenants. Ask for it if you need it.
 
 ## Active structure
 
@@ -78,7 +78,7 @@ archive/vendure/       Frozen Vendure-era dashboard, infra, and documentation
 
 The complete Vendure stack is preserved under `archive/vendure/` for migration rehearsal,
 read-only retention, and incident recovery. It is not part of the active workspace or CI. See
-[V1 → V2 migration](docs/V1_V2_MIGRATION.md).
+the internal migration runbook (gitignored — references real tenants).
 
 ## Documentation
 
@@ -87,7 +87,7 @@ read-only retention, and incident recovery. It is not part of the active workspa
 - [Production deployment](docs/DEPLOYMENT.md)
 - [Design system](docs/DESIGN_SYSTEM.md)
 - [Transaction workflows](docs/TRANSACTION_WORKFLOWS.md)
-- [Migration runbook](docs/V1_V2_MIGRATION.md)
+- Migration runbook — internal, gitignored (references real tenants)
 - [Documentation index](docs/README.md)
 
 ## Production boundary

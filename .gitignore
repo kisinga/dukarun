@@ -36,3 +36,8 @@ apps/*/src/environments/environment.generated.ts
 
 # Local ETL reports and dry-run captures.
 scripts/etl/out/
+
+# Internal ops docs (contain real tenant data) — keep local, never commit
+docs/V1_V2_MIGRATION.md
+scripts/etl/REPORT.md
+scripts/etl/out/

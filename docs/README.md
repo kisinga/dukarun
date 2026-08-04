@@ -2,15 +2,15 @@
 
 Current system documentation:
 
-| Topic                          | Document                                                   |
-| ------------------------------ | ---------------------------------------------------------- |
-| Architecture and boundaries    | [`../ARCHITECTURE.md`](../ARCHITECTURE.md)                 |
-| Local setup and infrastructure | [`INFRASTRUCTURE.md`](INFRASTRUCTURE.md)                   |
-| Production deployment          | [`DEPLOYMENT.md`](DEPLOYMENT.md)                           |
-| Dashboard design language      | [`DESIGN_SYSTEM.md`](DESIGN_SYSTEM.md)                     |
-| Transaction workflows          | [`TRANSACTION_WORKFLOWS.md`](TRANSACTION_WORKFLOWS.md)     |
-| Vendure → Supabase cutover     | [`V1_V2_MIGRATION.md`](V1_V2_MIGRATION.md)                 |
-| Troubleshooting                | [`GENERAL_TROUBLESHOOTING.md`](GENERAL_TROUBLESHOOTING.md) |
+| Topic                          | Document                                                              |
+| ------------------------------ | --------------------------------------------------------------------- |
+| Architecture and boundaries    | [`../ARCHITECTURE.md`](../ARCHITECTURE.md)                            |
+| Local setup and infrastructure | [`INFRASTRUCTURE.md`](INFRASTRUCTURE.md)                              |
+| Production deployment          | [`DEPLOYMENT.md`](DEPLOYMENT.md)                                      |
+| Dashboard design language      | [`DESIGN_SYSTEM.md`](DESIGN_SYSTEM.md)                                |
+| Transaction workflows          | [`TRANSACTION_WORKFLOWS.md`](TRANSACTION_WORKFLOWS.md)                |
+| Vendure → Supabase cutover     | `V1_V2_MIGRATION.md` — internal, gitignored (references real tenants) |
+| Troubleshooting                | [`GENERAL_TROUBLESHOOTING.md`](GENERAL_TROUBLESHOOTING.md)            |
 
 ## Source-of-truth map
 
