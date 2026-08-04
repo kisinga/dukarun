@@ -75,7 +75,7 @@ jobs:
           set -e
           if [ -n "${{ vars.FUNCTIONS_VOLUME }}" ]; then
             echo "Syncing functions into volume ${{ vars.FUNCTIONS_VOLUME }}"
-            for fn in paystack-charge paystack-webhook notification-flush; do
+            for fn in paystack-charge paystack-webhook notification-flush _shared; do
               rm -rf "${{ vars.FUNCTIONS_VOLUME }}/$fn"
               cp -r "supabase/functions/$fn" "${{ vars.FUNCTIONS_VOLUME }}/$fn"
             done
@@ -88,7 +88,7 @@ jobs:
             fi
             echo "Deploying functions into container $CONTAINER"
             docker exec "$CONTAINER" mkdir -p /home/deno/functions
-            for fn in paystack-charge paystack-webhook notification-flush; do
+            for fn in paystack-charge paystack-webhook notification-flush _shared; do
               docker cp "supabase/functions/$fn" "$CONTAINER:/home/deno/functions/$fn"
             done
             docker restart "$CONTAINER" >/dev/null

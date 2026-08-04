@@ -11,20 +11,26 @@
 #   scripts/deploy-db.sh                 # migrations only
 #   scripts/deploy-db.sh --functions     # migrations + edge functions
 #
-# Env (sane defaults for this project):
-#   SSH_HOST        ssh target          (default: root@***REMOVED***)
+# Env:
+#   .env.deploy (gitignored; see .env.deploy.example) provides:
+#     DEPLOY_SSH_HOST      ssh target for the Coolify host
+#     COOLIFY_SERVICE_DIR  supabase service dir on the host
 #   DB_PORT         local forward port  (default: 5433)
 #   DB_NAME         target database     (default: postgres)
-#   PG_PASSWORD     postgres password   (prompted if unset)
+#   PG_PASSWORD     postgres password   (fetched from host; prompted as fallback)
 #   FUNCTIONS_VOLUME edge-runtime functions dir on the host
-#                   (default: /opt/supabase/functions — override via env)
+#                   (default: $COOLIFY_SERVICE_DIR/volumes/functions)
 
 set -euo pipefail
 
-SSH_HOST="${SSH_HOST:-root@***REMOVED***}"
+# shellcheck source=/dev/null
+[ -f .env.deploy ] && source .env.deploy
+SSH_HOST="${DEPLOY_SSH_HOST:?missing DEPLOY_SSH_HOST — copy .env.deploy.example to .env.deploy and fill it in}"
+COOLIFY_SERVICE_DIR="${COOLIFY_SERVICE_DIR:?missing COOLIFY_SERVICE_DIR — see .env.deploy.example}"
 DB_PORT="${DB_PORT:-5433}"
 DB_NAME="${DB_NAME:-postgres}"
-FUNCTIONS_VOLUME="${FUNCTIONS_VOLUME:-/opt/supabase/functions}"
+PG_PASSWORD="${PG_PASSWORD:-}"
+FUNCTIONS_VOLUME="${FUNCTIONS_VOLUME:-$COOLIFY_SERVICE_DIR/volumes/functions}"
 SYNC_FUNCTIONS=0
 
 for arg in "$@"; do
@@ -34,12 +40,18 @@ for arg in "$@"; do
   esac
 done
 
+SSH_OPTS=(-o BatchMode=no -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new)
+
+# PG password lives in the Coolify service .env on the host — fetch it
+# automatically; prompt only if that fails.
+if [ -z "${PG_PASSWORD:-}" ]; then
+  PG_PASSWORD=$(ssh "${SSH_OPTS[@]}" "$SSH_HOST" \
+    "grep '^SERVICE_PASSWORD_POSTGRES=' '$COOLIFY_SERVICE_DIR/.env' | cut -d= -f2-" 2>/dev/null || true)
+fi
 if [ -z "${PG_PASSWORD:-}" ]; then
   read -rsp "Postgres password: " PG_PASSWORD
   echo
 fi
-
-SSH_OPTS=(-o BatchMode=no -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new)
 
 echo "→ opening tunnel $SSH_HOST : localhost:$DB_PORT -> postgres:5432"
 ssh "${SSH_OPTS[@]}" -N -L "$DB_PORT:127.0.0.1:5432" "$SSH_HOST" &
@@ -68,7 +80,7 @@ npx supabase db push --db-url "postgresql://postgres:${PG_PASSWORD}@127.0.0.1:${
 
 if [ "$SYNC_FUNCTIONS" = "1" ]; then
   echo "→ syncing edge functions to ${SSH_HOST}:${FUNCTIONS_VOLUME}"
-  for fn in paystack-charge paystack-webhook notification-flush; do
+  for fn in paystack-charge paystack-webhook notification-flush _shared; do
     rsync -az --delete -e "ssh ${SSH_OPTS[*]}" \
       "supabase/functions/${fn}/" "${SSH_HOST}:${FUNCTIONS_VOLUME}/${fn}/"
   done

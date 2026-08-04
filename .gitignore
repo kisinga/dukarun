@@ -5,6 +5,7 @@
 .env
 .env.*
 !.env.example
+!.env.deploy.example
 !env.example
 configs/.env
 
