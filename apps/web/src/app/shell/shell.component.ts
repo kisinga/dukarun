@@ -123,7 +123,7 @@ interface NavSection {
             </a>
 
             <!-- Global one-click till action -->
-            @if (cashierSession.cashControlEnabled() || cashierSession.isOpen()) {
+            @if (cashierSession.cashControlEnabled()) {
               <button
                 type="button"
                 class="btn btn-sm min-h-11 gap-2 px-3"
@@ -187,38 +187,29 @@ interface NavSection {
           class="fixed bottom-0 left-0 right-0 z-50 border-t border-base-300 bg-base-100 pb-[env(safe-area-inset-bottom,0px)] lg:hidden"
           role="navigation"
         >
-          <div class="flex h-14 items-center justify-around px-2">
+          <div class="flex h-16 items-stretch justify-around px-4">
             <a
               routerLink="/dashboard"
               routerLinkActive="bottom-nav-active"
               [routerLinkActiveOptions]="{ exact: true }"
-              class="bottom-nav-item"
+              class="bottom-nav-item flex-1 justify-center"
             >
               <span class="bottom-nav-ico"><app-icon name="heroHome" size="lg" /></span>
               <span class="bottom-nav-label">Home</span>
             </a>
-            <a routerLink="/pos/sell" routerLinkActive="bottom-nav-active" class="bottom-nav-item">
+            <a
+              routerLink="/pos/sell"
+              routerLinkActive="bottom-nav-active"
+              class="bottom-nav-item flex-1 justify-center"
+            >
               <span class="bottom-nav-ico"><app-icon name="heroShoppingCart" size="lg" /></span>
               <span class="bottom-nav-label">Sell</span>
             </a>
-            <a routerLink="/sales" routerLinkActive="bottom-nav-active" class="bottom-nav-item">
-              <span class="bottom-nav-ico"
-                ><app-icon name="heroClipboardDocumentList" size="lg"
-              /></span>
-              <span class="bottom-nav-label">Sales</span>
-            </a>
-            @if (cashierSession.cashControlEnabled() || cashierSession.isOpen()) {
-              <button
-                type="button"
-                class="bottom-nav-item"
-                [class.bottom-nav-active]="cashierDialog.visible()"
-                (click)="cashierDialog.show()"
-              >
-                <span class="bottom-nav-ico"><app-icon name="heroBanknotes" size="lg" /></span>
-                <span class="bottom-nav-label">Till</span>
-              </button>
-            }
-            <label for="app-drawer" class="bottom-nav-item cursor-pointer">
+            <label
+              for="app-drawer"
+              class="bottom-nav-item flex-1 cursor-pointer justify-center"
+              aria-label="Open menu"
+            >
               <span class="bottom-nav-ico"><app-icon name="heroBars3" size="lg" /></span>
               <span class="bottom-nav-label">More</span>
             </label>

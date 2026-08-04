@@ -67,38 +67,38 @@ import {
       </div>
     }
 
-    <div class="card mb-4 bg-base-100">
-      <div class="flex flex-wrap items-center gap-3 p-4">
-        <div
-          class="flex h-10 w-10 shrink-0 items-center justify-center rounded-field"
-          [class.bg-success/10]="openSession()"
-          [class.text-success]="openSession()"
-          [class.bg-base-200]="!openSession()"
-          [class.text-base-content/50]="!openSession()"
-        >
-          <app-icon [name]="openSession() ? 'heroLockOpen' : 'heroLockClosed'" size="lg" />
-        </div>
-        <div class="min-w-0">
-          <div class="flex flex-wrap items-center gap-2">
-            <h3 class="text-sm font-semibold">
-              {{ openSession() ? 'Till is open' : 'Till is closed' }}
-            </h3>
-            <app-status-badge
-              size="xs"
-              [type]="openSession() ? 'success' : 'neutral'"
-              [label]="openSession() ? 'Open' : 'Closed'"
-            />
+    @if (cashierSession.cashControlEnabled()) {
+      <div class="card mb-4 bg-base-100">
+        <div class="flex flex-wrap items-center gap-3 p-4">
+          <div
+            class="flex h-10 w-10 shrink-0 items-center justify-center rounded-field"
+            [class.bg-success/10]="openSession()"
+            [class.text-success]="openSession()"
+            [class.bg-base-200]="!openSession()"
+            [class.text-base-content/50]="!openSession()"
+          >
+            <app-icon [name]="openSession() ? 'heroLockOpen' : 'heroLockClosed'" size="lg" />
           </div>
-          <p class="type-caption mt-0.5">
-            @if (openSession(); as session) {
-              Opened {{ time(session.opened_at) }} · {{ accounts().length }} controlled
-              {{ accounts().length === 1 ? 'account' : 'accounts' }}
-            } @else {
-              No active cashier session.
-            }
-          </p>
-        </div>
-        @if (cashierSession.cashControlEnabled() || openSession()) {
+          <div class="min-w-0">
+            <div class="flex flex-wrap items-center gap-2">
+              <h3 class="text-sm font-semibold">
+                {{ openSession() ? 'Till is open' : 'Till is closed' }}
+              </h3>
+              <app-status-badge
+                size="xs"
+                [type]="openSession() ? 'success' : 'neutral'"
+                [label]="openSession() ? 'Open' : 'Closed'"
+              />
+            </div>
+            <p class="type-caption mt-0.5">
+              @if (openSession(); as session) {
+                Opened {{ time(session.opened_at) }} · {{ accounts().length }} controlled
+                {{ accounts().length === 1 ? 'account' : 'accounts' }}
+              } @else {
+                No active cashier session.
+              }
+            </p>
+          </div>
           <button
             appButton
             class="ml-auto"
@@ -110,9 +110,9 @@ import {
             <app-icon [name]="openSession() ? 'heroLockClosed' : 'heroLockOpen'" />
             {{ openSession() ? 'Close session' : 'Open session' }}
           </button>
-        }
+        </div>
       </div>
-    </div>
+    }
 
     <h2 class="section-title mb-2">Recent sessions</h2>
     <p class="type-caption mb-3">

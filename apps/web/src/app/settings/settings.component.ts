@@ -110,85 +110,116 @@ type SectionKey = 'profile' | 'pos' | 'inventory' | 'cash';
         <div class="card mb-4 bg-base-100">
           <div class="card-body p-4">
             <h2 class="card-title text-lg">POS &amp; cash control</h2>
-            <form
-              (submit)="$event.preventDefault(); saveSection('pos')"
-              class="mt-2 flex flex-col gap-2"
-            >
-              <label class="label cursor-pointer justify-start gap-2 py-0">
-                <input type="checkbox" class="checkbox checkbox-sm" [formControl]="enablePrinter" />
-                <span class="label-text">Enable receipt printing</span>
-              </label>
-              <label
-                class="flex cursor-pointer items-start gap-3 rounded-box border border-base-300 p-3"
-              >
-                <input
-                  type="checkbox"
-                  class="checkbox checkbox-sm mt-0.5"
-                  [formControl]="cashierFlow"
-                />
-                <span>
-                  <span class="block text-sm font-medium">Use a separate cashier queue</span>
-                  <span class="block text-xs text-base-content/60">
-                    When off, sellers take payment and complete orders directly on the Sell screen.
+            <form (submit)="$event.preventDefault(); saveSection('pos')" class="mt-1">
+              <div class="divide-y divide-base-300">
+                <!-- Receipt printing -->
+                <label class="flex cursor-pointer items-center justify-between gap-4 py-3">
+                  <span>
+                    <span class="block text-sm font-medium">Enable receipt printing</span>
+                    <span class="block text-xs text-base-content/60">
+                      Print a receipt after each completed sale.
+                    </span>
                   </span>
-                </span>
-              </label>
-              <label
-                class="flex cursor-pointer items-start gap-3 rounded-box border border-base-300 p-3"
-              >
-                <input
-                  type="checkbox"
-                  class="checkbox checkbox-sm mt-0.5"
-                  [formControl]="cashControl"
-                />
-                <span>
-                  <span class="block text-sm font-medium">Track till sessions</span>
-                  <span class="block text-xs text-base-content/60">
-                    Require an open till for payments and keep opening, closing, and variance
-                    counts.
+                  <input
+                    type="checkbox"
+                    class="toggle toggle-primary"
+                    [formControl]="enablePrinter"
+                  />
+                </label>
+
+                <!-- Cashier queue -->
+                <div class="py-3">
+                  <label class="flex cursor-pointer items-center justify-between gap-4">
+                    <span>
+                      <span class="block text-sm font-medium">Use a separate cashier queue</span>
+                      <span class="block text-xs text-base-content/60">
+                        When off, sellers take payment and complete orders directly on the Sell
+                        screen.
+                      </span>
+                    </span>
+                    <input
+                      type="checkbox"
+                      class="toggle toggle-primary"
+                      [formControl]="cashierFlow"
+                    />
+                  </label>
+                  @if (!cashierFlow.value) {
+                    <p class="mt-1.5 flex items-center gap-1 text-xs text-info">
+                      <app-icon name="heroInformationCircle" size="sm" />
+                      Direct checkout will be used. New orders will not enter a cashier queue.
+                    </p>
+                  }
+                </div>
+
+                <!-- Till sessions -->
+                <div class="py-3">
+                  <label class="flex cursor-pointer items-center justify-between gap-4">
+                    <span>
+                      <span class="block text-sm font-medium">Track till sessions</span>
+                      <span class="block text-xs text-base-content/60">
+                        Require an open till for payments and keep opening, closing, and variance
+                        counts.
+                      </span>
+                    </span>
+                    <input
+                      type="checkbox"
+                      class="toggle toggle-primary"
+                      [formControl]="cashControl"
+                    />
+                  </label>
+                  <div
+                    class="ml-4 mt-1 border-l-2 border-base-300 pl-4"
+                    [class.opacity-40]="!cashControl.value"
+                  >
+                    <label
+                      class="flex items-center justify-between gap-4 py-2"
+                      [class.cursor-pointer]="cashControl.value"
+                    >
+                      <span>
+                        <span class="block text-sm font-medium">Require opening count</span>
+                        <span class="block text-xs text-base-content/60">
+                          Count cash in the drawer before a till can be used.
+                        </span>
+                      </span>
+                      <input
+                        type="checkbox"
+                        class="toggle toggle-primary"
+                        [formControl]="requireOpening"
+                        [attr.disabled]="!cashControl.value ? '' : null"
+                      />
+                    </label>
+                    @if (cashControl.value && !requireOpening.value) {
+                      <p class="flex items-center gap-1 pb-1 text-xs text-info">
+                        <app-icon name="heroInformationCircle" size="sm" />
+                        Tills will open immediately using current balances; closing counts still
+                        apply.
+                      </p>
+                    }
+                  </div>
+                </div>
+
+                <!-- Proforma validity -->
+                <div class="flex items-center justify-between gap-4 py-3">
+                  <span>
+                    <span class="block text-sm font-medium">Proforma validity</span>
+                    <span class="block text-xs text-base-content/60">
+                      Applies to newly created proformas. Default: 30 days.
+                    </span>
                   </span>
-                </span>
-              </label>
-              @if (!cashierFlow.value) {
-                <div class="alert alert-info py-2 text-sm">
-                  <app-icon name="heroInformationCircle" />
-                  <span
-                    >Direct checkout will be used. New orders will not enter a cashier queue.</span
-                  >
+                  <label class="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min="1"
+                      max="3650"
+                      class="input input-bordered input-sm w-20 text-right"
+                      [formControl]="proformaValidityDays"
+                    />
+                    <span class="text-xs text-base-content/60">days</span>
+                  </label>
                 </div>
-              }
-              <label class="label cursor-pointer justify-start gap-2 py-0">
-                <input
-                  type="checkbox"
-                  class="checkbox checkbox-sm"
-                  [formControl]="requireOpening"
-                  [attr.disabled]="!cashControl.value ? '' : null"
-                />
-                <span class="label-text">Require opening count</span>
-              </label>
-              @if (cashControl.value && !requireOpening.value) {
-                <div class="alert alert-info py-2 text-sm">
-                  <app-icon name="heroInformationCircle" />
-                  <span
-                    >Tills will open immediately using current balances; closing counts still
-                    apply.</span
-                  >
-                </div>
-              }
-              <label class="form-control mt-2 w-full sm:w-64">
-                <span class="label-text">Proforma validity (days)</span>
-                <input
-                  type="number"
-                  min="1"
-                  max="3650"
-                  class="input input-bordered input-sm"
-                  [formControl]="proformaValidityDays"
-                />
-                <span class="label-text-alt text-base-content/60">
-                  Applies to newly created proformas. Default: 30 days.
-                </span>
-              </label>
-              <div>
+              </div>
+
+              <div class="mt-3">
                 @if (msg('pos'); as m) {
                   <p class="mb-2 text-sm" [class.text-success]="m.ok" [class.text-error]="!m.ok">
                     {{ m.text }}
