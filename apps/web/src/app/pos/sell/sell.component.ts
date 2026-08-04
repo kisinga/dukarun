@@ -3,7 +3,7 @@ import { ActivatedRoute } from '@angular/router';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { debounceTime, distinctUntilChanged } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { parseKesToCents } from '../../core/money';
+import { parseKes } from '../../core/money';
 import { PermissionsService } from '../../core/permissions.service';
 import { CashierSessionService } from '../../core/cashier-session.service';
 import { CartService, type CartLine } from '../cart.service';
@@ -284,7 +284,7 @@ import {
                     </span>
                     <span class="mt-auto flex w-full items-end justify-between gap-1">
                       <span class="text-sm font-bold whitespace-nowrap">
-                        <app-money [cents]="v.price ?? 0" />
+                        <app-money [amount]="v.price ?? 0" />
                       </span>
                       <span
                         class="text-right text-xs whitespace-nowrap"
@@ -469,7 +469,7 @@ import {
                         @if (!customer.is_credit_approved) {
                           Credit not approved
                         } @else if (customer.credit_limit > 0) {
-                          <app-money [cents]="customerCreditAvailable(customer)" /> available
+                          <app-money [amount]="customerCreditAvailable(customer)" /> available
                         } @else {
                           Credit has no configured cap
                         }
@@ -515,7 +515,7 @@ import {
                                 @if (!c.is_credit_approved) {
                                   No credit
                                 } @else if (c.credit_limit > 0) {
-                                  <app-money [cents]="customerCreditAvailable(c)" /> left
+                                  <app-money [amount]="customerCreditAvailable(c)" /> left
                                 } @else {
                                   No cap
                                 }
@@ -533,7 +533,7 @@ import {
                 <div class="hidden items-end justify-between gap-3 lg:flex">
                   <div>
                     <p class="type-caption">Amount due</p>
-                    <p class="mt-1 type-hero"><app-money [cents]="cart.total()" /></p>
+                    <p class="mt-1 type-hero"><app-money [amount]="cart.total()" /></p>
                   </div>
                   <span class="badge badge-ghost whitespace-nowrap">
                     {{ cartItemCount() }} {{ cartItemCount() === 1 ? 'item' : 'items' }}
@@ -589,7 +589,7 @@ import {
             <p class="type-caption">
               {{ cartItemCount() }} {{ cartItemCount() === 1 ? 'item' : 'items' }}
             </p>
-            <p class="type-hero truncate"><app-money [cents]="cart.total()" /></p>
+            <p class="type-hero truncate"><app-money [amount]="cart.total()" /></p>
           </a>
           <button
             appButton
@@ -625,7 +625,7 @@ import {
             <div>
               <p class="font-semibold">Price not changed</p>
               <p class="text-sm">
-                Minimum allowed for {{ feedback.label }} is <app-money [cents]="feedback.floor" />.
+                Minimum allowed for {{ feedback.label }} is <app-money [amount]="feedback.floor" />.
                 @if (feedback.wholesale) {
                   This is the wholesale floor.
                 }
@@ -831,9 +831,9 @@ export class SellComponent implements OnInit {
    */
   protected adjustPrice(line: CartLine, direction: 1 | -1): void {
     if (!this.canOverridePrices()) return;
-    const baseWhole = Math.round(line.unitPrice / 100) * 100;
-    const currentWhole = Math.round((line.customPrice ?? line.unitPrice) / 100) * 100;
-    const step = Math.max(100, Math.round((line.unitPrice * 0.03) / 100) * 100);
+    const baseWhole = line.unitPrice;
+    const currentWhole = line.customPrice ?? line.unitPrice;
+    const step = Math.max(1, Math.round(line.unitPrice * 0.03));
     const wholesaleFloor = this.wholesaleFloor(line);
     if (direction < 0 && currentWhole <= wholesaleFloor) {
       this.rejectBelowWholesale(line, wholesaleFloor);
@@ -848,7 +848,7 @@ export class SellComponent implements OnInit {
     this.cart.setCustomPrice(
       line.variant.variant_id!,
       customPrice,
-      customPrice === null ? '' : `Quick price ${verb} by KES ${step / 100}`
+      customPrice === null ? '' : `Quick price ${verb} by KES ${step}`
     );
 
     // When a whole-KES base is reached, remove the override entirely.
@@ -860,9 +860,8 @@ export class SellComponent implements OnInit {
   protected startOverride(line: CartLine): void {
     if (!this.canOverridePrices()) return;
     const effectivePrice = line.customPrice ?? line.unitPrice;
-    const kes = effectivePrice / 100;
     this.overrideFor.set(line.variant.variant_id!);
-    this.overridePrice.setValue(Number.isInteger(kes) ? String(kes) : kes.toFixed(2));
+    this.overridePrice.setValue(String(effectivePrice));
     this.overrideReason.setValue(line.overrideReason);
   }
 
@@ -870,22 +869,21 @@ export class SellComponent implements OnInit {
     if (!this.canOverridePrices()) return;
     const variantId = this.overrideFor();
     if (!variantId) return;
-    const enteredCents = parseKesToCents(this.overridePrice.value);
-    if (enteredCents === null || enteredCents <= 0) {
+    const enteredAmount = parseKes(this.overridePrice.value);
+    if (enteredAmount === null || enteredAmount <= 0) {
       this.error.set('Enter a valid price greater than zero');
       return;
     }
 
     const line = this.cart.lines().find(item => item.variant.variant_id === variantId);
     if (!line) return;
-    const wholeCents = Math.round(enteredCents / 100) * 100;
     const wholesaleFloor = this.wholesaleFloor(line);
-    if (wholeCents < wholesaleFloor) {
+    if (enteredAmount < wholesaleFloor) {
       this.rejectBelowWholesale(line, wholesaleFloor);
       return;
     }
 
-    const customPrice = wholeCents === line.unitPrice ? null : wholeCents;
+    const customPrice = enteredAmount === line.unitPrice ? null : enteredAmount;
     this.clearPriceFloorFeedback();
     this.cart.setCustomPrice(
       variantId,
@@ -894,7 +892,6 @@ export class SellComponent implements OnInit {
     );
     this.overrideFor.set(null);
     this.error.set(null);
-    if (wholeCents !== enteredCents) this.notice.set('Price rounded to the nearest whole KES');
   }
 
   protected resetPrice(line: CartLine): void {
@@ -904,7 +901,7 @@ export class SellComponent implements OnInit {
   }
 
   private wholesaleFloor(line: CartLine): number {
-    return Math.max(100, Math.ceil((line.variant.wholesale_price ?? 0) / 100) * 100);
+    return Math.max(1, line.variant.wholesale_price ?? 0);
   }
 
   private rejectBelowWholesale(line: CartLine, floor: number): void {

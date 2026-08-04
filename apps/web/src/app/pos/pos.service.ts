@@ -42,7 +42,7 @@ export function variantLabel(v: Pick<Variant, 'product_name' | 'variant_name'>):
   return `${product} — ${v.variant_name}`;
 }
 
-/** p_lines item for post_sale / save_draft (amounts in cents). */
+/** p_lines item for post_sale / save_draft (amounts in shillings). */
 export interface SaleLineInput {
   variant_id: string;
   quantity: number;
@@ -534,6 +534,22 @@ export class PosService {
       const v = byId.get(l.variant_id);
       return { ...l, label: v ? variantLabel(v) : l.variant_id.slice(0, 8) };
     });
+  }
+
+  /** Settled payment totals (shillings) per order, for many orders at once. */
+  async paidTotalsByOrder(orderIds: string[]): Promise<Map<string, number>> {
+    const totals = new Map<string, number>();
+    if (orderIds.length === 0) return totals;
+    const { data, error } = await this.client
+      .from('payments')
+      .select('order_id, amount, status')
+      .in('order_id', orderIds)
+      .neq('status', 'reversed');
+    if (error) throw error;
+    for (const row of data ?? []) {
+      totals.set(row.order_id, (totals.get(row.order_id) ?? 0) + row.amount);
+    }
+    return totals;
   }
 
   async orderPayments(orderId: string): Promise<Payment[]> {

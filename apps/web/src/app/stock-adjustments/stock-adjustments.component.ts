@@ -3,7 +3,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute } from '@angular/router';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { debounceTime, distinctUntilChanged } from 'rxjs';
-import { formatKes, formatKesInput, parseKesToCents } from '../core/money';
+import { formatKes, formatKesInput, parseKes } from '../core/money';
 import { MoneyService } from '../money/money.service';
 import { PosService, Variant, variantLabel } from '../pos/pos.service';
 import { ButtonComponent } from '../shared/ui/button.component';
@@ -604,7 +604,7 @@ export class StockAdjustmentsComponent implements OnInit {
     if (!variant.allow_fractional && !Number.isInteger(next)) return false;
     if (this.reason.value.length === 0) return false;
     if (this.quantityDifference() > 0) {
-      const cost = parseKesToCents(this.unitCost.value);
+      const cost = parseKes(this.unitCost.value);
       if (cost === null || cost <= 0) return false;
     }
     return true;
@@ -641,7 +641,7 @@ export class StockAdjustmentsComponent implements OnInit {
 
     const previous = this.currentQuantity();
     const difference = next - previous;
-    const unitCost = difference > 0 ? parseKesToCents(this.unitCost.value) : undefined;
+    const unitCost = difference > 0 ? parseKes(this.unitCost.value) : undefined;
     const details = this.notes.value.trim();
     const adjustmentReason = details ? `${this.reason.value}: ${details}` : this.reason.value;
 

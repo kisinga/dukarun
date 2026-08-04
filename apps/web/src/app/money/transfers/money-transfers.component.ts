@@ -1,7 +1,7 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
-import { parseKesToCents } from '../../core/money';
+import { parseKes } from '../../core/money';
 import { ButtonComponent } from '../../shared/ui/button.component';
 import { FormFieldComponent } from '../../shared/ui/form-field.component';
 import { JournalListComponent } from '../journal-list.component';
@@ -177,13 +177,13 @@ export class MoneyTransfersComponent implements OnInit {
       this.error.set(err instanceof Error ? err.message : 'Open a cashier session first');
       return;
     }
-    const principalCents = parseKesToCents(this.principal.value);
-    if (principalCents === null || principalCents <= 0) {
+    const principalAmount = parseKes(this.principal.value);
+    if (principalAmount === null || principalAmount <= 0) {
       this.error.set('Enter a valid principal amount');
       return;
     }
-    const feeCents = this.fee.value.trim() ? parseKesToCents(this.fee.value) : null;
-    if (this.fee.value.trim() && (feeCents === null || feeCents < 0)) {
+    const feeAmount = this.fee.value.trim() ? parseKes(this.fee.value) : null;
+    if (this.fee.value.trim() && (feeAmount === null || feeAmount < 0)) {
       this.error.set('Enter a valid fee amount');
       return;
     }
@@ -194,8 +194,8 @@ export class MoneyTransfersComponent implements OnInit {
       await this.money.postTransfer(
         this.from.value,
         this.to.value,
-        principalCents,
-        feeCents,
+        principalAmount,
+        feeAmount,
         this.transferId,
         this.memo.value.trim() || undefined
       );

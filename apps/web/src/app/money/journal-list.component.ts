@@ -19,7 +19,7 @@ import type { JournalEntryWithLines } from './money.service';
                 <span class="text-sm font-semibold">{{ entry.entry_date }}</span>
                 <span class="text-sm text-base-content/70">{{ entry.memo ?? '—' }}</span>
                 <span class="ml-auto font-bold tabular-nums"
-                  ><app-money [cents]="total(entry)"
+                  ><app-money [amount]="total(entry)"
                 /></span>
               </div>
               <table class="table table-xs mt-2">
@@ -30,12 +30,12 @@ import type { JournalEntryWithLines } from './money.service';
                       <td class="text-xs text-base-content/60">{{ line.ledger_accounts?.name }}</td>
                       <td class="text-right text-xs">
                         @if (line.debit > 0) {
-                          DR <app-money [cents]="line.debit" />
+                          DR <app-money [amount]="line.debit" />
                         }
                       </td>
                       <td class="text-right text-xs">
                         @if (line.credit > 0) {
-                          CR <app-money [cents]="line.credit" />
+                          CR <app-money [amount]="line.credit" />
                         }
                       </td>
                     </tr>

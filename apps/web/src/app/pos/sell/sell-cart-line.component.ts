@@ -92,14 +92,14 @@ import { MoneyComponent } from '../../shared/ui/money.component';
                 [attr.aria-label]="'Edit price for ' + label()"
                 (click)="priceEdit.emit()"
               >
-                <app-money [cents]="effectivePrice()" />
+                <app-money [amount]="effectivePrice()" />
                 <app-icon name="heroPencilSquare" size="sm" class="hidden sm:inline-flex" />
               </button>
             } @else {
               <p
                 class="flex min-h-11 min-w-0 flex-1 items-center justify-center rounded-field border border-base-content/15 bg-base-200/40 px-2 text-sm font-bold tabular-nums"
               >
-                <app-money [cents]="effectivePrice()" />
+                <app-money [amount]="effectivePrice()" />
               </p>
             }
             @if (canOverridePrice()) {
@@ -119,7 +119,7 @@ import { MoneyComponent } from '../../shared/ui/money.component';
           </div>
           @if (overridden()) {
             <p class="mt-0.5 truncate text-right text-xs text-base-content/50">
-              Base <app-money [cents]="line().unitPrice" />
+              Base <app-money [amount]="line().unitPrice" />
             </p>
           }
           @if (floorRejected()) {
@@ -129,7 +129,7 @@ import { MoneyComponent } from '../../shared/ui/money.component';
               aria-live="assertive"
             >
               {{ hasWholesaleFloor() ? 'Wholesale floor' : 'Minimum price' }}
-              <app-money [cents]="minimumPrice()" />
+              <app-money [amount]="minimumPrice()" />
             </p>
           }
         </div>
@@ -182,7 +182,7 @@ import { MoneyComponent } from '../../shared/ui/money.component';
           <p class="text-xs text-base-content/50">{{ line().quantity }} × price each</p>
         </div>
         <p class="type-heading shrink-0 tabular-nums">
-          <app-money [cents]="lineTotal()" />
+          <app-money [amount]="lineTotal()" />
         </p>
       </div>
     </article>
@@ -275,7 +275,7 @@ export class SellCartLineComponent {
   }
 
   protected minimumPrice(): number {
-    return Math.max(100, Math.ceil((this.line().variant.wholesale_price ?? 0) / 100) * 100);
+    return Math.max(1, this.line().variant.wholesale_price ?? 0);
   }
 
   protected hasWholesaleFloor(): boolean {

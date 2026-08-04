@@ -161,13 +161,12 @@ export abstract class PrintTemplate {
    * Format currency amount
    */
   protected formatCurrency(amount: number, currencyCode: string = 'KES'): string {
-    const hasSubunits = Math.abs(Math.round(amount)) % 100 !== 0;
     return new Intl.NumberFormat('en-KE', {
       style: 'currency',
       currency: currencyCode,
-      minimumFractionDigits: hasSubunits ? 2 : 0,
-      maximumFractionDigits: hasSubunits ? 2 : 0,
-    }).format(amount / 100); // Convert from cents
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
   }
 
   /**
@@ -1001,13 +1000,12 @@ export class A4PurchaseTemplate {
   }
 
   private formatCurrency(amount: number, currencyCode: string = 'KES'): string {
-    const hasSubunits = Math.abs(Math.round(amount)) % 100 !== 0;
     return new Intl.NumberFormat('en-KE', {
       style: 'currency',
       currency: currencyCode,
-      minimumFractionDigits: hasSubunits ? 2 : 0,
-      maximumFractionDigits: hasSubunits ? 2 : 0,
-    }).format(amount / 100);
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
   }
 
   private formatDate(dateString: string): string {

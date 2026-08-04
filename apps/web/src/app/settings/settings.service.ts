@@ -110,15 +110,24 @@ export class SettingsService {
 
   async updatePaymentMethod(
     code: string,
-    changes: { enabled?: boolean; requires_reconciliation?: boolean }
+    changes: {
+      enabled?: boolean;
+      requires_reconciliation?: boolean;
+      is_cashier_controlled?: boolean;
+    }
   ): Promise<void> {
+    // TODO: regenerate shared-types — p_is_cashier_controlled is not yet in the
+    // generated update_payment_method Args, hence the `as never` cast.
     const { error } = await this.db.rpc('update_payment_method', {
       p_code: code,
       ...(changes.enabled !== undefined ? { p_enabled: changes.enabled } : {}),
       ...(changes.requires_reconciliation !== undefined
         ? { p_requires_reconciliation: changes.requires_reconciliation }
         : {}),
-    });
+      ...(changes.is_cashier_controlled !== undefined
+        ? { p_is_cashier_controlled: changes.is_cashier_controlled }
+        : {}),
+    } as never);
     if (error) throw rpcError(error);
   }
 

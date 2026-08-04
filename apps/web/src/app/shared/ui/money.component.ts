@@ -24,8 +24,8 @@ import { formatKes, formatMoneyAmount } from '../../core/money';
   `,
 })
 export class MoneyComponent {
-  /** Amount in integer cents. */
-  readonly cents = input.required<number>();
+  /** Amount in integer shillings. */
+  readonly amount = input.required<number>();
   readonly direction = input<'in' | 'out' | 'none'>('none');
   /** Show the currency code when the surrounding label does not establish it. */
   readonly showCurrency = input(false);
@@ -33,7 +33,7 @@ export class MoneyComponent {
   readonly masked = input(false);
 
   protected readonly formatted = computed(() =>
-    this.showCurrency() ? formatKes(this.cents()) : formatMoneyAmount(this.cents())
+    this.showCurrency() ? formatKes(this.amount()) : formatMoneyAmount(this.amount())
   );
-  protected readonly accessibleAmount = computed(() => formatKes(this.cents()));
+  protected readonly accessibleAmount = computed(() => formatKes(this.amount()));
 }

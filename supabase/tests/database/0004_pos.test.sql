@@ -63,7 +63,7 @@ select is(
 select is(
   (select total from public.orders where id = (select order_id from sale1)),
   245000::bigint,
-  'order total is 245000 cents'
+  'order total is 245000 shillings'
 );
 
 -- Payment entries (one per payment row): DR CASH_ON_HAND 200000,

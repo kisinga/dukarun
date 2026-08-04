@@ -2,7 +2,7 @@ import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular
 import { FormControl, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import type { RealtimeChannel } from '@supabase/supabase-js';
-import { formatKes, formatKesInput, parseKesToCents } from '../core/money';
+import { formatKes, formatKesInput, parseKes } from '../core/money';
 import { PermissionsService } from '../core/permissions.service';
 import { SupabaseService } from '../core/supabase.service';
 import { PosService, StockLocation, Variant, variantLabel } from '../pos/pos.service';
@@ -287,7 +287,7 @@ interface ParsedPurchaseLine {
                       <td>
                         @if (supplier.supplier_credit_limit > 0) {
                           <p class="table-primary">
-                            <app-money [cents]="supplier.supplier_credit_limit" /> limit
+                            <app-money [amount]="supplier.supplier_credit_limit" /> limit
                           </p>
                         } @else {
                           <p class="table-primary">No credit cap</p>
@@ -302,7 +302,7 @@ interface ParsedPurchaseLine {
                         [class.text-base-content/50]="supplier.ap_balance === 0"
                       >
                         <app-money
-                          [cents]="supplier.ap_balance"
+                          [amount]="supplier.ap_balance"
                           [masked]="!perms.has('ViewFinancials')"
                         />
                       </td>
@@ -413,9 +413,9 @@ interface ParsedPurchaseLine {
                         <p class="type-caption mt-1 truncate">
                           {{ supplier.phone || supplier.email || 'No contact details' }}
                           @if (perms.has('ViewFinancials')) {
-                            · We owe <app-money [cents]="supplier.ap_balance" />
+                            · We owe <app-money [amount]="supplier.ap_balance" />
                             @if (supplier.supplier_credit_limit > 0) {
-                              · <app-money [cents]="supplierCreditAvailable(supplier)" /> credit
+                              · <app-money [amount]="supplierCreditAvailable(supplier)" /> credit
                               left
                             } @else {
                               · No credit cap
@@ -623,7 +623,7 @@ interface ParsedPurchaseLine {
                         <div class="flex min-h-9 items-center text-sm">
                           @if (supplier.supplier_credit_limit > 0) {
                             <strong
-                              ><app-money [cents]="supplierCreditAvailable(supplier)"
+                              ><app-money [amount]="supplierCreditAvailable(supplier)"
                             /></strong>
                             <span class="ml-1 text-base-content/60">available</span>
                           } @else {
@@ -869,7 +869,7 @@ interface ParsedPurchaseLine {
                             <p class="type-caption">This supplier</p>
                             @if (supplierInsight(line); as insight) {
                               <p class="font-semibold">
-                                <app-money [cents]="insight.last_unit_cost ?? 0" />
+                                <app-money [amount]="insight.last_unit_cost ?? 0" />
                               </p>
                               <p class="type-caption">
                                 Last cost · {{ insight.purchase_count }} purchase(s)
@@ -936,14 +936,14 @@ interface ParsedPurchaseLine {
                 >
                   <div>
                     <p class="type-caption">Purchase total</p>
-                    <p class="type-hero"><app-money [cents]="purchaseTotal()" /></p>
+                    <p class="type-hero"><app-money [amount]="purchaseTotal()" /></p>
                   </div>
                   <p class="ml-auto max-w-sm text-right text-sm">
                     @if (purchasePaymentMode.value === 'partial') {
-                      <strong><app-money [cents]="purchaseInitialPayment()" /></strong> paid now ·
-                      <strong><app-money [cents]="purchaseBalanceDue()" /></strong> we still owe
+                      <strong><app-money [amount]="purchaseInitialPayment()" /></strong> paid now ·
+                      <strong><app-money [amount]="purchaseBalanceDue()" /></strong> we still owe
                     } @else if (purchasePaymentMode.value === 'later') {
-                      <strong><app-money [cents]="purchaseBalanceDue()" /></strong> will become
+                      <strong><app-money [amount]="purchaseBalanceDue()" /></strong> will become
                       money we owe {{ selectedSupplierName() }}.
                     } @else {
                       This is recorded as <strong>paid now</strong>; what we owe the supplier will
@@ -957,7 +957,7 @@ interface ParsedPurchaseLine {
                     <app-icon name="heroExclamationTriangle" />
                     <span>
                       This purchase exceeds the supplier's available credit of
-                      <app-money [cents]="supplierCreditAvailable(selectedSupplier()!)" />.
+                      <app-money [amount]="supplierCreditAvailable(selectedSupplier()!)" />.
                     </span>
                   </div>
                 }
@@ -1058,8 +1058,8 @@ interface ParsedPurchaseLine {
                             @if (perms.has('ViewFinancials')) {
                               <p class="type-caption mt-1">
                                 @if (s.supplier_credit_limit > 0) {
-                                  Limit <app-money [cents]="s.supplier_credit_limit" /> ·
-                                  <app-money [cents]="supplierCreditAvailable(s)" /> available
+                                  Limit <app-money [amount]="s.supplier_credit_limit" /> ·
+                                  <app-money [amount]="supplierCreditAvailable(s)" /> available
                                 } @else {
                                   Credit has no configured cap
                                 }
@@ -1075,7 +1075,7 @@ interface ParsedPurchaseLine {
                               [class.text-warning]="s.ap_balance > 0"
                             >
                               <app-money
-                                [cents]="s.ap_balance"
+                                [amount]="s.ap_balance"
                                 [masked]="!perms.has('ViewFinancials')"
                               />
                             </p>
@@ -1247,7 +1247,10 @@ interface ParsedPurchaseLine {
                       <td class="text-sm">{{ p.is_credit ? 'Pay later' : 'Paid now' }}</td>
                       <td class="type-caption">{{ p.reference || '—' }}</td>
                       <td class="text-right font-semibold">
-                        <app-money [cents]="p.total_cost" [masked]="!perms.has('ViewFinancials')" />
+                        <app-money
+                          [amount]="p.total_cost"
+                          [masked]="!perms.has('ViewFinancials')"
+                        />
                       </td>
                       <td class="text-right">
                         <app-status-badge
@@ -1583,7 +1586,7 @@ export class SuppliersComponent implements OnInit, OnDestroy {
   }
 
   protected purchaseTotal(): number {
-    return this.lines.reduce((sum, line) => sum + this.purchaseLineTotalCents(line), 0);
+    return this.lines.reduce((sum, line) => sum + this.purchaseLineTotal(line), 0);
   }
 
   protected supplierCreditAvailable(supplier: SupplierWithAp): number {
@@ -1602,7 +1605,7 @@ export class SuppliersComponent implements OnInit, OnDestroy {
   protected purchaseInitialPayment(): number {
     if (this.purchasePaymentMode.value === 'paid') return this.purchaseTotal();
     if (this.purchasePaymentMode.value === 'later') return 0;
-    return Math.max(0, parseKesToCents(this.purchaseAmountPaid.value) ?? 0);
+    return Math.max(0, parseKes(this.purchaseAmountPaid.value) ?? 0);
   }
 
   protected purchaseBalanceDue(): number {
@@ -1612,7 +1615,7 @@ export class SuppliersComponent implements OnInit, OnDestroy {
   protected partialPaymentError(): string | null {
     if (this.purchasePaymentMode.value !== 'partial') return null;
     if (!this.purchaseAmountPaid.value.trim()) return null;
-    const paid = parseKesToCents(this.purchaseAmountPaid.value);
+    const paid = parseKes(this.purchaseAmountPaid.value);
     if (paid === null || paid <= 0) return 'Enter an amount greater than zero';
     if (paid >= this.purchaseTotal()) return 'Use Paid now for the full amount';
     return null;
@@ -1620,7 +1623,7 @@ export class SuppliersComponent implements OnInit, OnDestroy {
 
   protected partialPaymentValid(): boolean {
     if (this.purchasePaymentMode.value !== 'partial') return true;
-    const paid = parseKesToCents(this.purchaseAmountPaid.value);
+    const paid = parseKes(this.purchaseAmountPaid.value);
     return paid !== null && paid > 0 && paid < this.purchaseTotal();
   }
 
@@ -1679,7 +1682,7 @@ export class SuppliersComponent implements OnInit, OnDestroy {
     line.quantity = Number.isFinite(parsed) ? Math.max(minimum, parsed) : minimum;
     if (line.valueSource === 'total') {
       this.syncUnitFromLineTotal(line);
-      line.lineTotal = this.inputMoney(this.purchaseLineTotalCents(line));
+      line.lineTotal = this.inputMoney(this.purchaseLineTotal(line));
     } else {
       this.syncLineTotalFromUnit(line);
     }
@@ -1693,10 +1696,10 @@ export class SuppliersComponent implements OnInit, OnDestroy {
   }
 
   protected normalizePurchaseValue(line: PurchaseLineForm): void {
-    const unitCost = this.unitCostCents(line);
+    const unitCost = this.unitCostValue(line);
     if (unitCost === null) return;
     line.unitCost = this.inputMoney(unitCost);
-    line.lineTotal = this.inputMoney(this.purchaseLineTotalCents(line));
+    line.lineTotal = this.inputMoney(this.purchaseLineTotal(line));
   }
 
   protected filteredPurchaseVariants(): Variant[] {
@@ -1724,13 +1727,13 @@ export class SuppliersComponent implements OnInit, OnDestroy {
     const variant = this.variantFor(line);
     if (!variant) return false;
     return (
-      parseKesToCents(line.wholesalePrice) !== (variant.wholesale_price ?? 0) ||
-      parseKesToCents(line.retailPrice) !== (variant.price ?? 0)
+      parseKes(line.wholesalePrice) !== (variant.wholesale_price ?? 0) ||
+      parseKes(line.retailPrice) !== (variant.price ?? 0)
     );
   }
 
   protected enteredCatalogPrice(value: string): number | null {
-    return parseKesToCents(value);
+    return parseKes(value);
   }
 
   protected marginLabel(line: PurchaseLineForm, sellingPrice: number | null): string {
@@ -1748,10 +1751,10 @@ export class SuppliersComponent implements OnInit, OnDestroy {
   }
 
   protected priceWarning(line: PurchaseLineForm, variant: Variant): string | null {
-    const cost = this.unitCostCents(line);
+    const cost = this.unitCostValue(line);
     if (cost === null || cost <= 0) return null;
-    const retail = parseKesToCents(line.retailPrice) ?? variant.price ?? 0;
-    const wholesale = parseKesToCents(line.wholesalePrice) ?? variant.wholesale_price ?? 0;
+    const retail = parseKes(line.retailPrice) ?? variant.price ?? 0;
+    const wholesale = parseKes(line.wholesalePrice) ?? variant.wholesale_price ?? 0;
     if (retail > 0 && cost > retail) {
       return `This unit costs ${this.fmt(cost - retail)} more than the current retail price.`;
     }
@@ -1987,7 +1990,7 @@ export class SuppliersComponent implements OnInit, OnDestroy {
 
   protected async paySelectedPurchase(): Promise<void> {
     const id = this.payPurchaseId();
-    const amount = parseKesToCents(this.selectedPayAmount.value);
+    const amount = parseKes(this.selectedPayAmount.value);
     if (!id || amount === null || amount <= 0) {
       this.error.set('Enter a valid payment amount');
       return;
@@ -2009,13 +2012,13 @@ export class SuppliersComponent implements OnInit, OnDestroy {
   private parsedLines(): ParsedPurchaseLine[] | null {
     const parsed: ParsedPurchaseLine[] = [];
     for (const line of this.lines) {
-      const unitCost = this.unitCostCents(line);
+      const unitCost = this.unitCostValue(line);
       if (!line.variantId || !(line.quantity > 0) || unitCost === null || unitCost <= 0) {
         this.error.set('Every line needs a variant, quantity and valid unit cost');
         return null;
       }
-      const wholesalePrice = parseKesToCents(line.wholesalePrice);
-      const retailPrice = parseKesToCents(line.retailPrice);
+      const wholesalePrice = parseKes(line.wholesalePrice);
+      const retailPrice = parseKes(line.retailPrice);
       if (wholesalePrice === null || retailPrice === null || retailPrice < wholesalePrice) {
         this.error.set('Retail price must be valid and not lower than wholesale');
         return null;
@@ -2045,8 +2048,8 @@ export class SuppliersComponent implements OnInit, OnDestroy {
       this.error.set(err instanceof Error ? err.message : 'Open a cashier session first');
       return;
     }
-    const cents = parseKesToCents(this.payAmount.value);
-    if (cents === null || cents <= 0) {
+    const amount = parseKes(this.payAmount.value);
+    if (amount === null || amount <= 0) {
       this.error.set('Enter a valid amount');
       return;
     }
@@ -2055,10 +2058,10 @@ export class SuppliersComponent implements OnInit, OnDestroy {
     this.notice.set(null);
     try {
       const supplierName = this.supplierName(this.paySupplierId.value);
-      await this.money.paySupplier(this.paySupplierId.value, cents, this.payAccount.value);
+      await this.money.paySupplier(this.paySupplierId.value, amount, this.payAccount.value);
       this.payAmount.setValue('');
       await this.load();
-      this.notice.set(`${this.fmt(cents)} payment recorded for ${supplierName}.`);
+      this.notice.set(`${this.fmt(amount)} payment recorded for ${supplierName}.`);
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Payment failed');
     } finally {
@@ -2096,7 +2099,7 @@ export class SuppliersComponent implements OnInit, OnDestroy {
 
   protected async saveSupplier(): Promise<void> {
     if (this.newName.value.trim().length === 0) return;
-    const creditLimit = parseKesToCents(this.supplierCreditLimit.value);
+    const creditLimit = parseKes(this.supplierCreditLimit.value);
     if (this.perms.has('ManageSupplierCreditPurchases') && creditLimit === null) {
       this.error.set('Enter a valid supplier credit limit');
       return;
@@ -2269,22 +2272,22 @@ export class SuppliersComponent implements OnInit, OnDestroy {
     }, 250);
   }
 
-  private unitCostCents(line: PurchaseLineForm): number | null {
-    return line.unitCost.trim() ? parseKesToCents(line.unitCost) : null;
+  private unitCostValue(line: PurchaseLineForm): number | null {
+    return line.unitCost.trim() ? parseKes(line.unitCost) : null;
   }
 
-  private purchaseLineTotalCents(line: PurchaseLineForm): number {
-    const unitCost = this.unitCostCents(line);
+  private purchaseLineTotal(line: PurchaseLineForm): number {
+    const unitCost = this.unitCostValue(line);
     return unitCost === null ? 0 : Math.round(Math.max(0, line.quantity) * unitCost);
   }
 
   private syncLineTotalFromUnit(line: PurchaseLineForm): void {
-    const unitCost = this.unitCostCents(line);
-    line.lineTotal = unitCost === null ? '' : this.inputMoney(this.purchaseLineTotalCents(line));
+    const unitCost = this.unitCostValue(line);
+    line.lineTotal = unitCost === null ? '' : this.inputMoney(this.purchaseLineTotal(line));
   }
 
   private syncUnitFromLineTotal(line: PurchaseLineForm): void {
-    const total = line.lineTotal.trim() ? parseKesToCents(line.lineTotal) : null;
+    const total = line.lineTotal.trim() ? parseKes(line.lineTotal) : null;
     if (total === null || line.quantity <= 0) {
       line.unitCost = '';
       return;
@@ -2292,22 +2295,22 @@ export class SuppliersComponent implements OnInit, OnDestroy {
     line.unitCost = this.inputMoney(Math.round(total / line.quantity));
   }
 
-  private inputMoney(cents: number): string {
-    return formatKesInput(cents);
+  private inputMoney(amount: number): string {
+    return formatKesInput(amount);
   }
 
   private marginPercent(line: PurchaseLineForm, sellingPrice: number | null): number | null {
-    const cost = this.unitCostCents(line);
+    const cost = this.unitCostValue(line);
     if (cost === null || cost <= 0 || !sellingPrice || sellingPrice <= 0) return null;
     return ((sellingPrice - cost) / sellingPrice) * 100;
   }
 
-  private priceText(cents: number | null | undefined): string {
-    return cents && cents > 0 ? formatKesInput(cents) : '';
+  private priceText(amount: number | null | undefined): string {
+    return amount && amount > 0 ? formatKesInput(amount) : '';
   }
 
-  private catalogPriceText(cents: number | null | undefined): string {
-    return formatKesInput(cents ?? 0);
+  private catalogPriceText(amount: number | null | undefined): string {
+    return formatKesInput(amount ?? 0);
   }
 
   private newLine(variantId: string): PurchaseLineForm {

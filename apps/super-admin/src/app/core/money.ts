@@ -1,24 +1,22 @@
 /**
- * Money helpers. All money in state is integer cents (bigint on the backend);
+ * Money helpers. All money in state is integer shillings (bigint on the backend);
  * format to KES only at display time.
  */
-export function formatKes(cents: number): string {
-  const hasSubunits = Math.abs(Math.round(cents)) % 100 !== 0;
-  return `KES ${(cents / 100).toLocaleString('en-KE', {
-    minimumFractionDigits: hasSubunits ? 2 : 0,
-    maximumFractionDigits: hasSubunits ? 2 : 0,
+export function formatKes(amount: number): string {
+  return `KES ${Math.round(amount).toLocaleString('en-KE', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
   })}`;
 }
 
-/** Editable/computed amount text: whole KES unless real cents must be preserved. */
-export function formatKesInput(cents: number): string {
-  const amount = cents / 100;
-  return Math.abs(Math.round(cents)) % 100 === 0 ? String(Math.round(amount)) : amount.toFixed(2);
+/** Editable/computed amount text: whole shillings. */
+export function formatKesInput(amount: number): string {
+  return String(Math.round(amount));
 }
 
-/** Parse a user-typed KES amount ("2450", "2,450.50") into cents. Null when invalid. */
-export function parseKesToCents(raw: string): number | null {
+/** Parse a user-typed KES amount ("2450", "2,450") into integer shillings. Null when invalid. */
+export function parseKes(raw: string): number | null {
   const value = Number(raw.replace(/,/g, '').trim());
   if (!Number.isFinite(value) || value < 0) return null;
-  return Math.round(value * 100);
+  return Math.round(value);
 }

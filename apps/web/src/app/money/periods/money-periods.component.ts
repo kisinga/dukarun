@@ -1,6 +1,6 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormControl, FormsModule, ReactiveFormsModule } from '@angular/forms';
-import { parseKesToCents } from '../../core/money';
+import { parseKes } from '../../core/money';
 import { PermissionsService } from '../../core/permissions.service';
 import { ButtonComponent } from '../../shared/ui/button.component';
 import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
@@ -184,13 +184,13 @@ import {
                     @for (ra of recon.reconciliation_accounts; track ra.id) {
                       <tr>
                         <td class="font-mono text-xs">{{ ra.account_code }}</td>
-                        <td class="text-right"><app-money [cents]="ra.declared" /></td>
-                        <td class="text-right"><app-money [cents]="ra.expected" /></td>
+                        <td class="text-right"><app-money [amount]="ra.declared" /></td>
+                        <td class="text-right"><app-money [amount]="ra.expected" /></td>
                         <td
                           class="text-right font-semibold"
                           [class.text-error]="ra.variance !== 0 && !ra.reviewed_at"
                         >
-                          <app-money [cents]="ra.variance" />
+                          <app-money [amount]="ra.variance" />
                         </td>
                         <td class="text-right">
                           @if (ra.reviewed_at) {
@@ -341,15 +341,15 @@ export class MoneyPeriodsComponent implements OnInit {
     for (const account of this.accounts()) {
       const raw = this.declared[account.account_code]?.trim();
       if (!raw) continue; // skip untouched accounts
-      const cents = parseKesToCents(raw);
-      if (cents === null) {
+      const amount = parseKes(raw);
+      if (amount === null) {
         this.error.set(`Enter a valid amount for ${account.label}`);
         return;
       }
       const reason = this.reasons[account.account_code]?.trim();
       decls.push({
         account_code: account.account_code,
-        declared: cents,
+        declared: amount,
         ...(reason ? { reason } : {}),
       });
     }

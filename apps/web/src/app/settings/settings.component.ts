@@ -1,7 +1,7 @@
 import { Component, OnInit, computed, inject, signal, viewChild } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { formatKes, formatKesInput, parseKesToCents } from '../core/money';
+import { formatKes, formatKesInput, parseKes } from '../core/money';
 import { PageLayoutComponent } from '../shared/ui/page-layout.component';
 import {
   CompanySettings,
@@ -527,6 +527,7 @@ type SectionKey = 'profile' | 'pos' | 'inventory' | 'cash';
                     <th>Method</th>
                     <th>Enabled</th>
                     <th>Reconciliation</th>
+                    <th>Cashier</th>
                     <th>Locations</th>
                   </tr>
                 </thead>
@@ -535,9 +536,6 @@ type SectionKey = 'profile' | 'pos' | 'inventory' | 'cash';
                     <tr>
                       <td>
                         <span class="text-sm font-medium">{{ pm.name }}</span>
-                        @if (pm.is_cashier_controlled) {
-                          <span class="badge badge-xs badge-info ml-1">cashier</span>
-                        }
                         <span class="ml-1 font-mono text-xs text-base-content/60">
                           {{ pm.code }}
                         </span>
@@ -557,6 +555,15 @@ type SectionKey = 'profile' | 'pos' | 'inventory' | 'cash';
                           class="toggle toggle-sm"
                           [checked]="pm.requires_reconciliation"
                           (change)="toggleMethod(pm, 'requires_reconciliation', $event)"
+                          [disabled]="busy()"
+                        />
+                      </td>
+                      <td>
+                        <input
+                          type="checkbox"
+                          class="toggle toggle-sm"
+                          [checked]="pm.is_cashier_controlled"
+                          (change)="toggleMethod(pm, 'is_cashier_controlled', $event)"
                           [disabled]="busy()"
                         />
                       </td>
@@ -834,12 +841,12 @@ export class SettingsComponent implements OnInit {
         };
         break;
       case 'cash': {
-        const cents = parseKesToCents(this.varianceThreshold.value);
-        if (cents === null) {
+        const amount = parseKes(this.varianceThreshold.value);
+        if (amount === null) {
           this.flash('cash', false, 'Enter a valid threshold amount');
           return;
         }
-        patch = { variance_notification_threshold: cents };
+        patch = { variance_notification_threshold: amount };
         break;
       }
     }
@@ -860,7 +867,7 @@ export class SettingsComponent implements OnInit {
 
   protected async toggleMethod(
     pm: PaymentMethodRow,
-    field: 'enabled' | 'requires_reconciliation',
+    field: 'enabled' | 'requires_reconciliation' | 'is_cashier_controlled',
     event: Event
   ): Promise<void> {
     const value = (event.target as HTMLInputElement).checked;

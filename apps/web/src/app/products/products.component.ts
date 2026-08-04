@@ -3,7 +3,7 @@ import { RouterLink } from '@angular/router';
 import { EmptyStateComponent } from '../shared/ui/empty-state.component';
 import { PageLayoutComponent } from '../shared/ui/page-layout.component';
 import { FormControl, FormsModule, ReactiveFormsModule } from '@angular/forms';
-import { formatKes, formatKesInput, parseKesToCents } from '../core/money';
+import { formatKes, formatKesInput, parseKes } from '../core/money';
 import { SupabaseService } from '../core/supabase.service';
 import {
   CatalogVariantInput,
@@ -393,22 +393,11 @@ interface ProductEditorRow {
                   }
                 } @else {
                   <section>
-                    <div class="mb-4 flex items-start justify-between gap-3">
-                      <div>
-                        <h3 class="section-title">Sellable variants</h3>
-                        <p class="type-caption mt-1">
-                          Use one variant for a simple item, or add sizes and pack options.
-                        </p>
-                      </div>
-                      <button
-                        appButton
-                        type="button"
-                        variant="outline"
-                        [disabled]="editorLoading()"
-                        (click)="addEditorRow()"
-                      >
-                        <app-icon name="heroPlus" /> Add variant
-                      </button>
+                    <div class="mb-4">
+                      <h3 class="section-title">Sellable variants</h3>
+                      <p class="type-caption mt-1">
+                        Use one variant for a simple item, or add sizes and pack options.
+                      </p>
                     </div>
 
                     @if (editorLoading()) {
@@ -582,9 +571,8 @@ interface ProductEditorRow {
                                 <div class="grid gap-4 pt-2 sm:grid-cols-2 lg:grid-cols-3">
                                   <app-form-field label="Quantity">
                                     <input
-                                      type="number"
-                                      min="0"
-                                      [step]="row.allowFractional ? '0.001' : '1'"
+                                      type="text"
+                                      inputmode="decimal"
                                       class="input input-bordered w-full"
                                       placeholder="0"
                                       [(ngModel)]="row.openingQuantity"
@@ -635,7 +623,7 @@ interface ProductEditorRow {
                                       Opening value
                                       <strong class="ml-1 text-base-content">
                                         <app-money
-                                          [cents]="
+                                          [amount]="
                                             +row.openingQuantity *
                                             (parseAmount(row.openingUnitCost) ?? 0)
                                           "
@@ -649,6 +637,16 @@ interface ProductEditorRow {
                           </section>
                         }
                       </div>
+                      <button
+                        appButton
+                        type="button"
+                        variant="outline"
+                        class="mt-3 w-full"
+                        [disabled]="editorLoading()"
+                        (click)="addEditorRow()"
+                      >
+                        <app-icon name="heroPlus" /> Add variant
+                      </button>
                       @if (duplicateLabels()) {
                         <p class="mt-3 text-sm text-warning">Variant labels must be unique.</p>
                       }
@@ -922,7 +920,7 @@ interface ProductEditorRow {
                       @if (familyTracksInventory(group.variants)) {
                         <p class="font-medium tabular-nums">{{ familyStock(group.variants) }}</p>
                         <p class="type-caption tabular-nums">
-                          <app-money [cents]="familyStockValue(group.variants)" /> value
+                          <app-money [amount]="familyStockValue(group.variants)" /> value
                         </p>
                       } @else {
                         <span class="text-sm text-base-content/50">Not tracked</span>
@@ -982,7 +980,7 @@ interface ProductEditorRow {
                                   <div class="col-span-2 text-right">
                                     <p class="type-caption">Retail price</p>
                                     <p class="font-medium">
-                                      <app-money [cents]="v.price ?? 0" />
+                                      <app-money [amount]="v.price ?? 0" />
                                     </p>
                                   </div>
                                   <div class="col-span-2 text-right">
@@ -992,7 +990,7 @@ interface ProductEditorRow {
                                       </p>
                                       <p class="type-caption tabular-nums">
                                         <app-money
-                                          [cents]="stockOf(v.variant_id!)?.stock_value ?? 0"
+                                          [amount]="stockOf(v.variant_id!)?.stock_value ?? 0"
                                         />
                                         value
                                       </p>
@@ -1051,7 +1049,7 @@ interface ProductEditorRow {
                                             <span>{{ batch.remaining }} left</span>
                                           </div>
                                           <p class="mt-1 text-base-content/60">
-                                            Cost <app-money [cents]="batch.unit_cost" />
+                                            Cost <app-money [amount]="batch.unit_cost" />
                                             @if (preferences.batchExpiryEnabled()) {
                                               ·
                                               {{
@@ -1560,13 +1558,13 @@ export class ProductsComponent implements OnInit {
   private buildVariantInputs(): CatalogVariantInput[] | null {
     const variants: CatalogVariantInput[] = [];
     for (const row of this.editorRows) {
-      const price = parseKesToCents(row.price);
+      const price = parseKes(row.price);
       if (price === null) {
         this.error.set('Every variant needs a valid retail price.');
         return null;
       }
 
-      const wholesalePrice = row.wholesale.trim() ? parseKesToCents(row.wholesale) : null;
+      const wholesalePrice = row.wholesale.trim() ? parseKes(row.wholesale) : null;
       if (row.wholesale.trim() && wholesalePrice === null) {
         this.error.set('Enter a valid wholesale price on every variant.');
         return null;
@@ -1590,9 +1588,7 @@ export class ProductsComponent implements OnInit {
         return null;
       }
 
-      const openingUnitCost = row.openingUnitCost.trim()
-        ? parseKesToCents(row.openingUnitCost)
-        : null;
+      const openingUnitCost = row.openingUnitCost.trim() ? parseKes(row.openingUnitCost) : null;
       if (openingQuantity > 0 && openingUnitCost === null) {
         this.error.set('Enter a valid unit cost for opening stock.');
         return null;
@@ -1664,7 +1660,7 @@ export class ProductsComponent implements OnInit {
   }
 
   protected parseAmount(value: string): number | null {
-    return parseKesToCents(value);
+    return parseKes(value);
   }
 
   protected confirmDeactivate(target: DeactivateTarget): void {

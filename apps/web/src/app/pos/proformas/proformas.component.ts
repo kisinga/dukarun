@@ -178,7 +178,7 @@ const PROFORMA_STATUSES = ['draft', 'expired'];
                     </p>
                   </div>
                   <span class="shrink-0 font-bold tabular-nums">
-                    <app-money [cents]="draft.total" />
+                    <app-money [amount]="draft.total" />
                   </span>
                 </div>
 
@@ -255,7 +255,7 @@ const PROFORMA_STATUSES = ['draft', 'expired'];
                     <td [class.text-error]="draft.status === 'expired'">
                       {{ validityLabel(draft) }}
                     </td>
-                    <td class="table-number"><app-money [cents]="draft.total" /></td>
+                    <td class="table-number"><app-money [amount]="draft.total" /></td>
                     <td class="table-actions">
                       @if (draft.status === 'draft') {
                         <button

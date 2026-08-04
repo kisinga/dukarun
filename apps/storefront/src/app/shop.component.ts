@@ -7,12 +7,11 @@ import {
   StorefrontService,
 } from './storefront.service';
 
-/** Format cents as KES for display. */
-function formatKes(cents: number): string {
-  const hasSubunits = Math.abs(Math.round(cents)) % 100 !== 0;
-  return `KES ${(cents / 100).toLocaleString('en-KE', {
-    minimumFractionDigits: hasSubunits ? 2 : 0,
-    maximumFractionDigits: hasSubunits ? 2 : 0,
+/** Format integer shillings as KES for display. */
+function formatKes(amount: number): string {
+  return `KES ${Math.round(amount).toLocaleString('en-KE', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
   })}`;
 }
 

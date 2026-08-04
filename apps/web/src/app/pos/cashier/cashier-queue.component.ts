@@ -153,7 +153,7 @@ import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
                     </p>
                   </div>
                   <span class="shrink-0 font-bold">
-                    <app-money [cents]="order.total" />
+                    <app-money [amount]="order.total" />
                   </span>
                 </div>
 
@@ -202,11 +202,11 @@ import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
                               <p class="truncate font-medium">{{ line.label }}</p>
                               <p class="type-caption mt-1">
                                 {{ line.quantity }} ×
-                                <app-money [cents]="line.custom_price ?? line.unit_price" />
+                                <app-money [amount]="line.custom_price ?? line.unit_price" />
                               </p>
                             </div>
                             <span class="font-semibold">
-                              <app-money [cents]="line.line_total" />
+                              <app-money [amount]="line.line_total" />
                             </span>
                           </li>
                         }
@@ -256,7 +256,7 @@ import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
                     <td>
                       <app-status-badge type="warning" label="Awaiting payment" size="xs" />
                     </td>
-                    <td class="table-number"><app-money [cents]="order.total" /></td>
+                    <td class="table-number"><app-money [amount]="order.total" /></td>
                     <td class="table-actions" (click)="$event.stopPropagation()">
                       <button
                         appButton
@@ -318,10 +318,10 @@ import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
                                   <td>{{ line.label }}</td>
                                   <td class="text-right">{{ line.quantity }}</td>
                                   <td class="table-number">
-                                    <app-money [cents]="line.custom_price ?? line.unit_price" />
+                                    <app-money [amount]="line.custom_price ?? line.unit_price" />
                                   </td>
                                   <td class="table-number">
-                                    <app-money [cents]="line.line_total" />
+                                    <app-money [amount]="line.line_total" />
                                   </td>
                                 </tr>
                               }

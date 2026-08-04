@@ -75,7 +75,7 @@ Deno.serve(async req => {
       },
       body: JSON.stringify({
         email: SYSTEM_EMAIL,
-        amount, // Paystack expects the smallest currency unit (cents for KES)
+        amount: amount * 100, // Paystack expects the smallest currency unit; we store shillings
         currency: 'KES',
         mobile_money: { phone: `+${normalizedPhone}`, provider: 'mpesa' },
         metadata: {

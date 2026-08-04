@@ -1,8 +1,9 @@
 import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { formatKes } from '../../core/money';
 import { Company, SupabaseService } from '../../core/supabase.service';
+import { PermissionsService } from '../../core/permissions.service';
 import { SyncService } from '../../pos/offline/sync.service';
 import { PosService, variantLabel, type Variant } from '../../pos/pos.service';
 import {
@@ -40,6 +41,7 @@ type SalesChartPoint = DailySummary & { day: string; revenue: number; heightPerc
     IconComponent,
     MoneyComponent,
     PageLayoutComponent,
+    RouterLink,
     StatCardComponent,
   ],
   template: `
@@ -70,7 +72,7 @@ type SalesChartPoint = DailySummary & { day: string; revenue: number; heightPerc
       >
         <app-icon name="heroArrowPath" />
       </button>
-      @if (locations.isMultiLocation()) {
+      @if (canViewFinancials() && locations.isMultiLocation()) {
         <select
           actions
           class="select select-bordered select-sm"
@@ -98,50 +100,104 @@ type SalesChartPoint = DailySummary & { day: string; revenue: number; heightPerc
           <div class="flex flex-wrap items-end justify-between gap-2">
             <div>
               <h2 id="today-heading" class="section-title">Today</h2>
-              <p class="type-caption mt-1">Completed sales in Africa/Nairobi time.</p>
+              <p class="type-caption mt-1">
+                {{
+                  canViewFinancials()
+                    ? 'Completed sales in Africa/Nairobi time.'
+                    : 'Jump back into work.'
+                }}
+              </p>
             </div>
             @if (lastUpdated(); as updated) {
               <p class="type-caption">Updated {{ updatedTime(updated) }}</p>
             }
           </div>
 
-          <div class="grid grid-cols-2 gap-3 lg:grid-cols-5">
-            <app-stat-card
-              label="Revenue"
-              [value]="initialLoading() ? '—' : fmt(today()?.revenue ?? 0)"
-              sub="Completed sales"
-            />
-            <app-stat-card
-              label="Sales"
-              [value]="initialLoading() ? '—' : String(today()?.orders ?? 0)"
-              sub="Completed checkouts"
-            />
-            <app-stat-card
-              label="Sales volume"
-              [value]="initialLoading() ? '—' : quantity(todayQuantity())"
-              sub="Net item quantity sold"
-            />
-            <app-stat-card
-              label="Margin"
-              [value]="initialLoading() ? '—' : fmt(today()?.margin ?? 0)"
-              sub="Revenue less stock cost"
-              [tone]="
-                (today()?.margin ?? 0) > 0
-                  ? 'success'
-                  : (today()?.margin ?? 0) < 0
-                    ? 'error'
-                    : 'neutral'
-              "
-            />
-            <app-stat-card
-              label="Sales to sync"
-              [value]="String(pendingCount())"
-              [sub]="
-                sync.failedCount() > 0 ? sync.failedCount() + ' need attention' : 'Offline queue'
-              "
-              [tone]="sync.failedCount() > 0 ? 'error' : pendingCount() > 0 ? 'warning' : 'neutral'"
-            />
-          </div>
+          @if (canViewFinancials()) {
+            <div class="grid grid-cols-2 gap-3 lg:grid-cols-5">
+              <app-stat-card
+                label="Revenue"
+                [value]="initialLoading() ? '—' : fmt(today()?.revenue ?? 0)"
+                sub="Completed sales"
+              />
+              <app-stat-card
+                label="Sales"
+                [value]="initialLoading() ? '—' : String(today()?.orders ?? 0)"
+                sub="Completed checkouts"
+              />
+              <app-stat-card
+                label="Sales volume"
+                [value]="initialLoading() ? '—' : quantity(todayQuantity())"
+                sub="Net item quantity sold"
+              />
+              <app-stat-card
+                label="Margin"
+                [value]="initialLoading() ? '—' : fmt(today()?.margin ?? 0)"
+                sub="Revenue less stock cost"
+                [tone]="
+                  (today()?.margin ?? 0) > 0
+                    ? 'success'
+                    : (today()?.margin ?? 0) < 0
+                      ? 'error'
+                      : 'neutral'
+                "
+              />
+              <app-stat-card
+                label="Sales to sync"
+                [value]="String(pendingCount())"
+                [sub]="
+                  sync.failedCount() > 0 ? sync.failedCount() + ' need attention' : 'Offline queue'
+                "
+                [tone]="
+                  sync.failedCount() > 0 ? 'error' : pendingCount() > 0 ? 'warning' : 'neutral'
+                "
+              />
+            </div>
+          } @else {
+            <div class="grid grid-cols-2 gap-3 lg:grid-cols-3">
+              <a routerLink="/pos/sell" class="card bg-base-100 transition-shadow hover:shadow-md">
+                <div class="card-body flex-row items-center gap-3 p-4">
+                  <span
+                    class="flex h-10 w-10 shrink-0 items-center justify-center rounded-field bg-primary/10 text-primary"
+                  >
+                    <app-icon name="heroShoppingCart" size="lg" />
+                  </span>
+                  <span class="min-w-0">
+                    <span class="block text-sm font-semibold">Start selling</span>
+                    <span class="type-caption">Open the Sell screen</span>
+                  </span>
+                </div>
+              </a>
+              @if (preferences.cashierFlowEnabled()) {
+                <a
+                  routerLink="/pos/cashier"
+                  class="card bg-base-100 transition-shadow hover:shadow-md"
+                >
+                  <div class="card-body flex-row items-center gap-3 p-4">
+                    <span
+                      class="flex h-10 w-10 shrink-0 items-center justify-center rounded-field bg-primary/10 text-primary"
+                    >
+                      <app-icon name="heroQueueList" size="lg" />
+                    </span>
+                    <span class="min-w-0">
+                      <span class="block text-sm font-semibold">Cashier queue</span>
+                      <span class="type-caption">Take waiting payments</span>
+                    </span>
+                  </div>
+                </a>
+              }
+              <app-stat-card
+                label="Sales to sync"
+                [value]="String(pendingCount())"
+                [sub]="
+                  sync.failedCount() > 0 ? sync.failedCount() + ' need attention' : 'Offline queue'
+                "
+                [tone]="
+                  sync.failedCount() > 0 ? 'error' : pendingCount() > 0 ? 'warning' : 'neutral'
+                "
+              />
+            </div>
+          }
 
           @if (pendingCount() > 0) {
             <div
@@ -166,7 +222,7 @@ type SalesChartPoint = DailySummary & { day: string; revenue: number; heightPerc
           }
         </section>
 
-        @if (locations.isMultiLocation() && !dashboardLocationId()) {
+        @if (canViewFinancials() && locations.isMultiLocation() && !dashboardLocationId()) {
           <section aria-labelledby="locations-heading" class="space-y-3">
             <div>
               <h2 id="locations-heading" class="section-title">Location performance</h2>
@@ -221,8 +277,8 @@ type SalesChartPoint = DailySummary & { day: string; revenue: number; heightPerc
                       <td class="font-medium">{{ location.location_name }}</td>
                       <td class="text-right">{{ location.orders }}</td>
                       <td class="text-right">{{ quantity(location.quantity) }}</td>
-                      <td class="text-right"><app-money [cents]="location.revenue" /></td>
-                      <td class="text-right"><app-money [cents]="location.margin" /></td>
+                      <td class="text-right"><app-money [amount]="location.revenue" /></td>
+                      <td class="text-right"><app-money [amount]="location.margin" /></td>
                     </tr>
                   }
                 </tbody>
@@ -231,188 +287,190 @@ type SalesChartPoint = DailySummary & { day: string; revenue: number; heightPerc
           </section>
         }
 
-        <section aria-label="Sales performance" class="grid gap-4 xl:grid-cols-12">
-          <article class="card h-full overflow-hidden bg-base-100 xl:col-span-7">
-            <div
-              class="flex flex-wrap items-end justify-between gap-2 border-b border-base-300 px-4 py-3"
-            >
-              <div>
-                <h2 class="section-title">Sales trend</h2>
-                <p class="type-caption mt-1">Live completed-sale revenue · last 7 days.</p>
-              </div>
-              <button
-                appButton
-                variant="ghost"
-                size="sm"
-                [attr.aria-expanded]="salesChartExpanded()"
-                (click)="salesChartExpanded.set(!salesChartExpanded())"
-              >
-                {{ salesChartExpanded() ? 'Show less' : 'Expand' }}
-              </button>
-            </div>
-
-            @if (initialLoading()) {
+        @if (canViewFinancials()) {
+          <section aria-label="Sales performance" class="grid gap-4 xl:grid-cols-12">
+            <article class="card h-full overflow-hidden bg-base-100 xl:col-span-7">
               <div
-                role="status"
-                class="flex min-h-52 items-center justify-center gap-2 text-sm text-base-content/60"
+                class="flex flex-wrap items-end justify-between gap-2 border-b border-base-300 px-4 py-3"
               >
-                <span class="loading loading-spinner loading-sm"></span>
-                Loading sales
-              </div>
-            } @else if (!salesChartHasData()) {
-              <app-empty-state
-                [embedded]="true"
-                [compact]="true"
-                icon="heroBanknotes"
-                title="No sales this week"
-                description="Revenue and margin appear after the first completed sale."
-              />
-            } @else {
-              <div class="px-4 pb-3 pt-2">
-                <div class="mb-2 flex items-end justify-between gap-3">
-                  <div>
-                    <p class="type-caption">7-day revenue</p>
-                    <p class="type-title tabular-nums">{{ fmt(weekRevenue()) }}</p>
-                  </div>
-                  <p class="type-caption text-right">
-                    {{ weekOrders() }} sales · {{ quantity(weekQuantity()) }} items ·
-                    {{ fmt(weekMargin()) }} margin
-                  </p>
+                <div>
+                  <h2 class="section-title">Sales trend</h2>
+                  <p class="type-caption mt-1">Live completed-sale revenue · last 7 days.</p>
                 </div>
-
-                <div
-                  class="relative overflow-hidden rounded-box border border-base-300/70 bg-base-200/30"
-                  [class.h-32]="!salesChartExpanded()"
-                  [class.h-60]="salesChartExpanded()"
+                <button
+                  appButton
+                  variant="ghost"
+                  size="sm"
+                  [attr.aria-expanded]="salesChartExpanded()"
+                  (click)="salesChartExpanded.set(!salesChartExpanded())"
                 >
-                  @if (salesChartExpanded()) {
-                    <span class="absolute inset-x-0 top-1/3 border-t border-base-300/60"></span>
-                    <span class="absolute inset-x-0 top-2/3 border-t border-base-300/60"></span>
-                  }
+                  {{ salesChartExpanded() ? 'Show less' : 'Expand' }}
+                </button>
+              </div>
+
+              @if (initialLoading()) {
+                <div
+                  role="status"
+                  class="flex min-h-52 items-center justify-center gap-2 text-sm text-base-content/60"
+                >
+                  <span class="loading loading-spinner loading-sm"></span>
+                  Loading sales
+                </div>
+              } @else if (!salesChartHasData()) {
+                <app-empty-state
+                  [embedded]="true"
+                  [compact]="true"
+                  icon="heroBanknotes"
+                  title="No sales this week"
+                  description="Revenue and margin appear after the first completed sale."
+                />
+              } @else {
+                <div class="px-4 pb-3 pt-2">
+                  <div class="mb-2 flex items-end justify-between gap-3">
+                    <div>
+                      <p class="type-caption">7-day revenue</p>
+                      <p class="type-title tabular-nums">{{ fmt(weekRevenue()) }}</p>
+                    </div>
+                    <p class="type-caption text-right">
+                      {{ weekOrders() }} sales · {{ quantity(weekQuantity()) }} items ·
+                      {{ fmt(weekMargin()) }} margin
+                    </p>
+                  </div>
+
                   <div
-                    class="relative grid h-full grid-cols-7 items-end gap-2 px-4 pb-2 pt-3 sm:gap-3 sm:px-6"
-                    role="img"
-                    aria-label="Sales revenue for the last seven days"
+                    class="relative overflow-hidden rounded-box border border-base-300/70 bg-base-200/30"
+                    [class.h-32]="!salesChartExpanded()"
+                    [class.h-60]="salesChartExpanded()"
                   >
+                    @if (salesChartExpanded()) {
+                      <span class="absolute inset-x-0 top-1/3 border-t border-base-300/60"></span>
+                      <span class="absolute inset-x-0 top-2/3 border-t border-base-300/60"></span>
+                    }
+                    <div
+                      class="relative grid h-full grid-cols-7 items-end gap-2 px-4 pb-2 pt-3 sm:gap-3 sm:px-6"
+                      role="img"
+                      aria-label="Sales revenue for the last seven days"
+                    >
+                      @for (point of salesChartPoints(); track point.day) {
+                        <div class="group flex h-full min-w-0 items-end justify-center">
+                          <div
+                            class="w-full max-w-12 rounded-t-field bg-primary/80 transition-all group-hover:bg-primary"
+                            [style.height.%]="point.heightPercent"
+                            [attr.title]="shortDay(point.day) + ': ' + fmt(point.revenue)"
+                          ></div>
+                        </div>
+                      }
+                    </div>
+                  </div>
+
+                  <div class="mt-2 grid grid-cols-7 gap-1 text-center">
                     @for (point of salesChartPoints(); track point.day) {
-                      <div class="group flex h-full min-w-0 items-end justify-center">
-                        <div
-                          class="w-full max-w-12 rounded-t-field bg-primary/80 transition-all group-hover:bg-primary"
-                          [style.height.%]="point.heightPercent"
-                          [attr.title]="shortDay(point.day) + ': ' + fmt(point.revenue)"
-                        ></div>
+                      <div class="min-w-0">
+                        <p class="truncate text-xs font-medium text-base-content/60">
+                          {{ chartDay(point.day) }}
+                        </p>
+                        @if (salesChartExpanded()) {
+                          <p class="mt-0.5 truncate text-xs tabular-nums">
+                            {{ compactKes(point.revenue) }}
+                          </p>
+                        }
                       </div>
                     }
                   </div>
-                </div>
 
-                <div class="mt-2 grid grid-cols-7 gap-1 text-center">
-                  @for (point of salesChartPoints(); track point.day) {
-                    <div class="min-w-0">
-                      <p class="truncate text-xs font-medium text-base-content/60">
-                        {{ chartDay(point.day) }}
-                      </p>
-                      @if (salesChartExpanded()) {
-                        <p class="mt-0.5 truncate text-xs tabular-nums">
-                          {{ compactKes(point.revenue) }}
-                        </p>
-                      }
+                  @if (salesChartExpanded()) {
+                    <div class="table-scroll mt-3 border-t border-base-300/70 pt-2">
+                      <table class="table table-xs">
+                        <thead>
+                          <tr>
+                            <th>Day</th>
+                            <th class="text-right">Sales</th>
+                            <th class="text-right">Revenue</th>
+                            <th class="text-right">Margin</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          @for (day of week(); track day.day) {
+                            <tr>
+                              <td>{{ shortDay(day.day) }}</td>
+                              <td class="text-right">{{ day.orders ?? 0 }}</td>
+                              <td class="text-right"><app-money [amount]="day.revenue ?? 0" /></td>
+                              <td class="text-right"><app-money [amount]="day.margin ?? 0" /></td>
+                            </tr>
+                          }
+                        </tbody>
+                      </table>
                     </div>
                   }
                 </div>
+              }
+            </article>
 
-                @if (salesChartExpanded()) {
-                  <div class="table-scroll mt-3 border-t border-base-300/70 pt-2">
-                    <table class="table table-xs">
-                      <thead>
-                        <tr>
-                          <th>Day</th>
-                          <th class="text-right">Sales</th>
-                          <th class="text-right">Revenue</th>
-                          <th class="text-right">Margin</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        @for (day of week(); track day.day) {
-                          <tr>
-                            <td>{{ shortDay(day.day) }}</td>
-                            <td class="text-right">{{ day.orders ?? 0 }}</td>
-                            <td class="text-right"><app-money [cents]="day.revenue ?? 0" /></td>
-                            <td class="text-right"><app-money [cents]="day.margin ?? 0" /></td>
-                          </tr>
-                        }
-                      </tbody>
-                    </table>
-                  </div>
-                }
-              </div>
-            }
-          </article>
-
-          <article class="card h-full overflow-hidden bg-base-100 xl:col-span-5">
-            <div
-              class="flex flex-wrap items-end justify-between gap-2 border-b border-base-300 px-4 py-3"
-            >
-              <div>
-                <h2 class="section-title">Best margin</h2>
-                <p class="type-caption mt-1">Top-performing variants over 7 days.</p>
-              </div>
-              <span class="type-caption">Top 5</span>
-            </div>
-
-            @if (initialLoading()) {
+            <article class="card h-full overflow-hidden bg-base-100 xl:col-span-5">
               <div
-                role="status"
-                class="flex min-h-52 items-center justify-center gap-2 text-sm text-base-content/60"
+                class="flex flex-wrap items-end justify-between gap-2 border-b border-base-300 px-4 py-3"
               >
-                <span class="loading loading-spinner loading-sm"></span>
-                Loading products
+                <div>
+                  <h2 class="section-title">Best margin</h2>
+                  <p class="type-caption mt-1">Top-performing variants over 7 days.</p>
+                </div>
+                <span class="type-caption">Top 5</span>
               </div>
-            } @else if (topVariants().length === 0) {
-              <app-empty-state
-                [embedded]="true"
-                [compact]="true"
-                icon="heroCube"
-                title="Nothing sold yet"
-                description="Products rank here once completed sales have stock cost."
-              />
-            } @else {
-              <div class="table-scroll">
-                <table class="table table-sm">
-                  <thead>
-                    <tr>
-                      <th>Variant</th>
-                      <th class="text-right">Qty</th>
-                      <th class="text-right">Revenue</th>
-                      <th class="text-right">Margin</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    @for (variant of topVariants(); track variant.variantId) {
+
+              @if (initialLoading()) {
+                <div
+                  role="status"
+                  class="flex min-h-52 items-center justify-center gap-2 text-sm text-base-content/60"
+                >
+                  <span class="loading loading-spinner loading-sm"></span>
+                  Loading products
+                </div>
+              } @else if (topVariants().length === 0) {
+                <app-empty-state
+                  [embedded]="true"
+                  [compact]="true"
+                  icon="heroCube"
+                  title="Nothing sold yet"
+                  description="Products rank here once completed sales have stock cost."
+                />
+              } @else {
+                <div class="table-scroll">
+                  <table class="table table-sm">
+                    <thead>
                       <tr>
-                        <td>
-                          <span class="font-medium">{{ variant.label }}</span>
-                          <span class="type-caption ml-2">#{{ $index + 1 }}</span>
-                        </td>
-                        <td class="text-right">{{ quantity(variant.quantity) }}</td>
-                        <td class="text-right font-medium">
-                          <app-money [cents]="variant.revenue" />
-                        </td>
-                        <td
-                          class="text-right font-medium"
-                          [class.text-success]="variant.margin > 0"
-                          [class.text-error]="variant.margin < 0"
-                        >
-                          <app-money [cents]="variant.margin" />
-                        </td>
+                        <th>Variant</th>
+                        <th class="text-right">Qty</th>
+                        <th class="text-right">Revenue</th>
+                        <th class="text-right">Margin</th>
                       </tr>
-                    }
-                  </tbody>
-                </table>
-              </div>
-            }
-          </article>
-        </section>
+                    </thead>
+                    <tbody>
+                      @for (variant of topVariants(); track variant.variantId) {
+                        <tr>
+                          <td>
+                            <span class="font-medium">{{ variant.label }}</span>
+                            <span class="type-caption ml-2">#{{ $index + 1 }}</span>
+                          </td>
+                          <td class="text-right">{{ quantity(variant.quantity) }}</td>
+                          <td class="text-right font-medium">
+                            <app-money [amount]="variant.revenue" />
+                          </td>
+                          <td
+                            class="text-right font-medium"
+                            [class.text-success]="variant.margin > 0"
+                            [class.text-error]="variant.margin < 0"
+                          >
+                            <app-money [amount]="variant.margin" />
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              }
+            </article>
+          </section>
+        }
 
         <section aria-labelledby="attention-heading" class="space-y-3">
           <div class="flex flex-wrap items-end justify-between gap-2">
@@ -535,6 +593,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
   protected readonly sync = inject(SyncService);
   protected readonly locations = inject(LocationContextService);
   protected readonly preferences = inject(CompanyPreferencesService);
+  private readonly perms = inject(PermissionsService);
+  protected readonly canViewFinancials = computed(() => this.perms.has('ViewFinancials'));
 
   protected readonly fmt = formatKes;
   protected readonly String = String;
@@ -696,20 +756,25 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.loading.set(true);
     try {
       const since = this.daysAgoIso(6);
+      const canView = this.canViewFinancials();
       const [sales, lowStock, expiring] = await Promise.all([
-        this.reports.dashboardSales(since, this.dashboardLocationId()),
+        canView
+          ? this.reports.dashboardSales(since, this.dashboardLocationId())
+          : Promise.resolve(null),
         this.reports.lowStock(),
         this.preferences.batchExpiryEnabled()
           ? this.reports.expiringBatches()
           : Promise.resolve([]),
       ]);
-      this.summary.set(sales.summary);
-      this.productSales.set(sales.productSales);
-      this.locationRows.set(sales.locations);
-      this.comparison.set(sales.comparison);
+      if (sales) {
+        this.summary.set(sales.summary);
+        this.productSales.set(sales.productSales);
+        this.locationRows.set(sales.locations);
+        this.comparison.set(sales.comparison);
+        await this.computeTopVariants(sales.productSales);
+      }
       this.lowStock.set(lowStock);
       this.expiring.set(expiring);
-      await this.computeTopVariants(sales.productSales);
       this.lastUpdated.set(new Date());
       this.loadError.set(null);
     } catch (err) {
@@ -800,11 +865,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
     });
   }
 
-  protected compactKes(cents: number): string {
-    const value = cents / 100;
-    if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1).replace('.0', '')}m`;
-    if (value >= 1_000) return `${(value / 1_000).toFixed(1).replace('.0', '')}k`;
-    return Math.round(value).toLocaleString('en-KE');
+  protected compactKes(amount: number): string {
+    if (amount >= 1_000_000) return `${(amount / 1_000_000).toFixed(1).replace('.0', '')}m`;
+    if (amount >= 1_000) return `${(amount / 1_000).toFixed(1).replace('.0', '')}k`;
+    return Math.round(amount).toLocaleString('en-KE');
   }
 
   protected updatedTime(value: Date): string {

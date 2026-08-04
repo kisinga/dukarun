@@ -165,11 +165,11 @@ import { PerformanceService, StaffDailyPerformance, StaffPerformance } from './p
                   </td>
                   <td class="text-right">{{ row.transactions }}</td>
                   <td class="text-right">{{ quantity(row.quantity) }}</td>
-                  <td class="text-right"><app-money [cents]="row.gross_sales" /></td>
+                  <td class="text-right"><app-money [amount]="row.gross_sales" /></td>
                   <td class="text-right text-warning">
-                    <app-money [cents]="row.refunds + row.voided_sales" />
+                    <app-money [amount]="row.refunds + row.voided_sales" />
                   </td>
-                  <td class="text-right font-semibold"><app-money [cents]="row.net_sales" /></td>
+                  <td class="text-right font-semibold"><app-money [amount]="row.net_sales" /></td>
                   <td
                     class="text-right"
                     [class.text-success]="staffComparison(row) >= 0"
@@ -177,15 +177,15 @@ import { PerformanceService, StaffDailyPerformance, StaffPerformance } from './p
                   >
                     {{ comparisonLabel(row.net_sales, previousFor(row)?.net_sales ?? 0) }}
                   </td>
-                  <td class="text-right"><app-money [cents]="row.collected" /></td>
+                  <td class="text-right"><app-money [amount]="row.collected" /></td>
                   <td
                     class="text-right"
                     [class.text-success]="row.margin > 0"
                     [class.text-error]="row.margin < 0"
                   >
-                    <app-money [cents]="row.margin" />
+                    <app-money [amount]="row.margin" />
                   </td>
-                  <td class="text-right"><app-money [cents]="row.average_sale" /></td>
+                  <td class="text-right"><app-money [amount]="row.average_sale" /></td>
                 </tr>
               }
             </tbody>
@@ -243,14 +243,14 @@ import { PerformanceService, StaffDailyPerformance, StaffPerformance } from './p
                         <td>{{ day.day }}</td>
                         <td class="text-right">{{ day.transactions }}</td>
                         <td class="text-right">{{ quantity(day.quantity) }}</td>
-                        <td class="text-right"><app-money [cents]="day.gross_sales" /></td>
+                        <td class="text-right"><app-money [amount]="day.gross_sales" /></td>
                         <td class="text-right">
-                          <app-money [cents]="day.refunds + day.voided_sales" />
+                          <app-money [amount]="day.refunds + day.voided_sales" />
                         </td>
                         <td class="text-right font-semibold">
-                          <app-money [cents]="day.net_sales" />
+                          <app-money [amount]="day.net_sales" />
                         </td>
-                        <td class="text-right"><app-money [cents]="day.collected" /></td>
+                        <td class="text-right"><app-money [amount]="day.collected" /></td>
                       </tr>
                     }
                   </tbody>

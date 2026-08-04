@@ -131,7 +131,7 @@ select is(
   (select commission_total from public.commission_period_statement((select period_id from com_period))
    where staff_user_id = '22222222-2222-2222-2222-222222222222'),
   400::bigint,
-  '5 percent commission is calculated in integer cents'
+  '5 percent commission is calculated in integer shillings'
 );
 select is(
   (select min(rate_bps) from public.commission_lines

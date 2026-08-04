@@ -183,14 +183,14 @@ interface CreditParty {
                     <td class="table-number">{{ party.termsDays }} days</td>
                     <td class="table-number">
                       @if (party.limit > 0) {
-                        <app-money [cents]="party.limit" />
+                        <app-money [amount]="party.limit" />
                       } @else {
                         <span class="text-base-content/50">No cap</span>
                       }
                     </td>
                     <td class="table-number">
                       @if (party.available !== null) {
-                        <app-money [cents]="party.available" />
+                        <app-money [amount]="party.available" />
                       } @else {
                         <span class="text-base-content/50">No cap</span>
                       }
@@ -200,7 +200,7 @@ interface CreditParty {
                       [class.text-error]="mode() === 'receivables' && party.outstanding > 0"
                       [class.text-warning]="mode() === 'payables' && party.outstanding > 0"
                     >
-                      <app-money [cents]="party.outstanding" />
+                      <app-money [amount]="party.outstanding" />
                     </td>
                   </tr>
                 }
@@ -226,13 +226,13 @@ interface CreditParty {
                     <p class="type-caption">
                       {{ mode() === 'receivables' ? 'Owed to us' : 'We owe' }}
                     </p>
-                    <p class="text-sm font-bold"><app-money [cents]="party.outstanding" /></p>
+                    <p class="text-sm font-bold"><app-money [amount]="party.outstanding" /></p>
                   </div>
                   <div>
                     <p class="type-caption">Limit</p>
                     <p class="text-sm font-semibold">
                       @if (party.limit > 0) {
-                        <app-money [cents]="party.limit" />
+                        <app-money [amount]="party.limit" />
                       } @else {
                         No cap
                       }
@@ -423,7 +423,7 @@ export class MoneyCreditComponent implements OnInit {
     return [party.first_name, party.last_name].filter(Boolean).join(' ');
   }
 
-  private moneyLabel(cents: number): string {
-    return formatKes(cents);
+  private moneyLabel(amount: number): string {
+    return formatKes(amount);
   }
 }

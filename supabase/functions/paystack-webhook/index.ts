@@ -73,7 +73,7 @@ Deno.serve(async req => {
     p_tier_id: meta.tier_id,
     p_billing_cycle: meta.billing_cycle,
     p_reference: data.reference,
-    p_amount: data.amount,
+    p_amount: Math.round(data.amount / 100), // Paystack sends cents; we store shillings
   });
 
   if (error) {

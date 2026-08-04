@@ -138,10 +138,13 @@ const ALL_STATUSES = ['completed', 'voided', 'draft', 'expired', 'pending_paymen
                     [label]="statusLabel(order.status)"
                   />
                   @if (order.is_credit_sale) {
-                    <app-status-badge type="warning" label="credit" />
+                    <app-status-badge
+                      [type]="creditBadge(order).type"
+                      [label]="creditBadge(order).label"
+                    />
                   }
                   <span class="ml-auto font-bold tabular-nums"
-                    ><app-money [cents]="order.total"
+                    ><app-money [amount]="order.total"
                   /></span>
                   @if (order.status === 'pending_payment') {
                     <a appButton variant="soft" size="sm" routerLink="/pos/cashier">
@@ -215,9 +218,9 @@ const ALL_STATUSES = ['completed', 'voided', 'draft', 'expired', 'pending_paymen
                             <td>{{ line.label }}</td>
                             <td class="text-right">{{ line.quantity }}</td>
                             <td class="text-right">
-                              <app-money [cents]="line.custom_price ?? line.unit_price" />
+                              <app-money [amount]="line.custom_price ?? line.unit_price" />
                             </td>
-                            <td class="text-right"><app-money [cents]="line.line_total" /></td>
+                            <td class="text-right"><app-money [amount]="line.line_total" /></td>
                           </tr>
                         }
                       </tbody>
@@ -228,7 +231,7 @@ const ALL_STATUSES = ['completed', 'voided', 'draft', 'expired', 'pending_paymen
                           <span
                             class="inline-flex items-center gap-1 rounded-field border border-base-300 px-2 py-1 text-xs"
                           >
-                            {{ p.method_code }} · <app-money [cents]="p.amount" /> · {{ p.status }}
+                            {{ p.method_code }} · <app-money [amount]="p.amount" /> · {{ p.status }}
                             @if (p.reference) {
                               · {{ p.reference }}
                             }
@@ -351,7 +354,10 @@ const ALL_STATUSES = ['completed', 'voided', 'draft', 'expired', 'pending_paymen
                         [label]="statusLabel(order.status)"
                       />
                       @if (order.is_credit_sale) {
-                        <app-status-badge type="warning" label="credit" />
+                        <app-status-badge
+                          [type]="creditBadge(order).type"
+                          [label]="creditBadge(order).label"
+                        />
                       }
                     </td>
                     <td
@@ -360,7 +366,7 @@ const ALL_STATUSES = ['completed', 'voided', 'draft', 'expired', 'pending_paymen
                     >
                       {{ paymentLabel(order) }}
                     </td>
-                    <td class="table-number"><app-money [cents]="order.total" /></td>
+                    <td class="table-number"><app-money [amount]="order.total" /></td>
                     <td class="table-actions" (click)="$event.stopPropagation()">
                       @if (printerEnabled() && order.status === 'completed') {
                         <button
@@ -457,10 +463,10 @@ const ALL_STATUSES = ['completed', 'voided', 'draft', 'expired', 'pending_paymen
                                 <td>{{ line.label }}</td>
                                 <td class="text-right">{{ line.quantity }}</td>
                                 <td class="text-right">
-                                  <app-money [cents]="line.custom_price ?? line.unit_price" />
+                                  <app-money [amount]="line.custom_price ?? line.unit_price" />
                                 </td>
                                 <td class="text-right">
-                                  <app-money [cents]="line.line_total" />
+                                  <app-money [amount]="line.line_total" />
                                 </td>
                               </tr>
                             }
@@ -472,7 +478,7 @@ const ALL_STATUSES = ['completed', 'voided', 'draft', 'expired', 'pending_paymen
                               <span
                                 class="inline-flex items-center gap-1 rounded-field border border-base-300 px-2 py-1 text-xs"
                                 >{{ payment.method_code }} ·
-                                <app-money [cents]="payment.amount" /> ·
+                                <app-money [amount]="payment.amount" /> ·
                                 {{ payment.status }}
                                 @if (payment.status === 'settled') {
                                   <button
@@ -574,6 +580,8 @@ export class OrdersComponent implements OnInit, OnDestroy {
   protected readonly pageSize = signal(20);
   protected readonly totalItems = signal(0);
   protected readonly orders = signal<OrderWithCustomer[]>([]);
+  /** Paid-so-far totals (shillings) for the credit sales currently listed. */
+  protected readonly creditPaid = signal<Map<string, number>>(new Map());
   protected readonly expandedFor = signal<string | null>(null);
   protected readonly lines = signal<OrderLineWithProduct[]>([]);
   protected readonly payments = signal<Payment[]>([]);
@@ -687,6 +695,8 @@ export class OrdersComponent implements OnInit, OnDestroy {
       });
       this.orders.set(result.rows);
       this.totalItems.set(result.count);
+      const creditIds = result.rows.filter(order => order.is_credit_sale).map(order => order.id);
+      this.creditPaid.set(await this.pos.paidTotalsByOrder(creditIds));
       this.error.set(null);
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Failed to load sales');
@@ -757,7 +767,7 @@ export class OrdersComponent implements OnInit, OnDestroy {
   }
 
   protected async confirmRefund(orderId: string): Promise<void> {
-    const amount = Math.round(Number(this.refundAmount.value) * 100);
+    const amount = Math.round(Number(this.refundAmount.value));
     if (!Number.isFinite(amount) || amount <= 0 || !this.refundReason.value.trim()) {
       this.error.set('Refund amount and reason are required');
       return;
@@ -837,14 +847,31 @@ export class OrdersComponent implements OnInit, OnDestroy {
     if (order.status === 'draft') return 'Not posted';
     if (order.status === 'expired') return 'Expired';
     if (order.status === 'voided') return 'Voided';
-    return order.is_credit_sale ? 'Credit' : 'Paid';
+    if (!order.is_credit_sale) return 'Paid';
+    const paid = this.creditPaid().get(order.id) ?? 0;
+    if (paid <= 0) return 'Credit · Unpaid';
+    if (paid >= order.total) return 'Credit · Settled';
+    return `Credit · Part-paid (${formatKes(paid)} of ${formatKes(order.total)})`;
+  }
+
+  /** Badge for a credit sale: warning while anything is outstanding, success once settled. */
+  protected creditBadge(order: OrderWithCustomer): { type: 'warning' | 'success'; label: string } {
+    const paid = this.creditPaid().get(order.id) ?? 0;
+    return paid >= order.total
+      ? { type: 'success', label: 'credit · settled' }
+      : { type: 'warning', label: paid > 0 ? 'credit · part-paid' : 'credit' };
   }
 
   protected noPaymentsMessage(order: OrderWithCustomer): string {
     if (order.status === 'pending_payment') return 'Awaiting payment in the cashier queue.';
     if (order.status === 'draft') return 'No payments on this proforma.';
     if (order.status === 'expired') return 'This proforma expired without being converted.';
-    if (order.is_credit_sale) return 'Credit sale — no payment collected.';
+    if (order.is_credit_sale) {
+      const paid = this.creditPaid().get(order.id) ?? 0;
+      if (paid >= order.total) return 'Credit sale — fully repaid.';
+      if (paid > 0) return `Credit sale — ${formatKes(order.total - paid)} still outstanding.`;
+      return 'Credit sale — no payment collected yet.';
+    }
     return 'No payments recorded.';
   }
 

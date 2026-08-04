@@ -43,7 +43,7 @@ design language in `docs/DESIGN_SYSTEM.md` and shared primitives in
 - Auth hooks add company/role context to JWTs.
 - RLS is the read and write isolation boundary; UI permission checks are only affordances.
 - Privileged writes use security-definer RPCs with explicit company and permission checks.
-- Currency is stored as integer cents. Quantities may be fractional where the variant allows.
+- Currency is stored as integer shillings. Quantities may be fractional where the variant allows.
 - Ledger entries are double-entry and balanced in the same transaction as their source event.
 - Generated database types live at `packages/shared-types/database.types.ts` and are checked by
   CI against a fresh local database.

@@ -51,7 +51,7 @@ export type LedgerAccountWithBalance = LedgerAccount & { balance: number };
 /** Declaration item for cashier sessions and manual reconciliation. */
 export interface Declaration {
   account_code: string;
-  declared: number; // cents
+  declared: number; // shillings
   reason?: string;
 }
 

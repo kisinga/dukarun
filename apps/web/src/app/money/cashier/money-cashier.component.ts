@@ -153,13 +153,13 @@ import {
                       @for (count of session.cash_drawer_counts; track count.id) {
                         <tr>
                           <td>{{ count.count_type }}</td>
-                          <td class="text-right"><app-money [cents]="count.declared_cash" /></td>
-                          <td class="text-right"><app-money [cents]="count.expected_cash" /></td>
+                          <td class="text-right"><app-money [amount]="count.declared_cash" /></td>
+                          <td class="text-right"><app-money [amount]="count.expected_cash" /></td>
                           <td
                             class="text-right font-semibold"
                             [class.text-error]="count.variance !== 0"
                           >
-                            <app-money [cents]="count.variance" />
+                            <app-money [amount]="count.variance" />
                           </td>
                         </tr>
                       }
@@ -184,13 +184,13 @@ import {
                       @for (ra of reconFor(session.id); track ra.id) {
                         <tr>
                           <td class="font-mono text-xs">{{ ra.account_code }}</td>
-                          <td class="text-right"><app-money [cents]="ra.declared" /></td>
-                          <td class="text-right"><app-money [cents]="ra.expected" /></td>
+                          <td class="text-right"><app-money [amount]="ra.declared" /></td>
+                          <td class="text-right"><app-money [amount]="ra.expected" /></td>
                           <td
                             class="text-right font-semibold"
                             [class.text-error]="ra.variance !== 0 && !ra.reviewed_at"
                           >
-                            <app-money [cents]="ra.variance" />
+                            <app-money [amount]="ra.variance" />
                           </td>
                           <td class="text-right">
                             @if (ra.reviewed_at) {

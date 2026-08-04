@@ -1,6 +1,6 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
-import { formatKes, formatKesInput, parseKesToCents } from '../core/money';
+import { formatKes, formatKesInput, parseKes } from '../core/money';
 import { PermissionsService } from '../core/permissions.service';
 import {
   AgingInfo,
@@ -219,7 +219,7 @@ type CreditOrder = {
                       </div>
                       <p class="table-secondary">
                         @if (c.credit_limit > 0) {
-                          Limit <app-money [cents]="c.credit_limit" />
+                          Limit <app-money [amount]="c.credit_limit" />
                         } @else {
                           No credit cap
                         }
@@ -238,7 +238,7 @@ type CreditOrder = {
                       [class.text-error]="c.ar_balance > 0"
                       [class.text-base-content/50]="c.ar_balance === 0"
                     >
-                      <app-money [cents]="c.ar_balance" [masked]="!perms.has('ViewFinancials')" />
+                      <app-money [amount]="c.ar_balance" [masked]="!perms.has('ViewFinancials')" />
                     </td>
                     <td class="table-actions" (click)="$event.stopPropagation()">
                       <button
@@ -282,7 +282,7 @@ type CreditOrder = {
                     [class.text-error]="c.ar_balance > 0"
                     [class.text-base-content/60]="c.ar_balance === 0"
                   >
-                    <app-money [cents]="c.ar_balance" [masked]="!perms.has('ViewFinancials')" />
+                    <app-money [amount]="c.ar_balance" [masked]="!perms.has('ViewFinancials')" />
                     owed to us
                   </span>
                   <button appButton variant="ghost" (click)="startEdit(c)">Edit</button>
@@ -302,12 +302,12 @@ type CreditOrder = {
                           @if (c.credit_limit > 0) {
                             limit
                             <app-money
-                              [cents]="c.credit_limit"
+                              [amount]="c.credit_limit"
                               [masked]="!perms.has('ViewFinancials')"
                             />
                             ·
                             <app-money
-                              [cents]="customerCreditAvailable(c)"
+                              [amount]="customerCreditAvailable(c)"
                               [masked]="!perms.has('ViewFinancials')"
                             />
                             available
@@ -422,7 +422,9 @@ type CreditOrder = {
                             }}</span>
                             <span class="badge badge-xs badge-outline">{{ o.status }}</span>
                             <span class="ml-auto font-semibold"
-                              ><app-money [cents]="o.total" [masked]="!perms.has('ViewFinancials')"
+                              ><app-money
+                                [amount]="o.total"
+                                [masked]="!perms.has('ViewFinancials')"
                             /></span>
                             @if (perms.has('SettleOrder')) {
                               <button
@@ -514,7 +516,7 @@ type CreditOrder = {
                               </td>
                               <td class="text-right">
                                 <app-money
-                                  [cents]="o.total"
+                                  [amount]="o.total"
                                   [masked]="!perms.has('ViewFinancials')"
                                 />
                               </td>
@@ -556,10 +558,10 @@ type CreditOrder = {
                                 <td>{{ date(row.date) }}</td>
                                 <td class="font-mono text-xs">{{ row.reference }}</td>
                                 <td>{{ row.description }}</td>
-                                <td class="text-right"><app-money [cents]="row.debit" /></td>
-                                <td class="text-right"><app-money [cents]="row.credit" /></td>
+                                <td class="text-right"><app-money [amount]="row.debit" /></td>
+                                <td class="text-right"><app-money [amount]="row.credit" /></td>
                                 <td class="text-right font-semibold">
-                                  <app-money [cents]="row.balance" />
+                                  <app-money [amount]="row.balance" />
                                 </td>
                               </tr>
                             }
@@ -819,8 +821,8 @@ export class CustomersComponent implements OnInit {
       this.error.set(err instanceof Error ? err.message : 'Open a cashier session first');
       return;
     }
-    const cents = parseKesToCents(this.repayAmount.value);
-    if (cents === null || cents <= 0) {
+    const amount = parseKes(this.repayAmount.value);
+    if (amount === null || amount <= 0) {
       this.error.set('Enter a valid repayment amount');
       return;
     }
@@ -830,7 +832,7 @@ export class CustomersComponent implements OnInit {
     try {
       await this.money.postPaymentAllocation(
         orderId,
-        cents,
+        amount,
         this.repayMethod.value,
         this.repayReference.value.trim() || undefined
       );
@@ -853,7 +855,7 @@ export class CustomersComponent implements OnInit {
       this.error.set(error instanceof Error ? error.message : 'Open a cashier session first');
       return;
     }
-    const amount = parseKesToCents(this.bulkAmount.value);
+    const amount = parseKes(this.bulkAmount.value);
     if (amount === null || amount <= 0) {
       this.error.set('Enter a valid payment amount');
       return;
@@ -883,7 +885,7 @@ export class CustomersComponent implements OnInit {
 
   protected async adjustBalance(customerId: string): Promise<void> {
     const raw = Number(this.adjustmentAmount.value.replace(/,/g, '').trim());
-    const amount = Math.round(raw * 100);
+    const amount = Math.round(raw);
     if (!Number.isFinite(amount) || amount === 0 || !this.adjustmentReason.value.trim()) {
       this.error.set('Enter a non-zero adjustment and a reason');
       return;
@@ -914,8 +916,8 @@ export class CustomersComponent implements OnInit {
   }
 
   protected async saveCredit(c: CustomerWithAr): Promise<void> {
-    const limitCents = parseKesToCents(this.creditLimit.value);
-    if (limitCents === null) {
+    const limitAmount = parseKes(this.creditLimit.value);
+    if (limitAmount === null) {
       this.error.set('Enter a valid credit limit');
       return;
     }
@@ -925,7 +927,7 @@ export class CustomersComponent implements OnInit {
     try {
       await this.money.updateCustomerCredit(
         c.id,
-        limitCents,
+        limitAmount,
         this.approved.value,
         this.termsDays.value > 0 ? this.termsDays.value : undefined
       );

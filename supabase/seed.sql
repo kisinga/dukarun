@@ -10,7 +10,7 @@
 insert into public.subscription_tiers (code, name, price_monthly, price_yearly, features, limits)
 values
   ('trial', 'Trial', 0, 0, '{"multipleLocations": false, "staffPerformance": false, "commissions": false}', '{"maxAdmins": 1, "maxProducts": 100, "maxStockLocations": 1, "maxOrdersPerMonth": 500, "smsPerPeriod": 50}'),
-  ('standard', 'Standard', 150000, 1500000, '{"multipleLocations": true, "staffPerformance": true, "commissions": true}', '{"maxAdmins": 5, "maxProducts": 5000, "maxStockLocations": 3, "maxOrdersPerMonth": 10000, "smsPerPeriod": 500}')
+  ('standard', 'Standard', 1500, 15000, '{"multipleLocations": true, "staffPerformance": true, "commissions": true}', '{"maxAdmins": 5, "maxProducts": 5000, "maxStockLocations": 3, "maxOrdersPerMonth": 10000, "smsPerPeriod": 500}')
 on conflict (code) do update
 set name = excluded.name,
     price_monthly = excluded.price_monthly,
@@ -106,7 +106,7 @@ from public.companies where name = '<tenant> Stores'
 on conflict do nothing;
 
 insert into public.product_variants (id, product_id, company_id, name, sku, price, wholesale_price)
-select 'dd000000-0000-0000-0000-000000000001', 'd0000000-0000-0000-0000-000000000001', c.id, 'Default', 'UNGA2', 22000, 20000
+select 'dd000000-0000-0000-0000-000000000001', 'd0000000-0000-0000-0000-000000000001', c.id, 'Default', 'UNGA2', 220, 200
 from public.companies c where c.name = '<tenant> Stores'
 on conflict do nothing;
 
@@ -116,12 +116,12 @@ from public.companies where name = '<tenant> Stores'
 on conflict do nothing;
 
 insert into public.product_variants (id, product_id, company_id, name, sku, price, allow_fractional)
-select 'dd000000-0000-0000-0000-000000000002', 'd0000000-0000-0000-0000-000000000002', c.id, 'Loose (per kg)', 'SUGL', 18000, true
+select 'dd000000-0000-0000-0000-000000000002', 'd0000000-0000-0000-0000-000000000002', c.id, 'Loose (per kg)', 'SUGL', 180, true
 from public.companies c where c.name = '<tenant> Stores'
 on conflict do nothing;
 
 insert into public.product_variants (id, product_id, company_id, name, sku, price)
-select 'dd000000-0000-0000-0000-000000000003', 'd0000000-0000-0000-0000-000000000002', c.id, '1kg Packed', 'SUG1', 20000
+select 'dd000000-0000-0000-0000-000000000003', 'd0000000-0000-0000-0000-000000000002', c.id, '1kg Packed', 'SUG1', 200
 from public.companies c where c.name = '<tenant> Stores'
 on conflict do nothing;
 
@@ -131,7 +131,7 @@ from public.companies where name = '<tenant> Stores'
 on conflict do nothing;
 
 insert into public.product_variants (id, product_id, company_id, name, kind, sku, price, track_inventory)
-select 'dd000000-0000-0000-0000-000000000004', 'd0000000-0000-0000-0000-000000000003', c.id, 'Default', 'service', 'DEL', 5000, false
+select 'dd000000-0000-0000-0000-000000000004', 'd0000000-0000-0000-0000-000000000003', c.id, 'Default', 'service', 'DEL', 50, false
 from public.companies c where c.name = '<tenant> Stores'
 on conflict do nothing;
 
@@ -152,13 +152,13 @@ select
 from public.companies c
 join (
   values
-    ('e0000000-0000-0000-0000-000000000001', 'dd000000-0000-0000-0000-000000000001', 'MAIN', 30::numeric, 15000::bigint),
-    ('e0000000-0000-0000-0000-000000000002', 'dd000000-0000-0000-0000-000000000001', 'WAREHOUSE', 12::numeric, 15000::bigint),
-    ('e0000000-0000-0000-0000-000000000003', 'dd000000-0000-0000-0000-000000000001', 'WESTLANDS', 8::numeric, 15000::bigint),
-    ('e0000000-0000-0000-0000-000000000004', 'dd000000-0000-0000-0000-000000000002', 'MAIN', 20::numeric, 12000::bigint),
-    ('e0000000-0000-0000-0000-000000000005', 'dd000000-0000-0000-0000-000000000002', 'WAREHOUSE', 10::numeric, 12000::bigint),
-    ('e0000000-0000-0000-0000-000000000006', 'dd000000-0000-0000-0000-000000000003', 'MAIN', 25::numeric, 13000::bigint),
-    ('e0000000-0000-0000-0000-000000000007', 'dd000000-0000-0000-0000-000000000003', 'WESTLANDS', 15::numeric, 13000::bigint)
+    ('e0000000-0000-0000-0000-000000000001', 'dd000000-0000-0000-0000-000000000001', 'MAIN', 30::numeric, 150::bigint),
+    ('e0000000-0000-0000-0000-000000000002', 'dd000000-0000-0000-0000-000000000001', 'WAREHOUSE', 12::numeric, 150::bigint),
+    ('e0000000-0000-0000-0000-000000000003', 'dd000000-0000-0000-0000-000000000001', 'WESTLANDS', 8::numeric, 150::bigint),
+    ('e0000000-0000-0000-0000-000000000004', 'dd000000-0000-0000-0000-000000000002', 'MAIN', 20::numeric, 120::bigint),
+    ('e0000000-0000-0000-0000-000000000005', 'dd000000-0000-0000-0000-000000000002', 'WAREHOUSE', 10::numeric, 120::bigint),
+    ('e0000000-0000-0000-0000-000000000006', 'dd000000-0000-0000-0000-000000000003', 'MAIN', 25::numeric, 130::bigint),
+    ('e0000000-0000-0000-0000-000000000007', 'dd000000-0000-0000-0000-000000000003', 'WESTLANDS', 15::numeric, 130::bigint)
 ) as batch(id, variant_id, location_code, quantity, unit_cost) on true
 join public.stock_locations l on l.company_id = c.id and l.code = batch.location_code
 where c.name = '<tenant> Stores'

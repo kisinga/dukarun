@@ -2,7 +2,7 @@ import { Component, effect, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CashierSessionDialogService } from '../../core/cashier-session-dialog.service';
 import { CashierSessionService } from '../../core/cashier-session.service';
-import { parseKesToCents } from '../../core/money';
+import { parseKes } from '../../core/money';
 import { PrintService } from '../../shared/print/print.service';
 import { ReceiptDataService } from '../../shared/print/receipt-data.service';
 import { ButtonComponent } from '../../shared/ui/button.component';
@@ -120,7 +120,7 @@ import {
                         <p class="type-caption font-mono">{{ account.account_code }}</p>
                       </div>
                       <p class="shrink-0 font-bold tabular-nums">
-                        <app-money [cents]="reviewAmount(account.account_code)" />
+                        <app-money [amount]="reviewAmount(account.account_code)" />
                       </p>
                     </div>
                   }
@@ -157,7 +157,7 @@ import {
                           <p class="type-caption mt-1">
                             Previous closing:
                             <span class="font-medium text-base-content">
-                              <app-money [cents]="previous.declared" />
+                              <app-money [amount]="previous.declared" />
                             </span>
                           </p>
                         }
@@ -375,7 +375,7 @@ export class CashierSessionModalComponent {
   }
 
   protected reviewAmount(accountCode: string): number {
-    return parseKesToCents(this.declared[accountCode] ?? '') ?? 0;
+    return parseKes(this.declared[accountCode] ?? '') ?? 0;
   }
 
   protected previousClosing(accountCode: string): ReconAccountWithParent | undefined {
@@ -394,12 +394,12 @@ export class CashierSessionModalComponent {
   private declarations(): { account_code: string; declared: number }[] | null {
     const declarations: { account_code: string; declared: number }[] = [];
     for (const account of this.accounts()) {
-      const cents = parseKesToCents(this.declared[account.account_code] ?? '');
-      if (cents === null || cents < 0) {
+      const amount = parseKes(this.declared[account.account_code] ?? '');
+      if (amount === null || amount < 0) {
         this.error.set(`Enter a valid non-negative amount for ${account.label}`);
         return null;
       }
-      declarations.push({ account_code: account.account_code, declared: cents });
+      declarations.push({ account_code: account.account_code, declared: amount });
     }
     return declarations;
   }

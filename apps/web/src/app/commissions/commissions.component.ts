@@ -395,9 +395,9 @@ import {
                       />
                     </td>
                     <td class="text-right">{{ period.staff_count }}</td>
-                    <td class="text-right"><app-money [cents]="period.basis_total" /></td>
+                    <td class="text-right"><app-money [amount]="period.basis_total" /></td>
                     <td class="text-right font-semibold">
-                      <app-money [cents]="period.commission_total" />
+                      <app-money [amount]="period.commission_total" />
                     </td>
                     <td class="table-actions">
                       <button appButton variant="ghost" size="sm" (click)="openStatement(period)">
@@ -492,9 +492,9 @@ import {
                       <tr>
                         <td class="font-medium">{{ row.staff_name }}</td>
                         <td class="text-right">{{ row.event_count }}</td>
-                        <td class="text-right"><app-money [cents]="row.basis_total" /></td>
+                        <td class="text-right"><app-money [amount]="row.basis_total" /></td>
                         <td class="text-right font-semibold">
-                          <app-money [cents]="row.commission_total" />
+                          <app-money [amount]="row.commission_total" />
                         </td>
                       </tr>
                     }
@@ -503,8 +503,8 @@ import {
                     <tr>
                       <th>Total</th>
                       <th></th>
-                      <th class="text-right"><app-money [cents]="period.basis_total" /></th>
-                      <th class="text-right"><app-money [cents]="period.commission_total" /></th>
+                      <th class="text-right"><app-money [amount]="period.basis_total" /></th>
+                      <th class="text-right"><app-money [amount]="period.commission_total" /></th>
                     </tr>
                   </tfoot>
                 </table>
@@ -779,7 +779,7 @@ export class CommissionsComponent implements OnInit {
 
   protected async addAdjustment(): Promise<void> {
     const period = this.selectedPeriod();
-    const amount = Math.round(this.adjustmentAmount.value * 100);
+    const amount = Math.round(this.adjustmentAmount.value);
     if (!period || period.status !== 'draft') return;
     if (!amount || !this.adjustmentReason.value.trim() || !this.adjustmentStaff.value) {
       return this.fail('Choose staff, enter a non-zero amount, and give a reason');

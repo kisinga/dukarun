@@ -140,7 +140,7 @@ Compose pages from these — never hand-roll what a primitive owns:
   Use `soft`, not `primary`, for a selected method/filter so the CTA remains singular.
   Variants never change button geometry. No raw `btn btn-*` strings for standard actions
   (tight table-row clusters may stay raw by exception).
-- **`<app-money [cents]>`** — the only way to render money: compact tabular-nums by default,
+- **`<app-money [amount]>`** — the only way to render money: compact tabular-nums by default,
   `[showCurrency]="true"` only where context does not already establish KES,
   `direction="in|out"` for money-meaning colour, and `masked` for hidden figures. Never
   `{{ formatKes(...) }}` in templates (string composition in TS, e.g. option labels, is fine).

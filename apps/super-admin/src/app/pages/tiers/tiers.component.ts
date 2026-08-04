@@ -1,6 +1,6 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
-import { formatKes, formatKesInput, parseKesToCents } from '../../core/money';
+import { formatKes, formatKesInput, parseKes } from '../../core/money';
 import { PlatformService, Tier } from '../../core/platform.service';
 import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
 import { PageHeaderComponent } from '../../shared/ui/page-header.component';
@@ -239,8 +239,8 @@ export class TiersComponent implements OnInit {
   }
 
   protected async save(): Promise<void> {
-    const monthly = parseKesToCents(this.priceMonthly.value);
-    const yearly = parseKesToCents(this.priceYearly.value);
+    const monthly = parseKes(this.priceMonthly.value);
+    const yearly = parseKes(this.priceYearly.value);
     if (monthly === null || yearly === null) {
       this.error.set('Enter valid monthly and yearly prices');
       return;

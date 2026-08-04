@@ -1,6 +1,6 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
-import { parseKesToCents } from '../../core/money';
+import { parseKes } from '../../core/money';
 import { ButtonComponent } from '../../shared/ui/button.component';
 import { FormFieldComponent } from '../../shared/ui/form-field.component';
 import { JournalListComponent } from '../journal-list.component';
@@ -148,8 +148,8 @@ export class MoneyExpensesComponent implements OnInit {
       this.error.set(err instanceof Error ? err.message : 'Open a cashier session first');
       return;
     }
-    const cents = parseKesToCents(this.amount.value);
-    if (cents === null || cents <= 0) {
+    const amount = parseKes(this.amount.value);
+    if (amount === null || amount <= 0) {
       this.error.set('Enter a valid amount');
       return;
     }
@@ -158,7 +158,7 @@ export class MoneyExpensesComponent implements OnInit {
     this.notice.set(null);
     try {
       await this.money.postExpense(
-        cents,
+        amount,
         this.account.value,
         this.category.value.trim() || undefined,
         this.memo.value.trim() || undefined
