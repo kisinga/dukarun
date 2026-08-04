@@ -38,6 +38,13 @@
     "typescript": "~5.9.3"
   },
   "optionalDependencies": {
-    "lightningcss-linux-x64-gnu": "^1.32.0"
+    "@rolldown/binding-linux-x64-gnu": "^1.0.0-rc.4",
+    "@rolldown/binding-linux-x64-musl": "^1.0.0-rc.4",
+    "@tailwindcss/oxide-linux-x64-gnu": "^4.3.1",
+    "@tailwindcss/oxide-linux-x64-musl": "^4.3.1",
+    "lightningcss-linux-x64-gnu": "^1.32.0",
+    "lightningcss-linux-x64-musl": "^1.32.0",
+    "napi": "*",
+    "version": "^0.1.2"
   }
 }
