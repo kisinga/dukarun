@@ -29,10 +29,13 @@ nothing sensitive is stored in the repo.
 
 ## Remaining
 
-### 1. Paystack webhook secret
+### 1. Paystack webhook
 
-Dashboard → Settings → Webhooks: URL `https://supa.dukarun.com/functions/v1/paystack-webhook`,
-then set `PAYSTACK_WEBHOOK_SECRET` in Coolify env (HMAC check; unset = webhook 500s).
+Dashboard → Settings → API Keys & Webhooks: set webhook URL to
+`https://supa.dukarun.com/functions/v1/paystack-webhook`. Signature verification uses
+`PAYSTACK_SECRET_KEY` itself (Paystack signs webhooks with the secret key — there is no
+separate webhook secret). Verify with a dashboard test webhook (edge function log should
+show a 200 and the company row updating).
 
 ### 2. Email provider
 

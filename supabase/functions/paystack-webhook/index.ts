@@ -3,13 +3,12 @@
 // Replaces archive/vendure/backend/src/plugins/subscriptions/subscription-webhook.controller.ts
 // (charge.success is the only event with logic upstream; others are log-only).
 //
-// Env: PAYSTACK_WEBHOOK_SECRET, PAYSTACK_SECRET_KEY,
-//      PAYSTACK_ONLINE_VERIFY ('false' skips the /transaction/verify callback
-//      — local testing only; keep true in production).
+// Env: PAYSTACK_SECRET_KEY (Paystack signs webhooks with the secret key itself
+//      — there is no separate webhook secret), PAYSTACK_ONLINE_VERIFY ('false'
+//      skips the /transaction/verify callback — local testing only).
 
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
-const WEBHOOK_SECRET = Deno.env.get('PAYSTACK_WEBHOOK_SECRET') ?? '';
 const PAYSTACK_SECRET = Deno.env.get('PAYSTACK_SECRET_KEY') ?? '';
 const ONLINE_VERIFY = (Deno.env.get('PAYSTACK_ONLINE_VERIFY') ?? 'true') !== 'false';
 
@@ -33,7 +32,7 @@ Deno.serve(async req => {
   const rawBody = await req.text();
   const signature = req.headers.get('x-paystack-signature') ?? '';
 
-  const expected = await hmacHex(WEBHOOK_SECRET, rawBody);
+  const expected = await hmacHex(PAYSTACK_SECRET, rawBody);
   if (signature !== expected) {
     return Response.json({ error: 'invalid_signature' }, { status: 401 });
   }
