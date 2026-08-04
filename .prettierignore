@@ -19,3 +19,4 @@ archive/
 # Generated GraphQL outputs (codegen)
 super-admin/src/app/core/graphql/generated/
 storefront/src/app/core/graphql/generated/
+packages/shared-types/database.types.ts
