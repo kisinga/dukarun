@@ -10,7 +10,9 @@
 // before every insert; ledger entries additionally rely on
 // unique(company_id, source_type, source_id) with ON CONFLICT skip.
 //
-// Money is integer cents everywhere. int8 is parsed to Number (all values << 2^53).
+// Money is integer cents in the SOURCE (Vendure). The app now stores integer shillings:
+// if this ETL is ever re-run against a live target, divide all money values by 100 first.
+// int8 is parsed to Number (all values << 2^53).
 // SOURCE is read-only; TARGET writes bypass RPCs deliberately (migration, not app traffic).
 import pg from 'pg';
 import fs from 'node:fs';
@@ -24,12 +26,10 @@ const TGT_DSN =
   process.env.TARGET_DB_URL ?? 'postgres://postgres:postgres@127.0.0.1:54322/postgres';
 
 // Supabase API config for the --prod auth branch and asset uploads.
-// Defaults are the LOCAL dev stack (demo keys, per `npx supabase status -o env`);
-// override via env for real environments.
+// SUPABASE_SERVICE_ROLE_KEY is required for --prod/asset uploads — get the
+// local one from `npx supabase status -o env`; never hardcode a real key.
 const SUPABASE_URL = process.env.SUPABASE_URL ?? 'http://127.0.0.1:54321';
-const SUPABASE_SERVICE_ROLE_KEY =
-  process.env.SUPABASE_SERVICE_ROLE_KEY ??
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU';
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? '';
 // Vendure asset store root (asset.source is relative to this).
 const VENDURE_ASSET_DIR =
   process.env.VENDURE_ASSET_DIR ??
@@ -123,6 +123,8 @@ async function mapPut(companyId, type, oldId, newId) {
 // copyAssets(). 429 -> exponential backoff retry.
 // ---------------------------------------------------------------------------
 async function supaApi(pathname, init = {}, attempt = 0) {
+  if (!SUPABASE_SERVICE_ROLE_KEY)
+    throw new Error('SUPABASE_SERVICE_ROLE_KEY env required (local: `npx supabase status -o env`)');
   const res = await fetch(SUPABASE_URL + pathname, {
     ...init,
     headers: {
