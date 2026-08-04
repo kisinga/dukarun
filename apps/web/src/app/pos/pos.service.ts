@@ -53,7 +53,8 @@ export interface SaleLineInput {
 
 /** p_payments item for post_sale / convert_draft / settle_order. */
 export interface PaymentInput {
-  method: 'cash' | 'mpesa' | 'bank';
+  /** Method code from the payment_methods table (backend-validated). */
+  method: string;
   amount: number;
   reference?: string;
   mpesa_receipt?: string;
@@ -67,6 +68,18 @@ export type OrderLineWithProduct = OrderLine & {
   /** Resolved from variant_catalog (product — variant). */
   label: string;
 };
+
+/** One enabled tender method from `available_payment_methods` (credit excluded). */
+export interface EnabledPaymentMethod {
+  code: string;
+  name: string;
+  is_cashier_controlled: boolean;
+}
+
+/** post_sale_at_location result (jsonb since migration 0054). */
+export type PostSaleResult =
+  | { status: 'completed' | 'parked'; orderId: string }
+  | { status: 'approval_required'; orderId: string; approvalId: string };
 
 /** void_sale result: voided immediately, or parked for approval (supervisor path). */
 export type VoidResult =
@@ -441,13 +454,19 @@ export class PosService {
     }));
   }
 
-  /** Enabled non-credit payment method codes (credit is handled as its own checkout mode). */
-  async enabledPaymentMethods(): Promise<string[]> {
+  /** Enabled non-credit payment methods with display names and till-control flags. */
+  async enabledPaymentMethods(): Promise<EnabledPaymentMethod[]> {
     const { data, error } = await this.client.rpc('available_payment_methods', {
       p_location_id: this.locations.requireActiveId(),
     });
     if (error) throw error;
-    return data.filter(method => method.code !== 'credit').map(method => method.code);
+    return data
+      .filter(method => method.code !== 'credit')
+      .map(method => ({
+        code: method.code,
+        name: method.name,
+        is_cashier_controlled: method.is_cashier_controlled,
+      }));
   }
 
   /** Orders by status, most recent first. `since`/`until` bound created_at. */
@@ -592,7 +611,7 @@ export class PosService {
     park: boolean,
     clientRef?: string,
     locationId?: string
-  ): Promise<string> {
+  ): Promise<PostSaleResult> {
     const { data, error } = await this.client.rpc('post_sale_at_location', {
       p_location_id: locationId ?? this.locations.requireActiveId(),
       // null = walk-in customer (accepted by the backend; generated types mark it non-null)
@@ -604,7 +623,18 @@ export class PosService {
       ...(clientRef ? { p_client_ref: clientRef } : {}),
     });
     if (error) throw rpcError(error);
-    return data;
+    const result = data as { status: string; order_id: string; approval_id?: string };
+    if (result.status === 'approval_required') {
+      return {
+        status: 'approval_required',
+        orderId: result.order_id,
+        approvalId: result.approval_id!,
+      };
+    }
+    return {
+      status: result.status === 'parked' ? 'parked' : 'completed',
+      orderId: result.order_id,
+    };
   }
 
   private async withLocationStock(rows: Variant[]): Promise<Variant[]> {

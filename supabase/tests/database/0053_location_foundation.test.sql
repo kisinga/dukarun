@@ -2,7 +2,7 @@ begin;
 select plan(14);
 
 create temp table location_company as
-select id as company_id from public.companies where name = '<tenant> Stores';
+select id as company_id from public.companies where name = 'Mama Mboga Stores';
 grant select on pg_temp.location_company to authenticated;
 
 select testkit.as_user(

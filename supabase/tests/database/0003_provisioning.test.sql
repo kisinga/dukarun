@@ -9,7 +9,7 @@ set local role authenticated;
 set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
 
 create temp table provision_result as
-select public.provision_company('<tenant> Stores', 'Kiosk 1') as company_id;
+select public.provision_company('Mama Mboga Stores', 'Kiosk 1') as company_id;
 
 reset role;
 

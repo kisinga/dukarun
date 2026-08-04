@@ -51,7 +51,7 @@ export class CompanyPreferencesService {
         company_id: identity.companyId,
         user_id: identity.userId,
         location_id: locationId,
-        payment_methods: existing?.payment_methods ?? ['cash', 'mpesa', 'bank'],
+        payment_methods: existing?.payment_methods ?? [],
         cashier_flow_enabled: data.cashier_flow_enabled,
         cash_control_enabled: data.cash_control_enabled,
         require_opening_count: data.require_opening_count,

@@ -1,7 +1,7 @@
 -- Local development seed (runs on `supabase db reset`). NOT for production.
 -- Restores a fully walkable demo state after every reset:
 --   test user 254700000001 / OTP 123456 (configured in config.toml test_otp)
---   → <tenant> Stores (fully-permitted Admin) on the Standard tier, with
+--   → Mama Mboga Stores (fully-permitted Admin) on the Standard tier, with
 --     three stock locations, products, distributed stock, a customer, and a supplier.
 
 -- ---------------------------------------------------------------------------
@@ -42,7 +42,7 @@ on conflict (id) do nothing;
 -- ---------------------------------------------------------------------------
 set request.jwt.claims = '{"sub":"5877ac73-ff8d-457c-afcd-791e66229d17","role":"authenticated"}';
 
-select public.provision_company('<tenant> Stores', 'Kiosk 1')
+select public.provision_company('Mama Mboga Stores', 'Kiosk 1')
 where not exists (
   select 1 from public.company_memberships
   where user_id = '5877ac73-ff8d-457c-afcd-791e66229d17'
@@ -60,7 +60,7 @@ set subscription_tier_id = t.id,
     status = 'approved',
     updated_at = now()
 from public.subscription_tiers t
-where c.name = '<tenant> Stores' and t.code = 'standard';
+where c.name = 'Mama Mboga Stores' and t.code = 'standard';
 
 -- Keep the seeded founder as a fully-capable shop administrator even when this
 -- seed is re-run against a database that already contained the membership.
@@ -73,13 +73,13 @@ set permissions = array[
   'ViewStaffPerformance','ManageCommissions'
 ]::text[]
 from public.companies c
-where r.company_id = c.id and c.name = '<tenant> Stores' and r.name = 'Admin';
+where r.company_id = c.id and c.name = 'Mama Mboga Stores' and r.name = 'Admin';
 
 update public.company_memberships m
 set role_id = r.id, authorization_status = 'approved'
 from public.roles r, public.companies c
 where m.user_id = '5877ac73-ff8d-457c-afcd-791e66229d17'
-  and m.company_id = c.id and c.name = '<tenant> Stores'
+  and m.company_id = c.id and c.name = 'Mama Mboga Stores'
   and r.company_id = c.id and r.name = 'Admin';
 
 -- Provisioning creates MAIN/Kiosk 1. Add two non-default locations so purchase,
@@ -92,7 +92,7 @@ cross join (
     ('WAREHOUSE', 'Central Warehouse'),
     ('WESTLANDS', 'Westlands Branch')
 ) as location(code, name)
-where c.name = '<tenant> Stores'
+where c.name = 'Mama Mboga Stores'
 on conflict (company_id, code) do update
 set name = excluded.name,
     updated_at = now();
@@ -102,37 +102,37 @@ set name = excluded.name,
 -- ---------------------------------------------------------------------------
 insert into public.products (id, company_id, name, barcode)
 select 'd0000000-0000-0000-0000-000000000001', id, 'Unga wa Dola 2kg', '6001234567890'
-from public.companies where name = '<tenant> Stores'
+from public.companies where name = 'Mama Mboga Stores'
 on conflict do nothing;
 
 insert into public.product_variants (id, product_id, company_id, name, sku, price, wholesale_price)
 select 'dd000000-0000-0000-0000-000000000001', 'd0000000-0000-0000-0000-000000000001', c.id, 'Default', 'UNGA2', 220, 200
-from public.companies c where c.name = '<tenant> Stores'
+from public.companies c where c.name = 'Mama Mboga Stores'
 on conflict do nothing;
 
 insert into public.products (id, company_id, name)
 select 'd0000000-0000-0000-0000-000000000002', id, 'Sugar'
-from public.companies where name = '<tenant> Stores'
+from public.companies where name = 'Mama Mboga Stores'
 on conflict do nothing;
 
 insert into public.product_variants (id, product_id, company_id, name, sku, price, allow_fractional)
 select 'dd000000-0000-0000-0000-000000000002', 'd0000000-0000-0000-0000-000000000002', c.id, 'Loose (per kg)', 'SUGL', 180, true
-from public.companies c where c.name = '<tenant> Stores'
+from public.companies c where c.name = 'Mama Mboga Stores'
 on conflict do nothing;
 
 insert into public.product_variants (id, product_id, company_id, name, sku, price)
 select 'dd000000-0000-0000-0000-000000000003', 'd0000000-0000-0000-0000-000000000002', c.id, '1kg Packed', 'SUG1', 200
-from public.companies c where c.name = '<tenant> Stores'
+from public.companies c where c.name = 'Mama Mboga Stores'
 on conflict do nothing;
 
 insert into public.products (id, company_id, name)
 select 'd0000000-0000-0000-0000-000000000003', id, 'Delivery'
-from public.companies where name = '<tenant> Stores'
+from public.companies where name = 'Mama Mboga Stores'
 on conflict do nothing;
 
 insert into public.product_variants (id, product_id, company_id, name, kind, sku, price, track_inventory)
 select 'dd000000-0000-0000-0000-000000000004', 'd0000000-0000-0000-0000-000000000003', c.id, 'Default', 'service', 'DEL', 50, false
-from public.companies c where c.name = '<tenant> Stores'
+from public.companies c where c.name = 'Mama Mboga Stores'
 on conflict do nothing;
 
 -- Stock is spread across all three locations while preserving the original
@@ -161,16 +161,16 @@ join (
     ('e0000000-0000-0000-0000-000000000007', 'dd000000-0000-0000-0000-000000000003', 'WESTLANDS', 15::numeric, 130::bigint)
 ) as batch(id, variant_id, location_code, quantity, unit_cost) on true
 join public.stock_locations l on l.company_id = c.id and l.code = batch.location_code
-where c.name = '<tenant> Stores'
+where c.name = 'Mama Mboga Stores'
 on conflict (id) do nothing;
 
 -- Customer + supplier
 insert into public.customers (id, company_id, first_name, phone, is_credit_approved, credit_limit, credit_terms_days)
 select 'dc000000-0000-0000-0000-000000000001', id, 'Jane Mwangi', '0712345678', true, 50000, 30
-from public.companies where name = '<tenant> Stores'
+from public.companies where name = 'Mama Mboga Stores'
 on conflict do nothing;
 
 insert into public.customers (id, company_id, first_name, phone, is_supplier, supplier_credit_limit, supplier_credit_terms_days)
 select 'dc000000-0000-0000-0000-000000000002', id, 'Brookside Distributors', '0700111222', true, 200000, 30
-from public.companies where name = '<tenant> Stores'
+from public.companies where name = 'Mama Mboga Stores'
 on conflict do nothing;

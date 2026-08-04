@@ -51,9 +51,15 @@ export interface CashierSessionSnapshot extends ScopedRecord {
   confirmed_at: string;
 }
 
+export interface CachedPaymentMethod {
+  code: string;
+  name: string;
+  isCashierControlled: boolean;
+}
+
 export interface PosSettingsSnapshot extends ScopedRecord {
   key: string;
-  payment_methods: string[];
+  payment_methods: CachedPaymentMethod[];
   cashier_flow_enabled?: boolean;
   cash_control_enabled?: boolean;
   require_opening_count?: boolean;

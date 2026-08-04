@@ -4166,7 +4166,7 @@ export type Database = {
           p_park?: boolean
           p_payments: Json
         }
-        Returns: string
+        Returns: Json
       }
       post_stock_adjustment: {
         Args: {
@@ -4536,6 +4536,7 @@ export type Database = {
         Args: {
           p_code: string
           p_enabled?: boolean
+          p_is_cashier_controlled?: boolean
           p_requires_reconciliation?: boolean
         }
         Returns: string

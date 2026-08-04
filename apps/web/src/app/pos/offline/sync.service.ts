@@ -9,6 +9,7 @@ import {
   belongsToIdentity,
   offlineDb,
   offlineScopeKey,
+  type CachedPaymentMethod,
   type PosSettingsSnapshot,
 } from './offline-db';
 
@@ -273,14 +274,18 @@ export class SyncService {
   }
 
   /** Tenant-scoped payment settings with stale-on-error behavior. */
-  async paymentMethods(): Promise<string[]> {
+  async paymentMethods(): Promise<CachedPaymentMethod[]> {
     const identity = this.supabase.offlineIdentity();
     const locationId = this.locations.activeId();
-    if (!identity || !locationId) return ['cash', 'mpesa', 'bank'];
+    if (!identity || !locationId) return [];
     const key = offlineScopeKey(identity, locationId);
     if (this.connectivity.online()) {
       try {
-        const methods = await this.pos.enabledPaymentMethods();
+        const methods = (await this.pos.enabledPaymentMethods()).map(method => ({
+          code: method.code,
+          name: method.name,
+          isCashierControlled: method.is_cashier_controlled,
+        }));
         const db = await offlineDb();
         const existing = await db.get('settings', key);
         const snapshot: PosSettingsSnapshot = {
@@ -299,7 +304,7 @@ export class SyncService {
       }
     }
     const db = await offlineDb();
-    return (await db.get('settings', key))?.payment_methods ?? ['cash', 'mpesa', 'bank'];
+    return (await db.get('settings', key))?.payment_methods ?? [];
   }
 
   catalogStatusLabel(): string {

@@ -7,7 +7,10 @@ import { parseKes } from '../../core/money';
 import { PermissionsService } from '../../core/permissions.service';
 import { CashierSessionService } from '../../core/cashier-session.service';
 import { CartService, type CartLine } from '../cart.service';
-import { CheckoutPanelComponent } from '../checkout/checkout-panel.component';
+import {
+  CheckoutPanelComponent,
+  type PaymentMethodOption,
+} from '../checkout/checkout-panel.component';
 import { ConnectivityService } from '../offline/connectivity.service';
 import { SyncService } from '../offline/sync.service';
 import { ButtonComponent } from '../../shared/ui/button.component';
@@ -460,53 +463,58 @@ import {
           <aside class="min-w-0 lg:sticky lg:top-4 lg:col-start-4 lg:row-start-1 lg:h-full">
             <div class="card h-full overflow-hidden bg-base-100" aria-label="Sale summary">
               <section class="p-4">
-                <div class="flex items-center justify-between gap-3">
-                  <div class="min-w-0">
-                    <p class="type-caption">Customer</p>
-                    <p class="truncate font-semibold">{{ cart.customerName() }}</p>
-                    @if (selectedCustomer(); as customer) {
-                      <p class="type-caption mt-0.5">
-                        @if (!customer.is_credit_approved) {
-                          Credit not approved
-                        } @else if (customer.credit_limit > 0) {
-                          <app-money [amount]="customerCreditAvailable(customer)" /> available
-                        } @else {
-                          Credit has no configured cap
-                        }
-                      </p>
-                    }
+                <p class="type-caption">Customer</p>
+                @if (selectedCustomer(); as customer) {
+                  <div class="mt-1 flex items-center gap-1">
+                    <p class="min-w-0 flex-1 truncate font-semibold">
+                      {{ customerName(customer) }}
+                    </p>
+                    <button
+                      appButton
+                      variant="ghost"
+                      size="sm"
+                      [iconOnly]="true"
+                      type="button"
+                      aria-label="Clear customer (back to Walk-in)"
+                      (click)="clearCustomer()"
+                    >
+                      <app-icon name="heroXMark" />
+                    </button>
                   </div>
-                  <button appButton variant="ghost" size="md" (click)="toggleCustomerPicker()">
-                    {{ customerPickerOpen() ? 'Close' : 'Change' }}
-                  </button>
-                </div>
-
-                @if (customerPickerOpen()) {
-                  <div class="mt-3 border-t border-base-300/60 pt-3">
-                    <app-form-field label="Find customer" hint="Required only for credit sales.">
-                      <input
-                        type="search"
-                        class="input input-bordered min-h-11 w-full"
-                        placeholder="Name or phone…"
-                        [formControl]="customerSearch"
-                      />
-                    </app-form-field>
-                    @if (cart.customerId()) {
-                      <button
-                        appButton
-                        variant="ghost"
-                        size="sm"
-                        class="mt-1"
-                        (click)="selectCustomer(null)"
-                      >
-                        Use Walk-in customer
-                      </button>
+                  <p class="mt-0.5 text-xs text-base-content/60 sm:text-sm">
+                    @if (!customer.is_credit_approved) {
+                      Credit not approved
+                    } @else if (customer.credit_limit > 0) {
+                      Limit <app-money [amount]="customer.credit_limit" /> · Owed
+                      <app-money [amount]="customer.ar_balance" /> · Available
+                      <app-money [amount]="customerCreditAvailable(customer)" />
+                    } @else {
+                      Credit approved · no cap
                     }
-                    @if (customerResults().length > 0) {
-                      <ul class="menu mt-2 rounded-box bg-base-200 p-1">
+                  </p>
+                } @else {
+                  <div class="relative mt-1">
+                    <input
+                      type="search"
+                      class="input input-bordered min-h-11 w-full"
+                      placeholder="Walk-in"
+                      autocomplete="off"
+                      aria-label="Search customers"
+                      [formControl]="customerSearch"
+                      (focus)="onCustomerFocus()"
+                      (blur)="onCustomerBlur()"
+                    />
+                    @if (customerDropdownOpen() && customerResults().length > 0) {
+                      <ul
+                        class="menu absolute inset-x-0 z-20 mt-1 max-h-64 flex-nowrap overflow-y-auto rounded-box border border-base-300/60 bg-base-100 p-1 shadow-overlay"
+                      >
                         @for (c of customerResults(); track c.id) {
                           <li>
-                            <button type="button" class="min-h-11" (click)="selectCustomer(c)">
+                            <button
+                              type="button"
+                              class="min-h-11"
+                              (mousedown)="$event.preventDefault(); selectCustomer(c)"
+                            >
                               <span class="min-w-0 flex-1 truncate text-left">
                                 {{ customerName(c) }}
                               </span>
@@ -550,6 +558,18 @@ import {
                   <app-icon name="heroBanknotes" />
                   Take payment
                 </button>
+                @if (creditAllowed()) {
+                  <button
+                    appButton
+                    variant="secondary"
+                    size="md"
+                    class="mt-2 hidden min-h-11 w-full lg:flex"
+                    [disabled]="cart.isEmpty() || busy() || !cashierSession.canTakePayment()"
+                    (click)="creditConfirmOpen.set(true)"
+                  >
+                    Sell on credit
+                  </button>
+                }
 
                 <div class="flex flex-wrap gap-2 lg:mt-2 lg:flex-col">
                   @if (cashierSession.cashierFlowEnabled()) {
@@ -584,13 +604,25 @@ import {
       <div
         class="shadow-overlay fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom,0px))] z-30 border-t border-base-300/60 bg-base-100 p-3 lg:hidden"
       >
-        <div class="flex w-full items-center gap-3">
+        <div class="flex w-full flex-wrap items-center gap-3">
           <a href="#current-sale" class="min-w-0 flex-1 rounded-field focus:outline-primary">
             <p class="type-caption">
               {{ cartItemCount() }} {{ cartItemCount() === 1 ? 'item' : 'items' }}
             </p>
             <p class="type-hero truncate"><app-money [amount]="cart.total()" /></p>
           </a>
+          @if (creditAllowed()) {
+            <button
+              appButton
+              variant="secondary"
+              size="md"
+              class="min-h-11 flex-1"
+              [disabled]="cart.isEmpty() || busy() || !cashierSession.canTakePayment()"
+              (click)="creditConfirmOpen.set(true)"
+            >
+              Sell on credit
+            </button>
+          }
           <button
             appButton
             size="md"
@@ -607,13 +639,84 @@ import {
       @if (checkoutOpen() && cashierSession.canTakePayment()) {
         <app-checkout-panel
           [total]="cart.total()"
-          [creditAllowed]="creditAllowed()"
-          [methods]="methods()"
+          [methods]="panelMethods()"
+          [canUseDirectAccounts]="canUseDirectAccounts()"
           [busy]="busy()"
           heading="Take payment"
           (confirmed)="completeSale($event)"
+          (approvalRequested)="completeSale($event)"
           (cancelled)="checkoutOpen.set(false)"
         />
+      }
+      @if (creditConfirmOpen()) {
+        <dialog
+          class="modal modal-open"
+          aria-labelledby="credit-confirm-heading"
+          (cancel)="$event.preventDefault(); creditConfirmOpen.set(false)"
+        >
+          <div class="modal-box border border-base-300/60 bg-base-100">
+            <h2 id="credit-confirm-heading" class="type-title">Sell on credit?</h2>
+            @if (selectedCustomer(); as customer) {
+              <dl class="mt-3 flex flex-col gap-2 text-sm">
+                <div class="flex items-center justify-between gap-3">
+                  <dt class="text-base-content/60">Customer</dt>
+                  <dd class="font-semibold">{{ customerName(customer) }}</dd>
+                </div>
+                <div class="flex items-center justify-between gap-3">
+                  <dt class="text-base-content/60">Amount due</dt>
+                  <dd class="font-semibold tabular-nums">
+                    <app-money [amount]="cart.total()" />
+                  </dd>
+                </div>
+                @if (customer.credit_limit > 0) {
+                  <div class="flex items-center justify-between gap-3">
+                    <dt class="text-base-content/60">Credit available after this sale</dt>
+                    <dd class="font-semibold tabular-nums">
+                      <app-money [amount]="customerCreditAvailable(customer) - cart.total()" />
+                    </dd>
+                  </div>
+                }
+              </dl>
+            }
+            <div class="mt-4 flex justify-end gap-2">
+              <button
+                appButton
+                variant="ghost"
+                size="md"
+                type="button"
+                [disabled]="busy()"
+                (click)="creditConfirmOpen.set(false)"
+              >
+                Cancel
+              </button>
+              <button
+                appButton
+                size="md"
+                type="button"
+                [loading]="busy()"
+                (click)="confirmCreditSale()"
+              >
+                Confirm credit sale
+              </button>
+            </div>
+          </div>
+          <form method="dialog" class="modal-backdrop">
+            <button type="button" aria-label="Cancel" (click)="creditConfirmOpen.set(false)">
+              close
+            </button>
+          </form>
+        </dialog>
+      }
+      @if (approvalSent()) {
+        <div class="toast toast-bottom toast-end z-50" aria-live="polite">
+          <div class="alert alert-warning max-w-sm shadow-overlay">
+            <app-icon name="heroExclamationTriangle" />
+            <div>
+              <p class="font-semibold">Sent for approval</p>
+              <p class="text-sm">Order held pending settlement.</p>
+            </div>
+          </div>
+        </div>
       }
       @if (scannerOpen()) {
         <app-barcode-scanner (scanned)="barcodeScanned($event)" (close)="scannerOpen.set(false)" />
@@ -665,7 +768,7 @@ export class SellComponent implements OnInit {
   protected readonly customerSearch = new FormControl('', { nonNullable: true });
   protected readonly customerResults = signal<CustomerWithCredit[]>([]);
   protected readonly selectedCustomer = signal<CustomerWithCredit | null>(null);
-  protected readonly customerPickerOpen = signal(false);
+  protected readonly customerDropdownOpen = signal(false);
 
   protected readonly overrideFor = signal<string | null>(null);
   protected readonly overridePrice = new FormControl('', { nonNullable: true });
@@ -679,7 +782,8 @@ export class SellComponent implements OnInit {
 
   protected readonly checkoutOpen = signal(false);
   protected readonly clearCartArmed = signal(false);
-  protected readonly methods = signal<string[]>(['cash', 'mpesa', 'bank']);
+  protected readonly creditConfirmOpen = signal(false);
+  protected readonly methods = signal<PaymentMethodOption[]>([]);
   protected readonly catalogRefreshing = signal(false);
   protected readonly busy = signal(false);
   protected readonly error = signal<string | null>(null);
@@ -699,6 +803,14 @@ export class SellComponent implements OnInit {
       customer.ar_balance + this.cart.total() <= customer.credit_limit
     );
   });
+  /** Backend-derived tender methods; walk-ins may only use till-controlled accounts. */
+  protected readonly panelMethods = computed<PaymentMethodOption[]>(() => {
+    const methods = this.methods();
+    return this.cart.customerId() ? methods : methods.filter(m => m.isCashierControlled);
+  });
+  protected readonly canUseDirectAccounts = computed(() => this.perms.has('ViewFinancials'));
+  protected readonly approvalSent = signal(false);
+  private approvalSentTimer: ReturnType<typeof setTimeout> | null = null;
   private priceFloorTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
@@ -925,12 +1037,21 @@ export class SellComponent implements OnInit {
     this.priceFloorFeedback.set(null);
   }
 
-  protected toggleCustomerPicker(): void {
-    this.customerPickerOpen.update(open => !open);
-    if (!this.customerPickerOpen()) {
-      this.customerSearch.setValue('', { emitEvent: false });
-      this.customerResults.set([]);
-    }
+  protected onCustomerFocus(): void {
+    this.customerSearch.setValue('', { emitEvent: false });
+    this.customerResults.set([]);
+    this.customerDropdownOpen.set(true);
+  }
+
+  protected onCustomerBlur(): void {
+    this.customerDropdownOpen.set(false);
+    // No selection made: the field reverts to the Walk-in placeholder.
+    this.customerSearch.setValue('', { emitEvent: false });
+    this.customerResults.set([]);
+  }
+
+  protected clearCustomer(): void {
+    this.selectCustomer(null);
   }
 
   protected async onCustomerSearch(query: string): Promise<void> {
@@ -941,6 +1062,7 @@ export class SellComponent implements OnInit {
     }
     try {
       this.customerResults.set(await this.pos.searchCustomers(q));
+      this.customerDropdownOpen.set(true);
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Customer search failed');
     }
@@ -949,7 +1071,9 @@ export class SellComponent implements OnInit {
   protected selectCustomer(customer: CustomerWithCredit | null): void {
     this.selectedCustomer.set(customer);
     this.cart.setCustomer(customer?.id ?? null, customer ? this.customerName(customer) : 'Walk-in');
-    this.toggleCustomerPicker();
+    this.customerDropdownOpen.set(false);
+    this.customerSearch.setValue('', { emitEvent: false });
+    this.customerResults.set([]);
   }
 
   protected customerCreditAvailable(customer: CustomerWithCredit): number {
@@ -998,11 +1122,15 @@ export class SellComponent implements OnInit {
       return;
     }
     try {
-      const orderId = await this.pos.postSale(customerId, lines, payments, false, clientRef);
+      const result = await this.pos.postSale(customerId, lines, payments, false, clientRef);
       this.checkoutOpen.set(false);
       this.cart.clear();
       this.selectedCustomer.set(null);
-      this.success.set({ text: 'Sale completed', tone: 'success', orderId });
+      if (result.status === 'approval_required') {
+        this.showApprovalSent();
+      } else {
+        this.success.set({ text: 'Sale completed', tone: 'success', orderId: result.orderId });
+      }
     } catch (err) {
       if (!(err instanceof PosRpcError)) {
         try {
@@ -1019,6 +1147,20 @@ export class SellComponent implements OnInit {
     } finally {
       this.busy.set(false);
     }
+  }
+
+  protected confirmCreditSale(): void {
+    this.creditConfirmOpen.set(false);
+    // Credit sale: no tenders — the backend books it against the customer's
+    // credit (the same payload the old credit tab emitted).
+    void this.completeSale([]);
+  }
+
+  /** Timed toast for approval-held orders (mirrors the price-floor toast). */
+  private showApprovalSent(): void {
+    if (this.approvalSentTimer) clearTimeout(this.approvalSentTimer);
+    this.approvalSent.set(true);
+    this.approvalSentTimer = setTimeout(() => this.approvalSent.set(false), 5000);
   }
 
   private async queueSale(

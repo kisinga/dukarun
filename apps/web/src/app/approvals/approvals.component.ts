@@ -21,6 +21,7 @@ const TYPE_BADGE: Record<string, string> = {
   order_reversal: 'badge-error',
   overdraft: 'badge-info',
   customer_credit: 'badge-info',
+  external_account_payment: 'badge-warning',
 };
 
 @Component({
@@ -80,6 +81,10 @@ const TYPE_BADGE: Record<string, string> = {
         <p>
           <span class="font-semibold">overdraft</span> — a record of who authorized credit over the
           limit.
+        </p>
+        <p>
+          <span class="font-semibold">direct account payment</span> — a sale tendered to a non-till
+          account needs finance sign-off.
         </p>
       </div>
 
@@ -461,6 +466,7 @@ export class ApprovalsComponent implements OnInit {
   }
 
   protected typeLabel(type: string): string {
+    if (type === 'external_account_payment') return 'Direct account payment';
     return type.replace(/_/g, ' ');
   }
 
@@ -469,6 +475,7 @@ export class ApprovalsComponent implements OnInit {
       order_id?: string;
       reason?: string;
       lines?: { variant_id: string; custom_price: number; reason?: string }[];
+      tenders?: { method: string; amount: number; reference?: string | null }[];
       ar_balance?: number;
       order_total?: number;
       credit_limit?: number;
@@ -477,6 +484,14 @@ export class ApprovalsComponent implements OnInit {
     switch (a.type) {
       case 'order_reversal':
         return `Void ${code ?? 'order'}${meta.reason ? ` — ${meta.reason}` : ''}`;
+      case 'external_account_payment': {
+        const tenders = (meta.tenders ?? [])
+          .map(
+            t => `${t.method} ${formatKes(t.amount)}${t.reference ? ` (ref ${t.reference})` : ''}`
+          )
+          .join(', ');
+        return `Direct account payment on ${code ?? 'order'} — ${tenders}`;
+      }
       case 'below_wholesale': {
         const lines = (meta.lines ?? [])
           .map(

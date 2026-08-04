@@ -4,8 +4,12 @@ import { Router, RouterLink } from '@angular/router';
 import { PageLayoutComponent } from '../../shared/ui/page-layout.component';
 import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
 import { formatKes } from '../../core/money';
-import { CheckoutPanelComponent } from '../checkout/checkout-panel.component';
+import {
+  CheckoutPanelComponent,
+  type PaymentMethodOption,
+} from '../checkout/checkout-panel.component';
 import { OrderWithCustomer, PaymentInput, PosService } from '../pos.service';
+import { PermissionsService } from '../../core/permissions.service';
 import { PrintService } from '../../shared/print/print.service';
 import { ReceiptDataService } from '../../shared/print/receipt-data.service';
 import { CashierSessionService } from '../../core/cashier-session.service';
@@ -328,13 +332,28 @@ const PROFORMA_STATUSES = ['draft', 'expired'];
       @if (cashierSession.canTakePayment() && converting(); as draft) {
         <app-checkout-panel
           [total]="draft.total"
-          [creditAllowed]="draft.customer_id !== null"
-          [methods]="methods()"
+          [methods]="panelMethods()"
+          [canUseDirectAccounts]="canUseDirectAccounts()"
           [busy]="busy()"
           [heading]="'Convert ' + draft.code"
           (confirmed)="convert(draft.id, $event)"
+          (approvalRequested)="directAccountRequested()"
           (cancelled)="converting.set(null)"
         />
+      }
+      @if (directAccountNotice()) {
+        <div class="toast toast-bottom toast-end z-50" aria-live="polite">
+          <div class="alert alert-warning max-w-sm shadow-overlay">
+            <app-icon name="heroExclamationTriangle" />
+            <div>
+              <p class="font-semibold">Direct account payment needs finance sign-off</p>
+              <p class="text-sm">
+                Someone with finance access can settle it, or approve it from the
+                <a routerLink="/approvals" class="link font-medium">Approvals inbox</a>.
+              </p>
+            </div>
+          </div>
+        </div>
       }
 
       <app-delete-confirmation-modal
@@ -354,6 +373,7 @@ export class ProformasComponent implements OnInit, OnDestroy {
   private readonly router = inject(Router);
   private readonly receiptData = inject(ReceiptDataService);
   private readonly print = inject(PrintService);
+  private readonly perms = inject(PermissionsService);
   protected readonly cashierSession = inject(CashierSessionService);
   protected readonly orderQueueCounts = inject(OrderQueueCountsService);
 
@@ -368,7 +388,7 @@ export class ProformasComponent implements OnInit, OnDestroy {
   protected readonly to = new FormControl('', { nonNullable: true });
   protected readonly converting = signal<OrderWithCustomer | null>(null);
   protected readonly deleting = signal<OrderWithCustomer | null>(null);
-  protected readonly methods = signal<string[]>(['cash', 'mpesa', 'bank']);
+  protected readonly methods = signal<PaymentMethodOption[]>([]);
   protected readonly busy = signal(false);
   protected readonly printing = signal(false);
   protected readonly error = signal<string | null>(null);
@@ -376,6 +396,14 @@ export class ProformasComponent implements OnInit, OnDestroy {
   protected readonly completedSale = signal<{ id: string; code: string } | null>(null);
   protected readonly approvalPending = signal(false);
   protected readonly printerEnabled = signal(false);
+  protected readonly directAccountNotice = signal(false);
+  private directAccountTimer: ReturnType<typeof setTimeout> | null = null;
+  protected readonly canUseDirectAccounts = computed(() => this.perms.has('ViewFinancials'));
+  /** Walk-in proformas may only be converted to till-controlled accounts. */
+  protected readonly panelMethods = computed<PaymentMethodOption[]>(() => {
+    const methods = this.methods();
+    return this.converting()?.customer_id ? methods : methods.filter(m => m.isCashierControlled);
+  });
   protected readonly totalPages = computed(() =>
     Math.max(1, Math.ceil(this.totalItems() / this.pageSize()))
   );
@@ -408,15 +436,34 @@ export class ProformasComponent implements OnInit, OnDestroy {
   async ngOnInit(): Promise<void> {
     this.printerEnabled.set(await this.receiptData.printerEnabled());
     try {
-      this.methods.set(await this.pos.enabledPaymentMethods());
+      const methods = await this.pos.enabledPaymentMethods();
+      this.methods.set(
+        methods.map(m => ({
+          code: m.code,
+          name: m.name,
+          isCashierControlled: m.is_cashier_controlled,
+        }))
+      );
     } catch {
-      // keep defaults
+      // No methods configured yet; the panel will show an empty method list.
     }
     await this.load();
   }
 
   ngOnDestroy(): void {
     if (this.searchTimer) clearTimeout(this.searchTimer);
+    if (this.directAccountTimer) clearTimeout(this.directAccountTimer);
+  }
+
+  /**
+   * convert_draft has no external-account approval path, so offer the
+   * approvals inbox instead of silently settling a direct account.
+   */
+  protected directAccountRequested(): void {
+    this.converting.set(null);
+    if (this.directAccountTimer) clearTimeout(this.directAccountTimer);
+    this.directAccountNotice.set(true);
+    this.directAccountTimer = setTimeout(() => this.directAccountNotice.set(false), 6000);
   }
 
   protected onSearch(query: string): void {

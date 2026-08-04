@@ -116,8 +116,6 @@ export class SettingsService {
       is_cashier_controlled?: boolean;
     }
   ): Promise<void> {
-    // TODO: regenerate shared-types — p_is_cashier_controlled is not yet in the
-    // generated update_payment_method Args, hence the `as never` cast.
     const { error } = await this.db.rpc('update_payment_method', {
       p_code: code,
       ...(changes.enabled !== undefined ? { p_enabled: changes.enabled } : {}),
@@ -127,7 +125,7 @@ export class SettingsService {
       ...(changes.is_cashier_controlled !== undefined
         ? { p_is_cashier_controlled: changes.is_cashier_controlled }
         : {}),
-    } as never);
+    });
     if (error) throw rpcError(error);
   }
 

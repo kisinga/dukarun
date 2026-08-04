@@ -1,11 +1,16 @@
 import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { formatKes } from '../../core/money';
 import { PageLayoutComponent } from '../../shared/ui/page-layout.component';
 import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
-import { CheckoutPanelComponent } from '../checkout/checkout-panel.component';
+import {
+  CheckoutPanelComponent,
+  type PaymentMethodOption,
+} from '../checkout/checkout-panel.component';
 import { OrderLineWithProduct, OrderWithCustomer, PaymentInput, PosService } from '../pos.service';
 import { CashierSessionService } from '../../core/cashier-session.service';
+import { PermissionsService } from '../../core/permissions.service';
 import { SessionRequiredNoticeComponent } from '../../shared/ui/session-required-notice.component';
 import { ButtonComponent } from '../../shared/ui/button.component';
 import { MoneyComponent } from '../../shared/ui/money.component';
@@ -22,6 +27,7 @@ import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
 @Component({
   selector: 'app-cashier-queue',
   imports: [
+    RouterLink,
     CheckoutPanelComponent,
     PageLayoutComponent,
     EmptyStateComponent,
@@ -353,13 +359,28 @@ import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
       @if (cashierSession.canTakePayment() && settling(); as order) {
         <app-checkout-panel
           [total]="order.total"
-          [creditAllowed]="order.customer_id !== null"
           [methods]="methods()"
+          [canUseDirectAccounts]="canUseDirectAccounts()"
           [busy]="busy()"
           [heading]="'Collect payment · ' + order.code"
           (confirmed)="settle(order.id, $event)"
+          (approvalRequested)="directAccountRequested()"
           (cancelled)="settling.set(null)"
         />
+      }
+      @if (directAccountNotice()) {
+        <div class="toast toast-bottom toast-end z-50" aria-live="polite">
+          <div class="alert alert-warning max-w-sm shadow-overlay">
+            <app-icon name="heroExclamationTriangle" />
+            <div>
+              <p class="font-semibold">Direct account payment needs finance sign-off</p>
+              <p class="text-sm">
+                Someone with finance access can settle it, or approve it from the
+                <a routerLink="/approvals" class="link font-medium">Approvals inbox</a>.
+              </p>
+            </div>
+          </div>
+        </div>
       }
     </app-page>
   `,
@@ -368,6 +389,7 @@ export class CashierQueueComponent implements OnInit, OnDestroy {
   private readonly pos = inject(PosService);
   private readonly receiptData = inject(ReceiptDataService);
   private readonly print = inject(PrintService);
+  private readonly perms = inject(PermissionsService);
   protected readonly cashierSession = inject(CashierSessionService);
   protected readonly orderQueueCounts = inject(OrderQueueCountsService);
 
@@ -381,13 +403,16 @@ export class CashierQueueComponent implements OnInit, OnDestroy {
   protected readonly loadingLinesFor = signal<string | null>(null);
   protected readonly lines = signal<OrderLineWithProduct[]>([]);
   protected readonly settling = signal<OrderWithCustomer | null>(null);
-  protected readonly methods = signal<string[]>(['cash', 'mpesa', 'bank']);
+  protected readonly methods = signal<PaymentMethodOption[]>([]);
   protected readonly busy = signal(false);
   protected readonly loading = signal(false);
   protected readonly printing = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly completedSale = signal<{ id: string; code: string } | null>(null);
   protected readonly printerEnabled = signal(false);
+  protected readonly directAccountNotice = signal(false);
+  protected readonly canUseDirectAccounts = computed(() => this.perms.has('ViewFinancials'));
+  private directAccountTimer: ReturnType<typeof setTimeout> | null = null;
   protected readonly totalPages = computed(() =>
     Math.max(1, Math.ceil(this.totalItems() / this.pageSize()))
   );
@@ -419,9 +444,16 @@ export class CashierQueueComponent implements OnInit, OnDestroy {
   async ngOnInit(): Promise<void> {
     this.printerEnabled.set(await this.receiptData.printerEnabled());
     try {
-      this.methods.set(await this.pos.enabledPaymentMethods());
+      const methods = await this.pos.enabledPaymentMethods();
+      this.methods.set(
+        methods.map(m => ({
+          code: m.code,
+          name: m.name,
+          isCashierControlled: m.is_cashier_controlled,
+        }))
+      );
     } catch {
-      // keep defaults
+      // No methods configured yet; the panel will show an empty method list.
     }
     await this.load();
     this.channel = this.pos.client
@@ -437,6 +469,19 @@ export class CashierQueueComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     if (this.channel) void this.pos.client.removeChannel(this.channel);
     if (this.searchTimer) clearTimeout(this.searchTimer);
+    if (this.directAccountTimer) clearTimeout(this.directAccountTimer);
+  }
+
+  /**
+   * The external-account gate lives in post_sale_at_location, not settle_order,
+   * so the queue cannot create the approval itself — point the cashier at the
+   * approvals inbox instead.
+   */
+  protected directAccountRequested(): void {
+    this.settling.set(null);
+    if (this.directAccountTimer) clearTimeout(this.directAccountTimer);
+    this.directAccountNotice.set(true);
+    this.directAccountTimer = setTimeout(() => this.directAccountNotice.set(false), 6000);
   }
 
   protected onSearch(query: string): void {

@@ -623,7 +623,7 @@ export class CustomersComponent implements OnInit {
   protected readonly orders = signal<OrderWithCustomer[]>([]);
   protected readonly creditOrders = signal<CreditOrder[]>([]);
   protected readonly statement = signal<CustomerStatementRow[]>([]);
-  protected readonly methods = signal<string[]>(['cash', 'mpesa', 'bank']);
+  protected readonly methods = signal<string[]>([]);
   protected readonly repayFor = signal<string | null>(null);
 
   protected readonly query = signal('');

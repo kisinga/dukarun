@@ -15,7 +15,8 @@ export interface PaymentMethodOption {
 }
 
 interface Tender {
-  method: 'cash' | 'mpesa' | 'bank';
+  /** Method code from the configured payment methods. */
+  method: string;
   /** User-typed KES amount (parsed to shillings on confirm). */
   amountText: string;
   reference: string;
@@ -417,7 +418,7 @@ export class CheckoutPanelComponent {
 
   private reset(): void {
     this.initialized = true;
-    const first = (this.methods()[0]?.code ?? 'cash') as Tender['method'];
+    const first = this.methods()[0]?.code ?? 'cash';
     this.tenders.set([{ method: first, amountText: this.amountText(this.total()), reference: '' }]);
     this.error.set(null);
     this.armed.set(false);
@@ -427,7 +428,7 @@ export class CheckoutPanelComponent {
     this.armed.set(false);
     this.tenders.set([
       {
-        method: code as Tender['method'],
+        method: code,
         amountText: this.amountText(this.total()),
         reference: '',
       },
@@ -470,11 +471,11 @@ export class CheckoutPanelComponent {
     this.armed.set(false);
     this.tenders.set([
       {
-        method: first as Tender['method'],
+        method: first,
         amountText: this.amountText(this.total() - half),
         reference: '',
       },
-      { method: second as Tender['method'], amountText: this.amountText(half), reference: '' },
+      { method: second, amountText: this.amountText(half), reference: '' },
     ]);
   }
 
