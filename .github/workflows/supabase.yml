@@ -50,7 +50,13 @@ jobs:
     # Runs on the self-hosted runner ON the Coolify host — Postgres stays
     # private (runner reaches it via localhost), edge functions are copied
     # straight into the edge-runtime container.
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/pilot/supabase' || github.ref == 'refs/heads/main')
+    # Requires a registered self-hosted runner labelled [self-hosted, coolify]
+    # AND repo variable ENABLE_SELF_HOSTED_DEPLOY=true — otherwise the job
+    # would queue forever. We deploy manually for now (npm run deploy*).
+    if: >-
+      github.event_name == 'push'
+      && (github.ref == 'refs/heads/pilot/supabase' || github.ref == 'refs/heads/main')
+      && vars.ENABLE_SELF_HOSTED_DEPLOY == 'true'
     needs: test
     runs-on: [self-hosted, coolify]
     environment: production
