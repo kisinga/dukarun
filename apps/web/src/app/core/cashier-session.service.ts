@@ -83,7 +83,11 @@ export class CashierSessionService {
     if (!identity) throw new Error('Sign in again to confirm the cashier session.');
     if (!this.configurationLoaded()) await this.refreshConfiguration();
     if (this.refreshPromise) return this.refreshPromise;
-    this.loading.set(true);
+    // Only the first load (nothing confirmed yet) drives the UI spinner.
+    // Background polls and realtime-triggered refreshes must be silent —
+    // otherwise the header till button flickers "Checking till" every cycle.
+    const silent = this.session() !== null || this.lastConfirmedAt() !== null;
+    if (!silent) this.loading.set(true);
     const locationId = this.locations.requireActiveId();
     const key = offlineScopeKey(identity, locationId);
     this.refreshPromise = this.load(identity, key)
@@ -100,7 +104,7 @@ export class CashierSessionService {
         throw error;
       })
       .finally(() => {
-        this.loading.set(false);
+        if (!silent) this.loading.set(false);
         this.refreshPromise = null;
       });
     return this.refreshPromise;
