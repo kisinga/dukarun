@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import type { Database } from '@dukarun/shared-types';
 import { SupabaseService } from '../core/supabase.service';
 import { environment } from '../../environments/environment';
+import { LocationContextService } from '../core/location-context.service';
 
 export type Product = Database['public']['Tables']['products']['Row'];
 export type Collection = Database['public']['Tables']['collections']['Row'];
@@ -95,6 +96,7 @@ export function rpcError(error: { message: string; code?: string }): PosRpcError
 @Injectable({ providedIn: 'root' })
 export class PosService {
   private readonly supabase = inject(SupabaseService);
+  private readonly locations = inject(LocationContextService);
 
   get client() {
     return this.supabase.client;
@@ -114,7 +116,7 @@ export class PosService {
       .eq('product_active', true)
       .limit(20);
     if (error) throw error;
-    return data;
+    return this.withLocationStock(data);
   }
 
   /** Management list: whole catalog (active + inactive), search across family/variant/sku/barcode. */
@@ -134,7 +136,7 @@ export class PosService {
     }
     const { data, error } = await q;
     if (error) throw error;
-    return data;
+    return this.withLocationStock(data);
   }
 
   /** Product families (the products table) for the management screen grouping. */
@@ -157,7 +159,9 @@ export class PosService {
 
   /** Stock per variant from the product_stock view (client-side join). */
   async productStock(): Promise<Map<string, { stock: number; stock_value: number }>> {
-    const { data, error } = await this.client.from('product_stock').select('*');
+    const { data, error } = await this.client.rpc('location_stock_snapshot', {
+      p_location_id: this.locations.requireActiveId(),
+    });
     if (error) throw error;
     return new Map(
       (data ?? [])
@@ -172,6 +176,7 @@ export class PosService {
       .from('inventory_batches')
       .select('*')
       .eq('variant_id', variantId)
+      .eq('stock_location_id', this.locations.requireActiveId())
       .order('purchased_at', { ascending: false })
       .limit(50);
     if (error) throw error;
@@ -295,7 +300,7 @@ export class PosService {
       .order('variant_name')
       .limit(limit);
     if (error) throw error;
-    return data;
+    return this.withLocationStock(data);
   }
 
   /** Full active catalog for the offline snapshot (IndexedDB cache). */
@@ -313,7 +318,7 @@ export class PosService {
         .order('variant_id')
         .range(from, from + pageSize - 1);
       if (error) throw error;
-      products.push(...data);
+      products.push(...(await this.withLocationStock(data)));
       if (data.length < pageSize) return products;
     }
   }
@@ -438,13 +443,11 @@ export class PosService {
 
   /** Enabled non-credit payment method codes (credit is handled as its own checkout mode). */
   async enabledPaymentMethods(): Promise<string[]> {
-    const { data, error } = await this.client
-      .from('payment_methods')
-      .select('code')
-      .eq('enabled', true)
-      .neq('code', 'credit');
+    const { data, error } = await this.client.rpc('available_payment_methods', {
+      p_location_id: this.locations.requireActiveId(),
+    });
     if (error) throw error;
-    return data.map(m => m.code);
+    return data.filter(method => method.code !== 'credit').map(method => method.code);
   }
 
   /** Orders by status, most recent first. `since`/`until` bound created_at. */
@@ -456,6 +459,7 @@ export class PosService {
     let query = this.client
       .from('orders')
       .select('*, customers(first_name, last_name)')
+      .eq('location_id', this.locations.requireActiveId())
       .in('status', statuses)
       .order('created_at', { ascending: false })
       .limit(100);
@@ -488,6 +492,7 @@ export class PosService {
     let query = this.client
       .from('orders')
       .select('*, customers(first_name, last_name)', { count: 'exact' })
+      .eq('location_id', this.locations.requireActiveId())
       .in('status', input.statuses);
     if (input.since) query = query.gte('created_at', input.since);
     if (input.until) query = query.lt('created_at', input.until);
@@ -547,6 +552,11 @@ export class PosService {
     return data;
   }
 
+  async variantById(id: string): Promise<Variant | null> {
+    const rows = await this.variantsByIds([id]);
+    return (await this.withLocationStock(rows))[0] ?? null;
+  }
+
   async getOrder(orderId: string): Promise<OrderWithCustomer> {
     const { data, error } = await this.client
       .from('orders')
@@ -564,9 +574,11 @@ export class PosService {
     lines: SaleLineInput[],
     payments: PaymentInput[],
     park: boolean,
-    clientRef?: string
+    clientRef?: string,
+    locationId?: string
   ): Promise<string> {
-    const { data, error } = await this.client.rpc('post_sale', {
+    const { data, error } = await this.client.rpc('post_sale_at_location', {
+      p_location_id: locationId ?? this.locations.requireActiveId(),
       // null = walk-in customer (accepted by the backend; generated types mark it non-null)
       p_customer_id: customerId!,
       p_lines: lines as never,
@@ -579,12 +591,32 @@ export class PosService {
     return data;
   }
 
+  private async withLocationStock(rows: Variant[]): Promise<Variant[]> {
+    if (rows.length === 0) return rows;
+    const { data, error } = await this.client.rpc('location_stock_snapshot', {
+      p_location_id: this.locations.requireActiveId(),
+    });
+    if (error) throw error;
+    const stock = new Map(
+      data.map(item => [
+        item.variant_id,
+        { quantity: Number(item.stock ?? 0), value: item.stock_value ?? 0 },
+      ])
+    );
+    return rows.map(row => ({
+      ...row,
+      stock: stock.get(row.variant_id!)?.quantity ?? 0,
+      stock_value: stock.get(row.variant_id!)?.value ?? 0,
+    }));
+  }
+
   async saveDraft(
     customerId: string | null,
     lines: SaleLineInput[],
     draftId: string | null
   ): Promise<string> {
-    const { data, error } = await this.client.rpc('save_draft', {
+    const { data, error } = await this.client.rpc('save_draft_at_location', {
+      p_location_id: this.locations.requireActiveId(),
       // null = walk-in customer (accepted by the backend; generated types mark it non-null)
       p_customer_id: customerId!,
       p_lines: lines as never,

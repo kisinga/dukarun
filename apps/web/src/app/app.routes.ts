@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/auth.guard';
 import { permissionGuard } from './core/permission.guard';
+import { featureGuard } from './core/feature.guard';
 
 export const routes: Routes = [
   {
@@ -119,14 +120,43 @@ export const routes: Routes = [
       },
       {
         path: 'stock-adjustments',
+        canActivate: [permissionGuard],
+        data: { permission: 'ManageStockAdjustments' },
         loadComponent: () =>
           import('./stock-adjustments/stock-adjustments.component').then(
             m => m.StockAdjustmentsComponent
           ),
       },
       {
+        path: 'stock-transfers',
+        canActivate: [permissionGuard],
+        data: { permission: 'ManageStockAdjustments' },
+        loadComponent: () =>
+          import('./inventory/stock-transfers.component').then(m => m.StockTransfersComponent),
+      },
+      {
         path: 'team',
         loadComponent: () => import('./team/team.component').then(m => m.TeamComponent),
+      },
+      {
+        path: 'staff-performance',
+        canActivate: [featureGuard, permissionGuard],
+        data: { feature: 'staffPerformance', permission: 'ViewStaffPerformance' },
+        loadComponent: () =>
+          import('./performance/staff-performance.component').then(
+            m => m.StaffPerformanceComponent
+          ),
+      },
+      {
+        path: 'commissions',
+        canActivate: [featureGuard, permissionGuard],
+        data: {
+          feature: 'commissions',
+          requiresCommissionOptIn: true,
+          permission: 'ManageCommissions',
+        },
+        loadComponent: () =>
+          import('./commissions/commissions.component').then(m => m.CommissionsComponent),
       },
       {
         path: 'sales',

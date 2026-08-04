@@ -8,18 +8,28 @@ import { PosService, variantLabel, type Variant } from '../../pos/pos.service';
 import {
   DailyProductSales,
   DailySummary,
+  DashboardLocationSummary,
+  DashboardPeriodComparison,
   ExpiringBatch,
   LowStockVariant,
   ReportsService,
 } from '../../reports/reports.service';
+import { LocationContextService } from '../../core/location-context.service';
 import { ButtonComponent } from '../../shared/ui/button.component';
 import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
 import { IconComponent } from '../../shared/ui/icon.component';
 import { MoneyComponent } from '../../shared/ui/money.component';
 import { PageLayoutComponent } from '../../shared/ui/page-layout.component';
 import { StatCardComponent } from '../../shared/ui/stat-card.component';
+import { CompanyPreferencesService } from '../../core/company-preferences.service';
 
-type TopVariant = { variantId: string; label: string; revenue: number; margin: number };
+type TopVariant = {
+  variantId: string;
+  label: string;
+  quantity: number;
+  revenue: number;
+  margin: number;
+};
 type SalesChartPoint = DailySummary & { day: string; revenue: number; heightPercent: number };
 
 @Component({
@@ -60,6 +70,20 @@ type SalesChartPoint = DailySummary & { day: string; revenue: number; heightPerc
       >
         <app-icon name="heroArrowPath" />
       </button>
+      @if (locations.isMultiLocation()) {
+        <select
+          actions
+          class="select select-bordered select-sm"
+          aria-label="Dashboard location"
+          [value]="dashboardLocationId() ?? ''"
+          (change)="changeDashboardLocation($event)"
+        >
+          <option value="">All locations</option>
+          @for (location of locations.locations(); track location.id) {
+            <option [value]="location.id">{{ location.name }}</option>
+          }
+        </select>
+      }
 
       <div class="space-y-6">
         @if (loadError()) {
@@ -81,7 +105,7 @@ type SalesChartPoint = DailySummary & { day: string; revenue: number; heightPerc
             }
           </div>
 
-          <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <div class="grid grid-cols-2 gap-3 lg:grid-cols-5">
             <app-stat-card
               label="Revenue"
               [value]="initialLoading() ? '—' : fmt(today()?.revenue ?? 0)"
@@ -91,6 +115,11 @@ type SalesChartPoint = DailySummary & { day: string; revenue: number; heightPerc
               label="Sales"
               [value]="initialLoading() ? '—' : String(today()?.orders ?? 0)"
               sub="Completed checkouts"
+            />
+            <app-stat-card
+              label="Sales volume"
+              [value]="initialLoading() ? '—' : quantity(todayQuantity())"
+              sub="Net item quantity sold"
             />
             <app-stat-card
               label="Margin"
@@ -137,6 +166,71 @@ type SalesChartPoint = DailySummary & { day: string; revenue: number; heightPerc
           }
         </section>
 
+        @if (locations.isMultiLocation() && !dashboardLocationId()) {
+          <section aria-labelledby="locations-heading" class="space-y-3">
+            <div>
+              <h2 id="locations-heading" class="section-title">Location performance</h2>
+              <p class="type-caption mt-1">All business locations you can access.</p>
+            </div>
+            <div class="grid grid-cols-2 gap-3 lg:grid-cols-3">
+              <app-stat-card
+                label="Revenue change"
+                [value]="changeLabel(comparison().current_revenue, comparison().previous_revenue)"
+                sub="Versus previous 7 days"
+                [tone]="
+                  comparison().current_revenue >= comparison().previous_revenue
+                    ? 'success'
+                    : 'warning'
+                "
+              />
+              <app-stat-card
+                label="Volume change"
+                [value]="changeLabel(comparison().current_quantity, comparison().previous_quantity)"
+                sub="Units versus previous period"
+                [tone]="
+                  comparison().current_quantity >= comparison().previous_quantity
+                    ? 'success'
+                    : 'warning'
+                "
+              />
+              <app-stat-card
+                label="Order change"
+                [value]="changeLabel(comparison().current_orders, comparison().previous_orders)"
+                sub="Checkouts versus previous period"
+                [tone]="
+                  comparison().current_orders >= comparison().previous_orders
+                    ? 'success'
+                    : 'warning'
+                "
+              />
+            </div>
+            <div class="table-scroll rounded-box border border-base-300 bg-base-100">
+              <table class="table table-sm">
+                <thead>
+                  <tr>
+                    <th>Location</th>
+                    <th class="text-right">Orders</th>
+                    <th class="text-right">Volume</th>
+                    <th class="text-right">Revenue</th>
+                    <th class="text-right">Margin</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (location of locationRows(); track location.location_id) {
+                    <tr class="cursor-pointer hover" (click)="showLocation(location.location_id)">
+                      <td class="font-medium">{{ location.location_name }}</td>
+                      <td class="text-right">{{ location.orders }}</td>
+                      <td class="text-right">{{ quantity(location.quantity) }}</td>
+                      <td class="text-right"><app-money [cents]="location.revenue" /></td>
+                      <td class="text-right"><app-money [cents]="location.margin" /></td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </section>
+        }
+
         <section aria-label="Sales performance" class="grid gap-4 xl:grid-cols-12">
           <article class="card h-full overflow-hidden bg-base-100 xl:col-span-7">
             <div
@@ -181,7 +275,8 @@ type SalesChartPoint = DailySummary & { day: string; revenue: number; heightPerc
                     <p class="type-title tabular-nums">{{ fmt(weekRevenue()) }}</p>
                   </div>
                   <p class="type-caption text-right">
-                    {{ weekOrders() }} sales · {{ fmt(weekMargin()) }} margin
+                    {{ weekOrders() }} sales · {{ quantity(weekQuantity()) }} items ·
+                    {{ fmt(weekMargin()) }} margin
                   </p>
                 </div>
 
@@ -287,6 +382,7 @@ type SalesChartPoint = DailySummary & { day: string; revenue: number; heightPerc
                   <thead>
                     <tr>
                       <th>Variant</th>
+                      <th class="text-right">Qty</th>
                       <th class="text-right">Revenue</th>
                       <th class="text-right">Margin</th>
                     </tr>
@@ -298,6 +394,7 @@ type SalesChartPoint = DailySummary & { day: string; revenue: number; heightPerc
                           <span class="font-medium">{{ variant.label }}</span>
                           <span class="type-caption ml-2">#{{ $index + 1 }}</span>
                         </td>
+                        <td class="text-right">{{ quantity(variant.quantity) }}</td>
                         <td class="text-right font-medium">
                           <app-money [cents]="variant.revenue" />
                         </td>
@@ -326,53 +423,55 @@ type SalesChartPoint = DailySummary & { day: string; revenue: number; heightPerc
             <span class="type-caption">Updates with stock activity</span>
           </div>
 
-          <div class="grid gap-4 lg:grid-cols-2">
-            <article class="card h-full bg-base-100">
-              <div class="card-body p-4">
-                <div class="flex items-center justify-between gap-2">
-                  <div class="flex items-center gap-2">
-                    <app-icon name="heroCube" />
-                    <h3 class="section-title">Low stock</h3>
-                  </div>
-                  @if (lowStock().length > 0) {
-                    <span class="badge badge-warning badge-sm">{{ lowStock().length }}</span>
-                  }
-                </div>
-
-                @if (initialLoading()) {
-                  <div
-                    role="status"
-                    class="flex min-h-32 items-center justify-center gap-2 text-sm text-base-content/60"
-                  >
-                    <span class="loading loading-spinner loading-sm"></span>
-                    Loading stock
-                  </div>
-                } @else if (lowStock().length === 0) {
-                  <app-empty-state
-                    [embedded]="true"
-                    [compact]="true"
-                    icon="heroCheckCircle"
-                    title="All stocked up"
-                    description="Nothing is below its low-stock threshold."
-                  />
-                } @else {
-                  <div class="mt-2 flex flex-col divide-y divide-base-200">
-                    @for (item of lowStock(); track item.variant_id) {
-                      <div class="flex items-center gap-3 py-3">
-                        <div class="min-w-0 flex-1">
-                          <p class="truncate text-sm font-medium">{{ item.product_name }}</p>
-                          <p class="type-caption truncate">{{ item.variant_name }}</p>
-                        </div>
-                        <div class="text-right">
-                          <p class="font-medium tabular-nums text-warning">{{ item.stock }}</p>
-                          <p class="type-caption">threshold {{ item.low_stock_threshold }}</p>
-                        </div>
-                      </div>
+          <div class="grid gap-4" [class.lg:grid-cols-2]="preferences.batchExpiryEnabled()">
+            @if (preferences.batchExpiryEnabled()) {
+              <article class="card h-full bg-base-100">
+                <div class="card-body p-4">
+                  <div class="flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-2">
+                      <app-icon name="heroCube" />
+                      <h3 class="section-title">Low stock</h3>
+                    </div>
+                    @if (lowStock().length > 0) {
+                      <span class="badge badge-warning badge-sm">{{ lowStock().length }}</span>
                     }
                   </div>
-                }
-              </div>
-            </article>
+
+                  @if (initialLoading()) {
+                    <div
+                      role="status"
+                      class="flex min-h-32 items-center justify-center gap-2 text-sm text-base-content/60"
+                    >
+                      <span class="loading loading-spinner loading-sm"></span>
+                      Loading stock
+                    </div>
+                  } @else if (lowStock().length === 0) {
+                    <app-empty-state
+                      [embedded]="true"
+                      [compact]="true"
+                      icon="heroCheckCircle"
+                      title="All stocked up"
+                      description="Nothing is below its low-stock threshold."
+                    />
+                  } @else {
+                    <div class="mt-2 flex flex-col divide-y divide-base-200">
+                      @for (item of lowStock(); track item.variant_id) {
+                        <div class="flex items-center gap-3 py-3">
+                          <div class="min-w-0 flex-1">
+                            <p class="truncate text-sm font-medium">{{ item.product_name }}</p>
+                            <p class="type-caption truncate">{{ item.variant_name }}</p>
+                          </div>
+                          <div class="text-right">
+                            <p class="font-medium tabular-nums text-warning">{{ item.stock }}</p>
+                            <p class="type-caption">threshold {{ item.low_stock_threshold }}</p>
+                          </div>
+                        </div>
+                      }
+                    </div>
+                  }
+                </div>
+              </article>
+            }
 
             <article class="card h-full bg-base-100">
               <div class="card-body p-4">
@@ -434,6 +533,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
   private readonly reports = inject(ReportsService);
   private readonly pos = inject(PosService);
   protected readonly sync = inject(SyncService);
+  protected readonly locations = inject(LocationContextService);
+  protected readonly preferences = inject(CompanyPreferencesService);
 
   protected readonly fmt = formatKes;
   protected readonly String = String;
@@ -446,14 +547,31 @@ export class DashboardComponent implements OnInit, OnDestroy {
   protected readonly salesChartExpanded = signal(false);
 
   protected readonly summary = signal<DailySummary[]>([]);
+  protected readonly productSales = signal<DailyProductSales[]>([]);
   protected readonly topVariants = signal<TopVariant[]>([]);
   protected readonly lowStock = signal<LowStockVariant[]>([]);
   protected readonly expiring = signal<ExpiringBatch[]>([]);
+  protected readonly locationRows = signal<DashboardLocationSummary[]>([]);
+  protected readonly comparison = signal<DashboardPeriodComparison>({
+    current_revenue: 0,
+    current_quantity: 0,
+    current_orders: 0,
+    previous_revenue: 0,
+    previous_quantity: 0,
+    previous_orders: 0,
+  });
+  protected readonly dashboardLocationId = signal<string | null>(null);
 
   protected readonly dashboardSubtitle = computed(() => {
     const company = this.company();
+    const scope = this.dashboardLocationId()
+      ? this.locations.locations().find(location => location.id === this.dashboardLocationId())
+          ?.name
+      : this.locations.isMultiLocation()
+        ? 'All locations'
+        : null;
     return company
-      ? `${company.name} · Live trading and stock overview`
+      ? `${company.name}${scope ? ` · ${scope}` : ''} · Live trading and stock overview`
       : 'Live trading and stock overview';
   });
   protected readonly pendingCount = computed(
@@ -491,6 +609,14 @@ export class DashboardComponent implements OnInit, OnDestroy {
   protected readonly weekOrders = computed(() =>
     this.week().reduce((total, day) => total + (day.orders ?? 0), 0)
   );
+  protected readonly todayQuantity = computed(() =>
+    this.productSales()
+      .filter(row => row.day === this.todayIso())
+      .reduce((total, row) => total + Number(row.quantity ?? 0), 0)
+  );
+  protected readonly weekQuantity = computed(() =>
+    this.productSales().reduce((total, row) => total + Number(row.quantity ?? 0), 0)
+  );
   protected readonly salesChartHasData = computed(() => this.weekRevenue() > 0);
   protected readonly salesChartPoints = computed<SalesChartPoint[]>(() => {
     const days = this.week();
@@ -517,6 +643,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
         return;
       }
       this.company.set(company);
+      if (this.locations.locations().length === 0) await this.locations.load();
+      await this.preferences.refresh();
+      if (!this.locations.isMultiLocation())
+        this.dashboardLocationId.set(this.locations.activeId());
       this.connectLiveUpdates(company.id);
     } catch (err) {
       this.loadError.set(err instanceof Error ? err.message : 'Failed to load company');
@@ -541,6 +671,22 @@ export class DashboardComponent implements OnInit, OnDestroy {
     void this.router.navigate(['/pos/sync']);
   }
 
+  protected changeDashboardLocation(event: Event): void {
+    this.dashboardLocationId.set((event.target as HTMLSelectElement).value || null);
+    void this.loadReports();
+  }
+
+  protected showLocation(locationId: string): void {
+    this.dashboardLocationId.set(locationId);
+    void this.loadReports();
+  }
+
+  protected changeLabel(current: number, previous: number): string {
+    if (previous === 0) return current === 0 ? '0%' : 'New';
+    const value = ((current - previous) / Math.abs(previous)) * 100;
+    return `${value >= 0 ? '+' : ''}${value.toFixed(1)}%`;
+  }
+
   private async loadReports(): Promise<void> {
     if (this.loading()) {
       this.loadQueued = true;
@@ -551,11 +697,16 @@ export class DashboardComponent implements OnInit, OnDestroy {
     try {
       const since = this.daysAgoIso(6);
       const [sales, lowStock, expiring] = await Promise.all([
-        this.reports.dashboardSales(since),
+        this.reports.dashboardSales(since, this.dashboardLocationId()),
         this.reports.lowStock(),
-        this.reports.expiringBatches(),
+        this.preferences.batchExpiryEnabled()
+          ? this.reports.expiringBatches()
+          : Promise.resolve([]),
       ]);
       this.summary.set(sales.summary);
+      this.productSales.set(sales.productSales);
+      this.locationRows.set(sales.locations);
+      this.comparison.set(sales.comparison);
       this.lowStock.set(lowStock);
       this.expiring.set(expiring);
       await this.computeTopVariants(sales.productSales);
@@ -602,10 +753,11 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   private async computeTopVariants(rows: DailyProductSales[]): Promise<void> {
-    const byVariant = new Map<string, { revenue: number; margin: number }>();
+    const byVariant = new Map<string, { quantity: number; revenue: number; margin: number }>();
     for (const row of rows) {
       if (!row.variant_id) continue;
-      const current = byVariant.get(row.variant_id) ?? { revenue: 0, margin: 0 };
+      const current = byVariant.get(row.variant_id) ?? { quantity: 0, revenue: 0, margin: 0 };
+      current.quantity += Number(row.quantity ?? 0);
       current.revenue += row.revenue ?? 0;
       current.margin += (row.revenue ?? 0) - (row.cogs ?? 0);
       byVariant.set(row.variant_id, current);
@@ -620,10 +772,15 @@ export class DashboardComponent implements OnInit, OnDestroy {
         label: byId.has(variantId)
           ? variantLabel(byId.get(variantId) as Variant)
           : variantId.slice(0, 8),
+        quantity: totals.quantity,
         revenue: totals.revenue,
         margin: totals.margin,
       }))
     );
+  }
+
+  protected quantity(value: number): string {
+    return Number(value).toLocaleString('en-KE', { maximumFractionDigits: 3 });
   }
 
   protected shortDay(day: string | null): string {

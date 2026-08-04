@@ -2,6 +2,7 @@ import { Injectable, computed, effect, inject, signal, untracked } from '@angula
 import { SupabaseService, type AppIdentity } from '../../core/supabase.service';
 import { PosRpcError, PosService, Variant } from '../pos.service';
 import { ConnectivityService } from './connectivity.service';
+import { LocationContextService } from '../../core/location-context.service';
 import {
   OutboxEntry,
   ProductSnapshot,
@@ -35,6 +36,7 @@ export class SyncService {
   private readonly pos = inject(PosService);
   private readonly connectivity = inject(ConnectivityService);
   private readonly supabase = inject(SupabaseService);
+  private readonly locations = inject(LocationContextService);
 
   /** All outbox entries (queued + failed), FIFO by queued_at. */
   readonly entries = signal<OutboxEntry[]>([]);
@@ -53,10 +55,11 @@ export class SyncService {
     // App start, account change, reconnect, and resume-from-suspension triggers.
     effect(() => {
       const identity = this.supabase.offlineIdentity();
+      const locationId = this.locations.activeId();
       const online = this.connectivity.online();
       this.connectivity.resumeTick();
       untracked(() => {
-        const scope = identity ? offlineScopeKey(identity) : null;
+        const scope = identity ? offlineScopeKey(identity, locationId) : null;
         if (scope !== this.catalogScope) {
           this.catalogScope = scope;
           this.usingCachedCatalog.set(false);
@@ -93,6 +96,7 @@ export class SyncService {
       ...entry,
       company_id: identity.companyId,
       user_id: identity.userId,
+      location_id: this.locations.requireActiveId(),
       client_ref: clientRef,
       queued_at: new Date().toISOString(),
       status: 'queued',
@@ -124,7 +128,8 @@ export class SyncService {
             entry.lines,
             entry.payments,
             false,
-            entry.client_ref
+            entry.client_ref,
+            entry.location_id
           );
           await db.delete('outbox', entry.client_ref);
           posted++;
@@ -184,18 +189,24 @@ export class SyncService {
   /** Cache the active catalog in IndexedDB. Fire-and-forget when online. */
   async refreshProductSnapshot(): Promise<boolean> {
     const identity = this.supabase.offlineIdentity();
-    if (!identity || !this.connectivity.online()) return false;
+    const locationId = this.locations.activeId();
+    if (!identity || !locationId || !this.connectivity.online()) return false;
     try {
       const products = await this.pos.fetchActiveVariants();
       const currentIdentity = this.supabase.offlineIdentity();
-      if (!currentIdentity || offlineScopeKey(currentIdentity) !== offlineScopeKey(identity)) {
+      if (
+        !currentIdentity ||
+        offlineScopeKey(currentIdentity, this.locations.activeId()) !==
+          offlineScopeKey(identity, locationId)
+      ) {
         return false;
       }
       const db = await offlineDb();
       const snapshot: ProductSnapshot = {
-        key: offlineScopeKey(identity),
+        key: offlineScopeKey(identity, locationId),
         company_id: identity.companyId,
         user_id: identity.userId,
+        location_id: locationId,
         products,
         fetched_at: new Date().toISOString(),
       };
@@ -264,19 +275,23 @@ export class SyncService {
   /** Tenant-scoped payment settings with stale-on-error behavior. */
   async paymentMethods(): Promise<string[]> {
     const identity = this.supabase.offlineIdentity();
-    if (!identity) return ['cash', 'mpesa', 'bank'];
-    const key = offlineScopeKey(identity);
+    const locationId = this.locations.activeId();
+    if (!identity || !locationId) return ['cash', 'mpesa', 'bank'];
+    const key = offlineScopeKey(identity, locationId);
     if (this.connectivity.online()) {
       try {
         const methods = await this.pos.enabledPaymentMethods();
+        const db = await offlineDb();
+        const existing = await db.get('settings', key);
         const snapshot: PosSettingsSnapshot = {
+          ...existing,
           key,
           company_id: identity.companyId,
           user_id: identity.userId,
+          location_id: locationId,
           payment_methods: methods,
           fetched_at: new Date().toISOString(),
         };
-        const db = await offlineDb();
         await db.put('settings', snapshot);
         return methods;
       } catch {
@@ -304,9 +319,10 @@ export class SyncService {
 
   private async productSnapshot(): Promise<ProductSnapshot | undefined> {
     const identity = this.supabase.offlineIdentity();
-    if (!identity) return undefined;
+    const locationId = this.locations.activeId();
+    if (!identity || !locationId) return undefined;
     const db = await offlineDb();
-    const snapshot = await db.get('products', offlineScopeKey(identity));
+    const snapshot = await db.get('products', offlineScopeKey(identity, locationId));
     this.productSnapshotFetchedAt.set(snapshot?.fetched_at ?? null);
     return snapshot;
   }

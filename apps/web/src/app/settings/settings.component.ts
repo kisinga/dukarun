@@ -6,6 +6,7 @@ import { PageLayoutComponent } from '../shared/ui/page-layout.component';
 import {
   CompanySettings,
   PaymentMethodRow,
+  LocationPaymentMethodRow,
   SettingsService,
   StockLocationRow,
 } from './settings.service';
@@ -14,6 +15,7 @@ import { PermissionsService } from '../core/permissions.service';
 import { ButtonComponent } from '../shared/ui/button.component';
 import { DeleteConfirmationModalComponent } from '../shared/ui/delete-confirmation-modal.component';
 import { IconComponent } from '../shared/ui/icon.component';
+import { CashierSessionService } from '../core/cashier-session.service';
 
 type SectionKey = 'profile' | 'pos' | 'inventory' | 'cash';
 
@@ -116,22 +118,63 @@ type SectionKey = 'profile' | 'pos' | 'inventory' | 'cash';
                 <input type="checkbox" class="checkbox checkbox-sm" [formControl]="enablePrinter" />
                 <span class="label-text">Enable receipt printing</span>
               </label>
-              <label class="label cursor-pointer justify-start gap-2 py-0">
-                <input type="checkbox" class="checkbox checkbox-sm" [formControl]="cashierFlow" />
-                <span class="label-text">Cashier flow (send sales to cashier)</span>
+              <label
+                class="flex cursor-pointer items-start gap-3 rounded-box border border-base-300 p-3"
+              >
+                <input
+                  type="checkbox"
+                  class="checkbox checkbox-sm mt-0.5"
+                  [formControl]="cashierFlow"
+                />
+                <span>
+                  <span class="block text-sm font-medium">Use a separate cashier queue</span>
+                  <span class="block text-xs text-base-content/60">
+                    When off, sellers take payment and complete orders directly on the Sell screen.
+                  </span>
+                </span>
               </label>
-              <label class="label cursor-pointer justify-start gap-2 py-0">
-                <input type="checkbox" class="checkbox checkbox-sm" [formControl]="cashControl" />
-                <span class="label-text">Cash control</span>
+              <label
+                class="flex cursor-pointer items-start gap-3 rounded-box border border-base-300 p-3"
+              >
+                <input
+                  type="checkbox"
+                  class="checkbox checkbox-sm mt-0.5"
+                  [formControl]="cashControl"
+                />
+                <span>
+                  <span class="block text-sm font-medium">Track till sessions</span>
+                  <span class="block text-xs text-base-content/60">
+                    Require an open till for payments and keep opening, closing, and variance
+                    counts.
+                  </span>
+                </span>
               </label>
+              @if (!cashierFlow.value) {
+                <div class="alert alert-info py-2 text-sm">
+                  <app-icon name="heroInformationCircle" />
+                  <span
+                    >Direct checkout will be used. New orders will not enter a cashier queue.</span
+                  >
+                </div>
+              }
               <label class="label cursor-pointer justify-start gap-2 py-0">
                 <input
                   type="checkbox"
                   class="checkbox checkbox-sm"
                   [formControl]="requireOpening"
+                  [attr.disabled]="!cashControl.value ? '' : null"
                 />
                 <span class="label-text">Require opening count</span>
               </label>
+              @if (cashControl.value && !requireOpening.value) {
+                <div class="alert alert-info py-2 text-sm">
+                  <app-icon name="heroInformationCircle" />
+                  <span
+                    >Tills will open immediately using current balances; closing counts still
+                    apply.</span
+                  >
+                </div>
+              }
               <label class="form-control mt-2 w-full sm:w-64">
                 <span class="label-text">Proforma validity (days)</span>
                 <input
@@ -176,10 +219,29 @@ type SectionKey = 'profile' | 'pos' | 'inventory' | 'cash';
                   [formControl]="lowStock"
                 />
               </label>
-              <label class="label cursor-pointer justify-start gap-2">
-                <input type="checkbox" class="checkbox checkbox-sm" [formControl]="batchExpiry" />
-                <span class="label-text">Track batch expiry</span>
+              <label
+                class="flex cursor-pointer items-start gap-3 rounded-box border border-base-300 p-3"
+              >
+                <input
+                  type="checkbox"
+                  class="checkbox checkbox-sm mt-0.5"
+                  [formControl]="batchExpiry"
+                />
+                <span>
+                  <span class="block text-sm font-medium">Track batch expiry</span>
+                  <span class="block text-xs text-base-content/60">
+                    Show expiry fields on stock intake and warn about batches nearing expiry.
+                  </span>
+                </span>
               </label>
+              @if (!batchExpiry.value) {
+                <div class="alert alert-info w-full py-2 text-sm">
+                  <app-icon name="heroInformationCircle" />
+                  <span
+                    >Expiry fields and alerts are hidden. Existing expiry history is retained.</span
+                  >
+                </div>
+              }
               <div class="w-full">
                 @if (msg('inventory'); as m) {
                   <p class="mb-2 text-sm" [class.text-success]="m.ok" [class.text-error]="!m.ok">
@@ -355,6 +417,12 @@ type SectionKey = 'profile' | 'pos' | 'inventory' | 'cash';
               Flag drawer variances at or above this amount (currently
               {{ fmt(s.variance_notification_threshold) }}).
             </p>
+            @if (!cashControl.value) {
+              <div class="alert alert-info mt-2 py-2 text-sm">
+                <app-icon name="heroInformationCircle" />
+                <span>This threshold applies when till-session cash control is enabled.</span>
+              </div>
+            }
             <form
               (submit)="$event.preventDefault(); saveSection('cash')"
               class="mt-2 flex flex-wrap items-end gap-3"
@@ -383,6 +451,36 @@ type SectionKey = 'profile' | 'pos' | 'inventory' | 'cash';
         </div>
 
         <!-- Payment methods -->
+        @if (entitlements.enabled('commissions') && perms.has('ManageCommissions')) {
+          <div class="card mb-4 bg-base-100">
+            <div class="card-body p-4">
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 class="card-title text-lg">Commissions</h2>
+                  <p class="type-caption mt-1">
+                    Optional staff commission plans and reviewable statements.
+                  </p>
+                </div>
+                <label class="label cursor-pointer gap-3">
+                  <span class="label-text font-medium">Enable commissions</span>
+                  <input
+                    type="checkbox"
+                    class="toggle toggle-primary"
+                    [checked]="s.commissions_enabled"
+                    [disabled]="busy()"
+                    (change)="toggleCommissions($event)"
+                  />
+                </label>
+              </div>
+              @if (msg('commissions'); as m) {
+                <p class="mt-2 text-sm" [class.text-success]="m.ok" [class.text-error]="!m.ok">
+                  {{ m.text }}
+                </p>
+              }
+            </div>
+          </div>
+        }
+
         <div class="card mb-4 bg-base-100">
           <div class="card-body p-4">
             <div class="flex items-center justify-between">
@@ -398,7 +496,7 @@ type SectionKey = 'profile' | 'pos' | 'inventory' | 'cash';
                     <th>Method</th>
                     <th>Enabled</th>
                     <th>Reconciliation</th>
-                    <th></th>
+                    <th>Locations</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -431,7 +529,33 @@ type SectionKey = 'profile' | 'pos' | 'inventory' | 'cash';
                           [disabled]="busy()"
                         />
                       </td>
-                      <td class="type-caption">requires recon</td>
+                      <td>
+                        @if (locations().length <= 1) {
+                          <span class="type-caption">Main location</span>
+                        } @else {
+                          <details class="dropdown dropdown-end">
+                            <summary class="btn btn-ghost btn-xs min-h-9">
+                              {{ paymentLocationLabel(pm) }}
+                            </summary>
+                            <div
+                              class="dropdown-content z-20 mt-1 w-56 rounded-box border border-base-300 bg-base-100 p-2 shadow-overlay"
+                            >
+                              @for (location of locations(); track location.id) {
+                                <label class="label min-h-10 cursor-pointer justify-start gap-2">
+                                  <input
+                                    type="checkbox"
+                                    class="checkbox checkbox-sm"
+                                    [checked]="paymentMethodEnabledAt(pm, location.id)"
+                                    [disabled]="busy()"
+                                    (change)="togglePaymentLocation(pm, location.id, $event)"
+                                  />
+                                  <span class="label-text">{{ location.name }}</span>
+                                </label>
+                              }
+                            </div>
+                          </details>
+                        }
+                      </td>
                     </tr>
                   }
                 </tbody>
@@ -462,12 +586,14 @@ type SectionKey = 'profile' | 'pos' | 'inventory' | 'cash';
 })
 export class SettingsComponent implements OnInit {
   private readonly settingsService = inject(SettingsService);
+  private readonly cashierSession = inject(CashierSessionService);
   protected readonly entitlements = inject(EntitlementsService);
   protected readonly perms = inject(PermissionsService);
 
   protected readonly fmt = formatKes;
   protected readonly settings = signal<CompanySettings | null>(null);
   protected readonly paymentMethods = signal<PaymentMethodRow[]>([]);
+  protected readonly paymentMethodAssignments = signal<LocationPaymentMethodRow[]>([]);
   protected readonly locations = signal<StockLocationRow[]>([]);
   protected readonly loadError = signal<string | null>(null);
   protected readonly busy = signal(false);
@@ -512,15 +638,17 @@ export class SettingsComponent implements OnInit {
 
   async ngOnInit(): Promise<void> {
     try {
-      const [settings, methods, locations] = await Promise.all([
+      const [settings, methods, locations, paymentAssignments] = await Promise.all([
         this.settingsService.getSettings(),
         this.settingsService.paymentMethods(),
         this.settingsService.stockLocations(),
+        this.settingsService.paymentMethodLocations(),
         this.entitlements.refresh(),
       ]);
       this.settings.set(settings);
       this.paymentMethods.set(methods);
       this.locations.set(locations);
+      this.paymentMethodAssignments.set(paymentAssignments);
       this.name.setValue(settings.name);
       this.slug.setValue(settings.public_slug ?? '');
       this.whatsapp.setValue(settings.public_whatsapp_number ?? '');
@@ -688,6 +816,9 @@ export class SettingsComponent implements OnInit {
     try {
       await this.settingsService.updateSettings(s.id, patch);
       this.settings.set({ ...s, ...patch });
+      if (section === 'pos' || section === 'inventory') {
+        await this.cashierSession.refreshConfiguration();
+      }
       this.flash(section, true, 'Saved');
     } catch (err) {
       this.flash(section, false, err instanceof Error ? err.message : 'Save failed');
@@ -711,6 +842,76 @@ export class SettingsComponent implements OnInit {
       );
       this.pmMsg.set({ ok: true, text: `${pm.name} updated` });
     } catch (err) {
+      this.pmMsg.set({ ok: false, text: err instanceof Error ? err.message : 'Update failed' });
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected async toggleCommissions(event: Event): Promise<void> {
+    const enabled = (event.target as HTMLInputElement).checked;
+    const current = this.settings();
+    if (!current) return;
+    this.busy.set(true);
+    try {
+      await this.settingsService.setCommissionsEnabled(enabled);
+      this.settings.set({ ...current, commissions_enabled: enabled });
+      await this.entitlements.refresh();
+      this.flash('commissions', true, enabled ? 'Commissions enabled' : 'Commissions disabled');
+    } catch (err) {
+      (event.target as HTMLInputElement).checked = current.commissions_enabled;
+      this.flash('commissions', false, err instanceof Error ? err.message : 'Update failed');
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected paymentMethodEnabledAt(method: PaymentMethodRow, locationId: string): boolean {
+    return this.paymentMethodAssignments().some(
+      assignment =>
+        assignment.payment_method_id === method.id &&
+        assignment.location_id === locationId &&
+        assignment.enabled
+    );
+  }
+
+  protected paymentLocationLabel(method: PaymentMethodRow): string {
+    const count = this.locations().filter(location =>
+      this.paymentMethodEnabledAt(method, location.id)
+    ).length;
+    if (count === this.locations().length) return 'All locations';
+    return `${count} of ${this.locations().length}`;
+  }
+
+  protected async togglePaymentLocation(
+    method: PaymentMethodRow,
+    locationId: string,
+    event: Event
+  ): Promise<void> {
+    const checked = (event.target as HTMLInputElement).checked;
+    const selected = new Set(
+      this.locations()
+        .filter(location => this.paymentMethodEnabledAt(method, location.id))
+        .map(location => location.id)
+    );
+    if (checked) selected.add(locationId);
+    else selected.delete(locationId);
+    const ids = [...selected];
+    const all = ids.length === this.locations().length;
+    this.busy.set(true);
+    try {
+      await this.settingsService.setPaymentMethodLocations(method.code, ids, all);
+      this.paymentMethodAssignments.set(await this.settingsService.paymentMethodLocations());
+      this.paymentMethods.update(items =>
+        items.map(item =>
+          item.id === method.id
+            ? { ...item, availability_scope: all ? 'all_locations' : 'selected_locations' }
+            : item
+        )
+      );
+      this.pmMsg.set({ ok: true, text: `${method.name} locations updated` });
+    } catch (err) {
+      (event.target as HTMLInputElement).checked = !checked;
       this.pmMsg.set({ ok: false, text: err instanceof Error ? err.message : 'Update failed' });
     } finally {
       this.busy.set(false);

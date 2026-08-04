@@ -136,7 +136,7 @@ const PROFORMA_STATUSES = ['draft', 'expired'];
         </div>
       </app-list-search-bar>
 
-      @if (!cashierSession.isOpen() && activeOnPage() > 0) {
+      @if (cashierSession.cashControlEnabled() && !cashierSession.isOpen() && activeOnPage() > 0) {
         <app-session-required-notice action="converting a proforma to a sale" />
       }
 
@@ -208,7 +208,7 @@ const PROFORMA_STATUSES = ['draft', 'expired'];
                       appButton
                       size="sm"
                       class="ml-auto"
-                      [disabled]="!cashierSession.isOpen() || busy()"
+                      [disabled]="!cashierSession.canTakePayment() || busy()"
                       (click)="startConversion(draft)"
                     >
                       Convert to sale <app-icon name="heroArrowRight" />
@@ -298,7 +298,7 @@ const PROFORMA_STATUSES = ['draft', 'expired'];
                           appButton
                           size="sm"
                           class="ml-2"
-                          [disabled]="!cashierSession.isOpen() || busy()"
+                          [disabled]="!cashierSession.canTakePayment() || busy()"
                           (click)="startConversion(draft)"
                         >
                           Convert to sale <app-icon name="heroArrowRight" />
@@ -325,7 +325,7 @@ const PROFORMA_STATUSES = ['draft', 'expired'];
           />
         </div>
       }
-      @if (cashierSession.isOpen() && converting(); as draft) {
+      @if (cashierSession.canTakePayment() && converting(); as draft) {
         <app-checkout-panel
           [total]="draft.total"
           [creditAllowed]="draft.customer_id !== null"

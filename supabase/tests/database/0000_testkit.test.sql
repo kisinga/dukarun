@@ -33,9 +33,19 @@ $$;
 -- provision: set claims (txn-local) and run the real provisioning path
 create or replace function testkit.provision(p_user_id uuid, p_company_name text)
 returns uuid language plpgsql set search_path = '' as $$
+declare
+  v_company_id uuid;
 begin
   perform set_config('request.jwt.claims', format('{"sub":"%s","role":"authenticated"}', p_user_id), true);
-  return public.provision_company(p_company_name, 'Main');
+  v_company_id := public.provision_company(p_company_name, 'Main');
+  -- Financial fixtures retain strict session behavior unless a test explicitly
+  -- disables it. Production registration defaults both choices to off.
+  update public.companies
+  set cashier_flow_enabled = true,
+      cash_control_enabled = true,
+      batch_expiry_enabled = true
+  where id = v_company_id;
+  return v_company_id;
 end;
 $$;
 

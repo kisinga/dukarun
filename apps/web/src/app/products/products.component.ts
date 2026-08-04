@@ -26,6 +26,8 @@ import { FormFieldComponent } from '../shared/ui/form-field.component';
 import { IconComponent } from '../shared/ui/icon.component';
 import { MoneyComponent } from '../shared/ui/money.component';
 import { StatBarComponent } from '../shared/ui/stat-bar.component';
+import { CompanyPreferencesService } from '../core/company-preferences.service';
+import { PermissionsService } from '../core/permissions.service';
 
 type StockInfo = { stock: number; stock_value: number };
 
@@ -618,14 +620,16 @@ interface ProductEditorRow {
                                       [ngModelOptions]="{ standalone: true }"
                                     />
                                   </app-form-field>
-                                  <app-form-field label="Expiry date" hint="Optional">
-                                    <input
-                                      type="date"
-                                      class="input input-bordered w-full"
-                                      [(ngModel)]="row.expiryDate"
-                                      [ngModelOptions]="{ standalone: true }"
-                                    />
-                                  </app-form-field>
+                                  @if (preferences.batchExpiryEnabled()) {
+                                    <app-form-field label="Expiry date" hint="Optional">
+                                      <input
+                                        type="date"
+                                        class="input input-bordered w-full"
+                                        [(ngModel)]="row.expiryDate"
+                                        [ngModelOptions]="{ standalone: true }"
+                                      />
+                                    </app-form-field>
+                                  }
                                   @if (row.openingQuantity && row.openingUnitCost) {
                                     <div class="self-end pb-3 text-sm text-base-content/60">
                                       Opening value
@@ -826,6 +830,17 @@ interface ProductEditorRow {
                               Edit
                             </button>
                             @if (v.kind !== 'service' && v.track_inventory) {
+                              @if (perms.has('ManageStockAdjustments')) {
+                                <a
+                                  appButton
+                                  variant="outline"
+                                  size="sm"
+                                  routerLink="/stock-adjustments"
+                                  [queryParams]="{ variant: v.variant_id }"
+                                >
+                                  Adjust stock
+                                </a>
+                              }
                               <button
                                 appButton
                                 variant="ghost"
@@ -854,9 +869,11 @@ interface ProductEditorRow {
                                   <span class="text-base-content/60"
                                     >Cost {{ fmt(b.unit_cost) }}</span
                                   >
-                                  <span class="text-right text-base-content/60">{{
-                                    b.expiry_date ? 'Expires ' + b.expiry_date : 'No expiry'
-                                  }}</span>
+                                  @if (preferences.batchExpiryEnabled()) {
+                                    <span class="text-right text-base-content/60">{{
+                                      b.expiry_date ? 'Expires ' + b.expiry_date : 'No expiry'
+                                    }}</span>
+                                  }
                                 </div>
                               } @empty {
                                 <p class="type-caption">No stock batches yet.</p>
@@ -993,6 +1010,17 @@ interface ProductEditorRow {
                                       Edit
                                     </button>
                                     @if (v.kind !== 'service' && v.track_inventory) {
+                                      @if (perms.has('ManageStockAdjustments')) {
+                                        <a
+                                          appButton
+                                          variant="outline"
+                                          size="sm"
+                                          routerLink="/stock-adjustments"
+                                          [queryParams]="{ variant: v.variant_id }"
+                                        >
+                                          Adjust
+                                        </a>
+                                      }
                                       <button
                                         appButton
                                         variant="ghost"
@@ -1023,12 +1051,15 @@ interface ProductEditorRow {
                                             <span>{{ batch.remaining }} left</span>
                                           </div>
                                           <p class="mt-1 text-base-content/60">
-                                            Cost <app-money [cents]="batch.unit_cost" /> ·
-                                            {{
-                                              batch.expiry_date
-                                                ? 'Expires ' + batch.expiry_date
-                                                : 'No expiry'
-                                            }}
+                                            Cost <app-money [cents]="batch.unit_cost" />
+                                            @if (preferences.batchExpiryEnabled()) {
+                                              ·
+                                              {{
+                                                batch.expiry_date
+                                                  ? 'Expires ' + batch.expiry_date
+                                                  : 'No expiry'
+                                              }}
+                                            }
                                           </p>
                                         </div>
                                       } @empty {
@@ -1088,6 +1119,8 @@ interface ProductEditorRow {
 export class ProductsComponent implements OnInit {
   private readonly pos = inject(PosService);
   private readonly supabase = inject(SupabaseService);
+  protected readonly preferences = inject(CompanyPreferencesService);
+  protected readonly perms = inject(PermissionsService);
 
   protected readonly fmt = formatKes;
   protected readonly families = signal<Product[]>([]);
@@ -1212,7 +1245,7 @@ export class ProductsComponent implements OnInit {
   }
 
   async ngOnInit(): Promise<void> {
-    await this.load();
+    await Promise.all([this.preferences.refresh(), this.load()]);
   }
 
   protected async load(): Promise<void> {
@@ -1582,7 +1615,9 @@ export class ProductsComponent implements OnInit {
               opening_unit_cost: openingUnitCost!,
               ...(row.openingLocationId ? { opening_location_id: row.openingLocationId } : {}),
               ...(row.batchNumber.trim() ? { batch_number: row.batchNumber.trim() } : {}),
-              ...(row.expiryDate ? { expiry_date: row.expiryDate } : {}),
+              ...(this.preferences.batchExpiryEnabled() && row.expiryDate
+                ? { expiry_date: row.expiryDate }
+                : {}),
             }
           : {}),
       });

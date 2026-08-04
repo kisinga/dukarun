@@ -1,6 +1,7 @@
 import { Injectable, OnDestroy, computed, inject, signal } from '@angular/core';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { SupabaseService } from '../core/supabase.service';
+import { LocationContextService } from '../core/location-context.service';
 
 /**
  * Live counts for orders that still need action. These are exact database
@@ -9,6 +10,7 @@ import { SupabaseService } from '../core/supabase.service';
 @Injectable({ providedIn: 'root' })
 export class OrderQueueCountsService implements OnDestroy {
   private readonly supabase = inject(SupabaseService);
+  private readonly locations = inject(LocationContextService);
   private channel: RealtimeChannel | null = null;
 
   readonly cashierQueue = signal(0);
@@ -40,17 +42,21 @@ export class OrderQueueCountsService implements OnDestroy {
     // predicate below also keeps the badge correct if the sweep itself fails.
     await this.db.rpc('expire_proformas');
     const now = new Date().toISOString();
-    const [cashierQueue, proformas] = await Promise.all([
-      this.db
-        .from('orders')
-        .select('id', { count: 'exact', head: true })
-        .eq('status', 'pending_payment'),
-      this.db
-        .from('orders')
-        .select('id', { count: 'exact', head: true })
-        .eq('status', 'draft')
-        .gt('expires_at', now),
-    ]);
+    const locationId = this.locations.activeId();
+    let cashierQuery = this.db
+      .from('orders')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'pending_payment');
+    let proformaQuery = this.db
+      .from('orders')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'draft')
+      .gt('expires_at', now);
+    if (locationId) {
+      cashierQuery = cashierQuery.eq('location_id', locationId);
+      proformaQuery = proformaQuery.eq('location_id', locationId);
+    }
+    const [cashierQueue, proformas] = await Promise.all([cashierQuery, proformaQuery]);
 
     if (!cashierQueue.error) this.cashierQueue.set(cashierQueue.count ?? 0);
     if (!proformas.error) this.proformas.set(proformas.count ?? 0);

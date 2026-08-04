@@ -16,7 +16,6 @@ declare
   v_company_id uuid := public.current_company_id();
   v_recon record;
   v_recon_parent record;
-  v_latest_recon_id uuid;
   v_entry record;
   v_line record;
   v_reversal_lines jsonb := '[]'::jsonb;
@@ -55,13 +54,12 @@ begin
     raise exception 'already_reviewed';
   end if;
 
-  select r.id into v_latest_recon_id
-  from public.reconciliations r
-  where r.company_id = v_company_id
-  order by r.created_at desc, r.id desc
-  limit 1;
-
-  if v_latest_recon_id is distinct from v_recon_parent.id then
+  if exists (
+    select 1
+    from public.reconciliations r
+    where r.company_id = v_company_id
+      and r.created_at > v_recon_parent.created_at
+  ) then
     raise exception 'variance_revert_expired: newer reconciliation activity exists';
   end if;
 

@@ -76,8 +76,17 @@ import {
       @if (cashierSession.usingCachedState()) {
         <span actions class="badge badge-warning">{{ cashierSession.cachedStatusLabel() }}</span>
       }
+      @if (cashierSession.configurationLoaded() && !cashierSession.cashierFlowEnabled()) {
+        <span
+          actions
+          class="badge badge-info cursor-help"
+          title="Take payment here to complete the sale; the cashier queue is not used."
+        >
+          Direct checkout
+        </span>
+      }
 
-      @if (!cashierSession.isOpen()) {
+      @if (cashierSession.cashControlEnabled() && !cashierSession.isOpen()) {
         <app-session-required-notice action="taking payment or completing a sale" />
       }
 
@@ -535,7 +544,7 @@ import {
                   appButton
                   size="md"
                   class="mt-4 hidden w-full lg:flex"
-                  [disabled]="cart.isEmpty() || busy() || !cashierSession.isOpen()"
+                  [disabled]="cart.isEmpty() || busy() || !cashierSession.canTakePayment()"
                   (click)="openCheckout()"
                 >
                   <app-icon name="heroBanknotes" />
@@ -543,16 +552,18 @@ import {
                 </button>
 
                 <div class="flex flex-wrap gap-2 lg:mt-2 lg:flex-col">
-                  <button
-                    appButton
-                    variant="secondary"
-                    size="md"
-                    class="flex-1"
-                    [disabled]="cart.isEmpty() || busy()"
-                    (click)="sendToCashier()"
-                  >
-                    Send to cashier
-                  </button>
+                  @if (cashierSession.cashierFlowEnabled()) {
+                    <button
+                      appButton
+                      variant="secondary"
+                      size="md"
+                      class="flex-1"
+                      [disabled]="cart.isEmpty() || busy()"
+                      (click)="sendToCashier()"
+                    >
+                      Send to cashier
+                    </button>
+                  }
                   <button
                     appButton
                     variant="secondary"
@@ -584,7 +595,7 @@ import {
             appButton
             size="md"
             class="min-w-40 flex-1"
-            [disabled]="cart.isEmpty() || busy() || !cashierSession.isOpen()"
+            [disabled]="cart.isEmpty() || busy() || !cashierSession.canTakePayment()"
             (click)="openCheckout()"
           >
             Take payment
@@ -593,7 +604,7 @@ import {
         </div>
       </div>
 
-      @if (checkoutOpen() && cashierSession.isOpen()) {
+      @if (checkoutOpen() && cashierSession.canTakePayment()) {
         <app-checkout-panel
           [total]="cart.total()"
           [creditAllowed]="creditAllowed()"
@@ -1052,6 +1063,10 @@ export class SellComponent implements OnInit {
   }
 
   protected async sendToCashier(): Promise<void> {
+    if (!this.cashierSession.cashierFlowEnabled()) {
+      this.error.set('Cashier workflow is off. Take payment here to complete the sale.');
+      return;
+    }
     this.busy.set(true);
     this.error.set(null);
     this.notice.set(null);

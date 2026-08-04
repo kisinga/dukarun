@@ -2,6 +2,7 @@ import { Injectable, computed, effect, inject, signal, untracked } from '@angula
 import { SupabaseService } from '../core/supabase.service';
 import { offlineDb, offlineScopeKey, type PersistedCart } from './offline/offline-db';
 import { variantLabel, type SaleLineInput, type Variant } from './pos.service';
+import { LocationContextService } from '../core/location-context.service';
 
 export interface CartLine {
   variant: Variant;
@@ -14,6 +15,7 @@ export interface CartLine {
 @Injectable({ providedIn: 'root' })
 export class CartService {
   private readonly supabase = inject(SupabaseService);
+  private readonly locations = inject(LocationContextService);
   readonly lines = signal<CartLine[]>([]);
   /** null = Walk-in customer (sent as null customer_id to the RPCs). */
   readonly customerId = signal<string | null>(null);
@@ -33,20 +35,23 @@ export class CartService {
   constructor() {
     effect(() => {
       const identity = this.supabase.offlineIdentity();
-      const key = identity ? offlineScopeKey(identity) : null;
+      const locationId = this.locations.activeId();
+      const key = identity && locationId ? offlineScopeKey(identity, locationId) : null;
       untracked(() => void this.switchScope(key));
     });
     // Persist the in-progress cart on every change so a refresh or a
     // mid-sale connectivity drop doesn't lose it.
     effect(() => {
       const identity = this.supabase.offlineIdentity();
-      if (!identity) return;
-      const key = offlineScopeKey(identity);
+      const locationId = this.locations.activeId();
+      if (!identity || !locationId) return;
+      const key = offlineScopeKey(identity, locationId);
       if (this.restoredScope() !== key || this.activeScope() !== key) return;
       const persisted: PersistedCart = {
         key,
         company_id: identity.companyId,
         user_id: identity.userId,
+        location_id: locationId,
         lines: this.lines(),
         customerId: this.customerId(),
         customerName: this.customerName(),

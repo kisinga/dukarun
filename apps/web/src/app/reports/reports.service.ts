@@ -11,6 +11,27 @@ export type ExpiringBatch = Database['public']['Views']['expiring_batches']['Row
 export interface DashboardSalesSnapshot {
   summary: DailySummary[];
   productSales: DailyProductSales[];
+  locations: DashboardLocationSummary[];
+  comparison: DashboardPeriodComparison;
+}
+
+export interface DashboardLocationSummary {
+  location_id: string;
+  location_name: string;
+  orders: number;
+  revenue: number;
+  quantity: number;
+  cogs: number;
+  margin: number;
+}
+
+export interface DashboardPeriodComparison {
+  current_revenue: number;
+  current_quantity: number;
+  current_orders: number;
+  previous_revenue: number;
+  previous_quantity: number;
+  previous_orders: number;
 }
 
 /**
@@ -29,45 +50,58 @@ export class ReportsService {
    * Live operational snapshot for the dashboard. Unlike rpt_* materialized
    * views, this reads the source tables and is current as soon as a sale posts.
    */
-  async dashboardSales(since: string): Promise<DashboardSalesSnapshot> {
-    const { data, error } = await this.db.rpc('dashboard_sales_snapshot', {
+  async dashboardSales(since: string, locationId: string | null): Promise<DashboardSalesSnapshot> {
+    const { data, error } = await this.db.rpc('dashboard_location_snapshot', {
       p_since: since,
+      ...(locationId ? { p_location_id: locationId } : {}),
     });
     if (error) throw error;
     const snapshot = data as unknown as Partial<DashboardSalesSnapshot> | null;
     return {
       summary: snapshot?.summary ?? [],
       productSales: snapshot?.productSales ?? [],
+      locations: snapshot?.locations ?? [],
+      comparison: snapshot?.comparison ?? {
+        current_revenue: 0,
+        current_quantity: 0,
+        current_orders: 0,
+        previous_revenue: 0,
+        previous_quantity: 0,
+        previous_orders: 0,
+      },
     };
   }
 
-  /** Daily summary rows from `since` (yyyy-mm-dd, inclusive), ascending. */
-  async salesSummary(since: string): Promise<DailySummary[]> {
+  /** Daily summary rows in the inclusive yyyy-mm-dd range, ascending. */
+  async salesSummary(since: string, until: string): Promise<DailySummary[]> {
     const { data, error } = await this.db
       .from('rpt_daily_sales_summary')
       .select('*')
       .gte('day', since)
+      .lte('day', until)
       .order('day');
     if (error) throw error;
     return data;
   }
 
-  /** Per-variant daily sales from `since` (yyyy-mm-dd, inclusive). */
-  async productSales(since: string): Promise<DailyProductSales[]> {
+  /** Per-variant daily sales in the inclusive yyyy-mm-dd range. */
+  async productSales(since: string, until: string): Promise<DailyProductSales[]> {
     const { data, error } = await this.db
       .from('rpt_daily_product_sales')
       .select('*')
-      .gte('day', since);
+      .gte('day', since)
+      .lte('day', until);
     if (error) throw error;
     return data;
   }
 
-  /** Per-customer daily stats from `since` (yyyy-mm-dd, inclusive). */
-  async customerStats(since: string): Promise<DailyCustomerStats[]> {
+  /** Per-customer daily stats in the inclusive yyyy-mm-dd range. */
+  async customerStats(since: string, until: string): Promise<DailyCustomerStats[]> {
     const { data, error } = await this.db
       .from('rpt_daily_customer_stats')
       .select('*')
-      .gte('day', since);
+      .gte('day', since)
+      .lte('day', until);
     if (error) throw error;
     return data;
   }

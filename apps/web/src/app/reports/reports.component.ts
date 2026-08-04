@@ -360,12 +360,17 @@ export class ReportsComponent implements OnInit {
   protected async load(): Promise<void> {
     this.error.set(null);
     this.page.set(1);
+    if (this.from.value > this.to.value) {
+      this.error.set('The From date must be before the To date');
+      return;
+    }
     try {
       const since = this.from.value;
+      const until = this.to.value;
       const [summary, productSales, customerStats, stock, catalog] = await Promise.all([
-        this.reports.salesSummary(since),
-        this.reports.productSales(since),
-        this.reports.customerStats(since),
+        this.reports.salesSummary(since, until),
+        this.reports.productSales(since, until),
+        this.reports.customerStats(since, until),
         this.pos.productStock(),
         this.pos.fetchActiveVariants(),
       ]);

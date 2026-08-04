@@ -7,6 +7,8 @@ import {
   MembershipWithRole,
   PERMISSION_LABELS,
   Role,
+  MembershipLocation,
+  TeamLocation,
   TeamService,
 } from './team.service';
 import { StatusBadgeComponent } from '../shared/ui/status-badge.component';
@@ -110,8 +112,16 @@ import { EmptyStateComponent } from '../shared/ui/empty-state.component';
             }
             <form
               (submit)="$event.preventDefault(); addMember()"
-              class="mt-3 grid items-end gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_auto]"
+              class="mt-3 grid items-end gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_auto]"
             >
+              <app-form-field label="Name" [required]="true">
+                <input
+                  type="text"
+                  class="input input-bordered input-sm w-full"
+                  placeholder="e.g. Amina Wanjiku"
+                  [formControl]="memberName"
+                />
+              </app-form-field>
               <app-form-field label="Phone" [required]="true">
                 <input
                   type="tel"
@@ -131,7 +141,12 @@ import { EmptyStateComponent } from '../shared/ui/empty-state.component';
                 appButton
                 type="submit"
                 size="sm"
-                [disabled]="busy() || roles().length === 0 || !canAddMember()"
+                [disabled]="
+                  busy() ||
+                  roles().length === 0 ||
+                  !canAddMember() ||
+                  memberName.value.trim().length === 0
+                "
                 [loading]="busy()"
               >
                 Add member
@@ -178,12 +193,15 @@ import { EmptyStateComponent } from '../shared/ui/empty-state.component';
                   <tr>
                     <td>
                       <div class="table-entity">
-                        <app-entity-avatar size="sm" [firstName]="m.roles?.name ?? '?'" />
+                        <app-entity-avatar
+                          size="sm"
+                          [firstName]="m.staff_profile?.display_name ?? m.roles?.name ?? '?'"
+                        />
                         <div>
-                          <p class="table-primary font-mono" [title]="m.user_id">
-                            User …{{ shortId(m.user_id) }}
+                          <p class="table-primary" [title]="m.user_id">
+                            {{ memberNameFor(m) }}
                           </p>
-                          <p class="table-secondary">Team member</p>
+                          <p class="table-secondary font-mono">User …{{ shortId(m.user_id) }}</p>
                         </div>
                       </div>
                     </td>
@@ -197,6 +215,26 @@ import { EmptyStateComponent } from '../shared/ui/empty-state.component';
                     </td>
                     <td>{{ date(m.created_at) }}</td>
                     <td class="table-actions">
+                      @if (locations().length > 1) {
+                        <button
+                          appButton
+                          variant="ghost"
+                          size="sm"
+                          [disabled]="busy()"
+                          (click)="editMemberLocations(m)"
+                        >
+                          Locations
+                        </button>
+                      }
+                      <button
+                        appButton
+                        variant="ghost"
+                        size="sm"
+                        [disabled]="busy()"
+                        (click)="renameMember(m)"
+                      >
+                        Rename
+                      </button>
                       @if (m.authorization_status === 'disabled') {
                         <button
                           appButton
@@ -241,12 +279,17 @@ import { EmptyStateComponent } from '../shared/ui/empty-state.component';
             <div class="card bg-base-100">
               <div class="card-body gap-3 p-4">
                 <div class="flex items-center gap-3">
-                  <app-entity-avatar size="sm" [firstName]="m.roles?.name ?? '?'" />
+                  <app-entity-avatar
+                    size="sm"
+                    [firstName]="m.staff_profile?.display_name ?? m.roles?.name ?? '?'"
+                  />
                   <div class="min-w-0 flex-1">
-                    <p class="font-mono text-sm font-semibold" [title]="m.user_id">
-                      User …{{ shortId(m.user_id) }}
+                    <p class="text-sm font-semibold" [title]="m.user_id">
+                      {{ memberNameFor(m) }}
                     </p>
-                    <p class="type-caption mt-0.5">{{ m.roles?.name ?? 'No role' }}</p>
+                    <p class="type-caption mt-0.5">
+                      {{ m.roles?.name ?? 'No role' }} · User …{{ shortId(m.user_id) }}
+                    </p>
                   </div>
                   <app-status-badge
                     size="xs"
@@ -256,12 +299,32 @@ import { EmptyStateComponent } from '../shared/ui/empty-state.component';
                 </div>
                 <div class="flex items-center gap-2 border-t border-base-300/60 pt-3">
                   <span class="type-caption">Joined {{ date(m.created_at) }}</span>
+                  @if (locations().length > 1) {
+                    <button
+                      appButton
+                      variant="ghost"
+                      size="sm"
+                      [disabled]="busy()"
+                      (click)="editMemberLocations(m)"
+                    >
+                      Locations
+                    </button>
+                  }
+                  <button
+                    appButton
+                    variant="ghost"
+                    size="sm"
+                    class="ml-auto"
+                    [disabled]="busy()"
+                    (click)="renameMember(m)"
+                  >
+                    Rename
+                  </button>
                   @if (m.authorization_status === 'disabled') {
                     <button
                       appButton
                       variant="outline"
                       size="sm"
-                      class="ml-auto"
                       [disabled]="busy() || !canAddMember()"
                       (click)="setStatus(m, 'approved')"
                     >
@@ -272,7 +335,6 @@ import { EmptyStateComponent } from '../shared/ui/empty-state.component';
                       appButton
                       variant="outline"
                       size="sm"
-                      class="ml-auto"
                       [disabled]="busy()"
                       (click)="setStatus(m, 'disabled')"
                     >
@@ -398,6 +460,61 @@ import { EmptyStateComponent } from '../shared/ui/empty-state.component';
         confirmButtonText="Remove"
         (confirm)="confirmRemove()"
       />
+
+      @if (locationMember(); as member) {
+        <div class="modal modal-open" role="dialog" aria-modal="true" aria-label="Member locations">
+          <div class="modal-box max-w-lg">
+            <h2 class="section-title">Locations for {{ memberNameFor(member) }}</h2>
+            <p class="type-caption mt-1">
+              Choose where this person can work. One location must be primary.
+            </p>
+            <div class="mt-4 divide-y divide-base-200 rounded-box border border-base-300">
+              @for (location of locations(); track location.id) {
+                <div class="flex min-h-12 items-center gap-3 px-3">
+                  <input
+                    type="checkbox"
+                    class="checkbox checkbox-sm"
+                    [checked]="selectedLocations().has(location.id)"
+                    (change)="toggleMemberLocation(location.id)"
+                  />
+                  <span class="min-w-0 flex-1 text-sm font-medium">{{ location.name }}</span>
+                  <label class="label cursor-pointer gap-2">
+                    <input
+                      type="radio"
+                      name="primary-location"
+                      class="radio radio-sm"
+                      [checked]="primaryLocationId() === location.id"
+                      [disabled]="!selectedLocations().has(location.id)"
+                      (change)="primaryLocationId.set(location.id)"
+                    />
+                    <span class="label-text text-xs">Primary</span>
+                  </label>
+                </div>
+              }
+            </div>
+            <div class="modal-action">
+              <button appButton variant="ghost" type="button" (click)="locationMember.set(null)">
+                Cancel
+              </button>
+              <button
+                appButton
+                type="button"
+                [loading]="busy()"
+                [disabled]="selectedLocations().size === 0 || !primaryLocationId()"
+                (click)="saveMemberLocations()"
+              >
+                Save locations
+              </button>
+            </div>
+          </div>
+          <button
+            class="modal-backdrop"
+            type="button"
+            aria-label="Close"
+            (click)="locationMember.set(null)"
+          ></button>
+        </div>
+      }
     </app-page>
   `,
 })
@@ -409,6 +526,11 @@ export class TeamComponent implements OnInit {
   protected readonly permissionLabels = PERMISSION_LABELS;
   protected readonly members = signal<MembershipWithRole[]>([]);
   protected readonly roles = signal<Role[]>([]);
+  protected readonly locations = signal<TeamLocation[]>([]);
+  protected readonly membershipLocations = signal<MembershipLocation[]>([]);
+  protected readonly locationMember = signal<MembershipWithRole | null>(null);
+  protected readonly selectedLocations = signal<Set<string>>(new Set());
+  protected readonly primaryLocationId = signal<string | null>(null);
   protected readonly memberFormOpen = signal(false);
   protected readonly memberQuery = signal('');
   protected readonly memberPage = signal(1);
@@ -417,7 +539,12 @@ export class TeamComponent implements OnInit {
     const query = this.memberQuery().trim().toLowerCase();
     if (!query) return this.members();
     return this.members().filter(member =>
-      [member.user_id, member.roles?.name ?? '', member.authorization_status]
+      [
+        member.user_id,
+        member.staff_profile?.display_name ?? '',
+        member.roles?.name ?? '',
+        member.authorization_status,
+      ]
         .join(' ')
         .toLowerCase()
         .includes(query)
@@ -435,6 +562,7 @@ export class TeamComponent implements OnInit {
   private readonly deleteModal = viewChild(DeleteConfirmationModalComponent);
 
   protected readonly memberPhone = new FormControl('', { nonNullable: true });
+  protected readonly memberName = new FormControl('', { nonNullable: true });
   protected readonly memberRole = new FormControl('', { nonNullable: true });
 
   protected readonly roleFormOpen = signal(false);
@@ -476,9 +604,16 @@ export class TeamComponent implements OnInit {
   protected async load(): Promise<void> {
     this.loading.set(true);
     try {
-      const [members, roles] = await Promise.all([this.team.memberships(), this.team.roles()]);
+      const [members, roles, locations, membershipLocations] = await Promise.all([
+        this.team.memberships(),
+        this.team.roles(),
+        this.team.locations(),
+        this.team.membershipLocations(),
+      ]);
       this.members.set(members);
       this.roles.set(roles);
+      this.locations.set(locations);
+      this.membershipLocations.set(membershipLocations);
       if (!this.memberRole.value && roles.length > 0) this.memberRole.setValue(roles[0].id);
       this.error.set(null);
       await this.entitlements.refresh();
@@ -499,9 +634,15 @@ export class TeamComponent implements OnInit {
     this.error.set(null);
     this.notice.set(null);
     try {
-      await this.team.addTeamMember(phone, this.memberRole.value);
-      this.notice.set(`Added ${phone}`);
+      const displayName = this.memberName.value.trim();
+      if (!displayName) {
+        this.error.set('Enter the team member name');
+        return;
+      }
+      await this.team.addTeamMember(phone, this.memberRole.value, displayName);
+      this.notice.set(`Added ${displayName}`);
       this.memberPhone.setValue('');
+      this.memberName.setValue('');
       this.memberFormOpen.set(false);
       await this.load();
     } catch (err) {
@@ -535,8 +676,69 @@ export class TeamComponent implements OnInit {
   protected removeData() {
     const m = this.removingMember();
     return {
-      entityName: m ? `User …${this.shortId(m.user_id)} (${m.roles?.name ?? 'no role'})` : '',
+      entityName: m ? `${this.memberNameFor(m)} (${m.roles?.name ?? 'no role'})` : '',
     };
+  }
+
+  protected memberNameFor(member: MembershipWithRole): string {
+    return member.staff_profile?.display_name ?? `User …${this.shortId(member.user_id)}`;
+  }
+
+  protected async renameMember(member: MembershipWithRole): Promise<void> {
+    const next = window.prompt('Team member name', this.memberNameFor(member))?.trim();
+    if (!next || next === this.memberNameFor(member)) return;
+    this.busy.set(true);
+    this.error.set(null);
+    this.notice.set(null);
+    try {
+      await this.team.updateStaffDisplayName(member.id, next);
+      this.notice.set(`Renamed team member to ${next}`);
+      await this.load();
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Rename failed');
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected editMemberLocations(member: MembershipWithRole): void {
+    const assignments = this.membershipLocations().filter(item => item.membership_id === member.id);
+    this.locationMember.set(member);
+    this.selectedLocations.set(new Set(assignments.map(item => item.location_id)));
+    this.primaryLocationId.set(
+      assignments.find(item => item.is_primary)?.location_id ?? assignments[0]?.location_id ?? null
+    );
+  }
+
+  protected toggleMemberLocation(locationId: string): void {
+    const next = new Set(this.selectedLocations());
+    if (next.has(locationId)) {
+      next.delete(locationId);
+      if (this.primaryLocationId() === locationId) {
+        this.primaryLocationId.set([...next][0] ?? null);
+      }
+    } else {
+      next.add(locationId);
+      if (!this.primaryLocationId()) this.primaryLocationId.set(locationId);
+    }
+    this.selectedLocations.set(next);
+  }
+
+  protected async saveMemberLocations(): Promise<void> {
+    const member = this.locationMember();
+    const primary = this.primaryLocationId();
+    if (!member || !primary || this.selectedLocations().size === 0) return;
+    this.busy.set(true);
+    try {
+      await this.team.setMembershipLocations(member.id, [...this.selectedLocations()], primary);
+      this.notice.set('Member locations updated');
+      this.locationMember.set(null);
+      await this.load();
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Location update failed');
+    } finally {
+      this.busy.set(false);
+    }
   }
 
   protected async confirmRemove(): Promise<void> {

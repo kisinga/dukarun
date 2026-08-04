@@ -1,14 +1,22 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, effect, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { ActivatedRoute } from '@angular/router';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { debounceTime, distinctUntilChanged } from 'rxjs';
-import { formatKesInput, parseKesToCents } from '../core/money';
+import { formatKes, formatKesInput, parseKesToCents } from '../core/money';
 import { MoneyService } from '../money/money.service';
 import { PosService, Variant, variantLabel } from '../pos/pos.service';
 import { ButtonComponent } from '../shared/ui/button.component';
 import { FormFieldComponent } from '../shared/ui/form-field.component';
 import { PageLayoutComponent } from '../shared/ui/page-layout.component';
 import { IconComponent } from '../shared/ui/icon.component';
+import { EmptyStateComponent } from '../shared/ui/empty-state.component';
+import { PaginationComponent } from '../shared/ui/pagination.component';
+import { LocationContextService } from '../core/location-context.service';
+import {
+  StockAdjustmentsService,
+  type StockAdjustmentHistoryRow,
+} from './stock-adjustments.service';
 
 const ADJUSTMENT_REASONS = [
   'Stock count correction',
@@ -28,6 +36,8 @@ const ADJUSTMENT_REASONS = [
     ButtonComponent,
     PageLayoutComponent,
     IconComponent,
+    EmptyStateComponent,
+    PaginationComponent,
   ],
   template: `
     <app-page
@@ -255,6 +265,169 @@ const ADJUSTMENT_REASONS = [
             </form>
           }
         </section>
+
+        <section class="card bg-base-100">
+          <div class="border-b border-base-300/70 p-4 sm:p-6">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <div class="flex flex-wrap items-center gap-2">
+                  <h2 class="section-title">Adjustment history</h2>
+                  <span class="badge badge-ghost badge-sm">{{ historyTotal() }}</span>
+                </div>
+                <p class="type-caption mt-1">
+                  {{ locations.active()?.name ?? 'Working location' }} · grouped by adjustment
+                </p>
+              </div>
+              <button
+                appButton
+                variant="ghost"
+                size="sm"
+                type="button"
+                [iconOnly]="true"
+                [loading]="historyLoading()"
+                title="Refresh adjustment history"
+                aria-label="Refresh adjustment history"
+                (click)="loadHistory()"
+              >
+                <app-icon name="heroArrowPath" />
+              </button>
+            </div>
+
+            <div class="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
+              <input
+                type="search"
+                class="input input-bordered input-sm min-h-10 w-full sm:max-w-md"
+                placeholder="Search product, SKU, or reason"
+                [formControl]="historySearch"
+              />
+              @if (historyVariantId()) {
+                <button
+                  appButton
+                  variant="outline"
+                  size="sm"
+                  type="button"
+                  (click)="showAllHistory()"
+                >
+                  {{ selected() ? 'Showing this product' : 'Product filter' }} · Show all
+                </button>
+              }
+            </div>
+          </div>
+
+          <div class="p-4 sm:p-6">
+            @if (historyError()) {
+              <div role="alert" class="alert alert-error mb-3 text-sm">
+                <app-icon name="heroExclamationTriangle" />
+                <span>{{ historyError() }}</span>
+              </div>
+            }
+
+            @if (historyLoading() && historyRows().length === 0) {
+              <div
+                class="flex min-h-32 items-center justify-center gap-2 text-sm text-base-content/60"
+              >
+                <span class="loading loading-spinner loading-sm"></span> Loading adjustments
+              </div>
+            } @else if (historyRows().length === 0) {
+              <app-empty-state
+                [embedded]="true"
+                [compact]="true"
+                icon="heroArchiveBox"
+                title="No stock adjustments yet"
+                description="Completed count corrections for this location will appear here."
+              />
+            } @else {
+              <div class="space-y-2 lg:hidden">
+                @for (row of historyRows(); track row.adjustment_id) {
+                  <article class="rounded-box border border-base-300 p-3">
+                    <div class="flex items-start justify-between gap-3">
+                      <div class="min-w-0">
+                        <p class="truncate text-sm font-semibold">{{ historyProduct(row) }}</p>
+                        <p class="type-caption mt-0.5">{{ time(row.adjusted_at) }}</p>
+                      </div>
+                      <span
+                        class="font-bold tabular-nums"
+                        [class.text-success]="row.quantity_change > 0"
+                        [class.text-error]="row.quantity_change < 0"
+                        >{{ formatDifference(row.quantity_change) }}</span
+                      >
+                    </div>
+                    <p class="mt-2 text-sm">{{ row.reason }}</p>
+                    <div class="mt-2 flex flex-wrap gap-x-3 gap-y-1 type-caption">
+                      @if (row.quantity_before !== null && row.quantity_after !== null) {
+                        <span
+                          >{{ formatQuantity(row.quantity_before) }} →
+                          {{ formatQuantity(row.quantity_after) }}</span
+                        >
+                      }
+                      <span>{{ row.actor_name }}</span>
+                      <span>{{ signedValue(row) }}</span>
+                    </div>
+                  </article>
+                }
+              </div>
+
+              <div class="hidden overflow-x-auto lg:block">
+                <table class="table table-sm">
+                  <thead>
+                    <tr>
+                      <th>When</th>
+                      <th>Product</th>
+                      <th class="text-right">Change</th>
+                      <th class="text-right">Count</th>
+                      <th>Reason</th>
+                      <th>By</th>
+                      <th class="text-right">Stock value</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (row of historyRows(); track row.adjustment_id) {
+                      <tr>
+                        <td class="whitespace-nowrap text-xs">{{ time(row.adjusted_at) }}</td>
+                        <td>
+                          <p class="font-medium">{{ historyProduct(row) }}</p>
+                          <p class="type-caption font-mono">{{ row.sku }}</p>
+                        </td>
+                        <td
+                          class="text-right font-bold tabular-nums"
+                          [class.text-success]="row.quantity_change > 0"
+                          [class.text-error]="row.quantity_change < 0"
+                        >
+                          {{ formatDifference(row.quantity_change) }}
+                        </td>
+                        <td class="whitespace-nowrap text-right tabular-nums">
+                          @if (row.quantity_before !== null && row.quantity_after !== null) {
+                            {{ formatQuantity(row.quantity_before) }} →
+                            {{ formatQuantity(row.quantity_after) }}
+                          } @else {
+                            —
+                          }
+                        </td>
+                        <td class="max-w-72">
+                          <span class="line-clamp-2">{{ row.reason }}</span>
+                        </td>
+                        <td>{{ row.actor_name }}</td>
+                        <td class="whitespace-nowrap text-right tabular-nums">
+                          {{ signedValue(row) }}
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+
+              <app-pagination
+                class="mt-4 block"
+                [currentPage]="historyPage()"
+                [totalPages]="historyTotalPages()"
+                [totalItems]="historyTotal()"
+                [itemsPerPage]="historyPageSize"
+                itemLabel="adjustments"
+                (pageChange)="changeHistoryPage($event)"
+              />
+            }
+          </div>
+        </section>
       </div>
     </app-page>
   `,
@@ -262,7 +435,11 @@ const ADJUSTMENT_REASONS = [
 export class StockAdjustmentsComponent implements OnInit {
   private readonly money = inject(MoneyService);
   private readonly pos = inject(PosService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly history = inject(StockAdjustmentsService);
+  protected readonly locations = inject(LocationContextService);
   private searchRequest = 0;
+  private initialized = false;
 
   protected readonly reasons = ADJUSTMENT_REASONS;
   protected readonly search = new FormControl('', { nonNullable: true });
@@ -270,6 +447,7 @@ export class StockAdjustmentsComponent implements OnInit {
   protected readonly unitCost = new FormControl('', { nonNullable: true });
   protected readonly reason = new FormControl('', { nonNullable: true });
   protected readonly notes = new FormControl('', { nonNullable: true });
+  protected readonly historySearch = new FormControl('', { nonNullable: true });
 
   protected readonly results = signal<Variant[]>([]);
   protected readonly selected = signal<Variant | null>(null);
@@ -279,16 +457,64 @@ export class StockAdjustmentsComponent implements OnInit {
   protected readonly busy = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
+  protected readonly historyRows = signal<StockAdjustmentHistoryRow[]>([]);
+  protected readonly historyTotal = signal(0);
+  protected readonly historyPage = signal(1);
+  protected readonly historyVariantId = signal<string | null>(null);
+  protected readonly historyLoading = signal(false);
+  protected readonly historyError = signal<string | null>(null);
+  protected readonly historyPageSize = 20;
+  protected readonly historyTotalPages = computed(() =>
+    Math.max(1, Math.ceil(this.historyTotal() / this.historyPageSize))
+  );
   protected readonly label = variantLabel;
 
   constructor() {
+    effect(() => {
+      this.locations.activeId();
+      if (this.initialized) void this.reloadForLocation();
+    });
     this.search.valueChanges
       .pipe(debounceTime(200), distinctUntilChanged(), takeUntilDestroyed())
       .subscribe(query => void this.onSearch(query));
+    this.historySearch.valueChanges
+      .pipe(debounceTime(250), distinctUntilChanged(), takeUntilDestroyed())
+      .subscribe(() => {
+        this.historyPage.set(1);
+        void this.loadHistory();
+      });
   }
 
-  ngOnInit(): void {
-    // Search drives the product picker; no catalog preload is needed.
+  async ngOnInit(): Promise<void> {
+    this.initialized = true;
+    const variantId = this.route.snapshot.queryParamMap.get('variant');
+    if (variantId) {
+      try {
+        const variant = await this.pos.variantById(variantId);
+        if (variant?.track_inventory && variant.kind !== 'service') {
+          await this.pick(variant);
+          return;
+        }
+        this.error.set('This product does not have tracked stock to adjust.');
+      } catch (err) {
+        this.error.set(err instanceof Error ? err.message : 'Could not load that product.');
+      }
+    }
+    await this.loadHistory();
+  }
+
+  private async reloadForLocation(): Promise<void> {
+    const variantId = this.selected()?.variant_id;
+    if (!variantId) {
+      await this.loadHistory();
+      return;
+    }
+    try {
+      const variant = await this.pos.variantById(variantId);
+      if (variant) await this.pick(variant);
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Could not refresh location stock.');
+    }
   }
 
   protected async onSearch(query: string): Promise<void> {
@@ -331,6 +557,7 @@ export class StockAdjustmentsComponent implements OnInit {
     this.unitCost.setValue('');
     this.error.set(null);
     this.notice.set(null);
+    this.historyVariantId.set(variant.variant_id);
 
     if (!variant.variant_id) return;
     try {
@@ -342,6 +569,8 @@ export class StockAdjustmentsComponent implements OnInit {
     } catch {
       // A cost can still be entered manually if stock is increased.
     }
+    this.historyPage.set(1);
+    void this.loadHistory();
   }
 
   protected changeProduct(): void {
@@ -353,6 +582,9 @@ export class StockAdjustmentsComponent implements OnInit {
     this.notes.setValue('');
     this.error.set(null);
     this.notice.set(null);
+    this.historyVariantId.set(null);
+    this.historyPage.set(1);
+    void this.loadHistory();
   }
 
   protected validNewQuantity(): number | null {
@@ -432,6 +664,7 @@ export class StockAdjustmentsComponent implements OnInit {
       this.notice.set(
         `${this.label(variant)} updated: ${this.formatQuantity(previous)} → ${this.formatQuantity(next)}.`
       );
+      await this.loadHistory();
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Stock adjustment failed';
       if (message.startsWith('stock_changed:')) {
@@ -453,5 +686,57 @@ export class StockAdjustmentsComponent implements OnInit {
     } finally {
       this.busy.set(false);
     }
+  }
+
+  protected async loadHistory(): Promise<void> {
+    this.historyLoading.set(true);
+    this.historyError.set(null);
+    try {
+      const result = await this.history.history({
+        variantId: this.historyVariantId(),
+        search: this.historySearch.value,
+        page: this.historyPage(),
+        pageSize: this.historyPageSize,
+      });
+      this.historyRows.set(result.rows);
+      this.historyTotal.set(result.total);
+    } catch (err) {
+      this.historyError.set(err instanceof Error ? err.message : 'Adjustment history failed');
+    } finally {
+      this.historyLoading.set(false);
+    }
+  }
+
+  protected showAllHistory(): void {
+    this.historyVariantId.set(null);
+    this.historyPage.set(1);
+    void this.loadHistory();
+  }
+
+  protected changeHistoryPage(page: number): void {
+    this.historyPage.set(page);
+    void this.loadHistory();
+  }
+
+  protected historyProduct(row: StockAdjustmentHistoryRow): string {
+    return row.variant_name && row.variant_name !== 'Default'
+      ? `${row.product_name} · ${row.variant_name}`
+      : row.product_name;
+  }
+
+  protected time(value: string): string {
+    return new Date(value).toLocaleString('en-KE', {
+      timeZone: 'Africa/Nairobi',
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  }
+
+  protected signedValue(row: StockAdjustmentHistoryRow): string {
+    const prefix = row.quantity_change < 0 ? '−' : '+';
+    return `${prefix}${formatKes(row.stock_value)}`;
   }
 }

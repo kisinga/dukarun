@@ -5,6 +5,8 @@ import { rpcError } from '../pos/pos.service';
 
 export type PaymentMethodRow = Database['public']['Tables']['payment_methods']['Row'];
 export type StockLocationRow = Database['public']['Tables']['stock_locations']['Row'];
+export type LocationPaymentMethodRow =
+  Database['public']['Tables']['location_payment_methods']['Row'];
 
 /**
  * Company settings. The companies table has a COLUMN-LIMITED update grant:
@@ -27,6 +29,7 @@ export interface CompanySettings {
   cash_control_enabled: boolean;
   require_opening_count: boolean;
   variance_notification_threshold: number;
+  commissions_enabled: boolean;
 }
 
 const SELECT_COLUMNS = [
@@ -45,6 +48,7 @@ const SELECT_COLUMNS = [
   'cash_control_enabled',
   'require_opening_count',
   'variance_notification_threshold',
+  'commissions_enabled',
 ].join(', ');
 
 @Injectable({ providedIn: 'root' })
@@ -74,10 +78,34 @@ export class SettingsService {
   async paymentMethods(): Promise<PaymentMethodRow[]> {
     const { data, error } = await this.db
       .from('payment_methods')
-      .select('code, name, enabled, requires_reconciliation, is_cashier_controlled')
+      .select(
+        'id, code, name, enabled, requires_reconciliation, is_cashier_controlled, availability_scope'
+      )
       .order('code');
     if (error) throw error;
     return data as PaymentMethodRow[];
+  }
+
+  async paymentMethodLocations(): Promise<LocationPaymentMethodRow[]> {
+    const { data, error } = await this.db
+      .from('location_payment_methods')
+      .select('*')
+      .eq('enabled', true);
+    if (error) throw error;
+    return data;
+  }
+
+  async setPaymentMethodLocations(
+    code: string,
+    locationIds: string[],
+    allLocations: boolean
+  ): Promise<void> {
+    const { error } = await this.db.rpc('set_payment_method_locations', {
+      p_code: code,
+      p_location_ids: locationIds,
+      p_all_locations: allLocations,
+    });
+    if (error) throw rpcError(error);
   }
 
   async updatePaymentMethod(
@@ -92,6 +120,12 @@ export class SettingsService {
         : {}),
     });
     if (error) throw rpcError(error);
+  }
+
+  async setCommissionsEnabled(enabled: boolean): Promise<boolean> {
+    const { data, error } = await this.db.rpc('set_commissions_enabled', { p_enabled: enabled });
+    if (error) throw rpcError(error);
+    return data;
   }
 
   async stockLocations(): Promise<StockLocationRow[]> {

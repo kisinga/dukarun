@@ -29,14 +29,14 @@ from history_company;
 insert into public.inventory_batches(
   company_id, variant_id, stock_location_id, quantity, remaining, unit_cost, purchased_at
 )
-select company_id, 'aa000000-0000-0000-0000-000000000055', l.id, 5, 5, 300, date '2026-01-01'
+select c.company_id, 'aa000000-0000-0000-0000-000000000055', l.id, 5, 5, 300, date '2026-01-01'
 from history_company c
 join public.stock_locations l on l.company_id = c.company_id and l.is_default;
 
 insert into public.inventory_batches(
   company_id, variant_id, stock_location_id, quantity, remaining, unit_cost, purchased_at
 )
-select company_id, 'aa000000-0000-0000-0000-000000000055', l.id, 5, 5, 350, date '2026-02-01'
+select c.company_id, 'aa000000-0000-0000-0000-000000000055', l.id, 5, 5, 350, date '2026-02-01'
 from history_company c
 join public.stock_locations l on l.company_id = c.company_id and l.is_default;
 

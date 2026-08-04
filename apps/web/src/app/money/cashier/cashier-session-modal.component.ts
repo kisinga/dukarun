@@ -9,6 +9,7 @@ import { ButtonComponent } from '../../shared/ui/button.component';
 import { FormFieldComponent } from '../../shared/ui/form-field.component';
 import { IconComponent } from '../../shared/ui/icon.component';
 import { MoneyComponent } from '../../shared/ui/money.component';
+import { CompanyPreferencesService } from '../../core/company-preferences.service';
 import {
   CashierAccount,
   CashierSession,
@@ -37,7 +38,9 @@ import {
                 {{
                   reviewing()
                     ? 'Review the count before confirming.'
-                    : 'Count each controlled account.'
+                    : !openSession() && !preferences.requireOpeningCount()
+                      ? 'No opening count is required.'
+                      : 'Count each controlled account.'
                 }}
               </p>
             </div>
@@ -72,6 +75,17 @@ import {
                 <div role="alert" class="alert alert-warning text-sm">
                   <app-icon name="heroExclamationTriangle" />
                   <span>No enabled cashier-controlled payment accounts are configured.</span>
+                </div>
+              } @else if (!openSession() && !preferences.requireOpeningCount()) {
+                <div class="flex items-start gap-3 rounded-field bg-info/10 p-4 text-info-content">
+                  <app-icon name="heroInformationCircle" class="mt-0.5" />
+                  <div>
+                    <p class="text-sm font-semibold">Open without counting</p>
+                    <p class="type-caption mt-1">
+                      Opening count is disabled in Settings. Current account balances will be used
+                      without creating a variance.
+                    </p>
+                  </div>
                 </div>
               } @else if (reviewing(); as action) {
                 <div class="flex items-start gap-3 rounded-field bg-base-200/70 p-3">
@@ -175,6 +189,11 @@ import {
           <footer class="flex flex-wrap justify-end gap-2 border-t border-base-300 p-4">
             @if (loading()) {
               <button appButton variant="ghost" type="button" (click)="close()">Cancel</button>
+            } @else if (!openSession() && !preferences.requireOpeningCount()) {
+              <button appButton variant="ghost" type="button" (click)="close()">Cancel</button>
+              <button appButton type="button" [loading]="busy()" (click)="confirm('open')">
+                <app-icon name="heroLockOpen" /> Open till
+              </button>
             } @else if (reviewing(); as action) {
               <button appButton variant="ghost" type="button" (click)="reviewing.set(null)">
                 Back to count
@@ -246,6 +265,7 @@ import {
 export class CashierSessionModalComponent {
   protected readonly dialog = inject(CashierSessionDialogService);
   private readonly sessionState = inject(CashierSessionService);
+  protected readonly preferences = inject(CompanyPreferencesService);
   private readonly money = inject(MoneyService);
   private readonly receiptData = inject(ReceiptDataService);
   private readonly print = inject(PrintService);
@@ -314,7 +334,8 @@ export class CashierSessionModalComponent {
   }
 
   protected async confirm(action: 'open' | 'close'): Promise<void> {
-    const declarations = this.declarations();
+    const declarations =
+      action === 'open' && !this.preferences.requireOpeningCount() ? [] : this.declarations();
     if (!declarations) return;
 
     const session = this.openSession();

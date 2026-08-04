@@ -1,17 +1,24 @@
-import { Injectable, computed, signal } from '@angular/core';
+import { Injectable, computed, inject, signal } from '@angular/core';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { Database } from '@dukarun/shared-types';
 import { SupabaseService, type AppIdentity } from './supabase.service';
 import { offlineDb, offlineScopeKey } from '../pos/offline/offline-db';
+import { LocationContextService } from './location-context.service';
+import { CompanyPreferencesService } from './company-preferences.service';
 
 type CashierSession = Database['public']['Tables']['cashier_sessions']['Row'];
 
 /** One source of truth for the company till across the authenticated app. */
 @Injectable({ providedIn: 'root' })
 export class CashierSessionService {
+  private readonly preferences = inject(CompanyPreferencesService);
   readonly session = signal<CashierSession | null>(null);
   readonly loading = signal(false);
   readonly isOpen = computed(() => this.session() !== null);
+  readonly cashierFlowEnabled = this.preferences.cashierFlowEnabled;
+  readonly cashControlEnabled = this.preferences.cashControlEnabled;
+  readonly configurationLoaded = this.preferences.loaded;
+  readonly canTakePayment = computed(() => !this.cashControlEnabled() || this.isOpen());
   readonly usingCachedState = signal(false);
   readonly lastConfirmedAt = signal<string | null>(null);
 
@@ -21,11 +28,15 @@ export class CashierSessionService {
   private channel: RealtimeChannel | null = null;
   private pollTimer: ReturnType<typeof setInterval> | null = null;
 
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(
+    private readonly supabase: SupabaseService,
+    private readonly locations: LocationContextService
+  ) {}
 
   async start(): Promise<void> {
     const identity = await this.activateScope();
     if (!identity) return;
+    await this.refreshConfiguration();
     if (this.started) {
       try {
         await this.refresh();
@@ -43,7 +54,7 @@ export class CashierSessionService {
 
     try {
       this.channel = this.supabase.client
-        .channel(`cashier-session:${identity.companyId}`)
+        .channel(`cashier-session:${identity.companyId}:${this.locations.activeId()}`)
         .on(
           'postgres_changes',
           {
@@ -63,12 +74,18 @@ export class CashierSessionService {
     this.pollTimer = setInterval(() => void this.refresh().catch(() => undefined), 30_000);
   }
 
+  async refreshConfiguration(): Promise<void> {
+    await this.preferences.refresh();
+  }
+
   async refresh(): Promise<void> {
     const identity = await this.activateScope();
     if (!identity) throw new Error('Sign in again to confirm the cashier session.');
+    if (!this.configurationLoaded()) await this.refreshConfiguration();
     if (this.refreshPromise) return this.refreshPromise;
     this.loading.set(true);
-    const key = offlineScopeKey(identity);
+    const locationId = this.locations.requireActiveId();
+    const key = offlineScopeKey(identity, locationId);
     this.refreshPromise = this.load(identity, key)
       .catch(async error => {
         if (this.session() && this.cachedSessionIsCurrent()) {
@@ -91,6 +108,7 @@ export class CashierSessionService {
 
   /** Re-check immediately before a governed action, then fail with useful copy. */
   async assertOpen(action: string): Promise<void> {
+    if (!this.cashControlEnabled()) return;
     try {
       await this.refresh();
     } catch {
@@ -114,6 +132,7 @@ export class CashierSessionService {
       .from('cashier_sessions')
       .select('*')
       .eq('status', 'open')
+      .eq('location_id', this.locations.requireActiveId())
       .maybeSingle();
     if (error) throw error;
     if (this.activeScope !== key) return;
@@ -127,6 +146,7 @@ export class CashierSessionService {
         key,
         company_id: identity.companyId,
         user_id: identity.userId,
+        location_id: this.locations.requireActiveId(),
         session: data,
         confirmed_at: confirmedAt,
       });
@@ -138,7 +158,8 @@ export class CashierSessionService {
 
   private async activateScope(): Promise<AppIdentity | null> {
     const identity = this.supabase.offlineIdentity();
-    const key = identity ? offlineScopeKey(identity) : null;
+    const locationId = this.locations.activeId();
+    const key = identity && locationId ? offlineScopeKey(identity, locationId) : null;
     if (this.activeScope === key) return identity;
     if (this.refreshPromise) {
       try {
@@ -159,7 +180,7 @@ export class CashierSessionService {
     this.usingCachedState.set(false);
     this.lastConfirmedAt.set(null);
 
-    if (!identity || !key) return null;
+    if (!identity || !locationId || !key) return null;
     try {
       const db = await offlineDb();
       const snapshot = await db.get('cashier', key);
@@ -167,6 +188,7 @@ export class CashierSessionService {
         snapshot &&
         snapshot.session.status === 'open' &&
         snapshot.session.company_id === identity.companyId &&
+        snapshot.location_id === locationId &&
         this.nairobiDay(snapshot.confirmed_at) === this.nairobiDay(new Date().toISOString())
       ) {
         this.session.set(snapshot.session);

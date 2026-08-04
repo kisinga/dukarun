@@ -18,6 +18,8 @@ export const ALL_PERMISSIONS = [
   'CreateInterAccountTransfer',
   'ManageTeam',
   'ViewAuditTrail',
+  'ViewStaffPerformance',
+  'ManageCommissions',
 ] as const;
 
 export type Permission = (typeof ALL_PERMISSIONS)[number];
@@ -38,6 +40,8 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   CreateInterAccountTransfer: 'Transfer between accounts',
   ManageTeam: 'Manage team',
   ViewAuditTrail: 'View audit trail',
+  ViewStaffPerformance: 'View staff performance',
+  ManageCommissions: 'Manage commissions',
 };
 
 /**

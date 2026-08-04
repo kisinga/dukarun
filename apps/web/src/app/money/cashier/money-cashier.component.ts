@@ -1,6 +1,7 @@
 import { Component, OnInit, effect, inject, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { CashierSessionDialogService } from '../../core/cashier-session-dialog.service';
+import { CashierSessionService } from '../../core/cashier-session.service';
 import { PermissionsService } from '../../core/permissions.service';
 import { ButtonComponent } from '../../shared/ui/button.component';
 import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
@@ -57,6 +58,14 @@ import {
         <span>{{ notice() }}</span>
       </div>
     }
+    @if (cashierSession.configurationLoaded() && !cashierSession.cashControlEnabled()) {
+      <div role="status" class="alert alert-info mb-3 text-sm">
+        <app-icon name="heroInformationCircle" />
+        <span
+          >Cash control is off. Payments do not require an opening or closing till session.</span
+        >
+      </div>
+    }
 
     <div class="card mb-4 bg-base-100">
       <div class="flex flex-wrap items-center gap-3 p-4">
@@ -89,17 +98,19 @@ import {
             }
           </p>
         </div>
-        <button
-          appButton
-          class="ml-auto"
-          [variant]="openSession() ? 'outline' : 'primary'"
-          type="button"
-          [disabled]="accounts().length === 0"
-          (click)="cashierDialog.show()"
-        >
-          <app-icon [name]="openSession() ? 'heroLockClosed' : 'heroLockOpen'" />
-          {{ openSession() ? 'Close session' : 'Open session' }}
-        </button>
+        @if (cashierSession.cashControlEnabled() || openSession()) {
+          <button
+            appButton
+            class="ml-auto"
+            [variant]="openSession() ? 'outline' : 'primary'"
+            type="button"
+            [disabled]="accounts().length === 0"
+            (click)="cashierDialog.show()"
+          >
+            <app-icon [name]="openSession() ? 'heroLockClosed' : 'heroLockOpen'" />
+            {{ openSession() ? 'Close session' : 'Open session' }}
+          </button>
+        }
       </div>
     </div>
 
@@ -245,6 +256,7 @@ import {
 })
 export class MoneyCashierComponent implements OnInit {
   private readonly money = inject(MoneyService);
+  protected readonly cashierSession = inject(CashierSessionService);
   protected readonly perms = inject(PermissionsService);
   protected readonly cashierDialog = inject(CashierSessionDialogService);
 

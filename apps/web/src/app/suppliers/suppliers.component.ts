@@ -20,6 +20,7 @@ import { PaginationComponent } from '../shared/ui/pagination.component';
 import { StatBarComponent } from '../shared/ui/stat-bar.component';
 import { StatusBadgeComponent, type BadgeType } from '../shared/ui/status-badge.component';
 import { DataTableShellComponent } from '../shared/ui/data-table-shell.component';
+import { CompanyPreferencesService } from '../core/company-preferences.service';
 import {
   AgingInfo,
   LedgerAccount,
@@ -817,14 +818,16 @@ interface ParsedPurchaseLine {
                         <div
                           class="grid gap-2 md:col-span-2 md:grid-cols-2 lg:col-span-12 lg:grid-cols-4"
                         >
-                          <app-form-field label="Expiry (optional)">
-                            <input
-                              type="date"
-                              class="input input-bordered input-sm w-full"
-                              [(ngModel)]="line.expiryDate"
-                              [ngModelOptions]="{ standalone: true }"
-                            />
-                          </app-form-field>
+                          @if (preferences.batchExpiryEnabled()) {
+                            <app-form-field label="Expiry (optional)">
+                              <input
+                                type="date"
+                                class="input input-bordered input-sm w-full"
+                                [(ngModel)]="line.expiryDate"
+                                [ngModelOptions]="{ standalone: true }"
+                              />
+                            </app-form-field>
+                          }
                           <app-form-field label="Batch (optional)">
                             <input
                               class="input input-bordered input-sm w-full"
@@ -1334,6 +1337,7 @@ export class SuppliersComponent implements OnInit, OnDestroy {
   private readonly print = inject(PrintService);
   protected readonly perms = inject(PermissionsService);
   protected readonly cashierSession = inject(CashierSessionService);
+  protected readonly preferences = inject(CompanyPreferencesService);
   protected readonly isPurchasePage = signal(this.route.snapshot.data['purchasePage'] === true);
 
   protected readonly fmt = formatKes;
@@ -1481,7 +1485,11 @@ export class SuppliersComponent implements OnInit, OnDestroy {
   private loadQueued = false;
 
   async ngOnInit(): Promise<void> {
-    this.printerEnabled.set(await this.receiptData.printerEnabled());
+    const [, printerEnabled] = await Promise.all([
+      this.preferences.refresh(),
+      this.receiptData.printerEnabled(),
+    ]);
+    this.printerEnabled.set(printerEnabled);
     await this.load();
     const companyId = this.supabase.claims()?.company_id;
     if (companyId) this.connectLiveUpdates(companyId);
@@ -2019,7 +2027,9 @@ export class SuppliersComponent implements OnInit, OnDestroy {
         variant_id: line.variantId,
         quantity: line.quantity,
         unit_cost: unitCost,
-        ...(line.expiryDate ? { expiry_date: line.expiryDate } : {}),
+        ...(this.preferences.batchExpiryEnabled() && line.expiryDate
+          ? { expiry_date: line.expiryDate }
+          : {}),
         ...(line.batchNumber.trim() ? { batch_number: line.batchNumber.trim() } : {}),
         ...(wholesaleChanged ? { new_wholesale_price: wholesalePrice } : {}),
         ...(retailChanged ? { new_retail_price: retailPrice } : {}),

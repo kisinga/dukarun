@@ -174,7 +174,7 @@ begin
       coalesce(sum(m.total_cost), 0)::bigint as stock_value,
       coalesce(
         max(nullif(m.meta ->> 'reason', '')),
-        regexp_replace(max(e.description), '^Stock adjustment · ', '')
+        regexp_replace(max(e.memo), '^Stock adjustment · ', '')
       )::text as reason,
       max(m.actor::text)::uuid as actor_id,
       coalesce(
@@ -198,7 +198,7 @@ begin
       and (p_variant_id is null or m.variant_id = p_variant_id)
       and (
         nullif(trim(coalesce(p_search, '')), '') is null
-        or concat_ws(' ', p.name, v.name, v.sku, m.meta ->> 'reason', e.description)
+        or concat_ws(' ', p.name, v.name, v.sku, m.meta ->> 'reason', e.memo)
           ilike '%' || trim(p_search) || '%'
       )
     group by m.source_id, m.variant_id, p.name, v.name, v.sku,

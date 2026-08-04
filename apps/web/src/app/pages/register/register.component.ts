@@ -11,11 +11,13 @@ import { SupabaseService } from '../../core/supabase.service';
       <div class="card w-full max-w-sm bg-base-100">
         <div class="card-body">
           <h1 class="type-title">Set up your business</h1>
-          <p class="text-sm text-base-content/70">Create your company and first store</p>
+          <p class="text-sm text-base-content/70">
+            Your main business location is created automatically.
+          </p>
 
           <form (submit)="$event.preventDefault(); provision()" class="mt-4 flex flex-col gap-4">
             <label class="form-control">
-              <span class="label-text mb-1">Company name</span>
+              <span class="label-text mb-1">Business name</span>
               <input
                 type="text"
                 class="input input-bordered w-full"
@@ -24,18 +26,20 @@ import { SupabaseService } from '../../core/supabase.service';
               />
             </label>
             <label class="form-control">
-              <span class="label-text mb-1">Store name</span>
+              <span class="label-text mb-1"
+                >Location name <span class="text-base-content/45">(optional)</span></span
+              >
               <input
                 type="text"
                 class="input input-bordered w-full"
-                placeholder="Main Street Kiosk"
+                placeholder="Main location"
                 [formControl]="storeName"
               />
             </label>
             <button
               type="submit"
               class="btn btn-primary"
-              [disabled]="saving() || companyName.invalid || storeName.invalid"
+              [disabled]="saving() || companyName.invalid"
             >
               {{ saving() ? 'Creating…' : 'Create company' }}
             </button>
@@ -62,7 +66,6 @@ export class RegisterComponent implements OnInit {
   });
   protected readonly storeName = new FormControl('', {
     nonNullable: true,
-    validators: [Validators.required],
   });
 
   /** Already-provisioned users have no business here — send them to the dashboard. */
@@ -76,13 +79,13 @@ export class RegisterComponent implements OnInit {
   }
 
   protected async provision(): Promise<void> {
-    if (this.companyName.invalid || this.storeName.invalid) return;
+    if (this.companyName.invalid) return;
     this.saving.set(true);
     this.error.set(null);
     try {
       const { error } = await this.supabase.client.rpc('provision_company', {
         p_company_name: this.companyName.value.trim(),
-        p_store_name: this.storeName.value.trim(),
+        p_store_name: this.storeName.value.trim() || 'Main location',
       });
       // Already provisioned is fine — just refresh claims and continue.
       if (error && !error.message.includes('already_provisioned')) throw error;

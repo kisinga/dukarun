@@ -11,6 +11,8 @@ import { IconComponent } from '../shared/ui/icon.component';
 import { CashierSessionDialogService } from '../core/cashier-session-dialog.service';
 import { CashierSessionModalComponent } from '../money/cashier/cashier-session-modal.component';
 import { OrderQueueCountsService } from '../pos/order-queue-counts.service';
+import { EntitlementsService } from '../core/entitlements.service';
+import { LocationContextService } from '../core/location-context.service';
 
 interface NavItem {
   route: string;
@@ -56,6 +58,22 @@ interface NavSection {
 
           <!-- Page titles live in the pages; the navbar stays out of the way. -->
           <div class="flex-1"></div>
+
+          @if (locations.isMultiLocation()) {
+            <label class="mr-2 hidden items-center gap-2 sm:flex">
+              <span class="text-xs font-medium text-base-content/55">Working location</span>
+              <select
+                class="select select-bordered select-sm max-w-52"
+                [value]="locations.activeId()"
+                aria-label="Working location"
+                (change)="changeLocation($event)"
+              >
+                @for (location of locations.locations(); track location.id) {
+                  <option [value]="location.id">{{ location.name }}</option>
+                }
+              </select>
+            </label>
+          }
 
           <div class="flex flex-none items-center gap-1.5">
             @if (pendingSyncCount() > 0 || sync.syncing()) {
@@ -105,39 +123,41 @@ interface NavSection {
             </a>
 
             <!-- Global one-click till action -->
-            <button
-              type="button"
-              class="btn btn-sm min-h-11 gap-2 px-3"
-              [class.btn-primary]="!cashierSession.loading() && !cashierSession.isOpen()"
-              [class.btn-success]="!cashierSession.loading() && cashierSession.isOpen()"
-              [class.btn-outline]="cashierSession.isOpen()"
-              [class.btn-ghost]="cashierSession.loading()"
-              [title]="
-                cashierSession.isOpen() ? 'Count and close the till' : 'Count and open the till'
-              "
-              [attr.aria-label]="
-                cashierSession.isOpen() ? 'Open till closing dialog' : 'Open till opening dialog'
-              "
-              (click)="cashierDialog.show()"
-            >
-              <app-icon
-                [name]="
-                  cashierSession.loading()
-                    ? 'heroArrowPath'
-                    : cashierSession.isOpen()
-                      ? 'heroLockClosed'
-                      : 'heroLockOpen'
+            @if (cashierSession.cashControlEnabled() || cashierSession.isOpen()) {
+              <button
+                type="button"
+                class="btn btn-sm min-h-11 gap-2 px-3"
+                [class.btn-primary]="!cashierSession.loading() && !cashierSession.isOpen()"
+                [class.btn-success]="!cashierSession.loading() && cashierSession.isOpen()"
+                [class.btn-outline]="cashierSession.isOpen()"
+                [class.btn-ghost]="cashierSession.loading()"
+                [title]="
+                  cashierSession.isOpen() ? 'Count and close the till' : 'Count and open the till'
                 "
-                [class.animate-spin]="cashierSession.loading()"
-              />
-              <span class="hidden sm:inline">
-                @if (cashierSession.loading()) {
-                  Checking till
-                } @else {
-                  {{ cashierSession.isOpen() ? 'Close till' : 'Open till' }}
-                }
-              </span>
-            </button>
+                [attr.aria-label]="
+                  cashierSession.isOpen() ? 'Open till closing dialog' : 'Open till opening dialog'
+                "
+                (click)="cashierDialog.show()"
+              >
+                <app-icon
+                  [name]="
+                    cashierSession.loading()
+                      ? 'heroArrowPath'
+                      : cashierSession.isOpen()
+                        ? 'heroLockClosed'
+                        : 'heroLockOpen'
+                  "
+                  [class.animate-spin]="cashierSession.loading()"
+                />
+                <span class="hidden sm:inline">
+                  @if (cashierSession.loading()) {
+                    Checking till
+                  } @else {
+                    {{ cashierSession.isOpen() ? 'Close till' : 'Open till' }}
+                  }
+                </span>
+              </button>
+            }
 
             <button
               class="btn btn-ghost btn-sm min-h-11 min-w-11"
@@ -187,15 +207,17 @@ interface NavSection {
               /></span>
               <span class="bottom-nav-label">Sales</span>
             </a>
-            <button
-              type="button"
-              class="bottom-nav-item"
-              [class.bottom-nav-active]="cashierDialog.visible()"
-              (click)="cashierDialog.show()"
-            >
-              <span class="bottom-nav-ico"><app-icon name="heroBanknotes" size="lg" /></span>
-              <span class="bottom-nav-label">Till</span>
-            </button>
+            @if (cashierSession.cashControlEnabled() || cashierSession.isOpen()) {
+              <button
+                type="button"
+                class="bottom-nav-item"
+                [class.bottom-nav-active]="cashierDialog.visible()"
+                (click)="cashierDialog.show()"
+              >
+                <span class="bottom-nav-ico"><app-icon name="heroBanknotes" size="lg" /></span>
+                <span class="bottom-nav-label">Till</span>
+              </button>
+            }
             <label for="app-drawer" class="bottom-nav-item cursor-pointer">
               <span class="bottom-nav-ico"><app-icon name="heroBars3" size="lg" /></span>
               <span class="bottom-nav-label">More</span>
@@ -319,6 +341,8 @@ export class ShellComponent implements OnInit {
   protected readonly cashierDialog = inject(CashierSessionDialogService);
   protected readonly sync = inject(SyncService);
   protected readonly orderQueueCounts = inject(OrderQueueCountsService);
+  protected readonly entitlements = inject(EntitlementsService);
+  protected readonly locations = inject(LocationContextService);
 
   protected readonly company = signal<Company | null>(null);
   protected readonly pendingSyncCount = computed(
@@ -339,6 +363,8 @@ export class ShellComponent implements OnInit {
           label: 'Cashier Queue',
           icon: 'heroQueueList',
           badge: () => this.orderQueueCounts.cashierQueue(),
+          visible: () =>
+            this.cashierSession.cashierFlowEnabled() || this.orderQueueCounts.cashierQueue() > 0,
         },
         { route: '/sales', label: 'Sales', icon: 'heroClipboardDocumentList' },
         {
@@ -354,6 +380,13 @@ export class ShellComponent implements OnInit {
           label: 'Stock Adjustments',
           icon: 'heroArchiveBox',
           visible: () => this.perms.has('ManageStockAdjustments'),
+        },
+        {
+          route: '/stock-transfers',
+          label: 'Stock Transfers',
+          icon: 'heroArrowsRightLeft',
+          visible: () =>
+            this.perms.has('ManageStockAdjustments') && this.locations.isMultiLocation(),
         },
       ],
     },
@@ -392,6 +425,20 @@ export class ShellComponent implements OnInit {
           icon: 'heroUserGroup',
           visible: () => this.perms.has('ManageTeam'),
         },
+        {
+          route: '/staff-performance',
+          label: 'Staff Performance',
+          icon: 'heroChartBar',
+          visible: () =>
+            this.perms.has('ViewStaffPerformance') && this.entitlements.enabled('staffPerformance'),
+        },
+        {
+          route: '/commissions',
+          label: 'Commissions',
+          icon: 'heroCurrencyDollar',
+          visible: () =>
+            this.perms.has('ManageCommissions') && this.entitlements.commissionsVisible(),
+        },
         { route: '/messaging', label: 'Messaging', icon: 'heroChatBubbleLeftRight' },
       ],
     },
@@ -420,7 +467,17 @@ export class ShellComponent implements OnInit {
     } catch {
       // brand falls back to 'Dukarun'
     }
+    await Promise.all([this.locations.load(), this.entitlements.refresh().catch(() => undefined)]);
     await this.cashierSession.start();
+    await this.orderQueueCounts.refresh();
+  }
+
+  protected changeLocation(event: Event): void {
+    const locationId = (event.target as HTMLSelectElement).value;
+    if (!locationId || locationId === this.locations.activeId()) return;
+    this.locations.select(locationId);
+    void this.cashierSession.refresh().catch(() => undefined);
+    void this.orderQueueCounts.refresh();
   }
 
   protected closeDrawer(): void {

@@ -602,6 +602,9 @@ try {
   // -------------------------------------------------------------------------
   // 4. customers: channel members ∪ customers referenced by this channel's
   //    orders / ledger meta (cross-channel references observed in demo data).
+  //    Soft-deleted customers that are still referenced (AR balances, order
+  //    history) migrate too — v2 has no archived flag, so they're inserted as
+  //    normal customers with a notes marker; unreferenced deleted members skip.
   // -------------------------------------------------------------------------
   {
     const s = stat('customers');
@@ -618,9 +621,22 @@ try {
          union
          select (meta->>'supplierId')::int from ledger_journal_line
            where "channelId"=$1 and meta ? 'supplierId'
+       ),
+       referenced as (
+         select o."customerId" as id from "order" o
+           join order_channels_channel occ on occ."orderId"=o.id
+           where occ."channelId"=$1 and o."customerId" is not null
+         union
+         select (meta->>'customerId')::int from ledger_journal_line
+           where "channelId"=$1 and meta ? 'customerId'
+         union
+         select (meta->>'supplierId')::int from ledger_journal_line
+           where "channelId"=$1 and meta ? 'supplierId'
        )
-       select c.* from customer c join ids on ids.id = c.id
-       where c."deletedAt" is null order by c.id`,
+       select c.*, (c."deletedAt" is not null) as resurrected
+       from customer c join ids on ids.id = c.id
+       where c."deletedAt" is null or c.id in (select id from referenced)
+       order by c.id`,
       [channel.id]
     );
     const mapped = await mapAll(companyId, 'customer');
@@ -658,23 +674,38 @@ try {
             : Math.round(c.customFieldsLastrepaymentamount),
           c.customFieldsPaymentterms ?? null,
           c.customFieldsNotificationsenabled ?? true,
-          c.customFieldsNotes ?? null,
+          c.resurrected
+            ? [c.customFieldsNotes, 'v1: soft-deleted; migrated for AR/history']
+                .filter(Boolean)
+                .join(' | ')
+            : (c.customFieldsNotes ?? null),
           Math.round(c.customFieldsSuppliercreditlimit ?? 0),
           c.customFieldsSuppliercreditduration ?? null,
           c.createdAt,
         ]
       );
+      if (c.resurrected)
+        warn(
+          `customer ${c.id} ('${c.firstName} ${c.lastName}') soft-deleted but referenced; migrated with notes marker`
+        );
       await mapPut(companyId, 'customer', key, rows[0].id);
       s.inserted++;
     }
     const { rows: deleted } = await src.query(
       `select count(*)::int n from customer c join customer_channels_channel cc on cc."customerId"=c.id
-       where cc."channelId"=$1 and c."deletedAt" is not null`,
+       where cc."channelId"=$1 and c."deletedAt" is not null
+         and not exists (
+           select 1 from "order" o join order_channels_channel occ on occ."orderId"=o.id
+           where occ."channelId"=$1 and o."customerId"=c.id)
+         and not exists (
+           select 1 from ledger_journal_line l
+           where l."channelId"=$1
+             and ((l.meta->>'customerId')::int = c.id or (l.meta->>'supplierId')::int = c.id))`,
       [channel.id]
     );
     if (deleted[0].n) {
       s.skipped = deleted[0].n;
-      warn(`${deleted[0].n} soft-deleted customers skipped`);
+      warn(`${deleted[0].n} unreferenced soft-deleted customers skipped`);
     }
   }
 
@@ -684,12 +715,48 @@ try {
   {
     const sp = stat('products');
     const sv = stat('variants');
+    // Soft-deleted variants that are still referenced — by remaining stock or by
+    // lines of migratable orders (completed/voided) — must migrate too, or their
+    // batches and order lines silently vanish. They are inserted inactive with a
+    // suffixed sku (`--archived-<id>`) so the live catalog keeps the clean sku.
+    const MIGRATED_ORDER_STATES = [
+      'Fulfilled',
+      'Shipped',
+      'Delivered',
+      'PartiallyShipped',
+      'PaymentSettled',
+      'Cancelled',
+      'ArrangingPayment', // layaway sales migrate as pending_payment (see orders step)
+    ];
+    const { rows: refDel } = await src.query(
+      `select v.id, v."productId" from product_variant v
+       where v."deletedAt" is not null and (
+         exists (select 1 from inventory_batch b
+                 where b."productVariantId"=v.id and b."channelId"=$1 and b.quantity>0)
+         or exists (select 1 from order_line l
+                    join "order" o on o.id = l."orderId" and o.type='Regular'
+                    join order_channels_channel occ on occ."orderId"=o.id
+                    where l."productVariantId"=v.id and occ."channelId"=$1
+                      and (o.state = any($2) or o."customFieldsReversedat" is not null)))`,
+      [channel.id, MIGRATED_ORDER_STATES]
+    );
+    const refDelIds = refDel.map(r => r.id);
+    const refDelProductIds = [...new Set(refDel.map(r => r.productId))];
+    if (refDelIds.length)
+      console.log(
+        `  ${refDelIds.length} soft-deleted variant(s) still referenced; migrating inactive`
+      );
     const { rows: products } = await src.query(
-      `select p.*, t.name as tname from product p
+      `select p.*, t.name as tname, false as resurrected from product p
        join product_channels_channel pcc on pcc."productId"=p.id
        left join product_translation t on t."baseId"=p.id and t."languageCode"='en'
-       where pcc."channelId"=$1 and p."deletedAt" is null order by p.id`,
-      [channel.id]
+       where pcc."channelId"=$1 and p."deletedAt" is null
+       union
+       select p.*, t.name as tname, true as resurrected from product p
+       left join product_translation t on t."baseId"=p.id and t."languageCode"='en'
+       where p."deletedAt" is not null and p.id = any($2)
+       order by 1`,
+      [channel.id, refDelProductIds.length ? refDelProductIds : [0]]
     );
     const mappedP = await mapAll(companyId, 'product');
     const mappedV = await mapAll(companyId, 'variant');
@@ -714,10 +781,12 @@ try {
             companyId,
             (p.tname ?? `Product ${p.id}`).trim(),
             barcode,
-            p.enabled ?? true,
+            p.resurrected ? false : (p.enabled ?? true),
             p.createdAt,
           ]
         );
+        if (p.resurrected)
+          warn(`product ${p.id} ('${p.tname}') soft-deleted but referenced; migrating inactive`);
         productId = rows[0].id;
         await mapPut(companyId, 'product', p.id, productId);
         sp.inserted++;
@@ -729,10 +798,22 @@ try {
          join product_variant_channels_channel vcc on vcc."productVariantId"=v.id
          left join product_variant_price pvp
            on pvp."variantId"=v.id and pvp."channelId"=$1 and pvp."currencyCode"=$2
-         where vcc."channelId"=$1 and v."productId"=$3 and v."deletedAt" is null
-         order by v.id`,
-        [channel.id, channel.defaultCurrencyCode ?? 'KES', p.id]
+         where vcc."channelId"=$1 and v."productId"=$3 and v."deletedAt" is null and not $5
+         union
+         select v.*, pvp.price as channel_price from product_variant v
+         left join product_variant_price pvp
+           on pvp."variantId"=v.id and pvp."channelId"=$1 and pvp."currencyCode"=$2
+         where v."productId"=$3 and v.id = any($4)`,
+        [
+          channel.id,
+          channel.defaultCurrencyCode ?? 'KES',
+          p.id,
+          refDelIds.length ? refDelIds : [0],
+          p.resurrected,
+        ]
       );
+      // live variants first (they keep the clean sku), referenced-deleted last
+      variants.sort((a, b) => (a.deletedAt ? 1 : 0) - (b.deletedAt ? 1 : 0) || a.id - b.id);
       if (!variants.length)
         warn(`product ${p.id} ('${p.tname}') has no variants — violates new-system rules`);
 
@@ -761,6 +842,12 @@ try {
           v.trackInventory === 'INHERIT' ? channel.trackInventory : v.trackInventory === 'TRUE';
         const kind = track ? 'good' : 'service';
         let barcode = v.customFieldsBarcode || null; // variants have no barcode custom field in source; reserved
+        const resurrected = v.deletedAt != null;
+        const sku = resurrected ? `${v.sku}--archived-${v.id}` : v.sku;
+        if (resurrected)
+          warn(
+            `variant ${v.id} (${v.sku}) soft-deleted but referenced; migrating inactive as '${sku}'`
+          );
         const r = await tgt.query(
           `insert into public.product_variants (
              product_id, company_id, name, kind, sku, barcode, price, wholesale_price,
@@ -772,21 +859,21 @@ try {
             companyId,
             vname,
             kind,
-            v.sku,
+            sku,
             barcode,
             v.channel_price ?? 0,
             v.customFieldsWholesaleprice ?? null,
             v.customFieldsAllowfractionalquantity ?? false,
             track,
-            v.enabled ?? true,
+            resurrected ? false : p.resurrected ? false : (v.enabled ?? true),
             v.createdAt,
           ]
         );
         if (!r.rows.length) {
-          warn(`variant sku '${v.sku}' already exists in target company; mapped by sku`);
+          warn(`variant sku '${sku}' already exists in target company; mapped by sku`);
           const existing = await tgt.query(
             'select id from public.product_variants where company_id=$1 and sku=$2',
-            [companyId, v.sku]
+            [companyId, sku]
           );
           await mapPut(companyId, 'variant', v.id, existing.rows[0].id);
         } else {
@@ -892,18 +979,45 @@ try {
       const reversed = o.customFieldsReversedat != null;
       const isVoided = reversed || o.state === 'Cancelled';
       const isCompleted = !isVoided && COMPLETED_STATES.includes(o.state);
-      if (!isVoided && !isCompleted) {
-        // draft / ArrangingPayment parked — close before cutover
+      // Real-data finding <tenant>: ArrangingPayment orders with settled payments
+      // or ledger postings are partial-payment ("layaway") sales — goods gone,
+      // balance owed, 2-3 ledger entries posted. They migrate as pending_payment
+      // credit sales. ArrangingPayment with NEITHER is an abandoned checkout.
+      let isLayaway = false;
+      if (!isVoided && !isCompleted && o.state === 'ArrangingPayment') {
+        const { rows: lp } = await src.query(
+          `select (select coalesce(sum(amount),0) from payment where "orderId"=$1 and state='Settled')::float8 as settled,
+                  (select count(*)::int from ledger_journal_entry where "channelId"=$2 and "sourceId"=$1::text) as ledger_n`,
+          [o.id, channel.id]
+        );
+        isLayaway = lp[0].settled > 0 || lp[0].ledger_n > 0;
+      }
+      if (!isVoided && !isCompleted && !isLayaway) {
+        // draft / abandoned checkout — not migrated
         skippedParked.push({ id: o.id, code: o.code, state: o.state, total: o.subTotalWithTax });
         so.skipped++;
         continue;
       }
+      if (isLayaway)
+        console.log(`  layaway: order ${o.id} (${o.code}) -> pending_payment credit sale`);
       if (mappedO.has(String(o.id))) {
         so.existing++;
         continue;
       }
       if (DRY) {
         so.inserted++;
+        // count lines/payments for planning visibility (approximate: skip rules
+        // like unmapped variants only apply in --apply)
+        const { rows: lc } = await src.query(
+          'select count(*)::int c from order_line where "orderId"=$1',
+          [o.id]
+        );
+        sl.inserted += lc[0].c;
+        const { rows: pc } = await src.query(
+          'select count(*)::int c from payment where "orderId"=$1',
+          [o.id]
+        );
+        spay.inserted += pc[0].c;
         continue;
       }
 
@@ -964,9 +1078,9 @@ try {
           companyId,
           o.code,
           o.customerId == null ? null : (mappedC.get(String(o.customerId)) ?? null),
-          isVoided ? 'voided' : 'completed',
+          isVoided ? 'voided' : isLayaway ? 'pending_payment' : 'completed',
           total,
-          isCompleted && total > settledSum, // outstanding AR => credit sale
+          (isCompleted || isLayaway) && total > settledSum, // outstanding AR => credit sale
           o.customFieldsCashierpendingat ?? null,
           mapUser(o.customFieldsCreatedbyuseridid),
           isVoided ? (o.customFieldsReversedat ?? o.updatedAt) : null,

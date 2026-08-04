@@ -9,6 +9,7 @@ type CashierSession = Database['public']['Tables']['cashier_sessions']['Row'];
 interface ScopedRecord {
   company_id: string;
   user_id: string;
+  location_id?: string;
 }
 
 /**
@@ -31,6 +32,7 @@ export interface ProductSnapshot {
   key: string;
   company_id: string;
   user_id: string;
+  location_id: string;
   products: Variant[];
   fetched_at: string; // ISO
 }
@@ -52,6 +54,10 @@ export interface CashierSessionSnapshot extends ScopedRecord {
 export interface PosSettingsSnapshot extends ScopedRecord {
   key: string;
   payment_methods: string[];
+  cashier_flow_enabled?: boolean;
+  cash_control_enabled?: boolean;
+  require_opening_count?: boolean;
+  batch_expiry_enabled?: boolean;
   fetched_at: string;
 }
 
@@ -110,8 +116,8 @@ export function offlineDb(): Promise<IDBPDatabase<PosOfflineDb>> {
   return dbPromise;
 }
 
-export function offlineScopeKey(identity: AppIdentity): string {
-  return `${identity.companyId}:${identity.userId}`;
+export function offlineScopeKey(identity: AppIdentity, locationId?: string | null): string {
+  return [identity.companyId, identity.userId, locationId].filter(Boolean).join(':');
 }
 
 export function belongsToIdentity(record: Partial<ScopedRecord>, identity: AppIdentity): boolean {

@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import type { Database } from '@dukarun/shared-types';
 import { SupabaseService } from '../core/supabase.service';
 import { rpcError } from '../pos/pos.service';
+import { LocationContextService } from '../core/location-context.service';
 
 export type LedgerAccount = Database['public']['Tables']['ledger_accounts']['Row'];
 export type JournalEntry = Database['public']['Tables']['ledger_journal_entries']['Row'];
@@ -63,6 +64,7 @@ export interface CashierAccount {
 @Injectable({ providedIn: 'root' })
 export class MoneyService {
   private readonly supabase = inject(SupabaseService);
+  private readonly locations = inject(LocationContextService);
 
   private get db() {
     return this.supabase.client;
@@ -84,24 +86,22 @@ export class MoneyService {
 
   /** Cashier-controlled accounts from enabled payment methods (cash→CASH_ON_HAND, mpesa→MPESA). */
   async cashierAccounts(): Promise<CashierAccount[]> {
-    const { data, error } = await this.db
-      .from('payment_methods')
-      .select('name, ledger_account_code')
-      .eq('is_cashier_controlled', true)
-      .eq('enabled', true);
+    const { data, error } = await this.db.rpc('available_payment_methods', {
+      p_location_id: this.locations.requireActiveId(),
+    });
     if (error) throw error;
-    return data.map(m => ({ account_code: m.ledger_account_code, label: m.name }));
+    return data
+      .filter(method => method.is_cashier_controlled)
+      .map(method => ({ account_code: method.ledger_account_code, label: method.name }));
   }
 
   /** Enabled non-credit payment method codes (for repayment/allocation selects). */
   async enabledMethodCodes(): Promise<string[]> {
-    const { data, error } = await this.db
-      .from('payment_methods')
-      .select('code')
-      .eq('enabled', true)
-      .neq('code', 'credit');
+    const { data, error } = await this.db.rpc('available_payment_methods', {
+      p_location_id: this.locations.requireActiveId(),
+    });
     if (error) throw error;
-    return data.map(m => m.code);
+    return data.filter(method => method.code !== 'credit').map(method => method.code);
   }
 
   async journalBySource(sourceType: string, limit = 20): Promise<JournalEntryWithLines[]> {
@@ -167,6 +167,7 @@ export class MoneyService {
       .from('cashier_sessions')
       .select('*')
       .eq('status', 'open')
+      .eq('location_id', this.locations.requireActiveId())
       .order('opened_at', { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -178,6 +179,7 @@ export class MoneyService {
     const { data, error } = await this.db
       .from('cashier_sessions')
       .select('*, cash_drawer_counts(*)')
+      .eq('location_id', this.locations.requireActiveId())
       .order('opened_at', { ascending: false })
       .limit(limit);
     if (error) throw error;
@@ -375,6 +377,7 @@ export class MoneyService {
     const { data: purchases, error: e1 } = await this.db
       .from('purchases')
       .select('*')
+      .eq('stock_location_id', this.locations.requireActiveId())
       .order('created_at', { ascending: false })
       .limit(limit);
     if (e1) throw e1;
@@ -462,7 +465,8 @@ export class MoneyService {
   }
 
   async openCashierSession(declarations: Declaration[]): Promise<string> {
-    const { data, error } = await this.db.rpc('open_cashier_session', {
+    const { data, error } = await this.db.rpc('open_cashier_session_at_location', {
+      p_location_id: this.locations.requireActiveId(),
       p_declarations: declarations as never,
     });
     if (error) throw rpcError(error);
@@ -470,7 +474,8 @@ export class MoneyService {
   }
 
   async closeCashierSession(sessionId: string, declarations: Declaration[]): Promise<string> {
-    const { data, error } = await this.db.rpc('close_cashier_session', {
+    const { data, error } = await this.db.rpc('close_cashier_session_at_location', {
+      p_location_id: this.locations.requireActiveId(),
       p_session_id: sessionId,
       p_declarations: declarations as never,
     });
@@ -805,7 +810,8 @@ export class MoneyService {
     reason: string,
     unitCost?: number
   ): Promise<string> {
-    const { data, error } = await this.db.rpc('post_stock_adjustment', {
+    const { data, error } = await this.db.rpc('post_stock_adjustment_at_location', {
+      p_location_id: this.locations.requireActiveId(),
       p_variant_id: variantId,
       p_expected_quantity: expectedQuantity,
       p_new_quantity: newQuantity,

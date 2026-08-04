@@ -1,7 +1,7 @@
 import { Injectable, effect, inject, signal } from '@angular/core';
 import { SupabaseService } from './supabase.service';
 
-export type FeatureKey = 'multipleLocations';
+export type FeatureKey = 'multipleLocations' | 'staffPerformance' | 'commissions';
 export type LimitKey =
   'maxAdmins' | 'maxProducts' | 'maxStockLocations' | 'maxOrdersPerMonth' | 'smsPerPeriod';
 
@@ -11,6 +11,9 @@ export interface EntitlementSnapshot {
   tierCode: string | null;
   tierName: string | null;
   features: Partial<Record<FeatureKey, boolean>> & Record<string, unknown>;
+  settings: {
+    commissionsEnabled: boolean;
+  };
   limits: Partial<Record<LimitKey, number>> & Record<string, unknown>;
   usage: {
     stockLocations: number;
@@ -41,6 +44,10 @@ export class EntitlementsService {
 
   enabled(feature: FeatureKey): boolean {
     return this.snapshot()?.features[feature] === true;
+  }
+
+  commissionsVisible(): boolean {
+    return this.enabled('commissions') && this.snapshot()?.settings.commissionsEnabled === true;
   }
 
   limit(key: LimitKey): number | null {

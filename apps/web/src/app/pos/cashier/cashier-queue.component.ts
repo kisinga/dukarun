@@ -103,6 +103,16 @@ import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
         </div>
       }
 
+      @if (cashierSession.configurationLoaded() && !cashierSession.cashierFlowEnabled()) {
+        <div role="status" class="alert alert-info mb-3 text-sm">
+          <app-icon name="heroInformationCircle" />
+          <span
+            >Cashier workflow is off. New sales use direct checkout; only previously queued sales
+            appear here.</span
+          >
+        </div>
+      }
+
       <app-list-search-bar
         placeholder="Search sale code or customer…"
         [searchQuery]="query()"
@@ -111,7 +121,7 @@ import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
         <app-stat-bar summary [stats]="queueStats()" />
       </app-list-search-bar>
 
-      @if (!cashierSession.isOpen()) {
+      @if (cashierSession.cashControlEnabled() && !cashierSession.isOpen()) {
         <app-session-required-notice action="collecting payment from the cashier queue" />
       }
 
@@ -167,7 +177,7 @@ import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
                     size="sm"
                     class="ml-auto"
                     type="button"
-                    [disabled]="!cashierSession.isOpen() || busy()"
+                    [disabled]="!cashierSession.canTakePayment() || busy()"
                     (click)="startSettlement(order)"
                   >
                     <app-icon name="heroBanknotes" />
@@ -269,7 +279,7 @@ import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
                         size="sm"
                         class="ml-2"
                         type="button"
-                        [disabled]="!cashierSession.isOpen() || busy()"
+                        [disabled]="!cashierSession.canTakePayment() || busy()"
                         (click)="startSettlement(order)"
                       >
                         <app-icon name="heroBanknotes" />
@@ -340,7 +350,7 @@ import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
           />
         </div>
       }
-      @if (cashierSession.isOpen() && settling(); as order) {
+      @if (cashierSession.canTakePayment() && settling(); as order) {
         <app-checkout-panel
           [total]="order.total"
           [creditAllowed]="order.customer_id !== null"
