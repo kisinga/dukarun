@@ -80,6 +80,7 @@ Vendure DB into `/opt/backups/`, restore-verified with `pg_restore --list`,
 - Manual run: `ssh <host> /opt/backups/backup-dukarun.sh`
 - Restore drill: `docker run --rm -v /opt/backups:/b postgres:17 pg_restore --list /b/<file>`
   (verify), then restore into a scratch DB — never over the live one.
-- **Gap:** backups stay on the host. Add an offsite copy (object storage sync or a
-  scheduled pull) before the cutover bake ends — same-host backups don't survive
-  host loss.
+- Offsite: each run also `rclone copy`s dumps to Cloudflare R2 (`r2:dukarun-backups`,
+  config at `/root/.config/rclone/rclone.conf` on the host). R2 keeps everything —
+  it's the long-retention archive; local keeps 14 days. Token is bucket-scoped
+  (object R/W only; the `CreateBucket` 403 in logs is expected and harmless).
