@@ -24,10 +24,10 @@ interface Channel {
     <section class="bg-base-200/60 py-16 sm:py-24">
       <div class="mkt-container flex flex-col items-center text-center">
         <span class="mkt-eyebrow">Contact</span>
-        <h1 class="mkt-h1 mt-3">Talk to a human</h1>
+        <h1 class="mkt-h1 mt-3">Talk to us</h1>
         <p class="mkt-lead mx-auto mt-4 max-w-2xl">
-          No ticket numbers, no bots reading scripts. Real people who know the product and the
-          market, one message away.
+          Write to us and one of our experts will respond. We're constantly improving and your
+          feedback and queries are important to us.
         </p>
       </div>
     </section>
@@ -66,8 +66,8 @@ interface Channel {
             <span class="mkt-eyebrow">Optional extra</span>
             <h2 id="setup-heading" class="mkt-h2 mt-2">Installation and training</h2>
             <p class="mkt-lead mx-auto mt-3">
-              Want hands-on help? We offer optional setup and staff training. Pricing depends on
-              your location, number of shops, and team size — and it's always quoted before any work
+              Want hands-on help? We can come set up your shop and train your staff. Pricing depends
+              on your location, number of shops, and team size, and we always quote before any work
               begins.
             </p>
             <div class="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
@@ -84,7 +84,7 @@ interface Channel {
     <!-- Expectation -->
     <section class="bg-base-200/60 py-14 sm:py-20" aria-labelledby="expectation-heading">
       <div class="mkt-container text-center">
-        <h2 id="expectation-heading" class="mkt-h2">We answer ourselves</h2>
+        <h2 id="expectation-heading" class="mkt-h2">You'll hear back from us</h2>
         <p class="mkt-lead mx-auto mt-3 max-w-xl">
           Every message is read and answered by the team that builds dukarun. Email gets a reply
           within one working day.
@@ -105,7 +105,7 @@ export class ContactComponent {
     {
       icon: 'heroEnvelope',
       title: 'Email',
-      copy: 'Questions about the product, pricing, or your account. One working day, guaranteed.',
+      copy: 'Questions about the product, pricing, or your account. We reply within one working day.',
       linkText: 'hello@dukarun.com',
       linkHref: 'mailto:hello@dukarun.com',
       external: true,
@@ -113,7 +113,7 @@ export class ContactComponent {
     {
       icon: 'heroSparkles',
       title: 'Try it first',
-      copy: 'The fastest answer is often the product itself — the homepage has a working demo till you can play with.',
+      copy: 'Many questions answer themselves in the demo till on the homepage. Give it a try before you write.',
       linkText: 'Open the demo',
       linkHref: '/',
       external: false,

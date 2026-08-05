@@ -32,8 +32,8 @@ interface DocSection {
         <span class="mkt-eyebrow">Getting started</span>
         <h1 class="mkt-h1 mt-3">From zero to first sale in one morning</h1>
         <p class="mkt-lead mx-auto mt-4 max-w-2xl">
-          Five steps to a working shop, then honest documentation for every feature — expand the
-          ones you care about. Nothing here is "coming soon".
+          Five steps to a working shop, then documentation for every feature. Expand the ones you
+          care about; everything here is live today.
         </p>
         <div class="mt-8 flex flex-col gap-3 sm:flex-row">
           <a routerLink="/register" class="btn btn-primary min-h-11">
@@ -65,10 +65,9 @@ interface DocSection {
           <li
             class="flex flex-col justify-center gap-2 rounded-box border border-dashed border-primary/40 bg-primary/5 p-6"
           >
-            <h3 class="font-semibold text-primary">That's the whole setup.</h3>
+            <h3 class="font-semibold text-primary">That's all it takes.</h3>
             <p class="mb-0 text-sm text-base-content/70">
-              From here the shop runs itself: stock moves with every sale, and the day closes
-              balanced.
+              From here, stock moves with every sale and the day closes balanced.
             </p>
           </li>
         </ol>
@@ -86,7 +85,7 @@ interface DocSection {
           <span class="mkt-eyebrow">Documentation</span>
           <h2 id="features-heading" class="mkt-h2 mt-2">Every feature, expanded on demand</h2>
           <p class="mkt-lead mx-auto mt-3 max-w-xl">
-            Collapsed so you can scan. Open one and it reads like a short chapter.
+            Scan the list, then open the ones you care about for the full story.
           </p>
         </div>
         <div class="mt-10 flex flex-col gap-3">
@@ -123,8 +122,8 @@ interface DocSection {
         </div>
         <p class="mt-8 text-center text-sm text-base-content/70">
           Something unclear?
-          <a routerLink="/contact" class="link link-primary font-medium">Ask us directly</a> — a
-          human answers.
+          <a routerLink="/contact" class="link link-primary font-medium">Ask us directly</a> and
+          we'll answer.
         </p>
       </div>
     </section>
@@ -132,7 +131,7 @@ interface DocSection {
     <!-- Closer -->
     <section class="bg-primary text-primary-content">
       <div class="mkt-container py-16 text-center sm:py-20">
-        <h2 class="mkt-h1">Your counter is waiting.</h2>
+        <h2 class="mkt-h1">Ready when you are.</h2>
         <p class="mx-auto mt-4 max-w-xl text-primary-content/85">
           Create the account now, add your first products over chai, sell by lunch.
         </p>
@@ -159,7 +158,7 @@ export class DocsComponent {
   protected readonly steps: Step[] = [
     {
       title: 'Create your account',
-      copy: 'Register with your phone number and shop name. No card, no paperwork — the subscription bills through M-Pesa when the time comes.',
+      copy: 'Register with your phone number and shop name. The subscription bills through M-Pesa when the time comes, so no card or paperwork.',
     },
     {
       title: 'Add your products',
@@ -186,7 +185,7 @@ export class DocsComponent {
       title: 'Point of sale',
       summary: 'The counter screen your cashiers live in.',
       details: [
-        'The sell screen is a grid of your products: tap to add, tap to adjust, charge. It is built for a phone held in one hand — large targets, the total always visible, and no typing for a normal sale.',
+        'The sell screen is a grid of your products: tap to add, tap to adjust, charge. It is built for a phone held in one hand, with large targets, the total always visible, and no typing for a normal sale.',
         'Payments are cash, M-Pesa, or a split of both. Change is calculated for you, and every payment method lands in the right place in the books.',
         'Receipts can be printed or sent straight to the customer by SMS or WhatsApp before they leave the counter.',
       ],
@@ -198,7 +197,7 @@ export class DocsComponent {
       summary: 'The shop never stops because the network did.',
       details: [
         'When the internet drops, the POS keeps working. Sales are queued safely on the device with a unique reference, so a retry can never post the same sale twice.',
-        'Queued sales sync automatically when connectivity returns — you can watch the pending count and sync status from the app.',
+        'Queued sales sync automatically when connectivity returns, and you can watch the pending count and sync status from the app.',
         "Signing out with unsynced sales on the device triggers a warning, so a day's takings are never stranded on a phone.",
       ],
     },
@@ -206,10 +205,10 @@ export class DocsComponent {
       id: 'inventory',
       icon: 'heroCube',
       title: 'Inventory & batches',
-      summary: 'Stock that counts itself, batches and expiry included.',
+      summary: 'Stock that stays up to date, batches and expiry included.',
       details: [
         'Every sale deducts stock; every purchase adds it. Stock adjustments (damage, theft, corrections) are recorded with reasons and can require approval.',
-        'Batches track purchase date, cost, and expiry. The app surfaces what is expiring soon so you sell it first instead of writing it off.',
+        'Batches track purchase date, cost, and expiry. The app shows you what is expiring soon so you sell it first instead of writing it off.',
         'Need stock in another shop or store? Stock transfers move quantities between locations with a full paper trail.',
       ],
     },
@@ -220,7 +219,7 @@ export class DocsComponent {
       summary: 'Sell on credit without the notebook.',
       details: [
         'Trusted customers can take goods now and pay later. Each customer has a running balance, an optional credit limit, and a full payment history.',
-        'The credit view shows everyone who owes you, how much, and for how long — with aging, so old debts stand out before they become losses.',
+        'The credit view shows everyone who owes you, how much, and for how long, with aging so old debts stand out before they become losses.',
         'Balance reminders go out by SMS or WhatsApp, which is usually all the chasing a debt needs.',
       ],
     },
@@ -240,8 +239,8 @@ export class DocsComponent {
       title: 'Double-entry ledger',
       summary: 'Real books under every sale.',
       details: [
-        'Every transaction posts both a debit and a credit — sales, expenses, supplier payments, customer credit, everything. That is why the reports always balance.',
-        'You do not need to understand accounting to benefit: the ledger quietly guarantees that the numbers you see at closing time are the truth.',
+        'Every transaction posts both a debit and a credit: sales, expenses, supplier payments, customer credit, everything. That is why the reports always balance.',
+        'You do not need to understand accounting to benefit: the ledger keeps the books balanced, so the numbers you see at closing time are right.',
         'Periods can be closed formally, locking the books for that day or month so history cannot be quietly rewritten.',
       ],
     },
@@ -251,7 +250,7 @@ export class DocsComponent {
       title: 'Approvals & team roles',
       summary: 'Trust your team, verify the sensitive stuff.',
       details: [
-        'Roles decide what each person can do: cashiers sell, managers approve, owners see everything. Permissions are enforced in the app, not by policy on a wall.',
+        'Roles decide what each person can do: cashiers sell, managers approve, owners see everything. Permissions are enforced by the app itself.',
         'Sensitive actions — like large discounts, stock adjustments, or refunds — can be held for approval. The request reaches a manager, who approves or rejects with one tap.',
         'An audit trail records who did what and when, so "I don\'t know what happened" stops being an answer.',
       ],
@@ -262,7 +261,7 @@ export class DocsComponent {
       title: 'SMS & WhatsApp receipts',
       summary: 'Receipts and reminders in the channels customers read.',
       details: [
-        'After a sale, send the receipt by SMS or WhatsApp with one tap — no paper, no printer, no "I lost it".',
+        'After a sale, send the receipt by SMS or WhatsApp with one tap. No paper or printer needed, and the customer cannot lose it.',
         'The same channel sends credit balance reminders, so customers always know where they stand.',
         'Messages go from your account; standard carrier charges may apply on your side.',
       ],
@@ -273,8 +272,8 @@ export class DocsComponent {
       title: 'Subscription billing via M-Pesa',
       summary: 'One flat monthly price, paid the way you already pay.',
       details: [
-        'The subscription is a single flat monthly amount covering the whole product — every feature in this guide, no tiers.',
-        'Billing runs through M-Pesa: you get a prompt, approve it, done. No card required, no dollar invoices.',
+        'The subscription is a single flat monthly amount covering the whole product, every feature in this guide, with no tiers.',
+        'Billing runs through M-Pesa: you get a prompt on your phone, approve it, and you are done. No card required, no dollar invoices.',
         'Pause or cancel anytime from the app. Your data stays yours and can be exported whenever you like.',
       ],
     },
@@ -285,7 +284,7 @@ export class DocsComponent {
       summary: 'Who works here, and who did what.',
       details: [
         'Invite staff by phone, assign roles, and deactivate access the day someone leaves — their sales history stays intact.',
-        'Staff performance views show sales per person, so bonuses and hard conversations both have numbers behind them.',
+        'Staff performance views show sales per person, so pay and performance conversations both have numbers behind them.',
         'Optional commissions can be configured per team member where that fits how you pay.',
       ],
     },
@@ -296,7 +295,7 @@ export class DocsComponent {
       summary: 'What you owe, next to what you are owed.',
       details: [
         'Record purchases from suppliers as they happen — they add stock and create payables in one step.',
-        'The money view puts supplier payables next to customer receivables: your true position, not two half-truths in different notebooks.',
+        'The money view puts supplier payables next to customer receivables, so you see your true position in one place.',
       ],
     },
     {
@@ -306,7 +305,7 @@ export class DocsComponent {
       summary: 'Built for a cheap Android in bright sunlight.',
       details: [
         'The counter is designed for phones first: one-handed use, high-contrast surfaces, large touch targets, and fast screens on spotty data.',
-        'Desktop is the back office — ledger, reports, credit, and settings get wider, denser views of the same data.',
+        'On desktop, the ledger, reports, credit, and settings get wider, denser views of the same data.',
         'Install it to your home screen and it behaves like a native app, offline support included.',
       ],
     },

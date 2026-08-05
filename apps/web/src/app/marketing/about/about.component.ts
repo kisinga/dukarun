@@ -16,8 +16,8 @@ import { IconComponent } from '../../shared/ui/icon.component';
         <span class="mkt-eyebrow">About dukarun</span>
         <h1 class="mkt-h1 mt-3">Built for the duka down your street</h1>
         <p class="mkt-lead mx-auto mt-4 max-w-2xl">
-          Running a shop is long hours, thin margins, and a notebook that never quite balances. We
-          build dukarun so the paperwork isn't the hardest part of your day.
+          Running a shop means long hours and thin margins, and too often a notebook that never
+          quite balances. We build dukarun so the paperwork isn't the hardest part of your day.
         </p>
       </div>
     </section>
@@ -29,8 +29,7 @@ import { IconComponent } from '../../shared/ui/icon.component';
           <span class="mkt-eyebrow">What we believe</span>
           <h2 id="beliefs-heading" class="mkt-h2 mt-2">Software should earn its keep</h2>
           <p class="mkt-lead mx-auto mt-3 max-w-xl">
-            Three convictions shape everything we ship. If we ever stop believing them, you should
-            stop paying us.
+            Three convictions shape everything we ship. We hold ourselves to them on every release.
           </p>
         </div>
         <div class="mt-10 grid gap-4 md:grid-cols-3">
@@ -74,7 +73,7 @@ import { IconComponent } from '../../shared/ui/icon.component';
           }
         </div>
         <p class="mt-8 text-center text-sm text-base-content/70">
-          We'd rather under-promise than oversell. Everything on the
+          We'd rather promise less and deliver more. Everything on the
           <a routerLink="/" class="link link-primary font-medium">homepage</a> works today.
         </p>
       </div>
@@ -111,17 +110,17 @@ export class AboutComponent {
     {
       icon: 'heroBanknotes',
       title: 'Money is the product',
-      copy: 'A POS that loses track of money is worse than a notebook. Everything we build answers to the ledger — sales, credit, expenses, and cash in the drawer.',
+      copy: 'A POS that loses track of money is worse than a notebook. Sales, credit, expenses, and cash in the drawer all answer to the ledger.',
     },
     {
       icon: 'heroSignalSlash',
       title: 'Offline is normal',
-      copy: 'Kenyan internet is honest about being unreliable, so our software is too. The shop must never stop because the network did.',
+      copy: 'Kenyan internet goes down, and the shop must never stop because of it. We build for the network you actually have, not the one on the brochure.',
     },
     {
       icon: 'heroDevicePhoneMobile',
       title: 'The counter comes first',
-      copy: 'Cashiers use it standing up, one-handed, on a cheap phone in sunlight. If it is not fast there, it does not ship.',
+      copy: 'Cashiers use it standing up, one-handed, on a cheap phone in sunlight. If it is not fast there, we do not ship it.',
     },
   ];
 
@@ -129,17 +128,17 @@ export class AboutComponent {
     {
       icon: 'heroClipboardDocumentList',
       title: 'Real accounting underneath',
-      copy: 'Double-entry books, approvals, and audit trails — the discipline of a finance department, sized for one shop.',
+      copy: 'Double-entry books, approvals, and audit trails. The discipline of a finance department, sized for one shop.',
     },
     {
       icon: 'heroUsers',
       title: 'Credit that stays organised',
-      copy: 'Selling on credit is how dukas actually work. Balances, limits, and payment history are tracked per customer, not in a notebook.',
+      copy: 'Selling on credit is how dukas work. Balances, limits, and payment history are tracked per customer, not in a notebook.',
     },
     {
       icon: 'heroChatBubbleLeftRight',
       title: 'Receipts customers actually read',
-      copy: 'Send receipts and balance reminders by SMS or WhatsApp — the channels your customers already live in.',
+      copy: 'Send receipts and balance reminders by SMS or WhatsApp, the channels your customers already use every day.',
     },
     {
       icon: 'heroCreditCard',

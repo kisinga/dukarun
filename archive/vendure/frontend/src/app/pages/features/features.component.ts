@@ -1,3 +1,4 @@
+import { isPlatformBrowser, Location } from '@angular/common';
 import {
   AfterViewInit,
   ChangeDetectionStrategy,
@@ -7,12 +8,11 @@ import {
   OnInit,
   PLATFORM_ID,
 } from '@angular/core';
-import { isPlatformBrowser, Location } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { NgIcon } from '@ng-icons/core';
+import { SEOService } from '../../shared/services/seo.service';
 import { FooterComponent } from '../../shell/layout/footer/footer.component';
 import { NavbarComponent } from '../../shell/layout/navbar/navbar.component';
-import { SEOService } from '../../shared/services/seo.service';
 
 interface Feature {
   title: string;
@@ -177,7 +177,7 @@ export class FeaturesComponent implements OnInit, AfterViewInit, OnDestroy {
         {
           title: 'Performance Dashboards',
           description:
-            'See key metrics at a glance. Sales, inventory, and cash flow all in one place. Pro-level insight, designed for small businesses, not complex BI tools.',
+            'See key metrics at a glance. Sales, inventory, and cash flow all in one place. Pro-level insight, designed for businesses big and small, not complex BI tools.',
           icon: 'heroArrowTrendingUp',
         },
         {

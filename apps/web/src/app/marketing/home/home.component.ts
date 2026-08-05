@@ -26,6 +26,12 @@ interface Faq {
   readonly answer: string;
 }
 
+interface Testimonial {
+  readonly quote: string;
+  readonly author: string;
+  readonly title: string;
+}
+
 /**
  * Public landing page. Every claim here maps to a shipped v2 feature —
  * no camera recognition, no public storefronts, no push notifications.
@@ -49,8 +55,8 @@ interface Faq {
           Every shilling,<br />accounted for<span class="text-primary">.</span>
         </h1>
         <p class="mkt-lead mx-auto mt-5 max-w-xl">
-          Sell by cash or M-Pesa, online or off. Every sale, stock change, and customer debt posts
-          itself to a real double-entry ledger.
+          Sell by cash or M-Pesa, with or without internet. Every sale goes straight into a proper
+          double-entry ledger, so your books are always up to date.
         </p>
         <div class="mt-8 flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
           <a routerLink="/register" class="btn btn-primary btn-lg min-h-11">
@@ -75,10 +81,10 @@ interface Faq {
       <div class="mkt-container">
         <div class="text-center">
           <span class="mkt-eyebrow">Live demo</span>
-          <h2 id="demo-heading" class="mkt-h2 mt-2">Don't take our word for it. Make a sale.</h2>
+          <h2 id="demo-heading" class="mkt-h2 mt-2">Try the counter yourself</h2>
           <p class="mkt-lead mx-auto mt-3 max-w-xl">
-            This is the counter at Jiko Kiosk — a fictional shop with fictional prices. Tap
-            products, charge, and watch the receipt.
+            This is Jiko Kiosk, a fictional shop with fictional prices. Tap a few products, charge,
+            and watch the receipt print.
           </p>
         </div>
 
@@ -131,7 +137,7 @@ interface Faq {
                       class="flex h-full min-h-32 flex-col items-center justify-center gap-2 text-base-content/40"
                     >
                       <app-icon name="heroShoppingCart" size="xl" />
-                      <p class="mb-0 text-xs">Tap a product. That's the whole job.</p>
+                      <p class="mb-0 text-xs">Tap a product to start a sale.</p>
                     </div>
                   } @else {
                     <ul class="flex flex-col divide-y divide-base-300/60">
@@ -224,14 +230,50 @@ interface Faq {
             </div>
           </div>
           <p class="mt-4 text-center text-xs text-base-content/50">
-            You typed nothing. It's already in the books.
+            Nothing to type. The sale is already in the books.
           </p>
         </div>
       </div>
     </section>
 
+    <!-- Customer voices -->
+    <section class="bg-base-200/60 py-14 sm:py-20" aria-labelledby="voices-heading">
+      <div class="mkt-container">
+        <div class="text-center">
+          <span class="mkt-eyebrow">Word of mouth</span>
+          <h2 id="voices-heading" class="mkt-h2 mt-2">From the shops that run on dukarun</h2>
+          <p class="mkt-lead mx-auto mt-3 max-w-xl">Three shopkeepers, in their own words.</p>
+        </div>
+
+        <div class="mx-auto mt-10 max-w-md">
+          <div class="receipt-edge receipt-edge-up" aria-hidden="true"></div>
+          <div class="receipt px-6 py-6 font-mono shadow-overlay sm:px-8 sm:py-8">
+            <p class="mb-0 text-center text-xs font-bold tracking-widest">DUKARUN</p>
+            <p class="mb-0 mt-1 text-center text-xs uppercase tracking-widest opacity-60">
+              Customer voices · Kenya
+            </p>
+            <div class="my-4 border-t border-dashed border-current opacity-40"></div>
+
+            @for (t of testimonials; track t.author; let last = $last) {
+              <blockquote class="mb-0 text-sm leading-relaxed">"{{ t.quote }}"</blockquote>
+              <p class="mb-0 mt-2 text-xs uppercase tracking-wider opacity-60">
+                {{ t.author }} · {{ t.title }}
+              </p>
+              @if (!last) {
+                <div class="my-4 border-t border-dashed border-current opacity-40"></div>
+              }
+            }
+
+            <div class="my-4 border-t border-dashed border-current opacity-40"></div>
+            <p class="mb-0 text-center text-xs uppercase tracking-widest opacity-60">Asante sana</p>
+          </div>
+          <div class="receipt-edge" aria-hidden="true"></div>
+        </div>
+      </div>
+    </section>
+
     <!-- Three questions -->
-    <section class="bg-base-200/60 py-14 sm:py-20" aria-labelledby="questions-heading">
+    <section class="bg-base-100 py-14 sm:py-20" aria-labelledby="questions-heading">
       <div class="mkt-container">
         <div class="text-center">
           <span class="mkt-eyebrow">At closing time</span>
@@ -239,8 +281,8 @@ interface Faq {
             Three questions your books should answer
           </h2>
           <p class="mkt-lead mx-auto mt-3 max-w-xl">
-            Every shopkeeper asks the same three when the doors close. Most notebooks can't answer
-            them.
+            When the doors close, these are the questions that matter. A notebook can't answer them;
+            your ledger can.
           </p>
         </div>
         <div class="mt-10 grid gap-4 md:grid-cols-3">
@@ -257,20 +299,20 @@ interface Faq {
           }
         </div>
         <p class="mt-8 text-center font-semibold text-primary">
-          Answered by your ledger. Not your memory.
+          Real numbers from your own books, so you can go home sure.
         </p>
       </div>
     </section>
 
     <!-- Features -->
-    <section class="bg-base-100 py-14 sm:py-20" aria-labelledby="features-heading">
+    <section class="bg-base-200/60 py-14 sm:py-20" aria-labelledby="features-heading">
       <div class="mkt-container">
         <div class="text-center">
           <span class="mkt-eyebrow">What's inside</span>
           <h2 id="features-heading" class="mkt-h2 mt-2">One app for the whole shop</h2>
           <p class="mkt-lead mx-auto mt-3 max-w-xl">
-            Everything listed here ships today. No teaser tiers, no "coming soon" dressed up as
-            features.
+            The four things you'll use every single day. Everything else — inventory, cashier
+            sessions, approvals, receipts and more — is in the docs, and all of it ships today.
           </p>
         </div>
         <div class="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -295,15 +337,21 @@ interface Faq {
             </a>
           }
         </div>
+        <p class="mt-8 text-center text-sm text-base-content/70">
+          That's not all of it.
+          <a routerLink="/docs" class="link link-primary font-medium"
+            >See every feature in the docs</a
+          >.
+        </p>
       </div>
     </section>
 
     <!-- A day at the duka -->
-    <section class="bg-base-200/60 py-14 sm:py-20" aria-labelledby="day-heading">
+    <section class="bg-base-100 py-14 sm:py-20" aria-labelledby="day-heading">
       <div class="mkt-container">
         <div class="text-center">
           <span class="mkt-eyebrow">A day at the duka</span>
-          <h2 id="day-heading" class="mkt-h2 mt-2">The day counts itself</h2>
+          <h2 id="day-heading" class="mkt-h2 mt-2">Open to close</h2>
         </div>
         <ol class="mt-12 grid gap-8 md:grid-cols-3">
           @for (scene of scenes; track scene.time) {
@@ -327,14 +375,12 @@ interface Faq {
     </section>
 
     <!-- The honest deal -->
-    <section class="bg-base-100 py-14 sm:py-20" aria-labelledby="deal-heading">
+    <section class="bg-base-200/60 py-14 sm:py-20" aria-labelledby="deal-heading">
       <div class="mkt-container">
         <div class="card p-6 sm:p-10">
           <div class="text-center">
             <span class="mkt-eyebrow">The honest deal</span>
-            <h2 id="deal-heading" class="mkt-h2 mt-2">
-              What you pay. What you get. No fine print.
-            </h2>
+            <h2 id="deal-heading" class="mkt-h2 mt-2">A straight deal, in writing</h2>
           </div>
           <div class="mx-auto mt-8 grid max-w-4xl gap-8 md:grid-cols-2">
             <div>
@@ -367,7 +413,7 @@ interface Faq {
     </section>
 
     <!-- FAQ -->
-    <section class="bg-base-200/60 py-14 sm:py-20" aria-labelledby="faq-heading">
+    <section class="bg-base-100 py-14 sm:py-20" aria-labelledby="faq-heading">
       <div class="mkt-container max-w-3xl">
         <div class="text-center">
           <span class="mkt-eyebrow">Questions</span>
@@ -400,7 +446,7 @@ interface Faq {
       <div class="mkt-container py-16 text-center sm:py-24">
         <h2 class="mkt-h1">Balance your books tonight.</h2>
         <p class="mx-auto mt-4 max-w-xl text-primary-content/85">
-          Set up this morning. Sell by lunch. Close the day with nothing left to count.
+          Set up in the morning, sell by lunch, and close the day with the books already balanced.
         </p>
         <div class="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
           <a
@@ -483,19 +529,38 @@ export class HomeComponent {
       icon: 'heroChartBar',
       question: 'Did I actually make money today?',
       answer:
-        'Every sale and expense posts to a double-entry ledger. Profit is a number you read, not a feeling you guess.',
+        'Every sale and expense posts to a double-entry ledger, so profit is a figure you can read tonight, not a hunch.',
     },
     {
       icon: 'heroUsers',
       question: 'Who still owes me — and how much?',
       answer:
-        'Customer credit is tracked per person with balances and payment history, so the notebook under the counter can retire.',
+        'Customer credit is tracked per person, with balances and payment history. No more flipping through the notebook under the counter.',
     },
     {
       icon: 'heroCube',
       question: 'What should I restock tomorrow?',
       answer:
-        'Stock adjusts itself with every sale. Batches and expiry dates tell you what to move first and what to reorder.',
+        'Stock updates with every sale, and batch and expiry dates show you what to move first and what to reorder.',
+    },
+  ];
+
+  protected readonly testimonials: Testimonial[] = [
+    {
+      quote:
+        'I finally know my exact stock, down to the last packet, without counting shelves at night.',
+      author: 'Amina K.',
+      title: 'Mini Mart · Nairobi',
+    },
+    {
+      quote: 'Offline mode is a lifesaver during power cuts. Sales sync perfectly later.',
+      author: 'David M.',
+      title: 'Agrovet · Nakuru',
+    },
+    {
+      quote: 'The whole salon picked it up in one morning. Tracking sales is simple now.',
+      author: 'Grace W.',
+      title: 'Salon · Mombasa',
     },
   ];
 
@@ -503,74 +568,26 @@ export class HomeComponent {
     {
       icon: 'heroShoppingCart',
       title: 'Point of sale',
-      copy: 'A fast counter screen built for phones: tap products, take cash or M-Pesa, print or send the receipt.',
+      copy: 'Tap a product, take cash or M-Pesa, hand over the receipt. The counter screen is built for a phone in one hand.',
       docId: 'pos',
     },
     {
       icon: 'heroSignalSlash',
       title: 'Offline selling',
-      copy: 'No internet, no problem. Sales queue on the device and sync themselves when the network comes back.',
+      copy: 'Keep selling when the network drops. Sales wait safely on the phone and sync on their own when you are back online.',
       docId: 'offline',
-    },
-    {
-      icon: 'heroCube',
-      title: 'Inventory & batches',
-      copy: 'Stock levels, batch tracking, and expiry dates — so the oldest stock sells first and nothing quietly expires.',
-      docId: 'inventory',
     },
     {
       icon: 'heroUsers',
       title: 'Customer credit',
-      copy: 'Sell on credit without losing track: per-customer balances, limits, and a clear record of every payment.',
+      copy: 'Sell on credit to the customers you trust, with every balance and payment on record per person.',
       docId: 'credit',
-    },
-    {
-      icon: 'heroBanknotes',
-      title: 'Cashier sessions',
-      copy: 'Each cashier opens and closes a session. Expected vs counted cash is reconciled at every handover.',
-      docId: 'cashier-sessions',
     },
     {
       icon: 'heroClipboardDocumentList',
       title: 'Double-entry ledger',
-      copy: 'Real books under the hood: every transaction posts debit and credit, so reports always balance.',
+      copy: 'Every transaction posts debit and credit, so your reports always balance.',
       docId: 'ledger',
-    },
-    {
-      icon: 'heroCheckBadge',
-      title: 'Approvals & roles',
-      copy: 'Sensitive actions need a second pair of eyes. Owners, managers, and cashiers each see what they should.',
-      docId: 'approvals',
-    },
-    {
-      icon: 'heroChatBubbleLeftRight',
-      title: 'SMS & WhatsApp receipts',
-      copy: 'Send customers their receipt or balance reminder by SMS or WhatsApp — straight from the sale.',
-      docId: 'receipts',
-    },
-    {
-      icon: 'heroCreditCard',
-      title: 'M-Pesa billing',
-      copy: 'Your subscription is billed through M-Pesa. No card, no paperwork — pay the way you already do.',
-      docId: 'billing',
-    },
-    {
-      icon: 'heroUserGroup',
-      title: 'Team management',
-      copy: 'Add staff, assign roles, and see who sold what. Accountability without hovering over the counter.',
-      docId: 'team',
-    },
-    {
-      icon: 'heroTruck',
-      title: 'Suppliers & purchases',
-      copy: 'Track what you owe suppliers alongside what customers owe you — one honest view of your position.',
-      docId: 'suppliers',
-    },
-    {
-      icon: 'heroDevicePhoneMobile',
-      title: 'Phone-first',
-      copy: 'Designed for a cheap Android in bright sunlight, one-handed, on spotty data. Desktop is the back office.',
-      docId: 'phone-first',
     },
   ];
 
@@ -585,21 +602,21 @@ export class HomeComponent {
       time: '13:00',
       icon: 'heroSignalSlash',
       title: 'Lunch rush, no network',
-      copy: 'The internet drops. Nobody notices. Sales keep ringing and queue quietly on the phone until signal returns.',
+      copy: 'The internet drops and nobody at the counter notices. Sales keep going through and wait safely on the phone until the signal comes back.',
     },
     {
       time: '19:45',
       icon: 'heroLockClosed',
       title: 'Close in minutes',
-      copy: 'Count the drawer, match it against the session, post the day. The ledger already knows the answer.',
+      copy: 'Count the drawer and match it against the session. The numbers already agree, so posting the day takes minutes.',
     },
   ];
 
   protected readonly deal = [
     'One flat monthly subscription, billed through M-Pesa.',
-    'The whole product, not a teaser tier — every feature above is included.',
+    'Every feature included. No tiers, nothing locked behind a bigger plan.',
     'Pause anytime. Your data stays yours; export it whenever.',
-    'Cancel anytime. No exit fees, no phone calls, no guilt trip.',
+    'Cancel anytime, right from the app. No exit fees, no phone calls.',
   ];
 
   protected readonly disclosure = [
@@ -612,7 +629,7 @@ export class HomeComponent {
     {
       question: 'What happens when my internet drops?',
       answer:
-        'Nothing stops. The POS keeps selling offline and queues every sale on the device. When the network returns, queued sales sync to your books automatically — with safeguards so a sale is never posted twice.',
+        'Nothing changes at the counter. The POS keeps selling and queues every sale on the device, then syncs when the network returns. Safeguards make sure no sale is ever posted twice.',
     },
     {
       question: 'Do I need special hardware?',
@@ -632,7 +649,7 @@ export class HomeComponent {
     {
       question: 'How is the subscription billed?',
       answer:
-        'Monthly, through M-Pesa. You get a prompt, approve it, done — the same way you already pay for everything else.',
+        'Monthly, through M-Pesa. You get a prompt on your phone, approve it, and you are done.',
     },
   ];
 }
