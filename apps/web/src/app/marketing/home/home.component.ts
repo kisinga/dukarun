@@ -311,8 +311,7 @@ interface Testimonial {
           <span class="mkt-eyebrow">What's inside</span>
           <h2 id="features-heading" class="mkt-h2 mt-2">One app for the whole shop</h2>
           <p class="mkt-lead mx-auto mt-3 max-w-xl">
-            The four things you'll use every single day. Everything else — inventory, cashier
-            sessions, approvals, receipts and more — is in the docs, and all of it ships today.
+            Here are some featured capabilities of dukarun.
           </p>
         </div>
         <div class="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -337,12 +336,12 @@ interface Testimonial {
             </a>
           }
         </div>
-        <p class="mt-8 text-center text-sm text-base-content/70">
-          That's not all of it.
-          <a routerLink="/docs" class="link link-primary font-medium"
-            >See every feature in the docs</a
-          >.
-        </p>
+        <div class="mt-10 flex justify-center">
+          <a routerLink="/docs" class="btn btn-outline min-h-11">
+            See every feature in the docs
+            <app-icon name="heroArrowRight" size="md" />
+          </a>
+        </div>
       </div>
     </section>
 
@@ -353,20 +352,22 @@ interface Testimonial {
           <span class="mkt-eyebrow">A day at the duka</span>
           <h2 id="day-heading" class="mkt-h2 mt-2">Open to close</h2>
         </div>
-        <ol class="mt-12 grid gap-8 md:grid-cols-3">
+        <ol class="relative mt-12 grid gap-10 md:grid-cols-3 md:gap-8">
+          <span
+            aria-hidden="true"
+            class="absolute bottom-2 left-5 top-2 w-px bg-primary/25 md:bottom-auto md:left-0 md:right-0 md:top-5 md:h-px md:w-auto"
+          ></span>
           @for (scene of scenes; track scene.time) {
-            <li class="border-t-2 border-primary/50 pt-5">
-              <div class="flex items-baseline justify-between gap-3">
-                <span class="text-2xl font-bold tabular-nums tracking-tight text-base-content/80">
-                  {{ scene.time }}
-                </span>
-                <span
-                  class="flex h-10 w-10 shrink-0 items-center justify-center rounded-field bg-primary/10 text-primary"
-                >
-                  <app-icon [name]="scene.icon" size="lg" />
-                </span>
-              </div>
-              <h3 class="mt-2 text-lg font-semibold">{{ scene.title }}</h3>
+            <li class="relative pl-16 md:pl-0 md:pt-14">
+              <span
+                class="absolute left-0 top-0 flex h-10 w-10 items-center justify-center rounded-full border border-primary/30 bg-base-100 text-primary"
+              >
+                <app-icon [name]="scene.icon" size="md" />
+              </span>
+              <span class="text-sm font-bold tabular-nums tracking-widest text-primary">
+                {{ scene.time }}
+              </span>
+              <h3 class="mt-1 text-lg font-semibold">{{ scene.title }}</h3>
               <p class="mt-1 mb-0 text-sm text-base-content/70">{{ scene.copy }}</p>
             </li>
           }
@@ -374,46 +375,8 @@ interface Testimonial {
       </div>
     </section>
 
-    <!-- The honest deal -->
-    <section class="bg-base-200/60 py-14 sm:py-20" aria-labelledby="deal-heading">
-      <div class="mkt-container">
-        <div class="card p-6 sm:p-10">
-          <div class="text-center">
-            <span class="mkt-eyebrow">The honest deal</span>
-            <h2 id="deal-heading" class="mkt-h2 mt-2">A straight deal, in writing</h2>
-          </div>
-          <div class="mx-auto mt-8 grid max-w-4xl gap-8 md:grid-cols-2">
-            <div>
-              <h3 class="text-sm font-bold uppercase tracking-widest text-primary">The deal</h3>
-              <ul class="mt-4 flex flex-col gap-3 text-sm text-base-content/80">
-                @for (item of deal; track item) {
-                  <li class="flex items-start gap-2.5">
-                    <app-icon name="heroCheck" size="md" class="mt-0.5 shrink-0 text-primary" />
-                    {{ item }}
-                  </li>
-                }
-              </ul>
-            </div>
-            <div>
-              <h3 class="text-sm font-bold uppercase tracking-widest text-base-content/50">
-                Full disclosure
-              </h3>
-              <ul class="mt-4 flex flex-col gap-3 text-sm text-base-content/70">
-                @for (item of disclosure; track item) {
-                  <li class="flex items-start gap-2.5">
-                    <app-icon name="heroMinus" size="md" class="mt-0.5 shrink-0 text-primary" />
-                    {{ item }}
-                  </li>
-                }
-              </ul>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
     <!-- FAQ -->
-    <section class="bg-base-100 py-14 sm:py-20" aria-labelledby="faq-heading">
+    <section class="bg-base-200/60 py-14 sm:py-20" aria-labelledby="faq-heading">
       <div class="mkt-container max-w-3xl">
         <div class="text-center">
           <span class="mkt-eyebrow">Questions</span>
@@ -527,13 +490,13 @@ export class HomeComponent {
   protected readonly closingQuestions = [
     {
       icon: 'heroChartBar',
-      question: 'Did I actually make money today?',
+      question: 'How much did make this month?',
       answer:
-        'Every sale and expense posts to a double-entry ledger, so profit is a figure you can read tonight, not a hunch.',
+        'Every sale and expense posts to a double-entry ledger, so profit is accurate. You can even track profit per batch, per product or duration. This and much more',
     },
     {
       icon: 'heroUsers',
-      question: 'Who still owes me — and how much?',
+      question: 'Who still owes me, and how much?',
       answer:
         'Customer credit is tracked per person, with balances and payment history. No more flipping through the notebook under the counter.',
     },
@@ -574,7 +537,7 @@ export class HomeComponent {
     {
       icon: 'heroSignalSlash',
       title: 'Offline selling',
-      copy: 'Keep selling when the network drops. Sales wait safely on the phone and sync on their own when you are back online.',
+      copy: 'Keep selling when the network drops. Sales wait safely and sync on their own when you are back online.',
       docId: 'offline',
     },
     {
@@ -612,19 +575,6 @@ export class HomeComponent {
     },
   ];
 
-  protected readonly deal = [
-    'One flat monthly subscription, billed through M-Pesa.',
-    'Every feature included. No tiers, nothing locked behind a bigger plan.',
-    'Pause anytime. Your data stays yours; export it whenever.',
-    'Cancel anytime, right from the app. No exit fees, no phone calls.',
-  ];
-
-  protected readonly disclosure = [
-    'Customer-initiated M-Pesa (STK push from the buyer) is still in the works. Today you record M-Pesa payments from your existing till.',
-    'Receipts go out by SMS or WhatsApp from your account; carrier charges may apply on your side.',
-    'Hands-on setup and staff training are optional extras, quoted for your location and team size.',
-  ];
-
   protected readonly faqs: Faq[] = [
     {
       question: 'What happens when my internet drops?',
@@ -640,6 +590,11 @@ export class HomeComponent {
       question: 'How do my customers pay?',
       answer:
         'Cash or M-Pesa, recorded at the till. You can also sell on credit to customers you trust, with balances and limits tracked per person.',
+    },
+    {
+      question: 'Can customers pay straight into dukarun by M-Pesa?',
+      answer:
+        'Not yet. Customer-initiated M-Pesa (an STK push from the buyer) is still in the works. Today you record M-Pesa payments from your existing till, and they post to the books like any other sale.',
     },
     {
       question: 'Can my staff use it without seeing everything?',
