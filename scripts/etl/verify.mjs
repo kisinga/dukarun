@@ -305,7 +305,9 @@ const tgtLoc = await T('select count(*)::int n from public.stock_locations where
 await countCheck('stock_locations (provisioned)', 1, tgtLoc[0].n);
 
 // ---------------------------------------------------------------------------
-// 2. ledger tie-out
+// 2. ledger tie-out (source is integer CENTS, target integer SHILLINGS —
+//    source figures are converted with round(/100); per-account balance allows
+//    ±1 shilling of rounding drift per account, repaired per-entry by the ETL)
 // ---------------------------------------------------------------------------
 console.log('\n--- ledger tie-out ---');
 const srcTot = await S(
@@ -328,10 +330,22 @@ ok(
   Number(tgtTot[0].d) === Number(tgtTot[0].c),
   `${tgtTot[0].d} vs ${tgtTot[0].c}`
 );
+// Drift bound: entries whose exact src/100 total is non-integral can each be
+// off by up to 1 shilling after integer conversion (entry balance is enforced;
+// total drift is inherent to whole-shilling rounding).
+const driftRows = await S(
+  `select count(*)::int n from ledger_journal_entry e
+   where e."channelId"=$1 and exists (
+     select 1 from ledger_journal_line l where l."entryId"=e.id
+     group by l."entryId" having sum(l.debit) % 100 <> 0 or sum(l.credit) % 100 <> 0)`,
+  [CHANNEL_ID]
+);
+const driftBound = driftRows[0].n;
 ok(
-  'ledger totals match src=tgt',
-  Number(srcTot[0].d) === Number(tgtTot[0].d) && Number(srcTot[0].c) === Number(tgtTot[0].c),
-  `src D${srcTot[0].d}/C${srcTot[0].c} tgt D${tgtTot[0].d}/C${tgtTot[0].c}`
+  `ledger totals match src/100=tgt (±${driftBound} rounding)`,
+  Math.abs(Math.round(Number(srcTot[0].d) / 100) - Number(tgtTot[0].d)) <= driftBound &&
+    Math.abs(Math.round(Number(srcTot[0].c) / 100) - Number(tgtTot[0].c)) <= driftBound,
+  `src D${Math.round(Number(srcTot[0].d) / 100)}/C${Math.round(Number(srcTot[0].c) / 100)} tgt D${tgtTot[0].d}/C${tgtTot[0].c}`
 );
 
 const srcBal = await S(
@@ -347,18 +361,33 @@ const tgtBal = await T(
   [companyId]
 );
 const tgtBalMap = new Map(tgtBal.map(r => [r.code, Number(r.bal)]));
+// Odd lines (value % 100 <> 0) can each shift an account by up to a shilling
+// through rounding + entry-balance repair; bound the tolerance by them and
+// always print the actual deviation for visibility.
+const srcOdd = await S(
+  `select a.code, count(*)::int n from ledger_account a
+   join ledger_journal_line l on l."accountId"=a.id
+   where a."channelId"=$1 and ((l.debit>0 and l.debit%100<>0) or (l.credit>0 and l.credit%100<>0))
+   group by a.code`,
+  [CHANNEL_ID]
+);
+const oddByAcct = new Map(srcOdd.map(r => [r.code, r.n]));
 let balMismatch = 0;
 for (const r of srcBal) {
   const t = tgtBalMap.get(r.code);
-  if (t == null || Number(r.bal) !== t) {
-    balMismatch++;
-    console.log(`    account ${r.code}: src=${r.bal} tgt=${t ?? '(missing)'}`);
-  }
+  const expected = Math.round(Number(r.bal) / 100);
+  const bound = Math.max(1, oddByAcct.get(r.code) ?? 0);
+  const dev = t == null ? null : t - expected;
+  if (dev !== 0)
+    console.log(
+      `    account ${r.code}: src/100=${expected} tgt=${t} (dev ${dev}, bound ±${bound})`
+    );
+  if (t == null || Math.abs(dev) > bound) balMismatch++;
 }
 ok(
-  'closing balance per account code (exact)',
+  'closing balance per account code (drift bounded by odd lines)',
   balMismatch === 0,
-  `${srcBal.length - balMismatch}/${srcBal.length} accounts match`
+  `${srcBal.length - balMismatch}/${srcBal.length} accounts within bound`
 );
 
 // ---------------------------------------------------------------------------
@@ -422,10 +451,11 @@ for (const r of srcAr) {
       )[0]?.n
     : null;
   const t = newCid ? (tgtAr.get(newCid) ?? 0) : null;
-  const good = t !== null && Number(r.bal) === t;
+  const expected = Math.round(Number(r.bal) / 100);
+  const good = t !== null && Math.abs(expected - t) <= 1;
   if (!good) arMismatch++;
   console.log(
-    `  ${good ? 'PASS' : 'FAIL'}  customer ${r.cid}${name ? ` (${name.trim()})` : ''}: src AR=${r.bal} tgt AR=${t ?? '(unmapped)'}`
+    `  ${good ? 'PASS' : 'FAIL'}  customer ${r.cid}${name ? ` (${name.trim()})` : ''}: src AR=${expected} tgt AR=${t ?? '(unmapped)'}`
   );
   if (!good) failures++;
 }

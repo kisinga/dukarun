@@ -160,6 +160,19 @@ async function supaApi(pathname, init = {}, attempt = 0) {
   return res;
 }
 
+// Vendure stores money in integer CENTS; v2 uses integer SHILLINGS
+// (see apps/web/src/app/core/money.ts). Convert every money field with M().
+// Quantities, days, counts, thresholds in units, and ids are NOT money.
+// A nonzero source amount must never round to zero (v2 has a nonzero line
+// check): sub-shilling amounts floor to 1.
+const M = v => {
+  if (v == null) return null;
+  const n = Number(v);
+  if (n === 0) return 0;
+  const r = Math.round(n / 100);
+  return r === 0 ? (n > 0 ? 1 : -1) : r;
+};
+
 // Vendure identifiers are Kenyan local phones ('0702604380') or usernames
 // ('superadmin'); v2 auth is phone-OTP with E.164-minus-plus ('2547...',
 // see seed.sql). Returns null for non-phone identifiers.
@@ -366,7 +379,7 @@ try {
           channel.customFieldsLowstockthreshold ?? 10,
           channel.customFieldsCashcontrolenabled ?? true,
           channel.customFieldsRequireopeningcount ?? true,
-          channel.customFieldsVariancenotificationthreshold ?? 100,
+          M(channel.customFieldsVariancenotificationthreshold ?? 10000),
           channel.customFieldsEnableprinter ?? true,
           parseJsonText(
             channel.customFieldsNotificationcategorypreferences,
@@ -385,7 +398,7 @@ try {
           channel.customFieldsPaystackcustomercode,
           channel.customFieldsPaystacksubscriptioncode,
           channel.customFieldsLastpaymentdate,
-          channel.customFieldsLastpaymentamount,
+          M(channel.customFieldsLastpaymentamount),
           channel.customFieldsSubscriptionexpiredremindersentat,
           channel.customFieldsSubscriptionexemptuntil,
           channel.customFieldsSubscriptionexemptreason,
@@ -421,6 +434,9 @@ try {
     // blocks when the company has the cashier queue off (jutik). The external
     // hold flag is the designed bypass for parked orders from outside that flow.
     await tgt.query(`select set_config('app.external_payment_hold', 'on', true)`);
+    // Rounding-drift repair (cents→shillings) adjusts ledger lines post-insert;
+    // the immutability guard only permits that with this flag.
+    await tgt.query(`select set_config('app.allow_ledger_mutation', 'on', true)`);
   }
 
   // -------------------------------------------------------------------------
@@ -745,13 +761,11 @@ try {
           c.phoneNumber || null,
           c.emailAddress || null,
           c.customFieldsIssupplier ?? false,
-          Math.round(c.customFieldsCreditlimit ?? 0),
+          M(c.customFieldsCreditlimit ?? 0),
           c.customFieldsCreditduration ?? null,
           c.customFieldsIscreditapproved ?? false,
           c.customFieldsLastrepaymentdate ?? null,
-          c.customFieldsLastrepaymentamount == null
-            ? null
-            : Math.round(c.customFieldsLastrepaymentamount),
+          M(c.customFieldsLastrepaymentamount),
           c.customFieldsPaymentterms ?? null,
           c.customFieldsNotificationsenabled ?? true,
           c.resurrected
@@ -759,7 +773,7 @@ try {
                 .filter(Boolean)
                 .join(' | ')
             : (c.customFieldsNotes ?? null),
-          Math.round(c.customFieldsSuppliercreditlimit ?? 0),
+          M(c.customFieldsSuppliercreditlimit ?? 0),
           c.customFieldsSuppliercreditduration ?? null,
           c.createdAt,
         ]
@@ -941,8 +955,8 @@ try {
             kind,
             sku,
             barcode,
-            v.channel_price ?? 0,
-            v.customFieldsWholesaleprice ?? null,
+            M(v.channel_price ?? 0),
+            M(v.customFieldsWholesaleprice),
             v.customFieldsAllowfractionalquantity ?? false,
             track,
             resurrected ? false : p.resurrected ? false : (v.enabled ?? true),
@@ -1021,7 +1035,7 @@ try {
           mainLoc,
           supplierId,
           b.quantity,
-          b.unitCost,
+          M(b.unitCost),
           b.createdAt,
           b.expiryDate ?? null,
           b.createdAt,
@@ -1061,8 +1075,10 @@ try {
       const isCompleted = !isVoided && COMPLETED_STATES.includes(o.state);
       // Real-data finding (rehearsal tenant): ArrangingPayment orders with settled payments
       // or ledger postings are partial-payment ("layaway") sales — goods gone,
-      // balance owed, 2-3 ledger entries posted. They migrate as pending_payment
-      // credit sales. ArrangingPayment with NEITHER is an abandoned checkout.
+      // balance owed, 2-3 ledger entries posted. They migrate as COMPLETED credit
+      // sales (not pending_payment): v1's own books route them through AR, so the
+      // outstanding balance belongs on the customer's credit, visible in aging —
+      // not in the cashier queue. ArrangingPayment with NEITHER is an abandoned checkout.
       let isLayaway = false;
       if (!isVoided && !isCompleted && o.state === 'ArrangingPayment') {
         const { rows: lp } = await src.query(
@@ -1079,7 +1095,7 @@ try {
         continue;
       }
       if (isLayaway)
-        console.log(`  layaway: order ${o.id} (${o.code}) -> pending_payment credit sale`);
+        console.log(`  layaway: order ${o.id} (${o.code}) -> completed credit sale (AR)`);
       if (mappedO.has(String(o.id))) {
         so.existing++;
         continue;
@@ -1109,11 +1125,13 @@ try {
         'select * from payment where "orderId"=$1 order by id',
         [o.id]
       );
-      const settledSum = pays.filter(p => p.state === 'Settled').reduce((a, p) => a + p.amount, 0);
+      const settledSum = pays
+        .filter(p => p.state === 'Settled')
+        .reduce((a, p) => a + M(p.amount), 0);
 
       // Voided orders: Vendure zeroes line quantities on cancel; use
       // orderPlacedQuantity and derive the pre-cancel total from the lines.
-      let total = o.subTotalWithTax;
+      let total = M(o.subTotalWithTax);
       const lineRows = [];
       for (const l of lines) {
         const qty = isVoided && l.quantity === 0 ? l.orderPlacedQuantity : l.quantity;
@@ -1130,18 +1148,18 @@ try {
         }
         const customUnit =
           l.customFieldsCustomlineprice != null
-            ? Math.round(l.customFieldsCustomlineprice / qty)
+            ? M(Math.round(l.customFieldsCustomlineprice / qty))
             : null;
         const lineTotal =
           l.customFieldsCustomlineprice != null
             ? isVoided && l.quantity === 0
               ? customUnit * qty
-              : l.customFieldsCustomlineprice
-            : Math.round(qty * l.listPrice);
+              : M(l.customFieldsCustomlineprice)
+            : M(Math.round(qty * l.listPrice));
         lineRows.push({
           variantId,
           qty,
-          listPrice: l.listPrice,
+          listPrice: M(l.listPrice),
           customUnit,
           lineTotal,
           reason: l.customFieldsPriceoverridereason ?? null,
@@ -1158,7 +1176,7 @@ try {
           companyId,
           o.code,
           o.customerId == null ? null : (mappedC.get(String(o.customerId)) ?? null),
-          isVoided ? 'voided' : isLayaway ? 'pending_payment' : 'completed',
+          isVoided ? 'voided' : 'completed',
           total,
           (isCompleted || isLayaway) && total > settledSum, // outstanding AR => credit sale
           o.customFieldsCashierpendingat ?? null,
@@ -1226,7 +1244,7 @@ try {
             companyId,
             orderId,
             method,
-            p.amount,
+            M(p.amount),
             p.transactionId ?? null,
             method === 'mpesa' ? (p.transactionId ?? null) : null,
             state,
@@ -1272,7 +1290,7 @@ try {
             sess.status === 'open' ? 'open' : 'closed',
             sess.openedAt,
             sess.closedAt,
-            sess.closingDeclared,
+            M(sess.closingDeclared),
             sess.openedAt,
           ]
         );
@@ -1308,9 +1326,9 @@ try {
             newSessionId,
             companyId,
             ct,
-            d.declaredCash,
-            d.expectedCash,
-            d.variance,
+            M(d.declaredCash),
+            M(d.expectedCash),
+            M(d.variance),
             mapUser(d.countedByUserId),
             d.takenAt,
           ]
@@ -1359,8 +1377,8 @@ try {
         [r.id]
       );
       for (const a of accts) {
-        let expected = a.expectedAmountCents;
-        let variance = a.varianceCents;
+        let expected = M(a.expectedAmountCents);
+        let variance = M(a.varianceCents);
         if (expected == null || variance == null) {
           // Source leaves expected/variance NULL on opening reconciliations.
           // Reconstruct from the ledger: the old variance-adjustment sourceId
@@ -1375,8 +1393,8 @@ try {
                and e."sourceId" like $2 and la.code=$3`,
             [channel.id, `%-${a.code}-${r.id}`, a.code]
           );
-          variance = Number(v[0].net);
-          expected = a.declaredAmountCents - variance;
+          variance = M(Number(v[0].net));
+          expected = M(a.declaredAmountCents) - variance;
           warn(
             `reconciliation ${r.id} account ${a.code}: null expected/variance reconstructed from ledger (variance=${variance})`
           );
@@ -1384,7 +1402,7 @@ try {
         await tgt.query(
           `insert into public.reconciliation_accounts (reconciliation_id, account_code, declared, expected, variance)
            values ($1,$2,$3,$4,$5)`,
-          [newReconId, a.code, a.declaredAmountCents, expected, variance]
+          [newReconId, a.code, M(a.declaredAmountCents), expected, variance]
         );
       }
       sr.inserted++;
@@ -1533,17 +1551,54 @@ try {
           await tgt.query(
             `insert into public.ledger_journal_lines (entry_id, company_id, account_id, order_id, debit, credit, meta)
              values ($1,$2,$3,$4,$5,0,$7), ($1,$2,$3,$4,0,$6,$7)`,
-            [newEntryId, companyId, accountId, orderId, l.debit, l.credit, JSON.stringify(meta)]
+            [
+              newEntryId,
+              companyId,
+              accountId,
+              orderId,
+              M(l.debit),
+              M(l.credit),
+              JSON.stringify(meta),
+            ]
           );
           sl.inserted += 2;
         } else {
           await tgt.query(
             `insert into public.ledger_journal_lines (entry_id, company_id, account_id, order_id, debit, credit, meta)
              values ($1,$2,$3,$4,$5,$6,$7)`,
-            [newEntryId, companyId, accountId, orderId, l.debit, l.credit, JSON.stringify(meta)]
+            [
+              newEntryId,
+              companyId,
+              accountId,
+              orderId,
+              M(l.debit),
+              M(l.credit),
+              JSON.stringify(meta),
+            ]
           );
           sl.inserted++;
         }
+      }
+
+      // cents→shillings rounding can drift an entry off balance (e.g. 10.50→11
+      // while 10.25+10.25→10+10). The balance trigger is deferred to commit, so
+      // repair here: bump the largest line on the deficient side by the delta.
+      const { rows: imbalanced } = await tgt.query(
+        `select entry_id, sum(debit)::bigint d, sum(credit)::bigint c
+         from public.ledger_journal_lines where company_id=$1 group by entry_id
+         having sum(debit) <> sum(credit)`,
+        [companyId]
+      );
+      for (const e of imbalanced) {
+        const delta = Number(e.c) - Number(e.d);
+        const side = delta > 0 ? 'debit' : 'credit';
+        await tgt.query(
+          `update public.ledger_journal_lines set ${side} = ${side} + $1
+           where id = (select id from public.ledger_journal_lines
+                       where entry_id=$2 order by greatest(debit, credit) desc limit 1)`,
+          [Math.abs(delta), e.entry_id]
+        );
+        warn(`entry ${e.entry_id}: rounding drift ${delta} repaired on largest ${side} line`);
       }
 
       // backfill orders.cashier_session_id from remapped meta (new-system link)

@@ -45,6 +45,10 @@ const { rows: sLines } = await src.query(
   [CHANNEL]
 );
 
+// Source is integer CENTS; target integer SHILLINGS (round(/100), with the
+// ETL repairing entry-balance drift on the largest line). Compare per
+// (entry, account) Σdebit/Σcredit with ±1 tolerance per account.
+const M = v => Math.round(Number(v) / 100);
 function key(code, d, c) {
   return `${code}|${d}|${c}`;
 }
@@ -54,15 +58,24 @@ function addLine(map, eid, meta, code, d, c) {
   const k = key(code, d, c);
   e.lines.set(k, (e.lines.get(k) ?? 0) + 1);
 }
+function sums(lines) {
+  const m = new Map(); // code -> [Σd, Σc]
+  for (const k of lines.keys()) {
+    const [code, d, c] = k.split('|').map((x, i) => (i ? Number(x) : x));
+    const cur = m.get(code) ?? [0, 0];
+    m.set(code, [cur[0] + d * lines.get(k), cur[1] + c * lines.get(k)]);
+  }
+  return m;
+}
 const sMap = new Map();
 for (const r of sLines) {
   const meta = { st: r.sourceType, sid: r.sourceId, memo: r.memo ?? null };
   if (r.debit > 0 && r.credit > 0) {
     // the documented split
-    addLine(sMap, r.entry_id, meta, r.code, r.debit, 0);
-    addLine(sMap, r.entry_id, meta, r.code, 0, r.credit);
+    addLine(sMap, r.entry_id, meta, r.code, M(r.debit), 0);
+    addLine(sMap, r.entry_id, meta, r.code, 0, M(r.credit));
   } else {
-    addLine(sMap, r.entry_id, meta, r.code, r.debit, r.credit);
+    addLine(sMap, r.entry_id, meta, r.code, M(r.debit), M(r.credit));
   }
 }
 
@@ -106,37 +119,35 @@ for (const e of sMap.values()) {
     memoDiff++;
     problems.push(`MEMO diff ${k}: src='${e.meta.memo}' tgt='${t.meta.memo}'`);
   }
-  // multiset compare
-  let same = e.lines.size === t.lines.size;
+  // per-(entry,account) Σdebit/Σcredit compare, ±1 rounding tolerance
+  const sSums = sums(e.lines);
+  const tSums = sums(t.lines);
+  let same = sSums.size === tSums.size;
   if (same)
-    for (const [lk, n] of e.lines)
-      if (t.lines.get(lk) !== n) {
+    for (const [code, [sd, sc]] of sSums) {
+      const tgt = tSums.get(code);
+      if (!tgt || Math.abs(tgt[0] - sd) > 1 || Math.abs(tgt[1] - sc) > 1) {
         same = false;
         break;
       }
+    }
   if (same) ok++;
   else {
     lineDiff++;
-    const onlyS = [],
-      onlyT = [];
-    for (const [lk, n] of e.lines) {
-      const d = n - (t.lines.get(lk) ?? 0);
-      for (let i = 0; i < d; i++) onlyS.push(lk);
+    const diffs = [];
+    for (const [code, [sd, sc]] of sSums) {
+      const tgt = tSums.get(code);
+      if (!tgt || Math.abs(tgt[0] - sd) > 1 || Math.abs(tgt[1] - sc) > 1)
+        diffs.push(`${code}: src D${sd}/C${sc} tgt D${tgt?.[0] ?? '-'}/C${tgt?.[1] ?? '-'}`);
     }
-    for (const [lk, n] of t.lines) {
-      const d = n - (e.lines.get(lk) ?? 0);
-      for (let i = 0; i < d; i++) onlyT.push(lk);
-    }
-    problems.push(
-      `LINE diff ${k}:\n    only-src: ${onlyS.join(' , ') || '-'}\n    only-tgt: ${onlyT.join(' , ') || '-'}`
-    );
+    problems.push(`LINE diff ${k}: ${diffs.join(' | ') || 'account sets differ'}`);
   }
 }
 const extra = tByKey.size;
 
 console.log(`\n=== DEEP LEDGER DIFF channel ${CHANNEL} -> company ${companyId} ===`);
 console.log(`source entries: ${sMap.size}  target entries: ${tMap.size}`);
-console.log(`identical line multisets: ${ok}`);
+console.log(`entries matching (per-account sums ±1): ${ok}`);
 console.log(
   `line diffs: ${lineDiff}  missing in target: ${missing}  extra in target: ${extra}  memo diffs: ${memoDiff}`
 );

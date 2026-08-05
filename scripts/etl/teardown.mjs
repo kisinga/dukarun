@@ -141,6 +141,8 @@ const STEPS = [
 ];
 
 await tgt.query('begin');
+// Ledger rows are immutable without this escape (guard_ledger_*_immutable).
+await tgt.query(`select set_config('app.allow_ledger_mutation', 'on', true)`);
 try {
   console.log('\n--- deletions ---');
   for (const [label, sql] of STEPS) {
