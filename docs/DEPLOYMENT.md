@@ -81,6 +81,7 @@ Vendure DB into `/opt/backups/`, restore-verified with `pg_restore --list`,
 - Restore drill: `docker run --rm -v /opt/backups:/b postgres:17 pg_restore --list /b/<file>`
   (verify), then restore into a scratch DB — never over the live one.
 - Offsite: each run also `rclone copy`s dumps to Cloudflare R2 (`r2:dukarun-backups`,
-  config at `/root/.config/rclone/rclone.conf` on the host). R2 keeps everything —
-  it's the long-retention archive; local keeps 14 days. Token is bucket-scoped
-  (object R/W only; the `CreateBucket` 403 in logs is expected and harmless).
+  config at `/root/.config/rclone/rclone.conf` on the host). Retention: 14 days local,
+  364 days in R2 (bucket lifecycle rule, managed in the Cloudflare dashboard). The API
+  token is bucket-scoped (object R/W only; a `CreateBucket` 403 in logs is expected
+  and harmless).
