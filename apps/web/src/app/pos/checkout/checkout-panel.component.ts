@@ -1,6 +1,7 @@
 import { Component, computed, input, output, signal, type SimpleChanges } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { parseKes } from '../../core/money';
+import { isStatementMatch } from '../../core/payment-methods';
 import { ButtonComponent } from '../../shared/ui/button.component';
 import { FormFieldComponent } from '../../shared/ui/form-field.component';
 import { IconComponent } from '../../shared/ui/icon.component';
@@ -12,6 +13,11 @@ export interface PaymentMethodOption {
   code: string;
   name: string;
   isCashierControlled: boolean;
+  /**
+   * blind_count | transaction_verification | statement_match. May be absent in
+   * cached snapshots from before the RPC exposed it — callers fall back to code.
+   */
+  reconciliationType?: string | null;
 }
 
 interface Tender {
@@ -65,7 +71,7 @@ interface Tender {
             <p id="payment-method-heading" class="type-heading mb-2">Payment method</p>
             <div class="rounded-box bg-base-200 p-1">
               <div class="flex gap-1 overflow-x-auto" role="tablist" aria-label="Payment method">
-                @for (method of methods(); track method.code) {
+                @for (method of orderedMethods(); track method.code) {
                   <button
                     appButton
                     [variant]="!isSplit() && singleMethod() === method.code ? 'soft' : 'ghost'"
@@ -202,7 +208,7 @@ interface Tender {
                           [ngModel]="tender.method"
                           (ngModelChange)="patchTender($index, { method: $event })"
                         >
-                          @for (method of methods(); track method.code) {
+                          @for (method of orderedMethods(); track method.code) {
                             <option
                               [value]="method.code"
                               [disabled]="methodUsedElsewhere(method.code, $index)"
@@ -231,13 +237,27 @@ interface Tender {
                       />
                     </app-form-field>
                     @if (tender.method !== 'cash') {
-                      <app-form-field label="Reference" hint="Optional transaction code.">
+                      <app-form-field
+                        [label]="
+                          requiresReference(optionFor(tender.method))
+                            ? 'Transaction ID'
+                            : 'Reference'
+                        "
+                        [required]="requiresReference(optionFor(tender.method))"
+                        [hint]="
+                          requiresReference(optionFor(tender.method))
+                            ? 'Statement-matched payment — the bank reference is required.'
+                            : 'Optional transaction code.'
+                        "
+                        [error]="bankReferenceError($index)"
+                      >
                         <input
                           type="text"
                           class="input input-bordered min-h-11 w-full uppercase"
                           placeholder="e.g. QGH7X2K1"
                           [ngModel]="tender.reference"
                           (ngModelChange)="patchTender($index, { reference: $event })"
+                          (blur)="markReferenceTouched($index)"
                         />
                       </app-form-field>
                     }
@@ -390,9 +410,23 @@ export class CheckoutPanelComponent {
   protected readonly error = signal<string | null>(null);
   /** Two-tap arm for direct-account tenders when the user has finance access. */
   protected readonly armed = signal(false);
+  /** Reference fields the cashier has focused and left — drives bank validation text. */
+  protected readonly referenceTouched = signal<Set<number>>(new Set());
   protected readonly isSplit = computed(() => this.tenders().length > 1);
   protected readonly singleMethod = computed(() =>
     this.isSplit() ? null : (this.tenders()[0]?.method ?? null)
+  );
+
+  /**
+   * Everyday tenders first, statement-matched (bank) last: they are the rarest
+   * rail at the counter, so the tab order and default skip them (RPC order is
+   * kept otherwise). Cached snapshots without reconciliation_type fall back to
+   * the bank code.
+   */
+  protected readonly orderedMethods = computed(() =>
+    [...this.methods()].sort(
+      (a, b) => Number(this.requiresReference(a)) - Number(this.requiresReference(b))
+    )
   );
 
   /** First tender method that pays a direct (non-cashier-controlled) account. */
@@ -420,14 +454,48 @@ export class CheckoutPanelComponent {
 
   private reset(): void {
     this.initialized = true;
-    const first = this.methods()[0]?.code ?? 'cash';
-    this.tenders.set([{ method: first, amountText: this.amountText(this.total()), reference: '' }]);
+    this.tenders.set([
+      {
+        method: this.defaultMethodCode(),
+        amountText: this.amountText(this.total()),
+        reference: '',
+      },
+    ]);
     this.error.set(null);
     this.armed.set(false);
+    this.referenceTouched.set(new Set());
+  }
+
+  /** Cash when configured, else the first non-statement-matched method. */
+  private defaultMethodCode(): string {
+    const methods = this.orderedMethods();
+    if (methods.some(method => method.code === 'cash')) return 'cash';
+    return (
+      methods.find(method => !this.requiresReference(method))?.code ?? methods[0]?.code ?? 'cash'
+    );
+  }
+
+  /** Statement-matched methods (bank) need their transaction ID before confirming. */
+  protected requiresReference(method: PaymentMethodOption | undefined): boolean {
+    if (!method) return false;
+    return isStatementMatch(method.reconciliationType, method.code);
+  }
+
+  protected markReferenceTouched(index: number): void {
+    this.referenceTouched.update(set => new Set(set).add(index));
+  }
+
+  /** Inline validation text once a bank reference field was touched and left empty. */
+  protected bankReferenceError(index: number): string | null {
+    const tender = this.tenders()[index];
+    if (!tender || !this.requiresReference(this.optionFor(tender.method))) return null;
+    if (tender.reference.trim().length > 0) return null;
+    return this.referenceTouched().has(index) ? 'Enter the bank transaction ID' : null;
   }
 
   protected setMode(code: string): void {
     this.armed.set(false);
+    this.referenceTouched.set(new Set());
     this.tenders.set([
       {
         method: code,
@@ -562,6 +630,9 @@ export class CheckoutPanelComponent {
     const ts = this.tenders();
     if (ts.length === 0) return false;
     if (this.hasInvalidTender()) return false;
+    // Statement-matched (bank) tenders need their transaction ID before confirming.
+    if (ts.some(t => this.requiresReference(this.optionFor(t.method)) && !t.reference.trim()))
+      return false;
     // A single cash tender may exceed the total (change given); anything else
     // must sum to the total exactly (the backend enforces payment_mismatch).
     if (ts.length === 1 && ts[0].method === 'cash') return this.paidAmount() >= this.total();
@@ -572,7 +643,7 @@ export class CheckoutPanelComponent {
     return this.optionFor(code)?.name ?? code;
   }
 
-  private optionFor(code: string): PaymentMethodOption | undefined {
+  protected optionFor(code: string): PaymentMethodOption | undefined {
     return this.methods().find(method => method.code === code);
   }
 
@@ -610,6 +681,10 @@ export class CheckoutPanelComponent {
       const amount = parseKes(t.amountText);
       if (amount === null || amount <= 0) {
         this.error.set('Enter a valid amount for every payment row');
+        return null;
+      }
+      if (this.requiresReference(this.optionFor(t.method)) && t.reference.trim().length === 0) {
+        this.error.set('Enter the bank transaction ID');
         return null;
       }
       payments.push({

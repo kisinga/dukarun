@@ -57,6 +57,8 @@ export interface CachedPaymentMethod {
   code: string;
   name: string;
   isCashierControlled: boolean;
+  /** Carried through from the RPC; absent in snapshots cached before it existed. */
+  reconciliationType?: string | null;
 }
 
 export interface PosSettingsSnapshot extends ScopedRecord {

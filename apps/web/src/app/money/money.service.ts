@@ -424,6 +424,17 @@ export class MoneyService {
     return data;
   }
 
+  /** Individual payments recorded against one purchase (drawer payment history). */
+  async purchasePayments(purchaseId: string): Promise<PurchasePayment[]> {
+    const { data, error } = await this.db
+      .from('purchase_payments')
+      .select('*')
+      .eq('purchase_id', purchaseId)
+      .order('created_at');
+    if (error) throw error;
+    return data;
+  }
+
   async supplierVariantPerformance(): Promise<SupplierVariantPerformance[]> {
     const { data, error } = await this.db
       .from('supplier_variant_performance')

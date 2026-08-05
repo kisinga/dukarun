@@ -26,6 +26,8 @@ import { FormFieldComponent } from '../shared/ui/form-field.component';
 import { IconComponent } from '../shared/ui/icon.component';
 import { MoneyComponent } from '../shared/ui/money.component';
 import { StatBarComponent } from '../shared/ui/stat-bar.component';
+import { StatCardComponent } from '../shared/ui/stat-card.component';
+import { DrawerComponent } from '../shared/ui/drawer.component';
 import { CompanyPreferencesService } from '../core/company-preferences.service';
 import { PermissionsService } from '../core/permissions.service';
 
@@ -66,6 +68,8 @@ interface ProductEditorRow {
     ListSearchBarComponent,
     PaginationComponent,
     DataTableShellComponent,
+    StatCardComponent,
+    DrawerComponent,
     ButtonComponent,
     FormFieldComponent,
     IconComponent,
@@ -714,7 +718,14 @@ interface ProductEditorRow {
       } @else {
         <div class="flex flex-col gap-2 lg:hidden">
           @for (group of pagedGroups(); track group.family.id) {
-            <div class="card bg-base-100">
+            <div
+              class="card cursor-pointer bg-base-100"
+              role="button"
+              tabindex="0"
+              [class.border-primary]="selectedProductId() === group.family.id"
+              (click)="openProduct(group.family.id)"
+              (keydown.enter)="openProduct(group.family.id)"
+            >
               <div class="card-body p-4">
                 <div class="flex items-start gap-3">
                   @if (imageUrl(group.family.image_path); as thumb) {
@@ -727,7 +738,7 @@ interface ProductEditorRow {
                       />
                     }
                   }
-                  <button class="min-w-0 flex-1 text-left" (click)="toggleFamily(group.family.id)">
+                  <div class="min-w-0 flex-1">
                     <span class="block truncate font-semibold">{{ group.family.name }}</span>
                     <span class="type-caption mt-0.5 block">
                       {{ group.variants.length }}
@@ -736,21 +747,10 @@ interface ProductEditorRow {
                         · <span class="font-mono">{{ group.family.barcode }}</span>
                       }
                     </span>
-                  </button>
+                  </div>
                   @if (!group.family.active) {
                     <app-status-badge type="warning" label="inactive" />
                   }
-                  <button
-                    appButton
-                    variant="ghost"
-                    size="sm"
-                    [attr.aria-label]="
-                      expandedFamily() === group.family.id ? 'Collapse variants' : 'Expand variants'
-                    "
-                    (click)="toggleFamily(group.family.id)"
-                  >
-                    {{ expandedFamily() === group.family.id ? 'Hide' : 'View' }}
-                  </button>
                 </div>
 
                 <div class="mt-3 flex flex-wrap gap-1.5 border-t border-base-200 pt-3">
@@ -758,131 +758,11 @@ interface ProductEditorRow {
                     appButton
                     variant="outline"
                     size="sm"
-                    (click)="startFamilyEdit(group.family)"
+                    (click)="$event.stopPropagation(); startFamilyEdit(group.family)"
                   >
                     Edit product
                   </button>
                 </div>
-
-                <!-- Variants -->
-                @if (expandedFamily() === group.family.id) {
-                  @if (group.variants.length === 0) {
-                    <p class="mt-2 text-xs text-base-content/60">
-                      No variants yet. Edit the product to add one before selling it.
-                    </p>
-                  } @else {
-                    <div class="mt-3 grid gap-2">
-                      @for (v of group.variants; track v.variant_id) {
-                        <article class="rounded-box border border-base-300 bg-base-200/30 p-3">
-                          <div class="flex items-start justify-between gap-3">
-                            <div class="min-w-0">
-                              <p class="truncate font-semibold">{{ v.variant_name }}</p>
-                              <p class="type-caption mt-0.5 font-mono">{{ v.sku }}</p>
-                            </div>
-                            <div class="shrink-0 text-right">
-                              <p class="font-semibold tabular-nums">{{ fmt(v.price ?? 0) }}</p>
-                              @if (!v.variant_active) {
-                                <app-status-badge size="xs" type="warning" label="inactive" />
-                              }
-                            </div>
-                          </div>
-
-                          <dl class="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                            <div>
-                              <dt class="type-caption">Barcode</dt>
-                              <dd class="truncate font-mono text-xs">{{ v.barcode ?? '—' }}</dd>
-                            </div>
-                            <div>
-                              <dt class="type-caption">Type</dt>
-                              <dd class="capitalize">{{ v.kind }}</dd>
-                            </div>
-                            <div>
-                              <dt class="type-caption">Stock</dt>
-                              <dd class="font-medium tabular-nums">
-                                {{
-                                  v.kind === 'service' || !v.track_inventory
-                                    ? '—'
-                                    : (stockOf(v.variant_id!)?.stock ?? 0)
-                                }}
-                              </dd>
-                            </div>
-                            <div>
-                              <dt class="type-caption">Stock value</dt>
-                              <dd class="font-medium tabular-nums">
-                                {{
-                                  v.kind === 'service' || !v.track_inventory
-                                    ? '—'
-                                    : fmt(stockOf(v.variant_id!)?.stock_value ?? 0)
-                                }}
-                              </dd>
-                            </div>
-                          </dl>
-
-                          <div class="mt-3 flex flex-wrap gap-1.5 border-t border-base-300/70 pt-2">
-                            <button
-                              appButton
-                              variant="ghost"
-                              size="sm"
-                              (click)="startVariantEdit(group.family.id)"
-                            >
-                              Edit
-                            </button>
-                            @if (v.kind !== 'service' && v.track_inventory) {
-                              @if (perms.has('ManageStockAdjustments')) {
-                                <a
-                                  appButton
-                                  variant="outline"
-                                  size="sm"
-                                  routerLink="/stock-adjustments"
-                                  [queryParams]="{ variant: v.variant_id }"
-                                >
-                                  Adjust stock
-                                </a>
-                              }
-                              <button
-                                appButton
-                                variant="ghost"
-                                size="sm"
-                                (click)="toggleBatches(v.variant_id!)"
-                              >
-                                {{ batchesFor() === v.variant_id ? 'Hide batches' : 'Batches' }}
-                              </button>
-                            }
-                          </div>
-
-                          @if (batchesFor() === v.variant_id) {
-                            <div class="mt-3 border-t border-base-300 pt-3">
-                              <div class="mb-2 flex items-center justify-between gap-2">
-                                <h3 class="text-sm font-semibold">Batch history</h3>
-                                <a routerLink="/suppliers" class="link text-xs">Restock</a>
-                              </div>
-                              @for (b of batches(); track b.id) {
-                                <div
-                                  class="grid grid-cols-2 gap-2 border-t border-base-200 py-2 text-xs first:border-0"
-                                >
-                                  <span>{{ date(b.purchased_at) }}</span>
-                                  <span class="text-right"
-                                    >{{ b.remaining }} of {{ b.quantity }} left</span
-                                  >
-                                  <span class="text-base-content/60"
-                                    >Cost {{ fmt(b.unit_cost) }}</span
-                                  >
-                                  @if (preferences.batchExpiryEnabled()) {
-                                    <span class="text-right text-base-content/60">{{
-                                      b.expiry_date ? 'Expires ' + b.expiry_date : 'No expiry'
-                                    }}</span>
-                                  }
-                                </div>
-                              } @empty {
-                                <p class="type-caption">No stock batches yet.</p>
-                              }
-                            </div>
-                          }
-                        </article>
-                      }
-                    </div>
-                  }
-                }
               </div>
             </div>
           }
@@ -904,11 +784,16 @@ interface ProductEditorRow {
               </thead>
               <tbody>
                 @for (group of pagedGroups(); track group.family.id) {
-                  <tr>
+                  <tr
+                    role="button"
+                    tabindex="0"
+                    class="cursor-pointer"
+                    [class.table-row-active]="selectedProductId() === group.family.id"
+                    (click)="openProduct(group.family.id)"
+                    (keydown.enter)="openProduct(group.family.id)"
+                  >
                     <td>
-                      <button class="link font-semibold" (click)="toggleFamily(group.family.id)">
-                        {{ group.family.name }}
-                      </button>
+                      <span class="font-semibold">{{ group.family.name }}</span>
                       <p class="type-caption mt-0.5 font-mono">
                         {{ group.family.barcode || 'No shared barcode' }}
                       </p>
@@ -933,146 +818,20 @@ interface ProductEditorRow {
                         <app-status-badge size="xs" type="warning" label="inactive" />
                       }
                     </td>
-                    <td class="whitespace-nowrap text-right">
+                    <td class="table-actions" (click)="$event.stopPropagation()">
                       <button
                         appButton
-                        variant="outline"
-                        size="sm"
+                        variant="ghost"
+                        [iconOnly]="true"
+                        type="button"
+                        title="Edit product"
+                        aria-label="Edit product"
                         (click)="startFamilyEdit(group.family)"
                       >
-                        Edit product
+                        <app-icon name="heroPencilSquare" />
                       </button>
                     </td>
                   </tr>
-                  @if (expandedFamily() === group.family.id) {
-                    <tr class="row-detail">
-                      <td colspan="5">
-                        @if (group.variants.length === 0) {
-                          <p class="text-sm text-base-content/60">
-                            No variants yet. Edit the product to add one.
-                          </p>
-                        } @else {
-                          <div class="divide-y divide-base-300/70">
-                            @for (v of group.variants; track v.variant_id) {
-                              <div>
-                                <div class="grid grid-cols-12 items-center gap-4 py-3">
-                                  <div class="col-span-3 min-w-0">
-                                    <div class="flex items-center gap-2">
-                                      <span class="truncate font-medium">{{ v.variant_name }}</span>
-                                      @if (!v.variant_active) {
-                                        <app-status-badge
-                                          size="xs"
-                                          type="warning"
-                                          label="inactive"
-                                        />
-                                      }
-                                    </div>
-                                    <p class="type-caption mt-0.5 font-mono">{{ v.sku }}</p>
-                                  </div>
-                                  <div class="col-span-3 min-w-0">
-                                    <p class="text-sm">
-                                      {{ v.kind === 'service' ? 'Service' : 'Physical good' }}
-                                    </p>
-                                    <p class="type-caption mt-0.5 truncate font-mono">
-                                      {{ v.barcode || 'No barcode' }}
-                                    </p>
-                                  </div>
-                                  <div class="col-span-2 text-right">
-                                    <p class="type-caption">Retail price</p>
-                                    <p class="font-medium">
-                                      <app-money [amount]="v.price ?? 0" />
-                                    </p>
-                                  </div>
-                                  <div class="col-span-2 text-right">
-                                    @if (v.kind !== 'service' && v.track_inventory) {
-                                      <p class="font-medium tabular-nums">
-                                        {{ stockOf(v.variant_id!)?.stock ?? 0 }} in stock
-                                      </p>
-                                      <p class="type-caption tabular-nums">
-                                        <app-money
-                                          [amount]="stockOf(v.variant_id!)?.stock_value ?? 0"
-                                        />
-                                        value
-                                      </p>
-                                    } @else {
-                                      <span class="text-sm text-base-content/50">Not tracked</span>
-                                    }
-                                  </div>
-                                  <div class="col-span-2 flex justify-end gap-1">
-                                    <button
-                                      appButton
-                                      variant="ghost"
-                                      size="sm"
-                                      (click)="startVariantEdit(group.family.id)"
-                                    >
-                                      Edit
-                                    </button>
-                                    @if (v.kind !== 'service' && v.track_inventory) {
-                                      @if (perms.has('ManageStockAdjustments')) {
-                                        <a
-                                          appButton
-                                          variant="outline"
-                                          size="sm"
-                                          routerLink="/stock-adjustments"
-                                          [queryParams]="{ variant: v.variant_id }"
-                                        >
-                                          Adjust
-                                        </a>
-                                      }
-                                      <button
-                                        appButton
-                                        variant="ghost"
-                                        size="sm"
-                                        (click)="toggleBatches(v.variant_id!)"
-                                      >
-                                        {{
-                                          batchesFor() === v.variant_id ? 'Hide batches' : 'Batches'
-                                        }}
-                                      </button>
-                                    }
-                                  </div>
-                                </div>
-
-                                @if (batchesFor() === v.variant_id) {
-                                  <div class="border-t border-base-300/60 pb-3 pt-3">
-                                    <div class="mb-2 flex items-center justify-between gap-2">
-                                      <h3 class="type-heading">Batch history</h3>
-                                      <a routerLink="/suppliers" class="link text-xs">Restock</a>
-                                    </div>
-                                    <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-                                      @for (batch of batches(); track batch.id) {
-                                        <div class="rounded-field bg-base-100 px-3 py-2 text-xs">
-                                          <div class="flex justify-between gap-3">
-                                            <span class="font-medium">{{
-                                              batch.batch_number || 'Batch'
-                                            }}</span>
-                                            <span>{{ batch.remaining }} left</span>
-                                          </div>
-                                          <p class="mt-1 text-base-content/60">
-                                            Cost <app-money [amount]="batch.unit_cost" />
-                                            @if (preferences.batchExpiryEnabled()) {
-                                              ·
-                                              {{
-                                                batch.expiry_date
-                                                  ? 'Expires ' + batch.expiry_date
-                                                  : 'No expiry'
-                                              }}
-                                            }
-                                          </p>
-                                        </div>
-                                      } @empty {
-                                        <p class="type-caption">No stock batches yet.</p>
-                                      }
-                                    </div>
-                                  </div>
-                                }
-                              </div>
-                            }
-                          </div>
-                        }
-                      </td>
-                    </tr>
-                  }
                 }
               </tbody>
             </table>
@@ -1091,6 +850,165 @@ interface ProductEditorRow {
           />
         </div>
       }
+      <!-- Product detail drawer -->
+      @if (selectedGroup(); as group) {
+        <app-drawer
+          [open]="true"
+          (closed)="closeProductDrawer()"
+          [title]="group.family.name"
+          [subtitle]="
+            group.variants.length + (group.variants.length === 1 ? ' variant' : ' variants')
+          "
+        >
+          <button
+            actions
+            appButton
+            variant="ghost"
+            [iconOnly]="true"
+            type="button"
+            title="Edit product"
+            aria-label="Edit product"
+            (click)="editFromDrawer(group.family)"
+          >
+            <app-icon name="heroPencilSquare" />
+          </button>
+
+          <div class="flex flex-wrap items-center gap-1">
+            <app-status-badge
+              size="xs"
+              [type]="group.family.active ? 'neutral' : 'warning'"
+              [label]="group.family.active ? 'active' : 'inactive'"
+            />
+          </div>
+
+          <div class="mt-3 grid grid-cols-2 gap-2">
+            <app-stat-card label="Variants" [value]="group.variants.length + ''" />
+            <app-stat-card
+              label="Stock"
+              [value]="
+                familyTracksInventory(group.variants)
+                  ? familyStock(group.variants) + ' units'
+                  : 'Not tracked'
+              "
+              [sub]="
+                familyTracksInventory(group.variants)
+                  ? fmt(familyStockValue(group.variants)) + ' value'
+                  : undefined
+              "
+            />
+          </div>
+
+          <div class="mt-4">
+            <h3 class="section-title mb-2">Variants</h3>
+            @if (group.variants.length === 0) {
+              <app-empty-state
+                [compact]="true"
+                icon="heroCube"
+                title="No variants yet"
+                description="Edit the product to add one before selling it."
+              />
+            } @else {
+              <ul class="divide-y divide-base-200">
+                @for (v of group.variants; track v.variant_id) {
+                  <li class="py-3">
+                    <div class="flex items-start justify-between gap-3">
+                      <div class="min-w-0">
+                        <p class="truncate text-sm font-medium">{{ v.variant_name }}</p>
+                        <p class="type-caption mt-0.5 font-mono">{{ v.sku }}</p>
+                      </div>
+                      <div class="shrink-0 text-right">
+                        <p class="text-sm font-semibold tabular-nums">
+                          <app-money [amount]="v.price ?? 0" />
+                        </p>
+                        @if (!v.variant_active) {
+                          <app-status-badge size="xs" type="warning" label="inactive" />
+                        }
+                      </div>
+                    </div>
+                    <p class="type-caption mt-1">
+                      <span class="font-mono">{{ v.sku }}</span>
+                      @if (v.barcode) {
+                        · <span class="font-mono">{{ v.barcode }}</span>
+                      }
+                      @if (v.kind === 'service') {
+                        · Service
+                      }
+                    </p>
+                    @if (v.kind !== 'service' && v.track_inventory) {
+                      <p class="type-caption mt-0.5">
+                        {{ stockOf(v.variant_id!)?.stock ?? 0 }} in stock ·
+                        <app-money [amount]="stockOf(v.variant_id!)?.stock_value ?? 0" /> value
+                      </p>
+                    }
+                    <div class="mt-2 flex flex-wrap gap-1.5">
+                      <button
+                        appButton
+                        variant="ghost"
+                        size="sm"
+                        (click)="editVariantFromDrawer(group.family.id)"
+                      >
+                        <app-icon name="heroPencilSquare" /> Edit
+                      </button>
+                      @if (v.kind !== 'service' && v.track_inventory) {
+                        @if (perms.has('ManageStockAdjustments')) {
+                          <a
+                            appButton
+                            variant="ghost"
+                            size="sm"
+                            routerLink="/stock-adjustments"
+                            [queryParams]="{ variant: v.variant_id }"
+                          >
+                            <app-icon name="heroArrowsRightLeft" /> Adjust stock
+                          </a>
+                        }
+                        <button
+                          appButton
+                          variant="ghost"
+                          size="sm"
+                          (click)="toggleBatches(v.variant_id!)"
+                        >
+                          <app-icon name="heroQueueList" />
+                          {{ batchesFor() === v.variant_id ? 'Hide batches' : 'Batches' }}
+                        </button>
+                      }
+                    </div>
+                    @if (batchesFor() === v.variant_id) {
+                      <div class="mt-2 rounded-field border border-base-300 bg-base-200/50 p-2">
+                        <div class="mb-1 flex items-center justify-between gap-2">
+                          <h4 class="type-caption">Batch history</h4>
+                          <a routerLink="/suppliers" class="link text-xs">Restock</a>
+                        </div>
+                        <ul class="divide-y divide-base-200">
+                          @for (b of batches(); track b.id) {
+                            <li class="py-1.5">
+                              <div class="flex items-center gap-2 text-xs">
+                                <span class="font-medium">{{ b.batch_number || 'Batch' }}</span>
+                                <span class="text-base-content/60">{{ date(b.purchased_at) }}</span>
+                                <span class="ml-auto tabular-nums"
+                                  >{{ b.remaining }} of {{ b.quantity }} left</span
+                                >
+                              </div>
+                              <p class="type-caption mt-0.5">
+                                Cost <app-money [amount]="b.unit_cost" />
+                                @if (preferences.batchExpiryEnabled()) {
+                                  · {{ b.expiry_date ? 'Expires ' + b.expiry_date : 'No expiry' }}
+                                }
+                              </p>
+                            </li>
+                          } @empty {
+                            <p class="type-caption py-1">No stock batches yet.</p>
+                          }
+                        </ul>
+                      </div>
+                    }
+                  </li>
+                }
+              </ul>
+            }
+          </div>
+        </app-drawer>
+      }
+
       <app-delete-confirmation-modal
         [data]="deactivateData()"
         title="Deactivate?"
@@ -1124,7 +1042,7 @@ export class ProductsComponent implements OnInit {
   protected readonly families = signal<Product[]>([]);
   protected readonly catalog = signal<Variant[]>([]);
   protected readonly stock = signal<Map<string, StockInfo>>(new Map());
-  protected readonly expandedFamily = signal<string | null>(null);
+  protected readonly selectedProductId = signal<string | null>(null);
   protected readonly batchesFor = signal<string | null>(null);
   protected readonly batches = signal<InventoryBatch[]>([]);
 
@@ -1223,6 +1141,11 @@ export class ProductsComponent implements OnInit {
     const page = Math.min(this.page(), this.totalPages());
     const start = (page - 1) * this.pageSize();
     return this.grouped().slice(start, start + this.pageSize());
+  });
+  /** Product family shown in the detail drawer (live — derived from loaded signals). */
+  protected readonly selectedGroup = computed(() => {
+    const id = this.selectedProductId();
+    return id ? (this.grouped().find(g => g.family.id === id) ?? null) : null;
   });
 
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
@@ -1429,8 +1352,28 @@ export class ProductsComponent implements OnInit {
     );
   }
 
-  protected toggleFamily(productId: string): void {
-    this.expandedFamily.update(cur => (cur === productId ? null : productId));
+  protected openProduct(productId: string): void {
+    this.selectedProductId.set(productId);
+    this.batchesFor.set(null);
+    this.batches.set([]);
+  }
+
+  /** Called by the drawer after its close transition finishes. */
+  protected closeProductDrawer(): void {
+    this.selectedProductId.set(null);
+    this.batchesFor.set(null);
+    this.batches.set([]);
+  }
+
+  /** The product editor is a two-step modal (surface 3) — close the drawer first. */
+  protected editFromDrawer(family: Product): void {
+    this.closeProductDrawer();
+    this.startFamilyEdit(family);
+  }
+
+  protected editVariantFromDrawer(productId: string): void {
+    this.closeProductDrawer();
+    this.startVariantEdit(productId);
   }
 
   protected async toggleBatches(variantId: string): Promise<void> {

@@ -1,6 +1,7 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { formatKes, formatKesInput, parseKes } from '../core/money';
+import { reconciliationLabel, reconciliationTypeForCode } from '../core/payment-methods';
 import { PermissionsService } from '../core/permissions.service';
 import {
   AgingInfo,
@@ -18,11 +19,17 @@ import { ListSearchBarComponent } from '../shared/ui/list-search-bar.component';
 import { MoneyComponent } from '../shared/ui/money.component';
 import { PageLayoutComponent } from '../shared/ui/page-layout.component';
 import { PaginationComponent } from '../shared/ui/pagination.component';
-import { StatusBadgeComponent } from '../shared/ui/status-badge.component';
+import {
+  StatusBadgeComponent,
+  ORDER_STATUS_MAP,
+  type BadgeType,
+} from '../shared/ui/status-badge.component';
 import { CashierSessionService } from '../core/cashier-session.service';
 import { SessionRequiredNoticeComponent } from '../shared/ui/session-required-notice.component';
 import { DataTableShellComponent } from '../shared/ui/data-table-shell.component';
+import { DrawerComponent } from '../shared/ui/drawer.component';
 import { StatBarComponent } from '../shared/ui/stat-bar.component';
+import { StatCardComponent } from '../shared/ui/stat-card.component';
 
 type CustomerWithAr = MoneyCustomer & { ar_balance: number } & AgingInfo;
 type CreditOrder = {
@@ -49,7 +56,9 @@ type CreditOrder = {
     SessionRequiredNoticeComponent,
     PaginationComponent,
     DataTableShellComponent,
+    DrawerComponent,
     StatBarComponent,
+    StatCardComponent,
   ],
   template: `
     <app-page
@@ -79,74 +88,6 @@ type CreditOrder = {
       }
       @if (notice()) {
         <div role="status" class="alert alert-success mb-3 text-sm">{{ notice() }}</div>
-      }
-
-      <!-- Create / edit panel -->
-      @if (formOpen()) {
-        <div class="card mb-4 bg-base-100">
-          <form
-            (submit)="$event.preventDefault(); save()"
-            class="card-body grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4"
-          >
-            <div class="sm:col-span-2 lg:col-span-4">
-              <h2 class="section-title">{{ editing() ? 'Edit customer' : 'New customer' }}</h2>
-              <p class="type-caption mt-1">
-                Contact details are kept separate from credit, sales, and repayment history.
-              </p>
-            </div>
-            <app-form-field label="First name" [required]="true">
-              <input
-                type="text"
-                class="input input-bordered input-sm w-full"
-                autocomplete="given-name"
-                [formControl]="firstName"
-              />
-            </app-form-field>
-            <app-form-field label="Last name">
-              <input
-                type="text"
-                class="input input-bordered input-sm w-full"
-                autocomplete="family-name"
-                [formControl]="lastName"
-              />
-            </app-form-field>
-            <app-form-field label="Phone">
-              <input
-                type="tel"
-                class="input input-bordered input-sm w-full"
-                autocomplete="tel"
-                [formControl]="phone"
-              />
-            </app-form-field>
-            <app-form-field label="Email">
-              <input
-                type="email"
-                class="input input-bordered input-sm w-full"
-                autocomplete="email"
-                [formControl]="email"
-              />
-            </app-form-field>
-            <app-form-field label="Notes" class="sm:col-span-2 lg:col-span-4">
-              <input
-                type="text"
-                class="input input-bordered input-sm w-full"
-                placeholder="Preferences, delivery notes, or context…"
-                [formControl]="notes"
-              />
-            </app-form-field>
-            <div class="flex items-end gap-2 sm:col-span-2 lg:col-span-4">
-              <button
-                appButton
-                type="submit"
-                [loading]="busy()"
-                [disabled]="firstName.value.trim().length === 0"
-              >
-                {{ editing() ? 'Save changes' : 'Create customer' }}
-              </button>
-              <button appButton variant="ghost" type="button" (click)="closeForm()">Cancel</button>
-            </div>
-          </form>
-        </div>
       }
 
       <!-- Shared list summary and search toolbar -->
@@ -187,10 +128,9 @@ type CreditOrder = {
                   <tr
                     role="button"
                     tabindex="0"
-                    [attr.aria-expanded]="expandedFor() === c.id"
-                    [class.table-row-active]="expandedFor() === c.id"
-                    (click)="toggle(c.id)"
-                    (keydown.enter)="toggle(c.id)"
+                    [class.table-row-active]="selectedCustomerId() === c.id"
+                    (click)="openCustomer(c.id)"
+                    (keydown.enter)="openCustomer(c.id)"
                   >
                     <td>
                       <div class="table-entity">
@@ -260,12 +200,15 @@ type CreditOrder = {
           </app-data-table-shell>
         </div>
 
-        <div class="flex flex-col gap-2">
+        <div class="flex flex-col gap-2 lg:hidden">
           @for (c of pagedCustomers(); track c.id) {
             <div
-              class="card bg-base-100"
-              [class.lg:hidden]="expandedFor() !== c.id"
-              [class.lg:block]="expandedFor() === c.id"
+              class="card cursor-pointer bg-base-100"
+              role="button"
+              tabindex="0"
+              [class.border-primary]="selectedCustomerId() === c.id"
+              (click)="openCustomer(c.id)"
+              (keydown.enter)="openCustomer(c.id)"
             >
               <div class="card-body p-4">
                 <div class="flex flex-wrap items-center gap-3">
@@ -274,7 +217,7 @@ type CreditOrder = {
                     [firstName]="c.first_name"
                     [lastName]="c.last_name ?? ''"
                   />
-                  <button class="link font-semibold" (click)="toggle(c.id)">{{ name(c) }}</button>
+                  <span class="font-semibold">{{ name(c) }}</span>
                   <span class="text-xs text-base-content/60">{{ c.phone ?? '' }}</span>
                   <span
                     class="ml-auto"
@@ -285,289 +228,424 @@ type CreditOrder = {
                     <app-money [amount]="c.ar_balance" [masked]="!perms.has('ViewFinancials')" />
                     owed to us
                   </span>
-                  <button appButton variant="ghost" (click)="startEdit(c)">Edit</button>
+                  <button
+                    appButton
+                    variant="ghost"
+                    (click)="$event.stopPropagation(); startEdit(c)"
+                  >
+                    Edit
+                  </button>
                 </div>
+              </div>
+            </div>
+          }
+        </div>
 
-                @if (expandedFor() === c.id) {
-                  <div class="mt-3 grid gap-4 border-t pt-3 lg:grid-cols-2">
-                    <!-- Credit status + settings -->
-                    <div>
-                      <h3 class="section-title mb-2">Credit</h3>
-                      <div class="flex flex-wrap items-center gap-3">
+        <!-- Customer detail/edit drawer -->
+        @if (selectedCustomerId() !== null || creating()) {
+          <app-drawer
+            [open]="true"
+            (closed)="closeCustomerDrawer()"
+            [title]="drawerTitle()"
+            [subtitle]="drawerSubtitle()"
+          >
+            @if (detailCustomer(); as c) {
+              <app-entity-avatar
+                leading
+                size="sm"
+                [firstName]="c.first_name"
+                [lastName]="c.last_name ?? ''"
+              />
+            }
+            @if (detailCustomer(); as c) {
+              <button
+                actions
+                appButton
+                variant="ghost"
+                [iconOnly]="true"
+                type="button"
+                title="Edit customer"
+                aria-label="Edit customer"
+                (click)="editFromDrawer(c)"
+              >
+                <app-icon name="heroPencilSquare" />
+              </button>
+            }
+
+            @if (creating() || drawerEditing()) {
+              <!-- Create / edit mode: the same 5-field form, in place -->
+              <form (submit)="$event.preventDefault(); save()" class="flex flex-col gap-3">
+                <p class="type-caption">
+                  Contact details are kept separate from credit, sales, and repayment history.
+                </p>
+                <app-form-field label="First name" [required]="true">
+                  <input
+                    type="text"
+                    class="input input-bordered input-sm w-full"
+                    autocomplete="given-name"
+                    [formControl]="firstName"
+                  />
+                </app-form-field>
+                <app-form-field label="Last name">
+                  <input
+                    type="text"
+                    class="input input-bordered input-sm w-full"
+                    autocomplete="family-name"
+                    [formControl]="lastName"
+                  />
+                </app-form-field>
+                <app-form-field label="Phone">
+                  <input
+                    type="tel"
+                    class="input input-bordered input-sm w-full"
+                    autocomplete="tel"
+                    [formControl]="phone"
+                  />
+                </app-form-field>
+                <app-form-field label="Email">
+                  <input
+                    type="email"
+                    class="input input-bordered input-sm w-full"
+                    autocomplete="email"
+                    [formControl]="email"
+                  />
+                </app-form-field>
+                <app-form-field label="Notes">
+                  <input
+                    type="text"
+                    class="input input-bordered input-sm w-full"
+                    placeholder="Preferences, delivery notes, or context…"
+                    [formControl]="notes"
+                  />
+                </app-form-field>
+                <div class="flex gap-2">
+                  <button
+                    appButton
+                    type="submit"
+                    [loading]="busy()"
+                    [disabled]="firstName.value.trim().length === 0"
+                  >
+                    {{ editing() ? 'Save changes' : 'Create customer' }}
+                  </button>
+                  <button appButton variant="ghost" type="button" (click)="closeForm()">
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            } @else if (selectedCustomer(); as c) {
+              <div class="grid grid-cols-2 gap-2">
+                <app-stat-card
+                  label="Owed to us"
+                  [value]="perms.has('ViewFinancials') ? fmtKes(c.ar_balance) : 'Hidden'"
+                  [tone]="c.ar_balance > 0 ? 'error' : 'neutral'"
+                  [sub]="
+                    c.days_outstanding !== null
+                      ? c.days_outstanding + ' days · ' + c.bucket
+                      : undefined
+                  "
+                />
+                <app-stat-card
+                  label="Credit available"
+                  [value]="
+                    !perms.has('ViewFinancials')
+                      ? 'Hidden'
+                      : c.credit_limit > 0
+                        ? fmtKes(customerCreditAvailable(c))
+                        : 'No cap'
+                  "
+                  [sub]="
+                    c.credit_limit > 0
+                      ? 'Limit ' + fmtKes(c.credit_limit)
+                      : (c.credit_terms_days ?? 0) + 'd terms'
+                  "
+                />
+              </div>
+
+              @if (detailLoading()) {
+                <div class="flex items-center justify-center gap-2 py-8 text-base-content/60">
+                  <span class="loading loading-spinner loading-md"></span>
+                  <span class="text-sm">Loading account details…</span>
+                </div>
+              } @else {
+                <div class="mt-4 flex flex-col gap-4">
+                  <section>
+                    <h3 class="section-title mb-2">Credit</h3>
+                    <div class="flex flex-wrap items-center gap-2">
+                      <app-status-badge
+                        size="xs"
+                        [type]="c.is_credit_approved ? 'success' : 'neutral'"
+                        [label]="c.is_credit_approved ? 'Approved' : 'Not approved'"
+                      />
+                      <span class="type-caption">{{ c.credit_terms_days ?? 0 }}d terms</span>
+                      @if (c.days_outstanding !== null) {
+                        <span class="type-caption">{{ c.days_outstanding }}d</span>
                         <app-status-badge
-                          type="neutral"
-                          [label]="c.is_credit_approved ? 'approved' : 'not approved'"
+                          size="xs"
+                          [type]="bucketType(c.bucket)"
+                          [label]="c.bucket ?? 'current'"
                         />
-                        <span class="type-caption">
-                          @if (c.credit_limit > 0) {
-                            limit
-                            <app-money
-                              [amount]="c.credit_limit"
-                              [masked]="!perms.has('ViewFinancials')"
-                            />
-                            ·
-                            <app-money
-                              [amount]="customerCreditAvailable(c)"
-                              [masked]="!perms.has('ViewFinancials')"
-                            />
-                            available
-                          } @else {
-                            no configured cap
-                          }
-                        </span>
-                        <span class="type-caption">{{ c.credit_terms_days ?? 0 }}d terms</span>
-                        @if (c.days_outstanding !== null) {
-                          <span class="type-caption">{{ c.days_outstanding }}d</span>
-                          <span class="badge badge-xs" [class]="bucketBadge(c.bucket)">
-                            {{ c.bucket }}
-                          </span>
-                        }
-                      </div>
-                      @if (
-                        perms.has('ApproveCustomerCredit') || perms.has('ManageCustomerCreditLimit')
-                      ) {
-                        <form
-                          (submit)="$event.preventDefault(); saveCredit(c)"
-                          class="mt-3 flex flex-col gap-2"
+                      }
+                    </div>
+                    @if (
+                      perms.has('ApproveCustomerCredit') || perms.has('ManageCustomerCreditLimit')
+                    ) {
+                      <form
+                        (submit)="$event.preventDefault(); saveCredit(c)"
+                        class="mt-3 flex flex-col gap-2"
+                      >
+                        <app-form-field
+                          label="Credit limit (KES)"
+                          hint="Use 0 for no configured cap. Credit approval is controlled separately."
                         >
-                          <app-form-field
-                            label="Credit limit (KES)"
-                            hint="Use 0 for no configured cap. Credit approval is controlled separately."
-                          >
-                            <input
-                              type="text"
+                          <input
+                            type="text"
+                            inputmode="numeric"
+                            class="input input-bordered input-sm w-full"
+                            [formControl]="creditLimit"
+                          />
+                        </app-form-field>
+                        <app-form-field label="Terms (days)">
+                          <input
+                            type="number"
+                            class="input input-bordered input-sm w-full"
+                            [formControl]="termsDays"
+                          />
+                        </app-form-field>
+                        <label class="label cursor-pointer justify-start gap-2">
+                          <input
+                            type="checkbox"
+                            class="checkbox checkbox-sm"
+                            [formControl]="approved"
+                          />
+                          <span class="label-text">Approved for credit</span>
+                        </label>
+                        <button
+                          appButton
+                          variant="outline"
+                          type="submit"
+                          class="self-start"
+                          [disabled]="busy()"
+                        >
+                          Save settings
+                        </button>
+                      </form>
+                    }
+                  </section>
+
+                  <section class="border-t border-base-300/60 pt-3">
+                    <h3 class="section-title mb-2">Credit sales</h3>
+                    @if (!cashierSession.canTakePayment() && creditOrders().length > 0) {
+                      <app-session-required-notice action="collecting a repayment" />
+                    }
+                    @if (creditOrders().length === 0) {
+                      <app-empty-state
+                        [compact]="true"
+                        icon="heroCreditCard"
+                        title="No unpaid credit sales"
+                      />
+                    } @else {
+                      @if (perms.has('SettleOrder')) {
+                        <form
+                          (submit)="$event.preventDefault(); bulkRepay(c.id)"
+                          class="mb-3 grid gap-2 rounded-field border border-base-300 bg-base-200/50 p-2 sm:grid-cols-3"
+                        >
+                          <app-form-field label="Payment received (KES)"
+                            ><input
+                              class="input input-bordered input-sm"
                               inputmode="numeric"
-                              class="input input-bordered input-sm w-full"
-                              [formControl]="creditLimit"
-                            />
-                          </app-form-field>
-                          <app-form-field label="Terms (days)">
-                            <input
-                              type="number"
-                              class="input input-bordered input-sm w-full"
-                              [formControl]="termsDays"
-                            />
-                          </app-form-field>
-                          <label class="label cursor-pointer justify-start gap-2">
-                            <input
-                              type="checkbox"
-                              class="checkbox checkbox-sm"
-                              [formControl]="approved"
-                            />
-                            <span class="label-text">Approved for credit</span>
-                          </label>
+                              [formControl]="bulkAmount"
+                          /></app-form-field>
+                          <app-form-field label="Method"
+                            ><select
+                              class="select select-bordered select-sm"
+                              [formControl]="bulkMethod"
+                            >
+                              @for (m of methods(); track m) {
+                                <option [value]="m">{{ methodOptionLabel(m) }}</option>
+                              }
+                            </select></app-form-field
+                          >
+                          <app-form-field label="Reference"
+                            ><input
+                              class="input input-bordered input-sm"
+                              [formControl]="bulkReference"
+                          /></app-form-field>
                           <button
                             appButton
-                            variant="outline"
                             type="submit"
-                            class="self-start"
-                            [disabled]="busy()"
+                            class="sm:col-span-3 sm:justify-self-start"
+                            [disabled]="busy() || !cashierSession.canTakePayment()"
                           >
-                            Save settings
+                            Allocate oldest first
                           </button>
                         </form>
                       }
-                    </div>
-
-                    <!-- Credit orders + repayment -->
-                    <div>
-                      <h3 class="section-title mb-2">Credit sales</h3>
-                      @if (!cashierSession.canTakePayment() && creditOrders().length > 0) {
-                        <app-session-required-notice action="collecting a repayment" />
-                      }
-                      @if (creditOrders().length === 0) {
-                        <p class="text-xs text-base-content/60">No credit sales.</p>
-                      } @else {
-                        @if (perms.has('SettleOrder')) {
-                          <form
-                            (submit)="$event.preventDefault(); bulkRepay(c.id)"
-                            class="mb-3 grid gap-2 rounded-field border border-base-300 bg-base-200/50 p-2 sm:grid-cols-3"
-                          >
-                            <app-form-field label="Payment received (KES)"
-                              ><input
-                                class="input input-bordered input-sm"
-                                inputmode="numeric"
-                                [formControl]="bulkAmount"
-                            /></app-form-field>
-                            <app-form-field label="Method"
-                              ><select
-                                class="select select-bordered select-sm"
-                                [formControl]="bulkMethod"
-                              >
-                                @for (m of methods(); track m) {
-                                  <option [value]="m">{{ m }}</option>
-                                }
-                              </select></app-form-field
-                            >
-                            <app-form-field label="Reference"
-                              ><input
-                                class="input input-bordered input-sm"
-                                [formControl]="bulkReference"
-                            /></app-form-field>
-                            <button
-                              appButton
-                              type="submit"
-                              class="sm:col-span-3 sm:justify-self-start"
-                              [disabled]="busy() || !cashierSession.canTakePayment()"
-                            >
-                              Allocate oldest first
-                            </button>
-                          </form>
-                        }
+                      <ul class="divide-y divide-base-200">
                         @for (o of creditOrders(); track o.id) {
-                          <div class="flex items-center gap-2 py-1 text-sm">
-                            <span class="font-mono">{{ o.code }}</span>
-                            <span class="text-xs text-base-content/60">{{
-                              date(o.created_at)
-                            }}</span>
-                            <span class="badge badge-xs badge-outline">{{ o.status }}</span>
-                            <span class="ml-auto font-semibold"
-                              ><app-money
-                                [amount]="o.total"
-                                [masked]="!perms.has('ViewFinancials')"
-                            /></span>
-                            @if (perms.has('SettleOrder')) {
-                              <button
-                                appButton
-                                [disabled]="!cashierSession.canTakePayment()"
-                                (click)="startRepay(o.id, o.total)"
-                              >
-                                Repay
-                              </button>
-                            }
-                          </div>
-                          @if (repayFor() === o.id) {
-                            <form
-                              (submit)="$event.preventDefault(); repay(o.id)"
-                              class="mb-2 flex flex-wrap items-end gap-2 rounded bg-base-200 p-2"
-                            >
-                              <app-form-field label="Amount (KES)">
-                                <input
-                                  type="text"
-                                  inputmode="numeric"
-                                  class="input input-bordered input-xs w-24"
-                                  [formControl]="repayAmount"
-                                />
-                              </app-form-field>
-                              <app-form-field label="Method">
-                                <select
-                                  class="select select-bordered select-xs"
-                                  [formControl]="repayMethod"
-                                >
-                                  @for (m of methods(); track m) {
-                                    <option [value]="m">{{ m }}</option>
-                                  }
-                                </select>
-                              </app-form-field>
-                              <app-form-field label="Reference">
-                                <input
-                                  type="text"
-                                  class="input input-bordered input-xs w-28"
-                                  [formControl]="repayReference"
-                                />
-                              </app-form-field>
-                              <button
-                                appButton
-                                type="submit"
-                                [disabled]="busy() || !cashierSession.canTakePayment()"
-                              >
-                                Allocate
-                              </button>
-                              <button
-                                appButton
-                                variant="ghost"
-                                type="button"
-                                (click)="repayFor.set(null)"
-                              >
-                                Cancel
-                              </button>
-                            </form>
-                          }
-                        }
-                      }
-                    </div>
-                  </div>
-
-                  <!-- Sales history -->
-                  <div class="mt-3 border-t pt-3">
-                    <h3 class="section-title mb-2">Sales history</h3>
-                    @if (orders().length === 0) {
-                      <p class="text-xs text-base-content/60">No sales yet.</p>
-                    } @else {
-                      <table class="table table-xs">
-                        <thead>
-                          <tr>
-                            <th>Code</th>
-                            <th>Date</th>
-                            <th>Status</th>
-                            <th class="text-right">Total</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          @for (o of orders(); track o.id) {
-                            <tr>
-                              <td class="font-mono">{{ o.code }}</td>
-                              <td>{{ date(o.created_at) }}</td>
-                              <td>
-                                <span class="badge badge-xs badge-outline">{{ o.status }}</span>
-                                @if (o.is_credit_sale) {
-                                  <span class="badge badge-xs badge-warning">credit</span>
-                                }
-                              </td>
-                              <td class="text-right">
-                                <app-money
+                          <li class="py-2">
+                            <div class="flex items-center gap-2">
+                              <div class="min-w-0 flex-1">
+                                <p class="font-mono text-sm font-medium">{{ o.code }}</p>
+                                <p class="type-caption">{{ date(o.created_at) }}</p>
+                              </div>
+                              <app-status-badge
+                                size="xs"
+                                [type]="orderStatusType(o.status)"
+                                [label]="o.status"
+                              />
+                              <span class="text-sm font-semibold tabular-nums"
+                                ><app-money
                                   [amount]="o.total"
                                   [masked]="!perms.has('ViewFinancials')"
-                                />
-                              </td>
-                            </tr>
-                          }
-                        </tbody>
-                      </table>
+                              /></span>
+                              @if (perms.has('SettleOrder')) {
+                                <button
+                                  appButton
+                                  variant="outline"
+                                  size="sm"
+                                  [disabled]="!cashierSession.canTakePayment()"
+                                  (click)="startRepay(o.id, o.total)"
+                                >
+                                  Repay
+                                </button>
+                              }
+                            </div>
+                            @if (repayFor() === o.id) {
+                              <form
+                                (submit)="$event.preventDefault(); repay(o.id)"
+                                class="mt-2 flex flex-wrap items-end gap-2 rounded-field border border-base-300 bg-base-200/50 p-2"
+                              >
+                                <app-form-field label="Amount (KES)">
+                                  <input
+                                    type="text"
+                                    inputmode="numeric"
+                                    class="input input-bordered input-xs w-24"
+                                    [formControl]="repayAmount"
+                                  />
+                                </app-form-field>
+                                <app-form-field label="Method">
+                                  <select
+                                    class="select select-bordered select-xs"
+                                    [formControl]="repayMethod"
+                                  >
+                                    @for (m of methods(); track m) {
+                                      <option [value]="m">{{ methodOptionLabel(m) }}</option>
+                                    }
+                                  </select>
+                                </app-form-field>
+                                <app-form-field label="Reference">
+                                  <input
+                                    type="text"
+                                    class="input input-bordered input-xs w-28"
+                                    [formControl]="repayReference"
+                                  />
+                                </app-form-field>
+                                <button
+                                  appButton
+                                  size="sm"
+                                  type="submit"
+                                  [disabled]="busy() || !cashierSession.canTakePayment()"
+                                >
+                                  Allocate
+                                </button>
+                                <button
+                                  appButton
+                                  variant="ghost"
+                                  size="sm"
+                                  type="button"
+                                  (click)="repayFor.set(null)"
+                                >
+                                  Cancel
+                                </button>
+                              </form>
+                            }
+                          </li>
+                        }
+                      </ul>
                     }
-                  </div>
+                  </section>
 
-                  <div class="mt-3 border-t pt-3 print:mt-0 print:border-0">
+                  <section class="border-t border-base-300/60 pt-3">
+                    <h3 class="section-title mb-2">Sales history</h3>
+                    @if (orders().length === 0) {
+                      <app-empty-state
+                        [compact]="true"
+                        icon="heroShoppingCart"
+                        title="No sales yet"
+                      />
+                    } @else {
+                      <ul class="max-h-80 divide-y divide-base-200 overflow-y-auto">
+                        @for (o of orders(); track o.id) {
+                          <li class="flex items-center gap-2 py-2">
+                            <div class="min-w-0 flex-1">
+                              <p class="font-mono text-sm font-medium">{{ o.code }}</p>
+                              <p class="type-caption">{{ date(o.created_at) }}</p>
+                            </div>
+                            <app-status-badge
+                              size="xs"
+                              [type]="orderStatusType(o.status)"
+                              [label]="o.status"
+                            />
+                            @if (o.is_credit_sale) {
+                              <app-status-badge size="xs" type="warning" label="credit" />
+                            }
+                            <span class="text-sm font-semibold tabular-nums">
+                              <app-money
+                                [amount]="o.total"
+                                [masked]="!perms.has('ViewFinancials')"
+                              />
+                            </span>
+                          </li>
+                        }
+                      </ul>
+                    }
+                  </section>
+
+                  <section class="border-t border-base-300/60 pt-3 print:mt-0 print:border-0">
                     <div class="mb-2 flex items-center justify-between gap-2">
                       <div>
                         <h3 class="section-title">Customer statement</h3>
                         <p class="type-caption">Sales, repayments and running balance.</p>
                       </div>
-                      <button appButton variant="ghost" (click)="printStatement()">
-                        Print statement
+                      <button appButton variant="ghost" size="sm" (click)="printStatement()">
+                        <app-icon name="heroPrinter" /> Print
                       </button>
                     </div>
                     @if (statement().length === 0) {
-                      <p class="text-xs text-base-content/60">No credit statement activity.</p>
+                      <app-empty-state
+                        [compact]="true"
+                        icon="heroDocumentText"
+                        title="No statement activity"
+                      />
                     } @else {
-                      <div class="overflow-x-auto rounded-box border border-base-300/70">
-                        <table class="table table-sm">
-                          <thead>
-                            <tr>
-                              <th>Date</th>
-                              <th>Reference</th>
-                              <th>Description</th>
-                              <th class="text-right">Charge</th>
-                              <th class="text-right">Payment</th>
-                              <th class="text-right">Balance</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            @for (row of statement(); track row.id) {
-                              <tr>
-                                <td>{{ date(row.date) }}</td>
-                                <td class="font-mono text-xs">{{ row.reference }}</td>
-                                <td>{{ row.description }}</td>
-                                <td class="text-right"><app-money [amount]="row.debit" /></td>
-                                <td class="text-right"><app-money [amount]="row.credit" /></td>
-                                <td class="text-right font-semibold">
-                                  <app-money [amount]="row.balance" />
-                                </td>
-                              </tr>
-                            }
-                          </tbody>
-                        </table>
-                      </div>
+                      <ul
+                        class="max-h-80 divide-y divide-base-200 overflow-y-auto print:max-h-none print:overflow-visible"
+                      >
+                        @for (row of statement(); track row.id) {
+                          <li class="flex items-center gap-3 py-2">
+                            <div class="min-w-0 flex-1">
+                              <p class="truncate text-sm">{{ row.description }}</p>
+                              <p class="type-caption">
+                                {{ date(row.date) }} ·
+                                <span class="font-mono">{{ row.reference }}</span>
+                              </p>
+                            </div>
+                            <div class="shrink-0 text-right">
+                              <p class="text-sm font-semibold tabular-nums">
+                                <app-money [amount]="row.balance" />
+                              </p>
+                              <p class="type-caption">
+                                @if (row.debit > 0) {
+                                  charged <app-money [amount]="row.debit" direction="out" />
+                                }
+                                @if (row.credit > 0) {
+                                  paid <app-money [amount]="row.credit" direction="in" />
+                                }
+                              </p>
+                            </div>
+                          </li>
+                        }
+                      </ul>
                     }
                     @if (perms.has('OverrideCustomerBalance')) {
                       <form
@@ -585,17 +663,23 @@ type CreditOrder = {
                             class="input input-bordered input-sm"
                             [formControl]="adjustmentReason"
                         /></app-form-field>
-                        <button appButton variant="outline" type="submit" [disabled]="busy()">
+                        <button
+                          appButton
+                          variant="outline"
+                          size="sm"
+                          type="submit"
+                          [disabled]="busy()"
+                        >
                           Post adjustment
                         </button>
                       </form>
                     }
-                  </div>
-                }
-              </div>
-            </div>
-          }
-        </div>
+                  </section>
+                </div>
+              }
+            }
+          </app-drawer>
+        }
         <div class="mt-3">
           <app-pagination
             [currentPage]="customerPage()"
@@ -617,19 +701,23 @@ export class CustomersComponent implements OnInit {
   private readonly money = inject(MoneyService);
   private readonly pos = inject(PosService);
   protected readonly perms = inject(PermissionsService);
+  protected readonly fmtKes = formatKes;
 
   protected readonly customers = signal<CustomerWithAr[]>([]);
-  protected readonly expandedFor = signal<string | null>(null);
+  protected readonly selectedCustomerId = signal<string | null>(null);
   protected readonly orders = signal<OrderWithCustomer[]>([]);
   protected readonly creditOrders = signal<CreditOrder[]>([]);
   protected readonly statement = signal<CustomerStatementRow[]>([]);
   protected readonly methods = signal<string[]>([]);
   protected readonly repayFor = signal<string | null>(null);
+  protected readonly detailLoading = signal(false);
 
   protected readonly query = signal('');
   protected readonly customerPage = signal(1);
   protected readonly customerPageSize = signal(10);
-  protected readonly formOpen = signal(false);
+  /** Drawer edit mode: creating = empty form, drawerEditing = form for the open customer. */
+  protected readonly creating = signal(false);
+  protected readonly drawerEditing = signal(false);
   protected readonly editing = signal<CustomerWithAr | null>(null);
 
   protected readonly firstName = new FormControl('', { nonNullable: true });
@@ -662,6 +750,25 @@ export class CustomersComponent implements OnInit {
     return this.customers().filter(
       c => this.name(c).toLowerCase().includes(q) || (c.phone ?? '').toLowerCase().includes(q)
     );
+  });
+  protected readonly selectedCustomer = computed(() => {
+    const id = this.selectedCustomerId();
+    return id ? (this.customers().find(c => c.id === id) ?? null) : null;
+  });
+  /** Customer shown in the drawer's detail chrome (null while editing/creating). */
+  protected readonly detailCustomer = computed(() =>
+    this.creating() || this.drawerEditing() ? null : this.selectedCustomer()
+  );
+  protected readonly drawerTitle = computed(() => {
+    if (this.creating()) return 'New customer';
+    const c = this.selectedCustomer();
+    if (!c) return 'Customer';
+    return this.drawerEditing() ? `Edit ${this.name(c)}` : this.name(c);
+  });
+  protected readonly drawerSubtitle = computed(() => {
+    if (this.creating()) return undefined;
+    const c = this.selectedCustomer();
+    return c ? c.phone || c.email || undefined : undefined;
   });
   protected readonly customerTotalPages = computed(() =>
     Math.max(1, Math.ceil(this.filtered().length / this.customerPageSize()))
@@ -716,13 +823,13 @@ export class CustomersComponent implements OnInit {
     }
   }
 
-  protected async toggle(customerId: string): Promise<void> {
-    if (this.expandedFor() === customerId) {
-      this.expandedFor.set(null);
-      return;
-    }
-    this.expandedFor.set(customerId);
+  protected async openCustomer(customerId: string): Promise<void> {
+    this.selectedCustomerId.set(customerId);
     this.repayFor.set(null);
+    this.orders.set([]);
+    this.creditOrders.set([]);
+    this.statement.set([]);
+    this.detailLoading.set(true);
     const customer = this.customers().find(c => c.id === customerId);
     if (customer) {
       this.creditLimit.setValue(formatKesInput(customer.credit_limit));
@@ -735,12 +842,40 @@ export class CustomersComponent implements OnInit {
         this.money.creditOrders(customerId),
         this.money.customerStatement(customerId),
       ]);
+      // Ignore stale results when the drawer was closed (or reopened) meanwhile.
+      if (this.selectedCustomerId() !== customerId) return;
       this.orders.set(orders);
       this.creditOrders.set(creditOrders);
       this.statement.set(statement);
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Failed to load sales');
+    } finally {
+      if (this.selectedCustomerId() === customerId) this.detailLoading.set(false);
     }
+  }
+
+  /** Called by the drawer after its close transition finishes. */
+  protected closeCustomerDrawer(): void {
+    this.selectedCustomerId.set(null);
+    this.repayFor.set(null);
+    this.detailLoading.set(false);
+    this.creating.set(false);
+    this.drawerEditing.set(false);
+    this.editing.set(null);
+    this.orders.set([]);
+    this.creditOrders.set([]);
+    this.statement.set([]);
+  }
+
+  /** Edit in place: flip the open drawer to its form without closing it. */
+  protected editFromDrawer(c: CustomerWithAr): void {
+    this.editing.set(c);
+    this.firstName.setValue(c.first_name);
+    this.lastName.setValue(c.last_name ?? '');
+    this.phone.setValue(c.phone ?? '');
+    this.email.setValue(c.email ?? '');
+    this.notes.setValue(c.notes ?? '');
+    this.drawerEditing.set(true);
   }
 
   protected startCreate(): void {
@@ -750,23 +885,22 @@ export class CustomersComponent implements OnInit {
     this.phone.setValue('');
     this.email.setValue('');
     this.notes.setValue('');
-    this.formOpen.set(true);
+    this.drawerEditing.set(false);
+    this.creating.set(true);
   }
 
   protected startEdit(c: CustomerWithAr): void {
-    this.editing.set(c);
-    this.firstName.setValue(c.first_name);
-    this.lastName.setValue(c.last_name ?? '');
-    this.phone.setValue(c.phone ?? '');
-    this.email.setValue(c.email ?? '');
-    this.notes.setValue(c.notes ?? '');
-    this.formOpen.set(true);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    void this.openCustomer(c.id);
+    this.editFromDrawer(c);
   }
 
   protected closeForm(): void {
-    this.formOpen.set(false);
     this.editing.set(null);
+    if (this.creating()) {
+      this.creating.set(false);
+    } else {
+      this.drawerEditing.set(false);
+    }
   }
 
   protected async save(): Promise<void> {
@@ -797,8 +931,16 @@ export class CustomersComponent implements OnInit {
         }
         this.notice.set(`Created ${this.firstName.value.trim()}`);
       }
-      this.closeForm();
-      await this.load();
+      if (editing) {
+        // Return to the drawer's detail view with fresh data.
+        this.drawerEditing.set(false);
+        this.editing.set(null);
+        await this.load();
+        await this.openCustomer(editing.id);
+      } else {
+        this.closeForm();
+        await this.load();
+      }
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Save failed');
     } finally {
@@ -841,7 +983,7 @@ export class CustomersComponent implements OnInit {
       this.notice.set('Repayment allocated');
       this.repayFor.set(null);
       await this.load();
-      const current = this.customers().find(c => c.id === this.expandedFor());
+      const current = this.customers().find(c => c.id === this.selectedCustomerId());
       if (current) {
         this.creditOrders.set(await this.money.creditOrders(current.id));
         this.orders.set(await this.pos.customerOrders(current.id));
@@ -950,16 +1092,26 @@ export class CustomersComponent implements OnInit {
     return Math.max(0, customer.credit_limit - customer.ar_balance);
   }
 
-  protected bucketBadge(bucket: string | null): string {
+  protected orderStatusType(status: string): BadgeType {
+    return ORDER_STATUS_MAP[status] ?? 'neutral';
+  }
+
+  /** Select option label: method code plus its reconciliation-type caption. */
+  protected methodOptionLabel(code: string): string {
+    const type = reconciliationLabel(reconciliationTypeForCode(code));
+    return type === '—' ? code : `${code} · ${type}`;
+  }
+
+  protected bucketType(bucket: string | null): BadgeType {
     switch (bucket) {
       case '8-30':
-        return 'badge-info';
+        return 'info';
       case '31-60':
-        return 'badge-warning';
+        return 'warning';
       case '60+':
-        return 'badge-error';
+        return 'error';
       default:
-        return 'badge-ghost';
+        return 'neutral';
     }
   }
 

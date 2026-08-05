@@ -1,12 +1,13 @@
 import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
-import { NgTemplateOutlet } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import type { Json } from '@dukarun/shared-types';
 import { formatKes } from '../core/money';
 import { PermissionsService } from '../core/permissions.service';
 import { SupabaseService } from '../core/supabase.service';
 import { AuditActor, AuditEvent, AuditService } from './audit.service';
+import { DrawerComponent } from '../shared/ui/drawer.component';
 import { EmptyStateComponent } from '../shared/ui/empty-state.component';
+import { StatusBadgeComponent } from '../shared/ui/status-badge.component';
 import { IconComponent } from '../shared/ui/icon.component';
 import { ListSearchBarComponent } from '../shared/ui/list-search-bar.component';
 import { PageLayoutComponent } from '../shared/ui/page-layout.component';
@@ -77,8 +78,9 @@ const REASON_FIELDS = new Set(['decision_reason', 'void_reason', 'reason', 'note
   selector: 'app-audit',
   imports: [
     RouterLink,
-    NgTemplateOutlet,
+    DrawerComponent,
     EmptyStateComponent,
+    StatusBadgeComponent,
     IconComponent,
     ListSearchBarComponent,
     PageLayoutComponent,
@@ -227,7 +229,6 @@ const REASON_FIELDS = new Set(['decision_reason', 'void_reason', 'reason', 'note
                   <th>Activity</th>
                   <th>Person</th>
                   <th>Area</th>
-                  <th class="w-12"><span class="sr-only">Details</span></th>
                 </tr>
               </thead>
               <tbody>
@@ -235,10 +236,11 @@ const REASON_FIELDS = new Set(['decision_reason', 'void_reason', 'reason', 'note
                   <tr
                     role="button"
                     tabindex="0"
-                    [attr.aria-expanded]="expanded() === event.event_id"
-                    (click)="toggle(event.event_id)"
-                    (keydown.enter)="toggle(event.event_id)"
-                    (keydown.space)="$event.preventDefault(); toggle(event.event_id)"
+                    class="cursor-pointer"
+                    [class.table-row-active]="selectedEventId() === event.event_id"
+                    (click)="openEvent(event.event_id)"
+                    (keydown.enter)="openEvent(event.event_id)"
+                    (keydown.space)="$event.preventDefault(); openEvent(event.event_id)"
                   >
                     <td class="whitespace-nowrap">
                       <p class="table-primary">{{ relativeTime(event.occurred_at) }}</p>
@@ -264,19 +266,7 @@ const REASON_FIELDS = new Set(['decision_reason', 'void_reason', 'reason', 'note
                     <td>
                       <span class="badge badge-ghost badge-sm">{{ areaLabel(event.area) }}</span>
                     </td>
-                    <td class="text-right">
-                      <app-icon
-                        [name]="expanded() === event.event_id ? 'heroChevronUp' : 'heroChevronDown'"
-                      />
-                    </td>
                   </tr>
-                  @if (expanded() === event.event_id) {
-                    <tr class="row-detail">
-                      <td colspan="5">
-                        <ng-container *ngTemplateOutlet="details; context: { $implicit: event }" />
-                      </td>
-                    </tr>
-                  }
                 }
               </tbody>
             </table>
@@ -285,13 +275,15 @@ const REASON_FIELDS = new Set(['decision_reason', 'void_reason', 'reason', 'note
 
         <div class="space-y-3 md:hidden">
           @for (event of events(); track event.event_id) {
-            <article class="card bg-base-100">
-              <button
-                type="button"
-                class="min-h-11 w-full p-4 text-left"
-                [attr.aria-expanded]="expanded() === event.event_id"
-                (click)="toggle(event.event_id)"
-              >
+            <article
+              class="card cursor-pointer bg-base-100"
+              role="button"
+              tabindex="0"
+              [class.border-primary]="selectedEventId() === event.event_id"
+              (click)="openEvent(event.event_id)"
+              (keydown.enter)="openEvent(event.event_id)"
+            >
+              <div class="min-h-11 w-full p-4 text-left">
                 <div class="flex items-start gap-3">
                   <span
                     class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-base-200 text-base-content/60"
@@ -312,82 +304,94 @@ const REASON_FIELDS = new Set(['decision_reason', 'void_reason', 'reason', 'note
                       <span>{{ relativeTime(event.occurred_at) }}</span>
                     </span>
                   </span>
-                  <app-icon
-                    class="mt-1 text-base-content/40"
-                    [name]="expanded() === event.event_id ? 'heroChevronUp' : 'heroChevronDown'"
-                  />
                 </div>
-              </button>
-              @if (expanded() === event.event_id) {
-                <div class="border-t border-base-300 p-4">
-                  <ng-container *ngTemplateOutlet="details; context: { $implicit: event }" />
-                </div>
-              }
+              </div>
             </article>
           }
         </div>
 
-        <ng-template #details let-event>
-          <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_14rem]">
-            <div class="min-w-0">
+        <!-- Audit event detail drawer (read-only) -->
+        @if (selectedEvent(); as event) {
+          <app-drawer
+            [open]="true"
+            (closed)="closeEventDrawer()"
+            [title]="entityName(event)"
+            [subtitle]="actorName(event) + ' · ' + dateTime(event.occurred_at)"
+          >
+            @if (areaRoute(event.area); as route) {
+              <a
+                actions
+                appButton
+                variant="ghost"
+                [iconOnly]="true"
+                [routerLink]="route"
+                [title]="'Open ' + areaLabel(event.area)"
+                [attr.aria-label]="'Open ' + areaLabel(event.area)"
+              >
+                <app-icon name="heroArrowRight" />
+              </a>
+            }
+
+            <div class="flex flex-wrap items-center gap-1">
+              <app-status-badge size="xs" type="neutral" [label]="event.operation" />
+              <app-status-badge size="xs" type="neutral" [label]="areaLabel(event.area)" />
+              <span class="type-caption">{{ activityTitle(event) }}</span>
+            </div>
+
+            <div class="mt-4 flex flex-col gap-4">
               @if (event.reason) {
-                <div class="mb-3 rounded-box border border-info/20 bg-info/5 p-3">
-                  <p class="type-caption font-semibold uppercase tracking-wide">Reason</p>
-                  <p class="mt-1 text-sm">{{ event.reason }}</p>
-                </div>
+                <section>
+                  <div class="rounded-box border border-info/20 bg-info/5 p-3">
+                    <p class="type-caption font-semibold uppercase tracking-wide">Reason</p>
+                    <p class="mt-1 text-sm">{{ event.reason }}</p>
+                  </div>
+                </section>
               }
-              @if (changes(event).length > 0) {
-                <p class="mb-2 type-caption font-semibold uppercase tracking-wide">
-                  {{ detailHeading(event) }}
-                </p>
-                <div class="overflow-hidden rounded-box border border-base-300">
-                  @for (change of changes(event); track change.field) {
-                    <div
-                      class="grid gap-1 border-b border-base-300/60 p-3 last:border-0 sm:grid-cols-[10rem_1fr]"
-                    >
-                      <span class="text-xs font-semibold">{{ fieldLabel(change.field) }}</span>
-                      <span class="min-w-0 text-sm">
-                        @if (event.operation === 'UPDATE') {
-                          <span class="break-words text-base-content/50 line-through">{{
-                            change.before
-                          }}</span>
-                          <span class="mx-2 text-base-content/30">→</span>
-                        }
-                        <span class="break-words">{{ change.after }}</span>
-                      </span>
-                    </div>
-                  }
-                </div>
-              } @else {
-                <p class="text-sm text-base-content/60">
-                  No additional field details were recorded.
-                </p>
-              }
-            </div>
-            <div class="space-y-3 rounded-box bg-base-200/60 p-3 text-sm">
-              <div>
-                <p class="type-caption">Person</p>
-                <p class="font-medium">{{ actorName(event) }}</p>
-                @if (event.actor_role) {
-                  <p class="text-xs text-base-content/60">{{ event.actor_role }}</p>
+
+              <section>
+                <h3 class="section-title mb-2">{{ detailHeading(event) }}</h3>
+                @if (changes(event).length === 0) {
+                  <app-empty-state
+                    [compact]="true"
+                    icon="heroInformationCircle"
+                    title="No additional field details were recorded"
+                  />
+                } @else {
+                  <ul class="divide-y divide-base-200">
+                    @for (change of changes(event); track change.field) {
+                      <li class="py-2">
+                        <p class="type-caption">{{ fieldLabel(change.field) }}</p>
+                        <p class="mt-0.5 min-w-0 text-sm">
+                          @if (event.operation === 'UPDATE') {
+                            <span class="break-words text-base-content/50 line-through">{{
+                              change.before
+                            }}</span>
+                            <span class="mx-2 text-base-content/30">→</span>
+                          }
+                          <span class="break-words">{{ change.after }}</span>
+                        </p>
+                      </li>
+                    }
+                  </ul>
                 }
-              </div>
-              <div>
-                <p class="type-caption">Time</p>
-                <p>{{ dateTime(event.occurred_at) }}</p>
-              </div>
-              <div>
-                <p class="type-caption">Record</p>
-                <p class="font-medium">{{ entityName(event) }}</p>
-              </div>
-              @if (areaRoute(event.area); as route) {
-                <a [routerLink]="route" class="btn btn-outline btn-sm min-h-11 w-full"
-                  >Open {{ areaLabel(event.area) }}</a
-                >
-              }
+              </section>
+
+              <section class="border-t border-base-300/60 pt-3">
+                <h3 class="section-title mb-2">Record</h3>
+                <div class="grid grid-cols-2 gap-2 rounded-field bg-base-200/50 p-2">
+                  <div>
+                    <p class="type-caption">Record</p>
+                    <p class="text-sm font-semibold">{{ entityName(event) }}</p>
+                  </div>
+                  <div>
+                    <p class="type-caption">Role</p>
+                    <p class="text-sm font-semibold">{{ event.actor_role || 'System' }}</p>
+                  </div>
+                </div>
+              </section>
             </div>
-          </div>
-        </ng-template>
+          </app-drawer>
+        }
 
         @if (totalPages() > 1) {
           <div class="mt-4">
@@ -422,7 +426,11 @@ export class AuditComponent implements OnInit, OnDestroy {
   protected readonly totalPages = computed(() =>
     Math.max(1, Math.ceil(this.total() / this.pageSize))
   );
-  protected readonly expanded = signal<string | null>(null);
+  protected readonly selectedEventId = signal<string | null>(null);
+  protected readonly selectedEvent = computed(() => {
+    const id = this.selectedEventId();
+    return id ? (this.events().find(event => event.event_id === id) ?? null) : null;
+  });
   protected readonly search = signal('');
   protected readonly action = signal('');
   protected readonly area = signal('');
@@ -461,7 +469,7 @@ export class AuditComponent implements OnInit, OnDestroy {
       if (requestId !== this.requestId) return;
       this.events.set(rows);
       this.total.set(rows[0]?.total_count ?? 0);
-      this.expanded.set(null);
+      this.selectedEventId.set(null);
     } catch (err) {
       if (requestId !== this.requestId) return;
       this.error.set(err instanceof Error ? err.message : 'Could not load the audit trail.');
@@ -496,8 +504,13 @@ export class AuditComponent implements OnInit, OnDestroy {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  protected toggle(eventId: string): void {
-    this.expanded.update(current => (current === eventId ? null : eventId));
+  protected openEvent(eventId: string): void {
+    this.selectedEventId.set(eventId);
+  }
+
+  /** Called by the drawer after its close transition finishes. */
+  protected closeEventDrawer(): void {
+    this.selectedEventId.set(null);
   }
 
   protected activityTitle(event: AuditEvent): string {

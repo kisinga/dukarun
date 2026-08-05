@@ -74,6 +74,8 @@ export interface EnabledPaymentMethod {
   code: string;
   name: string;
   is_cashier_controlled: boolean;
+  /** blind_count | transaction_verification | statement_match (credit excluded). */
+  reconciliation_type: string | null;
 }
 
 /** post_sale_at_location result (jsonb since migration 0054). */
@@ -466,6 +468,7 @@ export class PosService {
         code: method.code,
         name: method.name,
         is_cashier_controlled: method.is_cashier_controlled,
+        reconciliation_type: method.reconciliation_type ?? null,
       }));
   }
 
@@ -496,6 +499,8 @@ export class PosService {
     search?: string;
     page: number;
     pageSize: number;
+    /** Oldest sales first (cashier queue works the backlog top-down). */
+    oldestFirst?: boolean;
   }): Promise<{ rows: OrderWithCustomer[]; count: number }> {
     let customerIds: string[] = [];
     const term = input.search?.trim().replace(/[%_,()]/g, ' ') ?? '';
@@ -521,10 +526,29 @@ export class PosService {
     }
     const start = (input.page - 1) * input.pageSize;
     const { data, error, count } = await query
-      .order('created_at', { ascending: false })
+      .order('created_at', { ascending: input.oldestFirst ?? false })
       .range(start, start + input.pageSize - 1);
     if (error) throw error;
     return { rows: data ?? [], count: count ?? 0 };
+  }
+
+  /**
+   * The current user's own sales waiting at the cashier — powers the
+   * "awaiting payment" follow-up chip on the Sell screen.
+   */
+  async myPendingSales(limit = 50): Promise<OrderWithCustomer[]> {
+    const userId = this.supabase.offlineIdentity()?.userId;
+    if (!userId) return [];
+    const { data, error } = await this.client
+      .from('orders')
+      .select('*, customers(first_name, last_name)')
+      .eq('location_id', this.locations.requireActiveId())
+      .eq('status', 'pending_payment')
+      .eq('created_by', userId)
+      .order('cashier_pending_at', { ascending: true })
+      .limit(limit);
+    if (error) throw error;
+    return data ?? [];
   }
 
   /** Full order history for one customer (all statuses). */

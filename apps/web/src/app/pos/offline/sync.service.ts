@@ -286,6 +286,7 @@ export class SyncService {
           code: method.code,
           name: method.name,
           isCashierControlled: method.is_cashier_controlled,
+          reconciliationType: method.reconciliation_type ?? null,
         }));
         const db = await offlineDb();
         const existing = await db.get('settings', key);

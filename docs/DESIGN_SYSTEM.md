@@ -55,7 +55,8 @@ One primary action per screen, in the standard page-header action group.
 - Modals are full-screen on phones — encoded globally on `.modal-box` in `styles.scss`
   (`h-full` on mobile, `md:h-auto md:max-h-[90vh]` on desktop). Don't add your own
   height handling; per-modal width via `md:max-w-*` only.
-- Transitions are 150–200ms, no ornamental animation in dashboard flows.
+- Transitions are 150–200ms, no ornamental animation in dashboard flows. Always honor
+  `prefers-reduced-motion` (`motion-reduce:`) on any motion you add.
 - Every async action has a loading state; every list has an empty state (use
   `EmptyStateComponent`); errors never fail silently.
 
@@ -165,6 +166,28 @@ Compose pages from these — never hand-roll what a primitive owns:
   `direction="in|out"` for money-meaning colour, and `masked` for hidden figures. Never
   `{{ formatKes(...) }}` in templates (string composition in TS, e.g. option labels, is fine).
 - **`<app-icon>`** — icons on the 4-size scale (see Icons).
+- **`<app-drawer>`** — right-side slide-over for record detail (customer, supplier):
+  `[(open)]`, `title`, optional `subtitle`, a `[leading]` header slot (entity avatar), an
+  `[actions]` header slot, and a scrollable projected body. Backdrop click or Escape closes.
+  Close is two-phase: the panel plays its exit transition, then `(closed)` emits — parents
+  clear their selection there, not on `openChange`. Keep the selected row highlighted while
+  the drawer is open.
+  - Motion: panel slides in from the right (ease-out, 200ms) and out (ease-in, 150ms),
+    backdrop fades; both are disabled under `prefers-reduced-motion` (`motion-reduce:`).
+    This is the sanctioned overlay motion — don't invent others.
+  - Drawer body sections stack in one column: `.section-title` headings separated by
+    hairline `border-t border-base-300/60`, stat summary via `app-stat-card` pairs, forms
+    via `app-form-field`. History lists are two-line rows (`divide-y divide-base-200`,
+    primary `text-sm font-medium` + `type-caption` secondary, amount right-aligned
+    `tabular-nums`), not wide tables; long lists cap at `max-h-80 overflow-y-auto`; empty
+    sections use `app-empty-state` compact. Detail fetches show a centered
+    `loading-spinner` block until data arrives.
+  - Editing a record happens **inside the drawer** in edit mode (see "Detail & edit
+    surfaces" below): the parent swaps the projected body to the form on an `editing`
+    signal and flips `title` to "Edit {entity}"; save returns to the detail view, cancel
+    returns without saving. Create uses the same form with a "New {entity}" title. Never
+    layer edit UI over the drawer, never bounce to a top-of-page panel. Editors that are
+    surface 3 (line-item grids, multi-step) close the drawer first and open the modal.
 - Plus the existing shells: `app-page-header` (inside `app-page`), `app-stat-bar`,
   `app-stat-card`, `app-status-badge`, `app-empty-state`, `app-list-search-bar`,
   `app-pagination`, `app-data-table-shell`, `app-entity-avatar`, `app-mobile-fab`,
@@ -208,11 +231,50 @@ elsewhere (sales from the POS) omit the create action.
 
 ### Create and edit panels
 
-Inline create/edit panels open immediately below the page header and use the same card for
-both modes. Start with a full-width title and one-line context, use a responsive 2/4-column
-field grid, then finish with primary save + ghost cancel actions on one full-width row. The
-same header action opens the panel on desktop and mobile; do not duplicate it as a FAB or
-move it into the list toolbar.
+Create/edit placement follows the three-surface rule (see "Detail & edit surfaces"
+below). Simple entity forms live in the drawer's edit mode; complex editors use the
+shared modal shell or a dedicated route. Inline top-of-page panels are retired for
+drawer-backed entities; where one remains, it opens immediately below the page header
+and uses the same card for both modes: full-width title and one-line context,
+responsive 2/4-column field grid, primary save + ghost cancel on one full-width row.
+The same header action opens create on desktop and mobile; do not duplicate it as a
+FAB or move it into the list toolbar.
+
+## Detail & edit surfaces (the three surfaces)
+
+Every entity gets **one** detail surface and **one** edit surface, chosen by content
+weight — never improvised per page. The four legacy idioms (inline `tr.row-detail`
+entity detail, hand-rolled per-page modals, separate routes for inspection, inline
+top-of-page edit cards) are being retired; see `DETAIL_SURFACES_ROLLOUT.md` for the
+migration scope.
+
+1. **Detail → the drawer (`app-drawer`).** The default for record detail. Row click
+   opens it (no "View" buttons, per the row language); the row stays highlighted
+   while open. The drawer holds the stat summary, history lists, and **lightweight
+   single-entity flows** — repay, pay, refund, void, credit-terms edit. Content is
+   one column per the drawer section patterns above.
+2. **Simple edit → drawer edit mode.** Forms of roughly ≤ 6 flat fields with no
+   line-item grid (customer, supplier, team member) edit **in place inside the same
+   drawer**: the header flips to "Edit {entity}", the body swaps to the form, save
+   returns to the detail view, cancel returns without saving. Create uses the same
+   form with a "New {entity}" title, opened from the standard header action. One
+   surface per entity — no separate inline create card, no route hop.
+3. **Complex or blocking work → shared modal or dedicated route.** Editors with
+   line-item grids, multi-step wizards, or blocking transactional steps (product
+   editor with its variant grid, purchase recording, checkout, till count) never
+   squeeze into 480px. They use the `.modal-box` contract or a full page. Modals
+   converge on one shared component; hand-rolled `div.modal` / `<dialog>` markup is
+   not added to new work.
+
+Scoping rules:
+
+- `tr.row-detail` survives only for **read-only accounting metadata** (ledger/journal
+  DR/CR lines, approval payloads) and **speed-critical queues** (cashier queue). Anything
+  with an entity identity and a history gets a drawer.
+- Read-only drill-downs (staff performance daily table, proforma preview) are
+  drawers too — "peek and dismiss" is the drawer's core affordance.
+- Blocking transaction steps (checkout, session open/close) stay modals: a drawer
+  implies casual dismissal, which is the wrong affordance mid-transaction.
 
 **Trend/insight cards** — the legacy app used a collapsible `<app-trend-card>` for analytics
 panels on list pages; it has not been ported to `apps/web` yet. Until it is, keep analytics
@@ -293,9 +355,11 @@ vocabulary — same meaning, same shape; different data, different cells:
 - **Actions**: right-aligned ghost icon buttons only (`btn btn-ghost btn-xs` + `title`),
   `$event.stopPropagation()` on the cell. The row itself navigates
   (`hover cursor-pointer` + row click); **labeled "View" buttons are forbidden**.
-- **Expanded detail rows** (line items, reconciliations): one `tr.row-detail` with a
-  single full-width `td` (inset surface is encoded). No second zebra inside, no nested
-  bordered boxes.
+- **Expanded detail rows**: `tr.row-detail` is reserved for read-only accounting
+  metadata (ledger DR/CR, audit payloads) and speed-critical queues — one
+  `tr.row-detail` with a single full-width `td` (inset surface is encoded). No
+  second zebra inside, no nested bordered boxes. Entity detail belongs in the
+  drawer (see "Detail & edit surfaces"), not in an expanded row.
 - **Shared cell recipes**: `.table-entity` contains avatar + name, `.table-primary` and
   `.table-secondary` form the allowed two-line hierarchy, `.table-number` owns right-aligned
   tabular values, and `.table-actions` owns the final icon-action cell. These recipes and all

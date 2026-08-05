@@ -30,6 +30,8 @@ import { PaginationComponent } from '../shared/ui/pagination.component';
 import { StatBarComponent } from '../shared/ui/stat-bar.component';
 import { StatusBadgeComponent, type BadgeType } from '../shared/ui/status-badge.component';
 import { DataTableShellComponent } from '../shared/ui/data-table-shell.component';
+import { DrawerComponent } from '../shared/ui/drawer.component';
+import { StatCardComponent } from '../shared/ui/stat-card.component';
 import { CompanyPreferencesService } from '../core/company-preferences.service';
 import {
   AgingInfo,
@@ -37,6 +39,8 @@ import {
   MoneyCustomer,
   MoneyService,
   PurchaseDraft,
+  PurchaseLine,
+  PurchasePayment,
   SupplierVariantPerformance,
 } from '../money/money.service';
 import { CashierSessionService } from '../core/cashier-session.service';
@@ -92,6 +96,8 @@ interface ParsedPurchaseLine {
     StatBarComponent,
     ListSearchBarComponent,
     DataTableShellComponent,
+    DrawerComponent,
+    StatCardComponent,
     PageLayoutComponent,
     SessionRequiredNoticeComponent,
     PaginationComponent,
@@ -153,90 +159,6 @@ interface ParsedPurchaseLine {
         </div>
       }
 
-      @if (!isPurchasePage() && createOpen()) {
-        <div class="card mb-4 bg-base-100">
-          <form
-            (submit)="$event.preventDefault(); saveSupplier()"
-            class="card-body grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4"
-          >
-            <div class="sm:col-span-2 lg:col-span-4">
-              <h2 class="section-title">
-                {{ editingSupplier() ? 'Edit supplier' : 'New supplier' }}
-              </h2>
-              <p class="type-caption mt-1">
-                Contact details are kept separate from purchase and payment history.
-              </p>
-            </div>
-            <app-form-field label="Supplier name" [required]="true">
-              <input
-                type="text"
-                class="input input-bordered input-sm w-full"
-                autocomplete="organization"
-                [formControl]="newName"
-              />
-            </app-form-field>
-            <app-form-field label="Phone">
-              <input
-                type="tel"
-                class="input input-bordered input-sm w-full"
-                autocomplete="tel"
-                [formControl]="newPhone"
-              />
-            </app-form-field>
-            <app-form-field label="Email">
-              <input
-                type="email"
-                class="input input-bordered input-sm w-full"
-                autocomplete="email"
-                [formControl]="newEmail"
-              />
-            </app-form-field>
-            <app-form-field label="Notes">
-              <input
-                type="text"
-                class="input input-bordered input-sm w-full"
-                placeholder="Contact person, delivery notes…"
-                [formControl]="newNotes"
-              />
-            </app-form-field>
-            @if (perms.has('ManageSupplierCreditPurchases')) {
-              <app-form-field
-                label="Credit limit (KES)"
-                hint="Use 0 when this supplier has no configured cap."
-              >
-                <input
-                  type="text"
-                  inputmode="numeric"
-                  class="input input-bordered input-sm w-full"
-                  [formControl]="supplierCreditLimit"
-                />
-              </app-form-field>
-              <app-form-field label="Credit terms (days)">
-                <input
-                  type="number"
-                  min="0"
-                  class="input input-bordered input-sm w-full"
-                  [formControl]="supplierTermsDays"
-                />
-              </app-form-field>
-            }
-            <div class="flex items-end gap-2 sm:col-span-2 lg:col-span-4">
-              <button
-                appButton
-                type="submit"
-                [loading]="busy()"
-                [disabled]="newName.value.trim().length === 0"
-              >
-                {{ editingSupplier() ? 'Save changes' : 'Create supplier' }}
-              </button>
-              <button appButton variant="ghost" type="button" (click)="closeSupplierForm()">
-                Cancel
-              </button>
-            </div>
-          </form>
-        </div>
-      }
-
       @if (!isPurchasePage()) {
         <app-list-search-bar
           placeholder="Search supplier name, phone, or email…"
@@ -272,7 +194,15 @@ interface ParsedPurchaseLine {
                 </thead>
                 <tbody>
                   @for (supplier of filteredSuppliers(); track supplier.id) {
-                    <tr [class.opacity-60]="!supplier.supplier_active">
+                    <tr
+                      role="button"
+                      tabindex="0"
+                      class="cursor-pointer"
+                      [class.opacity-60]="!supplier.supplier_active"
+                      [class.table-row-active]="drawerSupplierId() === supplier.id"
+                      (click)="openSupplierDrawer(supplier)"
+                      (keydown.enter)="openSupplierDrawer(supplier)"
+                    >
                       <td>
                         <div class="table-entity">
                           <app-entity-avatar size="sm" [firstName]="name(supplier)" />
@@ -328,7 +258,7 @@ interface ParsedPurchaseLine {
                           </p>
                         }
                       </td>
-                      <td class="table-actions">
+                      <td class="table-actions" (click)="$event.stopPropagation()">
                         <button
                           appButton
                           variant="ghost"
@@ -1081,7 +1011,15 @@ interface ParsedPurchaseLine {
                 } @else {
                   <div class="mt-1 flex flex-col divide-y divide-base-200">
                     @for (s of filteredSuppliers(); track s.id) {
-                      <div class="py-3" [class.opacity-60]="!s.supplier_active">
+                      <div
+                        class="cursor-pointer py-3"
+                        role="button"
+                        tabindex="0"
+                        [class.opacity-60]="!s.supplier_active"
+                        [class.bg-base-200/50]="drawerSupplierId() === s.id"
+                        (click)="openSupplierDrawer(s)"
+                        (keydown.enter)="openSupplierDrawer(s)"
+                      >
                         <div class="flex items-center gap-3">
                           <div class="min-w-0 flex-1">
                             <p class="truncate text-sm font-medium">{{ name(s) }}</p>
@@ -1154,7 +1092,7 @@ interface ParsedPurchaseLine {
                             appButton
                             variant="ghost"
                             size="sm"
-                            (click)="startSupplierEdit(s)"
+                            (click)="$event.stopPropagation(); startSupplierEdit(s)"
                           >
                             Edit
                           </button>
@@ -1163,7 +1101,7 @@ interface ParsedPurchaseLine {
                             variant="ghost"
                             size="sm"
                             [disabled]="busy()"
-                            (click)="setSupplierActive(s)"
+                            (click)="$event.stopPropagation(); setSupplierActive(s)"
                           >
                             {{ s.supplier_active ? 'Archive' : 'Reactivate' }}
                           </button>
@@ -1175,66 +1113,367 @@ interface ParsedPurchaseLine {
               </div>
             </section>
           }
-
-          @if (!isPurchasePage() && perms.has('ViewFinancials')) {
-            <section class="card bg-base-100">
-              <div class="card-body p-4">
-                <h2 class="section-title">Pay a supplier balance</h2>
-                @if (suppliersOwed().length === 0) {
-                  <p class="mt-2 text-sm text-base-content/60">We do not owe any suppliers.</p>
-                } @else {
-                  @if (!cashierSession.canTakePayment()) {
-                    <app-session-required-notice action="paying a supplier" />
-                  }
-                  <form
-                    (submit)="$event.preventDefault(); paySupplier()"
-                    class="mt-3 flex flex-col gap-3"
-                  >
-                    <app-form-field label="Supplier">
-                      <select
-                        class="select select-bordered select-sm w-full"
-                        [formControl]="paySupplierId"
-                      >
-                        @for (s of suppliersOwed(); track s.id) {
-                          <option [value]="s.id">
-                            {{ name(s) }} — we owe {{ fmt(s.ap_balance) }}
-                          </option>
-                        }
-                      </select>
-                    </app-form-field>
-                    <app-form-field label="Amount (KES)">
-                      <input
-                        type="text"
-                        inputmode="numeric"
-                        class="input input-bordered input-sm w-full"
-                        [formControl]="payAmount"
-                      />
-                    </app-form-field>
-                    <app-form-field label="Pay from">
-                      <select
-                        class="select select-bordered select-sm w-full"
-                        [formControl]="payAccount"
-                      >
-                        @for (a of accounts(); track a.code) {
-                          <option [value]="a.code">{{ a.code }} — {{ a.name }}</option>
-                        }
-                      </select>
-                    </app-form-field>
-                    <button
-                      appButton
-                      type="submit"
-                      [loading]="busy()"
-                      [disabled]="!cashierSession.canTakePayment()"
-                    >
-                      Record supplier payment
-                    </button>
-                  </form>
-                }
-              </div>
-            </section>
-          }
         </aside>
       </div>
+
+      <!-- Supplier detail/edit drawer (shared shell with the customer drawer) -->
+      @if (!isPurchasePage()) {
+        @if (drawerSupplierId() !== null || supplierCreating()) {
+          <app-drawer
+            [open]="true"
+            (closed)="closeSupplierDrawer()"
+            [title]="drawerTitle()"
+            [subtitle]="drawerSubtitle()"
+          >
+            @if (detailSupplier(); as s) {
+              <app-entity-avatar leading size="sm" [firstName]="name(s)" />
+            }
+            @if (detailSupplier(); as s) {
+              <button
+                actions
+                appButton
+                variant="ghost"
+                [iconOnly]="true"
+                type="button"
+                title="Edit supplier"
+                aria-label="Edit supplier"
+                (click)="editSupplierFromDrawer(s)"
+              >
+                <app-icon name="heroPencilSquare" />
+              </button>
+            }
+
+            @if (supplierCreating() || drawerEditing()) {
+              <!-- Create / edit mode: the supplier form, in place -->
+              <form (submit)="$event.preventDefault(); saveSupplier()" class="flex flex-col gap-3">
+                <p class="type-caption">
+                  Contact details are kept separate from purchase and payment history.
+                </p>
+                <app-form-field label="Supplier name" [required]="true">
+                  <input
+                    type="text"
+                    class="input input-bordered input-sm w-full"
+                    autocomplete="organization"
+                    [formControl]="newName"
+                  />
+                </app-form-field>
+                <app-form-field label="Phone">
+                  <input
+                    type="tel"
+                    class="input input-bordered input-sm w-full"
+                    autocomplete="tel"
+                    [formControl]="newPhone"
+                  />
+                </app-form-field>
+                <app-form-field label="Email">
+                  <input
+                    type="email"
+                    class="input input-bordered input-sm w-full"
+                    autocomplete="email"
+                    [formControl]="newEmail"
+                  />
+                </app-form-field>
+                <app-form-field label="Notes">
+                  <input
+                    type="text"
+                    class="input input-bordered input-sm w-full"
+                    placeholder="Contact person, delivery notes…"
+                    [formControl]="newNotes"
+                  />
+                </app-form-field>
+                @if (perms.has('ManageSupplierCreditPurchases')) {
+                  <app-form-field
+                    label="Credit limit (KES)"
+                    hint="Use 0 when this supplier has no configured cap."
+                  >
+                    <input
+                      type="text"
+                      inputmode="numeric"
+                      class="input input-bordered input-sm w-full"
+                      [formControl]="supplierCreditLimit"
+                    />
+                  </app-form-field>
+                  <app-form-field label="Credit terms (days)">
+                    <input
+                      type="number"
+                      min="0"
+                      class="input input-bordered input-sm w-full"
+                      [formControl]="supplierTermsDays"
+                    />
+                  </app-form-field>
+                }
+                <div class="flex gap-2">
+                  <button
+                    appButton
+                    type="submit"
+                    [loading]="busy()"
+                    [disabled]="newName.value.trim().length === 0"
+                  >
+                    {{ editingSupplier() ? 'Save changes' : 'Create supplier' }}
+                  </button>
+                  <button appButton variant="ghost" type="button" (click)="closeSupplierForm()">
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            } @else if (drawerSupplier(); as s) {
+              <div class="flex flex-wrap items-center gap-1">
+                <app-status-badge
+                  size="xs"
+                  [type]="s.supplier_active ? 'success' : 'neutral'"
+                  [label]="s.supplier_active ? 'Active' : 'Archived'"
+                />
+                @if (s.days_outstanding !== null) {
+                  <span class="type-caption">{{ s.days_outstanding }}d</span>
+                  <app-status-badge
+                    size="xs"
+                    [type]="bucketType(s.bucket)"
+                    [label]="s.bucket ?? 'current'"
+                  />
+                }
+              </div>
+
+              <div class="mt-3 grid grid-cols-2 gap-2">
+                <app-stat-card
+                  label="We owe"
+                  [value]="perms.has('ViewFinancials') ? fmt(s.ap_balance) : 'Hidden'"
+                  [tone]="s.ap_balance > 0 ? 'warning' : 'neutral'"
+                />
+                <app-stat-card
+                  label="Credit available"
+                  [value]="
+                    !perms.has('ViewFinancials')
+                      ? 'Hidden'
+                      : s.supplier_credit_limit > 0
+                        ? fmt(supplierCreditAvailable(s))
+                        : 'No cap'
+                  "
+                  [sub]="
+                    s.supplier_credit_limit > 0
+                      ? 'Limit ' + fmt(s.supplier_credit_limit)
+                      : (s.supplier_credit_terms_days || 0) + 'd terms'
+                  "
+                />
+              </div>
+
+              @if (supplierStats(s.id); as stats) {
+                <div class="mt-3 grid grid-cols-2 gap-2 rounded-field bg-base-200/50 p-2">
+                  <div>
+                    <p class="type-caption">Purchases</p>
+                    <p class="text-sm font-semibold">{{ stats.purchases }}</p>
+                  </div>
+                  <div>
+                    <p class="type-caption">Products supplied</p>
+                    <p class="text-sm font-semibold">{{ stats.products }}</p>
+                  </div>
+                  <div>
+                    <p class="type-caption">Average order</p>
+                    <p class="text-sm font-semibold">{{ fmt(stats.averageOrder) }}</p>
+                  </div>
+                  <div>
+                    <p class="type-caption">Price leader</p>
+                    <p class="text-sm font-semibold">{{ stats.bestPrices }} product(s)</p>
+                  </div>
+                </div>
+              }
+
+              <div class="mt-4 flex flex-col gap-4">
+                @if (perms.has('ViewFinancials')) {
+                  <section>
+                    <h3 class="section-title mb-2">Pay this supplier</h3>
+                    @if (s.ap_balance <= 0) {
+                      <p class="text-xs text-base-content/60">We do not owe this supplier.</p>
+                    } @else {
+                      @if (!cashierSession.canTakePayment()) {
+                        <app-session-required-notice action="paying a supplier" />
+                      }
+                      <form
+                        (submit)="$event.preventDefault(); paySupplier()"
+                        class="mt-2 flex flex-col gap-3"
+                      >
+                        <app-form-field label="Amount (KES)">
+                          <input
+                            type="text"
+                            inputmode="numeric"
+                            class="input input-bordered input-sm w-full"
+                            [formControl]="payAmount"
+                          />
+                        </app-form-field>
+                        <app-form-field label="Pay from">
+                          <select
+                            class="select select-bordered select-sm w-full"
+                            [formControl]="payAccount"
+                          >
+                            @for (a of accounts(); track a.code) {
+                              <option [value]="a.code">{{ a.code }} — {{ a.name }}</option>
+                            }
+                          </select>
+                        </app-form-field>
+                        <button
+                          appButton
+                          type="submit"
+                          class="self-start"
+                          [loading]="busy()"
+                          [disabled]="!cashierSession.canTakePayment()"
+                        >
+                          Record supplier payment
+                        </button>
+                      </form>
+                    }
+                  </section>
+                }
+
+                @if (perms.has('ManageSupplierCreditPurchases')) {
+                  <section class="border-t border-base-300/60 pt-3">
+                    <h3 class="section-title mb-2">Credit terms</h3>
+                    <form
+                      (submit)="$event.preventDefault(); saveDrawerCredit(s)"
+                      class="flex flex-col gap-2"
+                    >
+                      <app-form-field
+                        label="Credit limit (KES)"
+                        hint="Use 0 when this supplier has no configured cap."
+                      >
+                        <input
+                          type="text"
+                          inputmode="numeric"
+                          class="input input-bordered input-sm w-full"
+                          [formControl]="supplierCreditLimit"
+                        />
+                      </app-form-field>
+                      <app-form-field label="Credit terms (days)">
+                        <input
+                          type="number"
+                          min="0"
+                          class="input input-bordered input-sm w-full"
+                          [formControl]="supplierTermsDays"
+                        />
+                      </app-form-field>
+                      <button
+                        appButton
+                        variant="outline"
+                        type="submit"
+                        class="self-start"
+                        [disabled]="busy()"
+                      >
+                        Save credit terms
+                      </button>
+                    </form>
+                  </section>
+                }
+
+                <section class="border-t border-base-300/60 pt-3">
+                  <h3 class="section-title mb-2">Purchases</h3>
+                  @if (drawerPurchases().length === 0) {
+                    <app-empty-state
+                      [compact]="true"
+                      icon="heroTruck"
+                      title="No purchases from this supplier"
+                    />
+                  } @else {
+                    <p class="type-caption mb-2">
+                      Paid
+                      <app-money
+                        [amount]="drawerPaymentSummary().paid"
+                        [masked]="!perms.has('ViewFinancials')"
+                      />
+                      of
+                      <app-money
+                        [amount]="drawerPaymentSummary().total"
+                        [masked]="!perms.has('ViewFinancials')"
+                      />
+                      across {{ drawerPurchases().length }} purchase(s) · still to pay
+                      <app-money
+                        [amount]="drawerPaymentSummary().outstanding"
+                        [masked]="!perms.has('ViewFinancials')"
+                      />
+                    </p>
+                    <ul class="max-h-80 divide-y divide-base-200 overflow-y-auto">
+                      @for (p of drawerPurchases(); track p.id) {
+                        <li class="py-2">
+                          <div class="flex items-center gap-2">
+                            <div class="min-w-0 flex-1">
+                              <p class="truncate text-sm font-medium">
+                                {{ p.reference || 'No reference' }}
+                              </p>
+                              <p class="type-caption">
+                                {{ time(p.created_at) }} ·
+                                {{ p.is_credit ? 'Pay later' : 'Paid now' }}
+                              </p>
+                            </div>
+                            <app-status-badge
+                              size="xs"
+                              [type]="purchaseStatusType(p)"
+                              [label]="purchaseStatusLabel(p)"
+                            />
+                            <span class="text-sm font-semibold tabular-nums">
+                              <app-money
+                                [amount]="p.total_cost"
+                                [masked]="!perms.has('ViewFinancials')"
+                              />
+                            </span>
+                            @if (
+                              p.is_credit &&
+                              p.paid < p.total_cost &&
+                              perms.has('ManageSupplierCreditPurchases')
+                            ) {
+                              <button
+                                appButton
+                                variant="outline"
+                                size="sm"
+                                [disabled]="!cashierSession.canTakePayment()"
+                                (click)="startPurchasePayment(p)"
+                              >
+                                Pay
+                              </button>
+                            }
+                          </div>
+                          @if (payPurchaseId() === p.id) {
+                            <form
+                              (submit)="$event.preventDefault(); paySelectedPurchase()"
+                              class="mt-2 flex flex-wrap items-end gap-2 rounded-field border border-base-300 bg-base-200/50 p-2"
+                            >
+                              <app-form-field label="Amount (KES)"
+                                ><input
+                                  class="input input-bordered input-sm w-32"
+                                  [formControl]="selectedPayAmount" /></app-form-field
+                              ><app-form-field label="Pay from"
+                                ><select
+                                  class="select select-bordered select-sm"
+                                  [formControl]="selectedPayAccount"
+                                >
+                                  @for (a of accounts(); track a.code) {
+                                    <option [value]="a.code">{{ a.name }}</option>
+                                  }
+                                </select></app-form-field
+                              ><button
+                                appButton
+                                size="sm"
+                                type="submit"
+                                [disabled]="busy() || !cashierSession.canTakePayment()"
+                              >
+                                Record payment</button
+                              ><button
+                                appButton
+                                variant="ghost"
+                                size="sm"
+                                type="button"
+                                (click)="payPurchaseId.set(null)"
+                              >
+                                Cancel
+                              </button>
+                            </form>
+                          }
+                        </li>
+                      }
+                    </ul>
+                  }
+                </section>
+              </div>
+            }
+          </app-drawer>
+        }
+      }
 
       @if (isPurchasePage()) {
         <section>
@@ -1275,7 +1514,14 @@ interface ParsedPurchaseLine {
                 </thead>
                 <tbody>
                   @for (p of pagedPurchases(); track p.id) {
-                    <tr>
+                    <tr
+                      role="button"
+                      tabindex="0"
+                      class="cursor-pointer"
+                      [class.table-row-active]="drawerPurchaseId() === p.id"
+                      (click)="openPurchaseDrawer(p)"
+                      (keydown.enter)="openPurchaseDrawer(p)"
+                    >
                       <td class="whitespace-nowrap text-sm">{{ time(p.created_at) }}</td>
                       <td class="font-medium">{{ supplierName(p.supplier_id) }}</td>
                       <td class="text-sm">{{ p.is_credit ? 'Pay later' : 'Paid now' }}</td>
@@ -1292,10 +1538,18 @@ interface ParsedPurchaseLine {
                           [label]="purchaseStatusLabel(p)"
                         />
                       </td>
-                      <td class="whitespace-nowrap text-right">
+                      <td class="table-actions" (click)="$event.stopPropagation()">
                         @if (printerEnabled()) {
-                          <button appButton variant="ghost" (click)="printPurchase(p.id)">
-                            Print PO
+                          <button
+                            appButton
+                            variant="ghost"
+                            [iconOnly]="true"
+                            type="button"
+                            title="Print PO"
+                            aria-label="Print PO"
+                            (click)="printPurchase(p.id)"
+                          >
+                            <app-icon name="heroPrinter" />
                           </button>
                         }
                         @if (
@@ -1303,54 +1557,224 @@ interface ParsedPurchaseLine {
                           p.paid < p.total_cost &&
                           perms.has('ManageSupplierCreditPurchases')
                         ) {
-                          <button appButton variant="ghost" (click)="startPurchasePayment(p)">
-                            Pay
+                          <button
+                            appButton
+                            variant="ghost"
+                            [iconOnly]="true"
+                            type="button"
+                            title="Pay this purchase"
+                            aria-label="Pay this purchase"
+                            (click)="openPurchaseDrawer(p); startPurchasePayment(p)"
+                          >
+                            <app-icon name="heroBanknotes" />
                           </button>
                         }
                       </td>
                     </tr>
-                    @if (payPurchaseId() === p.id) {
-                      <tr class="row-detail">
-                        <td colspan="8">
+                  }
+                </tbody>
+              </table>
+            </app-data-table-shell>
+
+            <!-- Purchase detail drawer -->
+            @if (drawerPurchase(); as p) {
+              <app-drawer
+                [open]="true"
+                (closed)="closePurchaseDrawer()"
+                [title]="p.reference || 'Purchase'"
+                [subtitle]="supplierName(p.supplier_id) + ' · ' + time(p.created_at)"
+              >
+                @if (printerEnabled()) {
+                  <button
+                    actions
+                    appButton
+                    variant="ghost"
+                    [iconOnly]="true"
+                    type="button"
+                    title="Print PO"
+                    aria-label="Print PO"
+                    (click)="printPurchase(p.id)"
+                  >
+                    <app-icon name="heroPrinter" />
+                  </button>
+                }
+
+                <div class="flex flex-wrap items-center gap-1">
+                  <app-status-badge
+                    size="xs"
+                    [type]="purchaseStatusType(p)"
+                    [label]="purchaseStatusLabel(p)"
+                  />
+                  <app-status-badge
+                    size="xs"
+                    type="neutral"
+                    [label]="p.is_credit ? 'Pay later' : 'Paid now'"
+                  />
+                </div>
+
+                <div class="mt-3 grid grid-cols-2 gap-2">
+                  <app-stat-card
+                    label="Total"
+                    [value]="perms.has('ViewFinancials') ? fmt(p.total_cost) : 'Hidden'"
+                  />
+                  <app-stat-card
+                    label="Paid"
+                    [value]="perms.has('ViewFinancials') ? fmt(p.paid) : 'Hidden'"
+                    [tone]="p.paid >= p.total_cost ? 'success' : p.paid > 0 ? 'warning' : 'neutral'"
+                    [sub]="
+                      p.total_cost - p.paid > 0 && perms.has('ViewFinancials')
+                        ? 'Still to pay ' + fmt(p.total_cost - p.paid)
+                        : undefined
+                    "
+                  />
+                </div>
+
+                @if (purchaseDetailLoading()) {
+                  <div class="flex items-center justify-center gap-2 py-8 text-base-content/60">
+                    <span class="loading loading-spinner loading-md"></span>
+                    <span class="text-sm">Loading purchase details…</span>
+                  </div>
+                } @else {
+                  <div class="mt-4 flex flex-col gap-4">
+                    <section>
+                      <h3 class="section-title mb-2">Items</h3>
+                      @if (drawerPurchaseLines().length === 0) {
+                        <app-empty-state
+                          [compact]="true"
+                          icon="heroShoppingCart"
+                          title="No line items"
+                        />
+                      } @else {
+                        <ul class="divide-y divide-base-200">
+                          @for (line of drawerPurchaseLines(); track line.id) {
+                            <li class="flex items-center gap-3 py-2">
+                              <div class="min-w-0 flex-1">
+                                <p class="truncate text-sm font-medium">
+                                  {{ purchaseLineLabel(line.variant_id) }}
+                                </p>
+                                <p class="type-caption">
+                                  {{ line.quantity }} ×
+                                  <app-money
+                                    [amount]="line.unit_cost"
+                                    [masked]="!perms.has('ViewFinancials')"
+                                  />
+                                  @if (line.expiry_date) {
+                                    · exp {{ line.expiry_date }}
+                                  }
+                                  @if (line.batch_number) {
+                                    · batch {{ line.batch_number }}
+                                  }
+                                </p>
+                              </div>
+                              <span class="text-sm font-semibold tabular-nums">
+                                <app-money
+                                  [amount]="line.line_total"
+                                  [masked]="!perms.has('ViewFinancials')"
+                                />
+                              </span>
+                            </li>
+                          }
+                        </ul>
+                      }
+                    </section>
+
+                    <section class="border-t border-base-300/60 pt-3">
+                      <h3 class="section-title mb-2">Payments</h3>
+                      @if (drawerPurchasePayments().length === 0) {
+                        <app-empty-state
+                          [compact]="true"
+                          icon="heroBanknotes"
+                          title="No payments recorded"
+                        />
+                      } @else {
+                        <ul class="divide-y divide-base-200">
+                          @for (payment of drawerPurchasePayments(); track payment.id) {
+                            <li class="flex items-center gap-3 py-2">
+                              <div class="min-w-0 flex-1">
+                                <p class="text-sm font-medium">{{ payment.account_code }}</p>
+                                <p class="type-caption">{{ time(payment.created_at) }}</p>
+                              </div>
+                              <span class="text-sm font-semibold tabular-nums">
+                                <app-money
+                                  [amount]="payment.amount"
+                                  direction="out"
+                                  [masked]="!perms.has('ViewFinancials')"
+                                />
+                              </span>
+                            </li>
+                          }
+                        </ul>
+                      }
+                    </section>
+
+                    @if (
+                      p.is_credit &&
+                      p.paid < p.total_cost &&
+                      perms.has('ManageSupplierCreditPurchases')
+                    ) {
+                      <section class="border-t border-base-300/60 pt-3">
+                        <h3 class="section-title mb-2">Pay this purchase</h3>
+                        @if (!cashierSession.canTakePayment()) {
+                          <app-session-required-notice action="paying a supplier" />
+                        }
+                        @if (payPurchaseId() !== p.id) {
+                          <button
+                            appButton
+                            variant="outline"
+                            size="sm"
+                            [disabled]="!cashierSession.canTakePayment()"
+                            (click)="startPurchasePayment(p)"
+                          >
+                            Record payment
+                          </button>
+                        } @else {
                           <form
                             (submit)="$event.preventDefault(); paySelectedPurchase()"
-                            class="flex flex-wrap items-end gap-2"
+                            class="flex flex-col gap-2 rounded-field border border-base-300 bg-base-200/50 p-2"
                           >
-                            <app-form-field label="Amount (KES)"
-                              ><input
-                                class="input input-bordered input-sm w-32"
-                                [formControl]="selectedPayAmount" /></app-form-field
-                            ><app-form-field label="Pay from"
-                              ><select
-                                class="select select-bordered select-sm"
+                            <app-form-field label="Amount (KES)">
+                              <input
+                                class="input input-bordered input-sm w-full"
+                                [formControl]="selectedPayAmount"
+                              />
+                            </app-form-field>
+                            <app-form-field label="Pay from">
+                              <select
+                                class="select select-bordered select-sm w-full"
                                 [formControl]="selectedPayAccount"
                               >
                                 @for (a of accounts(); track a.code) {
                                   <option [value]="a.code">{{ a.name }}</option>
                                 }
-                              </select></app-form-field
-                            ><button
-                              appButton
-                              type="submit"
-                              [disabled]="busy() || !cashierSession.canTakePayment()"
-                            >
-                              Record payment</button
-                            ><button
-                              appButton
-                              variant="ghost"
-                              type="button"
-                              (click)="payPurchaseId.set(null)"
-                            >
-                              Cancel
-                            </button>
+                              </select>
+                            </app-form-field>
+                            <div class="flex gap-2">
+                              <button
+                                appButton
+                                size="sm"
+                                type="submit"
+                                [disabled]="busy() || !cashierSession.canTakePayment()"
+                              >
+                                Record payment
+                              </button>
+                              <button
+                                appButton
+                                variant="ghost"
+                                size="sm"
+                                type="button"
+                                (click)="payPurchaseId.set(null)"
+                              >
+                                Cancel
+                              </button>
+                            </div>
                           </form>
-                        </td>
-                      </tr>
+                        }
+                      </section>
                     }
-                  }
-                </tbody>
-              </table>
-            </app-data-table-shell>
+                  </div>
+                }
+              </app-drawer>
+            }
             <div class="mt-3">
               <app-pagination
                 [currentPage]="purchasePage()"
@@ -1397,7 +1821,9 @@ export class SuppliersComponent implements OnInit, OnDestroy {
   protected readonly locations = signal<StockLocation[]>([]);
   protected readonly activeDraftId = signal<string | null>(null);
   protected readonly purchaseFormOpen = signal(false);
-  protected readonly createOpen = signal(false);
+  /** Drawer edit mode: supplierCreating = empty form, drawerEditing = form for the open supplier. */
+  protected readonly supplierCreating = signal(false);
+  protected readonly drawerEditing = signal(false);
   protected readonly editingSupplier = signal<SupplierWithAp | null>(null);
 
   protected readonly newName = new FormControl('', { nonNullable: true });
@@ -1471,6 +1897,45 @@ export class SuppliersComponent implements OnInit, OnDestroy {
   protected readonly suppliersOwed = computed(() =>
     this.suppliers().filter(supplier => supplier.ap_balance > 0)
   );
+  protected readonly drawerSupplierId = signal<string | null>(null);
+  protected readonly drawerSupplier = computed(() => {
+    const id = this.drawerSupplierId();
+    return id ? (this.suppliers().find(s => s.id === id) ?? null) : null;
+  });
+  /** Supplier shown in the drawer's detail chrome (null while editing/creating). */
+  protected readonly detailSupplier = computed(() =>
+    this.supplierCreating() || this.drawerEditing() ? null : this.drawerSupplier()
+  );
+  protected readonly drawerTitle = computed(() => {
+    if (this.supplierCreating()) return 'New supplier';
+    const s = this.drawerSupplier();
+    if (!s) return 'Supplier';
+    return this.drawerEditing() ? `Edit ${this.name(s)}` : this.name(s);
+  });
+  protected readonly drawerSubtitle = computed(() => {
+    if (this.supplierCreating()) return undefined;
+    const s = this.drawerSupplier();
+    return s ? s.phone || s.email || undefined : undefined;
+  });
+  protected readonly drawerPurchases = computed(() => {
+    const id = this.drawerSupplierId();
+    return id ? this.purchases().filter(p => p.supplier_id === id) : [];
+  });
+  protected readonly drawerPaymentSummary = computed(() => {
+    const rows = this.drawerPurchases();
+    const total = rows.reduce((sum, p) => sum + p.total_cost, 0);
+    const paid = rows.reduce((sum, p) => sum + Math.min(p.paid, p.total_cost), 0);
+    return { total, paid, outstanding: Math.max(0, total - paid) };
+  });
+  // Purchase detail drawer (/purchases side)
+  protected readonly drawerPurchaseId = signal<string | null>(null);
+  protected readonly drawerPurchase = computed(() => {
+    const id = this.drawerPurchaseId();
+    return id ? (this.purchases().find(p => p.id === id) ?? null) : null;
+  });
+  protected readonly drawerPurchaseLines = signal<PurchaseLine[]>([]);
+  protected readonly drawerPurchasePayments = signal<PurchasePayment[]>([]);
+  protected readonly purchaseDetailLoading = signal(false);
   protected readonly openCreditPurchases = computed(
     () =>
       this.purchases().filter(purchase => purchase.is_credit && purchase.paid < purchase.total_cost)
@@ -1604,6 +2069,13 @@ export class SuppliersComponent implements OnInit, OnDestroy {
         this.selectedPayAccount.setValue(accounts[0].code);
       if (!this.purchaseLocation.value && locations.length > 0)
         this.purchaseLocation.setValue(locations[0].id);
+      // Realtime: keep an open purchase drawer's payment history in sync.
+      const openPurchaseId = this.drawerPurchaseId();
+      if (openPurchaseId && purchases.some(p => p.id === openPurchaseId)) {
+        void this.money.purchasePayments(openPurchaseId).then(pp => {
+          if (this.drawerPurchaseId() === openPurchaseId) this.drawerPurchasePayments.set(pp);
+        });
+      }
       this.error.set(null);
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Failed to load');
@@ -2076,6 +2548,42 @@ export class SuppliersComponent implements OnInit, OnDestroy {
     this.selectedPayAmount.setValue(formatKesInput(purchase.total_cost - purchase.paid));
   }
 
+  protected async openPurchaseDrawer(purchase: PurchaseRow): Promise<void> {
+    this.drawerPurchaseId.set(purchase.id);
+    this.payPurchaseId.set(null);
+    this.drawerPurchaseLines.set([]);
+    this.drawerPurchasePayments.set([]);
+    this.purchaseDetailLoading.set(true);
+    try {
+      const [lines, payments] = await Promise.all([
+        this.money.purchaseLines(purchase.id),
+        this.money.purchasePayments(purchase.id),
+      ]);
+      // Ignore stale results when the drawer was closed (or reopened) meanwhile.
+      if (this.drawerPurchaseId() !== purchase.id) return;
+      this.drawerPurchaseLines.set(lines);
+      this.drawerPurchasePayments.set(payments);
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Failed to load purchase details');
+    } finally {
+      if (this.drawerPurchaseId() === purchase.id) this.purchaseDetailLoading.set(false);
+    }
+  }
+
+  /** Called by the drawer after its close transition finishes. */
+  protected closePurchaseDrawer(): void {
+    this.drawerPurchaseId.set(null);
+    this.payPurchaseId.set(null);
+    this.purchaseDetailLoading.set(false);
+    this.drawerPurchaseLines.set([]);
+    this.drawerPurchasePayments.set([]);
+  }
+
+  protected purchaseLineLabel(variantId: string): string {
+    const variant = this.variants().find(v => v.variant_id === variantId);
+    return variant ? this.label(variant) : 'Item';
+  }
+
   protected async paySelectedPurchase(): Promise<void> {
     const id = this.payPurchaseId();
     const amount = parseKes(this.selectedPayAmount.value);
@@ -2090,6 +2598,11 @@ export class SuppliersComponent implements OnInit, OnDestroy {
       this.payPurchaseId.set(null);
       this.notice.set('Purchase payment recorded');
       await this.load();
+      // Keep an open purchase drawer's payment history in sync.
+      const openId = this.drawerPurchaseId();
+      if (openId) {
+        this.drawerPurchasePayments.set(await this.money.purchasePayments(openId));
+      }
     } catch (error) {
       this.error.set(error instanceof Error ? error.message : 'Payment failed');
     } finally {
@@ -2157,6 +2670,56 @@ export class SuppliersComponent implements OnInit, OnDestroy {
     }
   }
 
+  protected openSupplierDrawer(supplier: SupplierWithAp): void {
+    this.drawerSupplierId.set(supplier.id);
+    this.payPurchaseId.set(null);
+    this.paySupplierId.setValue(supplier.id);
+    this.payAmount.setValue('');
+    this.supplierCreditLimit.setValue(formatKesInput(supplier.supplier_credit_limit));
+    this.supplierTermsDays.setValue(supplier.supplier_credit_terms_days ?? 0);
+  }
+
+  /** Called by the drawer after its close transition finishes. */
+  protected closeSupplierDrawer(): void {
+    this.drawerSupplierId.set(null);
+    this.payPurchaseId.set(null);
+    this.supplierCreating.set(false);
+    this.drawerEditing.set(false);
+    this.editingSupplier.set(null);
+  }
+
+  /** Edit in place: flip the open drawer to its form without closing it. */
+  protected editSupplierFromDrawer(supplier: SupplierWithAp): void {
+    this.editingSupplier.set(supplier);
+    this.newName.setValue(this.name(supplier));
+    this.newPhone.setValue(supplier.phone ?? '');
+    this.newEmail.setValue(supplier.email ?? '');
+    this.newNotes.setValue(supplier.notes ?? '');
+    this.supplierCreditLimit.setValue(formatKesInput(supplier.supplier_credit_limit));
+    this.supplierTermsDays.setValue(supplier.supplier_credit_terms_days ?? 0);
+    this.drawerEditing.set(true);
+  }
+
+  protected async saveDrawerCredit(supplier: SupplierWithAp): Promise<void> {
+    const creditLimit = parseKes(this.supplierCreditLimit.value);
+    if (creditLimit === null) {
+      this.error.set('Enter a valid supplier credit limit');
+      return;
+    }
+    this.busy.set(true);
+    this.error.set(null);
+    this.notice.set(null);
+    try {
+      await this.money.updateSupplierCredit(supplier.id, creditLimit, this.supplierTermsDays.value);
+      this.notice.set(`Credit terms saved for ${this.name(supplier)}`);
+      await this.load();
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Save failed');
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
   protected startSupplierCreate(): void {
     this.editingSupplier.set(null);
     this.newName.setValue('');
@@ -2165,24 +2728,22 @@ export class SuppliersComponent implements OnInit, OnDestroy {
     this.newNotes.setValue('');
     this.supplierCreditLimit.setValue('0');
     this.supplierTermsDays.setValue(0);
-    this.createOpen.set(true);
+    this.drawerEditing.set(false);
+    this.supplierCreating.set(true);
   }
 
   protected startSupplierEdit(supplier: SupplierWithAp): void {
-    this.editingSupplier.set(supplier);
-    this.newName.setValue(this.name(supplier));
-    this.newPhone.setValue(supplier.phone ?? '');
-    this.newEmail.setValue(supplier.email ?? '');
-    this.newNotes.setValue(supplier.notes ?? '');
-    this.supplierCreditLimit.setValue(formatKesInput(supplier.supplier_credit_limit));
-    this.supplierTermsDays.setValue(supplier.supplier_credit_terms_days ?? 0);
-    this.createOpen.set(true);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    this.openSupplierDrawer(supplier);
+    this.editSupplierFromDrawer(supplier);
   }
 
   protected closeSupplierForm(): void {
-    this.createOpen.set(false);
     this.editingSupplier.set(null);
+    if (this.supplierCreating()) {
+      this.supplierCreating.set(false);
+    } else {
+      this.drawerEditing.set(false);
+    }
   }
 
   protected async saveSupplier(): Promise<void> {
@@ -2239,8 +2800,17 @@ export class SuppliersComponent implements OnInit, OnDestroy {
       this.newNotes.setValue('');
       this.supplierCreditLimit.setValue('0');
       this.supplierTermsDays.setValue(0);
-      this.closeSupplierForm();
-      await this.load();
+      if (editing) {
+        // Return to the drawer's detail view with fresh data.
+        this.drawerEditing.set(false);
+        this.editingSupplier.set(null);
+        await this.load();
+        const refreshed = this.suppliers().find(s => s.id === editing.id);
+        if (refreshed) this.openSupplierDrawer(refreshed);
+      } else {
+        this.closeSupplierForm();
+        await this.load();
+      }
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Create failed');
     } finally {
@@ -2293,6 +2863,19 @@ export class SuppliersComponent implements OnInit, OnDestroy {
         return 'badge-error';
       default:
         return 'badge-ghost';
+    }
+  }
+
+  protected bucketType(bucket: string | null): BadgeType {
+    switch (bucket) {
+      case '8-30':
+        return 'info';
+      case '31-60':
+        return 'warning';
+      case '60+':
+        return 'error';
+      default:
+        return 'neutral';
     }
   }
 

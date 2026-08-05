@@ -8,7 +8,7 @@ import {
   CheckoutPanelComponent,
   type PaymentMethodOption,
 } from '../checkout/checkout-panel.component';
-import { OrderWithCustomer, PaymentInput, PosService } from '../pos.service';
+import { OrderLineWithProduct, OrderWithCustomer, PaymentInput, PosService } from '../pos.service';
 import { PermissionsService } from '../../core/permissions.service';
 import { PrintService } from '../../shared/print/print.service';
 import { ReceiptDataService } from '../../shared/print/receipt-data.service';
@@ -24,6 +24,8 @@ import { PaginationComponent } from '../../shared/ui/pagination.component';
 import { StatBarComponent } from '../../shared/ui/stat-bar.component';
 import { FormFieldComponent } from '../../shared/ui/form-field.component';
 import { DataTableShellComponent } from '../../shared/ui/data-table-shell.component';
+import { DrawerComponent } from '../../shared/ui/drawer.component';
+import { StatCardComponent } from '../../shared/ui/stat-card.component';
 import { MoneyComponent } from '../../shared/ui/money.component';
 
 const PROFORMA_STATUSES = ['draft', 'expired'];
@@ -46,6 +48,8 @@ const PROFORMA_STATUSES = ['draft', 'expired'];
     StatBarComponent,
     FormFieldComponent,
     DataTableShellComponent,
+    DrawerComponent,
+    StatCardComponent,
     MoneyComponent,
   ],
   template: `
@@ -158,7 +162,14 @@ const PROFORMA_STATUSES = ['draft', 'expired'];
       } @else {
         <div class="flex flex-col gap-2 lg:hidden">
           @for (draft of proformas(); track draft.id) {
-            <div class="card bg-base-100">
+            <div
+              class="card cursor-pointer bg-base-100"
+              role="button"
+              tabindex="0"
+              [class.border-primary]="selectedDraftId() === draft.id"
+              (click)="openPreview(draft.id)"
+              (keydown.enter)="openPreview(draft.id)"
+            >
               <div class="card-body gap-3 p-4">
                 <div class="flex items-start justify-between gap-3">
                   <div class="min-w-0">
@@ -188,7 +199,12 @@ const PROFORMA_STATUSES = ['draft', 'expired'];
 
                 <div class="flex flex-wrap items-center gap-2 border-t border-base-300/60 pt-3">
                   @if (draft.status === 'draft') {
-                    <button appButton variant="outline" size="sm" (click)="edit(draft.id)">
+                    <button
+                      appButton
+                      variant="outline"
+                      size="sm"
+                      (click)="$event.stopPropagation(); edit(draft.id)"
+                    >
                       <app-icon name="heroPencilSquare" /> Edit
                     </button>
                     @if (printerEnabled()) {
@@ -197,7 +213,7 @@ const PROFORMA_STATUSES = ['draft', 'expired'];
                         variant="ghost"
                         size="sm"
                         [disabled]="printing()"
-                        (click)="printProforma(draft.id)"
+                        (click)="$event.stopPropagation(); printProforma(draft.id)"
                       >
                         <app-icon name="heroPrinter" /> Print
                       </button>
@@ -209,7 +225,7 @@ const PROFORMA_STATUSES = ['draft', 'expired'];
                     size="sm"
                     class="text-error"
                     [disabled]="busy()"
-                    (click)="startDelete(draft)"
+                    (click)="$event.stopPropagation(); startDelete(draft)"
                   >
                     <app-icon name="heroXMark" /> Delete
                   </button>
@@ -219,7 +235,7 @@ const PROFORMA_STATUSES = ['draft', 'expired'];
                       size="sm"
                       class="ml-auto"
                       [disabled]="!cashierSession.canTakePayment() || busy()"
-                      (click)="startConversion(draft)"
+                      (click)="$event.stopPropagation(); startConversion(draft)"
                     >
                       Convert to sale <app-icon name="heroArrowRight" />
                     </button>
@@ -251,7 +267,14 @@ const PROFORMA_STATUSES = ['draft', 'expired'];
               </thead>
               <tbody>
                 @for (draft of proformas(); track draft.id) {
-                  <tr>
+                  <tr
+                    role="button"
+                    tabindex="0"
+                    class="cursor-pointer"
+                    [class.table-row-active]="selectedDraftId() === draft.id"
+                    (click)="openPreview(draft.id)"
+                    (keydown.enter)="openPreview(draft.id)"
+                  >
                     <td>{{ time(draft.created_at) }}</td>
                     <td class="font-mono font-semibold">{{ draft.code }}</td>
                     <td>{{ customerName(draft) }}</td>
@@ -266,7 +289,7 @@ const PROFORMA_STATUSES = ['draft', 'expired'];
                       {{ validityLabel(draft) }}
                     </td>
                     <td class="table-number"><app-money [amount]="draft.total" /></td>
-                    <td class="table-actions">
+                    <td class="table-actions" (click)="$event.stopPropagation()">
                       @if (draft.status === 'draft') {
                         <button
                           appButton
@@ -336,6 +359,123 @@ const PROFORMA_STATUSES = ['draft', 'expired'];
           />
         </div>
       }
+      <!-- Proforma preview drawer (read-only; edit stays in the Sell workspace) -->
+      @if (selectedDraft(); as draft) {
+        <app-drawer
+          [open]="true"
+          (closed)="closePreview()"
+          [title]="draft.code"
+          [subtitle]="customerName(draft) + ' · ' + time(draft.created_at)"
+        >
+          @if (draft.status === 'draft') {
+            <button
+              actions
+              appButton
+              variant="ghost"
+              [iconOnly]="true"
+              type="button"
+              title="Edit proforma"
+              aria-label="Edit proforma"
+              (click)="editFromPreview(draft)"
+            >
+              <app-icon name="heroPencilSquare" />
+            </button>
+          }
+          @if (draft.status === 'draft' && printerEnabled()) {
+            <button
+              actions
+              appButton
+              variant="ghost"
+              [iconOnly]="true"
+              type="button"
+              title="Print proforma"
+              aria-label="Print proforma"
+              [disabled]="printing()"
+              (click)="printProforma(draft.id)"
+            >
+              <app-icon name="heroPrinter" />
+            </button>
+          }
+          <button
+            actions
+            appButton
+            variant="ghost"
+            [iconOnly]="true"
+            type="button"
+            class="text-error"
+            title="Delete proforma"
+            aria-label="Delete proforma"
+            [disabled]="busy()"
+            (click)="deleteFromPreview(draft)"
+          >
+            <app-icon name="heroXMark" />
+          </button>
+
+          <div class="flex flex-wrap items-center gap-1">
+            <app-status-badge
+              size="xs"
+              [type]="draft.status === 'expired' ? 'error' : 'info'"
+              [label]="draft.status === 'expired' ? 'Expired' : 'Active'"
+            />
+            <span class="type-caption">{{ validityLabel(draft) }}</span>
+          </div>
+
+          <div class="mt-3 grid grid-cols-2 gap-2">
+            <app-stat-card label="Total" [value]="fmtKes(draft.total)" />
+            <app-stat-card label="Items" [value]="previewLines().length + ' line(s)'" />
+          </div>
+
+          @if (previewLoading()) {
+            <div class="flex items-center justify-center gap-2 py-8 text-base-content/60">
+              <span class="loading loading-spinner loading-md"></span>
+              <span class="text-sm">Loading proforma…</span>
+            </div>
+          } @else {
+            <div class="mt-4 flex flex-col gap-4">
+              <section>
+                <h3 class="section-title mb-2">Items</h3>
+                @if (previewLines().length === 0) {
+                  <app-empty-state [compact]="true" icon="heroShoppingCart" title="No line items" />
+                } @else {
+                  <ul class="divide-y divide-base-200">
+                    @for (line of previewLines(); track line.id) {
+                      <li class="flex items-center gap-3 py-2">
+                        <div class="min-w-0 flex-1">
+                          <p class="truncate text-sm font-medium">{{ line.label }}</p>
+                          <p class="type-caption">
+                            {{ line.quantity }} ×
+                            <app-money [amount]="line.custom_price ?? line.unit_price" />
+                          </p>
+                        </div>
+                        <span class="text-sm font-semibold tabular-nums">
+                          <app-money [amount]="line.line_total" />
+                        </span>
+                      </li>
+                    }
+                  </ul>
+                }
+              </section>
+
+              @if (draft.status === 'draft') {
+                <section class="border-t border-base-300/60 pt-3">
+                  @if (cashierSession.cashControlEnabled() && !cashierSession.isOpen()) {
+                    <app-session-required-notice action="converting a proforma to a sale" />
+                  }
+                  <button
+                    appButton
+                    size="sm"
+                    [disabled]="!cashierSession.canTakePayment() || busy()"
+                    (click)="convertFromPreview(draft)"
+                  >
+                    Convert to sale <app-icon name="heroArrowRight" />
+                  </button>
+                </section>
+              }
+            </div>
+          }
+        </app-drawer>
+      }
+
       @if (cashierSession.canTakePayment() && converting(); as draft) {
         <app-checkout-panel
           [total]="draft.total"
@@ -395,6 +535,10 @@ export class ProformasComponent implements OnInit, OnDestroy {
   protected readonly to = new FormControl('', { nonNullable: true });
   protected readonly converting = signal<OrderWithCustomer | null>(null);
   protected readonly deleting = signal<OrderWithCustomer | null>(null);
+  protected readonly selectedDraftId = signal<string | null>(null);
+  protected readonly previewLines = signal<OrderLineWithProduct[]>([]);
+  protected readonly previewLoading = signal(false);
+  protected readonly fmtKes = formatKes;
   protected readonly methods = signal<PaymentMethodOption[]>([]);
   protected readonly busy = signal(false);
   protected readonly printing = signal(false);
@@ -417,6 +561,10 @@ export class ProformasComponent implements OnInit, OnDestroy {
   protected readonly activeOnPage = computed(
     () => this.proformas().filter(proforma => proforma.status === 'draft').length
   );
+  protected readonly selectedDraft = computed(() => {
+    const id = this.selectedDraftId();
+    return id ? (this.proformas().find(draft => draft.id === id) ?? null) : null;
+  });
   protected readonly proformaStats = computed(() => {
     const rows = this.proformas();
     return [
@@ -449,6 +597,7 @@ export class ProformasComponent implements OnInit, OnDestroy {
           code: m.code,
           name: m.name,
           isCashierControlled: m.is_cashier_controlled,
+          reconciliationType: m.reconciliation_type ?? null,
         }))
       );
     } catch {
@@ -555,6 +704,45 @@ export class ProformasComponent implements OnInit, OnDestroy {
 
   protected edit(orderId: string): void {
     void this.router.navigate(['/pos/sell'], { queryParams: { draft: orderId } });
+  }
+
+  protected async openPreview(orderId: string): Promise<void> {
+    this.selectedDraftId.set(orderId);
+    this.previewLines.set([]);
+    this.previewLoading.set(true);
+    try {
+      const lines = await this.pos.orderLines(orderId);
+      // Ignore stale results when the drawer was closed (or reopened) meanwhile.
+      if (this.selectedDraftId() !== orderId) return;
+      this.previewLines.set(lines);
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Failed to load proforma lines');
+    } finally {
+      if (this.selectedDraftId() === orderId) this.previewLoading.set(false);
+    }
+  }
+
+  /** Called by the drawer after its close transition finishes. */
+  protected closePreview(): void {
+    this.selectedDraftId.set(null);
+    this.previewLoading.set(false);
+    this.previewLines.set([]);
+  }
+
+  /** Edit happens in the Sell workspace — close the preview first. */
+  protected editFromPreview(draft: OrderWithCustomer): void {
+    this.closePreview();
+    this.edit(draft.id);
+  }
+
+  protected deleteFromPreview(draft: OrderWithCustomer): void {
+    this.closePreview();
+    this.startDelete(draft);
+  }
+
+  protected convertFromPreview(draft: OrderWithCustomer): void {
+    this.closePreview();
+    void this.startConversion(draft);
   }
 
   protected startDelete(draft: OrderWithCustomer): void {

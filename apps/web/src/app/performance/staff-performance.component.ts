@@ -3,6 +3,7 @@ import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { formatKes } from '../core/money';
 import { ButtonComponent } from '../shared/ui/button.component';
 import { DataTableShellComponent } from '../shared/ui/data-table-shell.component';
+import { DrawerComponent } from '../shared/ui/drawer.component';
 import { EmptyStateComponent } from '../shared/ui/empty-state.component';
 import { FormFieldComponent } from '../shared/ui/form-field.component';
 import { IconComponent } from '../shared/ui/icon.component';
@@ -18,6 +19,7 @@ import { PerformanceService, StaffDailyPerformance, StaffPerformance } from './p
     ReactiveFormsModule,
     ButtonComponent,
     DataTableShellComponent,
+    DrawerComponent,
     EmptyStateComponent,
     FormFieldComponent,
     IconComponent,
@@ -29,7 +31,7 @@ import { PerformanceService, StaffDailyPerformance, StaffPerformance } from './p
   template: `
     <app-page
       title="Staff performance"
-      subtitle="Sales value, volume, collections, refunds, voids, and margin by salesperson."
+      subtitle="Sales value, volume, collections, refunds, voids, margin, and held (unpaid) sales by salesperson."
       [wide]="true"
     >
       <button
@@ -125,7 +127,7 @@ import { PerformanceService, StaffDailyPerformance, StaffPerformance } from './p
       } @else {
         <app-data-table-shell
           title="Salesperson leaderboard"
-          [description]="filteredRows().length + ' staff records · click a name for daily detail'"
+          [description]="filteredRows().length + ' staff records · click a row for daily detail'"
         >
           <table class="table table-sm">
             <thead>
@@ -140,20 +142,22 @@ import { PerformanceService, StaffDailyPerformance, StaffPerformance } from './p
                 <th class="text-right">Collected</th>
                 <th class="text-right">Margin</th>
                 <th class="text-right">Average</th>
+                <th class="text-right">Held (unpaid)</th>
+                <th class="text-right">Held value</th>
               </tr>
             </thead>
             <tbody>
               @for (row of filteredRows(); track row.staff_user_id ?? row.display_name) {
-                <tr>
+                <tr
+                  role="button"
+                  tabindex="0"
+                  class="cursor-pointer"
+                  [class.table-row-active]="selected()?.staff_user_id === row.staff_user_id"
+                  (click)="selectStaff(row)"
+                  (keydown.enter)="selectStaff(row)"
+                >
                   <td>
-                    <button
-                      type="button"
-                      class="link text-left font-semibold"
-                      [disabled]="!row.staff_user_id"
-                      (click)="selectStaff(row)"
-                    >
-                      {{ row.display_name }}
-                    </button>
+                    <span class="font-semibold">{{ row.display_name }}</span>
                     <div class="mt-1 flex items-center gap-2">
                       <span class="type-caption">{{ row.role_name || 'No current role' }}</span>
                       <app-status-badge
@@ -186,6 +190,12 @@ import { PerformanceService, StaffDailyPerformance, StaffPerformance } from './p
                     <app-money [amount]="row.margin" />
                   </td>
                   <td class="text-right"><app-money [amount]="row.average_sale" /></td>
+                  <td class="text-right" [class.text-warning]="row.held_count > 0">
+                    {{ row.held_count }}
+                  </td>
+                  <td class="text-right" [class.text-warning]="row.held_value > 0">
+                    <app-money [amount]="row.held_value" />
+                  </td>
                 </tr>
               }
             </tbody>
@@ -194,77 +204,72 @@ import { PerformanceService, StaffDailyPerformance, StaffPerformance } from './p
       }
 
       @if (selected(); as staff) {
-        <div
-          class="modal modal-open"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Staff daily performance"
+        <app-drawer
+          [open]="true"
+          (closed)="closeDetail()"
+          [title]="staff.display_name"
+          [subtitle]="
+            (staff.role_name || 'No current role') + ' · ' + from.value + ' to ' + to.value
+          "
         >
-          <div class="modal-box max-w-4xl">
-            <div class="flex items-start justify-between gap-3">
-              <div>
-                <h2 class="section-title">{{ staff.display_name }}</h2>
-                <p class="type-caption mt-1">
-                  Daily sales movement from {{ from.value }} to {{ to.value }}
-                </p>
-              </div>
-              <button
-                appButton
-                variant="ghost"
-                [iconOnly]="true"
-                aria-label="Close"
-                (click)="closeDetail()"
-              >
-                <app-icon name="heroXMark" />
-              </button>
-            </div>
+          <div class="grid grid-cols-2 gap-2">
+            <app-stat-card
+              label="Net sales"
+              [value]="fmt(staff.net_sales)"
+              [sub]="
+                comparisonLabel(staff.net_sales, previousFor(staff)?.net_sales ?? 0) +
+                ' vs previous period'
+              "
+            />
+            <app-stat-card
+              label="Collected"
+              [value]="fmt(staff.collected)"
+              [sub]="staff.transactions + ' completed checkout(s)'"
+            />
+          </div>
 
+          <div class="mt-4">
+            <h3 class="section-title mb-2">Daily movement</h3>
             @if (detailLoading()) {
-              <div class="flex min-h-36 items-center justify-center">
+              <div class="flex items-center justify-center gap-2 py-8 text-base-content/60">
                 <span class="loading loading-spinner loading-md"></span>
+                <span class="text-sm">Loading daily performance…</span>
               </div>
+            } @else if (daily().length === 0) {
+              <app-empty-state
+                [compact]="true"
+                icon="heroChartBar"
+                title="No sales in this range"
+              />
             } @else {
-              <div class="table-scroll mt-4">
-                <table class="table table-sm">
-                  <thead>
-                    <tr>
-                      <th>Day</th>
-                      <th class="text-right">Transactions</th>
-                      <th class="text-right">Quantity</th>
-                      <th class="text-right">Gross</th>
-                      <th class="text-right">Refunds / voids</th>
-                      <th class="text-right">Net sales</th>
-                      <th class="text-right">Collected</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    @for (day of daily(); track day.day) {
-                      <tr>
-                        <td>{{ day.day }}</td>
-                        <td class="text-right">{{ day.transactions }}</td>
-                        <td class="text-right">{{ quantity(day.quantity) }}</td>
-                        <td class="text-right"><app-money [amount]="day.gross_sales" /></td>
-                        <td class="text-right">
-                          <app-money [amount]="day.refunds + day.voided_sales" />
-                        </td>
-                        <td class="text-right font-semibold">
-                          <app-money [amount]="day.net_sales" />
-                        </td>
-                        <td class="text-right"><app-money [amount]="day.collected" /></td>
-                      </tr>
-                    }
-                  </tbody>
-                </table>
-              </div>
+              <ul class="divide-y divide-base-200">
+                @for (day of daily(); track day.day) {
+                  <li class="flex items-center gap-3 py-2">
+                    <div class="min-w-0 flex-1">
+                      <p class="text-sm font-medium">{{ day.day }}</p>
+                      <p class="type-caption">
+                        {{ day.transactions }} sale(s) · qty {{ quantity(day.quantity) }}
+                        @if (day.refunds + day.voided_sales > 0) {
+                          ·
+                          <span class="text-warning">
+                            refunds/voids
+                            <app-money [amount]="day.refunds + day.voided_sales" />
+                          </span>
+                        }
+                      </p>
+                    </div>
+                    <div class="shrink-0 text-right">
+                      <p class="text-sm font-semibold tabular-nums">
+                        <app-money [amount]="day.net_sales" />
+                      </p>
+                      <p class="type-caption">collected <app-money [amount]="day.collected" /></p>
+                    </div>
+                  </li>
+                }
+              </ul>
             }
           </div>
-          <button
-            class="modal-backdrop"
-            type="button"
-            aria-label="Close"
-            (click)="closeDetail()"
-          ></button>
-        </div>
+        </app-drawer>
       }
     </app-page>
   `,
@@ -356,22 +361,29 @@ export class StaffPerformanceComponent implements OnInit {
   protected async selectStaff(staff: StaffPerformance): Promise<void> {
     if (!staff.staff_user_id) return;
     this.selected.set(staff);
+    this.daily.set([]);
     this.detailLoading.set(true);
     try {
-      this.daily.set(
-        await this.performance.daily(this.from.value, this.to.value, staff.staff_user_id)
+      const daily = await this.performance.daily(
+        this.from.value,
+        this.to.value,
+        staff.staff_user_id
       );
+      // Ignore stale results when the drawer was closed (or reopened) meanwhile.
+      if (this.selected()?.staff_user_id !== staff.staff_user_id) return;
+      this.daily.set(daily);
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Failed to load daily performance');
       this.closeDetail();
     } finally {
-      this.detailLoading.set(false);
+      if (this.selected()?.staff_user_id === staff.staff_user_id) this.detailLoading.set(false);
     }
   }
 
   protected closeDetail(): void {
     this.selected.set(null);
     this.daily.set([]);
+    this.detailLoading.set(false);
   }
 
   protected quantity(value: number): string {

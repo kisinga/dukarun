@@ -12,6 +12,7 @@ import { CashierSessionDialogService } from '../core/cashier-session-dialog.serv
 import { CashierSessionModalComponent } from '../money/cashier/cashier-session-modal.component';
 import { PersonaSwitcherComponent } from '../shared/ui/persona-switcher.component';
 import { OrderQueueCountsService } from '../pos/order-queue-counts.service';
+import { QUEUE_LONG_COUNT } from '../pos/queue-aging';
 import { EntitlementsService } from '../core/entitlements.service';
 import { LocationContextService } from '../core/location-context.service';
 import { ProfileService } from '../profile/profile.service';
@@ -22,6 +23,8 @@ interface NavItem {
   label: string;
   icon: string;
   badge?: () => number;
+  /** Badge tone override; defaults to `badge-warning`. */
+  badgeClass?: () => string;
   /** Permission predicate — item renders only when it returns true. */
   visible?: () => boolean;
 }
@@ -279,7 +282,11 @@ interface NavSection {
                     <app-icon [name]="item.icon" />
                     <span class="flex-1">{{ item.label }}</span>
                     @if (item.badge && item.badge() > 0) {
-                      <span class="badge badge-warning badge-sm">{{ item.badge() }}</span>
+                      <span
+                        class="badge badge-sm"
+                        [class]="item.badgeClass ? item.badgeClass() : 'badge-warning'"
+                        >{{ item.badge() }}</span
+                      >
                     }
                   </a>
                 }
@@ -389,6 +396,10 @@ export class ShellComponent implements OnInit {
           label: 'Cashier Queue',
           icon: 'heroQueueList',
           badge: () => this.orderQueueCounts.cashierQueue(),
+          badgeClass: () =>
+            this.orderQueueCounts.cashierQueue() >= QUEUE_LONG_COUNT
+              ? 'badge-warning'
+              : 'badge-ghost',
           visible: () =>
             this.cashierSession.cashierFlowEnabled() || this.orderQueueCounts.cashierQueue() > 0,
         },

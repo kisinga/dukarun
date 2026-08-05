@@ -18,6 +18,7 @@ import { IconComponent } from '../../shared/ui/icon.component';
 import { PrintService } from '../../shared/print/print.service';
 import { ReceiptDataService } from '../../shared/print/receipt-data.service';
 import { OrderQueueCountsService } from '../order-queue-counts.service';
+import { QUEUE_LONG_COUNT, queueAge, waitLabel, type QueueAge } from '../queue-aging';
 import { DataTableShellComponent } from '../../shared/ui/data-table-shell.component';
 import { ListSearchBarComponent } from '../../shared/ui/list-search-bar.component';
 import { PaginationComponent } from '../../shared/ui/pagination.component';
@@ -119,6 +120,24 @@ import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
         </div>
       }
 
+      @if (staleCount() > 0) {
+        <div role="alert" class="alert alert-warning mb-3 text-sm">
+          <app-icon name="heroExclamationTriangle" />
+          <span>
+            {{ staleCount() }} {{ staleCount() === 1 ? 'sale' : 'sales' }} waiting over an hour.
+            Collect payment or follow up with the salesperson.
+          </span>
+        </div>
+      }
+      @if (totalItems() >= longQueueCount) {
+        <div role="status" class="alert alert-info mb-3 text-sm">
+          <app-icon name="heroInformationCircle" />
+          <span
+            >Queue is getting long ({{ totalItems() }} waiting) — work the oldest sales first.</span
+          >
+        </div>
+      }
+
       <app-list-search-bar
         placeholder="Search sale code or customer…"
         [searchQuery]="query()"
@@ -145,7 +164,7 @@ import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
       } @else {
         <div class="flex flex-col gap-2 lg:hidden">
           @for (order of parked(); track order.id) {
-            <div class="card bg-base-100">
+            <div class="card bg-base-100" [class.bg-error/5]="ageOf(order) === 'stale'">
               <div class="card-body gap-3 p-4">
                 <div class="flex items-start justify-between gap-3">
                   <div class="min-w-0">
@@ -154,8 +173,9 @@ import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
                       <app-status-badge type="warning" label="Awaiting payment" size="xs" />
                     </div>
                     <p class="type-caption mt-1">{{ customerName(order) }}</p>
-                    <p class="mt-1 text-xs text-warning">
-                      Waiting {{ waitLabel(order.created_at) }} · {{ time(order.created_at) }}
+                    <p class="mt-1 text-xs" [class]="waitToneClass(order)">
+                      Waiting {{ waitLabel(pendingSince(order), now()) }} ·
+                      {{ time(pendingSince(order)) }}
                     </p>
                   </div>
                   <span class="shrink-0 font-bold">
@@ -249,13 +269,16 @@ import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
                     role="button"
                     tabindex="0"
                     class="cursor-pointer"
+                    [class.bg-error/5]="ageOf(order) === 'stale'"
                     [attr.aria-expanded]="expandedFor() === order.id"
                     (click)="toggleItems(order.id)"
                     (keydown.enter)="toggleItems(order.id)"
                   >
                     <td>
-                      <p class="table-primary text-warning">{{ waitLabel(order.created_at) }}</p>
-                      <p class="table-secondary">{{ time(order.created_at) }}</p>
+                      <p class="table-primary" [class]="waitToneClass(order)">
+                        {{ waitLabel(pendingSince(order), now()) }}
+                      </p>
+                      <p class="table-secondary">{{ time(pendingSince(order)) }}</p>
                     </td>
                     <td class="font-mono font-semibold">{{ order.code }}</td>
                     <td>{{ customerName(order) }}</td>
@@ -414,15 +437,23 @@ export class CashierQueueComponent implements OnInit, OnDestroy {
   protected readonly printerEnabled = signal(false);
   protected readonly directAccountNotice = signal(false);
   protected readonly canUseDirectAccounts = computed(() => this.perms.has('ViewFinancials'));
+  protected readonly longQueueCount = QUEUE_LONG_COUNT;
+  /** Ticks once a minute so wait labels and aging tones stay current. */
+  protected readonly now = signal(Date.now());
+  private nowTimer: ReturnType<typeof setInterval> | null = null;
   private directAccountTimer: ReturnType<typeof setTimeout> | null = null;
   protected readonly totalPages = computed(() =>
     Math.max(1, Math.ceil(this.totalItems() / this.pageSize()))
+  );
+  protected readonly staleCount = computed(
+    () => this.parked().filter(order => this.ageOf(order) === 'stale').length
   );
   protected readonly queueStats = computed(() => {
     const rows = this.parked();
     const oldest = rows.reduce<OrderWithCustomer | null>((current, order) => {
       if (!current) return order;
-      return new Date(order.created_at).getTime() < new Date(current.created_at).getTime()
+      return new Date(this.pendingSince(order)).getTime() <
+        new Date(this.pendingSince(current)).getTime()
         ? order
         : current;
     }, null);
@@ -432,7 +463,16 @@ export class CashierQueueComponent implements OnInit, OnDestroy {
         label: 'Value on page',
         value: formatKes(rows.reduce((total, order) => total + order.total, 0)),
       },
-      { label: 'Oldest on page', value: oldest ? this.waitLabel(oldest.created_at) : '—' },
+      {
+        label: 'Stale (1h+)',
+        value: this.staleCount(),
+        tone: 'error' as const,
+      },
+      {
+        label: 'Oldest on page',
+        value: oldest ? this.waitLabel(this.pendingSince(oldest), this.now()) : '—',
+        tone: oldest ? this.ageTone(this.ageOf(oldest)) : undefined,
+      },
       {
         label: 'Walk-ins on page',
         value: rows.filter(order => order.customer_id === null).length,
@@ -452,12 +492,14 @@ export class CashierQueueComponent implements OnInit, OnDestroy {
           code: m.code,
           name: m.name,
           isCashierControlled: m.is_cashier_controlled,
+          reconciliationType: m.reconciliation_type ?? null,
         }))
       );
     } catch {
       // No methods configured yet; the panel will show an empty method list.
     }
     await this.load();
+    this.nowTimer = setInterval(() => this.now.set(Date.now()), 60_000);
     this.channel = this.pos.client
       .channel('cashier-queue-live')
       .on(
@@ -470,6 +512,7 @@ export class CashierQueueComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     if (this.channel) void this.pos.client.removeChannel(this.channel);
+    if (this.nowTimer) clearInterval(this.nowTimer);
     if (this.searchTimer) clearTimeout(this.searchTimer);
     if (this.directAccountTimer) clearTimeout(this.directAccountTimer);
   }
@@ -503,6 +546,7 @@ export class CashierQueueComponent implements OnInit, OnDestroy {
         search: this.query(),
         page: this.page(),
         pageSize: this.pageSize(),
+        oldestFirst: true,
       });
       this.parked.set(result.rows);
       this.totalItems.set(result.count);
@@ -624,13 +668,27 @@ export class CashierQueueComponent implements OnInit, OnDestroy {
     });
   }
 
-  protected waitLabel(iso: string): string {
-    const minutes = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 60_000));
-    if (minutes < 1) return 'Just now';
-    if (minutes < 60) return `${minutes}m`;
-    const hours = Math.floor(minutes / 60);
-    if (hours < 24) return `${hours}h ${minutes % 60}m`;
-    const days = Math.floor(hours / 24);
-    return `${days}d ${hours % 24}h`;
+  /** When the sale was handed to the cashier; falls back to creation time. */
+  protected pendingSince(order: OrderWithCustomer): string {
+    return order.cashier_pending_at ?? order.created_at;
+  }
+
+  protected ageOf(order: OrderWithCustomer): QueueAge {
+    return queueAge(this.pendingSince(order), this.now());
+  }
+
+  protected ageTone(age: QueueAge): 'neutral' | 'warning' | 'error' {
+    return age === 'stale' ? 'error' : age === 'aging' ? 'warning' : 'neutral';
+  }
+
+  protected waitToneClass(order: OrderWithCustomer): string {
+    const age = this.ageOf(order);
+    if (age === 'stale') return 'text-error font-semibold';
+    if (age === 'aging') return 'text-warning';
+    return 'text-base-content/60';
+  }
+
+  protected waitLabel(iso: string, now = Date.now()): string {
+    return waitLabel(iso, now);
   }
 }

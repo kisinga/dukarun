@@ -8,6 +8,7 @@ Current system documentation:
 | Local setup and infrastructure | [`INFRASTRUCTURE.md`](INFRASTRUCTURE.md)                              |
 | Production deployment          | [`DEPLOYMENT.md`](DEPLOYMENT.md)                                      |
 | Dashboard design language      | [`DESIGN_SYSTEM.md`](DESIGN_SYSTEM.md)                                |
+| Detail-surface rollout scope   | [`DETAIL_SURFACES_ROLLOUT.md`](DETAIL_SURFACES_ROLLOUT.md)            |
 | Transaction workflows          | [`TRANSACTION_WORKFLOWS.md`](TRANSACTION_WORKFLOWS.md)                |
 | Vendure → Supabase cutover     | `V1_V2_MIGRATION.md` — internal, gitignored (references real tenants) |
 | Troubleshooting                | [`GENERAL_TROUBLESHOOTING.md`](GENERAL_TROUBLESHOOTING.md)            |

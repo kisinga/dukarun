@@ -3,6 +3,7 @@ import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { formatKes, formatKesInput, parseKes } from '../core/money';
+import { reconciliationLabel, reconciliationTypeForCode } from '../core/payment-methods';
 import { OrderLineWithProduct, OrderWithCustomer, Payment, PosService } from '../pos/pos.service';
 import { PrintService } from '../shared/print/print.service';
 import { ReceiptDataService } from '../shared/print/receipt-data.service';
@@ -13,6 +14,8 @@ import { PaginationComponent } from '../shared/ui/pagination.component';
 import { ORDER_STATUS_MAP, StatusBadgeComponent } from '../shared/ui/status-badge.component';
 import { MoneyService } from '../money/money.service';
 import { DataTableShellComponent } from '../shared/ui/data-table-shell.component';
+import { DrawerComponent } from '../shared/ui/drawer.component';
+import { StatCardComponent } from '../shared/ui/stat-card.component';
 import { ButtonComponent } from '../shared/ui/button.component';
 import { FormFieldComponent } from '../shared/ui/form-field.component';
 import { IconComponent } from '../shared/ui/icon.component';
@@ -24,7 +27,7 @@ const ALL_STATUSES = ['completed', 'voided', 'draft', 'expired', 'pending_paymen
 /**
  * Sales history — the canonical sales screen. Defaults to "today" with realtime
  * updates (live badge); status + date-range filters for full history;
- * expandable rows with lines/payments, void flow, and receipt reprint.
+ * drawer detail with lines/payments, void flow, and receipt reprint.
  */
 @Component({
   selector: 'app-orders',
@@ -37,6 +40,8 @@ const ALL_STATUSES = ['completed', 'voided', 'draft', 'expired', 'pending_paymen
     PaginationComponent,
     StatusBadgeComponent,
     DataTableShellComponent,
+    DrawerComponent,
+    StatCardComponent,
     ButtonComponent,
     FormFieldComponent,
     IconComponent,
@@ -125,12 +130,17 @@ const ALL_STATUSES = ['completed', 'voided', 'draft', 'expired', 'pending_paymen
       } @else {
         <div class="mt-3 flex flex-col gap-2 lg:hidden">
           @for (order of orders(); track order.id) {
-            <div class="card bg-base-100">
+            <div
+              class="card cursor-pointer bg-base-100"
+              role="button"
+              tabindex="0"
+              [class.border-primary]="selectedOrderId() === order.id"
+              (click)="openOrder(order.id)"
+              (keydown.enter)="openOrder(order.id)"
+            >
               <div class="card-body p-4">
                 <div class="flex flex-wrap items-center gap-3">
-                  <button class="link font-mono font-semibold" (click)="toggle(order.id)">
-                    {{ order.code }}
-                  </button>
+                  <span class="font-mono font-semibold">{{ order.code }}</span>
                   <span class="text-sm text-base-content/60">{{ time(order.created_at) }}</span>
                   <span class="text-sm">{{ customerName(order) }}</span>
                   <app-status-badge
@@ -147,20 +157,27 @@ const ALL_STATUSES = ['completed', 'voided', 'draft', 'expired', 'pending_paymen
                     ><app-money [amount]="order.total"
                   /></span>
                   @if (order.status === 'pending_payment') {
-                    <a appButton variant="soft" size="sm" routerLink="/pos/cashier">
+                    <a
+                      appButton
+                      variant="soft"
+                      size="sm"
+                      routerLink="/pos/cashier"
+                      (click)="$event.stopPropagation()"
+                    >
                       <app-icon name="heroBanknotes" />
                       Collect payment
                     </a>
                   } @else if (order.status === 'draft') {
-                    <a appButton variant="outline" size="sm" routerLink="/pos/proformas">
+                    <a
+                      appButton
+                      variant="outline"
+                      size="sm"
+                      routerLink="/pos/proformas"
+                      (click)="$event.stopPropagation()"
+                    >
                       <app-icon name="heroDocumentText" />
                       Open proforma
                     </a>
-                  }
-                  @if (order.status === 'completed') {
-                    <button class="btn btn-error btn-outline btn-sm" (click)="startVoid(order.id)">
-                      Void
-                    </button>
                   }
                 </div>
 
@@ -168,153 +185,6 @@ const ALL_STATUSES = ['completed', 'voided', 'draft', 'expired', 'pending_paymen
                   <p class="mt-1 text-xs text-base-content/60">
                     Void reason: {{ order.void_reason }}
                   </p>
-                }
-
-                @if (voidingFor() === order.id) {
-                  <form
-                    (submit)="$event.preventDefault(); confirmVoid(order.id)"
-                    class="mt-2 flex flex-wrap items-end gap-2 rounded-field bg-base-200 p-2"
-                  >
-                    <label class="form-control flex-1">
-                      <span class="label-text text-xs">Reason</span>
-                      <input
-                        type="text"
-                        class="input input-bordered input-sm"
-                        placeholder="e.g. Wrong item rung up"
-                        [formControl]="voidReason"
-                      />
-                    </label>
-                    <button
-                      type="submit"
-                      class="btn btn-error btn-sm min-h-11"
-                      [disabled]="voidReason.value.trim().length === 0 || busy()"
-                    >
-                      Confirm void
-                    </button>
-                    <button
-                      type="button"
-                      class="btn btn-ghost btn-sm"
-                      (click)="voidingFor.set(null)"
-                    >
-                      Cancel
-                    </button>
-                  </form>
-                }
-
-                @if (expandedFor() === order.id) {
-                  <div class="mt-3 border-t border-base-300/60 pt-3">
-                    <table class="table table-sm">
-                      <thead>
-                        <tr>
-                          <th>Item</th>
-                          <th class="text-right">Qty</th>
-                          <th class="text-right">Price</th>
-                          <th class="text-right">Total</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        @for (line of lines(); track line.id) {
-                          <tr>
-                            <td>{{ line.label }}</td>
-                            <td class="text-right">{{ line.quantity }}</td>
-                            <td class="text-right">
-                              <app-money [amount]="line.custom_price ?? line.unit_price" />
-                            </td>
-                            <td class="text-right"><app-money [amount]="line.line_total" /></td>
-                          </tr>
-                        }
-                      </tbody>
-                    </table>
-                    @if (payments().length > 0) {
-                      <div class="mt-2 flex flex-wrap gap-2">
-                        @for (p of payments(); track p.id) {
-                          <span
-                            class="inline-flex items-center gap-1 rounded-field border border-base-300 px-2 py-1 text-xs"
-                          >
-                            {{ p.method_code }} · <app-money [amount]="p.amount" /> · {{ p.status }}
-                            @if (p.reference) {
-                              · {{ p.reference }}
-                            }
-                            @if (p.status === 'settled') {
-                              <button
-                                class="btn btn-ghost btn-xs"
-                                [disabled]="busy()"
-                                (click)="reversePayment(p.id)"
-                              >
-                                Reverse
-                              </button>
-                            }
-                          </span>
-                        }
-                      </div>
-                    } @else {
-                      <p class="mt-2 text-xs text-base-content/60">
-                        {{ noPaymentsMessage(order) }}
-                      </p>
-                    }
-                    @if (printerEnabled() && order.status === 'completed') {
-                      <button class="btn btn-outline btn-xs mt-2" (click)="printOrder(order.id)">
-                        Print receipt
-                      </button>
-                    }
-                    @if (order.status === 'completed') {
-                      <div class="mt-3 border-t border-base-300/60 pt-3">
-                        @if (refundingFor() !== order.id) {
-                          <button
-                            class="btn btn-outline btn-xs"
-                            (click)="startRefund(order.id, order.total)"
-                          >
-                            Record refund
-                          </button>
-                        } @else {
-                          <form
-                            (submit)="$event.preventDefault(); confirmRefund(order.id)"
-                            class="grid gap-2 rounded-field bg-base-200 p-2 sm:grid-cols-4"
-                          >
-                            <label class="form-control"
-                              ><span class="label-text text-xs">Amount (KES)</span
-                              ><input
-                                class="input input-bordered input-sm"
-                                inputmode="numeric"
-                                [formControl]="refundAmount"
-                            /></label>
-                            <label class="form-control"
-                              ><span class="label-text text-xs">Method</span
-                              ><select
-                                class="select select-bordered select-sm"
-                                [formControl]="refundMethod"
-                              >
-                                <option value="cash">Cash</option>
-                                <option value="mpesa">M-Pesa</option>
-                                <option value="bank">Bank</option>
-                              </select></label
-                            >
-                            <label class="form-control sm:col-span-2"
-                              ><span class="label-text text-xs">Reason</span
-                              ><input
-                                class="input input-bordered input-sm"
-                                [formControl]="refundReason"
-                            /></label>
-                            <div class="flex gap-2 sm:col-span-4">
-                              <button
-                                class="btn btn-error btn-sm"
-                                type="submit"
-                                [disabled]="busy()"
-                              >
-                                Post refund</button
-                              ><button
-                                type="button"
-                                class="btn btn-ghost btn-sm"
-                                (click)="refundingFor.set(null)"
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          </form>
-                        }
-                      </div>
-                    }
-                  </div>
                 }
               </div>
             </div>
@@ -341,9 +211,12 @@ const ALL_STATUSES = ['completed', 'voided', 'draft', 'expired', 'pending_paymen
               <tbody>
                 @for (order of orders(); track order.id) {
                   <tr
+                    role="button"
+                    tabindex="0"
                     class="cursor-pointer"
-                    [attr.aria-expanded]="expandedFor() === order.id"
-                    (click)="toggle(order.id)"
+                    [class.table-row-active]="selectedOrderId() === order.id"
+                    (click)="openOrder(order.id)"
+                    (keydown.enter)="openOrder(order.id)"
                   >
                     <td>{{ time(order.created_at) }}</td>
                     <td class="font-mono font-semibold">{{ order.code }}</td>
@@ -409,155 +282,269 @@ const ALL_STATUSES = ['completed', 'voided', 'draft', 'expired', 'pending_paymen
                           [iconOnly]="true"
                           title="Void sale"
                           aria-label="Void sale"
-                          (click)="startVoid(order.id)"
+                          (click)="openOrder(order.id); startVoid(order.id)"
                         >
                           <app-icon name="heroXMark" />
                         </button>
                       }
                     </td>
                   </tr>
-                  @if (voidingFor() === order.id) {
-                    <tr class="row-detail">
-                      <td colspan="7">
-                        <form
-                          (submit)="$event.preventDefault(); confirmVoid(order.id)"
-                          class="flex items-end gap-2"
-                        >
-                          <label class="form-control flex-1"
-                            ><span class="label-text text-xs">Void reason</span
-                            ><input
-                              class="input input-bordered input-sm"
-                              [formControl]="voidReason" /></label
-                          ><button
-                            class="btn btn-error btn-sm"
-                            type="submit"
-                            [disabled]="busy() || !voidReason.value.trim()"
-                          >
-                            Confirm void</button
-                          ><button
-                            class="btn btn-ghost btn-sm"
-                            type="button"
-                            (click)="voidingFor.set(null)"
-                          >
-                            Cancel
-                          </button>
-                        </form>
-                      </td>
-                    </tr>
-                  }
-                  @if (expandedFor() === order.id) {
-                    <tr class="row-detail">
-                      <td colspan="7">
-                        <table class="table table-xs">
-                          <thead>
-                            <tr>
-                              <th>Item</th>
-                              <th class="text-right">Qty</th>
-                              <th class="text-right">Price</th>
-                              <th class="text-right">Total</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            @for (line of lines(); track line.id) {
-                              <tr>
-                                <td>{{ line.label }}</td>
-                                <td class="text-right">{{ line.quantity }}</td>
-                                <td class="text-right">
-                                  <app-money [amount]="line.custom_price ?? line.unit_price" />
-                                </td>
-                                <td class="text-right">
-                                  <app-money [amount]="line.line_total" />
-                                </td>
-                              </tr>
-                            }
-                          </tbody>
-                        </table>
-                        @if (payments().length > 0) {
-                          <div class="mt-2 flex flex-wrap gap-2">
-                            @for (payment of payments(); track payment.id) {
-                              <span
-                                class="inline-flex items-center gap-1 rounded-field border border-base-300 px-2 py-1 text-xs"
-                                >{{ payment.method_code }} ·
-                                <app-money [amount]="payment.amount" /> ·
-                                {{ payment.status }}
-                                @if (payment.status === 'settled') {
-                                  <button
-                                    class="btn btn-ghost btn-xs"
-                                    (click)="reversePayment(payment.id)"
-                                  >
-                                    Reverse
-                                  </button>
-                                }
-                              </span>
-                            }
-                          </div>
-                        } @else {
-                          <p class="mt-2 text-xs text-base-content/60">
-                            {{ noPaymentsMessage(order) }}
-                          </p>
-                        }
-                        @if (order.status === 'completed') {
-                          <div class="mt-3">
-                            @if (refundingFor() !== order.id) {
-                              <button
-                                class="btn btn-outline btn-xs"
-                                (click)="startRefund(order.id, order.total)"
-                              >
-                                Record refund
-                              </button>
-                            } @else {
-                              <form
-                                (submit)="$event.preventDefault(); confirmRefund(order.id)"
-                                class="grid gap-2 sm:grid-cols-4"
-                              >
-                                <label class="form-control"
-                                  ><span class="label-text text-xs">Amount (KES)</span
-                                  ><input
-                                    class="input input-bordered input-sm"
-                                    [formControl]="refundAmount" /></label
-                                ><label class="form-control"
-                                  ><span class="label-text text-xs">Method</span
-                                  ><select
-                                    class="select select-bordered select-sm"
-                                    [formControl]="refundMethod"
-                                  >
-                                    <option value="cash">Cash</option>
-                                    <option value="mpesa">M-Pesa</option>
-                                    <option value="bank">Bank</option>
-                                  </select></label
-                                ><label class="form-control sm:col-span-2"
-                                  ><span class="label-text text-xs">Reason</span
-                                  ><input
-                                    class="input input-bordered input-sm"
-                                    [formControl]="refundReason"
-                                /></label>
-                                <div class="sm:col-span-4">
-                                  <button
-                                    class="btn btn-error btn-sm"
-                                    type="submit"
-                                    [disabled]="busy()"
-                                  >
-                                    Post refund</button
-                                  ><button
-                                    class="btn btn-ghost btn-sm"
-                                    type="button"
-                                    (click)="refundingFor.set(null)"
-                                  >
-                                    Cancel
-                                  </button>
-                                </div>
-                              </form>
-                            }
-                          </div>
-                        }
-                      </td>
-                    </tr>
-                  }
                 }
               </tbody>
             </table>
           </app-data-table-shell>
         </div>
+
+        <!-- Order detail drawer -->
+        @if (selectedOrder(); as order) {
+          <app-drawer
+            [open]="true"
+            (closed)="closeOrderDrawer()"
+            [title]="order.code"
+            [subtitle]="time(order.created_at) + ' · ' + customerName(order)"
+          >
+            @if (printerEnabled() && order.status === 'completed') {
+              <button
+                actions
+                appButton
+                variant="ghost"
+                [iconOnly]="true"
+                type="button"
+                title="Print receipt"
+                aria-label="Print receipt"
+                (click)="printOrder(order.id)"
+              >
+                <app-icon name="heroPrinter" />
+              </button>
+            }
+
+            <div class="flex flex-wrap items-center gap-1">
+              <app-status-badge
+                size="xs"
+                [type]="statusType(order.status)"
+                [label]="statusLabel(order.status)"
+              />
+              @if (order.is_credit_sale) {
+                <app-status-badge
+                  size="xs"
+                  [type]="creditBadge(order).type"
+                  [label]="creditBadge(order).label"
+                />
+              }
+            </div>
+            @if (order.status === 'voided' && order.void_reason) {
+              <p class="type-caption mt-1">Void reason: {{ order.void_reason }}</p>
+            }
+
+            <div class="mt-3 grid grid-cols-2 gap-2">
+              <app-stat-card label="Total" [value]="fmtKes(order.total)" />
+              @if (order.is_credit_sale && order.status === 'completed') {
+                <app-stat-card
+                  label="Paid so far"
+                  [value]="fmtKes(creditPaid().get(order.id) ?? 0)"
+                  [tone]="(creditPaid().get(order.id) ?? 0) >= order.total ? 'success' : 'warning'"
+                  [sub]="paymentLabel(order)"
+                />
+              } @else {
+                <app-stat-card
+                  label="Payment"
+                  [value]="paymentLabel(order)"
+                  [tone]="order.status === 'pending_payment' ? 'warning' : 'neutral'"
+                />
+              }
+            </div>
+
+            @if (detailLoading()) {
+              <div class="flex items-center justify-center gap-2 py-8 text-base-content/60">
+                <span class="loading loading-spinner loading-md"></span>
+                <span class="text-sm">Loading sale details…</span>
+              </div>
+            } @else {
+              <div class="mt-4 flex flex-col gap-4">
+                <section>
+                  <h3 class="section-title mb-2">Items</h3>
+                  @if (lines().length === 0) {
+                    <app-empty-state
+                      [compact]="true"
+                      icon="heroShoppingCart"
+                      title="No line items"
+                    />
+                  } @else {
+                    <ul class="divide-y divide-base-200">
+                      @for (line of lines(); track line.id) {
+                        <li class="flex items-center gap-3 py-2">
+                          <div class="min-w-0 flex-1">
+                            <p class="truncate text-sm font-medium">{{ line.label }}</p>
+                            <p class="type-caption">
+                              {{ line.quantity }} ×
+                              <app-money [amount]="line.custom_price ?? line.unit_price" />
+                            </p>
+                          </div>
+                          <span class="text-sm font-semibold tabular-nums">
+                            <app-money [amount]="line.line_total" />
+                          </span>
+                        </li>
+                      }
+                    </ul>
+                  }
+                </section>
+
+                <section class="border-t border-base-300/60 pt-3">
+                  <h3 class="section-title mb-2">Payments</h3>
+                  @if (payments().length === 0) {
+                    <p class="text-xs text-base-content/60">{{ noPaymentsMessage(order) }}</p>
+                  } @else {
+                    <div class="flex flex-wrap gap-2">
+                      @for (p of payments(); track p.id) {
+                        <span
+                          class="inline-flex items-center gap-1 rounded-field border border-base-300 px-2 py-1 text-xs"
+                        >
+                          {{ p.method_code }} · <app-money [amount]="p.amount" /> · {{ p.status }}
+                          @if (p.reference) {
+                            · {{ p.reference }}
+                          }
+                          @if (p.status === 'settled') {
+                            <button
+                              class="btn btn-ghost btn-xs"
+                              [disabled]="busy()"
+                              (click)="reversePayment(p.id)"
+                            >
+                              Reverse
+                            </button>
+                          }
+                        </span>
+                      }
+                    </div>
+                  }
+                </section>
+
+                @if (order.status === 'pending_payment' || order.status === 'draft') {
+                  <section class="border-t border-base-300/60 pt-3">
+                    @if (order.status === 'pending_payment') {
+                      <a appButton variant="soft" size="sm" routerLink="/pos/cashier">
+                        <app-icon name="heroBanknotes" />
+                        Collect payment
+                      </a>
+                    } @else {
+                      <a appButton variant="outline" size="sm" routerLink="/pos/proformas">
+                        <app-icon name="heroDocumentText" />
+                        Open proforma
+                      </a>
+                    }
+                  </section>
+                }
+
+                @if (order.status === 'completed') {
+                  <section class="border-t border-base-300/60 pt-3">
+                    <h3 class="section-title mb-2">Refund</h3>
+                    @if (refundingFor() !== order.id) {
+                      <button
+                        appButton
+                        variant="outline"
+                        size="sm"
+                        (click)="startRefund(order.id, order.total)"
+                      >
+                        Record refund
+                      </button>
+                    } @else {
+                      <form
+                        (submit)="$event.preventDefault(); confirmRefund(order.id)"
+                        class="flex flex-col gap-2 rounded-field border border-base-300 bg-base-200/50 p-2"
+                      >
+                        <app-form-field label="Amount (KES)" [required]="true">
+                          <input
+                            class="input input-bordered input-sm w-full"
+                            inputmode="numeric"
+                            [formControl]="refundAmount"
+                          />
+                        </app-form-field>
+                        <app-form-field label="Method">
+                          <select
+                            class="select select-bordered select-sm w-full"
+                            [formControl]="refundMethod"
+                          >
+                            <option value="cash">{{ methodOptionLabel('cash') }}</option>
+                            <option value="mpesa">{{ methodOptionLabel('mpesa') }}</option>
+                            <option value="bank">{{ methodOptionLabel('bank') }}</option>
+                          </select>
+                        </app-form-field>
+                        <app-form-field label="Reason" [required]="true">
+                          <input
+                            class="input input-bordered input-sm w-full"
+                            [formControl]="refundReason"
+                          />
+                        </app-form-field>
+                        <div class="flex gap-2">
+                          <button
+                            appButton
+                            variant="error"
+                            size="sm"
+                            type="submit"
+                            [disabled]="busy()"
+                          >
+                            Post refund
+                          </button>
+                          <button
+                            appButton
+                            variant="ghost"
+                            size="sm"
+                            type="button"
+                            (click)="refundingFor.set(null)"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </form>
+                    }
+                  </section>
+
+                  <section class="border-t border-base-300/60 pt-3">
+                    <h3 class="section-title mb-2">Void sale</h3>
+                    @if (voidingFor() !== order.id) {
+                      <button appButton variant="error" size="sm" (click)="startVoid(order.id)">
+                        Void sale
+                      </button>
+                    } @else {
+                      <form
+                        (submit)="$event.preventDefault(); confirmVoid(order.id)"
+                        class="flex flex-col gap-2 rounded-field border border-base-300 bg-base-200/50 p-2"
+                      >
+                        <app-form-field label="Reason" [required]="true">
+                          <input
+                            type="text"
+                            class="input input-bordered input-sm w-full"
+                            placeholder="e.g. Wrong item rung up"
+                            [formControl]="voidReason"
+                          />
+                        </app-form-field>
+                        <div class="flex gap-2">
+                          <button
+                            appButton
+                            variant="error"
+                            size="sm"
+                            type="submit"
+                            [disabled]="voidReason.value.trim().length === 0 || busy()"
+                          >
+                            Confirm void
+                          </button>
+                          <button
+                            appButton
+                            variant="ghost"
+                            size="sm"
+                            type="button"
+                            (click)="voidingFor.set(null)"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </form>
+                    }
+                  </section>
+                }
+              </div>
+            }
+          </app-drawer>
+        }
 
         <div class="mt-3">
           <app-pagination
@@ -580,13 +567,15 @@ export class OrdersComponent implements OnInit, OnDestroy {
   private readonly receiptData = inject(ReceiptDataService);
   private readonly print = inject(PrintService);
   private readonly money = inject(MoneyService);
+  protected readonly fmtKes = formatKes;
 
   protected readonly pageSize = signal(20);
   protected readonly totalItems = signal(0);
   protected readonly orders = signal<OrderWithCustomer[]>([]);
   /** Paid-so-far totals (shillings) for the credit sales currently listed. */
   protected readonly creditPaid = signal<Map<string, number>>(new Map());
-  protected readonly expandedFor = signal<string | null>(null);
+  protected readonly selectedOrderId = signal<string | null>(null);
+  protected readonly detailLoading = signal(false);
   protected readonly lines = signal<OrderLineWithProduct[]>([]);
   protected readonly payments = signal<Payment[]>([]);
   protected readonly voidingFor = signal<string | null>(null);
@@ -618,6 +607,10 @@ export class OrdersComponent implements OnInit, OnDestroy {
   protected readonly totalPages = computed(() =>
     Math.max(1, Math.ceil(this.totalItems() / this.pageSize()))
   );
+  protected readonly selectedOrder = computed(() => {
+    const id = this.selectedOrderId();
+    return id ? (this.orders().find(order => order.id === id) ?? null) : null;
+  });
   protected readonly salesStats = computed(() => {
     const rows = this.orders();
     const completed = rows.filter(order => order.status === 'completed');
@@ -701,6 +694,11 @@ export class OrdersComponent implements OnInit, OnDestroy {
       this.totalItems.set(result.count);
       const creditIds = result.rows.filter(order => order.is_credit_sale).map(order => order.id);
       this.creditPaid.set(await this.pos.paidTotalsByOrder(creditIds));
+      // Keep an open drawer's lines/payments in sync with realtime refreshes.
+      const openId = this.selectedOrderId();
+      if (openId && result.rows.some(order => order.id === openId)) {
+        void this.refreshDetail(openId);
+      }
       this.error.set(null);
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Failed to load sales');
@@ -720,22 +718,41 @@ export class OrdersComponent implements OnInit, OnDestroy {
     await this.load();
   }
 
-  protected async toggle(orderId: string): Promise<void> {
-    if (this.expandedFor() === orderId) {
-      this.expandedFor.set(null);
-      return;
-    }
-    this.expandedFor.set(orderId);
+  protected async openOrder(orderId: string): Promise<void> {
+    this.selectedOrderId.set(orderId);
+    this.voidingFor.set(null);
+    this.refundingFor.set(null);
+    this.lines.set([]);
+    this.payments.set([]);
+    this.detailLoading.set(true);
+    await this.refreshDetail(orderId);
+  }
+
+  /** Refetch lines + payments for the open drawer; ignores stale results. */
+  protected async refreshDetail(orderId: string): Promise<void> {
     try {
       const [lines, payments] = await Promise.all([
         this.pos.orderLines(orderId),
         this.pos.orderPayments(orderId),
       ]);
+      if (this.selectedOrderId() !== orderId) return;
       this.lines.set(lines);
       this.payments.set(payments);
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Failed to load order details');
+    } finally {
+      if (this.selectedOrderId() === orderId) this.detailLoading.set(false);
     }
+  }
+
+  /** Called by the drawer after its close transition finishes. */
+  protected closeOrderDrawer(): void {
+    this.selectedOrderId.set(null);
+    this.voidingFor.set(null);
+    this.refundingFor.set(null);
+    this.detailLoading.set(false);
+    this.lines.set([]);
+    this.payments.set([]);
   }
 
   protected startVoid(orderId: string): void {
@@ -754,7 +771,7 @@ export class OrdersComponent implements OnInit, OnDestroy {
         // Not voided — the request waits in the Approvals inbox. Not an error.
         this.warning.set('Void request sent for approval');
       } else {
-        this.expandedFor.set(null);
+        this.closeOrderDrawer();
       }
       await this.load();
     } catch (err) {
@@ -786,8 +803,7 @@ export class OrdersComponent implements OnInit, OnDestroy {
         this.refundReason.value.trim()
       );
       this.refundingFor.set(null);
-      await this.toggle(orderId);
-      await this.toggle(orderId);
+      await this.refreshDetail(orderId);
     } catch (error) {
       this.error.set(error instanceof Error ? error.message : 'Refund failed');
     } finally {
@@ -801,10 +817,9 @@ export class OrdersComponent implements OnInit, OnDestroy {
     this.error.set(null);
     try {
       await this.money.reversePayment(paymentId);
-      const orderId = this.expandedFor();
+      const orderId = this.selectedOrderId();
       if (orderId) {
-        this.expandedFor.set(null);
-        await this.toggle(orderId);
+        await this.refreshDetail(orderId);
       }
     } catch (error) {
       this.error.set(error instanceof Error ? error.message : 'Payment reversal failed');
@@ -827,6 +842,12 @@ export class OrdersComponent implements OnInit, OnDestroy {
 
   protected statusType(status: string) {
     return ORDER_STATUS_MAP[status] ?? 'neutral';
+  }
+
+  /** Select option label: method code plus its reconciliation-type caption. */
+  protected methodOptionLabel(code: string): string {
+    const type = reconciliationLabel(reconciliationTypeForCode(code));
+    return type === '—' ? code : `${code} · ${type}`;
   }
 
   protected statusLabel(status: string): string {

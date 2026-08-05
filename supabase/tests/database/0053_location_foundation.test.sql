@@ -1,5 +1,5 @@
 begin;
-select plan(14);
+select plan(15);
 
 create temp table location_company as
 select id as company_id from public.companies where name = 'Mama Mboga Stores';
@@ -32,6 +32,15 @@ select is(
   )),
   4,
   'all company payment methods initially span Westlands'
+);
+
+select is(
+  (select reconciliation_type from public.available_payment_methods(
+    (select id from public.stock_locations
+     where company_id = (select company_id from location_company) and code = 'WESTLANDS')
+  ) where code = 'bank'),
+  'statement_match',
+  'bank method exposes its statement_match reconciliation type'
 );
 
 select public.set_payment_method_locations(

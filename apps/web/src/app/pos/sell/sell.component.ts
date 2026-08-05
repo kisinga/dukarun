@@ -13,6 +13,8 @@ import {
 } from '../checkout/checkout-panel.component';
 import { ConnectivityService } from '../offline/connectivity.service';
 import { SyncService } from '../offline/sync.service';
+import { OrderQueueCountsService } from '../order-queue-counts.service';
+import { QUEUE_LONG_COUNT } from '../queue-aging';
 import { ButtonComponent } from '../../shared/ui/button.component';
 import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
 import { FormFieldComponent } from '../../shared/ui/form-field.component';
@@ -653,6 +655,21 @@ interface DraftFlag {
                     >
                       Send to cashier
                     </button>
+                    @if (orderQueueCounts.cashierQueue() > 0) {
+                      @if (orderQueueCounts.cashierQueue() >= longQueueCount) {
+                        <span class="badge badge-warning h-auto whitespace-normal py-1 text-left">
+                          Cashier queue is busy ({{ orderQueueCounts.cashierQueue() }} waiting){{
+                            cashierSession.canTakePayment() ? ' — consider taking payment here' : ''
+                          }}
+                        </span>
+                      } @else {
+                        <p class="type-caption w-full">
+                          {{ orderQueueCounts.cashierQueue() }}
+                          {{ orderQueueCounts.cashierQueue() === 1 ? 'sale' : 'sales' }} waiting at
+                          the cashier
+                        </p>
+                      }
+                    }
                   }
                   <button
                     appButton
@@ -817,6 +834,8 @@ export class SellComponent implements OnInit {
   protected readonly print = inject(PrintService);
   protected readonly perms = inject(PermissionsService);
   protected readonly cashierSession = inject(CashierSessionService);
+  protected readonly orderQueueCounts = inject(OrderQueueCountsService);
+  protected readonly longQueueCount = QUEUE_LONG_COUNT;
   private readonly receiptData = inject(ReceiptDataService);
   private readonly pos = inject(PosService);
   private readonly route = inject(ActivatedRoute);

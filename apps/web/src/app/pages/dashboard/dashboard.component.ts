@@ -482,64 +482,15 @@ type SalesChartPoint = DailySummary & { day: string; revenue: number; heightPerc
           </div>
 
           <div class="grid gap-4" [class.lg:grid-cols-2]="preferences.batchExpiryEnabled()">
-            @if (preferences.batchExpiryEnabled()) {
-              <article class="card h-full bg-base-100">
-                <div class="card-body p-4">
-                  <div class="flex items-center justify-between gap-2">
-                    <div class="flex items-center gap-2">
-                      <app-icon name="heroCube" />
-                      <h3 class="section-title">Low stock</h3>
-                    </div>
-                    @if (lowStock().length > 0) {
-                      <span class="badge badge-warning badge-sm">{{ lowStock().length }}</span>
-                    }
-                  </div>
-
-                  @if (initialLoading()) {
-                    <div
-                      role="status"
-                      class="flex min-h-32 items-center justify-center gap-2 text-sm text-base-content/60"
-                    >
-                      <span class="loading loading-spinner loading-sm"></span>
-                      Loading stock
-                    </div>
-                  } @else if (lowStock().length === 0) {
-                    <app-empty-state
-                      [embedded]="true"
-                      [compact]="true"
-                      icon="heroCheckCircle"
-                      title="All stocked up"
-                      description="Nothing is below its low-stock threshold."
-                    />
-                  } @else {
-                    <div class="mt-2 flex flex-col divide-y divide-base-200">
-                      @for (item of lowStock(); track item.variant_id) {
-                        <div class="flex items-center gap-3 py-3">
-                          <div class="min-w-0 flex-1">
-                            <p class="truncate text-sm font-medium">{{ item.product_name }}</p>
-                            <p class="type-caption truncate">{{ item.variant_name }}</p>
-                          </div>
-                          <div class="text-right">
-                            <p class="font-medium tabular-nums text-warning">{{ item.stock }}</p>
-                            <p class="type-caption">threshold {{ item.low_stock_threshold }}</p>
-                          </div>
-                        </div>
-                      }
-                    </div>
-                  }
-                </div>
-              </article>
-            }
-
             <article class="card h-full bg-base-100">
               <div class="card-body p-4">
                 <div class="flex items-center justify-between gap-2">
                   <div class="flex items-center gap-2">
-                    <app-icon name="heroCalendarDays" />
-                    <h3 class="section-title">Expiring batches</h3>
+                    <app-icon name="heroCube" />
+                    <h3 class="section-title">Low stock</h3>
                   </div>
-                  @if (expiring().length > 0) {
-                    <span class="badge badge-warning badge-sm">{{ expiring().length }}</span>
+                  @if (lowStock().length > 0) {
+                    <span class="badge badge-warning badge-sm">{{ lowStock().length }}</span>
                   }
                 </div>
 
@@ -549,29 +500,27 @@ type SalesChartPoint = DailySummary & { day: string; revenue: number; heightPerc
                     class="flex min-h-32 items-center justify-center gap-2 text-sm text-base-content/60"
                   >
                     <span class="loading loading-spinner loading-sm"></span>
-                    Loading batches
+                    Loading stock
                   </div>
-                } @else if (expiring().length === 0) {
+                } @else if (lowStock().length === 0) {
                   <app-empty-state
                     [embedded]="true"
                     [compact]="true"
                     icon="heroCheckCircle"
-                    title="Nothing expiring"
-                    description="No batches expire in the next 30 days."
+                    title="All stocked up"
+                    description="Nothing is below its low-stock threshold."
                   />
                 } @else {
                   <div class="mt-2 flex flex-col divide-y divide-base-200">
-                    @for (batch of expiring(); track batch.batch_id) {
+                    @for (item of lowStock(); track item.variant_id) {
                       <div class="flex items-center gap-3 py-3">
                         <div class="min-w-0 flex-1">
-                          <p class="truncate text-sm font-medium">{{ batch.product_name }}</p>
-                          <p class="type-caption truncate">{{ batch.variant_name }}</p>
+                          <p class="truncate text-sm font-medium">{{ item.product_name }}</p>
+                          <p class="type-caption truncate">{{ item.variant_name }}</p>
                         </div>
                         <div class="text-right">
-                          <p class="font-medium tabular-nums text-warning">
-                            {{ batch.remaining }} left
-                          </p>
-                          <p class="type-caption">expires {{ batch.expiry_date }}</p>
+                          <p class="font-medium tabular-nums text-warning">{{ item.stock }}</p>
+                          <p class="type-caption">threshold {{ item.low_stock_threshold }}</p>
                         </div>
                       </div>
                     }
@@ -579,6 +528,57 @@ type SalesChartPoint = DailySummary & { day: string; revenue: number; heightPerc
                 }
               </div>
             </article>
+
+            @if (preferences.batchExpiryEnabled()) {
+              <article class="card h-full bg-base-100">
+                <div class="card-body p-4">
+                  <div class="flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-2">
+                      <app-icon name="heroCalendarDays" />
+                      <h3 class="section-title">Expiring batches</h3>
+                    </div>
+                    @if (expiring().length > 0) {
+                      <span class="badge badge-warning badge-sm">{{ expiring().length }}</span>
+                    }
+                  </div>
+
+                  @if (initialLoading()) {
+                    <div
+                      role="status"
+                      class="flex min-h-32 items-center justify-center gap-2 text-sm text-base-content/60"
+                    >
+                      <span class="loading loading-spinner loading-sm"></span>
+                      Loading batches
+                    </div>
+                  } @else if (expiring().length === 0) {
+                    <app-empty-state
+                      [embedded]="true"
+                      [compact]="true"
+                      icon="heroCheckCircle"
+                      title="Nothing expiring"
+                      description="No batches expire in the next 30 days."
+                    />
+                  } @else {
+                    <div class="mt-2 flex flex-col divide-y divide-base-200">
+                      @for (batch of expiring(); track batch.batch_id) {
+                        <div class="flex items-center gap-3 py-3">
+                          <div class="min-w-0 flex-1">
+                            <p class="truncate text-sm font-medium">{{ batch.product_name }}</p>
+                            <p class="type-caption truncate">{{ batch.variant_name }}</p>
+                          </div>
+                          <div class="text-right">
+                            <p class="font-medium tabular-nums text-warning">
+                              {{ batch.remaining }} left
+                            </p>
+                            <p class="type-caption">expires {{ batch.expiry_date }}</p>
+                          </div>
+                        </div>
+                      }
+                    </div>
+                  }
+                </div>
+              </article>
+            }
           </div>
         </section>
       </div>

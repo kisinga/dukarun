@@ -2,6 +2,7 @@ import { Component, OnInit, computed, inject, signal, viewChild } from '@angular
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { formatKesInput, parseKes } from '../core/money';
+import { reconciliationLabel } from '../core/payment-methods';
 import { PageLayoutComponent } from '../shared/ui/page-layout.component';
 import { FormFieldComponent } from '../shared/ui/form-field.component';
 import { MoneyComponent } from '../shared/ui/money.component';
@@ -551,6 +552,9 @@ type SectionKey = 'profile' | 'pos' | 'inventory' | 'cash';
                           <span class="ml-1 font-mono text-xs text-base-content/60">
                             {{ pm.code }}
                           </span>
+                          <p class="type-caption mt-0.5">
+                            {{ reconciliationLabel(pm.reconciliation_type) }}
+                          </p>
                         </td>
                         <td>
                           <input
@@ -944,6 +948,9 @@ export class SettingsComponent implements OnInit {
         assignment.enabled
     );
   }
+
+  /** Human label for a payment method's reconciliation type (settings list). */
+  protected readonly reconciliationLabel = reconciliationLabel;
 
   protected paymentLocationLabel(method: PaymentMethodRow): string {
     const count = this.locations().filter(location =>

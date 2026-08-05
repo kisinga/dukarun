@@ -3804,6 +3804,7 @@ export type Database = {
           is_cashier_controlled: boolean
           ledger_account_code: string
           name: string
+          reconciliation_type: string
           requires_reconciliation: boolean
         }[]
       }
@@ -4411,6 +4412,8 @@ export type Database = {
           credit_sales: number
           display_name: string
           gross_sales: number
+          held_count: number
+          held_value: number
           margin: number
           net_sales: number
           quantity: number
