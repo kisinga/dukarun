@@ -1,8 +1,10 @@
 import { Component, OnInit, computed, inject, signal, viewChild } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { formatKes, formatKesInput, parseKes } from '../core/money';
+import { formatKesInput, parseKes } from '../core/money';
 import { PageLayoutComponent } from '../shared/ui/page-layout.component';
+import { FormFieldComponent } from '../shared/ui/form-field.component';
+import { MoneyComponent } from '../shared/ui/money.component';
 import {
   CompanySettings,
   PaymentMethodRow,
@@ -28,6 +30,8 @@ type SectionKey = 'profile' | 'pos' | 'inventory' | 'cash';
     ButtonComponent,
     DeleteConfirmationModalComponent,
     IconComponent,
+    FormFieldComponent,
+    MoneyComponent,
   ],
   template: `
     <app-page title="Settings">
@@ -38,7 +42,7 @@ type SectionKey = 'profile' | 'pos' | 'inventory' | 'cash';
       @if (perms.has('ViewAuditTrail')) {
         <a
           routerLink="/settings/audit-trail"
-          class="card mb-4 flex min-h-11 flex-row items-center gap-3 bg-base-100 p-4 transition-colors hover:border-primary/40 hover:bg-primary/5"
+          class="card mb-6 flex min-h-11 flex-row items-center gap-3 bg-base-100 p-4 transition-colors hover:border-primary/40 hover:bg-primary/5"
         >
           <span
             class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-base-200 text-base-content/60"
@@ -56,554 +60,563 @@ type SectionKey = 'profile' | 'pos' | 'inventory' | 'cash';
       }
 
       @if (settings(); as s) {
-        <!-- Profile -->
-        <div class="card mb-4 bg-base-100">
-          <div class="card-body p-4">
-            <h2 class="card-title text-lg">Profile</h2>
-            <form
-              (submit)="$event.preventDefault(); saveSection('profile')"
-              class="mt-2 grid gap-3 sm:grid-cols-2"
-            >
-              <label class="form-control">
-                <span class="label-text">Company name</span>
-                <input type="text" class="input input-bordered input-sm" [formControl]="name" />
-              </label>
-              <label class="form-control">
-                <span class="label-text">Public slug</span>
-                <input type="text" class="input input-bordered input-sm" [formControl]="slug" />
-              </label>
-              <p class="type-caption sm:col-span-2">
-                Storefront fields are used by your public storefront (launching separately).
-              </p>
-              <label class="form-control">
-                <span class="label-text">WhatsApp number (storefront)</span>
-                <input
-                  type="text"
-                  class="input input-bordered input-sm"
-                  placeholder="+254…"
-                  [formControl]="whatsapp"
-                />
-              </label>
-              <label class="label cursor-pointer justify-start gap-2 self-end">
-                <input
-                  type="checkbox"
-                  class="checkbox checkbox-sm"
-                  [formControl]="storefrontEnabled"
-                />
-                <span class="label-text">Public storefront enabled</span>
-              </label>
-              <div class="sm:col-span-2">
-                @if (msg('profile'); as m) {
-                  <p class="mb-2 text-sm" [class.text-success]="m.ok" [class.text-error]="!m.ok">
-                    {{ m.text }}
-                  </p>
-                }
-                <button type="submit" class="btn btn-primary btn-sm min-h-11" [disabled]="busy()">
-                  Save profile
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-
-        <!-- POS & cash control -->
-        <div class="card mb-4 bg-base-100">
-          <div class="card-body p-4">
-            <h2 class="card-title text-lg">POS &amp; cash control</h2>
-            <form (submit)="$event.preventDefault(); saveSection('pos')" class="mt-1">
-              <div class="divide-y divide-base-300">
-                <!-- Receipt printing -->
-                <label class="flex cursor-pointer items-center justify-between gap-4 py-3">
-                  <span>
-                    <span class="block text-sm font-medium">Enable receipt printing</span>
-                    <span class="block text-xs text-base-content/60">
-                      Print a receipt after each completed sale.
-                    </span>
-                  </span>
+        <div class="space-y-6">
+          <!-- Profile -->
+          <div class="card bg-base-100">
+            <div class="card-body p-4">
+              <h2 class="section-title">Profile</h2>
+              <form
+                (submit)="$event.preventDefault(); saveSection('profile')"
+                class="mt-2 grid gap-3 sm:grid-cols-2"
+              >
+                <app-form-field label="Company name" [required]="true">
+                  <input
+                    type="text"
+                    class="input input-bordered input-sm w-full"
+                    [formControl]="name"
+                  />
+                </app-form-field>
+                <app-form-field label="Public slug">
+                  <input
+                    type="text"
+                    class="input input-bordered input-sm w-full"
+                    [formControl]="slug"
+                  />
+                </app-form-field>
+                <p class="type-caption sm:col-span-2">
+                  Storefront fields are used by your public storefront (launching separately).
+                </p>
+                <app-form-field label="WhatsApp number (storefront)">
+                  <input
+                    type="text"
+                    class="input input-bordered input-sm w-full"
+                    placeholder="+254…"
+                    [formControl]="whatsapp"
+                  />
+                </app-form-field>
+                <label class="label cursor-pointer justify-start gap-2 self-end">
                   <input
                     type="checkbox"
-                    class="toggle toggle-primary"
-                    [formControl]="enablePrinter"
+                    class="checkbox checkbox-sm"
+                    [formControl]="storefrontEnabled"
                   />
+                  <span class="label-text">Public storefront enabled</span>
                 </label>
-
-                <!-- Cashier queue -->
-                <div class="py-3">
-                  <label class="flex cursor-pointer items-center justify-between gap-4">
-                    <span>
-                      <span class="block text-sm font-medium">Use a separate cashier queue</span>
-                      <span class="block text-xs text-base-content/60">
-                        When off, sellers take payment and complete orders directly on the Sell
-                        screen.
-                      </span>
-                    </span>
-                    <input
-                      type="checkbox"
-                      class="toggle toggle-primary"
-                      [formControl]="cashierFlow"
-                    />
-                  </label>
-                  @if (!cashierFlow.value) {
-                    <p class="mt-1.5 flex items-center gap-1 text-xs text-info">
-                      <app-icon name="heroInformationCircle" size="sm" />
-                      Direct checkout will be used. New orders will not enter a cashier queue.
+                <div class="sm:col-span-2">
+                  @if (msg('profile'); as m) {
+                    <p class="mb-2 text-sm" [class.text-success]="m.ok" [class.text-error]="!m.ok">
+                      {{ m.text }}
                     </p>
                   }
+                  <button appButton type="submit" [loading]="busy()">Save profile</button>
                 </div>
+              </form>
+            </div>
+          </div>
 
-                <!-- Till sessions -->
-                <div class="py-3">
-                  <label class="flex cursor-pointer items-center justify-between gap-4">
+          <!-- POS & cash control -->
+          <div class="card bg-base-100">
+            <div class="card-body p-4">
+              <h2 class="section-title">POS &amp; cash control</h2>
+              <form (submit)="$event.preventDefault(); saveSection('pos')" class="mt-1">
+                <div class="divide-y divide-base-300">
+                  <!-- Receipt printing -->
+                  <label class="flex cursor-pointer items-center justify-between gap-4 py-3">
                     <span>
-                      <span class="block text-sm font-medium">Track till sessions</span>
+                      <span class="block text-sm font-medium">Enable receipt printing</span>
                       <span class="block text-xs text-base-content/60">
-                        Require an open till for payments and keep opening, closing, and variance
-                        counts.
+                        Print a receipt after each completed sale.
                       </span>
                     </span>
                     <input
                       type="checkbox"
                       class="toggle toggle-primary"
-                      [formControl]="cashControl"
+                      [formControl]="enablePrinter"
                     />
                   </label>
-                  <div
-                    class="ml-4 mt-1 border-l-2 border-base-300 pl-4"
-                    [class.opacity-40]="!cashControl.value"
-                  >
-                    <label
-                      class="flex items-center justify-between gap-4 py-2"
-                      [class.cursor-pointer]="cashControl.value"
-                    >
+
+                  <!-- Cashier queue -->
+                  <div class="py-3">
+                    <label class="flex cursor-pointer items-center justify-between gap-4">
                       <span>
-                        <span class="block text-sm font-medium">Require opening count</span>
+                        <span class="block text-sm font-medium">Use a separate cashier queue</span>
                         <span class="block text-xs text-base-content/60">
-                          Count cash in the drawer before a till can be used.
+                          When off, sellers take payment and complete orders directly on the Sell
+                          screen.
                         </span>
                       </span>
                       <input
                         type="checkbox"
                         class="toggle toggle-primary"
-                        [formControl]="requireOpening"
-                        [attr.disabled]="!cashControl.value ? '' : null"
+                        [formControl]="cashierFlow"
                       />
                     </label>
-                    @if (cashControl.value && !requireOpening.value) {
-                      <p class="flex items-center gap-1 pb-1 text-xs text-info">
+                    @if (!cashierFlow.value) {
+                      <p class="mt-1.5 flex items-center gap-1 text-xs text-info">
                         <app-icon name="heroInformationCircle" size="sm" />
-                        Tills will open immediately using current balances; closing counts still
-                        apply.
+                        Direct checkout will be used. New orders will not enter a cashier queue.
                       </p>
                     }
                   </div>
-                </div>
 
-                <!-- Proforma validity -->
-                <div class="flex items-center justify-between gap-4 py-3">
-                  <span>
-                    <span class="block text-sm font-medium">Proforma validity</span>
-                    <span class="block text-xs text-base-content/60">
-                      Applies to newly created proformas. Default: 30 days.
+                  <!-- Till sessions -->
+                  <div class="py-3">
+                    <label class="flex cursor-pointer items-center justify-between gap-4">
+                      <span>
+                        <span class="block text-sm font-medium">Track till sessions</span>
+                        <span class="block text-xs text-base-content/60">
+                          Require an open till for payments and keep opening, closing, and variance
+                          counts.
+                        </span>
+                      </span>
+                      <input
+                        type="checkbox"
+                        class="toggle toggle-primary"
+                        [formControl]="cashControl"
+                      />
+                    </label>
+                    <div
+                      class="ml-4 mt-1 border-l-2 border-base-300 pl-4"
+                      [class.opacity-40]="!cashControl.value"
+                    >
+                      <label
+                        class="flex items-center justify-between gap-4 py-2"
+                        [class.cursor-pointer]="cashControl.value"
+                      >
+                        <span>
+                          <span class="block text-sm font-medium">Require opening count</span>
+                          <span class="block text-xs text-base-content/60">
+                            Count cash in the drawer before a till can be used.
+                          </span>
+                        </span>
+                        <input
+                          type="checkbox"
+                          class="toggle toggle-primary"
+                          [formControl]="requireOpening"
+                          [attr.disabled]="!cashControl.value ? '' : null"
+                        />
+                      </label>
+                      @if (cashControl.value && !requireOpening.value) {
+                        <p class="flex items-center gap-1 pb-1 text-xs text-info">
+                          <app-icon name="heroInformationCircle" size="sm" />
+                          Tills will open immediately using current balances; closing counts still
+                          apply.
+                        </p>
+                      }
+                    </div>
+                  </div>
+
+                  <!-- Proforma validity -->
+                  <div class="flex items-center justify-between gap-4 py-3">
+                    <span>
+                      <span class="block text-sm font-medium">Proforma validity</span>
+                      <span class="block text-xs text-base-content/60">
+                        Applies to newly created proformas. Default: 30 days.
+                      </span>
                     </span>
-                  </span>
-                  <label class="flex items-center gap-2">
-                    <input
-                      type="number"
-                      min="1"
-                      max="3650"
-                      class="input input-bordered input-sm w-20 text-right"
-                      [formControl]="proformaValidityDays"
-                    />
-                    <span class="text-xs text-base-content/60">days</span>
-                  </label>
+                    <label class="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min="1"
+                        max="3650"
+                        class="input input-bordered input-sm w-20 text-right"
+                        [formControl]="proformaValidityDays"
+                      />
+                      <span class="text-xs text-base-content/60">days</span>
+                    </label>
+                  </div>
                 </div>
-              </div>
 
-              <div class="mt-3">
-                @if (msg('pos'); as m) {
-                  <p class="mb-2 text-sm" [class.text-success]="m.ok" [class.text-error]="!m.ok">
-                    {{ m.text }}
-                  </p>
-                }
-                <button type="submit" class="btn btn-primary btn-sm min-h-11" [disabled]="busy()">
-                  Save POS settings
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-
-        <!-- Inventory -->
-        <div class="card mb-4 bg-base-100">
-          <div class="card-body p-4">
-            <h2 class="card-title text-lg">Inventory</h2>
-            <form
-              (submit)="$event.preventDefault(); saveSection('inventory')"
-              class="mt-2 flex flex-wrap items-end gap-3"
-            >
-              <label class="form-control w-40">
-                <span class="label-text">Low-stock threshold</span>
-                <input
-                  type="number"
-                  min="0"
-                  class="input input-bordered input-sm"
-                  [formControl]="lowStock"
-                />
-              </label>
-              <label
-                class="flex cursor-pointer items-start gap-3 rounded-box border border-base-300 p-3"
-              >
-                <input
-                  type="checkbox"
-                  class="checkbox checkbox-sm mt-0.5"
-                  [formControl]="batchExpiry"
-                />
-                <span>
-                  <span class="block text-sm font-medium">Track batch expiry</span>
-                  <span class="block text-xs text-base-content/60">
-                    Show expiry fields on stock intake and warn about batches nearing expiry.
-                  </span>
-                </span>
-              </label>
-              @if (!batchExpiry.value) {
-                <div class="alert alert-info w-full py-2 text-sm">
-                  <app-icon name="heroInformationCircle" />
-                  <span
-                    >Expiry fields and alerts are hidden. Existing expiry history is retained.</span
-                  >
-                </div>
-              }
-              <div class="w-full">
-                @if (msg('inventory'); as m) {
-                  <p class="mb-2 text-sm" [class.text-success]="m.ok" [class.text-error]="!m.ok">
-                    {{ m.text }}
-                  </p>
-                }
-                <button type="submit" class="btn btn-primary btn-sm min-h-11" [disabled]="busy()">
-                  Save inventory
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-
-        <!-- Locations -->
-        <div class="card mb-4 bg-base-100">
-          <div class="card-body p-4">
-            <div class="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <div class="flex flex-wrap items-center gap-2">
-                  <h2 class="card-title text-lg">Stock locations</h2>
-                  @if (entitlements.snapshot(); as plan) {
-                    <span class="badge badge-outline badge-sm">{{
-                      plan.tierName ?? 'No plan'
-                    }}</span>
+                <div class="mt-3">
+                  @if (msg('pos'); as m) {
+                    <p class="mb-2 text-sm" [class.text-success]="m.ok" [class.text-error]="!m.ok">
+                      {{ m.text }}
+                    </p>
                   }
-                </div>
-                <p class="type-caption mt-1">
-                  Locations separate where purchases are received and stock is held.
-                  @if (locationLimit(); as limit) {
-                    {{ locations().length }} of {{ limit }} used.
-                  }
-                </p>
-              </div>
-              @if (perms.has('ManageStockAdjustments')) {
-                <button
-                  appButton
-                  variant="outline"
-                  [disabled]="!canAddLocation()"
-                  (click)="startLocationCreate()"
-                >
-                  Add location
-                </button>
-              }
-            </div>
-
-            @if (!entitlements.enabled('multipleLocations') && locations().length > 0) {
-              <div class="alert mt-3 border border-info/20 bg-info/5 text-sm">
-                <span class="flex-1">
-                  Multiple locations are not included in your current plan. You can still rename and
-                  maintain the default location.
-                </span>
-                <a routerLink="/billing" class="link whitespace-nowrap font-semibold">View plans</a>
-              </div>
-            } @else if (!canAddLocation() && locationLimit() !== null) {
-              <div class="alert mt-3 border border-warning/20 bg-warning/5 text-sm">
-                <span class="flex-1">Your plan's stock-location limit has been reached.</span>
-                <a routerLink="/billing" class="link whitespace-nowrap font-semibold">Upgrade</a>
-              </div>
-            }
-
-            @if (locationFormOpen()) {
-              <form
-                (submit)="$event.preventDefault(); saveLocation()"
-                class="mt-3 grid gap-3 rounded-box border border-base-300 bg-base-200/40 p-3 sm:grid-cols-2"
-              >
-                <label class="form-control">
-                  <span class="label-text">Location name</span>
-                  <input class="input input-bordered input-sm" [formControl]="locationName" />
-                </label>
-                <label class="form-control">
-                  <span class="label-text">Code</span>
-                  <input
-                    class="input input-bordered input-sm uppercase"
-                    placeholder="e.g. WESTLANDS"
-                    [formControl]="locationCode"
-                  />
-                </label>
-                <label class="label cursor-pointer justify-start gap-2 py-0 sm:col-span-2">
-                  <input
-                    type="checkbox"
-                    class="checkbox checkbox-sm"
-                    [formControl]="locationDefault"
-                  />
-                  <span class="label-text">Use as the default receiving location</span>
-                </label>
-                <div class="flex gap-2 sm:col-span-2">
-                  <button
-                    appButton
-                    type="submit"
-                    [loading]="locationBusy()"
-                    [disabled]="
-                      locationName.value.trim().length === 0 ||
-                      locationCode.value.trim().length === 0
-                    "
-                  >
-                    {{ editingLocation() ? 'Save location' : 'Create location' }}
-                  </button>
-                  <button appButton variant="ghost" type="button" (click)="closeLocationForm()">
-                    Cancel
-                  </button>
+                  <button appButton type="submit" [loading]="busy()">Save POS settings</button>
                 </div>
               </form>
-            }
-
-            @if (locationMessage(); as message) {
-              <p
-                class="mt-2 text-sm"
-                [class.text-success]="message.ok"
-                [class.text-error]="!message.ok"
-              >
-                {{ message.text }}
-              </p>
-            }
-
-            <div class="table-scroll mt-3">
-              <table class="table table-sm">
-                <thead>
-                  <tr>
-                    <th>Location</th>
-                    <th>Code</th>
-                    <th>Status</th>
-                    <th class="text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @for (location of locations(); track location.id) {
-                    <tr>
-                      <td class="font-medium">{{ location.name }}</td>
-                      <td class="font-mono text-xs">{{ location.code }}</td>
-                      <td>
-                        @if (location.is_default) {
-                          <span class="badge badge-primary badge-sm">Default</span>
-                        } @else {
-                          <span class="badge badge-ghost badge-sm">Additional</span>
-                        }
-                      </td>
-                      <td class="whitespace-nowrap text-right">
-                        @if (perms.has('ManageStockAdjustments')) {
-                          <button
-                            appButton
-                            variant="ghost"
-                            size="sm"
-                            (click)="startLocationEdit(location)"
-                          >
-                            Edit
-                          </button>
-                          @if (!location.is_default) {
-                            <button
-                              appButton
-                              variant="error"
-                              size="sm"
-                              (click)="startLocationDelete(location)"
-                            >
-                              Delete
-                            </button>
-                          }
-                        }
-                      </td>
-                    </tr>
-                  }
-                </tbody>
-              </table>
             </div>
           </div>
-        </div>
 
-        <!-- Cash control threshold -->
-        <div class="card mb-4 bg-base-100">
-          <div class="card-body p-4">
-            <h2 class="card-title text-lg">Variance notifications</h2>
-            <p class="type-caption">
-              Flag drawer variances at or above this amount (currently
-              {{ fmt(s.variance_notification_threshold) }}).
-            </p>
-            @if (!cashControl.value) {
-              <div class="alert alert-info mt-2 py-2 text-sm">
-                <app-icon name="heroInformationCircle" />
-                <span>This threshold applies when till-session cash control is enabled.</span>
+          <!-- Inventory -->
+          <div class="card bg-base-100">
+            <div class="card-body p-4">
+              <h2 class="section-title">Inventory</h2>
+              <form (submit)="$event.preventDefault(); saveSection('inventory')" class="mt-1">
+                <div class="divide-y divide-base-300">
+                  <div class="flex items-center justify-between gap-4 py-3">
+                    <span>
+                      <span class="block text-sm font-medium">Low-stock threshold</span>
+                      <span class="block text-xs text-base-content/60">
+                        Warn when available stock falls to this level.
+                      </span>
+                    </span>
+                    <input
+                      type="number"
+                      min="0"
+                      class="input input-bordered input-sm w-20 text-right"
+                      [formControl]="lowStock"
+                    />
+                  </div>
+                  <label class="flex cursor-pointer items-center justify-between gap-4 py-3">
+                    <span>
+                      <span class="block text-sm font-medium">Track batch expiry</span>
+                      <span class="block text-xs text-base-content/60">
+                        Show expiry fields on stock intake and warn about batches nearing expiry.
+                      </span>
+                    </span>
+                    <input
+                      type="checkbox"
+                      class="toggle toggle-primary"
+                      [formControl]="batchExpiry"
+                    />
+                  </label>
+                </div>
+                @if (!batchExpiry.value) {
+                  <div class="alert alert-info mt-2 py-2 text-sm">
+                    <app-icon name="heroInformationCircle" />
+                    <span
+                      >Expiry fields and alerts are hidden. Existing expiry history is
+                      retained.</span
+                    >
+                  </div>
+                }
+                <div class="mt-3">
+                  @if (msg('inventory'); as m) {
+                    <p class="mb-2 text-sm" [class.text-success]="m.ok" [class.text-error]="!m.ok">
+                      {{ m.text }}
+                    </p>
+                  }
+                  <button appButton type="submit" [loading]="busy()">Save inventory</button>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <!-- Locations -->
+          <div class="card bg-base-100">
+            <div class="card-body p-4">
+              <div class="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <h2 class="section-title">Stock locations</h2>
+                    @if (entitlements.snapshot(); as plan) {
+                      <span class="badge badge-outline badge-sm">{{
+                        plan.tierName ?? 'No plan'
+                      }}</span>
+                    }
+                  </div>
+                  <p class="type-caption mt-1">
+                    Locations separate where purchases are received and stock is held.
+                    @if (locationLimit(); as limit) {
+                      {{ locations().length }} of {{ limit }} used.
+                    }
+                  </p>
+                </div>
+                @if (perms.has('ManageStockAdjustments')) {
+                  <button
+                    appButton
+                    variant="outline"
+                    [disabled]="!canAddLocation()"
+                    (click)="startLocationCreate()"
+                  >
+                    <app-icon name="heroPlus" />
+                    Add location
+                  </button>
+                }
               </div>
-            }
-            <form
-              (submit)="$event.preventDefault(); saveSection('cash')"
-              class="mt-2 flex flex-wrap items-end gap-3"
-            >
-              <label class="form-control w-40">
-                <span class="label-text">Threshold (KES)</span>
-                <input
-                  type="text"
-                  inputmode="numeric"
-                  class="input input-bordered input-sm"
-                  [formControl]="varianceThreshold"
-                />
-              </label>
-              <div>
+
+              @if (!entitlements.enabled('multipleLocations') && locations().length > 0) {
+                <div class="alert alert-info mt-3 text-sm">
+                  <app-icon name="heroInformationCircle" />
+                  <span class="flex-1">
+                    Multiple locations are not included in your current plan. You can still rename
+                    and maintain the default location.
+                  </span>
+                  <a routerLink="/billing" class="link whitespace-nowrap font-semibold"
+                    >View plans</a
+                  >
+                </div>
+              } @else if (!canAddLocation() && locationLimit() !== null) {
+                <div class="alert alert-warning mt-3 text-sm">
+                  <app-icon name="heroExclamationTriangle" />
+                  <span class="flex-1">Your plan's stock-location limit has been reached.</span>
+                  <a routerLink="/billing" class="link whitespace-nowrap font-semibold">Upgrade</a>
+                </div>
+              }
+
+              @if (locationFormOpen()) {
+                <form
+                  (submit)="$event.preventDefault(); saveLocation()"
+                  class="mt-3 grid gap-3 border-t border-base-300 pt-3 sm:grid-cols-2"
+                >
+                  <app-form-field label="Location name" [required]="true">
+                    <input
+                      class="input input-bordered input-sm w-full"
+                      [formControl]="locationName"
+                    />
+                  </app-form-field>
+                  <app-form-field
+                    label="Code"
+                    [required]="true"
+                    hint="Short uppercase code, e.g. WESTLANDS"
+                  >
+                    <input
+                      class="input input-bordered input-sm w-full uppercase"
+                      placeholder="e.g. WESTLANDS"
+                      [formControl]="locationCode"
+                    />
+                  </app-form-field>
+                  <label class="label cursor-pointer justify-start gap-2 py-0 sm:col-span-2">
+                    <input
+                      type="checkbox"
+                      class="checkbox checkbox-sm"
+                      [formControl]="locationDefault"
+                    />
+                    <span class="label-text">Use as the default receiving location</span>
+                  </label>
+                  <div class="flex gap-2 sm:col-span-2">
+                    <button
+                      appButton
+                      type="submit"
+                      [loading]="locationBusy()"
+                      [disabled]="
+                        locationName.value.trim().length === 0 ||
+                        locationCode.value.trim().length === 0
+                      "
+                    >
+                      {{ editingLocation() ? 'Save location' : 'Create location' }}
+                    </button>
+                    <button appButton variant="ghost" type="button" (click)="closeLocationForm()">
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              }
+
+              @if (locationMessage(); as message) {
+                <p
+                  class="mt-2 text-sm"
+                  [class.text-success]="message.ok"
+                  [class.text-error]="!message.ok"
+                >
+                  {{ message.text }}
+                </p>
+              }
+
+              <div class="table-scroll mt-3">
+                <table class="table table-sm">
+                  <thead>
+                    <tr>
+                      <th>Location</th>
+                      <th>Code</th>
+                      <th>Status</th>
+                      <th class="text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (location of locations(); track location.id) {
+                      <tr>
+                        <td class="font-medium">{{ location.name }}</td>
+                        <td class="font-mono text-xs">{{ location.code }}</td>
+                        <td>
+                          @if (location.is_default) {
+                            <span class="badge badge-primary badge-sm">Default</span>
+                          } @else {
+                            <span class="badge badge-ghost badge-sm">Additional</span>
+                          }
+                        </td>
+                        <td class="whitespace-nowrap text-right">
+                          @if (perms.has('ManageStockAdjustments')) {
+                            <button
+                              appButton
+                              variant="ghost"
+                              size="sm"
+                              (click)="startLocationEdit(location)"
+                            >
+                              Edit
+                            </button>
+                            @if (!location.is_default) {
+                              <button
+                                appButton
+                                variant="error"
+                                size="sm"
+                                (click)="startLocationDelete(location)"
+                              >
+                                Delete
+                              </button>
+                            }
+                          }
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Cash control threshold -->
+          <div class="card bg-base-100">
+            <div class="card-body p-4">
+              <h2 class="section-title">Variance notifications</h2>
+              <p class="type-caption mt-1">
+                Flag drawer variances at or above
+                <app-money [amount]="s.variance_notification_threshold" [showCurrency]="true" />.
+              </p>
+              @if (!cashControl.value) {
+                <div class="alert alert-info mt-2 py-2 text-sm">
+                  <app-icon name="heroInformationCircle" />
+                  <span>This threshold applies when till-session cash control is enabled.</span>
+                </div>
+              }
+              <form (submit)="$event.preventDefault(); saveSection('cash')" class="mt-2 max-w-40">
+                <app-form-field label="Threshold (KES)">
+                  <input
+                    type="text"
+                    inputmode="numeric"
+                    class="input input-bordered input-sm w-full"
+                    [formControl]="varianceThreshold"
+                  />
+                </app-form-field>
                 @if (msg('cash'); as m) {
-                  <p class="mb-2 text-sm" [class.text-success]="m.ok" [class.text-error]="!m.ok">
+                  <p class="mt-2 text-sm" [class.text-success]="m.ok" [class.text-error]="!m.ok">
                     {{ m.text }}
                   </p>
                 }
-                <button type="submit" class="btn btn-primary btn-sm min-h-11" [disabled]="busy()">
+                <button appButton type="submit" class="mt-3" [loading]="busy()">
                   Save threshold
                 </button>
-              </div>
-            </form>
+              </form>
+            </div>
           </div>
-        </div>
 
-        <!-- Payment methods -->
-        @if (entitlements.enabled('commissions') && perms.has('ManageCommissions')) {
-          <div class="card mb-4 bg-base-100">
-            <div class="card-body p-4">
-              <div class="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <h2 class="card-title text-lg">Commissions</h2>
-                  <p class="type-caption mt-1">
-                    Optional staff commission plans and reviewable statements.
-                  </p>
+          <!-- Payment methods -->
+          @if (entitlements.enabled('commissions') && perms.has('ManageCommissions')) {
+            <div class="card bg-base-100">
+              <div class="card-body p-4">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h2 class="section-title">Commissions</h2>
+                    <p class="type-caption mt-1">
+                      Optional staff commission plans and reviewable statements.
+                    </p>
+                  </div>
+                  <label class="label cursor-pointer gap-3">
+                    <span class="label-text font-medium">Enable commissions</span>
+                    <input
+                      type="checkbox"
+                      class="toggle toggle-primary"
+                      [checked]="s.commissions_enabled"
+                      [disabled]="busy()"
+                      (change)="toggleCommissions($event)"
+                    />
+                  </label>
                 </div>
-                <label class="label cursor-pointer gap-3">
-                  <span class="label-text font-medium">Enable commissions</span>
-                  <input
-                    type="checkbox"
-                    class="toggle toggle-primary"
-                    [checked]="s.commissions_enabled"
-                    [disabled]="busy()"
-                    (change)="toggleCommissions($event)"
-                  />
-                </label>
+                @if (msg('commissions'); as m) {
+                  <p class="mt-2 text-sm" [class.text-success]="m.ok" [class.text-error]="!m.ok">
+                    {{ m.text }}
+                  </p>
+                }
               </div>
-              @if (msg('commissions'); as m) {
+            </div>
+          }
+
+          <div class="card bg-base-100">
+            <div class="card-body p-4">
+              <div class="flex items-center justify-between">
+                <h2 class="section-title">Payment methods</h2>
+                <a appButton variant="outline" routerLink="/billing">
+                  Billing &amp; plan
+                  <app-icon name="heroArrowRight" />
+                </a>
+              </div>
+              <div class="table-scroll">
+                <table class="table table-sm mt-2">
+                  <thead>
+                    <tr>
+                      <th>Method</th>
+                      <th>Enabled</th>
+                      <th>Reconciliation</th>
+                      <th>Cashier</th>
+                      <th>Locations</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (pm of paymentMethods(); track pm.code) {
+                      <tr>
+                        <td>
+                          <span class="text-sm font-medium">{{ pm.name }}</span>
+                          <span class="ml-1 font-mono text-xs text-base-content/60">
+                            {{ pm.code }}
+                          </span>
+                        </td>
+                        <td>
+                          <input
+                            type="checkbox"
+                            class="toggle toggle-sm"
+                            [checked]="pm.enabled"
+                            (change)="toggleMethod(pm, 'enabled', $event)"
+                            [disabled]="busy()"
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="checkbox"
+                            class="toggle toggle-sm"
+                            [checked]="pm.requires_reconciliation"
+                            (change)="toggleMethod(pm, 'requires_reconciliation', $event)"
+                            [disabled]="busy()"
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="checkbox"
+                            class="toggle toggle-sm"
+                            [checked]="pm.is_cashier_controlled"
+                            (change)="toggleMethod(pm, 'is_cashier_controlled', $event)"
+                            [disabled]="busy()"
+                          />
+                        </td>
+                        <td>
+                          @if (locations().length <= 1) {
+                            <span class="type-caption">Main location</span>
+                          } @else {
+                            <details class="dropdown dropdown-end">
+                              <summary class="btn btn-ghost btn-xs min-h-9">
+                                {{ paymentLocationLabel(pm) }}
+                              </summary>
+                              <div
+                                class="dropdown-content z-20 mt-1 w-56 rounded-box border border-base-300 bg-base-100 p-2 shadow-overlay"
+                              >
+                                @for (location of locations(); track location.id) {
+                                  <label class="label min-h-10 cursor-pointer justify-start gap-2">
+                                    <input
+                                      type="checkbox"
+                                      class="checkbox checkbox-sm"
+                                      [checked]="paymentMethodEnabledAt(pm, location.id)"
+                                      [disabled]="busy()"
+                                      (change)="togglePaymentLocation(pm, location.id, $event)"
+                                    />
+                                    <span class="label-text">{{ location.name }}</span>
+                                  </label>
+                                }
+                              </div>
+                            </details>
+                          }
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+              @if (pmMsg(); as m) {
                 <p class="mt-2 text-sm" [class.text-success]="m.ok" [class.text-error]="!m.ok">
                   {{ m.text }}
                 </p>
               }
             </div>
-          </div>
-        }
-
-        <div class="card mb-4 bg-base-100">
-          <div class="card-body p-4">
-            <div class="flex items-center justify-between">
-              <h2 class="card-title text-lg">Payment methods</h2>
-              <a routerLink="/billing" class="btn btn-outline btn-sm min-h-11">
-                Billing &amp; plan →
-              </a>
-            </div>
-            <div class="table-scroll">
-              <table class="table table-sm mt-2">
-                <thead>
-                  <tr>
-                    <th>Method</th>
-                    <th>Enabled</th>
-                    <th>Reconciliation</th>
-                    <th>Cashier</th>
-                    <th>Locations</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @for (pm of paymentMethods(); track pm.code) {
-                    <tr>
-                      <td>
-                        <span class="text-sm font-medium">{{ pm.name }}</span>
-                        <span class="ml-1 font-mono text-xs text-base-content/60">
-                          {{ pm.code }}
-                        </span>
-                      </td>
-                      <td>
-                        <input
-                          type="checkbox"
-                          class="toggle toggle-sm"
-                          [checked]="pm.enabled"
-                          (change)="toggleMethod(pm, 'enabled', $event)"
-                          [disabled]="busy()"
-                        />
-                      </td>
-                      <td>
-                        <input
-                          type="checkbox"
-                          class="toggle toggle-sm"
-                          [checked]="pm.requires_reconciliation"
-                          (change)="toggleMethod(pm, 'requires_reconciliation', $event)"
-                          [disabled]="busy()"
-                        />
-                      </td>
-                      <td>
-                        <input
-                          type="checkbox"
-                          class="toggle toggle-sm"
-                          [checked]="pm.is_cashier_controlled"
-                          (change)="toggleMethod(pm, 'is_cashier_controlled', $event)"
-                          [disabled]="busy()"
-                        />
-                      </td>
-                      <td>
-                        @if (locations().length <= 1) {
-                          <span class="type-caption">Main location</span>
-                        } @else {
-                          <details class="dropdown dropdown-end">
-                            <summary class="btn btn-ghost btn-xs min-h-9">
-                              {{ paymentLocationLabel(pm) }}
-                            </summary>
-                            <div
-                              class="dropdown-content z-20 mt-1 w-56 rounded-box border border-base-300 bg-base-100 p-2 shadow-overlay"
-                            >
-                              @for (location of locations(); track location.id) {
-                                <label class="label min-h-10 cursor-pointer justify-start gap-2">
-                                  <input
-                                    type="checkbox"
-                                    class="checkbox checkbox-sm"
-                                    [checked]="paymentMethodEnabledAt(pm, location.id)"
-                                    [disabled]="busy()"
-                                    (change)="togglePaymentLocation(pm, location.id, $event)"
-                                  />
-                                  <span class="label-text">{{ location.name }}</span>
-                                </label>
-                              }
-                            </div>
-                          </details>
-                        }
-                      </td>
-                    </tr>
-                  }
-                </tbody>
-              </table>
-            </div>
-            @if (pmMsg(); as m) {
-              <p class="mt-2 text-sm" [class.text-success]="m.ok" [class.text-error]="!m.ok">
-                {{ m.text }}
-              </p>
-            }
           </div>
         </div>
       } @else {
@@ -638,7 +651,6 @@ export class SettingsComponent implements OnInit {
   protected readonly entitlements = inject(EntitlementsService);
   protected readonly perms = inject(PermissionsService);
 
-  protected readonly fmt = formatKes;
   protected readonly settings = signal<CompanySettings | null>(null);
   protected readonly paymentMethods = signal<PaymentMethodRow[]>([]);
   protected readonly paymentMethodAssignments = signal<LocationPaymentMethodRow[]>([]);

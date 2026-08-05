@@ -55,7 +55,8 @@ begin
       'ApproveCustomerCredit', 'ManageCustomerCreditLimit', 'ReverseOrder',
       'OverrideCustomerBalance', 'SettleOrder', 'ManageSupplierCreditPurchases',
       'ViewFinancials', 'ManageReconciliation', 'CloseAccountingPeriod',
-      'CreateInterAccountTransfer', 'ManageTeam'
+      'CreateInterAccountTransfer', 'ManageTeam', 'ViewAuditTrail',
+      'ViewStaffPerformance', 'ManageCommissions'
     ])
   returning id into v_role_id;
 
