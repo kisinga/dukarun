@@ -206,7 +206,7 @@ await countCheck(
 );
 
 const srcPays = await S(
-  'select count(*)::int n from payment where "orderId" = any($1::int[]) and amount > 0',
+  `select count(*)::int n from payment where "orderId" = any($1::int[]) and amount > 0 and method <> 'reconciliation'`,
   [migratable.map(o => o.id)]
 );
 const tgtPays = await T('select count(*)::int n from public.payments where company_id=$1', [
@@ -215,18 +215,26 @@ const tgtPays = await T('select count(*)::int n from public.payments where compa
 await countCheck('payments', srcPays[0].n, tgtPays[0].n);
 
 const srcEntries = await S(
-  'select count(*)::int n from ledger_journal_entry where "channelId"=$1',
+  `select count(distinct e.id)::int n from ledger_journal_entry e
+   join ledger_journal_line l on l."entryId"=e.id and (l.debit>0 or l.credit>0)
+   where e."channelId"=$1`,
   [CHANNEL_ID]
 );
 const tgtEntries = await T(
   'select count(*)::int n from public.ledger_journal_entries where company_id=$1',
   [companyId]
 );
-await countCheck('ledger_journal_entries', srcEntries[0].n, tgtEntries[0].n, 'verbatim');
+await countCheck(
+  'ledger_journal_entries',
+  srcEntries[0].n,
+  tgtEntries[0].n,
+  'verbatim (all-zero-line v1 entries skipped)'
+);
 
-const srcJLines = await S('select count(*)::int n from ledger_journal_line where "channelId"=$1', [
-  CHANNEL_ID,
-]);
+const srcJLines = await S(
+  'select count(*)::int n from ledger_journal_line where "channelId"=$1 and (debit>0 or credit>0)',
+  [CHANNEL_ID]
+);
 const srcDouble = await S(
   'select count(*)::int n from ledger_journal_line where "channelId"=$1 and debit>0 and credit>0',
   [CHANNEL_ID]

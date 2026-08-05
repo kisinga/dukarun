@@ -10,7 +10,8 @@ grant select on pg_temp.bl_company to authenticated;
 
 select testkit.as_user((select company_id from bl_company), '11111111-1111-1111-1111-111111111111', 'Admin');
 
--- 1. Activation sets active + expiry a month out.
+-- 1. Activation sets active + expiry extending from the remaining trial
+--    (trial expiry is real since 0010_trial_expiry, so base = ~30 days out).
 reset role;
 select public.activate_subscription(
   (select company_id from bl_company),
@@ -25,9 +26,9 @@ select is(
 );
 
 select ok(
-  (select subscription_expires_at > now() + interval '25 days' from public.companies
+  (select subscription_expires_at > now() + interval '55 days' from public.companies
    where id = (select company_id from bl_company)),
-  'expiry set ~1 month out'
+  'expiry extends from remaining trial (~2 months out)'
 );
 
 -- 3. Replay with same reference is a no-op (no double extension).
@@ -38,7 +39,7 @@ select public.activate_subscription(
 );
 
 select ok(
-  (select subscription_expires_at < now() + interval '45 days' from public.companies
+  (select subscription_expires_at < now() + interval '65 days' from public.companies
    where id = (select company_id from bl_company)),
   'webhook replay with same reference does not double-extend'
 );

@@ -34,10 +34,12 @@ if (!mapRow.length) {
 const companyId = mapRow[0].new_id;
 
 // --- source: entry -> multiset of "code|D|C" (double-sided lines pre-split) ---
+// Zero-amount lines (v1 zero-cost COGS artifacts) excluded: v2's nonzero line
+// check forbids them and the ETL drops them (all-zero entries drop whole).
 const { rows: sLines } = await src.query(
   `select e.id as entry_id, e."sourceType", e."sourceId", e.memo, a.code, l.debit, l.credit
    from ledger_journal_entry e
-   join ledger_journal_line l on l."entryId" = e.id
+   join ledger_journal_line l on l."entryId" = e.id and (l.debit > 0 or l.credit > 0)
    join ledger_account a on a.id = l."accountId"
    where e."channelId" = $1`,
   [CHANNEL]

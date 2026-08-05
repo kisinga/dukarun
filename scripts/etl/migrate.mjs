@@ -14,11 +14,11 @@
 // if this ETL is ever re-run against a live target, divide all money values by 100 first.
 // int8 is parsed to Number (all values << 2^53).
 // SOURCE is read-only; TARGET writes bypass RPCs deliberately (migration, not app traffic).
-import pg from 'pg';
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import pg from 'pg';
 
 const SRC_DSN =
   process.env.SOURCE_DB_URL ?? 'postgres://vendure:changeme-secure-password@localhost:5432/vendure';
@@ -304,6 +304,24 @@ try {
         }
       }
       const name = FLAGS.name ?? prettify(channel.code);
+      // v2 launch (owner decision 2026-08-05): every migrated member WITHOUT a
+      // live paid subscription gets a fresh 1-week trial so nothing feels
+      // bricked on arrival. Live subscribers (active + future expiry)
+      // keep their verbatim subscription state.
+      const subExpiry = channel.customFieldsSubscriptionexpiresat
+        ? new Date(channel.customFieldsSubscriptionexpiresat)
+        : null;
+      const hasLiveSub = subStatus === 'active' && subExpiry !== null && subExpiry > new Date();
+      let trialTierId = null;
+      const launchTrialEnd = new Date(Date.now() + 7 * 24 * 3600 * 1000);
+      if (!hasLiveSub) {
+        const tt = await tgt.query("select id from public.subscription_tiers where code='trial'");
+        trialTierId = tt.rows[0]?.id ?? null;
+        if (!trialTierId) warn("no 'trial' tier in target; falling back to source tier mapping");
+        console.log(
+          `  launch trial: 1-week trial granted (expires ${launchTrialEnd.toISOString().slice(0, 10)})`
+        );
+      }
       const { rows } = await tgt.query(
         `insert into public.companies (
            code, name, currency, status,
@@ -339,12 +357,16 @@ try {
             channel.customFieldsNotificationcategorypreferences,
             'notificationCategoryPreferences'
           ),
-          tierId,
-          ['trial', 'active', 'expired', 'cancelled'].includes(subStatus) ? subStatus : null,
-          channel.customFieldsTrialendsat,
-          channel.customFieldsSubscriptionstartedat,
-          channel.customFieldsSubscriptionexpiresat,
-          ['monthly', 'yearly'].includes(billing) ? billing : null,
+          hasLiveSub || !trialTierId ? tierId : trialTierId,
+          hasLiveSub
+            ? ['trial', 'active', 'expired', 'cancelled'].includes(subStatus)
+              ? subStatus
+              : null
+            : 'trial',
+          hasLiveSub ? channel.customFieldsTrialendsat : launchTrialEnd,
+          hasLiveSub ? channel.customFieldsSubscriptionstartedat : null,
+          hasLiveSub ? channel.customFieldsSubscriptionexpiresat : launchTrialEnd,
+          hasLiveSub && ['monthly', 'yearly'].includes(billing) ? billing : null,
           channel.customFieldsPaystackcustomercode,
           channel.customFieldsPaystacksubscriptioncode,
           channel.customFieldsLastpaymentdate,
@@ -352,7 +374,7 @@ try {
           channel.customFieldsSubscriptionexpiredremindersentat,
           channel.customFieldsSubscriptionexemptuntil,
           channel.customFieldsSubscriptionexemptreason,
-          channel.customFieldsSubscriptiongraceperiodend,
+          hasLiveSub ? channel.customFieldsSubscriptiongraceperiodend : null,
           channel.customFieldsSmsusedthisperiod ?? 0,
           channel.customFieldsSmsperiodend,
           parseJsonText(channel.customFieldsSmsusagebycategory, 'smsUsageByCategory'),
@@ -363,6 +385,27 @@ try {
       s.inserted++;
       console.log(`  company inserted: ${companyId} (${channel.code} / ${name})`);
     }
+  }
+
+  // Post-squash triggers (assign_operational_location on orders/lines/payments)
+  // resolve tenant + location via JWT claims (current_company_id(),
+  // current_user_can_access_location()). The ETL connects as superuser with no
+  // JWT, so impersonate a platform admin for the rest of the transaction.
+  // set_config(..., true) is transaction-local; no-op in dry runs.
+  if (FLAGS.apply && companyId) {
+    await tgt.query(`select set_config('request.jwt.claims', $1, true)`, [
+      JSON.stringify({
+        sub: crypto.randomUUID(),
+        company_id: companyId,
+        user_role: 'Admin',
+        is_platform_admin: true,
+        role: 'service_role',
+      }),
+    ]);
+    // Layaway orders insert as pending_payment, which enforce_order_cashier_flow
+    // blocks when the company has the cashier queue off (jutik). The external
+    // hold flag is the designed bypass for parked orders from outside that flow.
+    await tgt.query(`select set_config('app.external_payment_hold', 'on', true)`);
   }
 
   // -------------------------------------------------------------------------
@@ -590,6 +633,26 @@ try {
         [companyId, locName]
       );
       r.rowCount ? sl.inserted++ : sl.existing++;
+
+      // Point the assign_operational_location trigger at MAIN: it reads the
+      // app.business_location_id GUC, and resolve_business_location accepts it
+      // (platform-admin claims set above pass the access check).
+      const { rows: mainLoc } = await tgt.query(
+        "select id from public.stock_locations where company_id=$1 and code='MAIN'",
+        [companyId]
+      );
+      if (mainLoc[0]) {
+        await tgt.query(`select set_config('app.business_location_id', $1, true)`, [mainLoc[0].id]);
+        // Method-at-location availability (validate_payment_location trigger on
+        // payments). Mirrors the RPC seeding in 0006_platform.
+        await tgt.query(
+          `insert into public.location_payment_methods(company_id, location_id, payment_method_id)
+           select $1, $2, pm.id from public.payment_methods pm
+           where pm.company_id = $1
+           on conflict (location_id, payment_method_id) do nothing`,
+          [companyId, mainLoc[0].id]
+        );
+      }
     } else stat('stock_locations').inserted = 1;
 
     if (!DRY) {
@@ -1120,6 +1183,15 @@ try {
           spay.skipped++;
           continue;
         }
+        // v1 recorded order reconciliations as pseudo-payments ("trust ledger").
+        // Not a tender — the ledger captures the adjustment; skip in v2.
+        if (String(p.method) === 'reconciliation') {
+          warn(
+            `payment ${p.id}: v1 reconciliation artifact (order ${p.orderId}, ${p.amount}); skipped (kept in ledger)`
+          );
+          spay.skipped++;
+          continue;
+        }
         const method = String(p.method).replace(/-\d+$/, '');
         if (!['cash', 'mpesa', 'bank', 'credit'].includes(method)) {
           warn(`payment ${p.id}: unknown method '${p.method}' -> kept as '${method}'`);
@@ -1320,9 +1392,28 @@ try {
       );
       const entryIdMap = new Map(); // old entry uuid -> new entry uuid
 
+      // Zero-amount lines (v1 posted InventorySaleCogs lines with unitCost=0)
+      // violate the nonzero line check in v2. They carry no money, so drop
+      // them; entries whose lines are ALL zero are dropped whole.
+      const { rows: nzRows } = await src.query(
+        `select "entryId", count(*) filter (where debit>0 or credit>0)::int as nz
+         from ledger_journal_line where "channelId"=$1 group by 1`,
+        [channel.id]
+      );
+      const nzByEntry = new Map(nzRows.map(r => [r.entryId, r.nz]));
+      const deadEntries = entries.filter(e => (nzByEntry.get(e.id) ?? 0) === 0);
+      if (deadEntries.length)
+        warn(
+          `${deadEntries.length} ledger entr(ies) with only zero-amount lines skipped (v1 zero-cost COGS)`
+        );
+
       // pass 1: entries
       const newEntryOldIds = new Set(); // old uuids inserted THIS run
       for (const e of entries) {
+        if ((nzByEntry.get(e.id) ?? 0) === 0) {
+          se.skipped++;
+          continue;
+        }
         const ins = await tgt.query(
           `insert into public.ledger_journal_entries (company_id, entry_date, posted_at, source_type, source_id, memo)
            values ($1,$2,$3,$4,$5,$6)
@@ -1363,6 +1454,10 @@ try {
       for (const l of lines) {
         if (!newEntryOldIds.has(l.entryId)) {
           sl.existing++;
+          continue;
+        }
+        if (!(l.debit > 0 || l.credit > 0)) {
+          sl.skipped++; // zero-amount v1 line (zero-cost COGS); carries no money
           continue;
         }
         const newEntryId = entryIdMap.get(l.entryId);
