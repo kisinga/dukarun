@@ -1,4 +1,14 @@
-import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  OnDestroy,
+  OnInit,
+  afterRenderEffect,
+  computed,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { FormControl, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import type { RealtimeChannel } from '@supabase/supabase-js';
@@ -697,7 +707,7 @@ interface ParsedPurchaseLine {
                                 </span>
                                 <input
                                   type="search"
-                                  autofocus
+                                  #variantSearch
                                   class="input input-bordered input-sm w-full pl-9"
                                   placeholder="Search product, SKU, or barcode…"
                                   [value]="variantQuery()"
@@ -836,22 +846,46 @@ interface ParsedPurchaseLine {
                             />
                           </app-form-field>
                           <app-form-field label="Wholesale price (KES)">
-                            <input
-                              type="text"
-                              inputmode="numeric"
-                              class="input input-bordered input-sm w-full tabular-nums"
-                              [(ngModel)]="line.wholesalePrice"
-                              [ngModelOptions]="{ standalone: true }"
-                            />
+                            <div class="relative">
+                              <input
+                                type="text"
+                                inputmode="numeric"
+                                class="input input-bordered input-sm w-full tabular-nums"
+                                [class.pr-8]="hasDuplicateVariant(line)"
+                                [(ngModel)]="line.wholesalePrice"
+                                (ngModelChange)="updateWholesalePrice(line, $event)"
+                                [ngModelOptions]="{ standalone: true }"
+                              />
+                              @if (hasDuplicateVariant(line)) {
+                                <span
+                                  class="absolute inset-y-0 right-2 flex items-center text-warning"
+                                  [title]="duplicatePriceTooltip"
+                                >
+                                  <app-icon name="heroExclamationTriangle" />
+                                </span>
+                              }
+                            </div>
                           </app-form-field>
                           <app-form-field label="Retail price (KES)">
-                            <input
-                              type="text"
-                              inputmode="numeric"
-                              class="input input-bordered input-sm w-full tabular-nums"
-                              [(ngModel)]="line.retailPrice"
-                              [ngModelOptions]="{ standalone: true }"
-                            />
+                            <div class="relative">
+                              <input
+                                type="text"
+                                inputmode="numeric"
+                                class="input input-bordered input-sm w-full tabular-nums"
+                                [class.pr-8]="hasDuplicateVariant(line)"
+                                [(ngModel)]="line.retailPrice"
+                                (ngModelChange)="updateRetailPrice(line, $event)"
+                                [ngModelOptions]="{ standalone: true }"
+                              />
+                              @if (hasDuplicateVariant(line)) {
+                                <span
+                                  class="absolute inset-y-0 right-2 flex items-center text-warning"
+                                  [title]="duplicatePriceTooltip"
+                                >
+                                  <app-icon name="heroExclamationTriangle" />
+                                </span>
+                              }
+                            </div>
                           </app-form-field>
                         </div>
 
@@ -1348,6 +1382,8 @@ export class SuppliersComponent implements OnInit, OnDestroy {
   protected readonly isPurchasePage = signal(this.route.snapshot.data['purchasePage'] === true);
 
   protected readonly fmt = formatKes;
+  protected readonly duplicatePriceTooltip =
+    'Same item on multiple lines — the selling price applies once to the product and stays in sync across those lines.';
   protected readonly suppliers = signal<SupplierWithAp[]>([]);
   protected readonly accounts = signal<LedgerAccount[]>([]);
   protected readonly variants = signal<Variant[]>([]);
@@ -1387,6 +1423,20 @@ export class SuppliersComponent implements OnInit, OnDestroy {
   protected readonly purchaseAccount = new FormControl('', { nonNullable: true });
   protected readonly variantPickerFor = signal<number | null>(null);
   protected readonly variantQuery = signal('');
+  private readonly variantSearchInput = viewChild<string, ElementRef<HTMLInputElement>>(
+    'variantSearch',
+    { read: ElementRef }
+  );
+
+  constructor() {
+    // Focus the picker search without scrolling the page (replaces the `autofocus`
+    // attribute, which scrolls the focused input into view and can hide page top).
+    afterRenderEffect(() => {
+      if (this.variantPickerFor() !== null) {
+        this.variantSearchInput()?.nativeElement.focus({ preventScroll: true });
+      }
+    });
+  }
   protected lines: PurchaseLineForm[] = [this.emptyLine()];
 
   protected readonly paySupplierId = new FormControl('', { nonNullable: true });
@@ -1665,7 +1715,40 @@ export class SuppliersComponent implements OnInit, OnDestroy {
     const quantity = line.quantity || 1;
     const replacement = this.newLine(variantId);
     Object.assign(line, replacement, { quantity });
+    // Selling price is one value per variant: adopt it from an existing line.
+    const existing = this.lines.find(other => other !== line && other.variantId === variantId);
+    if (existing) {
+      line.wholesalePrice = existing.wholesalePrice;
+      line.retailPrice = existing.retailPrice;
+    }
     this.syncLineTotalFromUnit(line);
+  }
+
+  protected hasDuplicateVariant(line: PurchaseLineForm): boolean {
+    return (
+      !!line.variantId &&
+      this.lines.some(other => other !== line && other.variantId === line.variantId)
+    );
+  }
+
+  protected updateWholesalePrice(line: PurchaseLineForm, value: string): void {
+    line.wholesalePrice = value;
+    this.syncDuplicateLinePrices(line);
+  }
+
+  protected updateRetailPrice(line: PurchaseLineForm, value: string): void {
+    line.retailPrice = value;
+    this.syncDuplicateLinePrices(line);
+  }
+
+  private syncDuplicateLinePrices(line: PurchaseLineForm): void {
+    if (!line.variantId) return;
+    for (const other of this.lines) {
+      if (other !== line && other.variantId === line.variantId) {
+        other.wholesalePrice = line.wholesalePrice;
+        other.retailPrice = line.retailPrice;
+      }
+    }
   }
 
   protected updateUnitCost(line: PurchaseLineForm, value: string): void {

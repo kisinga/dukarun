@@ -10,9 +10,12 @@ import { SyncService } from '../pos/offline/sync.service';
 import { IconComponent } from '../shared/ui/icon.component';
 import { CashierSessionDialogService } from '../core/cashier-session-dialog.service';
 import { CashierSessionModalComponent } from '../money/cashier/cashier-session-modal.component';
+import { PersonaSwitcherComponent } from '../shared/ui/persona-switcher.component';
 import { OrderQueueCountsService } from '../pos/order-queue-counts.service';
 import { EntitlementsService } from '../core/entitlements.service';
 import { LocationContextService } from '../core/location-context.service';
+import { ProfileService } from '../profile/profile.service';
+import { EntityAvatarComponent } from '../shared/ui/entity-avatar.component';
 
 interface NavItem {
   route: string;
@@ -41,7 +44,9 @@ interface NavSection {
     RouterLink,
     RouterLinkActive,
     IconComponent,
+    EntityAvatarComponent,
     CashierSessionModalComponent,
+    PersonaSwitcherComponent,
   ],
   template: `
     <div class="drawer lg:drawer-open">
@@ -170,15 +175,33 @@ interface NavSection {
             >
               <app-icon [name]="theme.theme() === 'light' ? 'heroMoon' : 'heroSun'" />
             </button>
-            <button
-              class="btn btn-ghost btn-sm min-h-11"
-              title="Sign out"
-              aria-label="Sign out"
-              [disabled]="sync.syncing()"
-              (click)="requestSignOut()"
-            >
-              <app-icon name="heroArrowRightOnRectangle" />
-            </button>
+            <div class="dropdown dropdown-end">
+              <button
+                type="button"
+                class="btn btn-ghost btn-sm min-h-11 gap-2 px-2"
+                aria-label="Account menu"
+              >
+                <app-entity-avatar size="sm" [firstName]="myName()" [imageUrl]="myAvatarUrl()" />
+                <app-icon name="heroChevronDown" class="hidden sm:inline" />
+              </button>
+              <ul
+                class="dropdown-content menu menu-sm z-50 mt-2 w-52 rounded-box border border-base-300 bg-base-100 p-2 shadow-overlay"
+              >
+                <li class="menu-title">{{ myName() }}</li>
+                <li>
+                  <a routerLink="/profile">
+                    <app-icon name="heroUserCircle" />
+                    My profile
+                  </a>
+                </li>
+                <li>
+                  <button type="button" [disabled]="sync.syncing()" (click)="requestSignOut()">
+                    <app-icon name="heroArrowRightOnRectangle" />
+                    Sign out
+                  </button>
+                </li>
+              </ul>
+            </div>
           </div>
         </div>
 
@@ -292,6 +315,7 @@ interface NavSection {
       </div>
 
       <app-cashier-session-modal />
+      <app-persona-switcher />
 
       @if (signOutWarning()) {
         <div
@@ -339,6 +363,12 @@ export class ShellComponent implements OnInit {
   protected readonly orderQueueCounts = inject(OrderQueueCountsService);
   protected readonly entitlements = inject(EntitlementsService);
   protected readonly locations = inject(LocationContextService);
+  protected readonly profile = inject(ProfileService);
+
+  protected readonly myName = computed(() => this.profile.me()?.display_name ?? 'Account');
+  protected readonly myAvatarUrl = computed(() =>
+    this.profile.avatarUrl(this.profile.me()?.avatar_path)
+  );
 
   protected readonly company = signal<Company | null>(null);
   protected readonly pendingSyncCount = computed(
@@ -463,6 +493,7 @@ export class ShellComponent implements OnInit {
     } catch {
       // brand falls back to 'Dukarun'
     }
+    void this.profile.myProfile().catch(() => null);
     await Promise.all([this.locations.load(), this.entitlements.refresh().catch(() => undefined)]);
     await this.cashierSession.start();
     await this.orderQueueCounts.refresh();

@@ -16,6 +16,8 @@ import { DeleteConfirmationModalComponent } from '../shared/ui/delete-confirmati
 import { EntityAvatarComponent } from '../shared/ui/entity-avatar.component';
 import { PaginationComponent } from '../shared/ui/pagination.component';
 import { EntitlementsService } from '../core/entitlements.service';
+import { SupabaseService } from '../core/supabase.service';
+import { ProfileService } from '../profile/profile.service';
 import { RouterLink } from '@angular/router';
 import { ButtonComponent } from '../shared/ui/button.component';
 import { IconComponent } from '../shared/ui/icon.component';
@@ -196,16 +198,40 @@ import { EmptyStateComponent } from '../shared/ui/empty-state.component';
                         <app-entity-avatar
                           size="sm"
                           [firstName]="m.staff_profile?.display_name ?? m.roles?.name ?? '?'"
+                          [imageUrl]="memberAvatarUrl(m)"
                         />
                         <div>
                           <p class="table-primary" [title]="m.user_id">
                             {{ memberNameFor(m) }}
+                            @if (isSelf(m)) {
+                              <span class="badge badge-xs badge-outline ml-1">You</span>
+                            }
                           </p>
                           <p class="table-secondary font-mono">User …{{ shortId(m.user_id) }}</p>
                         </div>
                       </div>
                     </td>
-                    <td>{{ m.roles?.name ?? '—' }}</td>
+                    <td>
+                      <select
+                        class="select select-bordered select-xs"
+                        [value]="m.role_id ?? ''"
+                        [disabled]="busy() || roles().length === 0 || isSelf(m)"
+                        [title]="
+                          isSelf(m) ? 'Ask another admin to change your role' : 'Change role'
+                        "
+                        aria-label="Change role"
+                        (change)="changeRole(m, $any($event.target))"
+                      >
+                        @if (!m.role_id) {
+                          <option value="" disabled>No role</option>
+                        }
+                        @for (r of roles(); track r.id) {
+                          <option [value]="r.id" [selected]="r.id === m.role_id">
+                            {{ r.name }}
+                          </option>
+                        }
+                      </select>
+                    </td>
                     <td>
                       <app-status-badge
                         size="xs"
@@ -235,37 +261,39 @@ import { EmptyStateComponent } from '../shared/ui/empty-state.component';
                       >
                         Rename
                       </button>
-                      @if (m.authorization_status === 'disabled') {
+                      @if (!isSelf(m)) {
+                        @if (m.authorization_status === 'disabled') {
+                          <button
+                            appButton
+                            variant="outline"
+                            size="sm"
+                            [disabled]="busy() || !canAddMember()"
+                            (click)="setStatus(m, 'approved')"
+                          >
+                            Enable
+                          </button>
+                        } @else {
+                          <button
+                            appButton
+                            variant="outline"
+                            size="sm"
+                            [disabled]="busy()"
+                            (click)="setStatus(m, 'disabled')"
+                          >
+                            Disable
+                          </button>
+                        }
                         <button
                           appButton
-                          variant="outline"
+                          variant="ghost"
                           size="sm"
-                          [disabled]="busy() || !canAddMember()"
-                          (click)="setStatus(m, 'approved')"
-                        >
-                          Enable
-                        </button>
-                      } @else {
-                        <button
-                          appButton
-                          variant="outline"
-                          size="sm"
+                          class="ml-1 text-error"
                           [disabled]="busy()"
-                          (click)="setStatus(m, 'disabled')"
+                          (click)="startRemove(m)"
                         >
-                          Disable
+                          Remove
                         </button>
                       }
-                      <button
-                        appButton
-                        variant="ghost"
-                        size="sm"
-                        class="ml-1 text-error"
-                        [disabled]="busy()"
-                        (click)="startRemove(m)"
-                      >
-                        Remove
-                      </button>
                     </td>
                   </tr>
                 }
@@ -282,14 +310,33 @@ import { EmptyStateComponent } from '../shared/ui/empty-state.component';
                   <app-entity-avatar
                     size="sm"
                     [firstName]="m.staff_profile?.display_name ?? m.roles?.name ?? '?'"
+                    [imageUrl]="memberAvatarUrl(m)"
                   />
                   <div class="min-w-0 flex-1">
                     <p class="text-sm font-semibold" [title]="m.user_id">
                       {{ memberNameFor(m) }}
+                      @if (isSelf(m)) {
+                        <span class="badge badge-xs badge-outline ml-1">You</span>
+                      }
                     </p>
-                    <p class="type-caption mt-0.5">
-                      {{ m.roles?.name ?? 'No role' }} · User …{{ shortId(m.user_id) }}
-                    </p>
+                    <p class="type-caption mt-0.5">User …{{ shortId(m.user_id) }}</p>
+                    <select
+                      class="select select-bordered select-xs mt-1"
+                      [value]="m.role_id ?? ''"
+                      [disabled]="busy() || roles().length === 0 || isSelf(m)"
+                      [title]="isSelf(m) ? 'Ask another admin to change your role' : 'Change role'"
+                      aria-label="Change role"
+                      (change)="changeRole(m, $any($event.target))"
+                    >
+                      @if (!m.role_id) {
+                        <option value="" disabled>No role</option>
+                      }
+                      @for (r of roles(); track r.id) {
+                        <option [value]="r.id" [selected]="r.id === m.role_id">
+                          {{ r.name }}
+                        </option>
+                      }
+                    </select>
                   </div>
                   <app-status-badge
                     size="xs"
@@ -320,37 +367,39 @@ import { EmptyStateComponent } from '../shared/ui/empty-state.component';
                   >
                     Rename
                   </button>
-                  @if (m.authorization_status === 'disabled') {
+                  @if (!isSelf(m)) {
+                    @if (m.authorization_status === 'disabled') {
+                      <button
+                        appButton
+                        variant="outline"
+                        size="sm"
+                        [disabled]="busy() || !canAddMember()"
+                        (click)="setStatus(m, 'approved')"
+                      >
+                        Enable
+                      </button>
+                    } @else {
+                      <button
+                        appButton
+                        variant="outline"
+                        size="sm"
+                        [disabled]="busy()"
+                        (click)="setStatus(m, 'disabled')"
+                      >
+                        Disable
+                      </button>
+                    }
                     <button
                       appButton
-                      variant="outline"
+                      variant="ghost"
                       size="sm"
-                      [disabled]="busy() || !canAddMember()"
-                      (click)="setStatus(m, 'approved')"
-                    >
-                      Enable
-                    </button>
-                  } @else {
-                    <button
-                      appButton
-                      variant="outline"
-                      size="sm"
+                      class="text-error"
                       [disabled]="busy()"
-                      (click)="setStatus(m, 'disabled')"
+                      (click)="startRemove(m)"
                     >
-                      Disable
+                      Remove
                     </button>
                   }
-                  <button
-                    appButton
-                    variant="ghost"
-                    size="sm"
-                    class="text-error"
-                    [disabled]="busy()"
-                    (click)="startRemove(m)"
-                  >
-                    Remove
-                  </button>
                 </div>
               </div>
             </div>
@@ -520,7 +569,11 @@ import { EmptyStateComponent } from '../shared/ui/empty-state.component';
 })
 export class TeamComponent implements OnInit {
   private readonly team = inject(TeamService);
+  private readonly supabase = inject(SupabaseService);
+  private readonly profile = inject(ProfileService);
   protected readonly entitlements = inject(EntitlementsService);
+
+  protected readonly currentUserId = computed(() => this.supabase.session()?.user.id ?? null);
 
   protected readonly allPermissions = ALL_PERMISSIONS;
   protected readonly permissionLabels = PERMISSION_LABELS;
@@ -668,6 +721,26 @@ export class TeamComponent implements OnInit {
     }
   }
 
+  protected async changeRole(m: MembershipWithRole, select: HTMLSelectElement): Promise<void> {
+    const roleId = select.value;
+    if (!roleId || roleId === m.role_id) return;
+    this.busy.set(true);
+    this.error.set(null);
+    this.notice.set(null);
+    try {
+      await this.team.updateTeamMember(m.id, { role_id: roleId });
+      const roleName = this.roles().find(r => r.id === roleId)?.name ?? 'role';
+      this.notice.set(`${this.memberNameFor(m)} is now ${roleName}`);
+      await this.load();
+    } catch (err) {
+      // The change didn't apply — snap the select back to the member's role.
+      select.value = m.role_id ?? '';
+      this.error.set(err instanceof Error ? err.message : 'Role change failed');
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
   protected startRemove(m: MembershipWithRole): void {
     this.removingMember.set(m);
     this.deleteModal()?.show();
@@ -678,6 +751,14 @@ export class TeamComponent implements OnInit {
     return {
       entityName: m ? `${this.memberNameFor(m)} (${m.roles?.name ?? 'no role'})` : '',
     };
+  }
+
+  protected isSelf(member: MembershipWithRole): boolean {
+    return member.user_id === this.currentUserId();
+  }
+
+  protected memberAvatarUrl(member: MembershipWithRole): string | null {
+    return this.profile.avatarUrl(member.staff_profile?.avatar_path);
   }
 
   protected memberNameFor(member: MembershipWithRole): string {

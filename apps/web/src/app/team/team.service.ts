@@ -12,7 +12,7 @@ export type TeamLocation = Database['public']['Tables']['stock_locations']['Row'
 
 export type MembershipWithRole = Membership & {
   roles: Pick<Role, 'name' | 'permissions'> | null;
-  staff_profile: Pick<StaffProfile, 'display_name' | 'last_role_name'> | null;
+  staff_profile: Pick<StaffProfile, 'display_name' | 'last_role_name' | 'avatar_path'> | null;
 };
 
 export { ALL_PERMISSIONS, PERMISSION_LABELS } from '../core/permissions.service';
@@ -28,19 +28,36 @@ export class TeamService {
   async memberships(): Promise<MembershipWithRole[]> {
     const [members, profiles] = await Promise.all([
       this.db.from('company_memberships').select('*, roles(name, permissions)').order('created_at'),
-      this.db.from('company_staff_profiles').select('user_id, display_name, last_role_name'),
+      this.db
+        .from('company_staff_profiles')
+        .select('user_id, display_name, last_role_name, avatar_path'),
     ]);
     if (members.error) throw members.error;
     if (profiles.error) throw profiles.error;
     const byUser = new Map((profiles.data ?? []).map(profile => [profile.user_id, profile]));
-    return (members.data ?? []).map(member => ({
-      ...member,
-      staff_profile: byUser.get(member.user_id) ?? null,
-    }));
+    // Sort by display name: created_at alone is unstable because seeded rows
+    // share one transaction timestamp, so any UPDATE reshuffles the list.
+    return (members.data ?? [])
+      .map(member => ({
+        ...member,
+        staff_profile: byUser.get(member.user_id) ?? null,
+      }))
+      .sort((a, b) =>
+        (a.staff_profile?.display_name ?? a.user_id).localeCompare(
+          b.staff_profile?.display_name ?? b.user_id
+        )
+      );
   }
 
+  /** Assignable company roles. Platform templates (is_template) are readable via
+   *  RLS for apply_role_template but must not be offered for assignment — the
+   *  team RPCs reject role ids outside the caller's company. */
   async roles(): Promise<Role[]> {
-    const { data, error } = await this.db.from('roles').select('*').order('name');
+    const { data, error } = await this.db
+      .from('roles')
+      .select('*')
+      .eq('is_template', false)
+      .order('name');
     if (error) throw error;
     return data;
   }

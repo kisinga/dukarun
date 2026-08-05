@@ -3,7 +3,7 @@ import {
   provideBrowserGlobalErrorListeners,
   provideZonelessChangeDetection,
 } from '@angular/core';
-import { provideRouter } from '@angular/router';
+import { provideRouter, withInMemoryScrolling } from '@angular/router';
 import { provideNgIconsConfig, provideIcons } from '@ng-icons/core';
 import {
   heroArchiveBox,
@@ -19,7 +19,7 @@ export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
     provideZonelessChangeDetection(),
-    provideRouter(routes),
+    provideRouter(routes, withInMemoryScrolling({ scrollPositionRestoration: 'enabled' })),
     provideNgIconsConfig({ size: '1rem' }),
     provideIcons({ heroArchiveBox, heroCheckCircle, heroChevronLeft, heroPlus, heroXMark }),
   ],

@@ -9,6 +9,10 @@ select testkit.provision('49494949-4949-4949-4949-494949494949', 'Expiry Co') co
        testkit.provision('50505050-5050-5050-5050-505050505050', 'Other Expiry Co') other_company_id;
 grant select on pg_temp.expiry_companies to authenticated;
 
+-- Member-side settings edits require an approved company.
+update public.companies set status = 'approved'
+where id = (select company_id from expiry_companies);
+
 select testkit.as_user(
   (select company_id from expiry_companies),
   '49494949-4949-4949-4949-494949494949',

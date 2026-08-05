@@ -84,8 +84,10 @@ select public.post_sale('c0000000-0000-0000-0000-0000000000aa',
   '[{"variant_id":"aa000000-0000-0000-0000-0000000000aa","quantity":1,"unit_price":10000}]', '[]') as order_id;
 
 reset role;
+select set_config('app.allow_ledger_mutation', 'on', true);
 update public.ledger_journal_entries set entry_date = entry_date - 10
 where source_id = (select order_id::text from cm_sale) and source_type = 'CreditSale';
+select set_config('app.allow_ledger_mutation', 'off', true);
 
 select public.credit_reminder_scan();
 

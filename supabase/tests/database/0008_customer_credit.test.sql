@@ -108,8 +108,8 @@ select throws_ok(
 -- 8. Allocation against an order with no AR debit fails.
 create temp table cash_sale as
 select public.post_sale(null,
-  '[{"variant_id":"aa000000-0000-0000-0000-0000000000cc","quantity":1,"unit_price":5000}]',
-  '[{"method":"cash","amount":5000}]') as order_id;
+  '[{"variant_id":"aa000000-0000-0000-0000-0000000000cc","quantity":1,"unit_price":10000}]',
+  '[{"method":"cash","amount":10000}]') as order_id;
 
 select throws_ok(
   $$select public.post_payment_allocation((select order_id from cash_sale), 1000, 'cash', null)$$,

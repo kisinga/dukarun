@@ -6,6 +6,10 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
 const PAYSTACK_SECRET = Deno.env.get('PAYSTACK_SECRET_KEY') ?? '';
+if (!PAYSTACK_SECRET) {
+  // Fail closed: without the secret we cannot call Paystack.
+  throw new Error('PAYSTACK_SECRET_KEY is not set');
+}
 const SYSTEM_EMAIL = Deno.env.get('PAYSTACK_SYSTEM_EMAIL') ?? 'billing@dukarun.com';
 
 const cors = {
@@ -106,9 +110,7 @@ Deno.serve(async req => {
       { headers: cors }
     );
   } catch (err) {
-    return Response.json(
-      { error: err instanceof Error ? err.message : 'internal_error' },
-      { status: 500, headers: cors }
-    );
+    console.error('paystack-charge failed', err);
+    return Response.json({ error: 'internal_error' }, { status: 500, headers: cors });
   }
 });

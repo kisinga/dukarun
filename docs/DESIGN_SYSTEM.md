@@ -94,6 +94,26 @@ Dashboard text never exceeds 24px. The roles are encoded as Tailwind utilities i
 - Public marketing/storefront surfaces may define a separate documented scale; this five-role
   scale governs the authenticated dashboard.
 
+### Public marketing scale (`src/app/marketing/**`)
+
+Public pages (/, /about, /contact) use their own scale, encoded as utilities in
+`apps/web/src/styles.scss` — same Outfit family, same tight tracking, same daisyUI tokens:
+
+| Utility         | Role                                          |
+| --------------- | --------------------------------------------- |
+| `mkt-display`   | Hero headline (clamp 2.25–3.5rem)             |
+| `mkt-h1`        | Page headline (clamp 2–3rem)                  |
+| `mkt-h2`        | Section headline (clamp 1.5–2.25rem)          |
+| `mkt-lead`      | Intro paragraph, `/70` muted                  |
+| `mkt-eyebrow`   | Overline label (uppercase, primary)           |
+| `mkt-container` | Centered page canvas with gutters             |
+| `mkt-card`      | Marketing card (standard recipe + hover lift) |
+
+The scale is implemented as utilities, not `text-*xl` classes, so the design guard needs no
+exceptions and still bans oversize text everywhere else. All other rules apply unchanged on
+marketing pages: `<app-icon>` only, no inline `<svg>`, no emoji, semantic colour with money
+meaning, daisyUI tokens only.
+
 ## Spacing
 
 - 4-point system: Tailwind steps `1, 1.5, 2, 3, 4, 6, 8`. No arbitrary px spacing.

@@ -2,14 +2,21 @@ import { Component, computed, input } from '@angular/core';
 
 type AvatarSize = 'sm' | 'md' | 'lg';
 
-/** Initials avatar for customers/team rows (ported from the old app). */
+/** Initials avatar for customers/team rows (ported from the old app).
+ *  Renders the photo when `imageUrl` is set, initials otherwise. */
 @Component({
   selector: 'app-entity-avatar',
   template: `
-    <div class="avatar placeholder">
-      <div [class]="containerClasses()" class="flex items-center justify-center">
-        <span [class]="textClasses()">{{ initials() }}</span>
-      </div>
+    <div class="avatar" [class.placeholder]="!imageUrl()">
+      @if (imageUrl(); as url) {
+        <div [class]="containerClasses()" class="overflow-hidden">
+          <img [src]="url" alt="" class="h-full w-full object-cover" />
+        </div>
+      } @else {
+        <div [class]="containerClasses()" class="flex items-center justify-center">
+          <span [class]="textClasses()">{{ initials() }}</span>
+        </div>
+      }
     </div>
   `,
 })
@@ -17,6 +24,7 @@ export class EntityAvatarComponent {
   readonly firstName = input<string>('');
   readonly lastName = input<string>('');
   readonly size = input<AvatarSize>('md');
+  readonly imageUrl = input<string | null>(null);
 
   protected readonly initials = computed(() => {
     const first = this.firstName()?.charAt(0) || '';

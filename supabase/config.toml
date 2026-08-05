@@ -269,6 +269,8 @@ max_frequency = "5s"
 # Real delivery is validated with a real number against the pilot project.
 [auth.sms.test_otp]
 254700000001 = "123456"
+254700000002 = "123456"
+254700000003 = "123456"
 
 # Configure logged in session timeouts.
 # [auth.sessions]
@@ -393,6 +395,12 @@ deno_version = 2
 
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
+
+# Paystack signs webhooks with x-paystack-signature (HMAC of the raw body) and
+# sends no Supabase JWT, so the gateway JWT check must be off for this function.
+# Authenticity is enforced by the signature check inside the function.
+[functions.paystack-webhook]
+verify_jwt = false
 
 [analytics]
 enabled = true

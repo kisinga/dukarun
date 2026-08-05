@@ -107,7 +107,7 @@ export class MoneyService {
   async journalBySource(sourceType: string, limit = 20): Promise<JournalEntryWithLines[]> {
     const { data, error } = await this.db
       .from('ledger_journal_entries')
-      .select('*, ledger_journal_lines(*, ledger_accounts(code, name))')
+      .select('*, ledger_journal_lines!entry_id(*, ledger_accounts(code, name))')
       .eq('source_type', sourceType)
       .order('posted_at', { ascending: false })
       .limit(limit);
@@ -148,8 +148,8 @@ export class MoneyService {
     // Account filter needs inner joins so only entries touching that account
     // match (and their embedded lines are that account's lines).
     const select = input.accountCode
-      ? '*, ledger_journal_lines!inner(*, ledger_accounts!inner(code, name))'
-      : '*, ledger_journal_lines(*, ledger_accounts(code, name))';
+      ? '*, ledger_journal_lines!entry_id!inner(*, ledger_accounts!inner(code, name))'
+      : '*, ledger_journal_lines!entry_id(*, ledger_accounts(code, name))';
     let query = this.db.from('ledger_journal_entries').select(select, { count: 'exact' });
     if (input.accountCode) {
       query = query.eq('ledger_journal_lines.ledger_accounts.code', input.accountCode);
@@ -344,7 +344,7 @@ export class MoneyService {
     const { data: adjustments, error: adjustmentError } = await this.db
       .from('ledger_journal_lines')
       .select(
-        'id, debit, credit, meta, ledger_journal_entries!inner(posted_at, memo, source_type, source_id), ledger_accounts!inner(code)'
+        'id, debit, credit, meta, ledger_journal_entries!entry_id!inner(posted_at, memo, source_type, source_id), ledger_accounts!inner(code)'
       )
       .eq('ledger_journal_entries.source_type', 'BalanceAdjustment')
       .eq('ledger_accounts.code', 'ACCOUNTS_RECEIVABLE')

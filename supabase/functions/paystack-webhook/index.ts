@@ -10,6 +10,10 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
 const PAYSTACK_SECRET = Deno.env.get('PAYSTACK_SECRET_KEY') ?? '';
+if (!PAYSTACK_SECRET) {
+  // Fail closed: without the secret we cannot verify webhook signatures.
+  throw new Error('PAYSTACK_SECRET_KEY is not set');
+}
 const ONLINE_VERIFY = (Deno.env.get('PAYSTACK_ONLINE_VERIFY') ?? 'true') !== 'false';
 
 async function hmacHex(secret: string, body: string): Promise<string> {
@@ -24,6 +28,19 @@ async function hmacHex(secret: string, body: string): Promise<string> {
   return [...new Uint8Array(sig)].map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
+// Constant-time comparison of two hex digests (avoids timing side-channel
+// on the signature check).
+function timingSafeEqualHex(a: string, b: string): boolean {
+  const ba = new TextEncoder().encode(a);
+  const bb = new TextEncoder().encode(b);
+  let diff = ba.length ^ bb.length;
+  const len = Math.max(ba.length, bb.length);
+  for (let i = 0; i < len; i++) {
+    diff |= (ba[i % ba.length] ?? 0) ^ (bb[i % bb.length] ?? 0);
+  }
+  return diff === 0;
+}
+
 Deno.serve(async req => {
   if (req.method !== 'POST') {
     return Response.json({ error: 'method_not_allowed' }, { status: 405 });
@@ -33,7 +50,7 @@ Deno.serve(async req => {
   const signature = req.headers.get('x-paystack-signature') ?? '';
 
   const expected = await hmacHex(PAYSTACK_SECRET, rawBody);
-  if (signature !== expected) {
+  if (!timingSafeEqualHex(signature, expected)) {
     return Response.json({ error: 'invalid_signature' }, { status: 401 });
   }
 
@@ -76,7 +93,8 @@ Deno.serve(async req => {
   });
 
   if (error) {
-    return Response.json({ error: error.message }, { status: 500 });
+    console.error('activate_subscription failed', { reference: data.reference, error });
+    return Response.json({ error: 'activation_failed' }, { status: 500 });
   }
 
   return Response.json({ received: true, activated: meta.company_id });

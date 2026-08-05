@@ -82,6 +82,74 @@ where m.user_id = '5877ac73-ff8d-457c-afcd-791e66229d17'
   and m.company_id = c.id and c.name = 'Mama Mboga Stores'
   and r.company_id = c.id and r.name = 'Admin';
 
+-- ---------------------------------------------------------------------------
+-- Test personas: Cashier + Manager sharing the demo company.
+-- Phones 254700000002/3 with OTP 123456 (config.toml test_otp). Used by the
+-- dev-only persona switcher in apps/web.
+-- ---------------------------------------------------------------------------
+insert into auth.users (
+  id, instance_id, aud, role, email, phone, phone_confirmed_at, encrypted_password,
+  confirmation_token, recovery_token, email_change, email_change_token_current,
+  email_change_token_new, phone_change, phone_change_token, reauthentication_token,
+  created_at, updated_at
+)
+values (
+  '5877ac73-ff8d-457c-afcd-791e66229d02',
+  '00000000-0000-0000-0000-000000000000',
+  'authenticated', 'authenticated',
+  'cashier@dukarun.local', '254700000002', now(), '',
+  '', '', '', '', '', '', '', '',
+  now(), now()
+)
+on conflict (id) do nothing;
+
+insert into auth.users (
+  id, instance_id, aud, role, email, phone, phone_confirmed_at, encrypted_password,
+  confirmation_token, recovery_token, email_change, email_change_token_current,
+  email_change_token_new, phone_change, phone_change_token, reauthentication_token,
+  created_at, updated_at
+)
+values (
+  '5877ac73-ff8d-457c-afcd-791e66229d03',
+  '00000000-0000-0000-0000-000000000000',
+  'authenticated', 'authenticated',
+  'manager@dukarun.local', '254700000003', now(), '',
+  '', '', '', '', '', '', '', '',
+  now(), now()
+)
+on conflict (id) do nothing;
+
+-- Provisioning seeds Admin + Cashier roles; add the Manager role with the
+-- platform template permission set (no CloseAccountingPeriod/ViewAuditTrail/
+-- ManageCommissions). Cashier keeps its template role (SettleOrder only).
+insert into public.roles (company_id, name, permissions)
+select c.id, 'Manager', array[
+  'ManageApprovals', 'OverridePrice', 'ManageStockAdjustments',
+  'ApproveCustomerCredit', 'ManageCustomerCreditLimit', 'ReverseOrder',
+  'SettleOrder', 'ManageSupplierCreditPurchases',
+  'ViewFinancials', 'ManageReconciliation',
+  'CreateInterAccountTransfer', 'ManageTeam'
+]::text[]
+from public.companies c
+where c.name = 'Mama Mboga Stores'
+on conflict (company_id, name) do update
+set permissions = excluded.permissions, updated_at = now();
+
+insert into public.company_memberships (company_id, user_id, role_id, authorization_status)
+select c.id, persona.user_id::uuid, r.id, 'approved'
+from public.companies c
+cross join (
+  values
+    ('5877ac73-ff8d-457c-afcd-791e66229d02', 'Cashier'),
+    ('5877ac73-ff8d-457c-afcd-791e66229d03', 'Manager')
+) as persona(user_id, role_name)
+join public.roles r on r.company_id = c.id and r.name = persona.role_name
+where c.name = 'Mama Mboga Stores'
+on conflict (company_id, user_id) do update
+set role_id = excluded.role_id,
+    authorization_status = excluded.authorization_status,
+    updated_at = now();
+
 -- Provisioning creates MAIN/Kiosk 1. Add two non-default locations so purchase,
 -- stock, and reporting screens can exercise real location selection.
 insert into public.stock_locations (company_id, code, name, is_default)

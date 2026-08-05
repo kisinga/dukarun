@@ -27,9 +27,12 @@ select public.post_sale('c0000000-0000-0000-0000-0000000000e1',
 
 reset role;
 -- Backdate the entry to 45 days ago (simulates old debt).
+-- Posted ledger rows are immutable unless the backfill escape hatch is set.
+select set_config('app.allow_ledger_mutation', 'on', true);
 update public.ledger_journal_entries
 set entry_date = entry_date - 45
 where source_id = (select order_id::text from age_sale) and source_type = 'CreditSale';
+select set_config('app.allow_ledger_mutation', 'off', true);
 
 -- 1-3. Customer aging view.
 select is(
@@ -66,9 +69,11 @@ select public.record_purchase('c0000000-0000-0000-0000-0000000000e2',
   true, 'PO-OLD');
 
 reset role;
+select set_config('app.allow_ledger_mutation', 'on', true);
 update public.ledger_journal_entries
 set entry_date = entry_date - 70
 where source_type = 'InventoryPurchase';
+select set_config('app.allow_ledger_mutation', 'off', true);
 
 select is(
   (select bucket from public.supplier_ap_aging where supplier_id = 'c0000000-0000-0000-0000-0000000000e2'),

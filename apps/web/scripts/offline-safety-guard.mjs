@@ -38,8 +38,8 @@ const checks = [
   {
     ok:
       /const clientRef = crypto\.randomUUID\(\)/.test(sell) &&
-      /postSale\(customerId, lines, payments, false, clientRef\)/.test(sell) &&
-      /queueSale\(customerId, lines, payments, clientRef\)/.test(sell),
+      /postSale\(\s*customerId,\s*lines,\s*payments,\s*false,\s*clientRef/.test(sell) &&
+      /queueSale\(\s*customerId,\s*lines,\s*payments,\s*clientRef\s*\)/.test(sell),
     message: 'The first sale attempt and every queued replay must reuse one client reference.',
   },
   {

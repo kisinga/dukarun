@@ -1138,25 +1138,26 @@ export class SellComponent implements OnInit {
       return;
     }
     try {
-      const result = await this.pos.postSale(customerId, lines, payments, false, clientRef);
-      // Completing from a loaded proforma: retire the draft so it can't be
-      // converted into a second, duplicate sale. Only on a real completion —
-      // an approval-held sale keeps the proforma intact.
-      const completedDraftId = this.cart.draftId();
+      // Completing from a loaded proforma: pass the draft id so the backend
+      // retires it in the same transaction as the sale — no separate delete
+      // call that could be lost (offline-queued sales still settle the
+      // proforma separately, since they cannot use this path).
+      const completedDraftId = this.cart.draftId() ?? undefined;
+      const result = await this.pos.postSale(
+        customerId,
+        lines,
+        payments,
+        false,
+        clientRef,
+        undefined,
+        completedDraftId
+      );
       this.checkoutOpen.set(false);
       this.cart.clear();
       this.selectedCustomer.set(null);
       if (result.status === 'approval_required') {
         this.showApprovalSent();
       } else {
-        if (completedDraftId) {
-          try {
-            await this.pos.deleteProforma(completedDraftId);
-          } catch {
-            // Delete failed: the draft lingers as Active. Surfaced in Proformas;
-            // far rarer and safer than selling against stale lines.
-          }
-        }
         this.success.set({ text: 'Sale completed', tone: 'success', orderId: result.orderId });
       }
     } catch (err) {

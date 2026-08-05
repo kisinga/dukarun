@@ -610,7 +610,8 @@ export class PosService {
     payments: PaymentInput[],
     park: boolean,
     clientRef?: string,
-    locationId?: string
+    locationId?: string,
+    draftId?: string
   ): Promise<PostSaleResult> {
     const { data, error } = await this.client.rpc('post_sale_at_location', {
       p_location_id: locationId ?? this.locations.requireActiveId(),
@@ -621,6 +622,8 @@ export class PosService {
       p_park: park,
       // Exactly-once replay: same client_ref returns the original order id.
       ...(clientRef ? { p_client_ref: clientRef } : {}),
+      // Proforma being converted: deleted atomically with the posted sale.
+      ...(draftId ? { p_draft_id: draftId } : {}),
     });
     if (error) throw rpcError(error);
     const result = data as { status: string; order_id: string; approval_id?: string };
@@ -696,10 +699,16 @@ export class PosService {
     return data;
   }
 
-  async settleOrder(orderId: string, payments: PaymentInput[]): Promise<string> {
+  async settleOrder(
+    orderId: string,
+    payments: PaymentInput[],
+    clientRef?: string
+  ): Promise<string> {
     const { data, error } = await this.client.rpc('settle_order', {
       p_order_id: orderId,
       p_payments: payments as never,
+      // Exactly-once replay: same client_ref returns the original result.
+      ...(clientRef ? { p_client_ref: clientRef } : {}),
     });
     if (error) throw rpcError(error);
     return data;

@@ -29,7 +29,9 @@ from flow_company;
 update public.companies
 set cashier_flow_enabled = false,
     cash_control_enabled = false,
-    batch_expiry_enabled = false
+    batch_expiry_enabled = false,
+    -- member-side settings toggles below require an approved company
+    status = 'approved'
 where id = (select company_id from flow_company);
 
 select testkit.as_user(

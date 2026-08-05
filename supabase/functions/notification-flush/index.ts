@@ -14,6 +14,9 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
 
 const BATCH = 50;
 const MAX_ATTEMPTS = 5;
+// Claim lease: exceeds the 1-minute flush interval so an in-flight send is
+// never re-claimed; a crashed batch becomes retryable once it expires.
+const LEASE_MS = 5 * 60_000;
 
 const db = createClient(
   Deno.env.get('SUPABASE_URL') ?? '',
@@ -34,14 +37,23 @@ async function sendSms(recipient: string, body: string): Promise<void> {
   const res = await fetch('https://sms.textsms.co.ke/api/services/sendsms/', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({ apikey: apiKey, partnerID, message: body, shortcode, mobile: kePhone(recipient) }),
+    body: JSON.stringify({
+      apikey: apiKey,
+      partnerID,
+      message: body,
+      shortcode,
+      mobile: kePhone(recipient),
+    }),
   });
   if (!res.ok) throw new Error(`textsms http ${res.status}`);
 
   const result = await res.json().catch(() => null);
-  const code = result?.responses?.[0]?.['respose-code'] ?? result?.responses?.[0]?.['response-code'];
+  const code =
+    result?.responses?.[0]?.['respose-code'] ?? result?.responses?.[0]?.['response-code'];
   if (code !== undefined && code !== 200) {
-    throw new Error(`textsms code ${code}: ${result?.responses?.[0]?.['response-description'] ?? ''}`);
+    throw new Error(
+      `textsms code ${code}: ${result?.responses?.[0]?.['response-description'] ?? ''}`
+    );
   }
 }
 
@@ -77,12 +89,12 @@ async function sendEmail(recipient: string, subject: string | null, body: string
   if (!res.ok) throw new Error(`email http ${res.status}`);
 }
 
-Deno.serve(async (req) => {
+Deno.serve(async req => {
   if (req.method !== 'POST') {
     return Response.json({ error: 'method_not_allowed' }, { status: 405 });
   }
 
-  const { data: rows, error } = await db
+  const { data: candidates, error } = await db
     .from('outbox')
     .select('id, company_id, channel, recipient, subject, body, attempts')
     .eq('status', 'pending')
@@ -90,12 +102,36 @@ Deno.serve(async (req) => {
     .order('scheduled_after', { ascending: true })
     .limit(BATCH);
 
-  if (error) return Response.json({ error: error.message }, { status: 500 });
+  if (error) {
+    console.error('outbox select failed', error);
+    return Response.json({ error: 'internal_error' }, { status: 500 });
+  }
+
+  // Claim rows before sending so concurrent invocations don't double-send.
+  // The status check constraint only allows pending/sent/failed, so we claim
+  // optimistically: increment attempts guarded on the exact (id, status,
+  // attempts) values we read — a concurrent flush that already claimed the row
+  // makes this update match nothing, and we skip it. The claim also pushes
+  // scheduled_after out by a lease: without it a second flush starting while
+  // a send is still in flight re-matches the row on its new attempts value
+  // and double-sends. A crashed batch leaves rows retryable after the lease.
+  const leaseUntil = new Date(Date.now() + LEASE_MS).toISOString();
+  const rows = [];
+  for (const row of candidates ?? []) {
+    const { data: claimed } = await db
+      .from('outbox')
+      .update({ attempts: row.attempts + 1, scheduled_after: leaseUntil })
+      .eq('id', row.id)
+      .eq('status', 'pending')
+      .eq('attempts', row.attempts)
+      .select('id');
+    if (claimed && claimed.length > 0) rows.push(row);
+  }
 
   let sent = 0;
   let failed = 0;
 
-  for (const row of rows ?? []) {
+  for (const row of rows) {
     try {
       if (row.channel === 'sms') await sendSms(row.recipient, row.body);
       else if (row.channel === 'whatsapp') await sendWhatsapp(row.recipient, row.body);
@@ -128,5 +164,5 @@ Deno.serve(async (req) => {
     }
   }
 
-  return Response.json({ processed: (rows ?? []).length, sent, failed });
+  return Response.json({ processed: rows.length, sent, failed });
 });

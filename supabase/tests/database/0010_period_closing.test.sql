@@ -54,9 +54,18 @@ select throws_ok(
 
 select testkit.as_user((select company_id from pc_company), '11111111-1111-1111-1111-111111111111', 'Admin');
 
--- 3-4. Manual reconciliation (matching declarations: verified, zero variance).
+-- 3-4. Manual reconciliation covering every reconciliation-requiring
+-- method's account (matching declarations: verified, zero variance).
 create temp table recon1 as
-select public.record_manual_reconciliation('[{"account_code":"CASH_ON_HAND","declared":10000}]') as recon_id;
+select public.record_manual_reconciliation((
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'account_code', pm.ledger_account_code,
+           'declared', public.account_balance((select company_id from pc_company), pm.ledger_account_code)
+         )), '[]'::jsonb)
+  from public.payment_methods pm
+  where pm.company_id = (select company_id from pc_company)
+    and pm.requires_reconciliation and pm.enabled
+)) as recon_id;
 
 select ok((select recon_id from recon1) is not null, 'manual reconciliation recorded');
 

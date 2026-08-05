@@ -4,6 +4,35 @@ import { permissionGuard } from './core/permission.guard';
 import { featureGuard } from './core/feature.guard';
 
 export const routes: Routes = [
+  // Public marketing surface — no auth required. Placed first so '/', '/about'
+  // and '/contact' resolve here; app paths (dashboard, sales, …) fall through
+  // to the guarded shell below.
+  {
+    path: '',
+    loadComponent: () =>
+      import('./marketing/marketing-layout.component').then(m => m.MarketingLayoutComponent),
+    children: [
+      {
+        path: '',
+        pathMatch: 'full',
+        loadComponent: () => import('./marketing/home/home.component').then(m => m.HomeComponent),
+      },
+      {
+        path: 'about',
+        loadComponent: () =>
+          import('./marketing/about/about.component').then(m => m.AboutComponent),
+      },
+      {
+        path: 'contact',
+        loadComponent: () =>
+          import('./marketing/contact/contact.component').then(m => m.ContactComponent),
+      },
+      {
+        path: 'docs',
+        loadComponent: () => import('./marketing/docs/docs.component').then(m => m.DocsComponent),
+      },
+    ],
+  },
   {
     path: 'login',
     loadComponent: () => import('./pages/login/login.component').then(m => m.LoginComponent),
@@ -137,6 +166,10 @@ export const routes: Routes = [
       {
         path: 'team',
         loadComponent: () => import('./team/team.component').then(m => m.TeamComponent),
+      },
+      {
+        path: 'profile',
+        loadComponent: () => import('./profile/profile.component').then(m => m.ProfileComponent),
       },
       {
         path: 'staff-performance',

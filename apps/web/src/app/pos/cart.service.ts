@@ -71,10 +71,24 @@ export class CartService {
       const db = await offlineDb();
       const saved = await db.get('cart', key);
       if (saved && this.activeScope() === key) {
-        this.lines.set(saved.lines);
-        this.customerId.set(saved.customerId);
-        this.customerName.set(saved.customerName);
-        this.draftId.set(saved.draftId);
+        // Merge instead of overwriting: lines added between scope activation
+        // and this restore completing would otherwise be clobbered.
+        const merged = saved.lines.map(line => ({ ...line }));
+        for (const line of this.lines()) {
+          const existing = merged.find(l => l.variant.variant_id === line.variant.variant_id);
+          if (existing) {
+            existing.quantity += line.quantity;
+          } else {
+            merged.push({ ...line });
+          }
+        }
+        this.lines.set(merged);
+        // Only restore customer/draft if the cashier hasn't picked one yet.
+        if (this.customerId() === null && this.customerName() === 'Walk-in') {
+          this.customerId.set(saved.customerId);
+          this.customerName.set(saved.customerName);
+        }
+        if (this.draftId() === null) this.draftId.set(saved.draftId);
       }
     } catch {
       // Persistence is best-effort; an empty cart beats a crashed app.

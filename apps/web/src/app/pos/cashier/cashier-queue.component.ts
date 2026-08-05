@@ -403,6 +403,8 @@ export class CashierQueueComponent implements OnInit, OnDestroy {
   protected readonly loadingLinesFor = signal<string | null>(null);
   protected readonly lines = signal<OrderLineWithProduct[]>([]);
   protected readonly settling = signal<OrderWithCustomer | null>(null);
+  /** Idempotency key for the in-flight settlement (see startSettlement). */
+  protected settleClientRef: string | null = null;
   protected readonly methods = signal<PaymentMethodOption[]>([]);
   protected readonly busy = signal(false);
   protected readonly loading = signal(false);
@@ -563,13 +565,16 @@ export class CashierQueueComponent implements OnInit, OnDestroy {
     this.completedSale.set(null);
     const order = this.settling();
     try {
-      await this.pos.settleOrder(orderId, payments);
+      await this.pos.settleOrder(orderId, payments, this.settleClientRef ?? undefined);
       this.settling.set(null);
+      this.settleClientRef = null;
       this.completedSale.set({ id: orderId, code: order?.code ?? 'Sale' });
       await this.load();
     } catch (err) {
+      // Keep the settlement (and its client ref) open: if the failure was a
+      // lost response, the retry must reuse the same ref so the server
+      // replays instead of double-posting the payment.
       this.error.set(err instanceof Error ? err.message : 'Payment collection failed');
-      this.settling.set(null);
     } finally {
       this.busy.set(false);
     }
@@ -580,6 +585,9 @@ export class CashierQueueComponent implements OnInit, OnDestroy {
     this.completedSale.set(null);
     try {
       await this.cashierSession.assertOpen('collecting payment');
+      // One reference per settlement attempt: every retry/replay of this
+      // settle reuses it, so a lost response cannot double-post the payment.
+      this.settleClientRef = crypto.randomUUID();
       this.settling.set(order);
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Open a cashier session first');

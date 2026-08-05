@@ -27,7 +27,10 @@ stock, fractional quantities follow the variant setting, and stock locations are
   reference, and purchase date. It creates batches, movements and the balanced journal.
 - `record_purchase_with_prices` validates optional wholesale/retail changes first, posts the
   purchase through `record_purchase`, and updates only the selected variant prices in the same
-  transaction. Drafts retain these choices and use the same path when confirmed.
+  transaction. The selling price is one value per variant: duplicate lines for the same variant
+  must agree on the new price or the purchase is rejected with
+  `conflicting_new_prices_for_variant`. Drafts retain these choices and use the same path when
+  confirmed.
 - `record_purchase_with_payment` and `confirm_purchase_draft_with_payment` accept the initial
   amount paid. Zero records credit, the full total records paid now, and an in-between amount
   records a credit purchase plus its allocated supplier payment atomically.

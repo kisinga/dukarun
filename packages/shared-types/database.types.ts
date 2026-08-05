@@ -848,6 +848,7 @@ export type Database = {
       }
       company_staff_profiles: {
         Row: {
+          avatar_path: string | null
           company_id: string
           created_at: string
           display_name: string
@@ -857,6 +858,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          avatar_path?: string | null
           company_id: string
           created_at?: string
           display_name: string
@@ -866,6 +868,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          avatar_path?: string | null
           company_id?: string
           created_at?: string
           display_name?: string
@@ -1446,6 +1449,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "public_storefronts"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ledger_journal_lines_entry_company_fkey"
+            columns: ["entry_id", "company_id"]
+            isOneToOne: false
+            referencedRelation: "ledger_journal_entries"
+            referencedColumns: ["id", "company_id"]
           },
           {
             foreignKeyName: "ledger_journal_lines_entry_id_fkey"
@@ -4151,6 +4161,7 @@ export type Database = {
         Args: {
           p_client_ref?: string
           p_customer_id: string
+          p_draft_id?: string
           p_lines: Json
           p_park?: boolean
           p_payments: Json
@@ -4161,6 +4172,7 @@ export type Database = {
         Args: {
           p_client_ref?: string
           p_customer_id: string
+          p_draft_id?: string
           p_lines: Json
           p_location_id: string
           p_park?: boolean
@@ -4372,7 +4384,7 @@ export type Database = {
         Returns: string
       }
       settle_order: {
-        Args: { p_order_id: string; p_payments: Json }
+        Args: { p_client_ref?: string; p_order_id: string; p_payments: Json }
         Returns: string
       }
       staff_fallback_name: { Args: { p_user_id: string }; Returns: string }
@@ -4530,6 +4542,10 @@ export type Database = {
           p_is_approved: boolean
           p_terms_days?: number
         }
+        Returns: string
+      }
+      update_my_profile: {
+        Args: { p_avatar_path?: string; p_display_name?: string }
         Returns: string
       }
       update_payment_method: {

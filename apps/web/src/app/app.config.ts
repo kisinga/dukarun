@@ -4,7 +4,7 @@ import {
   provideBrowserGlobalErrorListeners,
   provideZonelessChangeDetection,
 } from '@angular/core';
-import { provideRouter } from '@angular/router';
+import { provideRouter, withInMemoryScrolling } from '@angular/router';
 import { provideServiceWorker } from '@angular/service-worker';
 import { provideNgIconsConfig, provideIcons } from '@ng-icons/core';
 import {
@@ -13,9 +13,13 @@ import {
   heroBell,
   heroBellAlert,
   heroBellSlash,
+  heroChatBubbleOvalLeftEllipsis,
+  heroCheck,
   heroChevronDoubleLeft,
   heroChevronDoubleRight,
   heroChevronRight,
+  heroDevicePhoneMobile,
+  heroEnvelope,
   heroExclamationTriangle,
   heroMagnifyingGlass,
   heroArrowsRightLeft,
@@ -53,10 +57,13 @@ import {
   heroShoppingCart,
   heroSignal,
   heroSignalSlash,
+  heroSparkles,
   heroSun,
   heroTruck,
   heroUserGroup,
+  heroUserCircle,
   heroUsers,
+  heroWifi,
   heroXMark,
 } from '@ng-icons/heroicons/outline';
 
@@ -66,7 +73,10 @@ export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
     provideZonelessChangeDetection(),
-    provideRouter(routes),
+    provideRouter(
+      routes,
+      withInMemoryScrolling({ scrollPositionRestoration: 'enabled', anchorScrolling: 'enabled' })
+    ),
     // Icon registry (design system: Heroicons outline via <app-icon name="hero…">)
     provideNgIconsConfig({ size: '1rem' }),
     provideIcons({
@@ -118,8 +128,15 @@ export const appConfig: ApplicationConfig = {
       heroSun,
       heroTruck,
       heroUserGroup,
+      heroUserCircle,
       heroUsers,
       heroXMark,
+      heroChatBubbleOvalLeftEllipsis,
+      heroCheck,
+      heroDevicePhoneMobile,
+      heroEnvelope,
+      heroSparkles,
+      heroWifi,
     }),
     provideServiceWorker('ngsw-worker.js', {
       enabled: !isDevMode(),
