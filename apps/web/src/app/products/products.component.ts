@@ -30,6 +30,7 @@ import { StatCardComponent } from '../shared/ui/stat-card.component';
 import { DrawerComponent } from '../shared/ui/drawer.component';
 import { CompanyPreferencesService } from '../core/company-preferences.service';
 import { PermissionsService } from '../core/permissions.service';
+import { CatalogCacheService } from '../core/catalog-cache.service';
 
 type StockInfo = { stock: number; stock_value: number };
 
@@ -117,6 +118,14 @@ interface ProductEditorRow {
         <div role="status" class="alert alert-success mb-3 text-sm">
           <app-icon name="heroCheckCircle" />
           <span>{{ notice() }}</span>
+        </div>
+      }
+      @if (catalogTruncated()) {
+        <div role="status" class="alert alert-warning mb-3 text-sm">
+          <app-icon name="heroExclamationTriangle" />
+          <span
+            >Catalog too large for offline cache — showing first 2,000 products; use search.</span
+          >
         </div>
       }
 
@@ -1035,12 +1044,15 @@ interface ProductEditorRow {
 export class ProductsComponent implements OnInit {
   private readonly pos = inject(PosService);
   private readonly supabase = inject(SupabaseService);
+  private readonly catalogCache = inject(CatalogCacheService);
   protected readonly preferences = inject(CompanyPreferencesService);
   protected readonly perms = inject(PermissionsService);
 
   protected readonly fmt = formatKes;
   protected readonly families = signal<Product[]>([]);
-  protected readonly catalog = signal<Variant[]>([]);
+  /** Live view of the shared realtime-backed catalog cache (works offline). */
+  protected readonly catalog = this.catalogCache.catalog;
+  protected readonly catalogTruncated = this.catalogCache.catalogTruncated;
   protected readonly stock = signal<Map<string, StockInfo>>(new Map());
   protected readonly selectedProductId = signal<string | null>(null);
   protected readonly batchesFor = signal<string | null>(null);
@@ -1085,12 +1097,23 @@ export class ProductsComponent implements OnInit {
   protected readonly deactivateTarget = signal<DeactivateTarget | null>(null);
   private readonly deleteModal = viewChild(DeleteConfirmationModalComponent);
 
-  /** Families with their variants; families with no variants only show when not searching. */
+  /** Families with their variants; search filters the cached catalog client-side. */
   protected readonly grouped = computed(() => {
     const q = this.query().trim().toLowerCase();
     const byProduct = new Map<string, Variant[]>();
     for (const v of this.catalog()) {
       if (!v.product_id) continue;
+      if (
+        q &&
+        !(
+          (v.product_name ?? '').toLowerCase().includes(q) ||
+          (v.variant_name ?? '').toLowerCase().includes(q) ||
+          (v.sku ?? '').toLowerCase().includes(q) ||
+          (v.barcode ?? '').toLowerCase().includes(q)
+        )
+      ) {
+        continue;
+      }
       const list = byProduct.get(v.product_id) ?? [];
       list.push(v);
       byProduct.set(v.product_id, list);
@@ -1148,11 +1171,9 @@ export class ProductsComponent implements OnInit {
     return id ? (this.grouped().find(g => g.family.id === id) ?? null) : null;
   });
 
-  private searchTimer: ReturnType<typeof setTimeout> | null = null;
-
   constructor() {
-    // Debounced search (list-search-bar model → reload). Skip the effect's
-    // initial run — ngOnInit already loads, so it would double-fetch.
+    // Search is pure client-side filtering over the cached catalog (grouped());
+    // typing only resets pagination. Skip the effect's initial run.
     let firstRun = true;
     effect(() => {
       this.query();
@@ -1161,8 +1182,6 @@ export class ProductsComponent implements OnInit {
         return;
       }
       this.page.set(1);
-      if (this.searchTimer) clearTimeout(this.searchTimer);
-      this.searchTimer = setTimeout(() => void this.load(), 200);
     });
   }
 
@@ -1172,21 +1191,23 @@ export class ProductsComponent implements OnInit {
   }
 
   async ngOnInit(): Promise<void> {
+    // Emits the IndexedDB snapshot instantly, then background-refreshes.
+    void this.catalogCache.ensureLoaded();
     await Promise.all([this.preferences.refresh(), this.load()]);
   }
 
   protected async load(): Promise<void> {
     this.loading.set(true);
+    // Refresh the shared catalog in the background; the list re-renders silently.
+    void this.catalogCache.refresh();
     try {
-      const [families, catalog, stock, collections, locations] = await Promise.all([
+      const [families, stock, collections, locations] = await Promise.all([
         this.pos.listFamilies(),
-        this.pos.listCatalog(this.query()),
         this.pos.productStock(),
         this.pos.listCollections(),
         this.pos.listStockLocations(),
       ]);
       this.families.set(families);
-      this.catalog.set(catalog);
       this.stock.set(stock);
       this.collections.set(collections);
       this.stockLocations.set(locations);

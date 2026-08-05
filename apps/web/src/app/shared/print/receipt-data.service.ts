@@ -6,8 +6,9 @@ import type { OrderData, PrintMeta, PurchaseData } from './print-templates';
 export interface CompanyPrintInfo {
   name: string;
   code: string;
-  /** Full URL when logo_path is already absolute; storage-path logos are not resolved yet. */
+  /** Full public URL: kept as-is when logo_path is absolute, resolved from the company-logos bucket otherwise. */
   logoUrl: string | null;
+  address: string | null;
   printerEnabled: boolean;
 }
 
@@ -52,17 +53,28 @@ export class ReceiptDataService {
     if (this.settings) return this.settings;
     const { data, error } = await this.db
       .from('companies')
-      .select('name, code, logo_path, enable_printer')
+      .select('name, code, address, logo_path, enable_printer')
       .limit(1)
       .single();
     if (error) throw error;
+    const logoPath = data.logo_path;
     this.settings = {
       name: data.name,
       code: data.code,
-      logoUrl: data.logo_path?.startsWith('http') ? data.logo_path : null,
+      logoUrl: logoPath
+        ? logoPath.startsWith('http')
+          ? logoPath
+          : this.db.storage.from('company-logos').getPublicUrl(logoPath).data.publicUrl
+        : null,
+      address: data.address,
       printerEnabled: data.enable_printer,
     };
     return this.settings;
+  }
+
+  /** Drop the cached settings so the next print reflects new branding (logo/name/address). */
+  invalidateCompanyInfo(): void {
+    this.settings = null;
   }
 
   async printerEnabled(): Promise<boolean> {

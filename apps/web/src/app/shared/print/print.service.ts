@@ -54,6 +54,7 @@ export class PrintService {
     companyName: string | null,
     companyLogo: string | null,
     printMeta?: PrintMeta,
+    companyAddress?: string | null,
     templateId?: PrintFormat
   ): Promise<void> {
     const documentType = printMeta?.documentType ?? 'receipt';
@@ -62,7 +63,7 @@ export class PrintService {
     }
     const template = this.templates.get(templateId ?? this.format());
     if (!template) return;
-    const html = template.render(order, companyLogo, companyName, printMeta);
+    const html = template.render(order, companyLogo, companyName, printMeta, companyAddress);
     await this.printInFrame(`Print Order ${order.code}`, html, template.getStyles());
   }
 
@@ -71,12 +72,19 @@ export class PrintService {
     purchase: PurchaseData,
     companyName: string | null,
     companyLogo: string | null,
-    printMeta?: PrintMeta
+    printMeta?: PrintMeta,
+    companyAddress?: string | null
   ): Promise<void> {
-    const html = this.a4PurchaseTemplate.render(purchase, companyLogo, companyName, {
-      ...printMeta,
-      documentType: 'purchase-order',
-    });
+    const html = this.a4PurchaseTemplate.render(
+      purchase,
+      companyLogo,
+      companyName,
+      {
+        ...printMeta,
+        documentType: 'purchase-order',
+      },
+      companyAddress
+    );
     const ref = purchase.referenceNumber ?? purchase.id;
     await this.printInFrame(`Purchase Order ${ref}`, html, this.a4PurchaseTemplate.getStyles());
   }
@@ -89,10 +97,11 @@ export class PrintService {
     companyName: string | null,
     companyLogo: string | null,
     printMeta?: PrintMeta,
-    templateId?: PrintFormat
+    templateId?: PrintFormat,
+    companyAddress?: string | null
   ): string {
     const template = this.templates.get(templateId ?? this.format())!;
-    return template.render(order, companyLogo, companyName, printMeta);
+    return template.render(order, companyLogo, companyName, printMeta, companyAddress);
   }
 
   /** Hidden-iframe print (ported from the old app's PrintService). */

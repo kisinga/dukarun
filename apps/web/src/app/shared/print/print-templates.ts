@@ -144,12 +144,14 @@ export abstract class PrintTemplate {
    * @param companyLogo - Optional logo URL
    * @param companyName - Company/channel display name (defaults to 'Your Company')
    * @param printMeta - Optional contextual metadata (payment method name, served by, etc.)
+   * @param companyAddress - Optional company address shown under the company name
    */
   abstract render(
     order: OrderData,
     companyLogo?: string | null,
     companyName?: string | null,
-    printMeta?: PrintMeta
+    printMeta?: PrintMeta,
+    companyAddress?: string | null
   ): string;
 
   /**
@@ -231,7 +233,8 @@ export class Receipt52mmTemplate extends PrintTemplate {
     order: OrderData,
     companyLogo?: string | null,
     companyName?: string | null,
-    printMeta?: PrintMeta
+    printMeta?: PrintMeta,
+    companyAddress?: string | null
   ): string {
     const customerName = this.getCustomerName(order);
     const isWalkIn = this.isWalkInCustomer(order);
@@ -250,6 +253,7 @@ export class Receipt52mmTemplate extends PrintTemplate {
                 <div class="receipt-header">
                     ${companyLogo ? `<img src="${companyLogo}" alt="Logo" class="company-logo" />` : ''}
                     <h1 class="company-name">${name}</h1>
+                    ${companyAddress?.trim() ? `<p class="receipt-meta">${companyAddress.trim()}</p>` : ''}
                     ${docType === 'cashier-slip' ? '<p style="text-align:center;font-weight:bold;letter-spacing:1px;margin:4px 0;">PAY AT CASHIER</p>' : ''}
                     <p class="receipt-meta">
                         <span>Order: ${order.code}</span><br>
@@ -415,7 +419,8 @@ export class Receipt80mmTemplate extends PrintTemplate {
     order: OrderData,
     companyLogo?: string | null,
     companyName?: string | null,
-    printMeta?: PrintMeta
+    printMeta?: PrintMeta,
+    companyAddress?: string | null
   ): string {
     const customerName = this.getCustomerName(order);
     const isWalkIn = this.isWalkInCustomer(order);
@@ -434,6 +439,7 @@ export class Receipt80mmTemplate extends PrintTemplate {
                 <div class="receipt-header">
                     ${companyLogo ? `<img src="${companyLogo}" alt="Logo" class="company-logo" />` : ''}
                     <h1 class="company-name">${name}</h1>
+                    ${companyAddress?.trim() ? `<p class="receipt-meta">${companyAddress.trim()}</p>` : ''}
                     ${docType === 'cashier-slip' ? '<p style="text-align:center;font-weight:bold;letter-spacing:1px;margin:4px 0;">PAY AT CASHIER</p>' : ''}
                     <p class="receipt-meta">
                         <span>Order: ${order.code}</span><br>
@@ -598,7 +604,8 @@ export class A4Template extends PrintTemplate {
     order: OrderData,
     companyLogo?: string | null,
     companyName?: string | null,
-    printMeta?: PrintMeta
+    printMeta?: PrintMeta,
+    companyAddress?: string | null
   ): string {
     const customerName = this.getCustomerName(order);
     const isWalkIn = this.isWalkInCustomer(order);
@@ -631,7 +638,7 @@ export class A4Template extends PrintTemplate {
                     <div class="company-info">
                         ${companyLogo ? `<img src="${companyLogo}" alt="Logo" class="company-logo" />` : ''}
                         <h1 class="company-name">${name}</h1>
-                        <p class="company-address">Your Company Address</p>
+                        ${companyAddress?.trim() ? `<p class="company-address">${companyAddress.trim()}</p>` : ''}
                     </div>
                     <div class="invoice-meta">
                         <h2>${header}</h2>
@@ -888,7 +895,8 @@ export class A4PurchaseTemplate {
     purchase: PurchaseData,
     companyLogo?: string | null,
     companyName?: string | null,
-    printMeta?: PrintMeta
+    printMeta?: PrintMeta,
+    companyAddress?: string | null
   ): string {
     const docType = printMeta?.documentType ?? 'purchase-order';
     const header = 'PURCHASE ORDER';
@@ -912,7 +920,7 @@ export class A4PurchaseTemplate {
                     <div class="company-info">
                         ${companyLogo ? `<img src="${companyLogo}" alt="Logo" class="company-logo" />` : ''}
                         <h1 class="company-name">${name}</h1>
-                        <p class="company-address">Your Company Address</p>
+                        ${companyAddress?.trim() ? `<p class="company-address">${companyAddress.trim()}</p>` : ''}
                     </div>
                     <div class="invoice-meta">
                         <h2>${header}</h2>
@@ -1039,6 +1047,16 @@ export class A4PurchaseTemplate {
                     margin-bottom: 30px;
                     padding-bottom: 20px;
                     border-bottom: 2px solid #000;
+                }
+                .a4-purchase .company-logo,
+                .a4-invoice .company-logo {
+                    max-width: 70mm;
+                    max-height: 28mm;
+                    width: auto;
+                    height: auto;
+                    object-fit: contain;
+                    margin-bottom: 10px;
+                    display: block;
                 }
                 .a4-purchase .items-table,
                 .a4-invoice .items-table {

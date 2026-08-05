@@ -16,6 +16,8 @@ export type LocationPaymentMethodRow =
 export interface CompanySettings {
   id: string;
   name: string;
+  address: string | null;
+  email: string | null;
   logo_path: string | null;
   public_storefront_enabled: boolean;
   public_slug: string | null;
@@ -35,6 +37,8 @@ export interface CompanySettings {
 const SELECT_COLUMNS = [
   'id',
   'name',
+  'address',
+  'email',
   'logo_path',
   'public_storefront_enabled',
   'public_slug',
@@ -73,6 +77,38 @@ export class SettingsService {
   async updateSettings(id: string, patch: Partial<Omit<CompanySettings, 'id'>>): Promise<void> {
     const { error } = await this.db.from('companies').update(patch).eq('id', id);
     if (error) throw new Error(error.message);
+  }
+
+  /**
+   * Upload the company logo to a fixed path (overwrites any previous one),
+   * then point logo_path at it. Returns the storage path.
+   */
+  async uploadLogo(companyId: string, file: Blob, ext: string): Promise<string> {
+    const path = `${companyId}/logo.${ext}`;
+    const { error } = await this.db.storage
+      .from('company-logos')
+      .upload(path, file, { upsert: true });
+    if (error) throw new Error(error.message);
+    await this.updateSettings(companyId, { logo_path: path });
+    return path;
+  }
+
+  /** Remove all objects under the company logo prefix and clear logo_path. */
+  async removeLogo(companyId: string): Promise<void> {
+    const bucket = this.db.storage.from('company-logos');
+    const { data: objects, error: listError } = await bucket.list(`${companyId}`);
+    if (listError) throw new Error(listError.message);
+    const paths = (objects ?? []).map(o => `${companyId}/${o.name}`);
+    if (paths.length > 0) {
+      const { error: removeError } = await bucket.remove(paths);
+      if (removeError) throw new Error(removeError.message);
+    }
+    await this.updateSettings(companyId, { logo_path: null });
+  }
+
+  /** Public URL for a stored logo path (bucket is public). */
+  logoPublicUrl(logoPath: string): string {
+    return this.db.storage.from('company-logos').getPublicUrl(logoPath).data.publicUrl;
   }
 
   async paymentMethods(): Promise<PaymentMethodRow[]> {

@@ -3,9 +3,9 @@ import { SupabaseService, type AppIdentity } from '../../core/supabase.service';
 import { PosRpcError, PosService, Variant } from '../pos.service';
 import { ConnectivityService } from './connectivity.service';
 import { LocationContextService } from '../../core/location-context.service';
+import { CatalogCacheService } from '../../core/catalog-cache.service';
 import {
   OutboxEntry,
-  ProductSnapshot,
   belongsToIdentity,
   offlineDb,
   offlineScopeKey,
@@ -38,6 +38,7 @@ export class SyncService {
   private readonly connectivity = inject(ConnectivityService);
   private readonly supabase = inject(SupabaseService);
   private readonly locations = inject(LocationContextService);
+  private readonly catalogCache = inject(CatalogCacheService);
 
   /** All outbox entries (queued + failed), FIFO by queued_at. */
   readonly entries = signal<OutboxEntry[]>([]);
@@ -49,7 +50,8 @@ export class SyncService {
   /** Bumped after a sync pass that posted at least one sale — screens can refresh. */
   readonly lastPostedAt = signal<string | null>(null);
   readonly usingCachedCatalog = signal(false);
-  readonly productSnapshotFetchedAt = signal<string | null>(null);
+  /** Mirror of the shared catalog cache timestamp (CatalogCacheService owns the snapshot). */
+  readonly productSnapshotFetchedAt = computed(() => this.catalogCache.fetchedAt());
   private catalogScope: string | null = null;
 
   constructor() {
@@ -64,7 +66,6 @@ export class SyncService {
         if (scope !== this.catalogScope) {
           this.catalogScope = scope;
           this.usingCachedCatalog.set(false);
-          this.productSnapshotFetchedAt.set(null);
         }
         if (!identity) {
           this.entries.set([]);
@@ -187,38 +188,12 @@ export class SyncService {
   }
 
   // --- Product snapshot (offline search on the Sell screen) ---
+  // CatalogCacheService owns the snapshot; these methods only add the
+  // online-first policy and the cached-catalog fallback flag.
 
-  /** Cache the active catalog in IndexedDB. Fire-and-forget when online. */
-  async refreshProductSnapshot(): Promise<boolean> {
-    const identity = this.supabase.offlineIdentity();
-    const locationId = this.locations.activeId();
-    if (!identity || !locationId || !this.connectivity.online()) return false;
-    try {
-      const products = await this.pos.fetchActiveVariants();
-      const currentIdentity = this.supabase.offlineIdentity();
-      if (
-        !currentIdentity ||
-        offlineScopeKey(currentIdentity, this.locations.activeId()) !==
-          offlineScopeKey(identity, locationId)
-      ) {
-        return false;
-      }
-      const db = await offlineDb();
-      const snapshot: ProductSnapshot = {
-        key: offlineScopeKey(identity, locationId),
-        company_id: identity.companyId,
-        user_id: identity.userId,
-        location_id: locationId,
-        products,
-        fetched_at: new Date().toISOString(),
-      };
-      await db.put('products', snapshot);
-      this.productSnapshotFetchedAt.set(snapshot.fetched_at);
-      return true;
-    } catch {
-      // Snapshot refresh is best-effort; a stale cache beats none.
-      return false;
-    }
+  /** Refresh the shared catalog snapshot. Fire-and-forget when online. */
+  refreshProductSnapshot(): Promise<boolean> {
+    return this.catalogCache.refresh();
   }
 
   /** Online-first quick picks with an automatic scoped snapshot fallback. */
@@ -249,21 +224,20 @@ export class SyncService {
     return this.searchProductsOffline(query);
   }
 
-  /** Offline quick-pick source: first rows of the snapshot. */
+  /** Offline quick-pick source: first active rows of the snapshot. */
   async offlineTopVariants(limit: number): Promise<Variant[]> {
-    const snapshot = await this.productSnapshot();
     this.usingCachedCatalog.set(true);
-    return (snapshot?.products ?? []).slice(0, limit);
+    await this.catalogCache.ensureLoaded();
+    return this.sellable(this.catalogCache.getCatalog()).slice(0, limit);
   }
 
   /** Offline product search over the last successful snapshot. */
   async searchProductsOffline(query: string): Promise<Variant[]> {
-    const snapshot = await this.productSnapshot();
     this.usingCachedCatalog.set(true);
-    if (!snapshot) return [];
+    await this.catalogCache.ensureLoaded();
     const q = query.trim().toLowerCase();
     if (!q) return [];
-    return snapshot.products
+    return this.sellable(this.catalogCache.getCatalog())
       .filter(
         v =>
           (v.product_name ?? '').toLowerCase().includes(q) ||
@@ -272,6 +246,11 @@ export class SyncService {
           (v.barcode ?? '').toLowerCase().includes(q)
       )
       .slice(0, 20);
+  }
+
+  /** The shared cache holds the full catalog; the Sell screen only sells active rows. */
+  private sellable(variants: Variant[]): Variant[] {
+    return variants.filter(v => v.variant_active && v.product_active);
   }
 
   /** Tenant-scoped payment settings with stale-on-error behavior. */
@@ -322,16 +301,6 @@ export class SyncService {
       return `Cached catalog · updated ${Math.floor(elapsedMinutes / 60)}h ago`;
     }
     return `Cached catalog · updated ${Math.floor(elapsedMinutes / 1_440)}d ago`;
-  }
-
-  private async productSnapshot(): Promise<ProductSnapshot | undefined> {
-    const identity = this.supabase.offlineIdentity();
-    const locationId = this.locations.activeId();
-    if (!identity || !locationId) return undefined;
-    const db = await offlineDb();
-    const snapshot = await db.get('products', offlineScopeKey(identity, locationId));
-    this.productSnapshotFetchedAt.set(snapshot?.fetched_at ?? null);
-    return snapshot;
   }
 
   private requireIdentity(): AppIdentity {

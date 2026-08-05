@@ -834,7 +834,7 @@ export class OrdersComponent implements OnInit, OnDestroy {
         this.receiptData.buildReceiptData(orderId),
         this.receiptData.companyPrintInfo(),
       ]);
-      await this.print.printOrder(order, company.name, company.logoUrl, meta);
+      await this.print.printOrder(order, company.name, company.logoUrl, meta, company.address);
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Print failed');
     }

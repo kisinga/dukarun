@@ -1,8 +1,10 @@
 -- Local development seed (runs on `supabase db reset`). NOT for production.
 -- Restores a fully walkable demo state after every reset:
 --   test user 254700000001 / OTP 123456 (configured in config.toml test_otp)
---   → Mama Mboga Stores (fully-permitted Admin) on the Standard tier, with
---     three stock locations, products, distributed stock, a customer, and a supplier.
+--   → Mama Mboga Stores (fully-permitted Admin, ACTIVE) on the Standard tier,
+--     with three stock locations, products, distributed stock, a customer,
+--     and a supplier — plus a second company, Jiko Electronics, to exercise
+--     multi-company switching (0018).
 
 -- ---------------------------------------------------------------------------
 -- Subscription tiers (production tiers are admin-created; dev convenience)
@@ -58,6 +60,8 @@ set subscription_tier_id = t.id,
     billing_cycle = 'yearly',
     commissions_enabled = true,
     status = 'approved',
+    email = 'info@mamamboga.co.ke',
+    address = 'Kiosk 1, Tom Mboya Street, Nairobi',
     updated_at = now()
 from public.subscription_tiers t
 where c.name = 'Mama Mboga Stores' and t.code = 'standard';
@@ -242,3 +246,66 @@ insert into public.customers (id, company_id, first_name, phone, is_supplier, su
 select 'dc000000-0000-0000-0000-000000000002', id, 'Brookside Distributors', '0700111222', true, 200000, 30
 from public.companies where name = 'Mama Mboga Stores'
 on conflict do nothing;
+
+-- ---------------------------------------------------------------------------
+-- Second company for the demo user (multi-company switching, 0018).
+-- Jiko Electronics is a distinct catalog so switching is visibly different.
+-- Mama Mboga Stores stays the ACTIVE company (login lands there).
+-- ---------------------------------------------------------------------------
+do $$
+begin
+  if (select count(*) from public.company_memberships
+      where user_id = '5877ac73-ff8d-457c-afcd-791e66229d17') < 2 then
+    perform public.provision_company('Jiko Electronics', 'CBD Shop');
+  end if;
+end $$;
+
+update public.companies c
+set subscription_tier_id = t.id,
+    subscription_status = 'active',
+    subscription_started_at = coalesce(c.subscription_started_at, now()),
+    subscription_expires_at = now() + interval '1 year',
+    billing_cycle = 'yearly',
+    status = 'approved',
+    email = 'sales@jikoelectronics.co.ke',
+    address = 'Shop 4, Kimathi House, Kimathi Street, Nairobi',
+    updated_at = now()
+from public.subscription_tiers t
+where c.name = 'Jiko Electronics' and t.code = 'standard';
+
+insert into public.products (id, company_id, name, barcode)
+select 'd0000000-0000-0000-0000-000000000011', id, 'Jiko Energy Saver Stove', '6001234567906'
+from public.companies where name = 'Jiko Electronics'
+on conflict do nothing;
+
+insert into public.product_variants (id, product_id, company_id, name, sku, price)
+select 'dd000000-0000-0000-0000-000000000011', 'd0000000-0000-0000-0000-000000000011', c.id, 'Default', 'JIKO1', 3500
+from public.companies c where c.name = 'Jiko Electronics'
+on conflict do nothing;
+
+insert into public.inventory_batches (
+  id, company_id, variant_id, stock_location_id, quantity, remaining, unit_cost, purchased_at
+)
+select
+  'e0000000-0000-0000-0000-000000000011',
+  c.id,
+  'dd000000-0000-0000-0000-000000000011',
+  l.id,
+  15,
+  15,
+  2800,
+  now() - interval '5 days'
+from public.companies c
+join public.stock_locations l on l.company_id = c.id and l.code = 'MAIN'
+where c.name = 'Jiko Electronics'
+on conflict (id) do nothing;
+
+-- provision_company activates the newest company; pin the demo back to
+-- Mama Mboga Stores so existing walkthroughs are unchanged.
+insert into public.user_preferences (user_id, active_company_id)
+select '5877ac73-ff8d-457c-afcd-791e66229d17', c.id
+from public.companies c
+where c.name = 'Mama Mboga Stores'
+on conflict (user_id) do update
+set active_company_id = excluded.active_company_id,
+    updated_at = now();

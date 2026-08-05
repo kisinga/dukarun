@@ -25,6 +25,7 @@ import {
   type BadgeType,
 } from '../shared/ui/status-badge.component';
 import { CashierSessionService } from '../core/cashier-session.service';
+import { CompanyPrintInfo, ReceiptDataService } from '../shared/print/receipt-data.service';
 import { SessionRequiredNoticeComponent } from '../shared/ui/session-required-notice.component';
 import { DataTableShellComponent } from '../shared/ui/data-table-shell.component';
 import { DrawerComponent } from '../shared/ui/drawer.component';
@@ -602,6 +603,21 @@ type CreditOrder = {
                   </section>
 
                   <section class="border-t border-base-300/60 pt-3 print:mt-0 print:border-0">
+                    @if (companyInfo(); as company) {
+                      <div class="mb-3 hidden text-center print:block">
+                        @if (company.logoUrl) {
+                          <img
+                            [src]="company.logoUrl"
+                            alt="Company logo"
+                            class="mx-auto mb-1 max-h-16 object-contain"
+                          />
+                        }
+                        <p class="font-bold">{{ company.name }}</p>
+                        @if (company.address) {
+                          <p class="text-sm">{{ company.address }}</p>
+                        }
+                      </div>
+                    }
                     <div class="mb-2 flex items-center justify-between gap-2">
                       <div>
                         <h3 class="section-title">Customer statement</h3>
@@ -700,6 +716,7 @@ export class CustomersComponent implements OnInit {
   protected readonly cashierSession = inject(CashierSessionService);
   private readonly money = inject(MoneyService);
   private readonly pos = inject(PosService);
+  private readonly receiptData = inject(ReceiptDataService);
   protected readonly perms = inject(PermissionsService);
   protected readonly fmtKes = formatKes;
 
@@ -708,6 +725,7 @@ export class CustomersComponent implements OnInit {
   protected readonly orders = signal<OrderWithCustomer[]>([]);
   protected readonly creditOrders = signal<CreditOrder[]>([]);
   protected readonly statement = signal<CustomerStatementRow[]>([]);
+  protected readonly companyInfo = signal<CompanyPrintInfo | null>(null);
   protected readonly methods = signal<string[]>([]);
   protected readonly repayFor = signal<string | null>(null);
   protected readonly detailLoading = signal(false);
@@ -837,16 +855,18 @@ export class CustomersComponent implements OnInit {
       this.approved.setValue(customer.is_credit_approved);
     }
     try {
-      const [orders, creditOrders, statement] = await Promise.all([
+      const [orders, creditOrders, statement, company] = await Promise.all([
         this.pos.customerOrders(customerId),
         this.money.creditOrders(customerId),
         this.money.customerStatement(customerId),
+        this.receiptData.companyPrintInfo().catch(() => null),
       ]);
       // Ignore stale results when the drawer was closed (or reopened) meanwhile.
       if (this.selectedCustomerId() !== customerId) return;
       this.orders.set(orders);
       this.creditOrders.set(creditOrders);
       this.statement.set(statement);
+      this.companyInfo.set(company);
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Failed to load sales');
     } finally {

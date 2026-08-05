@@ -1,5 +1,5 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
-import { SupabaseService } from './supabase.service';
+import { SupabaseService, type AppIdentity } from './supabase.service';
 
 export interface BusinessLocation {
   id: string;
@@ -25,19 +25,42 @@ export class LocationContextService {
   );
   readonly isMultiLocation = computed(() => this.locations().length > 1);
 
-  async load(): Promise<void> {
+  private loadPromise: Promise<void> | null = null;
+  /** Identity scope the current locations list was loaded for. */
+  private loadedFor: string | null = null;
+
+  /**
+   * Idempotent: concurrent callers share one in-flight RPC, and repeat calls
+   * for the same identity short-circuit once a list is loaded. Route guards
+   * await this so pages never read activeId before it is resolved.
+   */
+  load(): Promise<void> {
     const identity = this.supabase.offlineIdentity();
     if (!identity) {
       this.locations.set([]);
       this.activeId.set(null);
-      return;
+      this.loadedFor = null;
+      return Promise.resolve();
     }
+    const scope = `${identity.companyId}:${identity.userId}`;
+    if (this.loadedFor === scope && this.locations().length > 0) return Promise.resolve();
+    this.loadPromise ??= this.doLoad(identity, scope).finally(() => {
+      this.loadPromise = null;
+    });
+    return this.loadPromise;
+  }
+
+  private async doLoad(identity: AppIdentity, scope: string): Promise<void> {
     this.loading.set(true);
     try {
       const { data, error } = await this.supabase.client.rpc('accessible_business_locations');
       if (error) throw error;
+      // Discard the result if the account/company changed mid-flight.
+      const current = this.supabase.offlineIdentity();
+      if (!current || `${current.companyId}:${current.userId}` !== scope) return;
       const locations = (data ?? []) as BusinessLocation[];
       this.locations.set(locations);
+      this.loadedFor = scope;
       const stored = localStorage.getItem(this.storageKey(identity.companyId, identity.userId));
       const selected =
         locations.find(location => location.id === stored) ??

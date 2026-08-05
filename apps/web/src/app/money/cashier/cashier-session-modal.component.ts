@@ -433,7 +433,7 @@ export class CashierSessionModalComponent {
         this.receiptData.buildCashierSlipData(sessionId),
         this.receiptData.companyPrintInfo(),
       ]);
-      await this.print.printOrder(order, company.name, company.logoUrl, meta);
+      await this.print.printOrder(order, company.name, company.logoUrl, meta, company.address);
     } catch (error) {
       this.printError.set(error instanceof Error ? error.message : 'Print failed');
     }

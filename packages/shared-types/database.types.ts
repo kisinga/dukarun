@@ -606,6 +606,7 @@ export type Database = {
       }
       companies: {
         Row: {
+          address: string | null
           batch_expiry_enabled: boolean
           billing_cycle: string | null
           cash_control_enabled: boolean
@@ -614,6 +615,7 @@ export type Database = {
           commissions_enabled: boolean
           created_at: string
           currency: string
+          email: string | null
           enable_printer: boolean
           id: string
           last_payment_amount: number | null
@@ -647,6 +649,7 @@ export type Database = {
           variance_notification_threshold: number
         }
         Insert: {
+          address?: string | null
           batch_expiry_enabled?: boolean
           billing_cycle?: string | null
           cash_control_enabled?: boolean
@@ -655,6 +658,7 @@ export type Database = {
           commissions_enabled?: boolean
           created_at?: string
           currency?: string
+          email?: string | null
           enable_printer?: boolean
           id?: string
           last_payment_amount?: number | null
@@ -688,6 +692,7 @@ export type Database = {
           variance_notification_threshold?: number
         }
         Update: {
+          address?: string | null
           batch_expiry_enabled?: boolean
           billing_cycle?: string | null
           cash_control_enabled?: boolean
@@ -696,6 +701,7 @@ export type Database = {
           commissions_enabled?: boolean
           created_at?: string
           currency?: string
+          email?: string | null
           enable_printer?: boolean
           id?: string
           last_payment_amount?: number | null
@@ -3082,6 +3088,39 @@ export type Database = {
         }
         Relationships: []
       }
+      user_preferences: {
+        Row: {
+          active_company_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          active_company_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          active_company_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_preferences_active_company_id_fkey"
+            columns: ["active_company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_preferences_active_company_id_fkey"
+            columns: ["active_company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       customer_ar_balances: {
@@ -3967,6 +4006,10 @@ export type Database = {
         Args: { p_company_id: string }
         Returns: undefined
       }
+      is_approved_member: {
+        Args: { p_company_id: string; p_user_id: string }
+        Returns: boolean
+      }
       is_platform_admin: { Args: never; Returns: boolean }
       list_audit_actors: {
         Args: never
@@ -4023,6 +4066,16 @@ export type Database = {
           stock: number
           stock_value: number
           variant_id: string
+        }[]
+      }
+      my_companies: {
+        Args: never
+        Returns: {
+          code: string
+          company_id: string
+          is_active: boolean
+          name: string
+          role_name: string
         }[]
       }
       notify: {
@@ -4230,8 +4283,10 @@ export type Database = {
       }
       provision_company: {
         Args: {
+          p_address?: string
           p_company_name: string
           p_currency?: string
+          p_email?: string
           p_store_name?: string
         }
         Returns: string

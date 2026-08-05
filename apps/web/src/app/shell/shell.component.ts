@@ -15,6 +15,7 @@ import { OrderQueueCountsService } from '../pos/order-queue-counts.service';
 import { QUEUE_LONG_COUNT } from '../pos/queue-aging';
 import { EntitlementsService } from '../core/entitlements.service';
 import { LocationContextService } from '../core/location-context.service';
+import { CompanyContextService } from '../core/company-context.service';
 import { ProfileService } from '../profile/profile.service';
 import { EntityAvatarComponent } from '../shared/ui/entity-avatar.component';
 
@@ -258,7 +259,44 @@ interface NavSection {
         <aside class="flex min-h-screen w-64 flex-col border-r border-base-300 bg-base-200">
           <div class="flex min-h-16 items-center gap-2.5 border-b border-base-300 px-4">
             <img src="/assets/logo/dukarun-icon-dark.svg" alt="Dukarun" class="h-8 w-8" />
-            <span class="truncate text-sm font-bold">{{ company()?.name ?? 'Dukarun' }}</span>
+            @if (companies.isMultiCompany()) {
+              <div class="dropdown min-w-0 flex-1">
+                <button
+                  type="button"
+                  class="btn btn-ghost btn-sm w-full justify-between gap-1 px-1"
+                  aria-label="Switch company"
+                >
+                  <span class="truncate text-sm font-bold">{{ company()?.name ?? 'Dukarun' }}</span>
+                  <app-icon name="heroChevronDown" size="sm" />
+                </button>
+                <ul
+                  class="dropdown-content menu menu-sm z-50 mt-2 w-56 rounded-box border border-base-300 bg-base-100 p-2 shadow-overlay"
+                >
+                  @for (c of companies.companies(); track c.company_id) {
+                    <li>
+                      <button
+                        type="button"
+                        [disabled]="companies.switching()"
+                        (click)="switchCompany(c.company_id)"
+                      >
+                        <span class="flex-1 truncate">{{ c.name }}</span>
+                        @if (c.company_id === company()?.id) {
+                          <app-icon name="heroCheck" size="sm" />
+                        }
+                      </button>
+                    </li>
+                  }
+                  <li class="mt-1 border-t border-base-300 pt-1">
+                    <a routerLink="/register" (click)="closeDrawer()">
+                      <app-icon name="heroPlus" />
+                      Add company
+                    </a>
+                  </li>
+                </ul>
+              </div>
+            } @else {
+              <span class="truncate text-sm font-bold">{{ company()?.name ?? 'Dukarun' }}</span>
+            }
           </div>
 
           <div class="flex-1 overflow-y-auto px-2 py-2">
@@ -370,6 +408,7 @@ export class ShellComponent implements OnInit {
   protected readonly orderQueueCounts = inject(OrderQueueCountsService);
   protected readonly entitlements = inject(EntitlementsService);
   protected readonly locations = inject(LocationContextService);
+  protected readonly companies = inject(CompanyContextService);
   protected readonly profile = inject(ProfileService);
 
   protected readonly myName = computed(() => this.profile.me()?.display_name ?? 'Account');
@@ -505,9 +544,16 @@ export class ShellComponent implements OnInit {
       // brand falls back to 'Dukarun'
     }
     void this.profile.myProfile().catch(() => null);
+    void this.companies.load().catch(() => undefined);
     await Promise.all([this.locations.load(), this.entitlements.refresh().catch(() => undefined)]);
     await this.cashierSession.start();
     await this.orderQueueCounts.refresh();
+  }
+
+  /** Switch active company — CompanyContextService ends this in a full reload. */
+  protected switchCompany(companyId: string): void {
+    if (companyId === this.company()?.id) return;
+    void this.companies.switchCompany(companyId).catch(() => undefined);
   }
 
   protected changeLocation(event: Event): void {

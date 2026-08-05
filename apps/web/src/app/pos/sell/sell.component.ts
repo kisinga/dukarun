@@ -13,8 +13,6 @@ import {
 } from '../checkout/checkout-panel.component';
 import { ConnectivityService } from '../offline/connectivity.service';
 import { SyncService } from '../offline/sync.service';
-import { OrderQueueCountsService } from '../order-queue-counts.service';
-import { QUEUE_LONG_COUNT } from '../queue-aging';
 import { ButtonComponent } from '../../shared/ui/button.component';
 import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
 import { FormFieldComponent } from '../../shared/ui/form-field.component';
@@ -24,6 +22,7 @@ import { PageLayoutComponent } from '../../shared/ui/page-layout.component';
 import { PrintService, type PrintFormat } from '../../shared/print/print.service';
 import { ReceiptDataService } from '../../shared/print/receipt-data.service';
 import { SellCartLineComponent } from './sell-cart-line.component';
+import { MyPendingSalesComponent } from './my-pending-sales.component';
 import { SessionRequiredNoticeComponent } from '../../shared/ui/session-required-notice.component';
 import { BarcodeScannerComponent } from '../../shared/ui/barcode-scanner.component';
 import {
@@ -61,6 +60,7 @@ interface DraftFlag {
     MoneyComponent,
     PageLayoutComponent,
     SellCartLineComponent,
+    MyPendingSalesComponent,
     SessionRequiredNoticeComponent,
     BarcodeScannerComponent,
   ],
@@ -102,6 +102,9 @@ interface DraftFlag {
         >
           Direct checkout
         </span>
+      }
+      @if (cashierSession.cashierFlowEnabled()) {
+        <app-my-pending-sales actions />
       }
 
       @if (cashierSession.cashControlEnabled() && !cashierSession.isOpen()) {
@@ -655,21 +658,6 @@ interface DraftFlag {
                     >
                       Send to cashier
                     </button>
-                    @if (orderQueueCounts.cashierQueue() > 0) {
-                      @if (orderQueueCounts.cashierQueue() >= longQueueCount) {
-                        <span class="badge badge-warning h-auto whitespace-normal py-1 text-left">
-                          Cashier queue is busy ({{ orderQueueCounts.cashierQueue() }} waiting){{
-                            cashierSession.canTakePayment() ? ' — consider taking payment here' : ''
-                          }}
-                        </span>
-                      } @else {
-                        <p class="type-caption w-full">
-                          {{ orderQueueCounts.cashierQueue() }}
-                          {{ orderQueueCounts.cashierQueue() === 1 ? 'sale' : 'sales' }} waiting at
-                          the cashier
-                        </p>
-                      }
-                    }
                   }
                   <button
                     appButton
@@ -834,8 +822,6 @@ export class SellComponent implements OnInit {
   protected readonly print = inject(PrintService);
   protected readonly perms = inject(PermissionsService);
   protected readonly cashierSession = inject(CashierSessionService);
-  protected readonly orderQueueCounts = inject(OrderQueueCountsService);
-  protected readonly longQueueCount = QUEUE_LONG_COUNT;
   private readonly receiptData = inject(ReceiptDataService);
   private readonly pos = inject(PosService);
   private readonly route = inject(ActivatedRoute);
@@ -1326,7 +1312,7 @@ export class SellComponent implements OnInit {
         this.receiptData.buildReceiptData(orderId),
         this.receiptData.companyPrintInfo(),
       ]);
-      await this.print.printOrder(order, company.name, company.logoUrl, meta);
+      await this.print.printOrder(order, company.name, company.logoUrl, meta, company.address);
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Print failed');
     } finally {

@@ -1,5 +1,5 @@
 import { Component, OnInit, computed, inject, signal, viewChild } from '@angular/core';
-import { FormControl, ReactiveFormsModule } from '@angular/forms';
+import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { formatKesInput, parseKes } from '../core/money';
 import { reconciliationLabel } from '../core/payment-methods';
@@ -19,6 +19,8 @@ import { ButtonComponent } from '../shared/ui/button.component';
 import { DeleteConfirmationModalComponent } from '../shared/ui/delete-confirmation-modal.component';
 import { IconComponent } from '../shared/ui/icon.component';
 import { CashierSessionService } from '../core/cashier-session.service';
+import { ReceiptDataService } from '../shared/print/receipt-data.service';
+import { imageExtension, resizeImage } from '../shared/ui/image.util';
 
 type SectionKey = 'profile' | 'pos' | 'inventory' | 'cash';
 
@@ -66,6 +68,57 @@ type SectionKey = 'profile' | 'pos' | 'inventory' | 'cash';
           <div class="card bg-base-100">
             <div class="card-body p-4">
               <h2 class="section-title">Profile</h2>
+
+              <!-- Company logo -->
+              <div class="mt-2 flex items-center gap-3">
+                @if (s.logo_path) {
+                  <img
+                    [src]="logoUrl(s.logo_path)"
+                    alt="Company logo"
+                    class="h-14 w-14 rounded-box border border-base-300 object-contain"
+                  />
+                }
+                <div class="flex flex-wrap items-center gap-2">
+                  <button
+                    appButton
+                    variant="outline"
+                    size="sm"
+                    type="button"
+                    [loading]="logoBusy()"
+                    (click)="logoInput.click()"
+                  >
+                    {{ s.logo_path ? 'Change logo' : 'Upload logo' }}
+                  </button>
+                  @if (s.logo_path) {
+                    <button
+                      appButton
+                      variant="ghost"
+                      size="sm"
+                      type="button"
+                      [disabled]="logoBusy()"
+                      (click)="removeLogo()"
+                    >
+                      Remove logo
+                    </button>
+                  }
+                  <input
+                    #logoInput
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/svg+xml"
+                    class="hidden"
+                    (change)="onLogoSelected($event)"
+                  />
+                </div>
+              </div>
+              <p class="type-caption mt-1">
+                JPEG, PNG, WebP or SVG up to 2 MB. Shown on receipts and invoices.
+              </p>
+              @if (logoMsg(); as m) {
+                <p class="mt-1 text-sm" [class.text-success]="m.ok" [class.text-error]="!m.ok">
+                  {{ m.text }}
+                </p>
+              }
+
               <form
                 (submit)="$event.preventDefault(); saveSection('profile')"
                 class="mt-2 grid gap-3 sm:grid-cols-2"
@@ -84,6 +137,21 @@ type SectionKey = 'profile' | 'pos' | 'inventory' | 'cash';
                     [formControl]="slug"
                   />
                 </app-form-field>
+                <app-form-field label="Business email">
+                  <input
+                    type="email"
+                    class="input input-bordered input-sm w-full"
+                    [formControl]="email"
+                  />
+                </app-form-field>
+                <app-form-field label="Business address" class="sm:col-span-2">
+                  <textarea
+                    rows="2"
+                    class="textarea textarea-bordered textarea-sm w-full"
+                    [formControl]="address"
+                  ></textarea>
+                </app-form-field>
+                <p class="type-caption sm:col-span-2">Shown on A4 invoices and receipts headers.</p>
                 <p class="type-caption sm:col-span-2">
                   Storefront fields are used by your public storefront (launching separately).
                 </p>
@@ -652,6 +720,7 @@ type SectionKey = 'profile' | 'pos' | 'inventory' | 'cash';
 export class SettingsComponent implements OnInit {
   private readonly settingsService = inject(SettingsService);
   private readonly cashierSession = inject(CashierSessionService);
+  private readonly receiptData = inject(ReceiptDataService);
   protected readonly entitlements = inject(EntitlementsService);
   protected readonly perms = inject(PermissionsService);
 
@@ -684,7 +753,14 @@ export class SettingsComponent implements OnInit {
   protected readonly name = new FormControl('', { nonNullable: true });
   protected readonly slug = new FormControl('', { nonNullable: true });
   protected readonly whatsapp = new FormControl('', { nonNullable: true });
+  protected readonly address = new FormControl('', { nonNullable: true });
+  protected readonly email = new FormControl('', {
+    nonNullable: true,
+    validators: [Validators.email],
+  });
   protected readonly storefrontEnabled = new FormControl(false, { nonNullable: true });
+  protected readonly logoBusy = signal(false);
+  protected readonly logoMsg = signal<{ ok: boolean; text: string } | null>(null);
 
   protected readonly enablePrinter = new FormControl(false, { nonNullable: true });
   protected readonly proformaValidityDays = new FormControl(30, { nonNullable: true });
@@ -721,6 +797,8 @@ export class SettingsComponent implements OnInit {
       this.name.setValue(settings.name);
       this.slug.setValue(settings.public_slug ?? '');
       this.whatsapp.setValue(settings.public_whatsapp_number ?? '');
+      this.address.setValue(settings.address ?? '');
+      this.email.setValue(settings.email ?? '');
       this.storefrontEnabled.setValue(settings.public_storefront_enabled);
       this.enablePrinter.setValue(settings.enable_printer);
       this.proformaValidityDays.setValue(settings.proforma_validity_days);
@@ -831,6 +909,55 @@ export class SettingsComponent implements OnInit {
     return this.messages().get(key) ?? null;
   }
 
+  protected logoUrl(logoPath: string): string {
+    return this.settingsService.logoPublicUrl(logoPath);
+  }
+
+  /** Validate, resize (except SVG) and upload the selected logo file. */
+  protected async onLogoSelected(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    const s = this.settings();
+    if (!file || !s) return;
+    if (file.size > 2 * 1024 * 1024) {
+      this.logoMsg.set({ ok: false, text: 'Logo must be 2 MB or smaller' });
+      return;
+    }
+    this.logoBusy.set(true);
+    this.logoMsg.set(null);
+    try {
+      const isSvg = file.type === 'image/svg+xml';
+      const ext = isSvg ? 'svg' : imageExtension(file);
+      const blob = isSvg ? file : await resizeImage(file, 400);
+      const logoPath = await this.settingsService.uploadLogo(s.id, blob, ext);
+      this.settings.set({ ...s, logo_path: logoPath });
+      this.receiptData.invalidateCompanyInfo();
+      this.logoMsg.set({ ok: true, text: 'Logo updated' });
+    } catch (err) {
+      this.logoMsg.set({ ok: false, text: err instanceof Error ? err.message : 'Upload failed' });
+    } finally {
+      this.logoBusy.set(false);
+    }
+  }
+
+  protected async removeLogo(): Promise<void> {
+    const s = this.settings();
+    if (!s?.logo_path) return;
+    this.logoBusy.set(true);
+    this.logoMsg.set(null);
+    try {
+      await this.settingsService.removeLogo(s.id);
+      this.settings.set({ ...s, logo_path: null });
+      this.receiptData.invalidateCompanyInfo();
+      this.logoMsg.set({ ok: true, text: 'Logo removed' });
+    } catch (err) {
+      this.logoMsg.set({ ok: false, text: err instanceof Error ? err.message : 'Remove failed' });
+    } finally {
+      this.logoBusy.set(false);
+    }
+  }
+
   private flash(key: string, ok: boolean, text: string): void {
     this.messages.update(map => new Map(map).set(key, { ok, text }));
   }
@@ -845,10 +972,16 @@ export class SettingsComponent implements OnInit {
           this.flash('profile', false, 'Company name is required');
           return;
         }
+        if (this.email.invalid) {
+          this.flash('profile', false, 'Enter a valid business email');
+          return;
+        }
         patch = {
           name: this.name.value.trim(),
           public_slug: this.slug.value.trim() || null,
           public_whatsapp_number: this.whatsapp.value.trim() || null,
+          address: this.address.value.trim() || null,
+          email: this.email.value.trim() || null,
           public_storefront_enabled: this.storefrontEnabled.value,
         };
         break;

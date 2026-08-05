@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { authGuard, guestGuard } from './core/auth.guard';
+import { locationGuard } from './core/location.guard';
 import { permissionGuard } from './core/permission.guard';
 import { featureGuard } from './core/feature.guard';
 
@@ -47,6 +48,7 @@ export const routes: Routes = [
   {
     path: '',
     canActivate: [authGuard],
+    canActivateChild: [locationGuard],
     loadComponent: () => import('./shell/shell.component').then(m => m.ShellComponent),
     children: [
       {

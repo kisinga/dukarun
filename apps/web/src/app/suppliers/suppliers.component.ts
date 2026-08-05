@@ -2847,7 +2847,13 @@ export class SuppliersComponent implements OnInit, OnDestroy {
         this.receiptData.buildPurchaseData(purchaseId),
         this.receiptData.companyPrintInfo(),
       ]);
-      await this.print.printPurchase(purchase, company.name, company.logoUrl);
+      await this.print.printPurchase(
+        purchase,
+        company.name,
+        company.logoUrl,
+        undefined,
+        company.address
+      );
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Print failed');
     }
