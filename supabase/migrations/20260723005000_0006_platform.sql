@@ -541,6 +541,13 @@ insert into storage.buckets (id, name, public)
 values ('product-images', 'product-images', true)
 on conflict (id) do nothing;
 
+-- Policies survive a public-schema reset (storage schema is separate), so
+-- drop-if-exists first for idempotency.
+drop policy if exists "product images readable by everyone" on storage.objects;
+drop policy if exists "members write their company image prefix" on storage.objects;
+drop policy if exists "members update their company image prefix" on storage.objects;
+drop policy if exists "members delete their company image prefix" on storage.objects;
+
 create policy "product images readable by everyone"
   on storage.objects for select
   using (bucket_id = 'product-images');

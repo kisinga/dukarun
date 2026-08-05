@@ -28,6 +28,9 @@ set -euo pipefail
 SSH_HOST="${DEPLOY_SSH_HOST:?missing DEPLOY_SSH_HOST — copy .env.deploy.example to .env.deploy and fill it in}"
 COOLIFY_SERVICE_DIR="${COOLIFY_SERVICE_DIR:?missing COOLIFY_SERVICE_DIR — see .env.deploy.example}"
 DB_PORT="${DB_PORT:-5433}"
+# If the default port is occupied (e.g. a stale tunnel from an interrupted
+# run), walk forward until a free one is found.
+while nc -z 127.0.0.1 "$DB_PORT" 2>/dev/null; do DB_PORT=$((DB_PORT + 1)); done
 DB_NAME="${DB_NAME:-postgres}"
 PG_PASSWORD="${PG_PASSWORD:-}"
 FUNCTIONS_VOLUME="${FUNCTIONS_VOLUME:-$COOLIFY_SERVICE_DIR/volumes/functions}"
@@ -40,7 +43,12 @@ for arg in "$@"; do
   esac
 done
 
-SSH_OPTS=(-o BatchMode=no -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new)
+# One ssh connection, reused (ControlMaster) — a single password prompt.
+SSH_SOCKET_DIR=$(mktemp -d -t dukarun-deploy-ssh)
+SSH_OPTS=(
+  -o BatchMode=no -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new
+  -o ControlMaster=auto -o ControlPath="$SSH_SOCKET_DIR/s" -o ControlPersist=300
+)
 
 # PG password lives in the Coolify service .env on the host — fetch it
 # automatically; prompt only if that fails.
@@ -53,14 +61,26 @@ if [ -z "${PG_PASSWORD:-}" ]; then
   echo
 fi
 
-echo "→ opening tunnel $SSH_HOST : localhost:$DB_PORT -> postgres:5432"
-ssh "${SSH_OPTS[@]}" -N -L "$DB_PORT:127.0.0.1:5432" "$SSH_HOST" &
+echo "→ resolving DB container address"
+# The supabase DB container does not publish 5432 to the host — tunnel to its
+# docker-network IP instead. Container name derives from the Coolify service dir.
+DB_CONTAINER="supabase-db-$(basename "$COOLIFY_SERVICE_DIR")"
+DB_IP=$(ssh "${SSH_OPTS[@]}" "$SSH_HOST" \
+  "docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $DB_CONTAINER" 2>/dev/null || true)
+if [ -z "${DB_IP:-}" ]; then
+  echo "✗ could not resolve IP for container $DB_CONTAINER (is the supabase service up?)" >&2
+  exit 1
+fi
+
+echo "→ opening tunnel $SSH_HOST : localhost:$DB_PORT -> $DB_CONTAINER:5432 ($DB_IP)"
+ssh "${SSH_OPTS[@]}" -N -L "$DB_PORT:$DB_IP:5432" "$SSH_HOST" &
 TUNNEL_PID=$!
 
 # Always close the tunnel, whatever happens.
 cleanup() {
   kill "$TUNNEL_PID" 2>/dev/null || true
   wait "$TUNNEL_PID" 2>/dev/null || true
+  rm -rf "$SSH_SOCKET_DIR" 2>/dev/null || true
   echo "→ tunnel closed"
 }
 trap cleanup EXIT
