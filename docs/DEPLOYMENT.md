@@ -37,10 +37,14 @@ Dashboard → Settings → API Keys & Webhooks: set webhook URL to
 separate webhook secret). Verify with a dashboard test webhook (edge function log should
 show a 200 and the company row updating).
 
-### 2. Email provider
+### 2. Email
 
-`EMAIL_API_URL`, `EMAIL_API_KEY`, `EMAIL_FROM` in Coolify env (HTTPS email API;
-host blocks SMTP ports). Until set, email outbox rows fail; SMS/WhatsApp unaffected.
+- **Auth emails (GoTrue)**: wired to the v1 SMTP relay (`rs1.hpcnoc.com:465`,
+  `hello@dukarun.com`) — container reachability verified. Test with a real
+  recovery/invite email from the app.
+- **Outbox emails (notification-flush)**: still needs `EMAIL_API_URL` /
+  `EMAIL_API_KEY` / `EMAIL_FROM` (HTTPS email API). Until set, email outbox rows
+  fail; SMS/WhatsApp unaffected.
 
 ### 3. Storefront
 
