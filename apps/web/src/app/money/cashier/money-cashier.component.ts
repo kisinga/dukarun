@@ -118,7 +118,7 @@ import {
     <p class="type-caption mb-3">
       A variance can only be reverted before the next opening, closing, or reconciliation.
     </p>
-    @if (sessions().length === 0) {
+    @if (!loading() && sessions().length === 0) {
       <app-empty-state
         icon="heroBanknotes"
         title="No sessions yet"
@@ -268,6 +268,7 @@ export class MoneyCashierComponent implements OnInit {
   protected readonly revertingFor = signal<string | null>(null);
   protected readonly revertReason = new FormControl('', { nonNullable: true });
   protected readonly busy = signal(false);
+  protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
 
@@ -282,6 +283,7 @@ export class MoneyCashierComponent implements OnInit {
   }
 
   protected async load(): Promise<void> {
+    this.loading.set(true);
     try {
       const [accounts, open, sessions] = await Promise.all([
         this.money.cashierAccounts(),
@@ -300,6 +302,8 @@ export class MoneyCashierComponent implements OnInit {
       this.error.set(null);
     } catch (error) {
       this.error.set(error instanceof Error ? error.message : 'Failed to load sessions');
+    } finally {
+      this.loading.set(false);
     }
   }
 

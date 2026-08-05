@@ -50,7 +50,9 @@ type InventoryRow = {
             <span class="label-text text-xs">To</span>
             <input type="date" class="input input-bordered input-sm" [formControl]="to" />
           </label>
-          <button class="btn btn-primary btn-sm min-h-11" (click)="load()">Apply</button>
+          <button class="btn btn-primary btn-sm min-h-11" [disabled]="loading()" (click)="load()">
+            {{ loading() ? 'Loading…' : 'Apply' }}
+          </button>
           <span class="type-caption ml-auto">Figures refresh hourly.</span>
         </div>
       </div>
@@ -92,7 +94,7 @@ type InventoryRow = {
 
       <!-- Sales tab -->
       @if (tab() === 'sales') {
-        @if (summary().length === 0) {
+        @if (!loading() && summary().length === 0) {
           <app-empty-state
             [compact]="true"
             icon="heroBanknotes"
@@ -160,7 +162,7 @@ type InventoryRow = {
 
       <!-- Products tab -->
       @if (tab() === 'products') {
-        @if (products().length === 0) {
+        @if (!loading() && products().length === 0) {
           <app-empty-state
             [compact]="true"
             icon="heroCube"
@@ -205,7 +207,7 @@ type InventoryRow = {
 
       <!-- Customers tab -->
       @if (tab() === 'customers') {
-        @if (customers().length === 0) {
+        @if (!loading() && customers().length === 0) {
           <app-empty-state
             [compact]="true"
             icon="heroUsers"
@@ -267,7 +269,7 @@ type InventoryRow = {
             </div>
           </div>
         </div>
-        @if (inventory().length === 0) {
+        @if (!loading() && inventory().length === 0) {
           <app-empty-state
             [compact]="true"
             icon="heroArchiveBox"
@@ -320,6 +322,7 @@ export class ReportsComponent implements OnInit {
   protected readonly customers = signal<CustomerRow[]>([]);
   protected readonly inventory = signal<InventoryRow[]>([]);
   protected readonly error = signal<string | null>(null);
+  protected readonly loading = signal(false);
   protected readonly page = signal(1);
   protected readonly pageSize = 15;
 
@@ -364,6 +367,7 @@ export class ReportsComponent implements OnInit {
       this.error.set('The From date must be before the To date');
       return;
     }
+    this.loading.set(true);
     try {
       const since = this.from.value;
       const until = this.to.value;
@@ -396,6 +400,8 @@ export class ReportsComponent implements OnInit {
       );
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Failed to load reports');
+    } finally {
+      this.loading.set(false);
     }
   }
 
@@ -452,12 +458,15 @@ export class ReportsComponent implements OnInit {
   }
 
   private todayIso(): string {
-    return new Date().toISOString().slice(0, 10);
+    return this.nairobiDate(new Date());
   }
 
   private daysAgoIso(n: number): string {
-    const d = new Date();
-    d.setDate(d.getDate() - n);
-    return d.toISOString().slice(0, 10);
+    return this.nairobiDate(new Date(Date.now() - n * 86_400_000));
+  }
+
+  /** Business dates are Africa/Nairobi, not UTC (00:00-03:00 EAT is still "today"). */
+  private nairobiDate(date: Date): string {
+    return date.toLocaleDateString('en-CA', { timeZone: 'Africa/Nairobi' });
   }
 }

@@ -7,6 +7,7 @@ import { EmptyStateComponent } from '../shared/ui/empty-state.component';
 import { PageLayoutComponent } from '../shared/ui/page-layout.component';
 import { StatusBadgeComponent } from '../shared/ui/status-badge.component';
 import { BillingCycle, BillingService, CompanyBilling, Tier, TierLimits } from './billing.service';
+import { EntitlementsService } from '../core/entitlements.service';
 
 type BadgeType = 'success' | 'info' | 'warning' | 'error' | 'neutral';
 
@@ -220,6 +221,7 @@ const POLL_TIMEOUT_MS = 60_000;
 })
 export class BillingComponent implements OnInit, OnDestroy {
   private readonly billingService = inject(BillingService);
+  private readonly entitlements = inject(EntitlementsService);
 
   protected readonly fmt = formatKes;
   protected readonly billing = signal<CompanyBilling | null>(null);
@@ -331,6 +333,9 @@ export class BillingComponent implements OnInit, OnDestroy {
       this.billing.set(billing);
       if (billing.subscription_status === 'active') {
         this.cancelPending();
+        // Plan gates read entitlements loaded at app start — refresh so a
+        // just-paid upgrade unlocks immediately, without a full reload.
+        void this.entitlements.refresh();
       }
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Status check failed');
@@ -362,7 +367,10 @@ export class BillingComponent implements OnInit, OnDestroy {
     try {
       const billing = await this.billingService.companyBilling();
       this.billing.set(billing);
-      if (billing.subscription_status === 'active') this.cancelPending();
+      if (billing.subscription_status === 'active') {
+        this.cancelPending();
+        void this.entitlements.refresh();
+      }
     } catch {
       // silent — the manual button reports errors
     }

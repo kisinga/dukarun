@@ -236,7 +236,7 @@ interface ParsedPurchaseLine {
           <app-stat-bar summary [stats]="supplierSummary()" />
         </app-list-search-bar>
 
-        @if (filteredSuppliers().length === 0) {
+        @if (!loading() && filteredSuppliers().length === 0) {
           <app-empty-state
             icon="heroTruck"
             title="No suppliers found"
@@ -633,7 +633,7 @@ interface ParsedPurchaseLine {
                       </div>
                     }
                   </div>
-                  @if (!cashierSession.isOpen()) {
+                  @if (!cashierSession.canTakePayment()) {
                     @if (purchasePaymentMode.value !== 'later') {
                       <div class="mt-2">
                         <app-session-required-notice
@@ -970,7 +970,7 @@ interface ParsedPurchaseLine {
                     [disabled]="
                       activeSuppliers().length === 0 ||
                       variants().length === 0 ||
-                      (purchasePaymentMode.value !== 'later' && !cashierSession.isOpen()) ||
+                      (purchasePaymentMode.value !== 'later' && !cashierSession.canTakePayment()) ||
                       !partialPaymentValid() ||
                       (purchasePaymentMode.value !== 'paid' && supplierCreditExceeded())
                     "
@@ -1149,7 +1149,7 @@ interface ParsedPurchaseLine {
                 @if (suppliersOwed().length === 0) {
                   <p class="mt-2 text-sm text-base-content/60">We do not owe any suppliers.</p>
                 } @else {
-                  @if (!cashierSession.isOpen()) {
+                  @if (!cashierSession.canTakePayment()) {
                     <app-session-required-notice action="paying a supplier" />
                   }
                   <form
@@ -1190,7 +1190,7 @@ interface ParsedPurchaseLine {
                       appButton
                       type="submit"
                       [loading]="busy()"
-                      [disabled]="!cashierSession.isOpen()"
+                      [disabled]="!cashierSession.canTakePayment()"
                     >
                       Record supplier payment
                     </button>
@@ -1264,7 +1264,11 @@ interface ParsedPurchaseLine {
                             Print PO
                           </button>
                         }
-                        @if (p.is_credit && p.paid < p.total_cost && perms.has('ViewFinancials')) {
+                        @if (
+                          p.is_credit &&
+                          p.paid < p.total_cost &&
+                          perms.has('ManageSupplierCreditPurchases')
+                        ) {
                           <button appButton variant="ghost" (click)="startPurchasePayment(p)">
                             Pay
                           </button>
@@ -1294,7 +1298,7 @@ interface ParsedPurchaseLine {
                             ><button
                               appButton
                               type="submit"
-                              [disabled]="busy() || !cashierSession.isOpen()"
+                              [disabled]="busy() || !cashierSession.canTakePayment()"
                             >
                               Record payment</button
                             ><button
@@ -1503,12 +1507,13 @@ export class SuppliersComponent implements OnInit, OnDestroy {
     if (this.refreshTimer) clearTimeout(this.refreshTimer);
   }
 
-  protected async load(): Promise<void> {
+  /** Silent reloads (realtime events) refresh data without flashing the header spinner. */
+  protected async load(silent = false): Promise<void> {
     if (this.loading()) {
       this.loadQueued = true;
       return;
     }
-    this.loading.set(true);
+    if (!silent) this.loading.set(true);
     try {
       const [suppliers, accounts, variants, purchases, drafts, locations, performance] =
         await Promise.all([
@@ -2268,7 +2273,9 @@ export class SuppliersComponent implements OnInit, OnDestroy {
     if (this.refreshTimer) clearTimeout(this.refreshTimer);
     this.refreshTimer = setTimeout(() => {
       this.refreshTimer = null;
-      void this.load();
+      // Silent when data is already on screen — background events shouldn't
+      // flash the header spinner.
+      void this.load(this.suppliers().length > 0);
     }, 250);
   }
 

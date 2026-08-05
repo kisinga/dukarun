@@ -287,7 +287,10 @@ export class SellCartLineComponent {
   }
 
   protected emitQuantity(event: Event): void {
-    const quantity = Number((event.target as HTMLInputElement).value);
+    const raw = (event.target as HTMLInputElement).value;
+    // Cleared field: Number('') === 0 would silently delete the line — ignore.
+    if (raw.trim() === '') return;
+    const quantity = Number(raw);
     if (Number.isFinite(quantity)) this.quantityChanged.emit(quantity);
   }
 }

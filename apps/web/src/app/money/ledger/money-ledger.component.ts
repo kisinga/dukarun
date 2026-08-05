@@ -27,7 +27,8 @@ import { JournalEntryWithLines, LedgerAccountWithBalance, MoneyService } from '.
             <button
               type="button"
               class="rounded-box border border-base-300/70 bg-base-100 p-3 text-left hover:border-primary/40"
-              (click)="sourceType.set(''); search.set(account.code); applyFilters()"
+              [class.border-primary]="accountCode() === account.code"
+              (click)="filterByAccount(account.code)"
             >
               <span class="type-caption font-mono">{{ account.code }}</span>
               <span class="mt-1 block text-sm font-medium">{{ account.name }}</span>
@@ -61,10 +62,27 @@ import { JournalEntryWithLines, LedgerAccountWithBalance, MoneyService } from '.
         </div>
       </app-list-search-bar>
 
+      @if (accountCode()) {
+        <div class="flex items-center gap-2 text-sm">
+          <span class="badge badge-primary badge-outline font-mono">{{ accountCode() }}</span>
+          <button
+            type="button"
+            class="btn btn-ghost btn-xs"
+            aria-label="Clear account filter"
+            (click)="clearAccountFilter()"
+          >
+            clear
+          </button>
+        </div>
+      }
       @if (error()) {
         <p class="text-sm text-error">{{ error() }}</p>
       }
-      @if (rows().length === 0 && !loading()) {
+      @if (loading() && rows().length === 0) {
+        <div class="flex justify-center p-8">
+          <span class="loading loading-spinner loading-md"></span>
+        </div>
+      } @else if (rows().length === 0) {
         <app-empty-state
           [compact]="true"
           icon="heroDocumentText"
@@ -155,6 +173,7 @@ export class MoneyLedgerComponent implements OnInit {
   protected readonly page = signal(1);
   protected readonly pageSize = signal(25);
   protected readonly search = signal('');
+  protected readonly accountCode = signal('');
   protected readonly sourceType = signal('');
   protected readonly from = signal('');
   protected readonly to = signal('');
@@ -164,12 +183,18 @@ export class MoneyLedgerComponent implements OnInit {
   protected readonly totalPages = computed(() =>
     Math.max(1, Math.ceil(this.total() / this.pageSize()))
   );
-  protected readonly sourceTypes = computed(() =>
-    [...new Set(this.rows().map(row => row.source_type))].sort()
-  );
+  /**
+   * Filter options must not collapse to the applied filter's type, so they
+   * accumulate across every loaded page instead of deriving from current rows.
+   */
+  protected readonly sourceTypes = signal<string[]>([]);
 
   async ngOnInit(): Promise<void> {
-    await Promise.all([this.loadAccounts(), this.load()]);
+    try {
+      await Promise.all([this.loadAccounts(), this.load()]);
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Failed to load ledger');
+    }
   }
   protected async loadAccounts(): Promise<void> {
     this.accounts.set(await this.money.ledgerAccountsWithBalances());
@@ -182,12 +207,16 @@ export class MoneyLedgerComponent implements OnInit {
         page: this.page(),
         pageSize: this.pageSize(),
         search: this.search(),
+        accountCode: this.accountCode() || undefined,
         sourceType: this.sourceType(),
         from: this.from(),
         to: this.to(),
       });
       this.rows.set(result.rows);
       this.total.set(result.count);
+      this.sourceTypes.update(types =>
+        [...new Set([...types, ...result.rows.map(row => row.source_type)])].sort()
+      );
     } catch (error) {
       this.error.set(error instanceof Error ? error.message : 'Failed to load ledger');
     } finally {
@@ -198,8 +227,19 @@ export class MoneyLedgerComponent implements OnInit {
     this.page.set(1);
     await this.load();
   }
+  protected async filterByAccount(code: string): Promise<void> {
+    this.accountCode.set(code);
+    this.search.set('');
+    this.sourceType.set('');
+    await this.applyFilters();
+  }
+  protected async clearAccountFilter(): Promise<void> {
+    this.accountCode.set('');
+    await this.applyFilters();
+  }
   protected async clearFilters(): Promise<void> {
     this.search.set('');
+    this.accountCode.set('');
     this.sourceType.set('');
     this.from.set('');
     this.to.set('');

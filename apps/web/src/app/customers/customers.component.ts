@@ -159,7 +159,7 @@ type CreditOrder = {
       </app-list-search-bar>
 
       <!-- List -->
-      @if (filtered().length === 0) {
+      @if (!loading() && filtered().length === 0) {
         <app-empty-state
           icon="heroUsers"
           title="No customers found"
@@ -372,7 +372,7 @@ type CreditOrder = {
                     <!-- Credit orders + repayment -->
                     <div>
                       <h3 class="section-title mb-2">Credit sales</h3>
-                      @if (!cashierSession.isOpen() && creditOrders().length > 0) {
+                      @if (!cashierSession.canTakePayment() && creditOrders().length > 0) {
                         <app-session-required-notice action="collecting a repayment" />
                       }
                       @if (creditOrders().length === 0) {
@@ -408,7 +408,7 @@ type CreditOrder = {
                               appButton
                               type="submit"
                               class="sm:col-span-3 sm:justify-self-start"
-                              [disabled]="busy() || !cashierSession.isOpen()"
+                              [disabled]="busy() || !cashierSession.canTakePayment()"
                             >
                               Allocate oldest first
                             </button>
@@ -429,7 +429,7 @@ type CreditOrder = {
                             @if (perms.has('SettleOrder')) {
                               <button
                                 appButton
-                                [disabled]="!cashierSession.isOpen()"
+                                [disabled]="!cashierSession.canTakePayment()"
                                 (click)="startRepay(o.id, o.total)"
                               >
                                 Repay
@@ -469,7 +469,7 @@ type CreditOrder = {
                               <button
                                 appButton
                                 type="submit"
-                                [disabled]="busy() || !cashierSession.isOpen()"
+                                [disabled]="busy() || !cashierSession.canTakePayment()"
                               >
                                 Allocate
                               </button>
@@ -696,8 +696,10 @@ export class CustomersComponent implements OnInit {
   async ngOnInit(): Promise<void> {
     try {
       this.methods.set(await this.money.enabledMethodCodes());
-    } catch {
-      // keep defaults
+    } catch (err) {
+      // Without the real method list the repayment selects would silently
+      // submit hardcoded 'cash' — surface the failure instead.
+      this.error.set(err instanceof Error ? err.message : 'Failed to load payment methods');
     }
     await this.load();
   }
@@ -805,7 +807,7 @@ export class CustomersComponent implements OnInit {
   }
 
   protected startRepay(orderId: string, total: number): void {
-    if (!this.cashierSession.isOpen()) {
+    if (!this.cashierSession.canTakePayment()) {
       this.error.set('Open a cashier session before collecting a repayment.');
       return;
     }
@@ -840,7 +842,11 @@ export class CustomersComponent implements OnInit {
       this.repayFor.set(null);
       await this.load();
       const current = this.customers().find(c => c.id === this.expandedFor());
-      if (current) this.creditOrders.set(await this.money.creditOrders(current.id));
+      if (current) {
+        this.creditOrders.set(await this.money.creditOrders(current.id));
+        this.orders.set(await this.pos.customerOrders(current.id));
+        this.statement.set(await this.money.customerStatement(current.id));
+      }
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Repayment failed');
     } finally {

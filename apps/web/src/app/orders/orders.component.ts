@@ -2,7 +2,7 @@ import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import type { RealtimeChannel } from '@supabase/supabase-js';
-import { formatKes, formatKesInput } from '../core/money';
+import { formatKes, formatKesInput, parseKes } from '../core/money';
 import { OrderLineWithProduct, OrderWithCustomer, Payment, PosService } from '../pos/pos.service';
 import { PrintService } from '../shared/print/print.service';
 import { ReceiptDataService } from '../shared/print/receipt-data.service';
@@ -113,7 +113,7 @@ const ALL_STATUSES = ['completed', 'voided', 'draft', 'expired', 'pending_paymen
         </div>
       </app-list-search-bar>
 
-      @if (orders().length === 0) {
+      @if (!loading() && orders().length === 0) {
         <div class="mt-3">
           <app-empty-state
             [compact]="true"
@@ -532,7 +532,11 @@ const ALL_STATUSES = ['completed', 'voided', 'draft', 'expired', 'pending_paymen
                                     [formControl]="refundReason"
                                 /></label>
                                 <div class="sm:col-span-4">
-                                  <button class="btn btn-error btn-sm" type="submit">
+                                  <button
+                                    class="btn btn-error btn-sm"
+                                    type="submit"
+                                    [disabled]="busy()"
+                                  >
                                     Post refund</button
                                   ><button
                                     class="btn btn-ghost btn-sm"
@@ -767,8 +771,8 @@ export class OrdersComponent implements OnInit, OnDestroy {
   }
 
   protected async confirmRefund(orderId: string): Promise<void> {
-    const amount = Math.round(Number(this.refundAmount.value));
-    if (!Number.isFinite(amount) || amount <= 0 || !this.refundReason.value.trim()) {
+    const amount = parseKes(this.refundAmount.value);
+    if (amount === null || amount <= 0 || !this.refundReason.value.trim()) {
       this.error.set('Refund amount and reason are required');
       return;
     }
@@ -890,12 +894,15 @@ export class OrdersComponent implements OnInit, OnDestroy {
   }
 
   private todayIso(): string {
-    return new Date().toISOString().slice(0, 10);
+    return this.nairobiDate(new Date());
   }
 
   private daysAgoIso(n: number): string {
-    const d = new Date();
-    d.setDate(d.getDate() - n);
-    return d.toISOString().slice(0, 10);
+    return this.nairobiDate(new Date(Date.now() - n * 86_400_000));
+  }
+
+  /** Business dates are Africa/Nairobi, not UTC (00:00-03:00 EAT is still "today"). */
+  private nairobiDate(date: Date): string {
+    return date.toLocaleDateString('en-CA', { timeZone: 'Africa/Nairobi' });
   }
 }

@@ -113,6 +113,7 @@ interface NavSection {
               routerLink="/notifications"
               class="btn btn-square btn-ghost btn-sm indicator min-h-11 min-w-11"
               title="Notifications"
+              aria-label="Notifications"
             >
               <app-icon name="heroBell" size="lg" />
               @if (notifications.unreadCount() > 0) {
@@ -162,6 +163,9 @@ interface NavSection {
             <button
               class="btn btn-ghost btn-sm min-h-11 min-w-11"
               [title]="theme.theme() === 'light' ? 'Switch to dark mode' : 'Switch to light mode'"
+              [attr.aria-label]="
+                theme.theme() === 'light' ? 'Switch to dark mode' : 'Switch to light mode'
+              "
               (click)="theme.toggle()"
             >
               <app-icon [name]="theme.theme() === 'light' ? 'heroMoon' : 'heroSun'" />
@@ -169,6 +173,7 @@ interface NavSection {
             <button
               class="btn btn-ghost btn-sm min-h-11"
               title="Sign out"
+              aria-label="Sign out"
               [disabled]="sync.syncing()"
               (click)="requestSignOut()"
             >

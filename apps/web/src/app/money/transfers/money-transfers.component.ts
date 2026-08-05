@@ -41,7 +41,7 @@ import { IconComponent } from '../../shared/ui/icon.component';
       </button>
     </div>
 
-    @if (!cashierSession.isOpen()) {
+    @if (!cashierSession.canTakePayment()) {
       <app-session-required-notice action="moving money between accounts" />
     }
 
@@ -99,7 +99,7 @@ import { IconComponent } from '../../shared/ui/icon.component';
               appButton
               type="submit"
               [loading]="busy()"
-              [disabled]="sameAccount() || !cashierSession.isOpen()"
+              [disabled]="sameAccount() || !cashierSession.canTakePayment()"
             >
               Post transfer
             </button>
@@ -115,7 +115,11 @@ import { IconComponent } from '../../shared/ui/icon.component';
     </div>
 
     <h2 class="section-title mb-2">Recent transfers</h2>
-    <app-journal-list [entries]="entries()" emptyText="No transfers posted yet." />
+    <app-journal-list
+      [entries]="entries()"
+      [loading]="loading()"
+      emptyText="No transfers posted yet."
+    />
   `,
 })
 export class MoneyTransfersComponent implements OnInit {

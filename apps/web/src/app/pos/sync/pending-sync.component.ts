@@ -43,6 +43,9 @@ import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
       @if (notice()) {
         <p class="mb-2 text-sm text-success">{{ notice() }}</p>
       }
+      @if (error()) {
+        <p class="mb-2 text-sm text-error">{{ error() }}</p>
+      }
 
       @if (sync.legacyEntryCount() > 0) {
         <div role="alert" class="alert alert-warning mb-3 text-sm">
@@ -87,8 +90,12 @@ import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
                   />
                   <span class="ml-auto font-bold tabular-nums">{{ fmt(total(entry)) }}</span>
                   @if (entry.status === 'failed') {
-                    <button class="btn btn-outline btn-sm" (click)="retry(entry.client_ref)">
-                      Retry
+                    <button
+                      class="btn btn-outline btn-sm"
+                      [disabled]="retrying() === entry.client_ref"
+                      (click)="retry(entry.client_ref)"
+                    >
+                      {{ retrying() === entry.client_ref ? 'Retrying…' : 'Retry' }}
                     </button>
                     <button class="btn btn-error btn-outline btn-sm" (click)="startDiscard(entry)">
                       Discard
@@ -126,6 +133,8 @@ export class PendingSyncComponent {
   protected readonly discarding = signal<OutboxEntry | null>(null);
   private readonly deleteModal = viewChild(DeleteConfirmationModalComponent);
   protected readonly notice = signal<string | null>(null);
+  protected readonly error = signal<string | null>(null);
+  protected readonly retrying = signal<string | null>(null);
 
   protected total(entry: OutboxEntry): number {
     return entry.lines.reduce(
@@ -150,14 +159,25 @@ export class PendingSyncComponent {
   protected async syncNow(): Promise<void> {
     this.notice.set(null);
     const before = this.sync.queuedCount();
+    const failedBefore = this.sync.failedCount();
     await this.sync.sync();
-    const posted = before - this.sync.queuedCount();
+    // Rejected entries flip queued→failed without leaving the outbox; don't
+    // report them as synced.
+    const posted = before - this.sync.queuedCount() - (this.sync.failedCount() - failedBefore);
     if (posted > 0) this.notice.set(`Synced ${posted} sale(s)`);
   }
 
   protected async retry(clientRef: string): Promise<void> {
     this.discarding.set(null);
-    await this.sync.retry(clientRef);
+    this.error.set(null);
+    this.retrying.set(clientRef);
+    try {
+      await this.sync.retry(clientRef);
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Retry failed');
+    } finally {
+      this.retrying.set(null);
+    }
   }
 
   protected startDiscard(entry: OutboxEntry): void {

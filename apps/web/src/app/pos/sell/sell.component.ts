@@ -163,6 +163,16 @@ import {
           <div class="alert alert-success mb-4 py-3" aria-live="polite">
             <app-icon name="heroCheckCircle" />
             <span>{{ notice() }}</span>
+            <button
+              appButton
+              variant="ghost"
+              size="sm"
+              [iconOnly]="true"
+              aria-label="Dismiss notice"
+              (click)="notice.set(null)"
+            >
+              <app-icon name="heroXMark" />
+            </button>
           </div>
         }
 
@@ -193,6 +203,7 @@ import {
                     class="input input-bordered min-h-11 w-full pr-12 pl-11"
                     placeholder="Search or scan barcode…"
                     autocomplete="off"
+                    aria-label="Search products or scan barcode"
                     [formControl]="search"
                   />
                   @if (search.value) {
@@ -811,6 +822,7 @@ export class SellComponent implements OnInit {
   protected readonly canUseDirectAccounts = computed(() => this.perms.has('ViewFinancials'));
   protected readonly approvalSent = signal(false);
   private approvalSentTimer: ReturnType<typeof setTimeout> | null = null;
+  private searchSeq = 0;
   private priceFloorTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
@@ -869,20 +881,24 @@ export class SellComponent implements OnInit {
 
   protected async onSearch(query: string): Promise<void> {
     const q = query.trim();
+    // Sequence guard: a slower earlier response must not overwrite newer results.
+    const seq = ++this.searchSeq;
     if (q.length < 2) {
       this.results.set([]);
       return;
     }
     try {
       const variants = await this.sync.searchProducts(q);
+      if (seq !== this.searchSeq) return;
       const exact = variants.find(v => v.barcode === q);
       if (exact) {
-        this.cart.addVariant(exact);
+        this.addVariant(exact);
         this.clearSearch();
         return;
       }
       this.results.set(variants);
     } catch (err) {
+      if (seq !== this.searchSeq) return;
       this.error.set(err instanceof Error ? err.message : 'Product search failed');
     }
   }
@@ -1123,12 +1139,24 @@ export class SellComponent implements OnInit {
     }
     try {
       const result = await this.pos.postSale(customerId, lines, payments, false, clientRef);
+      // Completing from a loaded proforma: retire the draft so it can't be
+      // converted into a second, duplicate sale. Only on a real completion —
+      // an approval-held sale keeps the proforma intact.
+      const completedDraftId = this.cart.draftId();
       this.checkoutOpen.set(false);
       this.cart.clear();
       this.selectedCustomer.set(null);
       if (result.status === 'approval_required') {
         this.showApprovalSent();
       } else {
+        if (completedDraftId) {
+          try {
+            await this.pos.deleteProforma(completedDraftId);
+          } catch {
+            // Delete failed: the draft lingers as Active. Surfaced in Proformas;
+            // far rarer and safer than selling against stale lines.
+          }
+        }
         this.success.set({ text: 'Sale completed', tone: 'success', orderId: result.orderId });
       }
     } catch (err) {
@@ -1209,8 +1237,11 @@ export class SellComponent implements OnInit {
     this.busy.set(true);
     this.error.set(null);
     this.notice.set(null);
+    // Same idempotency reference as completeSale: a lost response followed by a
+    // retry must not park the sale twice.
+    const clientRef = crypto.randomUUID();
     try {
-      await this.pos.postSale(this.cart.customerId(), this.cart.toSaleLines(), [], true);
+      await this.pos.postSale(this.cart.customerId(), this.cart.toSaleLines(), [], true, clientRef);
       this.cart.clear();
       this.selectedCustomer.set(null);
       this.notice.set('Sent to the cashier queue');

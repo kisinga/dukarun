@@ -705,7 +705,7 @@ interface ProductEditorRow {
       </app-list-search-bar>
 
       <!-- Grouped list -->
-      @if (grouped().length === 0) {
+      @if (!loading() && grouped().length === 0) {
         <app-empty-state
           icon="heroCube"
           title="No products found"
@@ -1228,9 +1228,15 @@ export class ProductsComponent implements OnInit {
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
-    // Debounced search (list-search-bar model → reload).
+    // Debounced search (list-search-bar model → reload). Skip the effect's
+    // initial run — ngOnInit already loads, so it would double-fetch.
+    let firstRun = true;
     effect(() => {
       this.query();
+      if (firstRun) {
+        firstRun = false;
+        return;
+      }
       this.page.set(1);
       if (this.searchTimer) clearTimeout(this.searchTimer);
       this.searchTimer = setTimeout(() => void this.load(), 200);

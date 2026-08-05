@@ -527,7 +527,9 @@ export class ApprovalsComponent implements OnInit {
       } else {
         await this.approvals.deny(target.approval.id, reason);
       }
-      this.notice.set(`${this.typeLabel(target.approval.type)} request ${target.action}d`);
+      this.notice.set(
+        `${this.typeLabel(target.approval.type)} request ${target.action === 'approve' ? 'approved' : 'denied'}`
+      );
       this.deciding.set(null);
       await this.loadSummaries();
     } catch (err) {

@@ -144,7 +144,7 @@ const PROFORMA_STATUSES = ['draft', 'expired'];
         <app-session-required-notice action="converting a proforma to a sale" />
       }
 
-      @if (proformas().length === 0) {
+      @if (!loading() && proformas().length === 0) {
         <app-empty-state
           [compact]="query().length > 0"
           icon="heroClipboardDocumentList"
@@ -192,7 +192,13 @@ const PROFORMA_STATUSES = ['draft', 'expired'];
                       <app-icon name="heroPencilSquare" /> Edit
                     </button>
                     @if (printerEnabled()) {
-                      <button appButton variant="ghost" size="sm" (click)="printProforma(draft.id)">
+                      <button
+                        appButton
+                        variant="ghost"
+                        size="sm"
+                        [disabled]="printing()"
+                        (click)="printProforma(draft.id)"
+                      >
                         <app-icon name="heroPrinter" /> Print
                       </button>
                     }
@@ -279,6 +285,7 @@ const PROFORMA_STATUSES = ['draft', 'expired'];
                             [iconOnly]="true"
                             title="Print proforma"
                             aria-label="Print proforma"
+                            [disabled]="printing()"
                             (click)="printProforma(draft.id)"
                           >
                             <app-icon name="heroPrinter" />
@@ -531,6 +538,8 @@ export class ProformasComponent implements OnInit, OnDestroy {
   }
 
   protected async printProforma(orderId: string): Promise<void> {
+    this.printing.set(true);
+    this.error.set(null);
     try {
       const [{ order, meta }, company] = await Promise.all([
         this.receiptData.buildProformaData(orderId),
@@ -539,6 +548,8 @@ export class ProformasComponent implements OnInit, OnDestroy {
       await this.print.printOrder(order, company.name, company.logoUrl, meta);
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Print failed');
+    } finally {
+      this.printing.set(false);
     }
   }
 

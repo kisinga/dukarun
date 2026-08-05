@@ -363,6 +363,11 @@ export class MoneyPeriodsComponent implements OnInit {
     try {
       await this.money.recordManualReconciliation(decls);
       this.notice.set('Reconciliation recorded');
+      // Clear stale declarations so a second click can't resubmit them.
+      for (const d of decls) {
+        this.declared[d.account_code] = '';
+        this.reasons[d.account_code] = '';
+      }
       await this.load();
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Reconciliation failed');

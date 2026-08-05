@@ -607,7 +607,17 @@ type SectionKey = 'profile' | 'pos' | 'inventory' | 'cash';
           </div>
         </div>
       } @else {
-        <p class="text-sm text-base-content/60">Loading…</p>
+        @if (loadError()) {
+          <div role="alert" class="alert alert-error">
+            <app-icon name="heroExclamationTriangle" />
+            <span>{{ loadError() }}</span>
+            <button appButton variant="outline" size="sm" type="button" (click)="load()">
+              Retry
+            </button>
+          </div>
+        } @else {
+          <p class="text-sm text-base-content/60">Loading…</p>
+        }
       }
 
       <app-delete-confirmation-modal
@@ -675,6 +685,11 @@ export class SettingsComponent implements OnInit {
   protected readonly locationDefault = new FormControl(false, { nonNullable: true });
 
   async ngOnInit(): Promise<void> {
+    await this.load();
+  }
+
+  protected async load(): Promise<void> {
+    this.loadError.set(null);
     try {
       const [settings, methods, locations, paymentAssignments] = await Promise.all([
         this.settingsService.getSettings(),
@@ -810,6 +825,10 @@ export class SettingsComponent implements OnInit {
     let patch: Partial<Omit<CompanySettings, 'id'>>;
     switch (section) {
       case 'profile':
+        if (this.name.value.trim().length === 0) {
+          this.flash('profile', false, 'Company name is required');
+          return;
+        }
         patch = {
           name: this.name.value.trim(),
           public_slug: this.slug.value.trim() || null,
@@ -880,6 +899,7 @@ export class SettingsComponent implements OnInit {
       );
       this.pmMsg.set({ ok: true, text: `${pm.name} updated` });
     } catch (err) {
+      (event.target as HTMLInputElement).checked = !value;
       this.pmMsg.set({ ok: false, text: err instanceof Error ? err.message : 'Update failed' });
     } finally {
       this.busy.set(false);

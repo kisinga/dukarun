@@ -8,7 +8,7 @@ import type { JournalEntryWithLines } from './money.service';
   selector: 'app-journal-list',
   imports: [EmptyStateComponent, MoneyComponent],
   template: `
-    @if (entries().length === 0) {
+    @if (!loading() && entries().length === 0) {
       <app-empty-state icon="heroBanknotes" [title]="emptyText()" />
     } @else {
       <div class="flex flex-col gap-2">
@@ -52,6 +52,8 @@ import type { JournalEntryWithLines } from './money.service';
 export class JournalListComponent {
   readonly entries = input.required<JournalEntryWithLines[]>();
   readonly emptyText = input('Nothing posted yet.');
+  /** While true the empty state stays hidden (initial fetch in flight). */
+  readonly loading = input(false);
 
   protected total(entry: JournalEntryWithLines): number {
     return entry.ledger_journal_lines.reduce((sum, l) => sum + l.debit, 0);

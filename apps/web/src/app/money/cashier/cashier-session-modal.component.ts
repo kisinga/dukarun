@@ -260,6 +260,28 @@ import {
         </div>
       </div>
     }
+
+    @if (printError(); as message) {
+      <div class="toast toast-bottom toast-end z-[70]" role="alert">
+        <div class="alert alert-error max-w-sm shadow-overlay">
+          <app-icon name="heroExclamationTriangle" />
+          <div class="min-w-0 flex-1">
+            <p class="font-semibold">Could not print slip</p>
+            <p class="text-sm">{{ message }}</p>
+          </div>
+          <button
+            appButton
+            variant="ghost"
+            [iconOnly]="true"
+            type="button"
+            aria-label="Dismiss print error"
+            (click)="printError.set(null)"
+          >
+            <app-icon name="heroXMark" />
+          </button>
+        </div>
+      </div>
+    }
   `,
 })
 export class CashierSessionModalComponent {
@@ -284,6 +306,7 @@ export class CashierSessionModalComponent {
     message: string;
     closedSessionId?: string;
   } | null>(null);
+  protected readonly printError = signal<string | null>(null);
 
   constructor() {
     effect(() => {
@@ -412,10 +435,7 @@ export class CashierSessionModalComponent {
       ]);
       await this.print.printOrder(order, company.name, company.logoUrl, meta);
     } catch (error) {
-      this.success.set({
-        title: 'Could not print slip',
-        message: error instanceof Error ? error.message : 'Print failed',
-      });
+      this.printError.set(error instanceof Error ? error.message : 'Print failed');
     }
   }
 }

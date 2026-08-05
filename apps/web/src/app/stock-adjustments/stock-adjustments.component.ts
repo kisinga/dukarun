@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, effect, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, effect, inject, signal, untracked } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute } from '@angular/router';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
@@ -95,6 +95,7 @@ const ADJUSTMENT_REASONS = [
                     class="input input-bordered min-h-11 w-full"
                     placeholder="Search product, SKU, or barcode"
                     autocomplete="off"
+                    aria-label="Search product, SKU, or barcode"
                     [formControl]="search"
                   />
                   @if (searching()) {
@@ -298,6 +299,7 @@ const ADJUSTMENT_REASONS = [
                 type="search"
                 class="input input-bordered input-sm min-h-10 w-full sm:max-w-md"
                 placeholder="Search product, SKU, or reason"
+                aria-label="Search adjustment history"
                 [formControl]="historySearch"
               />
               @if (historyVariantId()) {
@@ -471,8 +473,10 @@ export class StockAdjustmentsComponent implements OnInit {
 
   constructor() {
     effect(() => {
-      this.locations.activeId();
-      if (this.initialized) void this.reloadForLocation();
+      const activeId = this.locations.activeId();
+      // Track only the location; reloadForLocation reads/writes other signals
+      // (selected, historyVariantId, ...) which must not re-trigger this effect.
+      if (this.initialized && activeId) untracked(() => void this.reloadForLocation());
     });
     this.search.valueChanges
       .pipe(debounceTime(200), distinctUntilChanged(), takeUntilDestroyed())
@@ -588,7 +592,11 @@ export class StockAdjustmentsComponent implements OnInit {
   }
 
   protected validNewQuantity(): number | null {
-    const value = Number(this.newQuantity.value);
+    // Cleared number inputs yield null at runtime; Number(null) === 0 would
+    // mean "set stock to 0" — treat empty as invalid.
+    const raw = this.newQuantity.value as number | null;
+    if (raw === null || String(raw).trim() === '') return null;
+    const value = Number(raw);
     return Number.isFinite(value) && value >= 0 ? value : null;
   }
 

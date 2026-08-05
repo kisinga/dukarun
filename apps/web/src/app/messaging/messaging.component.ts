@@ -190,7 +190,7 @@ const STATUS_TYPE: Record<string, 'success' | 'warning' | 'error' | 'neutral'> =
         </div>
       </app-list-search-bar>
 
-      @if (filteredOutbox().length === 0) {
+      @if (!loading() && filteredOutbox().length === 0) {
         <app-empty-state
           [compact]="query().length > 0 || channelFilter() !== 'all' || statusFilter() !== 'all'"
           icon="heroBellSlash"

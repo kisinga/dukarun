@@ -1,4 +1,4 @@
-import { Component, computed, input, output, signal } from '@angular/core';
+import { Component, computed, input, output, signal, type SimpleChanges } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { parseKes } from '../../core/money';
 import { ButtonComponent } from '../../shared/ui/button.component';
@@ -412,8 +412,10 @@ export class CheckoutPanelComponent {
     this.reset();
   }
 
-  ngOnChanges(): void {
-    if (this.initialized) this.reset();
+  ngOnChanges(changes: SimpleChanges): void {
+    // Only a new total or method list warrants a reset — a `busy` toggle from
+    // the parent mid-submit must not wipe entered amounts.
+    if (this.initialized && (changes['total'] || changes['methods'])) this.reset();
   }
 
   private reset(): void {
@@ -522,16 +524,16 @@ export class CheckoutPanelComponent {
   protected readonly cashSuggestions = computed(() => {
     const total = this.total();
     const roundUp = (unit: number) => Math.ceil(total / unit) * unit;
-    const kenyanNotes = [5_000, 10_000, 20_000, 50_000, 100_000];
+    const kenyanNotes = [50, 100, 200, 500, 1_000];
 
     return [
       ...new Set([
         total,
-        roundUp(5_000),
-        roundUp(10_000),
+        roundUp(50),
+        roundUp(100),
         ...kenyanNotes.filter(note => note >= total),
-        roundUp(50_000),
-        roundUp(100_000),
+        roundUp(500),
+        roundUp(1_000),
       ]),
     ]
       .filter(amount => amount >= total)

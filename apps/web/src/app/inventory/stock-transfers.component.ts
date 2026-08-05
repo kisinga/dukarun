@@ -89,6 +89,9 @@ interface TransferLine {
                   [formControl]="search"
                 />
               </app-form-field>
+              @if (searchError()) {
+                <p class="mt-1 text-sm text-error">{{ searchError() }}</p>
+              }
               @if (results().length > 0) {
                 <div class="mt-2 max-h-56 overflow-auto rounded-box border border-base-300">
                   @for (variant of results(); track variant.variant_id) {
@@ -216,6 +219,7 @@ export class StockTransfersComponent implements OnInit {
   protected readonly search = new FormControl('', { nonNullable: true });
   protected readonly notes = new FormControl('', { nonNullable: true });
   protected readonly results = signal<Variant[]>([]);
+  protected readonly searchError = signal<string | null>(null);
   protected readonly lines = signal<TransferLine[]>([]);
   protected readonly history = signal<StockTransferListRow[]>([]);
   protected readonly loading = signal(false);
@@ -308,8 +312,10 @@ export class StockTransfersComponent implements OnInit {
     }
     try {
       this.results.set(await this.pos.searchVariants(query));
+      this.searchError.set(null);
     } catch {
       this.results.set([]);
+      this.searchError.set('Search failed — check your connection and try again.');
     }
   }
 

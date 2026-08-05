@@ -2,7 +2,7 @@ import { Component, ElementRef, computed, input, output, viewChild } from '@angu
 import { NgIcon } from '@ng-icons/core';
 
 export interface DeleteConfirmationData {
-  /** Name of the entity being removed (e.g. "Jiko Kiosk", "<tenant>"). */
+  /** Name of the entity being removed (e.g. "Jiko Kiosk", "Mama Fua Shop"). */
   entityName: string;
   /** Optional: count of related items affected (e.g. variants). */
   relatedCount?: number;

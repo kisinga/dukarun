@@ -40,7 +40,7 @@ import { IconComponent } from '../../shared/ui/icon.component';
       </button>
     </div>
 
-    @if (!cashierSession.isOpen()) {
+    @if (!cashierSession.canTakePayment()) {
       <app-session-required-notice action="recording an expense" />
     }
 
@@ -85,7 +85,7 @@ import { IconComponent } from '../../shared/ui/icon.component';
               appButton
               type="submit"
               [loading]="busy()"
-              [disabled]="!cashierSession.isOpen()"
+              [disabled]="!cashierSession.canTakePayment()"
             >
               Post expense
             </button>
@@ -101,7 +101,11 @@ import { IconComponent } from '../../shared/ui/icon.component';
     </div>
 
     <h2 class="section-title mb-2">Recent expenses</h2>
-    <app-journal-list [entries]="entries()" emptyText="No expenses posted yet." />
+    <app-journal-list
+      [entries]="entries()"
+      [loading]="loading()"
+      emptyText="No expenses posted yet."
+    />
   `,
 })
 export class MoneyExpensesComponent implements OnInit {

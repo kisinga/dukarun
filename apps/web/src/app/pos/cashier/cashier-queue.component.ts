@@ -131,7 +131,7 @@ import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
         <app-session-required-notice action="collecting payment from the cashier queue" />
       }
 
-      @if (parked().length === 0) {
+      @if (!loading() && parked().length === 0) {
         <app-empty-state
           [compact]="query().length > 0"
           icon="heroBanknotes"
@@ -461,7 +461,7 @@ export class CashierQueueComponent implements OnInit, OnDestroy {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'orders' },
-        () => void this.load()
+        () => void this.load(true)
       )
       .subscribe(status => this.live.set(status === 'SUBSCRIBED'));
   }
@@ -491,8 +491,9 @@ export class CashierQueueComponent implements OnInit, OnDestroy {
     this.searchTimer = setTimeout(() => void this.load(), 250);
   }
 
-  protected async load(): Promise<void> {
-    this.loading.set(true);
+  /** Silent reloads (realtime events) update the list without flashing the header spinner. */
+  protected async load(silent = false): Promise<void> {
+    if (!silent) this.loading.set(true);
     void this.orderQueueCounts.refresh();
     try {
       const result = await this.pos.ordersPage({

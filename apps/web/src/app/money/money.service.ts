@@ -140,13 +140,20 @@ export class MoneyService {
     page: number;
     pageSize: number;
     search?: string;
+    accountCode?: string;
     sourceType?: string;
     from?: string;
     to?: string;
   }): Promise<{ rows: JournalEntryWithLines[]; count: number }> {
-    let query = this.db
-      .from('ledger_journal_entries')
-      .select('*, ledger_journal_lines(*, ledger_accounts(code, name))', { count: 'exact' });
+    // Account filter needs inner joins so only entries touching that account
+    // match (and their embedded lines are that account's lines).
+    const select = input.accountCode
+      ? '*, ledger_journal_lines!inner(*, ledger_accounts!inner(code, name))'
+      : '*, ledger_journal_lines(*, ledger_accounts(code, name))';
+    let query = this.db.from('ledger_journal_entries').select(select, { count: 'exact' });
+    if (input.accountCode) {
+      query = query.eq('ledger_journal_lines.ledger_accounts.code', input.accountCode);
+    }
     if (input.search?.trim()) {
       const pattern = `%${input.search.trim().replace(/[%_,()]/g, ' ')}%`;
       query = query.or(`memo.ilike.${pattern},source_id.ilike.${pattern}`);

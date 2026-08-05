@@ -165,7 +165,7 @@ import { EmptyStateComponent } from '../shared/ui/empty-state.component';
         <app-stat-bar summary [stats]="teamStats()" />
       </app-list-search-bar>
 
-      @if (filteredMembers().length === 0) {
+      @if (!loading() && filteredMembers().length === 0) {
         <app-empty-state
           [compact]="true"
           icon="heroUsers"

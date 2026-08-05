@@ -38,27 +38,31 @@ export class OrderQueueCountsService implements OnDestroy {
   }
 
   async refresh(): Promise<void> {
-    // Keep the persisted status in sync before counting. The explicit expiry
-    // predicate below also keeps the badge correct if the sweep itself fails.
-    await this.db.rpc('expire_proformas');
-    const now = new Date().toISOString();
-    const locationId = this.locations.activeId();
-    let cashierQuery = this.db
-      .from('orders')
-      .select('id', { count: 'exact', head: true })
-      .eq('status', 'pending_payment');
-    let proformaQuery = this.db
-      .from('orders')
-      .select('id', { count: 'exact', head: true })
-      .eq('status', 'draft')
-      .gt('expires_at', now);
-    if (locationId) {
-      cashierQuery = cashierQuery.eq('location_id', locationId);
-      proformaQuery = proformaQuery.eq('location_id', locationId);
-    }
-    const [cashierQueue, proformas] = await Promise.all([cashierQuery, proformaQuery]);
+    try {
+      // Keep the persisted status in sync before counting. The explicit expiry
+      // predicate below also keeps the badge correct if the sweep itself fails.
+      await this.db.rpc('expire_proformas');
+      const now = new Date().toISOString();
+      const locationId = this.locations.activeId();
+      let cashierQuery = this.db
+        .from('orders')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'pending_payment');
+      let proformaQuery = this.db
+        .from('orders')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'draft')
+        .gt('expires_at', now);
+      if (locationId) {
+        cashierQuery = cashierQuery.eq('location_id', locationId);
+        proformaQuery = proformaQuery.eq('location_id', locationId);
+      }
+      const [cashierQueue, proformas] = await Promise.all([cashierQuery, proformaQuery]);
 
-    if (!cashierQueue.error) this.cashierQueue.set(cashierQueue.count ?? 0);
-    if (!proformas.error) this.proformas.set(proformas.count ?? 0);
+      if (!cashierQueue.error) this.cashierQueue.set(cashierQueue.count ?? 0);
+      if (!proformas.error) this.proformas.set(proformas.count ?? 0);
+    } catch {
+      // Offline or transient failure: keep the last counts; callers `void` this.
+    }
   }
 }

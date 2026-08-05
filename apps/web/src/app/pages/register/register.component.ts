@@ -21,7 +21,7 @@ import { SupabaseService } from '../../core/supabase.service';
               <input
                 type="text"
                 class="input input-bordered w-full"
-                placeholder="<tenant> Enterprises"
+                placeholder="Jiko Kiosk Enterprises"
                 [formControl]="companyName"
               />
             </label>
