@@ -100,7 +100,7 @@ npx supabase db push --db-url "postgresql://postgres:${PG_PASSWORD}@127.0.0.1:${
 
 if [ "$SYNC_FUNCTIONS" = "1" ]; then
   echo "→ syncing edge functions to ${SSH_HOST}:${FUNCTIONS_VOLUME}"
-  for fn in paystack-charge paystack-webhook notification-flush _shared; do
+  for fn in paystack-charge paystack-webhook notification-flush; do
     rsync -az --delete -e "ssh ${SSH_OPTS[*]}" \
       "supabase/functions/${fn}/" "${SSH_HOST}:${FUNCTIONS_VOLUME}/${fn}/"
   done
