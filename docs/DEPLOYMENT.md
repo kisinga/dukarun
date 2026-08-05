@@ -69,3 +69,17 @@ runners; deploy job on the self-hosted runner on the Coolify host
 - Do NOT run `supabase db reset` against production.
 - App deploys keep the previous container as `<name>-backup-<ts>`; prune old
   backups occasionally.
+
+## Backups
+
+Host cron runs `/opt/backups/backup-dukarun.sh` nightly at 00:17 UTC (03:17 EAT):
+custom-format `pg_dump` of the Supabase DB and (until cutover completes) the v1
+Vendure DB into `/opt/backups/`, restore-verified with `pg_restore --list`,
+14-day rotation, append log at `/opt/backups/backup.log`.
+
+- Manual run: `ssh <host> /opt/backups/backup-dukarun.sh`
+- Restore drill: `docker run --rm -v /opt/backups:/b postgres:17 pg_restore --list /b/<file>`
+  (verify), then restore into a scratch DB — never over the live one.
+- **Gap:** backups stay on the host. Add an offsite copy (object storage sync or a
+  scheduled pull) before the cutover bake ends — same-host backups don't survive
+  host loss.
