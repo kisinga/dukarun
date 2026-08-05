@@ -1,0 +1,49 @@
+# Coolify production compose — transitional v1 → v2.
+#
+# v2 apps serve the main domains; the v1 backend + storefront stay alive until
+# the v2 storefront ships (the public tenant shops depend on them).
+#
+# Domain mapping (set in Coolify per service):
+#   web          -> dukarun.com         (v2 dashboard, port 80)
+#   super-admin  -> admin.dukarun.com   (v2 platform admin, port 80)
+#   storefront   -> store./jutik.dukarun.com  (v1, port 4202)
+#   backend      -> vendure.dukarun.com (v1 API, port 3000 — v1 storefront's backend)
+#
+# SUPABASE_URL / SUPABASE_ANON_KEY must be set in the Coolify app env; the v1
+# services read their full config from the same env file (DB_*, REDIS_*, etc.).
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: apps/Dockerfile
+      args:
+        APP: web
+        SUPABASE_URL: ${SUPABASE_URL}
+        SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
+    restart: unless-stopped
+
+  super-admin:
+    build:
+      context: .
+      dockerfile: apps/Dockerfile
+      args:
+        APP: super-admin
+        SUPABASE_URL: ${SUPABASE_URL}
+        SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
+    restart: unless-stopped
+
+  # --- v1 remnants (delete this block at final decommission) ---
+  storefront:
+    build:
+      context: .
+      dockerfile: archive/vendure/storefront/Dockerfile
+    env_file: .env
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: archive/vendure/backend/Dockerfile
+    env_file: .env
+    restart: unless-stopped
