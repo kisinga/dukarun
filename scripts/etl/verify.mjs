@@ -462,6 +462,90 @@ for (const r of srcAr) {
 if (!srcAr.length) console.log('  (no AR in source)');
 
 // ---------------------------------------------------------------------------
+// 4b. supply side: purchases, lines, payments, movements + AP per supplier
+// ---------------------------------------------------------------------------
+console.log('\n--- supply-side tie-out ---');
+const migratableVariantOldIds = [...(maps.variant?.keys() ?? [])];
+
+const srcPurch = await S('select count(*)::int n from stock_purchase where "channelId"=$1', [
+  CHANNEL_ID,
+]);
+const tgtPurch = await T('select count(*)::int n from public.purchases where company_id=$1', [
+  companyId,
+]);
+await countCheck('purchases', srcPurch[0].n, tgtPurch[0].n);
+
+const srcPL = await S(
+  `select count(*)::int n from stock_purchase_line l join stock_purchase p on p.id=l."purchaseId"
+   where p."channelId"=$1 and l."variantId"::text = any($2::text[])`,
+  [CHANNEL_ID, migratableVariantOldIds]
+);
+const tgtPL = await T('select count(*)::int n from public.purchase_lines where company_id=$1', [
+  companyId,
+]);
+await countCheck('purchase_lines', srcPL[0].n, tgtPL[0].n, 'lines with unmapped variants skipped');
+
+const srcPP = await S('select count(*)::int n from purchase_payment where "channelId"=$1', [
+  CHANNEL_ID,
+]);
+const tgtPP = await T('select count(*)::int n from public.purchase_payments where company_id=$1', [
+  companyId,
+]);
+await countCheck('purchase_payments', srcPP[0].n, tgtPP[0].n);
+
+const srcMv = await S(
+  `select count(*)::int n from inventory_movement
+   where "channelId"=$1 and "productVariantId"::text = any($2::text[])`,
+  [CHANNEL_ID, migratableVariantOldIds]
+);
+const tgtMv = await T(
+  'select count(*)::int n from public.inventory_movements where company_id=$1',
+  [companyId]
+);
+await countCheck(
+  'inventory_movements',
+  srcMv[0].n,
+  tgtMv[0].n,
+  'movements with unmapped variants skipped'
+);
+
+// AP per supplier: liability balance = credit - debit on ACCOUNTS_PAYABLE,
+// grouped by meta.supplierId on both sides (source cents -> /100).
+const srcAp = await S(
+  `select l.meta->>'supplierId' sid, coalesce(sum(l.credit - l.debit),0)::text bal
+   from ledger_journal_line l join ledger_account a on a.id=l."accountId"
+   where l."channelId"=$1 and a.code='ACCOUNTS_PAYABLE' and l.meta ? 'supplierId'
+   group by 1`,
+  [CHANNEL_ID]
+);
+const tgtApRows = await T(
+  `select l.meta->>'supplierId' sid, coalesce(sum(l.credit - l.debit),0)::text bal
+   from public.ledger_journal_lines l join public.ledger_accounts a on a.id=l.account_id
+   where l.company_id=$1 and a.code='ACCOUNTS_PAYABLE' and l.meta ? 'supplierId'
+   group by 1`,
+  [companyId]
+);
+const tgtAp = new Map(tgtApRows.map(r => [r.sid, Number(r.bal)]));
+let apMismatch = 0;
+for (const r of srcAp) {
+  const newSid = maps.customer?.get(String(r.sid));
+  const t = newSid ? (tgtAp.get(newSid) ?? 0) : null;
+  const expected = Math.round(Number(r.bal) / 100);
+  // AP carries the known rounding drift (see account-balance check): tolerate
+  // up to 3 shillings, print the deviation.
+  const dev = t == null ? null : t - expected;
+  if (dev !== 0)
+    console.log(`  note: supplier ${r.sid} AP dev ${dev} (src/100=${expected} tgt=${t})`);
+  const good = t !== null && Math.abs(dev) <= 3;
+  if (!good) apMismatch++;
+  console.log(
+    `  ${good ? 'PASS' : 'FAIL'}  supplier ${r.sid}: src AP=${expected} tgt AP=${t ?? '(unmapped)'}`
+  );
+  if (!good) failures++;
+}
+if (!srcAp.length) console.log('  (no AP in source)');
+
+// ---------------------------------------------------------------------------
 // 5. rule-violation warnings (source rows the new system would reject)
 // ---------------------------------------------------------------------------
 console.log('\n--- warnings ---');

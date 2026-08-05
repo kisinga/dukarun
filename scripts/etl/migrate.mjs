@@ -518,23 +518,37 @@ try {
       }
       userMap.set(key, authId);
     }
-    // roles: get-or-create by (company_id, name)
+    // roles: get-or-create by (company_id, name); on re-runs, top up the
+    // template-managed roles' permissions (audit/staff/commissions were added
+    // after the first prod import) without touching custom roles.
     async function ensureRole(name, permissions) {
       if (DRY) return crypto.randomUUID();
-      const f = await tgt.query('select id from public.roles where company_id=$1 and name=$2', [
-        companyId,
-        name,
-      ]);
-      if (f.rows.length) return f.rows[0].id;
+      const f = await tgt.query(
+        'select id, permissions from public.roles where company_id=$1 and name=$2',
+        [companyId, name]
+      );
+      if (f.rows.length) {
+        const missing = permissions.filter(p => !f.rows[0].permissions.includes(p));
+        if (missing.length && ['Admin', 'Cashier'].includes(name)) {
+          await tgt.query('update public.roles set permissions=$2 where id=$1', [
+            f.rows[0].id,
+            [...f.rows[0].permissions, ...missing],
+          ]);
+          warn(`role '${name}': added permissions ${missing.join(', ')}`);
+        }
+        return f.rows[0].id;
+      }
       const { rows } = await tgt.query(
         'insert into public.roles (company_id, name, permissions) values ($1,$2,$3) returning id',
         [companyId, name, permissions]
       );
       return rows[0].id;
     }
-    // The full 14-permission set (0016 added ManageTeam) — same as the
-    // 'Admin' role template and provision_company.
-    const ALL_PERMS = [
+    // Admin gets ALL permissions the schema allows (parsed from the roles
+    // check constraint) — independent of any role-name mapping, and future
+    // permissions flow to migrated Admins automatically. Hardcoded fallback
+    // for dry runs / older schemas.
+    const FALLBACK_PERMS = [
       'ManageApprovals',
       'OverridePrice',
       'ManageStockAdjustments',
@@ -549,7 +563,20 @@ try {
       'CloseAccountingPeriod',
       'CreateInterAccountTransfer',
       'ManageTeam',
+      'ViewAuditTrail',
+      'ViewStaffPerformance',
+      'ManageCommissions',
     ];
+    let ALL_PERMS = FALLBACK_PERMS;
+    if (!DRY) {
+      const { rows: pc } = await tgt.query(
+        `select pg_get_constraintdef(oid) as def from pg_constraint
+         where conrelid='public.roles'::regclass and contype='c'
+           and pg_get_constraintdef(oid) like '%permissions <@%'`
+      );
+      const parsed = [...(pc[0]?.def ?? '').matchAll(/'([^']+)'::text/g)].map(m => m[1]);
+      if (parsed.length) ALL_PERMS = parsed;
+    }
     const adminRoleId = members.length ? await ensureRole('Admin', ALL_PERMS) : null;
     const cashierRoleId = members.length > 1 ? await ensureRole('Cashier', ['SettleOrder']) : null;
 
@@ -1624,6 +1651,265 @@ try {
       );
       se.inserted = c[0].entries;
       sl.inserted = c[0].lines + c[0].doubles;
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // 9b. purchases + lines + payments — supply side. Additive: rows are
+  // idempotent via etl_id_map, so re-runs only pick up new v1 activity
+  // (live-ops syncs; no teardown needed for these tables).
+  // -------------------------------------------------------------------------
+  {
+    const sp = stat('purchases');
+    const spl = stat('purchase_lines');
+    const spp = stat('purchase_payments');
+    const mappedV2 = await mapAll(companyId, 'variant');
+    const batchMap2 = await mapAll(companyId, 'batch');
+    const custMap2 = await mapAll(companyId, 'customer');
+    let mainLocId = null;
+    if (!DRY) {
+      const { rows: ml } = await tgt.query(
+        "select id from public.stock_locations where company_id=$1 and code='MAIN'",
+        [companyId]
+      );
+      mainLocId = ml[0]?.id ?? null;
+    }
+
+    const { rows: purchases } = await src.query(
+      'select * from stock_purchase where "channelId"=$1 order by id',
+      [channel.id]
+    );
+    for (const p of purchases) {
+      const key = String(p.id);
+      let purchaseId = await mapGet(companyId, 'purchase', key);
+      if (purchaseId) sp.existing++;
+      else if (DRY) {
+        sp.inserted++;
+        purchaseId = crypto.randomUUID();
+      } else {
+        const supplierId =
+          p.supplierId != null ? (custMap2.get(String(p.supplierId)) ?? null) : null;
+        if (p.supplierId != null && !supplierId)
+          warn(`purchase ${p.id}: supplier ${p.supplierId} not migrated; supplier_id null`);
+        const { rows } = await tgt.query(
+          `insert into public.purchases (
+             company_id, supplier_id, reference, total_cost, is_credit, created_by,
+             created_at, purchase_date, notes, stock_location_id
+           ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) returning id`,
+          [
+            companyId,
+            supplierId,
+            p.referenceNumber ?? null,
+            M(p.totalCost),
+            p.isCreditPurchase ?? false,
+            firstMemberAuthId,
+            p.createdAt,
+            p.purchaseDate ?? p.createdAt,
+            p.notes ?? null,
+            mainLocId,
+          ]
+        );
+        purchaseId = rows[0].id;
+        await mapPut(companyId, 'purchase', key, purchaseId);
+        sp.inserted++;
+      }
+
+      const { rows: lines } = await src.query(
+        'select * from stock_purchase_line where "purchaseId"=$1 order by id',
+        [p.id]
+      );
+      for (const l of lines) {
+        const lKey = String(l.id);
+        if (await mapGet(companyId, 'purchase_line', lKey)) {
+          spl.existing++;
+          continue;
+        }
+        if (DRY) {
+          spl.inserted++;
+          continue;
+        }
+        const variantId = mappedV2.get(String(l.variantId));
+        if (!variantId) {
+          warn(`purchase line ${l.id}: variant ${l.variantId} not migrated; line skipped`);
+          spl.skipped++;
+          continue;
+        }
+        // link the line to its migrated batch (variant + this purchase as source)
+        let lineBatchId = null;
+        const { rows: b } = await src.query(
+          `select id from inventory_batch
+           where "productVariantId"=$1 and "sourceType"='Purchase' and "sourceId"=$2
+           order by "createdAt" limit 1`,
+          [l.variantId, String(p.id)]
+        );
+        if (b[0]) lineBatchId = batchMap2.get(String(b[0].id)) ?? null;
+        const { rows: ins } = await tgt.query(
+          `insert into public.purchase_lines (
+             company_id, purchase_id, variant_id, inventory_batch_id,
+             quantity, unit_cost, line_total, created_at
+           ) values ($1,$2,$3,$4,$5,$6,$7,$8) returning id`,
+          [
+            companyId,
+            purchaseId,
+            variantId,
+            lineBatchId,
+            l.quantity,
+            M(l.unitCost),
+            M(l.totalCost),
+            p.createdAt,
+          ]
+        );
+        await mapPut(companyId, 'purchase_line', lKey, ins[0].id);
+        spl.inserted++;
+      }
+    }
+
+    const ACCOUNT_FOR = { cash: 'CASH_ON_HAND', bank: 'BANK_MAIN', mpesa: 'MPESA' };
+    const { rows: ppays } = await src.query(
+      'select * from purchase_payment where "channelId"=$1 order by id',
+      [channel.id]
+    );
+    const purchaseMap = await mapAll(companyId, 'purchase');
+    for (const pp of ppays) {
+      const key = String(pp.id);
+      if (await mapGet(companyId, 'purchase_payment', key)) {
+        spp.existing++;
+        continue;
+      }
+      if (DRY) {
+        spp.inserted++;
+        continue;
+      }
+      const purchaseId =
+        pp.purchaseId != null ? (purchaseMap.get(String(pp.purchaseId)) ?? null) : null;
+      if (pp.purchaseId != null && !purchaseId) {
+        warn(`purchase_payment ${pp.id}: purchase ${pp.purchaseId} not migrated; skipped`);
+        spp.skipped++;
+        continue;
+      }
+      const account = ACCOUNT_FOR[pp.method] ?? null;
+      if (!account)
+        warn(`purchase_payment ${pp.id}: unknown method '${pp.method}' -> account null`);
+      const { rows: ins } = await tgt.query(
+        `insert into public.purchase_payments (company_id, purchase_id, amount, account_code, created_by, created_at)
+         values ($1,$2,$3,$4,$5,$6) returning id`,
+        [
+          companyId,
+          purchaseId,
+          M(pp.amount),
+          account,
+          firstMemberAuthId,
+          pp.paidAt ?? pp.createdAt ?? null,
+        ]
+      );
+      await mapPut(companyId, 'purchase_payment', key, ins[0].id);
+      spp.inserted++;
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // 9c. inventory movements — full stock history (sales consumption, purchase
+  // receipts, adjustments, opening stock, reversals). Also covers the v1
+  // stock_adjustment entities (sourceType='StockAdjustment').
+  // -------------------------------------------------------------------------
+  {
+    const sm = stat('inventory_movements');
+    const mappedV2 = await mapAll(companyId, 'variant');
+    const batchMap2 = await mapAll(companyId, 'batch');
+    let mainLocId = null;
+    if (!DRY) {
+      const { rows: ml } = await tgt.query(
+        "select id from public.stock_locations where company_id=$1 and code='MAIN'",
+        [companyId]
+      );
+      mainLocId = ml[0]?.id ?? null;
+    }
+    const TYPE = { SALE: 'sale', PURCHASE: 'purchase', ADJUSTMENT: 'adjustment' };
+    // Adjustment actors: movement.sourceId -> inventory_stock_adjustment.id
+    // -> adjustedByUserId (v1 user id, remapped below).
+    const { rows: adjUsers } = await src.query(
+      'select id, "adjustedByUserId" from inventory_stock_adjustment where "channelId"=$1',
+      [channel.id]
+    );
+    const adjUserById = new Map(adjUsers.map(a => [String(a.id), a.adjustedByUserId]));
+    const { rows: mvts } = await src.query(
+      'select * from inventory_movement where "channelId"=$1 order by id',
+      [channel.id]
+    );
+    for (const m of mvts) {
+      const key = String(m.id);
+      const actorFor = () => {
+        if (m.sourceType === 'StockAdjustment') {
+          const v1User = adjUserById.get(String(m.sourceId));
+          if (v1User != null) {
+            const mapped = mapUser(v1User);
+            if (mapped) return mapped;
+            warn(`movement ${m.id}: adjustedBy user ${v1User} not migrated; actor = first admin`);
+          }
+        }
+        return firstMemberAuthId;
+      };
+      const existingId = await mapGet(companyId, 'movement', key);
+      if (existingId) {
+        sm.existing++;
+        // Retroactive actor fix: adjustments inserted before the mapping existed
+        // got the first admin; correct them on re-run.
+        if (m.sourceType === 'StockAdjustment' && !DRY) {
+          const actor = actorFor();
+          await tgt.query(
+            `update public.inventory_movements set actor=$1 where id=$2 and actor is distinct from $1`,
+            [actor, existingId]
+          );
+        }
+        continue;
+      }
+      if (DRY) {
+        sm.inserted++;
+        continue;
+      }
+      const variantId = mappedV2.get(String(m.productVariantId));
+      if (!variantId) {
+        warn(`movement ${m.id}: variant ${m.productVariantId} not migrated; skipped`);
+        sm.skipped++;
+        continue;
+      }
+      const type = m.sourceType === 'OrderReversal' ? 'reversal' : TYPE[m.movementType];
+      if (!type) {
+        warn(`movement ${m.id}: unknown type '${m.movementType}'; skipped`);
+        sm.skipped++;
+        continue;
+      }
+      const batchId = m.batchId ? (batchMap2.get(String(m.batchId)) ?? null) : null;
+      const meta = {
+        v1_id: m.id,
+        ...(m.metadata ?? {}),
+        ...(m.orderLineId ? { v1_orderLineId: m.orderLineId } : {}),
+        ...(m.batchId && !batchId ? { v1_batch_id: m.batchId } : {}),
+        ...(m.reversesMovementId ? { v1_reverses: m.reversesMovementId } : {}),
+      };
+      const { rows: ins } = await tgt.query(
+        `insert into public.inventory_movements (
+           company_id, batch_id, type, quantity, unit_cost, total_cost,
+           source_type, source_id, meta, variant_id, actor, stock_location_id, created_at
+         ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) returning id`,
+        [
+          companyId,
+          batchId,
+          type,
+          m.quantity,
+          M(m.unitCostCents),
+          M(m.totalCostCents),
+          m.sourceType,
+          String(m.sourceId ?? ''),
+          JSON.stringify(meta),
+          variantId,
+          actorFor(),
+          mainLocId,
+          m.createdAt,
+        ]
+      );
+      await mapPut(companyId, 'movement', key, ins[0].id);
+      sm.inserted++;
     }
   }
 
