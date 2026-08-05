@@ -57,8 +57,8 @@ deploy_one() {
   local anon_key; anon_key=$(fetch_anon_key)
   [ -n "$anon_key" ] || { echo "✗ could not read SERVICE_SUPABASEANON_KEY from host" >&2; exit 1; }
 
-  echo "▶ [$app] building image"
-  docker build -f apps/Dockerfile \
+  echo "▶ [$app] building image (linux/amd64)"
+  docker build --platform linux/amd64 -f apps/Dockerfile \
     --build-arg "APP=$app" \
     --build-arg "SUPABASE_URL=$SUPABASE_URL" \
     --build-arg "SUPABASE_ANON_KEY=$anon_key" \

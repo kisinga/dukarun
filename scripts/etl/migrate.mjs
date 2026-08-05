@@ -125,17 +125,32 @@ async function mapPut(companyId, type, oldId, newId) {
 async function supaApi(pathname, init = {}, attempt = 0) {
   if (!SUPABASE_SERVICE_ROLE_KEY)
     throw new Error('SUPABASE_SERVICE_ROLE_KEY env required (local: `npx supabase status -o env`)');
-  const res = await fetch(SUPABASE_URL + pathname, {
-    ...init,
-    headers: {
-      apikey: SUPABASE_SERVICE_ROLE_KEY,
-      authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-      ...(init.body && !init.headers?.['content-type']
-        ? { 'content-type': 'application/json' }
-        : {}),
-      ...(init.headers ?? {}),
-    },
-  });
+  let res;
+  try {
+    res = await fetch(SUPABASE_URL + pathname, {
+      ...init,
+      headers: {
+        apikey: SUPABASE_SERVICE_ROLE_KEY,
+        authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        ...(init.body && !init.headers?.['content-type']
+          ? { 'content-type': 'application/json' }
+          : {}),
+        ...(init.headers ?? {}),
+      },
+    });
+  } catch (err) {
+    // Transient network failure (ETIMEDOUT, ECONNRESET, EHOSTUNREACH...) —
+    // safe to retry: user creation resolves conflicts via lookup afterwards.
+    if (attempt < 5) {
+      const wait = 1000 * 2 ** attempt;
+      console.log(
+        `  WARN: Supabase API network error (${err.cause?.code ?? err.message}); retrying in ${wait}ms`
+      );
+      await new Promise(r => setTimeout(r, wait));
+      return supaApi(pathname, init, attempt + 1);
+    }
+    throw err;
+  }
   if (res.status === 429 && attempt < 5) {
     const wait = 1000 * 2 ** attempt;
     console.log(`  WARN: Supabase API rate-limited (429); retrying in ${wait}ms`);
@@ -1192,7 +1207,11 @@ try {
           spay.skipped++;
           continue;
         }
-        const method = String(p.method).replace(/-\d+$/, '');
+        // v1 method spellings vary across channels: strip the channel suffix
+        // (mpesa-10 -> mpesa) and alias variants (cash-payment -> cash).
+        const METHOD_ALIASES = { 'cash-payment': 'cash', 'mpesa-payment': 'mpesa' };
+        const rawMethod = String(p.method).replace(/-\d+$/, '');
+        const method = METHOD_ALIASES[rawMethod] ?? rawMethod;
         if (!['cash', 'mpesa', 'bank', 'credit'].includes(method)) {
           warn(`payment ${p.id}: unknown method '${p.method}' -> kept as '${method}'`);
         }
@@ -1386,6 +1405,14 @@ try {
     const orderSession = new Map(); // new order uuid -> new session uuid (backfill)
 
     if (!DRY) {
+      // The squashed schema's enforce_journal_entry_cashier_session trigger
+      // demands an OPEN session for operational entry types — historical data
+      // has only closed ones. Temporarily disarm it at the company level for
+      // the ledger insert, then restore (same transaction, so the migrated
+      // value is what commits).
+      await tgt.query('update public.companies set cash_control_enabled=false where id=$1', [
+        companyId,
+      ]);
       const { rows: entries } = await src.query(
         'select * from ledger_journal_entry where "channelId"=$1 order by "postedAt", id',
         [channel.id]
@@ -1526,6 +1553,13 @@ try {
           [sid, oid]
         );
       }
+
+      // restore the migrated cash-control setting (temporarily disarmed for
+      // the ledger insert — see above)
+      await tgt.query('update public.companies set cash_control_enabled=$2 where id=$1', [
+        companyId,
+        channel.customFieldsCashcontrolenabled ?? true,
+      ]);
     } else {
       const { rows: c } = await src.query(
         `select (select count(*)::int from ledger_journal_entry where "channelId"=$1) as entries,
