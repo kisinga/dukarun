@@ -80,6 +80,9 @@ export class PersonaSwitcherComponent {
     this.switching.set(true);
     this.error.set(null);
     try {
+      // Clear any active session first; gotrue-js behavior when calling
+      // signInWithOtp over an existing session varies.
+      await this.supabase.client.auth.signOut();
       const { error: otpError } = await this.supabase.client.auth.signInWithOtp({
         phone: persona.phone,
       });

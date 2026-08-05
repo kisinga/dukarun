@@ -22,6 +22,8 @@ export interface OutboxEntry extends ScopedRecord {
   customer_id: string | null;
   lines: SaleLineInput[];
   payments: PaymentInput[];
+  /** Proforma being converted — passed as p_draft_id on replay so it retires with the sale. */
+  draft_id?: string | null;
   queued_at: string; // ISO
   status: 'queued' | 'failed';
   /** Server rejection message (P0001) when status is 'failed'. */

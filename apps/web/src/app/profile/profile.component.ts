@@ -170,7 +170,9 @@ export class ProfileComponent implements OnInit {
     this.error.set(null);
     try {
       await this.profile.updateMyProfile({ avatarPath: '' });
-      await this.profile.removeAvatar(path);
+      // Best-effort: the profile no longer references the file, so a storage
+      // failure only leaves a harmless orphan, not inconsistent state.
+      await this.profile.removeAvatar(path).catch(() => {});
       this.avatarPath.set(null);
       this.notice.set('Photo removed');
     } catch (err) {
@@ -199,7 +201,13 @@ export class ProfileComponent implements OnInit {
       if (photo) {
         const previousPath = this.avatarPath();
         const path = await this.profile.uploadAvatar(companyId, photo.blob, photo.ext);
-        await this.profile.updateMyProfile({ displayName: name, avatarPath: path });
+        try {
+          await this.profile.updateMyProfile({ displayName: name, avatarPath: path });
+        } catch (err) {
+          // Best-effort: don't orphan the just-uploaded object if the RPC failed.
+          await this.profile.removeAvatar(path).catch(() => {});
+          throw err;
+        }
         if (previousPath) await this.profile.removeAvatar(previousPath);
         this.avatarPath.set(path);
         this.pendingPhoto.set(null);

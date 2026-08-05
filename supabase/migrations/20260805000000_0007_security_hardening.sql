@@ -1161,7 +1161,7 @@ end;
 $function$;
 
 revoke execute on function public.settle_order(uuid, jsonb, text) from anon, public;
-grant execute on function public.settle_order(uuid, jsonb, text) to authenticated, service_role;
+grant execute on function public.settle_order(uuid, jsonb, text) to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- post_sale gains p_draft_id: when a sale is completed from a loaded
@@ -1259,7 +1259,7 @@ end;
 $function$;
 
 revoke execute on function public.post_sale(uuid, jsonb, jsonb, boolean, text, uuid) from anon, public;
-grant execute on function public.post_sale(uuid, jsonb, jsonb, boolean, text, uuid) to authenticated, service_role;
+grant execute on function public.post_sale(uuid, jsonb, jsonb, boolean, text, uuid) to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- post_sale_at_location: pass p_draft_id through to post_sale, and close an
@@ -1361,7 +1361,7 @@ end;
 $function$;
 
 revoke execute on function public.post_sale_at_location(uuid, uuid, jsonb, jsonb, boolean, text, uuid) from anon, public;
-grant execute on function public.post_sale_at_location(uuid, uuid, jsonb, jsonb, boolean, text, uuid) to authenticated, service_role;
+grant execute on function public.post_sale_at_location(uuid, uuid, jsonb, jsonb, boolean, text, uuid) to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- Ledger immutability. Nothing blocked UPDATE/DELETE on posted journal
@@ -1537,6 +1537,10 @@ begin
   if p_end_date is null or p_end_date > (now() at time zone 'Africa/Nairobi')::date then
     raise exception 'invalid_period_end: cannot close a future period';
   end if;
+
+  -- Serialize first-time closes: with no period_locks row yet the for update
+  -- below locks nothing, so also take an advisory lock keyed on company/period.
+  perform pg_advisory_xact_lock(hashtext(v_company_id::text || ':' || p_end_date::text));
 
   select * into v_lock from public.period_locks where company_id = v_company_id
   for update;

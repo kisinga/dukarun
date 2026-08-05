@@ -11,3 +11,11 @@ export const authGuard: CanActivateFn = async () => {
   supabase.session.set(data.session);
   return data.session ? true : router.createUrlTree(['/login']);
 };
+
+export const guestGuard: CanActivateFn = async () => {
+  const supabase = inject(SupabaseService);
+  const router = inject(Router);
+  const { data } = await supabase.client.auth.getSession();
+  supabase.session.set(data.session);
+  return data.session ? router.createUrlTree(['/dashboard']) : true;
+};

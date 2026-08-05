@@ -81,4 +81,4 @@ end;
 $$;
 
 revoke execute on function public.update_team_member(uuid, uuid, text) from anon, public;
-grant execute on function public.update_team_member(uuid, uuid, text) to authenticated, service_role;
+grant execute on function public.update_team_member(uuid, uuid, text) to authenticated;

@@ -132,6 +132,17 @@ Deno.serve(async req => {
   let failed = 0;
 
   for (const row of rows) {
+    // A crash between claim and send burns an attempt without reaching the
+    // catch path, so a row can arrive here already exhausted; fail it instead
+    // of re-claiming it forever.
+    if (row.attempts >= MAX_ATTEMPTS) {
+      await db
+        .from('outbox')
+        .update({ status: 'failed', attempts: row.attempts + 1, error: 'max_attempts_exceeded' })
+        .eq('id', row.id);
+      failed++;
+      continue;
+    }
     try {
       if (row.channel === 'sms') await sendSms(row.recipient, row.body);
       else if (row.channel === 'whatsapp') await sendWhatsapp(row.recipient, row.body);

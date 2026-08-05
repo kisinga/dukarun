@@ -130,7 +130,8 @@ export class SyncService {
             entry.payments,
             false,
             entry.client_ref,
-            entry.location_id
+            entry.location_id,
+            entry.draft_id ?? undefined
           );
           await db.delete('outbox', entry.client_ref);
           posted++;

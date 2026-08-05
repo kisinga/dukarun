@@ -587,6 +587,11 @@ export class PosService {
     return data;
   }
 
+  /** Variants with stock resolved for the active location (proforma load checks). */
+  async variantsByIdsWithStock(ids: string[]): Promise<Variant[]> {
+    return this.withLocationStock(await this.variantsByIds(ids));
+  }
+
   async variantById(id: string): Promise<Variant | null> {
     const rows = await this.variantsByIds([id]);
     return (await this.withLocationStock(rows))[0] ?? null;

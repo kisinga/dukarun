@@ -34,6 +34,19 @@ import {
   variantLabel,
 } from '../pos.service';
 
+/** One load-time proforma warning (see loadDraft). All numeric fields are
+ *  kind-specific; unused ones stay 0. */
+interface DraftFlag {
+  kind: 'price' | 'override' | 'override-blocked' | 'stock' | 'unavailable';
+  label: string;
+  was: number;
+  now: number;
+  overridePrice: number;
+  available: number;
+  needed: number;
+  count: number;
+}
+
 @Component({
   selector: 'app-sell',
   imports: [
@@ -170,6 +183,52 @@ import {
               [iconOnly]="true"
               aria-label="Dismiss notice"
               (click)="notice.set(null)"
+            >
+              <app-icon name="heroXMark" />
+            </button>
+          </div>
+        }
+        @if (cart.draftId() && draftFlags().length > 0 && !draftFlagsDismissed()) {
+          <div class="alert alert-warning mb-4 py-3" role="status">
+            <app-icon name="heroExclamationTriangle" />
+            <div class="flex flex-col gap-1">
+              <span class="font-semibold">This proforma changed since it was saved</span>
+              @for (flag of draftFlags(); track $index) {
+                <span class="text-sm">
+                  @switch (flag.kind) {
+                    @case ('price') {
+                      {{ flag.label }} — quoted <app-money [amount]="flag.was" />, now
+                      <app-money [amount]="flag.now" />
+                    }
+                    @case ('override') {
+                      {{ flag.label }} — list was <app-money [amount]="flag.was" />, now
+                      <app-money [amount]="flag.now" /> (override
+                      <app-money [amount]="flag.overridePrice" /> kept)
+                    }
+                    @case ('override-blocked') {
+                      {{ flag.label }} — override <app-money [amount]="flag.overridePrice" /> needs
+                      a manager (list now <app-money [amount]="flag.now" />) — checkout will be
+                      rejected
+                    }
+                    @case ('stock') {
+                      {{ flag.label }} — only {{ flag.available }} in stock, proforma needs
+                      {{ flag.needed }}
+                    }
+                    @case ('unavailable') {
+                      {{ flag.count }} {{ flag.count === 1 ? 'line is' : 'lines are' }} no longer
+                      available and were skipped
+                    }
+                  }
+                </span>
+              }
+            </div>
+            <button
+              appButton
+              variant="ghost"
+              size="sm"
+              [iconOnly]="true"
+              aria-label="Dismiss proforma warnings"
+              (click)="draftFlagsDismissed.set(true)"
             >
               <app-icon name="heroXMark" />
             </button>
@@ -799,6 +858,13 @@ export class SellComponent implements OnInit {
   protected readonly busy = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
+  /**
+   * Load-time warnings for a proforma being edited: price drift since it was
+   * saved, overrides this user cannot keep, stock shortfalls, dropped lines.
+   * Shown only while a proforma is loaded (cart.draftId set).
+   */
+  protected readonly draftFlags = signal<DraftFlag[]>([]);
+  protected readonly draftFlagsDismissed = signal(false);
   protected readonly success = signal<{
     text: string;
     tone: 'success' | 'warning';
@@ -1140,18 +1206,34 @@ export class SellComponent implements OnInit {
     try {
       // Completing from a loaded proforma: pass the draft id so the backend
       // retires it in the same transaction as the sale — no separate delete
-      // call that could be lost (offline-queued sales still settle the
-      // proforma separately, since they cannot use this path).
+      // call that could be lost. Offline-queued sales carry the draft id in
+      // the outbox entry and use the same mechanism on replay.
       const completedDraftId = this.cart.draftId() ?? undefined;
-      const result = await this.pos.postSale(
-        customerId,
-        lines,
-        payments,
-        false,
-        clientRef,
-        undefined,
-        completedDraftId
-      );
+      let result;
+      try {
+        result = await this.pos.postSale(
+          customerId,
+          lines,
+          payments,
+          false,
+          clientRef,
+          undefined,
+          completedDraftId
+        );
+      } catch (err) {
+        // The loaded proforma expired or was retired on another device: drop
+        // the link and retry once as a plain sale. The same client_ref keeps
+        // the retry idempotent if the first attempt somehow committed.
+        if (
+          !completedDraftId ||
+          !(err instanceof PosRpcError) ||
+          !err.message.startsWith('draft_not_found')
+        ) {
+          throw err;
+        }
+        this.cart.draftId.set(null);
+        result = await this.pos.postSale(customerId, lines, payments, false, clientRef);
+      }
       this.checkoutOpen.set(false);
       this.cart.clear();
       this.selectedCustomer.set(null);
@@ -1198,7 +1280,10 @@ export class SellComponent implements OnInit {
     payments: PaymentInput[],
     clientRef: string
   ): Promise<void> {
-    await this.sync.enqueue({ customer_id: customerId, lines, payments }, clientRef);
+    await this.sync.enqueue(
+      { customer_id: customerId, lines, payments, draft_id: this.cart.draftId() },
+      clientRef
+    );
     this.checkoutOpen.set(false);
     this.cart.clear();
     this.selectedCustomer.set(null);
@@ -1282,6 +1367,8 @@ export class SellComponent implements OnInit {
   }
 
   private async loadDraft(orderId: string): Promise<void> {
+    this.draftFlags.set([]);
+    this.draftFlagsDismissed.set(false);
     try {
       const order = await this.pos.getOrder(orderId);
       if (order.status !== 'draft') {
@@ -1289,22 +1376,97 @@ export class SellComponent implements OnInit {
         return;
       }
       const lines = await this.pos.orderLines(orderId);
-      const variants = await this.pos.variantsByIds(lines.map(line => line.variant_id));
+      // Location-resolved stock so the shortfall flags match what the server
+      // will enforce at completion.
+      const variants = await this.pos.variantsByIdsWithStock(lines.map(line => line.variant_id));
       const byId = new Map(variants.map(variant => [variant.variant_id, variant]));
+      const flags: DraftFlag[] = [];
+      let unavailable = 0;
       this.cart.clear();
       for (const savedLine of lines) {
         const variant = byId.get(savedLine.variant_id);
-        if (!variant) continue;
+        if (!variant) {
+          unavailable++;
+          continue;
+        }
+        const label = variantLabel(variant);
+        const was = Number(savedLine.unit_price);
+        const now = variant.price ?? 0;
+        const override = savedLine.custom_price;
+        // The server rejects a custom_price that differs from the CURRENT list
+        // price when the user lacks OverridePrice — flag it now, not at checkout.
+        const blocked = override !== null && override !== now && !this.canOverridePrices();
+        if (blocked) {
+          flags.push({
+            kind: 'override-blocked',
+            label,
+            was,
+            now,
+            overridePrice: override ?? 0,
+            available: 0,
+            needed: 0,
+            count: 0,
+          });
+        } else if (was !== now && override !== null) {
+          flags.push({
+            kind: 'override',
+            label,
+            was,
+            now,
+            overridePrice: override,
+            available: 0,
+            needed: 0,
+            count: 0,
+          });
+        } else if (was !== now) {
+          flags.push({
+            kind: 'price',
+            label,
+            was,
+            now,
+            overridePrice: 0,
+            available: 0,
+            needed: 0,
+            count: 0,
+          });
+        }
+        const needed = Number(savedLine.quantity);
+        const available = Number(variant.stock ?? 0);
+        if (variant.track_inventory && available < needed) {
+          flags.push({
+            kind: 'stock',
+            label,
+            was: 0,
+            now: 0,
+            overridePrice: 0,
+            available,
+            needed,
+            count: 0,
+          });
+        }
         this.cart.addVariant(variant);
-        this.cart.setQuantity(variant.variant_id!, Number(savedLine.quantity));
-        if (savedLine.custom_price !== null) {
+        this.cart.setQuantity(variant.variant_id!, needed);
+        if (override !== null) {
           this.cart.setCustomPrice(
             variant.variant_id!,
-            savedLine.custom_price,
+            override,
             savedLine.price_override_reason ?? ''
           );
         }
       }
+      if (unavailable > 0) {
+        flags.push({
+          kind: 'unavailable',
+          label: '',
+          was: 0,
+          now: 0,
+          overridePrice: 0,
+          available: 0,
+          needed: 0,
+          count: unavailable,
+        });
+      }
+      this.draftFlags.set(flags);
       if (order.customer_id && order.customers) {
         this.cart.setCustomer(
           order.customer_id,
