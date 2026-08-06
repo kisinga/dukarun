@@ -51,8 +51,9 @@ show a 200 and the company row updating).
 
 ### 3. Storefront
 
-v2 `apps/storefront` is a placeholder; v1 keeps serving the tenant storefront
-domains until it ships. Do not redeploy storefront.
+The storefront is not part of the commissioned production compose. The v2
+`apps/storefront` remains a placeholder and the Vendure storefront/backend are
+retired from Coolify deployment.
 
 ## CI/CD
 
