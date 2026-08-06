@@ -17,12 +17,13 @@ select is(
   'four platform templates seeded (Admin, Manager, Cashier, Stock Clerk)'
 );
 
--- 2. Provisioning seeds Admin AND Cashier.
+-- 2. Provisioning seeds the complete operational role set.
 select is(
   (select count(*)::int from public.roles
-   where company_id = (select company_id from tm_company) and name in ('Admin', 'Cashier')),
-  2,
-  'provisioning creates Admin + Cashier roles'
+   where company_id = (select company_id from tm_company)
+     and name in ('Admin', 'Manager', 'Cashier', 'Stock Clerk')),
+  4,
+  'provisioning creates Admin, Manager, Cashier, and Stock Clerk roles'
 );
 
 -- 3. Template permissions are valid per the constraint (spot-check Manager).

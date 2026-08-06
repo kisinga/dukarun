@@ -4440,6 +4440,10 @@ export type Database = {
         }
         Returns: string
       }
+      seed_default_company_roles: {
+        Args: { p_company_id: string }
+        Returns: undefined
+      }
       send_sms_hook: { Args: { event: Json }; Returns: Json }
       set_commissions_enabled: {
         Args: { p_enabled: boolean }
