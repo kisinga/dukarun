@@ -746,6 +746,10 @@ try {
         [companyId]
       );
       for (const r of rows) accountByCode.set(r.code, r.id);
+      // Vendure history uses the old clearing-account name. In v2 M-Pesa is a
+      // real money account, but historical lines must still land on it.
+      const mpesaAccountId = accountByCode.get('MPESA');
+      if (mpesaAccountId) accountByCode.set('CLEARING_MPESA', mpesaAccountId);
     }
   }
 

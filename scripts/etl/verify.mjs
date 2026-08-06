@@ -432,7 +432,8 @@ const srcOdd = await S(
 const oddByAcct = new Map(srcOdd.map(r => [r.code, r.n]));
 let balMismatch = 0;
 for (const r of srcBal) {
-  const t = tgtBalMap.get(r.code);
+  const targetCode = r.code === 'CLEARING_MPESA' ? 'MPESA' : r.code;
+  const t = tgtBalMap.get(targetCode);
   const expected = Math.round(Number(r.bal) / 100);
   const bound = Math.max(1, oddByAcct.get(r.code) ?? 0);
   const dev = t == null ? null : t - expected;
