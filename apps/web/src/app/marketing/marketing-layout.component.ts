@@ -5,6 +5,7 @@ import { IconComponent } from '../shared/ui/icon.component';
 interface NavLink {
   readonly label: string;
   readonly path: string;
+  readonly fragment?: string;
 }
 
 /**
@@ -30,8 +31,9 @@ interface NavLink {
             @for (link of links; track link.path) {
               <a
                 [routerLink]="link.path"
+                [fragment]="link.fragment"
                 routerLinkActive="text-primary"
-                [routerLinkActiveOptions]="{ exact: link.path === '/' }"
+                [routerLinkActiveOptions]="linkActiveOptions"
                 class="flex min-h-11 items-center rounded-field px-3 text-sm font-medium text-base-content/70 transition-colors hover:text-base-content"
               >
                 {{ link.label }}
@@ -66,8 +68,9 @@ interface NavLink {
               @for (link of links; track link.path) {
                 <a
                   [routerLink]="link.path"
+                  [fragment]="link.fragment"
                   routerLinkActive="text-primary"
-                  [routerLinkActiveOptions]="{ exact: link.path === '/' }"
+                  [routerLinkActiveOptions]="linkActiveOptions"
                   class="flex min-h-11 items-center rounded-field px-3 text-sm font-medium text-base-content/80"
                   (click)="menuOpen.set(false)"
                 >
@@ -109,6 +112,7 @@ interface NavLink {
             @for (link of links; track link.path) {
               <a
                 [routerLink]="link.path"
+                [fragment]="link.fragment"
                 class="flex min-h-8 items-center text-sm text-base-content/70 hover:text-base-content"
               >
                 {{ link.label }}
@@ -144,10 +148,17 @@ interface NavLink {
   `,
 })
 export class MarketingLayoutComponent {
+  protected readonly linkActiveOptions = {
+    paths: 'exact',
+    queryParams: 'ignored',
+    matrixParams: 'ignored',
+    fragment: 'exact',
+  } as const;
   protected readonly year = new Date().getFullYear();
   protected readonly menuOpen = signal(false);
   protected readonly links: NavLink[] = [
     { label: 'Home', path: '/' },
+    { label: 'Pricing', path: '/', fragment: 'pricing' },
     { label: 'Guide', path: '/docs' },
     { label: 'About', path: '/about' },
     { label: 'Contact', path: '/contact' },

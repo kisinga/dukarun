@@ -143,7 +143,7 @@ export class AboutComponent {
     {
       icon: 'heroCreditCard',
       title: 'Billing that fits your life',
-      copy: 'One flat monthly subscription paid by M-Pesa. No card required, no dollar invoices, no surprises.',
+      copy: 'Choose a subscription plan and pay monthly or yearly through M-Pesa. No card required, no dollar invoices, no surprises.',
     },
   ];
 }
