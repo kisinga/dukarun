@@ -10,10 +10,7 @@ import { AuthService } from '../../core/auth.service';
     <main class="dashboard-main flex min-h-screen items-center justify-center bg-base-200 p-4">
       <div class="w-full max-w-sm">
         <div class="mb-6 text-center">
-          <span
-            class="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-field bg-primary font-bold text-primary-content"
-            >D</span
-          >
+          <img src="/assets/logo/dukarun-icon.svg" alt="" class="mx-auto mb-3 h-12 w-12" />
           <h1 class="type-title">Dukarun Platform</h1>
           <p class="mt-1 text-sm text-base-content/70">Secure access for platform staff</p>
         </div>

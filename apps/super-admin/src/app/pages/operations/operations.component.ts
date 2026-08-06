@@ -9,10 +9,19 @@ import {
 } from '../../core/platform.service';
 import { PageHeaderComponent } from '../../shared/ui/page-header.component';
 import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
+import { DataTableShellComponent } from '../../shared/ui/data-table-shell.component';
+import { FormFieldComponent } from '../../shared/ui/form-field.component';
 
 @Component({
   selector: 'app-operations',
-  imports: [ReactiveFormsModule, NgIcon, PageHeaderComponent, EmptyStateComponent],
+  imports: [
+    ReactiveFormsModule,
+    NgIcon,
+    PageHeaderComponent,
+    EmptyStateComponent,
+    DataTableShellComponent,
+    FormFieldComponent,
+  ],
   template: `
     <app-page-header title="Operations" subtitle="Registration, accounting and delivery health">
       <button
@@ -87,22 +96,20 @@ import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
       <section class="card bg-base-100">
         <form class="card-body p-4" (submit)="$event.preventDefault(); sendBroadcast()">
           <h2 class="type-heading">Platform broadcast</h2>
-          <label class="form-control">
-            <span class="label-text">Title</span>
-            <input class="input input-bordered input-sm w-full" [formControl]="title" />
-          </label>
-          <label class="form-control">
-            <span class="label-text">Message</span>
+          <p class="type-caption">Send an in-app notice to every approved company.</p>
+          <app-form-field label="Title" [required]="true">
+            <input class="input input-bordered w-full" [formControl]="title" />
+          </app-form-field>
+          <app-form-field label="Message" [required]="true">
             <textarea class="textarea textarea-bordered w-full" [formControl]="body"></textarea>
-          </label>
-          <label class="form-control">
-            <span class="label-text">App link</span>
+          </app-form-field>
+          <app-form-field label="App link" hint="Relative link inside the tenant app">
             <input
-              class="input input-bordered input-sm"
+              class="input input-bordered w-full"
               placeholder="/notifications"
               [formControl]="link"
             />
-          </label>
+          </app-form-field>
           <button
             class="btn btn-primary btn-sm min-h-11 self-start"
             [disabled]="busy() || !title.value.trim() || !body.value.trim()"
@@ -114,39 +121,67 @@ import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
           </button>
         </form>
       </section>
-      <section class="card overflow-hidden bg-base-100 xl:col-span-2">
-        <div class="border-b border-base-300 px-4 py-3">
-          <h2 class="type-heading">Failed outbound messages</h2>
+      <section class="xl:col-span-2">
+        <div class="hidden md:block">
+          <app-data-table-shell
+            title="Failed outbound messages"
+            description="Delivery attempts that need investigation"
+          >
+            <table class="table table-sm">
+              <thead>
+                <tr>
+                  <th>When</th>
+                  <th>Company</th>
+                  <th>Channel</th>
+                  <th>Recipient</th>
+                  <th>Error</th>
+                  <th class="text-right">Attempts</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (row of failures(); track row.id) {
+                  <tr>
+                    <td>{{ date(row.created_at) }}</td>
+                    <td>{{ row.companies?.name || row.company_id }}</td>
+                    <td>{{ row.channel }}</td>
+                    <td>{{ row.recipient }}</td>
+                    <td class="max-w-md truncate text-error">{{ row.error }}</td>
+                    <td class="text-right">{{ row.attempts }}</td>
+                  </tr>
+                } @empty {
+                  <tr>
+                    <td colspan="6" class="py-8 text-center text-base-content/60">
+                      No failed messages. Delivery is healthy.
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </app-data-table-shell>
         </div>
-        <div class="overflow-x-auto">
-          <table class="table table-sm">
-            <thead>
-              <tr>
-                <th>When</th>
-                <th>Company</th>
-                <th>Channel</th>
-                <th>Recipient</th>
-                <th>Error</th>
-                <th class="text-right">Attempts</th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (row of failures(); track row.id) {
-                <tr>
-                  <td>{{ date(row.created_at) }}</td>
-                  <td>{{ row.companies?.name || row.company_id }}</td>
-                  <td>{{ row.channel }}</td>
-                  <td>{{ row.recipient }}</td>
-                  <td class="max-w-md truncate text-error">{{ row.error }}</td>
-                  <td class="text-right">{{ row.attempts }}</td>
-                </tr>
-              } @empty {
-                <tr>
-                  <td colspan="6" class="text-center text-base-content/60">No failed messages.</td>
-                </tr>
-              }
-            </tbody>
-          </table>
+        <div class="space-y-3 md:hidden">
+          <h2 class="section-title">Failed outbound messages</h2>
+          @for (row of failures(); track row.id) {
+            <article class="card bg-base-100 p-4">
+              <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <p class="truncate text-sm font-semibold">
+                    {{ row.companies?.name || row.company_id }}
+                  </p>
+                  <p class="type-caption mt-0.5">{{ row.channel }} · {{ date(row.created_at) }}</p>
+                </div>
+                <span class="badge badge-error badge-sm">{{ row.attempts }} attempts</span>
+              </div>
+              <p class="mt-3 text-sm text-error">{{ row.error }}</p>
+              <p class="type-caption mt-2 truncate">{{ row.recipient }}</p>
+            </article>
+          } @empty {
+            <app-empty-state
+              [embedded]="true"
+              title="Delivery is healthy"
+              description="There are no failed outbound messages."
+            />
+          }
         </div>
       </section>
     </div>

@@ -55,12 +55,7 @@ function initialDarkTheme(): boolean {
         ></label>
         <aside class="flex min-h-screen w-64 flex-col border-r border-base-300 bg-base-200">
           <div class="flex min-h-16 items-center gap-3 border-b border-base-300 px-4">
-            <span
-              class="flex h-9 w-9 items-center justify-center rounded-field bg-primary text-primary-content"
-              aria-hidden="true"
-            >
-              <ng-icon name="heroCog6Tooth" size="1.25rem" />
-            </span>
+            <img src="/assets/logo/dukarun-icon.svg" alt="" class="h-9 w-9" />
             <div class="min-w-0">
               <p class="truncate text-sm font-bold">Dukarun</p>
               <p class="type-caption">Platform administration</p>

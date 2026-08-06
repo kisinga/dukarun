@@ -14,13 +14,15 @@ import {
   heroChartBar,
   heroCheckCircle,
   heroChevronLeft,
+  heroChevronRight,
   heroClipboardDocumentList,
-  heroCog6Tooth,
   heroHome,
+  heroMagnifyingGlass,
   heroMoon,
   heroPlus,
   heroServerStack,
   heroSun,
+  heroXMark,
 } from '@ng-icons/heroicons/outline';
 
 import { routes } from './app.routes';
@@ -40,13 +42,15 @@ export const appConfig: ApplicationConfig = {
       heroChartBar,
       heroCheckCircle,
       heroChevronLeft,
+      heroChevronRight,
       heroClipboardDocumentList,
-      heroCog6Tooth,
       heroHome,
+      heroMagnifyingGlass,
       heroMoon,
       heroPlus,
       heroServerStack,
       heroSun,
+      heroXMark,
     }),
   ],
 };
