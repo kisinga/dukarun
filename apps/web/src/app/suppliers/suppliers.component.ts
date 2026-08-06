@@ -787,7 +787,14 @@ interface ParsedPurchaseLine {
                                 type="text"
                                 inputmode="numeric"
                                 class="input input-bordered input-sm w-full tabular-nums"
+                                [class.bg-base-200]="!perms.has('ManageStockAdjustments')"
                                 [class.pr-8]="hasDuplicateVariant(line)"
+                                [readonly]="!perms.has('ManageStockAdjustments')"
+                                [title]="
+                                  perms.has('ManageStockAdjustments')
+                                    ? ''
+                                    : 'Your role can receive stock but cannot change catalog prices'
+                                "
                                 [(ngModel)]="line.wholesalePrice"
                                 (ngModelChange)="updateWholesalePrice(line, $event)"
                                 [ngModelOptions]="{ standalone: true }"
@@ -808,7 +815,14 @@ interface ParsedPurchaseLine {
                                 type="text"
                                 inputmode="numeric"
                                 class="input input-bordered input-sm w-full tabular-nums"
+                                [class.bg-base-200]="!perms.has('ManageStockAdjustments')"
                                 [class.pr-8]="hasDuplicateVariant(line)"
+                                [readonly]="!perms.has('ManageStockAdjustments')"
+                                [title]="
+                                  perms.has('ManageStockAdjustments')
+                                    ? ''
+                                    : 'Your role can receive stock but cannot change catalog prices'
+                                "
                                 [(ngModel)]="line.retailPrice"
                                 (ngModelChange)="updateRetailPrice(line, $event)"
                                 [ngModelOptions]="{ standalone: true }"
@@ -823,6 +837,11 @@ interface ParsedPurchaseLine {
                               }
                             </div>
                           </app-form-field>
+                          @if (!perms.has('ManageStockAdjustments')) {
+                            <p class="type-caption md:col-span-2 lg:col-span-2">
+                              Your role can receive stock but cannot change catalog prices.
+                            </p>
+                          }
                         </div>
 
                         <div
@@ -2624,15 +2643,21 @@ export class SuppliersComponent implements OnInit, OnDestroy {
         this.error.set('Every line needs a variant, quantity and valid unit cost');
         return null;
       }
-      const wholesalePrice = parseKes(line.wholesalePrice);
-      const retailPrice = parseKes(line.retailPrice);
+      const variant = this.variantFor(line);
+      const canModifyCatalogPrices = this.perms.has('ManageStockAdjustments');
+      const wholesalePrice = canModifyCatalogPrices
+        ? parseKes(line.wholesalePrice)
+        : (variant?.wholesale_price ?? 0);
+      const retailPrice = canModifyCatalogPrices
+        ? parseKes(line.retailPrice)
+        : (variant?.price ?? 0);
       if (wholesalePrice === null || retailPrice === null || retailPrice < wholesalePrice) {
         this.error.set('Retail price must be valid and not lower than wholesale');
         return null;
       }
-      const variant = this.variantFor(line);
-      const wholesaleChanged = wholesalePrice !== (variant?.wholesale_price ?? 0);
-      const retailChanged = retailPrice !== (variant?.price ?? 0);
+      const wholesaleChanged =
+        canModifyCatalogPrices && wholesalePrice !== (variant?.wholesale_price ?? 0);
+      const retailChanged = canModifyCatalogPrices && retailPrice !== (variant?.price ?? 0);
       parsed.push({
         variant_id: line.variantId,
         quantity: line.quantity,

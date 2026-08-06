@@ -273,7 +273,7 @@ const SUB_TYPE: Record<string, BadgeType> = {
               <app-form-field label="Tier">
                 <select class="select select-bordered w-full" [formControl]="subTier">
                   @for (tier of tiers(); track tier.id) {
-                    <option [value]="tier.id">{{ tier.name }}</option>
+                    <option [value]="tier.id">{{ tier.code }} — {{ tier.name }}</option>
                   }
                 </select>
               </app-form-field>
