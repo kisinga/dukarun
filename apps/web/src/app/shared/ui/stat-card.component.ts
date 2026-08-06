@@ -7,8 +7,9 @@ import { Component, input } from '@angular/core';
  */
 @Component({
   selector: 'app-stat-card',
+  host: { class: 'block h-full' },
   template: `
-    <div class="card bg-base-100">
+    <div class="card h-full bg-base-100">
       <div class="card-body p-4">
         <p class="type-caption">{{ label() }}</p>
         <p

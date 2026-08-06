@@ -882,7 +882,8 @@ interface ProductEditorRow {
             <app-icon name="heroPencilSquare" />
           </button>
 
-          <div class="flex flex-wrap items-center gap-1">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <p class="type-caption">Product status</p>
             <app-status-badge
               size="xs"
               [type]="group.family.active ? 'neutral' : 'warning'"
@@ -907,8 +908,14 @@ interface ProductEditorRow {
             />
           </div>
 
-          <div class="mt-4">
-            <h3 class="section-title mb-2">Variants</h3>
+          <div class="mt-4 border-t border-base-300/60 pt-4">
+            <div class="mb-2 flex items-end justify-between gap-3">
+              <div>
+                <h3 class="section-title">Variants</h3>
+                <p class="type-caption mt-0.5">Pricing, identifiers, and inventory</p>
+              </div>
+              <span class="type-caption tabular-nums"> {{ group.variants.length }} total </span>
+            </div>
             @if (group.variants.length === 0) {
               <app-empty-state
                 [compact]="true"
@@ -917,42 +924,58 @@ interface ProductEditorRow {
                 description="Edit the product to add one before selling it."
               />
             } @else {
-              <ul class="divide-y divide-base-200">
+              <ul
+                class="overflow-hidden rounded-box border border-base-300/60 bg-base-100 shadow-sm"
+              >
                 @for (v of group.variants; track v.variant_id) {
-                  <li class="py-3">
+                  <li
+                    class="p-3 [&:not(:last-child)]:border-b [&:not(:last-child)]:border-base-200"
+                  >
                     <div class="flex items-start justify-between gap-3">
                       <div class="min-w-0">
-                        <p class="truncate text-sm font-medium">{{ v.variant_name }}</p>
-                        <p class="type-caption mt-0.5 font-mono">{{ v.sku }}</p>
+                        <div class="flex min-w-0 flex-wrap items-center gap-1.5">
+                          <p class="truncate text-sm font-semibold">{{ v.variant_name }}</p>
+                          @if (!v.variant_active) {
+                            <app-status-badge size="xs" type="warning" label="inactive" />
+                          }
+                        </div>
+                        <p class="type-caption mt-0.5">
+                          SKU <span class="font-mono text-base-content/80">{{ v.sku }}</span>
+                        </p>
                       </div>
                       <div class="shrink-0 text-right">
-                        <p class="text-sm font-semibold tabular-nums">
-                          <app-money [amount]="v.price ?? 0" />
+                        <p class="type-caption">Retail price</p>
+                        <p class="mt-0.5 text-sm font-semibold tabular-nums">
+                          <app-money [amount]="v.price ?? 0" [showCurrency]="true" />
                         </p>
-                        @if (!v.variant_active) {
-                          <app-status-badge size="xs" type="warning" label="inactive" />
-                        }
                       </div>
                     </div>
-                    <p class="type-caption mt-1">
-                      <span class="font-mono">{{ v.sku }}</span>
+
+                    <div class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1">
                       @if (v.barcode) {
-                        · <span class="font-mono">{{ v.barcode }}</span>
+                        <p class="type-caption">
+                          Barcode
+                          <span class="font-mono text-base-content/80">{{ v.barcode }}</span>
+                        </p>
                       }
                       @if (v.kind === 'service') {
-                        · Service
+                        <p class="type-caption">Service · Inventory not tracked</p>
+                      } @else if (v.track_inventory) {
+                        <p class="type-caption tabular-nums">
+                          <span class="font-semibold text-base-content/80">
+                            {{ stockOf(v.variant_id!)?.stock ?? 0 }} in stock
+                          </span>
+                          · <app-money [amount]="stockOf(v.variant_id!)?.stock_value ?? 0" /> value
+                        </p>
+                      } @else {
+                        <p class="type-caption">Inventory not tracked</p>
                       }
-                    </p>
-                    @if (v.kind !== 'service' && v.track_inventory) {
-                      <p class="type-caption mt-0.5">
-                        {{ stockOf(v.variant_id!)?.stock ?? 0 }} in stock ·
-                        <app-money [amount]="stockOf(v.variant_id!)?.stock_value ?? 0" /> value
-                      </p>
-                    }
-                    <div class="mt-2 flex flex-wrap gap-1.5">
+                    </div>
+
+                    <div class="mt-3 flex flex-wrap gap-1.5 border-t border-base-200 pt-2">
                       <button
                         appButton
-                        variant="ghost"
+                        variant="outline"
                         size="sm"
                         (click)="editVariantFromDrawer(group.family.id)"
                       >
@@ -962,7 +985,7 @@ interface ProductEditorRow {
                         @if (perms.has('ManageStockAdjustments')) {
                           <a
                             appButton
-                            variant="ghost"
+                            variant="soft"
                             size="sm"
                             routerLink="/stock-adjustments"
                             [queryParams]="{ variant: v.variant_id }"
@@ -982,8 +1005,8 @@ interface ProductEditorRow {
                       }
                     </div>
                     @if (batchesFor() === v.variant_id) {
-                      <div class="mt-2 rounded-field border border-base-300 bg-base-200/50 p-2">
-                        <div class="mb-1 flex items-center justify-between gap-2">
+                      <div class="mt-3 rounded-field bg-base-200/70 p-3">
+                        <div class="mb-2 flex items-center justify-between gap-2">
                           <h4 class="type-caption">Batch history</h4>
                           <a routerLink="/suppliers" class="link text-xs">Restock</a>
                         </div>

@@ -517,6 +517,14 @@ try {
         s.inserted++;
       }
       userMap.set(key, authId);
+      // Platform superadmins get no company membership — but they do need a
+      // platform_admins row on v2 (is_platform_admin() reads it via the JWT hook).
+      if (a.role_code === '__super_admin_role__' && !DRY) {
+        await tgt.query(
+          'insert into public.platform_admins (user_id) values ($1) on conflict do nothing',
+          [authId]
+        );
+      }
     }
     // roles: get-or-create by (company_id, name); on re-runs, top up the
     // template-managed roles' permissions (audit/staff/commissions were added
