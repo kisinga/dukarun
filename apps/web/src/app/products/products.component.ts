@@ -33,6 +33,8 @@ import { PermissionsService } from '../core/permissions.service';
 import { CatalogCacheService } from '../core/catalog-cache.service';
 
 type StockInfo = { stock: number; stock_value: number };
+type ProductStatusFilter = 'all' | 'active' | 'inactive';
+type StockStatusFilter = 'all' | 'in_stock' | 'out_of_stock' | 'not_tracked';
 
 /** One variant in the coupled create/edit product editor. */
 type DeactivateTarget = { kind: 'collection'; collection: CollectionWithCount };
@@ -715,6 +717,42 @@ interface ProductEditorRow {
         [(searchQuery)]="query"
       >
         <app-stat-bar summary [stats]="productStats()" />
+        <div filters class="grid gap-2 sm:grid-cols-2 lg:flex lg:items-end">
+          <app-form-field label="Product status" class="lg:w-44">
+            <select
+              class="select select-bordered select-sm w-full"
+              [value]="productStatusFilter()"
+              (change)="setProductStatusFilter($event)"
+            >
+              <option value="all">All statuses</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </app-form-field>
+          <app-form-field label="Stock" class="lg:w-44">
+            <select
+              class="select select-bordered select-sm w-full"
+              [value]="stockStatusFilter()"
+              (change)="setStockStatusFilter($event)"
+            >
+              <option value="all">All stock states</option>
+              <option value="in_stock">In stock</option>
+              <option value="out_of_stock">Out of stock</option>
+              <option value="not_tracked">Not tracked</option>
+            </select>
+          </app-form-field>
+          @if (hasProductFilters()) {
+            <button
+              appButton
+              type="button"
+              variant="ghost"
+              size="sm"
+              (click)="clearProductFilters()"
+            >
+              Clear filters
+            </button>
+          }
+        </div>
       </app-list-search-bar>
 
       <!-- Grouped list -->
@@ -722,7 +760,11 @@ interface ProductEditorRow {
         <app-empty-state
           icon="heroCube"
           title="No products found"
-          description="Add a product from the page header, or clear the search."
+          [description]="
+            hasProductFilters()
+              ? 'No products match the selected filters. Clear a filter or try another search.'
+              : 'Add a product from the page header, or clear the search.'
+          "
         />
       } @else {
         <div class="flex flex-col gap-2 lg:hidden">
@@ -1082,6 +1124,8 @@ export class ProductsComponent implements OnInit {
   protected readonly batches = signal<InventoryBatch[]>([]);
 
   protected readonly query = signal('');
+  protected readonly productStatusFilter = signal<ProductStatusFilter>('all');
+  protected readonly stockStatusFilter = signal<StockStatusFilter>('all');
 
   protected readonly editingFamily = signal<Product | null>(null);
   protected readonly familyName = new FormControl('', { nonNullable: true });
@@ -1123,6 +1167,8 @@ export class ProductsComponent implements OnInit {
   /** Families with their variants; search filters the cached catalog client-side. */
   protected readonly grouped = computed(() => {
     const q = this.query().trim().toLowerCase();
+    const productStatus = this.productStatusFilter();
+    const stockStatus = this.stockStatusFilter();
     const byProduct = new Map<string, Variant[]>();
     for (const v of this.catalog()) {
       if (!v.product_id) continue;
@@ -1144,17 +1190,37 @@ export class ProductsComponent implements OnInit {
     return this.families()
       .map(family => ({ family, variants: byProduct.get(family.id) ?? [] }))
       .filter(g => {
-        if (g.variants.length > 0) return true;
-        if (!q) return true; // empty families visible when not searching
-        return g.family.name.toLowerCase().includes(q);
+        const matchesSearch =
+          g.variants.length > 0 || !q || g.family.name.toLowerCase().includes(q);
+        if (!matchesSearch) return false;
+        if (productStatus !== 'all') {
+          const isActive = g.family.active;
+          if (productStatus === 'active' ? !isActive : isActive) return false;
+        }
+        if (stockStatus === 'all') return true;
+        const tracksInventory = this.familyTracksInventory(g.variants);
+        if (stockStatus === 'not_tracked') return !tracksInventory;
+        if (!tracksInventory) return false;
+        const quantity = this.familyStock(g.variants);
+        return stockStatus === 'in_stock' ? quantity > 0 : quantity <= 0;
       });
   });
 
   protected readonly totalStockValue = computed(() => {
-    let sum = 0;
-    for (const info of this.stock().values()) sum += info.stock_value;
-    return sum;
+    return this.grouped().reduce((sum, group) => sum + this.familyStockValue(group.variants), 0);
   });
+  protected readonly totalRetailStockValue = computed(() => {
+    return this.grouped().reduce(
+      (sum, group) => sum + this.familyRetailStockValue(group.variants),
+      0
+    );
+  });
+  protected readonly hasProductFilters = computed(
+    () =>
+      this.query().trim().length > 0 ||
+      this.productStatusFilter() !== 'all' ||
+      this.stockStatusFilter() !== 'all'
+  );
   protected readonly productStats = computed(() => {
     const groups = this.grouped();
     const variants = groups.reduce((count, group) => count + group.variants.length, 0);
@@ -1172,7 +1238,8 @@ export class ProductsComponent implements OnInit {
     return [
       { label: 'Matching products', value: groups.length },
       { label: 'Variants shown', value: variants },
-      { label: 'Stock value', value: this.fmt(this.totalStockValue()) },
+      { label: 'Cost value', value: this.fmt(this.totalStockValue()) },
+      { label: 'Retail value', value: this.fmt(this.totalRetailStockValue()) },
       {
         label: 'Out of stock',
         value: outOfStock,
@@ -1200,6 +1267,8 @@ export class ProductsComponent implements OnInit {
     let firstRun = true;
     effect(() => {
       this.query();
+      this.productStatusFilter();
+      this.stockStatusFilter();
       if (firstRun) {
         firstRun = false;
         return;
@@ -1211,6 +1280,20 @@ export class ProductsComponent implements OnInit {
   protected changePageSize(size: number): void {
     this.pageSize.set(size);
     this.page.set(1);
+  }
+
+  protected setProductStatusFilter(event: Event): void {
+    this.productStatusFilter.set((event.target as HTMLSelectElement).value as ProductStatusFilter);
+  }
+
+  protected setStockStatusFilter(event: Event): void {
+    this.stockStatusFilter.set((event.target as HTMLSelectElement).value as StockStatusFilter);
+  }
+
+  protected clearProductFilters(): void {
+    this.query.set('');
+    this.productStatusFilter.set('all');
+    this.stockStatusFilter.set('all');
   }
 
   async ngOnInit(): Promise<void> {
@@ -1405,6 +1488,14 @@ export class ProductsComponent implements OnInit {
       (sum, variant) => sum + (this.stockOf(variant.variant_id!)?.stock_value ?? 0),
       0
     );
+  }
+
+  protected familyRetailStockValue(variants: Variant[]): number {
+    return variants.reduce((sum, variant) => {
+      if (variant.kind === 'service' || !variant.track_inventory || !variant.variant_id) return sum;
+      const quantity = this.stockOf(variant.variant_id)?.stock ?? 0;
+      return sum + quantity * (variant.price ?? 0);
+    }, 0);
   }
 
   protected openProduct(productId: string): void {
