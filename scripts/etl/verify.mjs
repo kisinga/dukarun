@@ -191,6 +191,37 @@ await countCheck(
   'excl. soft-deleted (referenced deleted migrate inactive)'
 );
 
+const sourceManufacturerRows = await S(
+  `select pf."productId"::text as old_id,
+          coalesce(nullif(btrim(fvt.name), ''), fv.code) as manufacturer
+   from product_facet_values_facet_value pf
+   join facet_value fv on fv.id=pf."facetValueId"
+   join facet f on f.id=fv."facetId" and lower(f.code)='manufacturer'
+   left join facet_value_translation fvt
+     on fvt."baseId"=fv.id and fvt."languageCode"='en'
+   where pf."productId"::text = any($1::text[])`,
+  [[...(maps.product?.keys() ?? [])]]
+);
+const targetManufacturerRows = await T(
+  `select p.id, m.name as manufacturer
+   from public.products p
+   left join public.manufacturers m on m.id=p.manufacturer_id
+   where p.company_id=$1`,
+  [companyId]
+);
+const targetManufacturerByProduct = new Map(
+  targetManufacturerRows.map(row => [row.id, row.manufacturer])
+);
+const manufacturerMismatches = sourceManufacturerRows.filter(row => {
+  const targetId = maps.product?.get(row.old_id);
+  return !targetId || targetManufacturerByProduct.get(targetId) !== row.manufacturer;
+});
+ok(
+  'product manufacturers',
+  manufacturerMismatches.length === 0,
+  `src_assignments=${sourceManufacturerRows.length} mismatches=${manufacturerMismatches.length}`
+);
+
 const srcVariants = await S(
   `with ref as (${REF_DEL_VARIANTS})
    select (select count(*)::int from product_variant v

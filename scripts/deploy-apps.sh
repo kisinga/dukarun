@@ -35,7 +35,7 @@ SSH_OPTS=(-o BatchMode=no -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-n
 # app -> container name prefix of the v1 container it replaces
 container_prefix() {
   case "$1" in
-    web) echo "frontend-" ;;
+    web) echo "web-" ;;
     super-admin) echo "super-admin-" ;;
     *) echo "unknown app: $1 (web|super-admin)" >&2; exit 2 ;;
   esac
@@ -78,20 +78,31 @@ OLD=$(docker ps --format '{{.Names}}' | grep "^${PREFIX}" | head -1)
 TS=$(date +%Y%m%d%H%M%S)
 BACKUP="${OLD}-backup-${TS}"
 
-# capture labels + networks of the old container
-LABEL_ARGS=$(docker inspect "$OLD" --format '{{range $k,$v := .Config.Labels}}--label {{$k}}={{$v}} {{end}}')
-NET_ARGS=$(docker inspect "$OLD" --format '{{range $k,$v := .NetworkSettings.Networks}}--network {{$k}} {{end}}' | awk '!seen[$0]++')
+# Capture labels in a file so values containing spaces (for example
+# `caddy.encode=zstd gzip`) remain one label instead of becoming image args.
+LABEL_FILE=$(mktemp)
+docker inspect "$OLD" --format '{{range $k,$v := .Config.Labels}}{{printf "%s=%s\n" $k $v}}{{end}}' > "$LABEL_FILE"
+NETWORKS=$(docker inspect "$OLD" --format '{{range $k,$v := .NetworkSettings.Networks}}{{println $k}}{{end}}')
+PRIMARY_NETWORK=$(printf '%s\n' "$NETWORKS" | head -1)
 
 echo "  old: $OLD -> backup: $BACKUP"
 docker rename "$OLD" "$BACKUP"
 docker stop "$BACKUP" >/dev/null
 
-# run the new container with the old identity
-# (label values contain {{upstreams 80}} braces; safe unquoted via xargs)
-echo "$LABEL_ARGS $NET_ARGS" | xargs docker run -d --name "$OLD" --restart unless-stopped "$IMAGE"
+# Run the new container with the old identity. Restore immediately if Docker
+# rejects the launch; do not leave production without its serving container.
+if ! docker run -d --name "$OLD" --restart unless-stopped \
+  --label-file "$LABEL_FILE" --network "$PRIMARY_NETWORK" "$IMAGE"; then
+  rm -f "$LABEL_FILE"
+  docker rename "$BACKUP" "$OLD"
+  docker start "$OLD" >/dev/null
+  exit 1
+fi
+rm -f "$LABEL_FILE"
 docker ps --format '{{.Names}} {{.Networks}}' | grep "^${OLD} " >/dev/null
-# join any additional networks (xargs --network only applies the first)
-for net in $(docker inspect "$BACKUP" --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}} {{end}}'); do
+# Join any additional networks.
+for net in $NETWORKS; do
+  [ "$net" = "$PRIMARY_NETWORK" ] && continue
   docker network connect "$net" "$OLD" 2>/dev/null || true
 done
 

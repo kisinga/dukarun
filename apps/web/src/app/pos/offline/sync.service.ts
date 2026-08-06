@@ -246,7 +246,8 @@ export class SyncService {
           (v.product_name ?? '').toLowerCase().includes(q) ||
           (v.variant_name ?? '').toLowerCase().includes(q) ||
           (v.sku ?? '').toLowerCase().includes(q) ||
-          (v.barcode ?? '').toLowerCase().includes(q)
+          (v.barcode ?? '').toLowerCase().includes(q) ||
+          (v.manufacturer_name ?? '').toLowerCase().includes(q)
       )
       .slice(0, 20);
   }

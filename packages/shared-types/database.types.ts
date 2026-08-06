@@ -2243,6 +2243,44 @@ export type Database = {
           },
         ]
       }
+      manufacturers: {
+        Row: {
+          active: boolean
+          company_id: string
+          created_at: string
+          id: string
+          name: string
+          normalized_name: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          company_id: string
+          created_at?: string
+          id?: string
+          name: string
+          normalized_name?: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          company_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+          normalized_name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "manufacturers_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           active: boolean
@@ -2251,6 +2289,7 @@ export type Database = {
           created_at: string
           id: string
           image_path: string | null
+          manufacturer_id: string | null
           name: string
           updated_at: string
         }
@@ -2261,6 +2300,7 @@ export type Database = {
           created_at?: string
           id?: string
           image_path?: string | null
+          manufacturer_id?: string | null
           name: string
           updated_at?: string
         }
@@ -2271,10 +2311,18 @@ export type Database = {
           created_at?: string
           id?: string
           image_path?: string | null
+          manufacturer_id?: string | null
           name?: string
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "products_manufacturer_company_fkey"
+            columns: ["company_id", "manufacturer_id"]
+            isOneToOne: false
+            referencedRelation: "manufacturers"
+            referencedColumns: ["company_id", "id"]
+          },
           {
             foreignKeyName: "products_company_id_fkey"
             columns: ["company_id"]
@@ -3772,6 +3820,8 @@ export type Database = {
           company_id: string | null
           image_path: string | null
           kind: string | null
+          manufacturer_id: string | null
+          manufacturer_name: string | null
           price: number | null
           product_active: boolean | null
           product_id: string | null
@@ -3953,6 +4003,16 @@ export type Database = {
         Args: {
           p_barcode?: string
           p_image_path?: string
+          p_name: string
+          p_variants: Json
+        }
+        Returns: string
+      }
+      create_catalog_product_with_manufacturer: {
+        Args: {
+          p_barcode?: string
+          p_image_path?: string
+          p_manufacturer_id?: string
           p_name: string
           p_variants: Json
         }
@@ -4554,6 +4614,8 @@ export type Database = {
           company_id: string | null
           image_path: string | null
           kind: string | null
+          manufacturer_id: string | null
+          manufacturer_name: string | null
           price: number | null
           product_active: boolean | null
           product_id: string | null
@@ -4616,6 +4678,18 @@ export type Database = {
         }
         Returns: string
       }
+      update_catalog_product_with_manufacturer: {
+        Args: {
+          p_active?: boolean
+          p_barcode?: string
+          p_manufacturer_id?: string
+          p_name: string
+          p_product_id: string
+          p_variants: Json
+        }
+        Returns: string
+      }
+      upsert_manufacturer: { Args: { p_name: string }; Returns: string }
       update_commission_period_status: {
         Args: { p_notes?: string; p_period_id: string; p_status: string }
         Returns: string
@@ -4872,4 +4946,3 @@ export const Constants = {
     Enums: {},
   },
 } as const
-

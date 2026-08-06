@@ -37,6 +37,7 @@
     "etl:migrate": "node scripts/etl/migrate.mjs",
     "etl:verify": "node scripts/etl/verify.mjs",
     "etl:teardown": "node scripts/etl/teardown.mjs",
+    "etl:backfill-manufacturers": "node scripts/etl/backfill-manufacturers.mjs",
     "etl:diff": "node scripts/etl/ledger-diff.mjs",
     "etl:export-map": "node scripts/etl/export-map.mjs"
   },

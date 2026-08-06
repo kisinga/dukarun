@@ -1,5 +1,5 @@
 begin;
-select plan(15);
+select plan(18);
 
 select has_column('public','customers','supplier_active','suppliers can be archived reversibly');
 select has_view('public','supplier_variant_performance','supplier/product price history is queryable');
@@ -15,6 +15,9 @@ select testkit.create_user('42424242-4242-4242-4242-424242424242','purchase-inte
 create temp table pi_company as select testkit.provision(
   '42424242-4242-4242-4242-424242424242','Purchase Intel Co') company_id;
 grant select on pg_temp.pi_company to authenticated;
+select testkit.create_user('42424242-4242-4242-4242-424242424243','receiver@test.local');
+select testkit.add_member((select company_id from pi_company),
+  '42424242-4242-4242-4242-424242424243','Receiver',array[]::text[]);
 
 insert into public.products(id,company_id,name) select
   '42000000-0000-0000-0000-000000000001',company_id,'Coffee' from pi_company;
@@ -53,6 +56,26 @@ select public.record_purchase_with_prices('42000000-0000-0000-0000-000000000004'
 select is((select count(*)::int from public.supplier_variant_performance
   where variant_id='42000000-0000-0000-0000-000000000002'),2,
   'supplier comparison keeps one aggregate per supplier and product');
+
+select testkit.as_user((select company_id from pi_company),
+  '42424242-4242-4242-4242-424242424243','Receiver');
+
+select lives_ok(
+  $$select public.record_purchase_with_prices('42000000-0000-0000-0000-000000000003',
+    '[{"variant_id":"42000000-0000-0000-0000-000000000002","quantity":1,"unit_cost":8800}]',
+    false,'PI-RECEIVER')$$,
+  'receiver can record invoice cost without changing catalog prices');
+select throws_ok(
+  $$select public.record_purchase_with_prices('42000000-0000-0000-0000-000000000003',
+    '[{"variant_id":"42000000-0000-0000-0000-000000000002","quantity":1,"unit_cost":8800,
+      "new_retail_price":16500}]',false,'PI-RECEIVER-PRICE')$$,
+  'P0001','permission_denied: ManageStockAdjustments required for price updates',
+  'receiver cannot change catalog prices while receiving');
+select is((select count(*)::int from public.purchases where reference='PI-RECEIVER-PRICE'),0,
+  'denied catalog price change leaves no purchase behind');
+
+select testkit.as_user((select company_id from pi_company),
+  '42424242-4242-4242-4242-424242424242','Admin');
 
 select public.set_supplier_active('42000000-0000-0000-0000-000000000004',false);
 select is((select supplier_active from public.customers
