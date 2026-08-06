@@ -62,8 +62,8 @@ const checks = [
     message: 'Offline catalog snapshots must page through the full active catalog.',
   },
   {
-    ok: /supabase\.session\.set\(data\.session\)/.test(authGuard),
-    message: 'The auth guard must initialize offline identity before routed services restore data.',
+    ok: /await supabase\.initializeSession\(\)/.test(authGuard),
+    message: 'The auth guard must resolve offline identity before routed services restore data.',
   },
 ];
 
