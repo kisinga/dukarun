@@ -55,10 +55,23 @@ export class SupabaseService {
     }
   }
 
-  /** RLS-scoped company lookup: returns the user's company, or null when not provisioned. */
+  /**
+   * Resolve the company selected by the token hook.
+   *
+   * Platform administrators can read every company through RLS, so an
+   * unfiltered `limit(1)` is not a tenant lookup for them. The JWT claim is
+   * the source of truth used by current_company_id() and every tenant-scoped
+   * query; the shell must render that exact same company.
+   */
   async currentCompany(): Promise<Company | null> {
-    const { data, error } = await this.client.from('companies').select('id, name, code').limit(1);
+    const companyId = this.claims()?.company_id;
+    if (!companyId) return null;
+    const { data, error } = await this.client
+      .from('companies')
+      .select('id, name, code')
+      .eq('id', companyId)
+      .maybeSingle();
     if (error) throw error;
-    return data[0] ?? null;
+    return data;
   }
 }
