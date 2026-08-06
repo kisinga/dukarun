@@ -43,15 +43,15 @@ ANON_KEY=$(ssh "${SSH_OPTS[@]}" "$DEPLOY_SSH_HOST" \
   "grep '^SERVICE_SUPABASEANON_KEY=' '$COOLIFY_SERVICE_DIR/.env' | cut -d= -f2-")
 [ -n "$ANON_KEY" ] || { echo "✗ could not read SERVICE_SUPABASEANON_KEY from host" >&2; exit 1; }
 
-BUILD_CACHE_ARGS=()
+BUILD_ARGS=(--platform linux/amd64 -f apps/Dockerfile)
 if [ "${FRESH_BUILD:-0}" = "1" ]; then
-  BUILD_CACHE_ARGS=(--no-cache)
+  BUILD_ARGS=(--no-cache "${BUILD_ARGS[@]}")
 fi
 
 for app in "${APPS[@]}"; do
   image="dukarun-$app:parallel"
   echo "▶ [$app] building (linux/amd64)"
-  docker build -q "${BUILD_CACHE_ARGS[@]}" --platform linux/amd64 -f apps/Dockerfile \
+  docker build -q "${BUILD_ARGS[@]}" \
     --build-arg "APP=$app" \
     --build-arg "SUPABASE_URL=$SUPABASE_URL" \
     --build-arg "SUPABASE_ANON_KEY=$ANON_KEY" \
