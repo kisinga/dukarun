@@ -196,23 +196,25 @@ export class SyncService {
     return this.catalogCache.refresh();
   }
 
-  /** Online-first quick picks with an automatic scoped snapshot fallback. */
+  /** Cache-first quick picks; a cold cache waits for one server hydration. */
   async topVariants(limit: number): Promise<Variant[]> {
-    if (this.connectivity.online()) {
-      try {
-        const variants = await this.pos.topVariants(limit);
-        this.usingCachedCatalog.set(false);
-        return variants;
-      } catch {
-        // Degraded/captive networks should still use the last good snapshot.
-      }
+    await this.catalogCache.ensureLoaded();
+    let variants = this.sellable(this.catalogCache.getCatalog()).slice(0, limit);
+    if (variants.length === 0 && this.connectivity.online()) {
+      await this.catalogCache.refresh();
+      variants = this.sellable(this.catalogCache.getCatalog()).slice(0, limit);
     }
-    return this.offlineTopVariants(limit);
+    this.usingCachedCatalog.set(!this.connectivity.online());
+    return variants;
   }
 
-  /** Online-first search with an automatic scoped snapshot fallback. */
+  /** Local search is instant; oversized catalogs retain server-side search. */
   async searchProducts(query: string): Promise<Variant[]> {
-    if (this.connectivity.online()) {
+    await this.catalogCache.ensureLoaded();
+    if (this.catalogCache.getCatalog().length === 0 && this.connectivity.online()) {
+      await this.catalogCache.refresh();
+    }
+    if (this.catalogCache.catalogTruncated() && this.connectivity.online()) {
       try {
         const variants = await this.pos.searchVariants(query);
         this.usingCachedCatalog.set(false);
@@ -221,6 +223,7 @@ export class SyncService {
         // Fall through to the local snapshot.
       }
     }
+    this.usingCachedCatalog.set(!this.connectivity.online());
     return this.searchProductsOffline(query);
   }
 

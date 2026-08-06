@@ -43,7 +43,8 @@ begin
   update public.companies
   set cashier_flow_enabled = true,
       cash_control_enabled = true,
-      batch_expiry_enabled = true
+      batch_expiry_enabled = true,
+      status = 'approved'
   where id = v_company_id;
   return v_company_id;
 end;

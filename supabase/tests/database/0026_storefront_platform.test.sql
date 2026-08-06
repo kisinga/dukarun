@@ -18,7 +18,7 @@ select 'aa000000-0000-0000-0000-0000000000aa', 'a0000000-0000-0000-0000-00000000
 
 -- Company starts unapproved: invisible in the directory.
 update public.companies
-set public_storefront_enabled = true, public_slug = 'sf-co'
+set status = 'unapproved', public_storefront_enabled = true, public_slug = 'sf-co'
 where id = (select company_id from sf_company);
 
 -- 1. Anon sees nothing while unapproved.

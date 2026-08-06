@@ -1,7 +1,7 @@
 -- Billing tests (migration 0024): activation, idempotent webhook replay,
 -- expiry scan + grace, entitlement gates and tier limits.
 begin;
-select plan(10);
+select plan(13);
 
 select testkit.create_user('11111111-1111-1111-1111-111111111111', 'admin@bill.local');
 create temp table bl_company as
@@ -125,6 +125,21 @@ where id = (select company_id from bl_company);
 
 select testkit.as_user((select company_id from bl_company), '11111111-1111-1111-1111-111111111111', 'Admin');
 
+select throws_ok(
+  $$select public.create_product_with_variants(
+    'Too many at once', '[{"name":"One","price":1000},{"name":"Two","price":1000}]'
+  )$$,
+  'P0001', 'limit_reached: product limit (1); upgrade your plan',
+  'one product family cannot smuggle multiple variants past the limit'
+);
+
+select is(
+  (select count(*)::int from public.product_variants
+   where company_id = (select company_id from bl_company) and active),
+  0,
+  'failed multi-variant creation rolls back the whole family'
+);
+
 select lives_ok(
   $$select public.create_product_with_variants('First', '[{"price": 1000}]')$$,
   'first product within the limit'
@@ -134,6 +149,11 @@ select throws_ok(
   $$select public.create_product_with_variants('Second', '[{"price": 1000}]')$$,
   'P0001', 'limit_reached: product limit (1); upgrade your plan',
   'second product exceeds the tier limit'
+);
+
+select lives_ok(
+  $$select public.assert_entitled((select company_id from bl_company), 'product')$$,
+  'being at the product limit does not block restocking or purchase workflows'
 );
 
 select * from finish();

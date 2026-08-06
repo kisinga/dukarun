@@ -24,8 +24,11 @@ nothing sensitive is stored in the repo.
 - [x] Vault secrets: `TEXTSMS_API_KEY`, `TEXTSMS_PARTNER_ID`, `TEXTSMS_SHORTCODE`,
       `SUPABASE_SERVICE_ROLE_KEY`, `NOTIFY_FLUSH_URL`
 - [x] Edge functions deployed: paystack-charge, paystack-webhook, notification-flush, _shared
-- [x] Edge-runtime env: `PAYSTACK_SECRET_KEY`, `TEXTSMS_*`, `OPENWA_*`
+- [x] Edge-runtime env: `PAYSTACK_SECRET_KEY`, `TEXTSMS_*`, `OPENWA_*`, `EMAIL_API_*`
 - [x] Env managed in Coolify UI (survives redeploys)
+- [x] Commissioning hardening migration `0023` applied (2026-08-06)
+- [x] R2 restore drill completed in a disposable Supabase Postgres container
+      (11 companies, 1,516 orders, balanced ledger)
 
 ## Remaining
 
@@ -42,9 +45,9 @@ show a 200 and the company row updating).
 - **Auth emails (GoTrue)**: wired to the v1 SMTP relay (`rs1.hpcnoc.com:465`,
   `hello@dukarun.com`) — container reachability verified. Test with a real
   recovery/invite email from the app.
-- **Outbox emails (notification-flush)**: still needs `EMAIL_API_URL` /
-  `EMAIL_API_KEY` / `EMAIL_FROM` (HTTPS email API). Until set, email outbox rows
-  fail; SMS/WhatsApp unaffected.
+- **Outbox emails (notification-flush)**: `EMAIL_API_URL` / `EMAIL_API_KEY` /
+  `EMAIL_FROM` are configured. Run one controlled delivery before commissioning;
+  SMS/WhatsApp are independent.
 
 ### 3. Storefront
 
@@ -55,7 +58,8 @@ domains until it ships. Do not redeploy storefront.
 
 `.github/workflows/supabase.yml`: lint + pgTAP + type-freshness on GitHub
 runners; deploy job on the self-hosted runner on the Coolify host
-(migrations + functions, hot-reload via volume, docker-cp fallback).
+(migrations + functions, hot-reload via volume, docker-cp fallback). Its smoke
+checks now fail the deployment on unexpected REST/function status codes.
 `.github/workflows/test.yml`: design guard + builds for all three apps.
 
 ## Lint findings (accepted, by design)
@@ -89,3 +93,7 @@ Vendure DB into `/opt/backups/`, restore-verified with `pg_restore --list`,
   364 days in R2 (bucket lifecycle rule, managed in the Cloudflare dashboard). The API
   token is bucket-scoped (object R/W only; a `CreateBucket` 403 in logs is expected
   and harmless).
+- Restore drill, 2026-08-06: `supabase-20260806-0017.dump` streamed from R2 into a
+  disposable `supabase/postgres:15.8.1.085` container and restored with PostgreSQL 17
+  client tools. The PG17-only `SET transaction_timeout = 0` header must be removed when
+  restoring to PG15. Integrity checks: 11 companies, 1,516 orders, ledger delta 0.

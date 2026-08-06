@@ -61,6 +61,64 @@ const maps = {};
 for (const r of idMap) (maps[r.old_type] ??= new Map()).set(r.old_id, r.new_id);
 
 // ---------------------------------------------------------------------------
+// 0. identities and multi-company memberships
+// ---------------------------------------------------------------------------
+console.log('\n--- identities and multi-company memberships ---');
+const srcAccessUsers = await S(
+  `select u.id::text old_id
+   from administrator a
+   join "user" u on u.id = a."userId"
+   join user_roles_role ur on ur."userId" = u.id
+   join role r on r.id = ur."roleId"
+   where r.code <> '__super_admin_role__'
+     and exists (
+       select 1 from role_channels_channel rc
+       where rc."roleId" = r.id and rc."channelId" = $1
+     )
+     and a."deletedAt" is null and u."deletedAt" is null
+   group by u.id`,
+  [CHANNEL_ID]
+);
+
+const accessOldIds = srcAccessUsers.map(u => u.old_id);
+const accessNewIds = accessOldIds.map(id => maps.user?.get(id)).filter(Boolean);
+ok(
+  'administrator identities mapped',
+  accessNewIds.length === accessOldIds.length,
+  `src=${accessOldIds.length} mapped=${accessNewIds.length}`
+);
+
+const targetMemberIds = new Set(
+  (
+    await T(
+      `select user_id from public.company_memberships
+       where company_id=$1 and user_id = any($2::uuid[])`,
+      [companyId, accessNewIds]
+    )
+  ).map(r => r.user_id)
+);
+ok(
+  'company memberships mapped',
+  accessNewIds.every(id => targetMemberIds.has(id)),
+  `src=${accessNewIds.length} tgt=${targetMemberIds.size}`
+);
+
+const identitySplits = accessOldIds.length
+  ? await T(
+      `select old_id, count(distinct new_id)::int identities
+       from public.etl_id_map
+       where old_type='user' and old_id = any($1::text[])
+       group by old_id having count(distinct new_id) <> 1`,
+      [accessOldIds]
+    )
+  : [];
+ok(
+  'shared users keep one auth identity across companies',
+  identitySplits.length === 0,
+  identitySplits.length ? `${identitySplits.length} split mapping(s)` : 'no split mappings'
+);
+
+// ---------------------------------------------------------------------------
 // 1. row counts per entity
 // ---------------------------------------------------------------------------
 console.log('\n--- row counts (source -> target) ---');

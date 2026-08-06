@@ -1072,11 +1072,11 @@ export class ProductsComponent implements OnInit {
   protected readonly perms = inject(PermissionsService);
 
   protected readonly fmt = formatKes;
-  protected readonly families = signal<Product[]>([]);
+  protected readonly families = this.catalogCache.families;
   /** Live view of the shared realtime-backed catalog cache (works offline). */
   protected readonly catalog = this.catalogCache.catalog;
   protected readonly catalogTruncated = this.catalogCache.catalogTruncated;
-  protected readonly stock = signal<Map<string, StockInfo>>(new Map());
+  protected readonly stock = this.catalogCache.stock;
   protected readonly selectedProductId = signal<string | null>(null);
   protected readonly batchesFor = signal<string | null>(null);
   protected readonly batches = signal<InventoryBatch[]>([]);
@@ -1214,37 +1214,48 @@ export class ProductsComponent implements OnInit {
   }
 
   async ngOnInit(): Promise<void> {
-    // Emits the IndexedDB snapshot instantly, then background-refreshes.
-    void this.catalogCache.ensureLoaded();
-    await Promise.all([this.preferences.refresh(), this.load()]);
+    this.loading.set(true);
+    const hydrated = await this.catalogCache.ensureLoaded();
+    if (hydrated) this.loading.set(false);
+    void this.preferences.refresh();
+    void this.loadAuxiliary().catch(err => {
+      this.error.set(err instanceof Error ? err.message : 'Failed to load product settings');
+    });
+    if (!hydrated) {
+      const refreshed = await this.catalogCache.refresh();
+      if (!refreshed) this.error.set('Could not load the catalog; check your connection.');
+      this.loading.set(false);
+    }
   }
 
   protected async load(): Promise<void> {
     this.loading.set(true);
-    // Refresh the shared catalog in the background; the list re-renders silently.
-    void this.catalogCache.refresh();
     try {
-      const [families, stock, collections, locations] = await Promise.all([
-        this.pos.listFamilies(),
-        this.pos.productStock(),
-        this.pos.listCollections(),
-        this.pos.listStockLocations(),
+      await Promise.all([
+        this.catalogCache.refresh(),
+        this.preferences.refresh(),
+        this.loadAuxiliary(),
       ]);
-      this.families.set(families);
-      this.stock.set(stock);
-      this.collections.set(collections);
-      this.stockLocations.set(locations);
-      const defaultLocationId = locations[0]?.id ?? '';
-      this.editorRows = this.editorRows.map(row => ({
-        ...row,
-        openingLocationId: row.openingLocationId || defaultLocationId,
-      }));
       this.error.set(null);
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Failed to load products');
     } finally {
       this.loading.set(false);
     }
+  }
+
+  private async loadAuxiliary(): Promise<void> {
+    const [collections, locations] = await Promise.all([
+      this.pos.listCollections(),
+      this.pos.listStockLocations(),
+    ]);
+    this.collections.set(collections);
+    this.stockLocations.set(locations);
+    const defaultLocationId = locations[0]?.id ?? '';
+    this.editorRows = this.editorRows.map(row => ({
+      ...row,
+      openingLocationId: row.openingLocationId || defaultLocationId,
+    }));
   }
 
   // --- Images ---

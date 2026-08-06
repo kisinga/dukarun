@@ -1,7 +1,7 @@
 -- Comms tests (migration 0025): notifications, outbox quiet-hours + metering,
 -- credit reminder dedupe, batch messaging.
 begin;
-select plan(10);
+select plan(13);
 
 select testkit.create_user('11111111-1111-1111-1111-111111111111', 'admin@comms.local');
 create temp table cm_company as
@@ -47,6 +47,12 @@ select is(
   'sms queued pending'
 );
 
+select is(
+  (select sms_used_this_period from public.companies where id = (select company_id from cm_company)),
+  1,
+  'SMS capacity is reserved when queued rather than after delivery'
+);
+
 -- 4. WhatsApp quiet-hours: scheduled_after always lands in the 08:00-19:00
 --    EAT window (immediate when inside, deferred to 08:00 when outside).
 reset role;
@@ -71,6 +77,25 @@ select throws_ok(
   'P0001', 'sms_limit_reached: 1 of 1 used this period',
   'sms cap enforced at the tier limit'
 );
+
+update public.companies
+set sms_used_this_period = 50, sms_period_end = now() - interval '1 second'
+where id = (select company_id from cm_company);
+select public.queue_message((select company_id from cm_company), 'sms', '0711999999', 'new period');
+
+select is(
+  (select sms_used_this_period from public.companies where id = (select company_id from cm_company)),
+  1,
+  'expired SMS usage resets before reserving the new message'
+);
+
+select ok(
+  (select sms_period_end > now() from public.companies where id = (select company_id from cm_company)),
+  'SMS reset advances the period boundary'
+);
+
+delete from public.outbox
+where company_id = (select company_id from cm_company) and recipient = '0711999999';
 
 -- restore headroom for later tests
 update public.companies set sms_used_this_period = 0 where id = (select company_id from cm_company);

@@ -19,83 +19,93 @@ import { SupabaseService } from '../../core/supabase.service';
             </p>
           </div>
 
-          <form (submit)="$event.preventDefault(); provision()" class="flex flex-col gap-5">
-            <fieldset class="flex flex-col gap-3">
-              <legend class="text-xs font-semibold uppercase tracking-wider text-base-content/45">
-                About you
-              </legend>
-              <label class="form-control">
-                <span class="label-text mb-1">Your name</span>
-                <input
-                  type="text"
-                  class="input input-bordered w-full"
-                  placeholder="Amina Otieno"
-                  autocomplete="name"
-                  [formControl]="ownerName"
-                />
-                <span class="label-text-alt mt-1 text-base-content/45">
-                  Shown to your team and on audit records.
-                </span>
-              </label>
-            </fieldset>
+          @if (createdPending()) {
+            <div class="alert alert-success" role="status">
+              <span>Your workspace was created and is awaiting platform approval.</span>
+            </div>
+          }
 
-            <fieldset class="flex flex-col gap-3">
-              <legend class="text-xs font-semibold uppercase tracking-wider text-base-content/45">
-                About the business
-              </legend>
-              <label class="form-control">
-                <span class="label-text mb-1">Business name <span class="text-error">*</span></span>
-                <input
-                  type="text"
-                  class="input input-bordered w-full"
-                  placeholder="Jiko Kiosk Enterprises"
-                  [formControl]="companyName"
-                />
-              </label>
-              <label class="form-control">
-                <span class="label-text mb-1">Location name</span>
-                <input
-                  type="text"
-                  class="input input-bordered w-full"
-                  placeholder="Main location"
-                  [formControl]="storeName"
-                />
-              </label>
-              <label class="form-control">
-                <span class="label-text mb-1">Business email</span>
-                <input
-                  type="email"
-                  class="input input-bordered w-full"
-                  placeholder="info@yourbusiness.co.ke"
-                  autocomplete="off"
-                  [formControl]="companyEmail"
-                />
-                @if (companyEmail.invalid && companyEmail.dirty) {
-                  <span class="label-text-alt mt-1 text-error">Enter a valid email address.</span>
-                }
-              </label>
-              <label class="form-control">
-                <span class="label-text mb-1">Business address</span>
-                <textarea
-                  class="textarea textarea-bordered w-full"
-                  rows="2"
-                  placeholder="Shop 4, Kimathi Street, Nairobi"
-                  [formControl]="companyAddress"
-                ></textarea>
-                <span class="label-text-alt mt-1 text-base-content/45">
-                  Printed on receipts and invoices.
-                </span>
-              </label>
-            </fieldset>
+          @if (!createdPending()) {
+            <form (submit)="$event.preventDefault(); provision()" class="flex flex-col gap-5">
+              <fieldset class="flex flex-col gap-3">
+                <legend class="text-xs font-semibold uppercase tracking-wider text-base-content/45">
+                  About you
+                </legend>
+                <label class="form-control">
+                  <span class="label-text mb-1">Your name</span>
+                  <input
+                    type="text"
+                    class="input input-bordered w-full"
+                    placeholder="Amina Otieno"
+                    autocomplete="name"
+                    [formControl]="ownerName"
+                  />
+                  <span class="label-text-alt mt-1 text-base-content/45">
+                    Shown to your team and on audit records.
+                  </span>
+                </label>
+              </fieldset>
 
-            <button
-              type="submit"
-              class="btn btn-primary"
-              [disabled]="saving() || companyName.invalid || companyEmail.invalid"
-            >
-              {{ saving() ? 'Creating workspace…' : 'Create company' }}
-            </button>
-          </form>
+              <fieldset class="flex flex-col gap-3">
+                <legend class="text-xs font-semibold uppercase tracking-wider text-base-content/45">
+                  About the business
+                </legend>
+                <label class="form-control">
+                  <span class="label-text mb-1"
+                    >Business name <span class="text-error">*</span></span
+                  >
+                  <input
+                    type="text"
+                    class="input input-bordered w-full"
+                    placeholder="Jiko Kiosk Enterprises"
+                    [formControl]="companyName"
+                  />
+                </label>
+                <label class="form-control">
+                  <span class="label-text mb-1">Location name</span>
+                  <input
+                    type="text"
+                    class="input input-bordered w-full"
+                    placeholder="Main location"
+                    [formControl]="storeName"
+                  />
+                </label>
+                <label class="form-control">
+                  <span class="label-text mb-1">Business email</span>
+                  <input
+                    type="email"
+                    class="input input-bordered w-full"
+                    placeholder="info@yourbusiness.co.ke"
+                    autocomplete="off"
+                    [formControl]="companyEmail"
+                  />
+                  @if (companyEmail.invalid && companyEmail.dirty) {
+                    <span class="label-text-alt mt-1 text-error">Enter a valid email address.</span>
+                  }
+                </label>
+                <label class="form-control">
+                  <span class="label-text mb-1">Business address</span>
+                  <textarea
+                    class="textarea textarea-bordered w-full"
+                    rows="2"
+                    placeholder="Shop 4, Kimathi Street, Nairobi"
+                    [formControl]="companyAddress"
+                  ></textarea>
+                  <span class="label-text-alt mt-1 text-base-content/45">
+                    Printed on receipts and invoices.
+                  </span>
+                </label>
+              </fieldset>
+
+              <button
+                type="submit"
+                class="btn btn-primary"
+                [disabled]="saving() || companyName.invalid || companyEmail.invalid"
+              >
+                {{ saving() ? 'Creating workspace…' : 'Create company' }}
+              </button>
+            </form>
+          }
 
           @if (error()) {
             <p class="text-sm text-error">{{ error() }}</p>
@@ -110,6 +120,7 @@ export class RegisterComponent implements OnInit {
 
   protected readonly saving = signal(false);
   protected readonly error = signal<string | null>(null);
+  protected readonly createdPending = signal(false);
   /** True when the user already belongs to a company and is adding another. */
   protected readonly hasCompany = signal(false);
 
@@ -139,7 +150,7 @@ export class RegisterComponent implements OnInit {
     this.saving.set(true);
     this.error.set(null);
     try {
-      const { error } = await this.supabase.client.rpc('provision_company', {
+      const { data: companyId, error } = await this.supabase.client.rpc('provision_company', {
         p_company_name: this.companyName.value.trim(),
         p_store_name: this.storeName.value.trim() || 'Main location',
         p_currency: 'KES',
@@ -151,6 +162,10 @@ export class RegisterComponent implements OnInit {
       // update_my_profile (and everything else) scopes by.
       const { error: refreshError } = await this.supabase.client.auth.refreshSession();
       if (refreshError) throw refreshError;
+      if (this.supabase.claims()?.company_id !== companyId) {
+        this.createdPending.set(true);
+        return;
+      }
       // The owner's display name rides on provisioning — optional, best-effort.
       const name = this.ownerName.value.trim();
       if (name) {

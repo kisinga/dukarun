@@ -909,14 +909,12 @@ export class SellComponent implements OnInit {
   }
 
   async ngOnInit(): Promise<void> {
-    this.methods.set(await this.sync.paymentMethods());
-    this.printerEnabled.set(await this.receiptData.printerEnabled());
-    void this.sync.refreshProductSnapshot();
-    try {
-      this.topVariants.set(await this.sync.topVariants(8));
-    } catch {
-      // The quick list can stay empty; product search still works.
-    }
+    void this.sync.paymentMethods().then(methods => this.methods.set(methods));
+    void this.receiptData.printerEnabled().then(enabled => this.printerEnabled.set(enabled));
+    void this.sync
+      .topVariants(8)
+      .then(variants => this.topVariants.set(variants))
+      .catch(() => undefined);
     const draftId = this.route.snapshot.queryParamMap.get('draft');
     if (draftId) await this.loadDraft(draftId);
     const customerId = this.cart.customerId();

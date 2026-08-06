@@ -103,5 +103,21 @@ jobs:
 
       - name: Smoke check
         run: |
-          curl -sf -o /dev/null -w "rest: %{http_code}\n" https://supa.dukarun.com/rest/v1/ || true
-          curl -s -o /dev/null -w "functions: %{http_code}\n" https://supa.dukarun.com/functions/v1/
+          set -eu
+          check_status() {
+            name="$1"
+            expected="$2"
+            shift 2
+            actual=$(curl -sS -o /dev/null -w '%{http_code}' "$@")
+            echo "$name: $actual"
+            if [ "$actual" != "$expected" ]; then
+              echo "::error::$name returned $actual; expected $expected"
+              exit 1
+            fi
+          }
+          check_status "REST rejects missing key" 401 https://supa.dukarun.com/rest/v1/
+          check_status "notification flush rejects missing service key" 401 \
+            -X POST https://supa.dukarun.com/functions/v1/notification-flush
+          check_status "Paystack webhook rejects unsigned payload" 401 \
+            -X POST -H 'content-type: application/json' -d '{}' \
+            https://supa.dukarun.com/functions/v1/paystack-webhook

@@ -110,6 +110,11 @@ select is(
   'newly provisioned company becomes the active company'
 );
 
+-- Platform approval is required before either membership can become a live
+-- tenant context. Provisioning itself intentionally leaves both pending.
+update public.companies set status = 'approved'
+where id in ((select company_id from provision_result), (select company_id from provision_result_2));
+
 -- Switching back as the authenticated user: company_memberships RLS only
 -- exposes the active company, so this exercises is_approved_member (0018).
 set local role authenticated;

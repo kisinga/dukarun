@@ -1,14 +1,14 @@
 -- Auth hook tests (migration 0002).
 begin;
-select plan(10);
+select plan(16);
 
 -- Fixtures
 select testkit.create_user('11111111-1111-1111-1111-111111111111', 'member@test.local');
 select testkit.create_user('33333333-3333-3333-3333-333333333333', 'loner@test.local');
 select testkit.create_user('99999999-9999-9999-9999-999999999999', 'root@platform.local');
 
-insert into public.companies (id, code, name)
-values ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'HOOKCO', 'Hook Co');
+insert into public.companies (id, code, name, status)
+values ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'HOOKCO', 'Hook Co', 'approved');
 
 select testkit.add_member('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '11111111-1111-1111-1111-111111111111', 'Admin', '{ViewFinancials}');
 
@@ -66,8 +66,8 @@ select is(
 
 -- 7-10. Multi-company (0018): the active company in user_preferences wins;
 -- its membership supplies the role; stale/disabled preferences fall back.
-insert into public.companies (id, code, name)
-values ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'HOOKCO2', 'Hook Co Two');
+insert into public.companies (id, code, name, status)
+values ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'HOOKCO2', 'Hook Co Two', 'approved');
 
 select testkit.add_member('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '11111111-1111-1111-1111-111111111111', 'Cashier', '{SettleOrder}');
 
@@ -89,6 +89,74 @@ select is(
   'Cashier',
   'role resolves from the active company membership'
 );
+
+select testkit.as_user(
+  'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+  '11111111-1111-1111-1111-111111111111',
+  'Cashier'
+);
+
+select is(
+  (select count(*)::int from public.my_companies()),
+  2,
+  'company switcher lists every accessible company'
+);
+
+reset role;
+update public.companies set status = 'unapproved'
+where id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+
+select ok(
+  (public.custom_access_token_hook(
+    '{"user_id":"11111111-1111-1111-1111-111111111111","claims":{"sub":"11111111-1111-1111-1111-111111111111"}}'
+  ) -> 'claims' ->> 'company_id') = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+  'unapproved active company is excluded from tenant claims'
+);
+
+select testkit.as_user(
+  'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+  '11111111-1111-1111-1111-111111111111',
+  'Cashier'
+);
+select ok(
+  public.current_company_id() is null,
+  'unapproved company is rejected even by an already-issued company claim'
+);
+
+reset role;
+update public.companies set status = 'approved'
+where id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+
+-- A platform suspension is stronger than membership approval. It removes the
+-- company from new tokens, the switcher, and current_company_id() for old JWTs.
+reset role;
+update public.companies set status = 'disabled'
+where id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+
+select testkit.as_user(
+  'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+  '11111111-1111-1111-1111-111111111111',
+  'Cashier'
+);
+
+select ok(
+  public.current_company_id() is null,
+  'disabled company is rejected even by an already-issued company claim'
+);
+
+reset role;
+
+select is(
+  (public.custom_access_token_hook(
+    '{"user_id":"11111111-1111-1111-1111-111111111111","claims":{"sub":"11111111-1111-1111-1111-111111111111"}}'
+  ) -> 'claims' ->> 'company_id'),
+  'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+  'disabled active company falls back to another accessible membership'
+);
+
+reset role;
+update public.companies set status = 'approved'
+where id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
 
 -- Preference points at a membership that is no longer approved: fall back to
 -- the earliest approved membership.
@@ -115,6 +183,21 @@ select is(
   ) -> 'claims' ->> 'company_id'),
   'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
   'missing preference falls back to earliest approved company'
+);
+
+-- GoTrue invokes the hook as supabase_auth_admin, not the migration owner.
+-- The local CLI connection cannot SET ROLE to it, so assert both layers that
+-- the lifecycle join needs; live password-login smoke tests execute the hook.
+select ok(
+  has_table_privilege('supabase_auth_admin', 'public.companies', 'select')
+  and exists (
+    select 1 from pg_policies
+    where schemaname = 'public'
+      and tablename = 'companies'
+      and policyname = 'auth admin reads companies for token hook'
+      and 'supabase_auth_admin' = any(roles)
+  ),
+  'GoTrue role can read company lifecycle state for the token hook'
 );
 
 select * from finish();

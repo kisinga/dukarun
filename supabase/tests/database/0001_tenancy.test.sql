@@ -13,10 +13,10 @@ select testkit.create_user('99999999-9999-9999-9999-999999999999', 'admin@platfo
 insert into public.subscription_tiers (id, code, name, price_monthly, price_yearly)
 values ('dddddddd-dddd-dddd-dddd-dddddddddddd', 'test-fixture-tier', 'Test Fixture Tier', 100000, 1000000);
 
-insert into public.companies (id, code, name, subscription_tier_id, subscription_status)
+insert into public.companies (id, code, name, status, subscription_tier_id, subscription_status)
 values
-  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'TESTCOMPA', 'Company A', 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'trial'),
-  ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'TESTCOMPB', 'Company B', 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'trial');
+  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'TESTCOMPA', 'Company A', 'approved', 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'trial'),
+  ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'TESTCOMPB', 'Company B', 'approved', 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'trial');
 
 select testkit.add_member('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '11111111-1111-1111-1111-111111111111', 'Admin', '{ViewFinancials,SettleOrder}');
 select testkit.add_member('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '22222222-2222-2222-2222-222222222222', 'Admin', '{ViewFinancials}');

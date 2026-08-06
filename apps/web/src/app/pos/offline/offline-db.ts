@@ -2,7 +2,7 @@ import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import type { Database } from '@dukarun/shared-types';
 import type { AppIdentity } from '../../core/supabase.service';
 import type { CartLine } from '../cart.service';
-import type { PaymentInput, SaleLineInput, Variant } from '../pos.service';
+import type { PaymentInput, Product, SaleLineInput, Variant } from '../pos.service';
 
 type CashierSession = Database['public']['Tables']['cashier_sessions']['Row'];
 
@@ -36,6 +36,11 @@ export interface ProductSnapshot {
   user_id: string;
   location_id: string;
   products: Variant[];
+  /** Cached separately so management can render products with no variants. */
+  families?: Product[];
+  /** Location-correct stock; variant_catalog.stock is company-wide. */
+  location_stock?: Array<{ variant_id: string; stock: number; stock_value: number }>;
+  truncated?: boolean;
   fetched_at: string; // ISO
 }
 

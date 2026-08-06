@@ -173,7 +173,7 @@ const M = v => {
   return r === 0 ? (n > 0 ? 1 : -1) : r;
 };
 
-// Vendure identifiers are Kenyan local phones ('0702604380') or usernames
+// Vendure identifiers are Kenyan local phones ('0712345678') or usernames
 // ('superadmin'); v2 auth is phone-OTP with E.164-minus-plus ('2547...',
 // see seed.sql). Returns null for non-phone identifiers.
 function normalizePhone(identifier) {
@@ -437,25 +437,34 @@ try {
     // Rounding-drift repair (cents→shillings) adjusts ledger lines post-insert;
     // the immutability guard only permits that with this flag.
     await tgt.query(`select set_config('app.allow_ledger_mutation', 'on', true)`);
+    await tgt.query(`select set_config('app.bypass_business_limits', 'on', true)`);
   }
 
   // -------------------------------------------------------------------------
   // 2. users + roles + memberships
-  //    superadmin (role __super_admin_role__) gets an auth user (sessions etc.
-  //    reference it) but NO company membership — it is platform-level.
+  //    A Vendure user may hold roles in several channels. Every channel run
+  //    resolves the same phone/email to the same GoTrue user, then adds the
+  //    company-specific membership. Legacy Vendure superadmins are deliberately
+  //    excluded: v2 platform admins are provisioned explicitly in Supabase.
   // -------------------------------------------------------------------------
   const userMap = new Map(); // vendure user id (string) -> auth uuid
   let firstMemberAuthId = null;
   {
     const { rows: admins } = await src.query(
       `select a.id as admin_id, u.id as user_id, u.identifier, u.verified,
-              a."emailAddress", a."firstName", a."lastName", r.code as role_code
+              a."emailAddress", a."firstName", a."lastName"
        from administrator a
        join "user" u on u.id = a."userId"
        join user_roles_role ur on ur."userId" = u.id
        join role r on r.id = ur."roleId"
-       join role_channels_channel rc on rc."roleId" = r.id
-       where rc."channelId" = $1 and a."deletedAt" is null and u."deletedAt" is null
+       where r.code <> '__super_admin_role__'
+         and exists (
+           select 1 from role_channels_channel rc
+           where rc."roleId" = r.id and rc."channelId" = $1
+         )
+         and a."deletedAt" is null and u."deletedAt" is null
+       group by a.id, u.id, u.identifier, u.verified,
+                a."emailAddress", a."firstName", a."lastName"
        order by a.id`,
       [channel.id]
     );
@@ -502,7 +511,7 @@ try {
     const s = stat('users');
     const sm = stat('memberships');
     const mapped = await mapAll(companyId, 'user');
-    const members = admins.filter(a => a.role_code !== '__super_admin_role__');
+    const members = admins;
     for (const a of admins) {
       const key = String(a.user_id);
       let authId = mapped.get(key) ?? null;
@@ -517,14 +526,6 @@ try {
         s.inserted++;
       }
       userMap.set(key, authId);
-      // Platform superadmins get no company membership — but they do need a
-      // platform_admins row on v2 (is_platform_admin() reads it via the JWT hook).
-      if (a.role_code === '__super_admin_role__' && !DRY) {
-        await tgt.query(
-          'insert into public.platform_admins (user_id) values ($1) on conflict do nothing',
-          [authId]
-        );
-      }
     }
     // roles: get-or-create by (company_id, name); on re-runs, top up the
     // template-managed roles' permissions (audit/staff/commissions were added

@@ -23,6 +23,15 @@ const db = createClient(
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 );
 
+function authorized(req: Request): boolean {
+  const expected = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+  const actual = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '');
+  if (!expected || actual.length !== expected.length) return false;
+  let diff = 0;
+  for (let i = 0; i < expected.length; i++) diff |= actual.charCodeAt(i) ^ expected.charCodeAt(i);
+  return diff === 0;
+}
+
 function kePhone(raw: string): string {
   const digits = raw.replace(/[^\d]/g, '');
   return digits.startsWith('0') ? '254' + digits.slice(1) : digits.replace(/^\+/, '');
@@ -93,6 +102,9 @@ Deno.serve(async req => {
   if (req.method !== 'POST') {
     return Response.json({ error: 'method_not_allowed' }, { status: 405 });
   }
+  if (!authorized(req)) {
+    return Response.json({ error: 'not_authorized' }, { status: 401 });
+  }
 
   const { data: candidates, error } = await db
     .from('outbox')
@@ -153,10 +165,6 @@ Deno.serve(async req => {
         .update({ status: 'sent', sent_at: new Date().toISOString(), attempts: row.attempts + 1 })
         .eq('id', row.id);
 
-      // SMS metering against the tier's smsPerPeriod.
-      if (row.channel === 'sms') {
-        await db.rpc('increment_sms_usage', { p_company_id: row.company_id });
-      }
       sent++;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'send failed';

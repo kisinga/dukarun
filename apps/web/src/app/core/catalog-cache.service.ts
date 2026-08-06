@@ -4,9 +4,10 @@ import { SupabaseService } from './supabase.service';
 import { LocationContextService } from './location-context.service';
 import { ConnectivityService } from '../pos/offline/connectivity.service';
 import { offlineDb, offlineScopeKey, type ProductSnapshot } from '../pos/offline/offline-db';
-import type { Variant } from '../pos/pos.service';
+import type { Product, Variant } from '../pos/pos.service';
 
 const CATALOG_LIMIT = 2_000;
+const CATALOG_MAX_AGE_MS = 5 * 60_000;
 /** Row-level patch fetches are buffered this long to coalesce bursts. */
 const PATCH_BUFFER_MS = 500;
 /** More buffered events than this falls back to one full silent refresh. */
@@ -26,6 +27,8 @@ export class CatalogCacheService {
   private readonly locations = inject(LocationContextService);
 
   readonly catalog = signal<Variant[]>([]);
+  readonly families = signal<Product[]>([]);
+  readonly stock = signal<Map<string, { stock: number; stock_value: number }>>(new Map());
   readonly fetchedAt = signal<string | null>(null);
   /** True when the catalog exceeds the offline cache — only the first rows are kept. */
   readonly catalogTruncated = signal(false);
@@ -36,6 +39,7 @@ export class CatalogCacheService {
   private companyId: string | null = null;
   private channel: RealtimeChannel | null = null;
   private refreshPromise: Promise<boolean> | null = null;
+  private stockRefreshPromise: Promise<boolean> | null = null;
   private wasOnline = true;
 
   private patchTimer: ReturnType<typeof setTimeout> | null = null;
@@ -43,6 +47,7 @@ export class CatalogCacheService {
   private readonly upsertVariantIds = new Set<string>();
   private readonly deleteVariantIds = new Set<string>();
   private readonly productIds = new Set<string>();
+  private stockDirty = false;
 
   constructor() {
     effect(() => {
@@ -70,17 +75,21 @@ export class CatalogCacheService {
    * Emit the IndexedDB snapshot immediately, then background-refresh when
    * online. Safe to call from every consumer — refreshes are shared.
    */
-  async ensureLoaded(): Promise<void> {
-    if (!this.scope) return;
+  async ensureLoaded(): Promise<boolean> {
+    const requestedScope = this.scope;
+    if (!requestedScope) return false;
     const db = await offlineDb();
-    const snapshot = await db.get('products', this.scope);
-    if (this.scope !== snapshot?.key) return;
-    if (snapshot) {
-      this.catalog.set(snapshot.products);
-      this.fetchedAt.set(snapshot.fetched_at);
-      this.loaded.set(true);
+    const snapshot = await db.get('products', requestedScope);
+    if (this.scope !== requestedScope) return false;
+    // Pre-location-stock snapshots are unsafe for POS availability and must be
+    // rehydrated once instead of presenting company-wide stock as local stock.
+    if (snapshot?.location_stock) {
+      this.applySnapshot(snapshot);
     }
-    if (this.connectivity.online()) void this.refresh();
+    const stale =
+      !snapshot || Date.now() - new Date(snapshot.fetched_at).getTime() >= CATALOG_MAX_AGE_MS;
+    if (this.connectivity.online() && stale) void this.refresh();
+    return !!snapshot?.families && !!snapshot.location_stock;
   }
 
   /** Current in-memory catalog rows (empty until ensureLoaded resolves). */
@@ -103,35 +112,90 @@ export class CatalogCacheService {
     if (!identity || !locationId || !this.connectivity.online()) return false;
     const scope = offlineScopeKey(identity, locationId);
     try {
-      const { data, error, count } = await this.supabase.client
-        .from('variant_catalog')
-        .select('*', { count: 'exact' })
-        .order('product_name')
-        .order('variant_name')
-        .order('variant_id')
-        .limit(CATALOG_LIMIT);
-      if (error) throw error;
+      const [catalogResult, familyResult, stockResult] = await Promise.all([
+        this.supabase.client
+          .from('variant_catalog')
+          .select('*')
+          .order('product_name')
+          .order('variant_name')
+          .order('variant_id')
+          .limit(CATALOG_LIMIT + 1),
+        this.supabase.client
+          .from('products')
+          .select('*')
+          .order('name')
+          .limit(CATALOG_LIMIT + 1),
+        this.supabase.client.rpc('location_stock_snapshot', { p_location_id: locationId }),
+      ]);
+      if (catalogResult.error) throw catalogResult.error;
+      if (familyResult.error) throw familyResult.error;
+      if (stockResult.error) throw stockResult.error;
       // Discard the write if the user switched company/location mid-flight.
       if (scope !== this.scope) return false;
+      const locationStock = (stockResult.data ?? []).map(row => ({
+        variant_id: row.variant_id!,
+        stock: Number(row.stock ?? 0),
+        stock_value: row.stock_value ?? 0,
+      }));
+      const stockByVariant = new Map(locationStock.map(row => [row.variant_id, row]));
+      const products = (catalogResult.data ?? []).slice(0, CATALOG_LIMIT).map(row => ({
+        ...row,
+        stock: stockByVariant.get(row.variant_id!)?.stock ?? 0,
+      }));
       const db = await offlineDb();
       const snapshot: ProductSnapshot = {
         key: scope,
         company_id: identity.companyId,
         user_id: identity.userId,
         location_id: locationId,
-        products: data,
+        products,
+        families: (familyResult.data ?? []).slice(0, CATALOG_LIMIT),
+        location_stock: locationStock,
+        truncated:
+          (catalogResult.data?.length ?? 0) > CATALOG_LIMIT ||
+          (familyResult.data?.length ?? 0) > CATALOG_LIMIT,
         fetched_at: new Date().toISOString(),
       };
       await db.put('products', snapshot);
-      this.catalog.set(snapshot.products);
-      this.fetchedAt.set(snapshot.fetched_at);
-      this.catalogTruncated.set((count ?? data.length) > CATALOG_LIMIT);
-      this.loaded.set(true);
+      this.applySnapshot(snapshot);
       return true;
     } catch {
       // Snapshot refresh is best-effort; a stale cache beats none.
       return false;
     }
+  }
+
+  /** Inventory events only need a location-stock refresh, not a full catalog download. */
+  private refreshStock(): Promise<boolean> {
+    if (this.stockRefreshPromise) return this.stockRefreshPromise;
+    const run = async (): Promise<boolean> => {
+      const locationId = this.locations.activeId();
+      const scope = this.scope;
+      if (!locationId || !scope || !this.connectivity.online()) return false;
+      const { data, error } = await this.supabase.client.rpc('location_stock_snapshot', {
+        p_location_id: locationId,
+      });
+      if (error || scope !== this.scope) return false;
+      const locationStock = (data ?? []).map(row => ({
+        variant_id: row.variant_id!,
+        stock: Number(row.stock ?? 0),
+        stock_value: row.stock_value ?? 0,
+      }));
+      const stockByVariant = new Map(locationStock.map(row => [row.variant_id, row]));
+      const products = this.catalog().map(row => ({
+        ...row,
+        stock: stockByVariant.get(row.variant_id!)?.stock ?? 0,
+      }));
+      const db = await offlineDb();
+      const existing = await db.get('products', scope);
+      if (!existing || scope !== this.scope) return false;
+      const snapshot = { ...existing, products, location_stock: locationStock };
+      await db.put('products', snapshot);
+      this.applySnapshot(snapshot);
+      return true;
+    };
+    this.stockRefreshPromise = run().finally(() => (this.stockRefreshPromise = null));
+    return this.stockRefreshPromise;
   }
 
   // --- Realtime patching ---
@@ -155,6 +219,14 @@ export class CatalogCacheService {
           'postgres_changes',
           { event: '*', schema: 'public', table: 'products', filter },
           payload => this.onProductChange(payload)
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'inventory_batches', filter },
+          () => {
+            this.stockDirty = true;
+            this.bufferPatch();
+          }
         )
         .subscribe();
     } catch {
@@ -212,6 +284,7 @@ export class CatalogCacheService {
     this.upsertVariantIds.clear();
     this.deleteVariantIds.clear();
     this.productIds.clear();
+    this.stockDirty = false;
   }
 
   private async flushPatches(): Promise<void> {
@@ -222,31 +295,33 @@ export class CatalogCacheService {
     const upsertIds = [...this.upsertVariantIds];
     const deleteIds = [...this.deleteVariantIds];
     const productIds = [...this.productIds];
+    const stockDirty = this.stockDirty;
     this.clearPatchBuffer();
     try {
-      let rows = this.catalog().filter(
-        v => !deleteIds.includes(v.variant_id!) && !productIds.includes(v.product_id!)
-      );
+      // Family changes affect both the management rows and all child labels.
+      if (productIds.length > 0) {
+        await this.refresh();
+        return;
+      }
+      let rows = this.catalog().filter(v => !deleteIds.includes(v.variant_id!));
       if (upsertIds.length > 0) {
         const { data, error } = await this.supabase.client
           .from('variant_catalog')
           .select('*')
           .in('variant_id', upsertIds);
         if (error) throw error;
-        const patched = new Map((data ?? []).map(row => [row.variant_id, row]));
+        const stock = this.stock();
+        const patched = new Map(
+          (data ?? []).map(row => [
+            row.variant_id,
+            { ...row, stock: stock.get(row.variant_id!)?.stock ?? 0 },
+          ])
+        );
         rows = rows.map(v => patched.get(v.variant_id) ?? v);
         for (const id of upsertIds) {
           const row = patched.get(id);
           if (row && !rows.some(v => v.variant_id === id)) rows.push(row);
         }
-      }
-      if (productIds.length > 0) {
-        const { data, error } = await this.supabase.client
-          .from('variant_catalog')
-          .select('*')
-          .in('product_id', productIds);
-        if (error) throw error;
-        rows.push(...(data ?? []));
       }
       rows.sort(
         (a, b) =>
@@ -259,14 +334,33 @@ export class CatalogCacheService {
       const db = await offlineDb();
       const existing = await db.get('products', this.scope);
       if (existing) await db.put('products', { ...existing, products: rows });
+      if (stockDirty) await this.refreshStock();
     } catch {
       // A failed patch leaves the stale snapshot; the next refresh heals it.
     }
   }
 
+  private applySnapshot(snapshot: ProductSnapshot): void {
+    this.catalog.set(snapshot.products);
+    this.families.set(snapshot.families ?? []);
+    this.stock.set(
+      new Map(
+        (snapshot.location_stock ?? []).map(row => [
+          row.variant_id,
+          { stock: row.stock, stock_value: row.stock_value },
+        ])
+      )
+    );
+    this.fetchedAt.set(snapshot.fetched_at);
+    this.catalogTruncated.set(snapshot.truncated ?? false);
+    this.loaded.set(true);
+  }
+
   private reset(): void {
     this.clearPatchBuffer();
     this.catalog.set([]);
+    this.families.set([]);
+    this.stock.set(new Map());
     this.fetchedAt.set(null);
     this.catalogTruncated.set(false);
     this.loaded.set(false);

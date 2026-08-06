@@ -1,7 +1,7 @@
 -- Money ops tests (migration 0007): expenses, transfers, refunds, reversals,
 -- balance adjustments, posting idempotency.
 begin;
-select plan(15);
+select plan(17);
 
 select testkit.create_user('11111111-1111-1111-1111-111111111111', 'admin@mops.local');
 select testkit.create_user('22222222-2222-2222-2222-222222222222', 'cashier@mops.local');
@@ -129,6 +129,18 @@ select is(
   public.post_payment_reversal((select payment_id from pay_m)),
   (select entry_id from prev1),
   'payment reversal is idempotent'
+);
+
+select is(
+  (select status from public.payments where id = (select payment_id from pay_m)),
+  'cancelled',
+  'payment reversal atomically removes the payment from settled collections'
+);
+
+select throws_ok(
+  $$select public.post_refund((select order_id from sale_m), 1, 'cash', 'after reversal')$$,
+  'P0001', 'refund_exceeds_collected: refundable amount is 0',
+  'a reversed payment cannot fund another cash refund'
 );
 
 select is(
