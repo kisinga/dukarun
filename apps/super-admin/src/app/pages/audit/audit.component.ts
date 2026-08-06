@@ -1,5 +1,6 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
+import { NgIcon } from '@ng-icons/core';
 import { AuditRow, Company, PlatformService } from '../../core/platform.service';
 import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
 import { PageHeaderComponent } from '../../shared/ui/page-header.component';
@@ -13,16 +14,33 @@ const OP_TYPE: Record<string, 'success' | 'warning' | 'error' | 'neutral' | 'inf
 
 @Component({
   selector: 'app-audit',
-  imports: [ReactiveFormsModule, PageHeaderComponent, EmptyStateComponent, StatusBadgeComponent],
+  imports: [
+    ReactiveFormsModule,
+    NgIcon,
+    PageHeaderComponent,
+    EmptyStateComponent,
+    StatusBadgeComponent,
+  ],
   template: `
-    <app-page-header title="Audit log" subtitle="Every tracked write, newest first" />
+    <app-page-header title="Audit log" subtitle="Every tracked write, newest first">
+      <button
+        actions
+        class="btn btn-square btn-ghost btn-sm min-h-11 min-w-11"
+        title="Refresh audit log"
+        aria-label="Refresh audit log"
+        [disabled]="loading()"
+        (click)="load()"
+      >
+        <ng-icon name="heroArrowPath" [class.animate-spin]="loading()" />
+      </button>
+    </app-page-header>
 
     <!-- Filters -->
     <div class="card mb-3 bg-base-100">
-      <div class="card-body flex-row flex-wrap items-end gap-3 p-4">
+      <div class="card-body grid items-end gap-3 p-4 sm:grid-cols-2 lg:grid-cols-5">
         <label class="form-control">
-          <span class="label-text text-xs">Table</span>
-          <select class="select select-bordered select-sm" [formControl]="table">
+          <span class="label-text">Table</span>
+          <select class="select select-bordered select-sm w-full" [formControl]="table">
             <option value="">All</option>
             @for (t of tables(); track t) {
               <option [value]="t">{{ t }}</option>
@@ -30,8 +48,8 @@ const OP_TYPE: Record<string, 'success' | 'warning' | 'error' | 'neutral' | 'inf
           </select>
         </label>
         <label class="form-control">
-          <span class="label-text text-xs">Operation</span>
-          <select class="select select-bordered select-sm" [formControl]="operation">
+          <span class="label-text">Operation</span>
+          <select class="select select-bordered select-sm w-full" [formControl]="operation">
             <option value="">All</option>
             <option value="INSERT">INSERT</option>
             <option value="UPDATE">UPDATE</option>
@@ -39,8 +57,8 @@ const OP_TYPE: Record<string, 'success' | 'warning' | 'error' | 'neutral' | 'inf
           </select>
         </label>
         <label class="form-control">
-          <span class="label-text text-xs">Company</span>
-          <select class="select select-bordered select-sm" [formControl]="companyId">
+          <span class="label-text">Company</span>
+          <select class="select select-bordered select-sm w-full" [formControl]="companyId">
             <option value="">All</option>
             @for (c of companies(); track c.id) {
               <option [value]="c.id">{{ c.name }}</option>
@@ -48,15 +66,17 @@ const OP_TYPE: Record<string, 'success' | 'warning' | 'error' | 'neutral' | 'inf
           </select>
         </label>
         <label class="form-control">
-          <span class="label-text text-xs">Since</span>
-          <input type="date" class="input input-bordered input-sm" [formControl]="since" />
+          <span class="label-text">Since</span>
+          <input type="date" class="input input-bordered input-sm w-full" [formControl]="since" />
         </label>
         <button class="btn btn-primary btn-sm min-h-11" (click)="load()">Apply</button>
       </div>
     </div>
 
     @if (error()) {
-      <p class="mb-2 text-sm text-error">{{ error() }}</p>
+      <div class="alert alert-error mb-4" role="alert">
+        <span>{{ error() }}</span>
+      </div>
     }
 
     @if (rows().length === 0) {
@@ -136,6 +156,7 @@ export class AuditComponent implements OnInit {
 
   protected readonly tables = signal<string[]>([]);
   protected readonly error = signal<string | null>(null);
+  protected readonly loading = signal(false);
 
   async ngOnInit(): Promise<void> {
     try {
@@ -147,6 +168,7 @@ export class AuditComponent implements OnInit {
   }
 
   protected async load(): Promise<void> {
+    this.loading.set(true);
     try {
       const rows = await this.platform.auditLog({
         table: this.table.value || undefined,
@@ -163,6 +185,8 @@ export class AuditComponent implements OnInit {
       this.error.set(null);
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Failed to load audit log');
+    } finally {
+      this.loading.set(false);
     }
   }
 

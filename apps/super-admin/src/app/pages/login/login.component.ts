@@ -8,44 +8,54 @@ import { AuthService } from '../../core/auth.service';
   imports: [ReactiveFormsModule],
   template: `
     <main class="dashboard-main flex min-h-screen items-center justify-center bg-base-200 p-4">
-      <div class="card w-full max-w-sm bg-base-100">
-        <div class="card-body">
+      <div class="w-full max-w-sm">
+        <div class="mb-6 text-center">
+          <span
+            class="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-field bg-primary font-bold text-primary-content"
+            >D</span
+          >
           <h1 class="type-title">Dukarun Platform</h1>
-          <p class="text-sm text-base-content/70">Staff sign-in</p>
+          <p class="mt-1 text-sm text-base-content/70">Secure access for platform staff</p>
+        </div>
+        <div class="card bg-base-100">
+          <div class="card-body p-5 sm:p-6">
+            @if (denied()) {
+              <div class="alert alert-error mb-4" role="alert">
+                <span class="text-sm"> Signed in, but this account is not a platform admin. </span>
+              </div>
+            }
 
-          @if (denied()) {
-            <div class="alert alert-error mt-3">
-              <span class="text-sm"> Signed in, but this account is not a platform admin. </span>
-            </div>
-          }
+            <form (submit)="$event.preventDefault(); signIn()" class="flex flex-col gap-4">
+              <label class="form-control">
+                <span class="label-text mb-1">Email</span>
+                <input
+                  type="email"
+                  class="input input-bordered w-full"
+                  autocomplete="email"
+                  [formControl]="email"
+                />
+              </label>
+              <label class="form-control">
+                <span class="label-text mb-1">Password</span>
+                <input
+                  type="password"
+                  class="input input-bordered w-full"
+                  autocomplete="current-password"
+                  [formControl]="password"
+                />
+              </label>
+              <button type="submit" class="btn btn-primary min-h-11" [disabled]="busy()">
+                @if (busy()) {
+                  <span class="loading loading-spinner loading-sm"></span>
+                }
+                {{ busy() ? 'Signing in…' : 'Sign in' }}
+              </button>
+            </form>
 
-          <form (submit)="$event.preventDefault(); signIn()" class="mt-4 flex flex-col gap-4">
-            <label class="form-control">
-              <span class="label-text mb-1">Email</span>
-              <input
-                type="email"
-                class="input input-bordered w-full"
-                autocomplete="email"
-                [formControl]="email"
-              />
-            </label>
-            <label class="form-control">
-              <span class="label-text mb-1">Password</span>
-              <input
-                type="password"
-                class="input input-bordered w-full"
-                autocomplete="current-password"
-                [formControl]="password"
-              />
-            </label>
-            <button type="submit" class="btn btn-primary min-h-11" [disabled]="busy()">
-              {{ busy() ? 'Signing in…' : 'Sign in' }}
-            </button>
-          </form>
-
-          @if (error()) {
-            <p class="mt-2 text-sm text-error">{{ error() }}</p>
-          }
+            @if (error()) {
+              <p class="mt-3 text-sm text-error" role="alert">{{ error() }}</p>
+            }
+          </div>
         </div>
       </div>
     </main>

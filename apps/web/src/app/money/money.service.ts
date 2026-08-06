@@ -3,6 +3,7 @@ import type { Database } from '@dukarun/shared-types';
 import { SupabaseService } from '../core/supabase.service';
 import { rpcError } from '../pos/pos.service';
 import { LocationContextService } from '../core/location-context.service';
+import { PartyCacheService } from '../core/party-cache.service';
 
 export type LedgerAccount = Database['public']['Tables']['ledger_accounts']['Row'];
 export type JournalEntry = Database['public']['Tables']['ledger_journal_entries']['Row'];
@@ -65,6 +66,7 @@ export interface CashierAccount {
 export class MoneyService {
   private readonly supabase = inject(SupabaseService);
   private readonly locations = inject(LocationContextService);
+  private readonly parties = inject(PartyCacheService);
 
   private get db() {
     return this.supabase.client;
@@ -258,65 +260,6 @@ export class MoneyService {
     });
     if (error) throw rpcError(error);
     return data;
-  }
-
-  /** Non-supplier customers joined with their AR balance + credit aging (client-side joins). */
-  async customersWithAr(
-    includeDeleted = false
-  ): Promise<(MoneyCustomer & { ar_balance: number } & AgingInfo)[]> {
-    let customerQuery = this.db
-      .from('customers')
-      .select('*')
-      .eq('is_supplier', false)
-      .order('first_name');
-    if (!includeDeleted) customerQuery = customerQuery.is('deleted_at', null);
-    const [
-      { data: customers, error: e1 },
-      { data: balances, error: e2 },
-      { data: aging, error: e3 },
-    ] = await Promise.all([
-      customerQuery,
-      this.db.from('customer_ar_balances').select('*'),
-      this.db.from('customer_credit_aging').select('customer_id, days_outstanding, bucket'),
-    ]);
-    if (e1) throw e1;
-    if (e2) throw e2;
-    if (e3) throw e3;
-    const byCustomer = new Map((balances ?? []).map(b => [b.customer_id, b.balance ?? 0]));
-    const agingByCustomer = new Map(
-      (aging ?? []).filter(a => a.customer_id !== null).map(a => [a.customer_id!, a])
-    );
-    return (customers ?? []).map(c => ({
-      ...c,
-      ar_balance: byCustomer.get(c.id) ?? 0,
-      days_outstanding: agingByCustomer.get(c.id)?.days_outstanding ?? null,
-      bucket: agingByCustomer.get(c.id)?.bucket ?? null,
-    }));
-  }
-
-  async suppliersWithAp(): Promise<(MoneyCustomer & { ap_balance: number } & AgingInfo)[]> {
-    const [
-      { data: suppliers, error: e1 },
-      { data: balances, error: e2 },
-      { data: aging, error: e3 },
-    ] = await Promise.all([
-      this.db.from('customers').select('*').eq('is_supplier', true).order('first_name'),
-      this.db.from('supplier_ap_balances').select('*'),
-      this.db.from('supplier_ap_aging').select('supplier_id, days_outstanding, bucket'),
-    ]);
-    if (e1) throw e1;
-    if (e2) throw e2;
-    if (e3) throw e3;
-    const bySupplier = new Map((balances ?? []).map(b => [b.supplier_id, b.balance ?? 0]));
-    const agingBySupplier = new Map(
-      (aging ?? []).filter(a => a.supplier_id !== null).map(a => [a.supplier_id!, a])
-    );
-    return (suppliers ?? []).map(s => ({
-      ...s,
-      ap_balance: bySupplier.get(s.id) ?? 0,
-      days_outstanding: agingBySupplier.get(s.id)?.days_outstanding ?? null,
-      bucket: agingBySupplier.get(s.id)?.bucket ?? null,
-    }));
   }
 
   async creditOrders(customerId: string) {
@@ -538,6 +481,7 @@ export class MoneyService {
       ...(reference ? { p_reference: reference } : {}),
     });
     if (error) throw rpcError(error);
+    this.parties.invalidateFinancials();
     return data;
   }
 
@@ -554,6 +498,7 @@ export class MoneyService {
       ...(reference ? { p_reference: reference } : {}),
     });
     if (error) throw rpcError(error);
+    this.parties.invalidateFinancials();
   }
 
   async postRefund(
@@ -569,6 +514,7 @@ export class MoneyService {
       p_reason: reason,
     });
     if (error) throw rpcError(error);
+    this.parties.invalidateFinancials();
     return data;
   }
 
@@ -577,6 +523,7 @@ export class MoneyService {
       p_payment_id: paymentId,
     });
     if (error) throw rpcError(error);
+    this.parties.invalidateFinancials();
     return data;
   }
 
@@ -587,6 +534,7 @@ export class MoneyService {
       p_reason: reason,
     });
     if (error) throw rpcError(error);
+    this.parties.invalidateFinancials();
     return data;
   }
 
@@ -597,6 +545,7 @@ export class MoneyService {
       p_reason: reason,
     });
     if (error) throw rpcError(error);
+    this.parties.invalidateFinancials();
     return data;
   }
 
@@ -613,6 +562,7 @@ export class MoneyService {
       ...(termsDays !== undefined ? { p_terms_days: termsDays } : {}),
     });
     if (error) throw rpcError(error);
+    this.parties.invalidate();
     return data;
   }
 
@@ -627,6 +577,7 @@ export class MoneyService {
       ...(termsDays !== undefined ? { p_terms_days: termsDays } : {}),
     });
     if (error) throw rpcError(error);
+    this.parties.invalidate();
     return data;
   }
 
@@ -645,6 +596,7 @@ export class MoneyService {
       p_is_supplier: isSupplier,
     });
     if (error) throw rpcError(error);
+    this.parties.invalidate();
     return data;
   }
 
@@ -668,6 +620,7 @@ export class MoneyService {
       ...(changes.notes !== undefined ? { p_notes: changes.notes } : {}),
     });
     if (error) throw rpcError(error);
+    this.parties.invalidate();
     return data;
   }
 
@@ -677,6 +630,7 @@ export class MoneyService {
       p_deleted: deleted,
     });
     if (error) throw rpcError(error);
+    this.parties.invalidate();
     return data;
   }
 
@@ -709,6 +663,7 @@ export class MoneyService {
       ...(stockLocationId ? { p_stock_location_id: stockLocationId } : {}),
     });
     if (error) throw rpcError(error);
+    this.parties.invalidateFinancials();
     return data;
   }
 
@@ -741,6 +696,7 @@ export class MoneyService {
       ...(stockLocationId ? { p_stock_location_id: stockLocationId } : {}),
     });
     if (error) throw rpcError(error);
+    this.parties.invalidateFinancials();
     return data;
   }
 
@@ -785,6 +741,7 @@ export class MoneyService {
       ...(stockLocationId ? { p_stock_location_id: stockLocationId } : {}),
     });
     if (error) throw rpcError(error);
+    this.parties.invalidateFinancials();
     return data;
   }
 
@@ -801,6 +758,7 @@ export class MoneyService {
       ...(stockLocationId ? { p_stock_location_id: stockLocationId } : {}),
     });
     if (error) throw rpcError(error);
+    this.parties.invalidateFinancials();
     return data;
   }
 
@@ -816,6 +774,7 @@ export class MoneyService {
       p_account_code: accountCode,
     });
     if (error) throw rpcError(error);
+    this.parties.invalidateFinancials();
     return data;
   }
 
@@ -826,6 +785,7 @@ export class MoneyService {
       p_account_code: accountCode,
     });
     if (error) throw rpcError(error);
+    this.parties.invalidateFinancials();
     return data;
   }
 
@@ -835,6 +795,7 @@ export class MoneyService {
       p_active: active,
     });
     if (error) throw rpcError(error);
+    this.parties.invalidate();
     return data;
   }
 

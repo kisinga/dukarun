@@ -10,8 +10,8 @@ import { NgIcon } from '@ng-icons/core';
   selector: 'app-page-header',
   imports: [RouterLink, NgIcon],
   template: `
-    <div class="mb-4 flex flex-wrap items-start gap-x-4 gap-y-3">
-      <div class="min-w-0">
+    <div class="mb-6 flex flex-wrap items-start gap-x-4 gap-y-3">
+      <div class="min-w-0 flex-1">
         @if (backLink(); as link) {
           <a
             [routerLink]="link"
@@ -29,10 +29,10 @@ import { NgIcon } from '@ng-icons/core';
           }
         </h1>
         @if (subtitle()) {
-          <p class="mt-0.5 truncate text-sm text-base-content/60">{{ subtitle() }}</p>
+          <p class="mt-0.5 text-sm text-base-content/60">{{ subtitle() }}</p>
         }
       </div>
-      <div class="ml-auto flex shrink-0 items-center gap-2">
+      <div class="flex shrink-0 items-center gap-2">
         <ng-content select="[actions]"></ng-content>
       </div>
     </div>

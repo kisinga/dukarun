@@ -282,7 +282,22 @@ try {
   // -------------------------------------------------------------------------
   {
     const s = stat('company');
+    const { rows: standardTiers } = await tgt.query(
+      "select id from public.subscription_tiers where code='standard' and is_active limit 1"
+    );
+    const standardTierId = standardTiers[0]?.id ?? null;
+    if (!standardTierId) {
+      throw new Error("target subscription tier 'standard' is missing or inactive");
+    }
     if (resumed) {
+      if (!DRY) {
+        await tgt.query(
+          `update public.companies
+           set subscription_tier_id=$2, updated_at=now()
+           where id=$1 and subscription_tier_id is distinct from $2`,
+          [companyId, standardTierId]
+        );
+      }
       s.existing++;
     } else if (DRY) {
       s.inserted++;
@@ -290,25 +305,6 @@ try {
         `  plan company: code=${channel.code} name=${FLAGS.name ?? prettify(channel.code)}`
       );
     } else {
-      // tier: source subscription_tier.id -> code -> target tier by code, else null
-      let tierId = null;
-      if (channel.customFieldsSubscriptiontierid) {
-        const st = await src.query('select code from subscription_tier where id=$1', [
-          channel.customFieldsSubscriptiontierid,
-        ]);
-        if (st.rows[0]) {
-          const tt = await tgt.query('select id from public.subscription_tiers where code=$1', [
-            st.rows[0].code,
-          ]);
-          tierId = tt.rows[0]?.id ?? null;
-          if (!tierId)
-            warn(`tier code '${st.rows[0].code}' not found in target; subscription_tier_id null`);
-        } else {
-          warn(
-            `source tier ${channel.customFieldsSubscriptiontierid} not found; subscription_tier_id null`
-          );
-        }
-      }
       const status = (channel.customFieldsStatus ?? 'unapproved').toLowerCase();
       if (!['unapproved', 'approved', 'disabled', 'banned'].includes(status)) {
         warn(`unknown channel status '${channel.customFieldsStatus}' -> 'unapproved'`);
@@ -332,22 +328,18 @@ try {
         }
       }
       const name = FLAGS.name ?? prettify(channel.code);
-      // v2 launch (owner decision 2026-08-05): every migrated member WITHOUT a
-      // live paid subscription gets a fresh 1-week trial so nothing feels
-      // bricked on arrival. Live subscribers (active + future expiry)
-      // keep their verbatim subscription state.
+      // Every imported company receives the Standard capability bundle. A
+      // company without a live paid subscription still gets a time-limited
+      // trial status; tier controls capabilities, while status controls access
+      // duration. Live subscribers keep their verbatim subscription state.
       const subExpiry = channel.customFieldsSubscriptionexpiresat
         ? new Date(channel.customFieldsSubscriptionexpiresat)
         : null;
       const hasLiveSub = subStatus === 'active' && subExpiry !== null && subExpiry > new Date();
-      let trialTierId = null;
       const launchTrialEnd = new Date(Date.now() + 7 * 24 * 3600 * 1000);
       if (!hasLiveSub) {
-        const tt = await tgt.query("select id from public.subscription_tiers where code='trial'");
-        trialTierId = tt.rows[0]?.id ?? null;
-        if (!trialTierId) warn("no 'trial' tier in target; falling back to source tier mapping");
         console.log(
-          `  launch trial: 1-week trial granted (expires ${launchTrialEnd.toISOString().slice(0, 10)})`
+          `  launch trial: Standard tier for 1 week (expires ${launchTrialEnd.toISOString().slice(0, 10)})`
         );
       }
       const { rows } = await tgt.query(
@@ -385,7 +377,7 @@ try {
             channel.customFieldsNotificationcategorypreferences,
             'notificationCategoryPreferences'
           ),
-          hasLiveSub || !trialTierId ? tierId : trialTierId,
+          standardTierId,
           hasLiveSub
             ? ['trial', 'active', 'expired', 'cancelled'].includes(subStatus)
               ? subStatus
@@ -619,6 +611,21 @@ try {
   {
     if (!DRY) {
       const s = stat('ledger_accounts');
+      // The target schema treats M-Pesa as a real money account. Older ETL
+      // runs used the pre-0029 clearing-account code, so normalize it before
+      // the idempotent inserts below.
+      await tgt.query(
+        `update public.ledger_accounts
+         set code='MPESA', name='M-Pesa', updated_at=now()
+         where company_id=$1 and code='CLEARING_MPESA'`,
+        [companyId]
+      );
+      await tgt.query(
+        `update public.payment_methods
+         set ledger_account_code='MPESA', updated_at=now()
+         where company_id=$1 and ledger_account_code='CLEARING_MPESA'`,
+        [companyId]
+      );
       const { rows: cash } = await tgt.query(
         `insert into public.ledger_accounts (company_id, code, name, type, is_parent, is_system)
          values ($1,'CASH','Cash','asset',true,true)
@@ -638,7 +645,7 @@ try {
       const LEAVES = [
         ['CASH_ON_HAND', 'Cash on Hand', 'asset', 'CASH'],
         ['BANK_MAIN', 'Bank - Main', 'asset', 'CASH'],
-        ['CLEARING_MPESA', 'Clearing - M-Pesa', 'asset', 'CASH'],
+        ['MPESA', 'M-Pesa', 'asset', 'CASH'],
         ['CLEARING_CREDIT', 'Clearing - Customer Credit', 'asset', null],
         ['CLEARING_GENERIC', 'Clearing - Generic', 'asset', null],
         ['ACCOUNTS_RECEIVABLE', 'Accounts Receivable', 'asset', null],
@@ -665,10 +672,21 @@ try {
         );
         r.rowCount ? s.inserted++ : s.existing++;
       }
+      // These are the only accounts that users may choose for expenses,
+      // transfers, and supplier payments. The column defaults to false, so
+      // direct ETL inserts must explicitly apply the same rule as provisioning.
+      await tgt.query(
+        `update public.ledger_accounts
+         set allow_manual_posting=(code in ('CASH_ON_HAND','BANK_MAIN','MPESA')),
+             updated_at=now()
+         where company_id=$1
+           and allow_manual_posting<>(code in ('CASH_ON_HAND','BANK_MAIN','MPESA'))`,
+        [companyId]
+      );
       const pm = stat('payment_methods');
       const METHODS = [
         ['cash', 'Cash', 'CASH_ON_HAND', 'blind_count', true],
-        ['mpesa', 'M-Pesa', 'CLEARING_MPESA', 'transaction_verification', true],
+        ['mpesa', 'M-Pesa', 'MPESA', 'transaction_verification', true],
         ['bank', 'Bank Transfer', 'BANK_MAIN', 'statement_match', false],
         ['credit', 'Customer Credit', 'CLEARING_CREDIT', 'credit_ledger', false],
       ];

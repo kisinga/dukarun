@@ -12,6 +12,7 @@ import { MoneyComponent } from '../../shared/ui/money.component';
 import { PaginationComponent } from '../../shared/ui/pagination.component';
 import { StatBarComponent } from '../../shared/ui/stat-bar.component';
 import { StatusBadgeComponent, type BadgeType } from '../../shared/ui/status-badge.component';
+import { PartyCacheService } from '../../core/party-cache.service';
 
 type CreditMode = 'receivables' | 'payables';
 type CustomerWithAr = MoneyCustomer & { ar_balance: number } & AgingInfo;
@@ -83,6 +84,11 @@ interface CreditParty {
         <div role="alert" class="alert alert-error mb-3 text-sm">
           <app-icon name="heroExclamationTriangle" />
           <span>{{ error() }}</span>
+        </div>
+      }
+      @if (partyCache.loaded() && !partyCache.complete()) {
+        <div role="status" class="alert alert-warning mb-3 text-sm">
+          Party limit reached. Credit totals and local filters cover cached parties only.
         </div>
       }
 
@@ -264,9 +270,10 @@ interface CreditParty {
 })
 export class MoneyCreditComponent implements OnInit {
   private readonly money = inject(MoneyService);
+  protected readonly partyCache = inject(PartyCacheService);
 
-  protected readonly customers = signal<CustomerWithAr[]>([]);
-  protected readonly suppliers = signal<SupplierWithAp[]>([]);
+  protected readonly customers = computed<CustomerWithAr[]>(() => this.partyCache.customerRows());
+  protected readonly suppliers = computed<SupplierWithAp[]>(() => this.partyCache.suppliers());
   protected readonly mode = signal<CreditMode>('receivables');
   protected readonly query = signal('');
   protected readonly page = signal(1);
@@ -345,12 +352,7 @@ export class MoneyCreditComponent implements OnInit {
     this.loading.set(true);
     this.error.set(null);
     try {
-      const [customers, suppliers] = await Promise.all([
-        this.money.customersWithAr(),
-        this.money.suppliersWithAp(),
-      ]);
-      this.customers.set(customers);
-      this.suppliers.set(suppliers);
+      await this.partyCache.ensureLoaded();
     } catch (error) {
       this.error.set(error instanceof Error ? error.message : 'Failed to load credit position');
     } finally {

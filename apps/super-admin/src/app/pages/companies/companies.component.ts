@@ -2,6 +2,7 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { debounceTime, distinctUntilChanged } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { NgIcon } from '@ng-icons/core';
 import { formatKes } from '../../core/money';
 import { Company, PlatformService, Tier } from '../../core/platform.service';
 import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
@@ -27,24 +28,50 @@ const SUB_TYPE: Record<string, BadgeType> = {
 
 @Component({
   selector: 'app-companies',
-  imports: [ReactiveFormsModule, PageHeaderComponent, EmptyStateComponent, StatusBadgeComponent],
+  imports: [
+    ReactiveFormsModule,
+    NgIcon,
+    PageHeaderComponent,
+    EmptyStateComponent,
+    StatusBadgeComponent,
+  ],
   template: `
     <app-page-header title="Companies" [subtitle]="companies().length + ' shown'">
-      <button actions class="btn btn-ghost btn-sm" (click)="load()">Refresh</button>
+      <button
+        actions
+        class="btn btn-square btn-ghost btn-sm min-h-11 min-w-11"
+        title="Refresh companies"
+        aria-label="Refresh companies"
+        [disabled]="loading()"
+        (click)="load()"
+      >
+        <ng-icon name="heroArrowPath" [class.animate-spin]="loading()" />
+      </button>
     </app-page-header>
 
-    <input
-      type="text"
-      class="input input-bordered input-sm mb-3 w-full max-w-sm"
-      placeholder="Search name or code…"
-      [formControl]="search"
-    />
+    <div class="card mb-4 bg-base-100">
+      <div class="p-4">
+        <label class="form-control max-w-sm">
+          <span class="label-text">Search companies</span>
+          <input
+            type="search"
+            class="input input-bordered input-sm w-full"
+            placeholder="Name or company code"
+            [formControl]="search"
+          />
+        </label>
+      </div>
+    </div>
 
     @if (error()) {
-      <p class="mb-2 text-sm text-error">{{ error() }}</p>
+      <div class="alert alert-error mb-4" role="alert">
+        <span>{{ error() }}</span>
+      </div>
     }
     @if (notice()) {
-      <p class="mb-2 text-sm text-success">{{ notice() }}</p>
+      <div class="alert alert-success mb-4" role="status">
+        <span>{{ notice() }}</span>
+      </div>
     }
 
     @if (companies().length === 0) {
@@ -261,6 +288,7 @@ export class CompaniesComponent implements OnInit {
   protected readonly subExemptReason = new FormControl('', { nonNullable: true });
 
   protected readonly busy = signal(false);
+  protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
 
@@ -280,11 +308,14 @@ export class CompaniesComponent implements OnInit {
   }
 
   protected async load(): Promise<void> {
+    this.loading.set(true);
     try {
       this.companies.set((await this.platform.companies(this.search.value)) as CompanyRow[]);
       this.error.set(null);
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Failed to load companies');
+    } finally {
+      this.loading.set(false);
     }
   }
 

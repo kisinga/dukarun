@@ -97,12 +97,11 @@ export class NotificationsService implements OnDestroy {
   async smsUsage(): Promise<{ used: number; limit: number | null }> {
     const { data, error } = await this.db
       .from('companies')
-      .select('sms_used_this_period, subscription_tiers(limits)')
+      .select('sms_used_this_period, subscription_tiers(sms_per_period)')
       .limit(1)
       .single();
     if (error) throw error;
-    const limits = (data.subscription_tiers as { limits?: { smsPerPeriod?: number } } | null)
-      ?.limits;
-    return { used: data.sms_used_this_period, limit: limits?.smsPerPeriod ?? null };
+    const tier = data.subscription_tiers as { sms_per_period: number | null } | null;
+    return { used: data.sms_used_this_period, limit: tier?.sms_per_period ?? null };
   }
 }

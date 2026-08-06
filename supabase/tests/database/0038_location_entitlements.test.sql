@@ -7,13 +7,21 @@ select testkit.create_user('40404040-4040-4040-4040-404040404040',
 create temp table location_company as
 select testkit.provision('39393939-3939-3939-3939-393939393939', 'Location Feature Co') company_id;
 grant select on pg_temp.location_company to authenticated;
+insert into public.subscription_tiers (
+  code, name, price_monthly, price_yearly, max_team_members,
+  max_products, max_stock_locations, max_orders_per_month, sms_per_period
+)
+values ('restricted-test', 'Restricted Test', 0, 0, 1, 100, 1, 500, 50);
+update public.companies
+set subscription_tier_id = (select id from public.subscription_tiers where code = 'restricted-test')
+where id = (select company_id from location_company);
 select testkit.as_user((select company_id from location_company),
   '39393939-3939-3939-3939-393939393939', 'Admin');
 
 select is((public.current_entitlements() -> 'features' ->> 'multipleLocations')::boolean,
-  false, 'trial disables multiple locations');
+  false, 'restricted tier disables multiple locations');
 select is((public.current_entitlements() -> 'limits' ->> 'maxStockLocations')::int,
-  1, 'trial exposes the location limit');
+  1, 'restricted tier exposes the location limit');
 select is((public.current_entitlements() -> 'usage' ->> 'stockLocations')::int,
   1, 'entitlements expose current usage');
 select is((select count(*)::int from public.stock_locations where company_id =
@@ -21,15 +29,15 @@ select is((select count(*)::int from public.stock_locations where company_id =
 select throws_ok(
   $$select public.create_stock_location('BR-2', 'Branch 2')$$,
   'P0001', 'feature_unavailable: multiple locations; upgrade your plan',
-  'trial cannot add a second location');
+  'restricted tier cannot add a second location');
 select throws_ok(
   $$select public.add_team_member('0740404040',
     (select id from public.roles where company_id =
       (select company_id from location_company) and name = 'Cashier'))$$,
   'P0001', 'limit_reached: team member limit (1); upgrade your plan',
-  'trial team-member limit is enforced');
+  'restricted tier team-member limit is enforced');
 set local role postgres;
-create temp table disabled_trial_member as
+create temp table disabled_restricted_member as
 with inserted as (
   insert into public.company_memberships (company_id, user_id, role_id, authorization_status)
   select (select company_id from location_company), '40404040-4040-4040-4040-404040404040',
@@ -38,12 +46,12 @@ with inserted as (
   returning id
 )
 select id membership_id from inserted;
-grant select on pg_temp.disabled_trial_member to authenticated;
+grant select on pg_temp.disabled_restricted_member to authenticated;
 select testkit.as_user((select company_id from location_company),
   '39393939-3939-3939-3939-393939393939', 'Admin');
 select throws_ok(
   $$select public.update_team_member(
-    (select membership_id from disabled_trial_member), null, 'approved')$$,
+    (select membership_id from disabled_restricted_member), null, 'approved')$$,
   'P0001', 'limit_reached: team member limit (1); upgrade your plan',
   'reactivating a member also enforces the limit');
 
@@ -52,13 +60,17 @@ select lives_ok(
     (select id from public.stock_locations where company_id =
       (select company_id from location_company) and is_default),
     'MAIN', 'Main shop', true)$$,
-  'trial can maintain its existing location');
+  'restricted tier can maintain its existing location');
 
 set local role postgres;
-insert into public.subscription_tiers (code, name, price_monthly, price_yearly, features, limits)
-values ('location-test', 'Location Test', 1, 1, '{"multipleLocations":true}',
-  '{"maxStockLocations":2}')
-on conflict (code) do update set features = excluded.features, limits = excluded.limits;
+insert into public.subscription_tiers (
+  code, name, price_monthly, price_yearly,
+  multiple_locations_enabled, max_stock_locations
+)
+values ('location-test', 'Location Test', 1, 1, true, 2)
+on conflict (code) do update
+set multiple_locations_enabled = excluded.multiple_locations_enabled,
+    max_stock_locations = excluded.max_stock_locations;
 update public.companies set subscription_tier_id =
   (select id from public.subscription_tiers where code = 'location-test'), subscription_status = 'active'
 where id = (select company_id from location_company);

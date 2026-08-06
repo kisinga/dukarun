@@ -1,5 +1,6 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
+import { NgIcon } from '@ng-icons/core';
 import {
   Company,
   FailedOutboxRow,
@@ -7,21 +8,33 @@ import {
   PlatformService,
 } from '../../core/platform.service';
 import { PageHeaderComponent } from '../../shared/ui/page-header.component';
+import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
 
 @Component({
   selector: 'app-operations',
-  imports: [ReactiveFormsModule, PageHeaderComponent],
+  imports: [ReactiveFormsModule, NgIcon, PageHeaderComponent, EmptyStateComponent],
   template: `
-    <app-page-header title="Operations" subtitle="Registration, accounting and delivery health."
-      ><button actions class="btn btn-ghost btn-sm" (click)="load()">
-        Refresh
-      </button></app-page-header
-    >
+    <app-page-header title="Operations" subtitle="Registration, accounting and delivery health">
+      <button
+        actions
+        class="btn btn-square btn-ghost btn-sm min-h-11 min-w-11"
+        title="Refresh operations"
+        aria-label="Refresh operations"
+        [disabled]="loading()"
+        (click)="load()"
+      >
+        <ng-icon name="heroArrowPath" [class.animate-spin]="loading()" />
+      </button>
+    </app-page-header>
     @if (error()) {
-      <p class="mb-3 text-sm text-error">{{ error() }}</p>
+      <div class="alert alert-error mb-4" role="alert">
+        <span>{{ error() }}</span>
+      </div>
     }
     @if (notice()) {
-      <p class="mb-3 text-sm text-success">{{ notice() }}</p>
+      <div class="alert alert-success mb-4" role="status">
+        <span>{{ notice() }}</span>
+      </div>
     }
     @if (snapshot(); as stats) {
       <div class="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -29,11 +42,9 @@ import { PageHeaderComponent } from '../../shared/ui/page-header.component';
           <div class="card bg-base-100">
             <div class="card-body p-4">
               <span class="type-caption">{{ stat.label }}</span
-              ><strong
-                class="text-2xl tabular-nums"
-                [class.text-error]="stat.danger && stat.value > 0"
-                >{{ stat.value }}</strong
-              >
+              ><strong class="type-hero" [class.text-error]="stat.danger && stat.value > 0">{{
+                stat.value
+              }}</strong>
             </div>
           </div>
         }
@@ -46,17 +57,29 @@ import { PageHeaderComponent } from '../../shared/ui/page-header.component';
           <div class="mt-2 divide-y divide-base-200">
             @for (company of pending(); track company.id) {
               <div class="flex items-center gap-2 py-2">
-                <span class="flex-1"
-                  ><strong>{{ company.name }}</strong
-                  ><br /><span class="type-caption"
-                    >{{ company.code }} · {{ date(company.created_at) }}</span
-                  ></span
-                ><button class="btn btn-success btn-outline btn-xs" (click)="approve(company)">
-                  Approve
+                <span class="min-w-0 flex-1">
+                  <strong class="block truncate">{{ company.name }}</strong>
+                  <span class="type-caption">
+                    {{ company.code }} · {{ date(company.created_at) }}
+                  </span>
+                </span>
+                <button
+                  class="btn btn-outline btn-sm min-h-11"
+                  [disabled]="approvingId() !== null"
+                  (click)="approve(company)"
+                >
+                  @if (approvingId() === company.id) {
+                    <span class="loading loading-spinner loading-sm"></span>
+                  }
+                  {{ approvingId() === company.id ? 'Approving…' : 'Approve' }}
                 </button>
               </div>
             } @empty {
-              <p class="text-sm text-base-content/60">No registrations waiting.</p>
+              <app-empty-state
+                [embedded]="true"
+                title="All caught up"
+                description="No registrations are waiting for approval."
+              />
             }
           </div>
         </div>
@@ -64,22 +87,29 @@ import { PageHeaderComponent } from '../../shared/ui/page-header.component';
       <section class="card bg-base-100">
         <form class="card-body p-4" (submit)="$event.preventDefault(); sendBroadcast()">
           <h2 class="type-heading">Platform broadcast</h2>
-          <label class="form-control"
-            ><span class="label-text text-xs">Title</span
-            ><input class="input input-bordered input-sm" [formControl]="title" /></label
-          ><label class="form-control"
-            ><span class="label-text text-xs">Message</span
-            ><textarea class="textarea textarea-bordered" [formControl]="body"></textarea></label
-          ><label class="form-control"
-            ><span class="label-text text-xs">App link</span
-            ><input
+          <label class="form-control">
+            <span class="label-text">Title</span>
+            <input class="input input-bordered input-sm w-full" [formControl]="title" />
+          </label>
+          <label class="form-control">
+            <span class="label-text">Message</span>
+            <textarea class="textarea textarea-bordered w-full" [formControl]="body"></textarea>
+          </label>
+          <label class="form-control">
+            <span class="label-text">App link</span>
+            <input
               class="input input-bordered input-sm"
               placeholder="/notifications"
-              [formControl]="link" /></label
-          ><button
-            class="btn btn-primary btn-sm self-start"
+              [formControl]="link"
+            />
+          </label>
+          <button
+            class="btn btn-primary btn-sm min-h-11 self-start"
             [disabled]="busy() || !title.value.trim() || !body.value.trim()"
           >
+            @if (busy()) {
+              <span class="loading loading-spinner loading-sm"></span>
+            }
             Send to approved companies
           </button>
         </form>
@@ -130,13 +160,16 @@ export class OperationsComponent implements OnInit {
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
   protected readonly busy = signal(false);
+  protected readonly loading = signal(false);
+  protected readonly approvingId = signal<string | null>(null);
   protected readonly title = new FormControl('', { nonNullable: true });
   protected readonly body = new FormControl('', { nonNullable: true });
   protected readonly link = new FormControl('/notifications', { nonNullable: true });
-  async ngOnInit() {
+  async ngOnInit(): Promise<void> {
     await this.load();
   }
-  protected async load() {
+  protected async load(): Promise<void> {
+    this.loading.set(true);
     try {
       const [snapshot, pending, failures] = await Promise.all([
         this.platform.operationsSnapshot(),
@@ -149,6 +182,8 @@ export class OperationsComponent implements OnInit {
       this.error.set(null);
     } catch (error) {
       this.error.set(error instanceof Error ? error.message : 'Load failed');
+    } finally {
+      this.loading.set(false);
     }
   }
   protected cards(s: OperationsSnapshot) {
@@ -159,17 +194,22 @@ export class OperationsComponent implements OnInit {
       { label: 'Unbalanced journals', value: s.unbalanced_journals, danger: true },
     ];
   }
-  protected async approve(company: Company) {
+  protected async approve(company: Company): Promise<void> {
+    this.approvingId.set(company.id);
+    this.error.set(null);
     try {
       await this.platform.setCompanyStatus(company.id, 'approved');
       this.notice.set(company.name + ' approved');
       await this.load();
     } catch (error) {
       this.error.set(error instanceof Error ? error.message : 'Approval failed');
+    } finally {
+      this.approvingId.set(null);
     }
   }
-  protected async sendBroadcast() {
+  protected async sendBroadcast(): Promise<void> {
     this.busy.set(true);
+    this.error.set(null);
     try {
       const count = await this.platform.broadcast(
         this.title.value.trim(),
@@ -185,7 +225,7 @@ export class OperationsComponent implements OnInit {
       this.busy.set(false);
     }
   }
-  protected date(value: string) {
+  protected date(value: string): string {
     return new Date(value).toLocaleString('en-KE');
   }
 }

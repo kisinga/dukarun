@@ -6,14 +6,6 @@ import { SupabaseService } from '../core/supabase.service';
 export type Tier = Database['public']['Tables']['subscription_tiers']['Row'];
 export type BillingCycle = 'monthly' | 'yearly';
 
-export interface TierLimits {
-  maxAdmins?: number;
-  maxProducts?: number;
-  maxStockLocations?: number;
-  maxOrdersPerMonth?: number;
-  smsPerPeriod?: number;
-}
-
 /** Company billing row (companies read surface). */
 export interface CompanyBilling {
   id: string;

@@ -631,7 +631,7 @@ export class TeamComponent implements OnInit {
   protected permissionLabel(permission: string): string {
     return PERMISSION_LABELS[permission as keyof typeof PERMISSION_LABELS] ?? permission;
   }
-  protected readonly memberLimit = computed(() => this.entitlements.limit('maxAdmins'));
+  protected readonly memberLimit = computed(() => this.entitlements.limit('maxTeamMembers'));
   protected readonly activeMemberCount = computed(
     () => this.members().filter(member => member.authorization_status === 'approved').length
   );

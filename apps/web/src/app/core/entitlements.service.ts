@@ -3,7 +3,7 @@ import { SupabaseService } from './supabase.service';
 
 export type FeatureKey = 'multipleLocations' | 'staffPerformance' | 'commissions';
 export type LimitKey =
-  'maxAdmins' | 'maxProducts' | 'maxStockLocations' | 'maxOrdersPerMonth' | 'smsPerPeriod';
+  'maxTeamMembers' | 'maxProducts' | 'maxStockLocations' | 'maxOrdersPerMonth' | 'smsPerPeriod';
 
 export interface EntitlementSnapshot {
   companyId: string;

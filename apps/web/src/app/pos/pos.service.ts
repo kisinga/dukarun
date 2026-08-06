@@ -3,6 +3,7 @@ import type { Database } from '@dukarun/shared-types';
 import { SupabaseService } from '../core/supabase.service';
 import { environment } from '../../environments/environment';
 import { LocationContextService } from '../core/location-context.service';
+import { PartyCacheService, type PartyQueryResult } from '../core/party-cache.service';
 
 export type Product = Database['public']['Tables']['products']['Row'];
 export type Collection = Database['public']['Tables']['collections']['Row'];
@@ -112,6 +113,7 @@ export function rpcError(error: { message: string; code?: string }): PosRpcError
 export class PosService {
   private readonly supabase = inject(SupabaseService);
   private readonly locations = inject(LocationContextService);
+  private readonly parties = inject(PartyCacheService);
 
   get client() {
     return this.supabase.client;
@@ -417,45 +419,12 @@ export class PosService {
     return (data ?? []).map(r => r.collection_id);
   }
 
-  async searchCustomers(query: string): Promise<CustomerWithCredit[]> {
-    const pattern = `%${query.trim().replace(/[%_,()]/g, ' ')}%`;
-    const { data, error } = await this.client
-      .from('customers')
-      .select('*')
-      .eq('is_supplier', false)
-      .is('deleted_at', null)
-      .or(`first_name.ilike.${pattern},last_name.ilike.${pattern},phone.ilike.${pattern}`)
-      .limit(10);
-    if (error) throw error;
-    return this.withCustomerBalances(data);
+  async searchCustomers(query: string): Promise<PartyQueryResult<CustomerWithCredit>> {
+    return this.parties.searchCustomers(query);
   }
 
   async customerWithCredit(customerId: string): Promise<CustomerWithCredit | null> {
-    const { data, error } = await this.client
-      .from('customers')
-      .select('*')
-      .eq('id', customerId)
-      .eq('is_supplier', false)
-      .is('deleted_at', null)
-      .maybeSingle();
-    if (error) throw error;
-    if (!data) return null;
-    return (await this.withCustomerBalances([data]))[0] ?? null;
-  }
-
-  private async withCustomerBalances(customers: Customer[]): Promise<CustomerWithCredit[]> {
-    if (customers.length === 0) return [];
-    const ids = customers.map(customer => customer.id);
-    const { data, error } = await this.client
-      .from('customer_ar_balances')
-      .select('customer_id, balance')
-      .in('customer_id', ids);
-    if (error) throw error;
-    const balances = new Map((data ?? []).map(row => [row.customer_id, row.balance ?? 0]));
-    return customers.map(customer => ({
-      ...customer,
-      ar_balance: balances.get(customer.id) ?? 0,
-    }));
+    return this.parties.customerWithCredit(customerId);
   }
 
   /** Enabled non-credit payment methods with display names and till-control flags. */

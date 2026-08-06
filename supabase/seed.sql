@@ -9,16 +9,25 @@
 -- ---------------------------------------------------------------------------
 -- Subscription tiers (production tiers are admin-created; dev convenience)
 -- ---------------------------------------------------------------------------
-insert into public.subscription_tiers (code, name, price_monthly, price_yearly, features, limits)
+insert into public.subscription_tiers (
+  code, name, price_monthly, price_yearly,
+  multiple_locations_enabled, staff_performance_enabled, commissions_available,
+  max_team_members, max_products, max_stock_locations, max_orders_per_month, sms_per_period
+)
 values
-  ('trial', 'Trial', 0, 0, '{"multipleLocations": false, "staffPerformance": false, "commissions": false}', '{"maxAdmins": 1, "maxProducts": 100, "maxStockLocations": 1, "maxOrdersPerMonth": 500, "smsPerPeriod": 50}'),
-  ('standard', 'Standard', 1500, 15000, '{"multipleLocations": true, "staffPerformance": true, "commissions": true}', '{"maxAdmins": 5, "maxProducts": 5000, "maxStockLocations": 3, "maxOrdersPerMonth": 10000, "smsPerPeriod": 500}')
+  ('standard', 'Standard', 1500, 15000, true, true, true, 5, 5000, 3, 10000, 500)
 on conflict (code) do update
 set name = excluded.name,
     price_monthly = excluded.price_monthly,
     price_yearly = excluded.price_yearly,
-    features = excluded.features,
-    limits = excluded.limits;
+    multiple_locations_enabled = excluded.multiple_locations_enabled,
+    staff_performance_enabled = excluded.staff_performance_enabled,
+    commissions_available = excluded.commissions_available,
+    max_team_members = excluded.max_team_members,
+    max_products = excluded.max_products,
+    max_stock_locations = excluded.max_stock_locations,
+    max_orders_per_month = excluded.max_orders_per_month,
+    sms_per_period = excluded.sms_per_period;
 
 -- ---------------------------------------------------------------------------
 -- Demo auth user (matches [auth.sms.test_otp] in config.toml)
@@ -50,8 +59,7 @@ where not exists (
   where user_id = '5877ac73-ff8d-457c-afcd-791e66229d17'
 );
 
--- The demo exercises paid-plan and multi-location paths instead of being
--- constrained to the single-location trial fixture.
+-- The demo exercises active paid-subscription paths instead of trial status.
 update public.companies c
 set subscription_tier_id = t.id,
     subscription_status = 'active',

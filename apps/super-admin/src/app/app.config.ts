@@ -7,10 +7,20 @@ import { provideRouter, withInMemoryScrolling } from '@angular/router';
 import { provideNgIconsConfig, provideIcons } from '@ng-icons/core';
 import {
   heroArchiveBox,
+  heroArrowPath,
+  heroArrowRightOnRectangle,
+  heroBars3,
+  heroBuildingOffice2,
+  heroChartBar,
   heroCheckCircle,
   heroChevronLeft,
+  heroClipboardDocumentList,
+  heroCog6Tooth,
+  heroHome,
+  heroMoon,
   heroPlus,
-  heroXMark,
+  heroServerStack,
+  heroSun,
 } from '@ng-icons/heroicons/outline';
 
 import { routes } from './app.routes';
@@ -21,6 +31,22 @@ export const appConfig: ApplicationConfig = {
     provideZonelessChangeDetection(),
     provideRouter(routes, withInMemoryScrolling({ scrollPositionRestoration: 'enabled' })),
     provideNgIconsConfig({ size: '1rem' }),
-    provideIcons({ heroArchiveBox, heroCheckCircle, heroChevronLeft, heroPlus, heroXMark }),
+    provideIcons({
+      heroArchiveBox,
+      heroArrowPath,
+      heroArrowRightOnRectangle,
+      heroBars3,
+      heroBuildingOffice2,
+      heroChartBar,
+      heroCheckCircle,
+      heroChevronLeft,
+      heroClipboardDocumentList,
+      heroCog6Tooth,
+      heroHome,
+      heroMoon,
+      heroPlus,
+      heroServerStack,
+      heroSun,
+    }),
   ],
 };

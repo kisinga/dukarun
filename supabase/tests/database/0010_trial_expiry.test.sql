@@ -1,7 +1,7 @@
 -- 0010_trial_expiry: provisioning sets an enforceable expiry, and the daily
 -- scan actually flips a lapsed trial to expired with a grace window.
 begin;
-select plan(4);
+select plan(5);
 
 select testkit.create_user('60606060-6060-6060-6060-606060606060', 'trial-expiry@test.local');
 
@@ -13,6 +13,14 @@ select is(
   (select subscription_status from public.companies where id = (select company_id from trial_company)),
   'trial',
   'new company starts on trial'
+);
+
+select is(
+  (select t.code from public.companies c
+   join public.subscription_tiers t on t.id = c.subscription_tier_id
+   where c.id = (select company_id from trial_company)),
+  'standard',
+  'trial status uses the Standard capability tier'
 );
 
 select is(

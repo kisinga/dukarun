@@ -67,9 +67,9 @@ select ok(
 
 -- 5. SMS metering: tier with smsPerPeriod=1 blocks the second.
 reset role;
-update public.subscription_tiers set limits = '{"smsPerPeriod": 1}' where code = 'trial';
+update public.subscription_tiers set sms_per_period = 1 where code = 'standard';
 update public.companies set sms_used_this_period = 1,
-  subscription_tier_id = (select id from public.subscription_tiers where code = 'trial')
+  subscription_tier_id = (select id from public.subscription_tiers where code = 'standard')
 where id = (select company_id from cm_company);
 
 select throws_ok(
@@ -99,7 +99,7 @@ where company_id = (select company_id from cm_company) and recipient = '07119999
 
 -- restore headroom for later tests
 update public.companies set sms_used_this_period = 0 where id = (select company_id from cm_company);
-update public.subscription_tiers set limits = '{"smsPerPeriod": 50, "maxAdmins": 1, "maxProducts": 100, "maxStockLocations": 1, "maxOrdersPerMonth": 500}' where code = 'trial';
+update public.subscription_tiers set sms_per_period = 500 where code = 'standard';
 
 -- 6-8. Credit reminders: overdue customer gets notified once, deduped on rerun.
 -- Create a 10-day-old credit sale (bucket 8-30).

@@ -608,6 +608,27 @@ interface DraftFlag {
                         }
                       </ul>
                     }
+                    @if (
+                      customerDropdownOpen() &&
+                      customerSearch.value.trim().length >= 2 &&
+                      customerResults().length === 0
+                    ) {
+                      <p class="mt-1 text-xs text-base-content/60">
+                        {{
+                          customerSearchExhaustive()
+                            ? 'No customers found'
+                            : 'No cached matches — more may be available online'
+                        }}
+                      </p>
+                    } @else if (customerDropdownOpen() && !customerSearchExhaustive()) {
+                      <p class="mt-1 text-xs text-base-content/60">
+                        {{
+                          customerSearchHasMore()
+                            ? 'Refine search for more matches'
+                            : 'Cached results may be incomplete'
+                        }}
+                      </p>
+                    }
                   </div>
                 }
               </section>
@@ -842,6 +863,8 @@ export class SellComponent implements OnInit {
 
   protected readonly customerSearch = new FormControl('', { nonNullable: true });
   protected readonly customerResults = signal<CustomerWithCredit[]>([]);
+  protected readonly customerSearchExhaustive = signal(true);
+  protected readonly customerSearchHasMore = signal(false);
   protected readonly selectedCustomer = signal<CustomerWithCredit | null>(null);
   protected readonly customerDropdownOpen = signal(false);
 
@@ -894,6 +917,7 @@ export class SellComponent implements OnInit {
   protected readonly approvalSent = signal(false);
   private approvalSentTimer: ReturnType<typeof setTimeout> | null = null;
   private searchSeq = 0;
+  private customerSearchSeq = 0;
   private priceFloorTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
@@ -1141,12 +1165,19 @@ export class SellComponent implements OnInit {
 
   protected async onCustomerSearch(query: string): Promise<void> {
     const q = query.trim();
+    const seq = ++this.customerSearchSeq;
     if (q.length < 2) {
       this.customerResults.set([]);
+      this.customerSearchExhaustive.set(true);
+      this.customerSearchHasMore.set(false);
       return;
     }
     try {
-      this.customerResults.set(await this.pos.searchCustomers(q));
+      const result = await this.pos.searchCustomers(q);
+      if (seq !== this.customerSearchSeq) return;
+      this.customerResults.set(result.items);
+      this.customerSearchExhaustive.set(result.exhaustive);
+      this.customerSearchHasMore.set(result.hasMore);
       this.customerDropdownOpen.set(true);
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Customer search failed');

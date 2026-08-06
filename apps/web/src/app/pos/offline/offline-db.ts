@@ -5,6 +5,19 @@ import type { CartLine } from '../cart.service';
 import type { PaymentInput, Product, SaleLineInput, Variant } from '../pos.service';
 
 type CashierSession = Database['public']['Tables']['cashier_sessions']['Row'];
+type Customer = Database['public']['Tables']['customers']['Row'];
+
+export type CachedCustomer = Customer & {
+  ar_balance: number;
+  days_outstanding: number | null;
+  bucket: string | null;
+};
+
+export type CachedSupplier = Customer & {
+  ap_balance: number;
+  days_outstanding: number | null;
+  bucket: string | null;
+};
 
 interface ScopedRecord {
   company_id: string;
@@ -42,6 +55,16 @@ export interface ProductSnapshot {
   location_stock?: Array<{ variant_id: string; stock: number; stock_value: number }>;
   truncated?: boolean;
   fetched_at: string; // ISO
+}
+
+export interface PartySnapshot extends ScopedRecord {
+  key: string;
+  customers: CachedCustomer[];
+  suppliers: CachedSupplier[];
+  /** False means local browse/search can return matches, never authoritative absence. */
+  complete: boolean;
+  directory_fetched_at: string;
+  financial_fetched_at: string;
 }
 
 export interface PersistedCart extends ScopedRecord {
@@ -86,6 +109,10 @@ interface PosOfflineDb extends DBSchema {
     key: string;
     value: ProductSnapshot;
   };
+  parties: {
+    key: string;
+    value: PartySnapshot;
+  };
   cart: {
     key: string;
     value: PersistedCart;
@@ -106,7 +133,7 @@ export function offlineDb(): Promise<IDBPDatabase<PosOfflineDb>> {
   // v3 scopes all new records by company + user. Existing records are never
   // deleted here: unscoped outbox entries are quarantined by SyncService so an
   // upgrade cannot lose or accidentally replay a sale under another account.
-  dbPromise ??= openDB<PosOfflineDb>('dukarun-pos-offline', 3, {
+  dbPromise ??= openDB<PosOfflineDb>('dukarun-pos-offline', 4, {
     upgrade(db, _oldVersion, _newVersion, transaction) {
       const outbox = db.objectStoreNames.contains('outbox')
         ? transaction.objectStore('outbox')
@@ -116,6 +143,9 @@ export function offlineDb(): Promise<IDBPDatabase<PosOfflineDb>> {
       }
       if (!db.objectStoreNames.contains('products')) {
         db.createObjectStore('products', { keyPath: 'key' });
+      }
+      if (!db.objectStoreNames.contains('parties')) {
+        db.createObjectStore('parties', { keyPath: 'key' });
       }
       if (!db.objectStoreNames.contains('cart')) {
         db.createObjectStore('cart', { keyPath: 'key' });

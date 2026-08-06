@@ -115,7 +115,7 @@ delete from public.orders where company_id = (select company_id from bl_company)
 
 -- 9-10. Tier limits: set a tiny product limit and hit it.
 reset role;
-update public.subscription_tiers set limits = '{"maxProducts": 1}' where code = 'standard';
+update public.subscription_tiers set max_products = 1 where code = 'standard';
 update public.companies
 set subscription_status = 'active',
     subscription_expires_at = now() + interval '30 days',

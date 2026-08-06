@@ -17,10 +17,11 @@ const cashier = source('src/app/core/cashier-session.service.ts');
 const shell = source('src/app/shell/shell.component.ts');
 const pos = source('src/app/pos/pos.service.ts');
 const authGuard = source('src/app/core/auth.guard.ts');
+const dbVersion = Number(db.match(/openDB<PosOfflineDb>\('dukarun-pos-offline', (\d+),/)?.[1]);
 
 const checks = [
   {
-    ok: /openDB<PosOfflineDb>\('dukarun-pos-offline', 3,/.test(db),
+    ok: Number.isInteger(dbVersion) && dbVersion >= 3,
     message: 'IndexedDB schema must remain on the tenant-scoped v3+ migration path.',
   },
   {

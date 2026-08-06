@@ -61,13 +61,18 @@ platform-admin JWT claim.
 
 ## Feature entitlements
 
-Subscription tiers expose two separate contracts: boolean `features` answer whether a capability
-exists, while numeric `limits` cap its usage. `current_entitlements` is the shared frontend read
-model; it includes the tier, feature map, limits and current usage. UI gating is explanatory only:
-write RPCs enforce subscription state, feature availability, permissions and limits inside the
-database transaction.
+Subscription tiers use typed boolean capability columns and nullable integer quota columns.
+`current_entitlements` is the shared frontend read model; it includes the tier, feature map, limits
+and current usage. UI gating is explanatory only: write RPCs enforce subscription state, feature
+availability, permissions and limits inside the database transaction. Trial is a subscription
+status over the Standard tier, not a separate capability tier.
 
-Multiple stock locations use the `multipleLocations` feature and `maxStockLocations` limit. Trial
-keeps its provisioned default location and may maintain it, but cannot create another. Location
-creation, editing, default selection and deletion live in Settings. Locations carrying stock or
-purchase history cannot be deleted.
+Multiple stock locations use the `multipleLocations` feature and `maxStockLocations` limit.
+Location creation, editing, default selection and deletion live in Settings. Locations carrying
+stock or purchase history cannot be deleted.
+
+The other feature keys are `staffPerformance` and `commissions`. Staff performance also requires
+the user's `ViewStaffPerformance` permission. Commissions require the tier feature, the company's
+Settings opt-in, and the user's `ManageCommissions` permission. The supported numeric limits are
+`maxTeamMembers`, `maxProducts` (active variants), `maxStockLocations`, `maxOrdersPerMonth`
+(non-voided sales), and `smsPerPeriod`. A null limit is unlimited; zero prevents new usage.

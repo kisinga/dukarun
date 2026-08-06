@@ -78,17 +78,46 @@
   /* Table language: calm uppercase headers, middle-aligned cells,
      tabular-nums on right-aligned (amount) cells. */
   .dashboard-main .table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+
+    th,
+    td {
+      padding: 0.75rem 1rem;
+    }
+
     thead th {
       font-size: 0.75rem;
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.05em;
       color: color-mix(in oklab, var(--color-base-content) 50%, transparent);
-      border-bottom: 1px solid color-mix(in oklab, var(--color-base-300) 60%, transparent);
+      background: color-mix(in oklab, var(--color-base-200) 72%, var(--color-base-100));
+      border-bottom: 1px solid var(--color-base-300);
+      white-space: nowrap;
+    }
+
+    tbody {
+      font-size: 0.875rem;
+      line-height: 1.375;
     }
 
     tbody td {
       vertical-align: middle;
+      border-bottom: 1px solid color-mix(in oklab, var(--color-base-300) 75%, transparent);
+    }
+
+    tbody tr:last-child > td {
+      border-bottom: 0;
+    }
+
+    tbody tr:not(.row-detail) {
+      transition: background-color 120ms ease;
+    }
+
+    tbody tr:not(.row-detail):hover > td {
+      background: color-mix(in oklab, var(--color-primary) 4%, var(--color-base-100));
     }
 
     td.text-right,
@@ -102,6 +131,30 @@
       border-bottom: 1px solid color-mix(in oklab, var(--color-base-300) 60%, transparent);
       padding: 1rem;
     }
+  }
+
+  /* Router pages share one calm, centered canvas. */
+  .dashboard-main > :not(router-outlet) {
+    display: block;
+    width: 100%;
+    max-width: 80rem;
+    margin-inline: auto;
+  }
+
+  /* Tables remain usable at counter-width without breaking the page. */
+  .dashboard-main .card:has(> .table),
+  .dashboard-main .card:has(> table) {
+    overflow-x: auto;
+  }
+
+  .form-control {
+    gap: 0.25rem;
+  }
+
+  .form-control .label-text {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: color-mix(in oklab, var(--color-base-content) 70%, transparent);
   }
 }
 
@@ -272,4 +325,29 @@ body {
   font-size: 0.875rem; // Counter body role
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+html,
+body {
+  min-height: 100%;
+  background: var(--color-base-200);
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  transition-duration: 150ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
 }

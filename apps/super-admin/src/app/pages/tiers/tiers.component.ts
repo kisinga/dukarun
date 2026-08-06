@@ -1,45 +1,84 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
+import { NgIcon } from '@ng-icons/core';
 import { formatKes, formatKesInput, parseKes } from '../../core/money';
 import { PlatformService, Tier } from '../../core/platform.service';
 import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
 import { PageHeaderComponent } from '../../shared/ui/page-header.component';
 import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
 
-const LIMIT_KEYS = [
-  ['maxAdmins', 'Max team members'],
-  ['maxProducts', 'Max products'],
-  ['maxStockLocations', 'Max stock locations'],
-  ['maxOrdersPerMonth', 'Max sales/mo'],
-  ['smsPerPeriod', 'SMS/mo'],
+const LIMIT_FIELDS = [
+  {
+    key: 'max_team_members',
+    label: 'Max team members',
+    help: 'Approved company memberships.',
+  },
+  { key: 'max_products', label: 'Max products', help: 'Active product variants.' },
+  {
+    key: 'max_stock_locations',
+    label: 'Max stock locations',
+    help: 'Requires Multiple stock locations when greater than one.',
+  },
+  { key: 'max_orders_per_month', label: 'Max sales/mo', help: 'Non-voided sales per month.' },
+  { key: 'sms_per_period', label: 'SMS/mo', help: 'Messages reserved in the monthly SMS period.' },
 ] as const;
 
-const FEATURE_KEYS = [['multipleLocations', 'Multiple stock locations']] as const;
+const FEATURE_FIELDS = [
+  {
+    key: 'multiple_locations_enabled',
+    label: 'Multiple stock locations',
+    help: 'Allows creating and managing more than the provisioned default location.',
+  },
+  {
+    key: 'staff_performance_enabled',
+    label: 'Staff performance',
+    help: 'Enables staff sales attribution and performance reports for permitted users.',
+  },
+  {
+    key: 'commissions_available',
+    label: 'Commissions',
+    help: 'Makes commissions available; each company must also enable commissions in Settings.',
+  },
+] as const;
 
 @Component({
   selector: 'app-tiers',
-  imports: [ReactiveFormsModule, PageHeaderComponent, EmptyStateComponent, StatusBadgeComponent],
+  imports: [
+    ReactiveFormsModule,
+    NgIcon,
+    PageHeaderComponent,
+    EmptyStateComponent,
+    StatusBadgeComponent,
+  ],
   template: `
     <app-page-header title="Subscription tiers">
-      <button actions class="btn btn-primary btn-sm min-h-11" (click)="startCreate()">
-        + New tier
+      <button actions class="btn btn-primary btn-sm min-h-11 gap-2" (click)="startCreate()">
+        <ng-icon name="heroPlus" /> New tier
       </button>
     </app-page-header>
 
     @if (error()) {
-      <p class="mb-2 text-sm text-error">{{ error() }}</p>
+      <div class="alert alert-error mb-4" role="alert">
+        <span>{{ error() }}</span>
+      </div>
     }
     @if (notice()) {
-      <p class="mb-2 text-sm text-success">{{ notice() }}</p>
+      <div class="alert alert-success mb-4" role="status">
+        <span>{{ notice() }}</span>
+      </div>
     }
 
     <!-- Create / edit form -->
     @if (formOpen()) {
       <div class="card mb-4 bg-base-100">
         <div class="card-body p-4">
-          <h2 class="card-title text-lg">
+          <h2 class="type-heading">
             {{ editing() ? 'Edit ' + editing()!.name : 'New tier' }}
           </h2>
+          <p class="text-sm text-base-content/60">
+            Features enable capabilities. Limits cap usage; leave a limit blank for unlimited, or
+            set it to 0 to block new usage.
+          </p>
           <form (submit)="$event.preventDefault(); save()" class="mt-2 grid gap-3 sm:grid-cols-2">
             <label class="form-control">
               <span class="label-text">Code</span>
@@ -83,20 +122,24 @@ const FEATURE_KEYS = [['multipleLocations', 'Multiple stock locations']] as cons
                   [value]="limits()[field.key] ?? ''"
                   (input)="setLimit(field.key, $any($event.target).value)"
                 />
+                <span class="label-text-alt text-base-content/60">{{ field.help }}</span>
               </label>
             }
             <fieldset class="sm:col-span-2">
               <legend class="label-text mb-1 font-semibold">Features</legend>
               @for (field of featureFields; track field.key) {
-                <label class="label cursor-pointer justify-start gap-2 py-1">
-                  <input
-                    type="checkbox"
-                    class="checkbox checkbox-sm"
-                    [checked]="features()[field.key] === true"
-                    (change)="setFeature(field.key, $any($event.target).checked)"
-                  />
-                  <span class="label-text">{{ field.label }}</span>
-                </label>
+                <div class="py-1">
+                  <label class="label cursor-pointer justify-start gap-2 py-0">
+                    <input
+                      type="checkbox"
+                      class="checkbox checkbox-sm"
+                      [checked]="features()[field.key] === true"
+                      (change)="setFeature(field.key, $any($event.target).checked)"
+                    />
+                    <span class="label-text">{{ field.label }}</span>
+                  </label>
+                  <p class="ml-8 text-xs text-base-content/60">{{ field.help }}</p>
+                </div>
               }
             </fieldset>
             @if (editing()) {
@@ -105,7 +148,7 @@ const FEATURE_KEYS = [['multipleLocations', 'Multiple stock locations']] as cons
                 <span class="label-text">Active</span>
               </label>
             }
-            <div class="flex gap-2 sm:col-span-2">
+            <div class="flex flex-wrap gap-2 border-t border-base-300/60 pt-3 sm:col-span-2">
               <button
                 type="submit"
                 class="btn btn-primary btn-sm min-h-11"
@@ -170,8 +213,8 @@ export class TiersComponent implements OnInit {
   private readonly platform = inject(PlatformService);
 
   protected readonly fmt = formatKes;
-  protected readonly limitFields = LIMIT_KEYS.map(([key, label]) => ({ key, label }));
-  protected readonly featureFields = FEATURE_KEYS.map(([key, label]) => ({ key, label }));
+  protected readonly limitFields = LIMIT_FIELDS;
+  protected readonly featureFields = FEATURE_FIELDS;
   protected readonly tiers = signal<Tier[]>([]);
   protected readonly formOpen = signal(false);
   protected readonly editing = signal<Tier | null>(null);
@@ -228,8 +271,18 @@ export class TiersComponent implements OnInit {
     this.priceMonthly.setValue(formatKesInput(tier.price_monthly));
     this.priceYearly.setValue(formatKesInput(tier.price_yearly));
     this.isActive.setValue(tier.is_active);
-    this.limits.set({ ...(tier.limits as Record<string, number>) });
-    this.features.set({ ...(tier.features as Record<string, boolean>) });
+    this.limits.set({
+      max_team_members: tier.max_team_members ?? undefined,
+      max_products: tier.max_products ?? undefined,
+      max_stock_locations: tier.max_stock_locations ?? undefined,
+      max_orders_per_month: tier.max_orders_per_month ?? undefined,
+      sms_per_period: tier.sms_per_period ?? undefined,
+    });
+    this.features.set({
+      multiple_locations_enabled: tier.multiple_locations_enabled,
+      staff_performance_enabled: tier.staff_performance_enabled,
+      commissions_available: tier.commissions_available,
+    });
     this.formOpen.set(true);
   }
 
@@ -263,8 +316,14 @@ export class TiersComponent implements OnInit {
         name: this.name.value.trim(),
         price_monthly: monthly,
         price_yearly: yearly,
-        limits,
-        features: this.features(),
+        multiple_locations_enabled: this.features()['multiple_locations_enabled'] === true,
+        staff_performance_enabled: this.features()['staff_performance_enabled'] === true,
+        commissions_available: this.features()['commissions_available'] === true,
+        max_team_members: limits['max_team_members'] ?? null,
+        max_products: limits['max_products'] ?? null,
+        max_stock_locations: limits['max_stock_locations'] ?? null,
+        max_orders_per_month: limits['max_orders_per_month'] ?? null,
+        sms_per_period: limits['sms_per_period'] ?? null,
         ...(editing ? { tier_id: editing.id, is_active: this.isActive.value } : {}),
       });
       this.notice.set(editing ? 'Tier updated' : 'Tier created');
@@ -278,15 +337,16 @@ export class TiersComponent implements OnInit {
   }
 
   protected limitSummary(tier: Tier): string {
-    const limits = (tier.limits ?? {}) as Record<string, number>;
-    return LIMIT_KEYS.filter(([key]) => limits[key])
-      .map(([key, label]) => `${label}: ${limits[key]}`)
-      .join(' · ');
+    const values = tier as unknown as Record<string, number | null>;
+    const configured = LIMIT_FIELDS.filter(field => values[field.key] !== null).map(
+      field => `${field.label}: ${values[field.key]}`
+    );
+    return configured.length > 0 ? configured.join(' · ') : 'Unlimited';
   }
 
   protected featureSummary(tier: Tier): string {
-    const features = (tier.features ?? {}) as Record<string, boolean>;
-    const enabled = FEATURE_KEYS.filter(([key]) => features[key]).map(([, label]) => label);
+    const values = tier as unknown as Record<string, boolean>;
+    const enabled = FEATURE_FIELDS.filter(field => values[field.key]).map(field => field.label);
     return enabled.length > 0 ? enabled.join(' · ') : 'Core only';
   }
 }

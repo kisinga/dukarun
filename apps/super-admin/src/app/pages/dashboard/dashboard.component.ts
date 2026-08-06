@@ -11,29 +11,31 @@ import { PageHeaderComponent } from '../../shared/ui/page-header.component';
     <app-page-header title="Platform dashboard" subtitle="Live tenant and revenue totals" />
 
     @if (error()) {
-      <p class="mb-2 text-sm text-error">{{ error() }}</p>
+      <div class="alert alert-error mb-4" role="alert">
+        <span>{{ error() }}</span>
+      </div>
     }
 
     @if (stats(); as s) {
-      <div class="grid grid-cols-2 gap-2 lg:grid-cols-4">
+      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <div class="card bg-base-100">
           <div class="card-body p-4">
             <p class="type-caption">MRR estimate</p>
-            <p class="type-hero mt-1">{{ fmt(s.mrr_estimate) }}</p>
+            <p class="type-hero mt-1 text-success">{{ fmt(s.mrr_estimate) }}</p>
           </div>
         </div>
         <div class="card bg-base-100">
           <div class="card-body p-4">
             <p class="type-caption">Revenue today</p>
             <p class="type-hero mt-1">{{ fmt(s.revenue_today) }}</p>
-            <p class="mt-0.5 text-xs text-base-content/60">{{ s.orders_today }} orders today</p>
+            <p class="mt-0.5 type-caption">{{ s.orders_today }} orders today</p>
           </div>
         </div>
         <div class="card bg-base-100">
           <div class="card-body p-4">
             <p class="type-caption">Companies</p>
             <p class="type-hero mt-1">{{ s.companies_total }}</p>
-            <p class="mt-0.5 text-xs text-base-content/60">
+            <p class="mt-0.5 type-caption">
               {{ s.companies_approved }} approved ·
               <span [class.text-warning]="s.companies_pending > 0"
                 >{{ s.companies_pending }} pending</span
@@ -45,7 +47,7 @@ import { PageHeaderComponent } from '../../shared/ui/page-header.component';
           <div class="card-body p-4">
             <p class="type-caption">Subscriptions</p>
             <p class="type-hero mt-1 text-success">{{ s.subscriptions_active }}</p>
-            <p class="mt-0.5 text-xs text-base-content/60">
+            <p class="mt-0.5 type-caption">
               {{ s.subscriptions_trial }} trial ·
               <span [class.text-error]="s.subscriptions_expired > 0"
                 >{{ s.subscriptions_expired }} expired</span
@@ -55,7 +57,16 @@ import { PageHeaderComponent } from '../../shared/ui/page-header.component';
         </div>
       </div>
     } @else {
-      <p class="text-sm text-base-content/60">Loading…</p>
+      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Loading stats">
+        @for (_ of [1, 2, 3, 4]; track $index) {
+          <div class="card bg-base-100">
+            <div class="card-body gap-3 p-4">
+              <div class="skeleton h-3 w-24"></div>
+              <div class="skeleton h-8 w-32"></div>
+            </div>
+          </div>
+        }
+      </div>
     }
   `,
 })

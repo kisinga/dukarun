@@ -3058,38 +3058,56 @@ export type Database = {
       subscription_tiers: {
         Row: {
           code: string
+          commissions_available: boolean
           created_at: string
-          features: Json
           id: string
           is_active: boolean
-          limits: Json
+          max_orders_per_month: number | null
+          max_products: number | null
+          max_stock_locations: number | null
+          max_team_members: number | null
+          multiple_locations_enabled: boolean
           name: string
           price_monthly: number
           price_yearly: number
+          sms_per_period: number | null
+          staff_performance_enabled: boolean
           updated_at: string
         }
         Insert: {
           code: string
+          commissions_available?: boolean
           created_at?: string
-          features?: Json
           id?: string
           is_active?: boolean
-          limits?: Json
+          max_orders_per_month?: number | null
+          max_products?: number | null
+          max_stock_locations?: number | null
+          max_team_members?: number | null
+          multiple_locations_enabled?: boolean
           name: string
           price_monthly: number
           price_yearly: number
+          sms_per_period?: number | null
+          staff_performance_enabled?: boolean
           updated_at?: string
         }
         Update: {
           code?: string
+          commissions_available?: boolean
           created_at?: string
-          features?: Json
           id?: string
           is_active?: boolean
-          limits?: Json
+          max_orders_per_month?: number | null
+          max_products?: number | null
+          max_stock_locations?: number | null
+          max_team_members?: number | null
+          multiple_locations_enabled?: boolean
           name?: string
           price_monthly?: number
           price_yearly?: number
+          sms_per_period?: number | null
+          staff_performance_enabled?: boolean
           updated_at?: string
         }
         Relationships: []
@@ -4140,12 +4158,18 @@ export type Database = {
       platform_upsert_tier: {
         Args: {
           p_code: string
-          p_features?: Json
+          p_commissions_available: boolean
           p_is_active?: boolean
-          p_limits?: Json
+          p_max_orders_per_month?: number
+          p_max_products?: number
+          p_max_stock_locations?: number
+          p_max_team_members?: number
+          p_multiple_locations_enabled: boolean
           p_name: string
           p_price_monthly: number
           p_price_yearly: number
+          p_sms_per_period?: number
+          p_staff_performance_enabled: boolean
           p_tier_id?: string
         }
         Returns: string

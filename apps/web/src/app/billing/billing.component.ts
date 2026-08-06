@@ -6,7 +6,7 @@ import { normalizeKenyanPhone } from '../core/phone';
 import { EmptyStateComponent } from '../shared/ui/empty-state.component';
 import { PageLayoutComponent } from '../shared/ui/page-layout.component';
 import { StatusBadgeComponent } from '../shared/ui/status-badge.component';
-import { BillingCycle, BillingService, CompanyBilling, Tier, TierLimits } from './billing.service';
+import { BillingCycle, BillingService, CompanyBilling, Tier } from './billing.service';
 import { EntitlementsService } from '../core/entitlements.service';
 
 type BadgeType = 'success' | 'info' | 'warning' | 'error' | 'neutral';
@@ -286,15 +286,14 @@ export class BillingComponent implements OnInit, OnDestroy {
     return this.cycle() === 'monthly' ? tier.price_monthly : tier.price_yearly;
   }
 
-  /** Human key limits: "500 sales/mo", "5 team members", "50 SMS/mo". */
+  /** Human-readable tier limits: "500 sales/mo", "5 team members", "50 SMS/mo". */
   protected limitLines(tier: Tier): string[] {
-    const limits = (tier.limits ?? {}) as TierLimits;
     const lines: string[] = [];
-    if (limits.maxOrdersPerMonth) lines.push(`${limits.maxOrdersPerMonth} sales/mo`);
-    if (limits.maxAdmins) lines.push(`${limits.maxAdmins} team members`);
-    if (limits.maxProducts) lines.push(`${limits.maxProducts} products`);
-    if (limits.maxStockLocations) lines.push(`${limits.maxStockLocations} stock location(s)`);
-    if (limits.smsPerPeriod) lines.push(`${limits.smsPerPeriod} SMS/mo`);
+    if (tier.max_orders_per_month) lines.push(`${tier.max_orders_per_month} sales/mo`);
+    if (tier.max_team_members) lines.push(`${tier.max_team_members} team members`);
+    if (tier.max_products) lines.push(`${tier.max_products} products`);
+    if (tier.max_stock_locations) lines.push(`${tier.max_stock_locations} stock location(s)`);
+    if (tier.sms_per_period) lines.push(`${tier.sms_per_period} SMS/mo`);
     return lines;
   }
 

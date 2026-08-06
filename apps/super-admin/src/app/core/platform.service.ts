@@ -161,8 +161,14 @@ export class PlatformService {
     name: string;
     price_monthly: number;
     price_yearly: number;
-    limits?: Record<string, number>;
-    features?: Record<string, boolean>;
+    multiple_locations_enabled: boolean;
+    staff_performance_enabled: boolean;
+    commissions_available: boolean;
+    max_team_members: number | null;
+    max_products: number | null;
+    max_stock_locations: number | null;
+    max_orders_per_month: number | null;
+    sms_per_period: number | null;
     tier_id?: string;
     is_active?: boolean;
   }): Promise<void> {
@@ -171,8 +177,18 @@ export class PlatformService {
       p_name: input.name,
       p_price_monthly: input.price_monthly,
       p_price_yearly: input.price_yearly,
-      ...(input.limits ? { p_limits: input.limits as never } : {}),
-      ...(input.features ? { p_features: input.features as never } : {}),
+      p_multiple_locations_enabled: input.multiple_locations_enabled,
+      p_staff_performance_enabled: input.staff_performance_enabled,
+      p_commissions_available: input.commissions_available,
+      ...(input.max_team_members !== null ? { p_max_team_members: input.max_team_members } : {}),
+      ...(input.max_products !== null ? { p_max_products: input.max_products } : {}),
+      ...(input.max_stock_locations !== null
+        ? { p_max_stock_locations: input.max_stock_locations }
+        : {}),
+      ...(input.max_orders_per_month !== null
+        ? { p_max_orders_per_month: input.max_orders_per_month }
+        : {}),
+      ...(input.sms_per_period !== null ? { p_sms_per_period: input.sms_per_period } : {}),
       ...(input.tier_id ? { p_tier_id: input.tier_id } : {}),
       ...(input.is_active !== undefined ? { p_is_active: input.is_active } : {}),
     });

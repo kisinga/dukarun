@@ -45,6 +45,7 @@ import {
 } from '../money/money.service';
 import { CashierSessionService } from '../core/cashier-session.service';
 import { SessionRequiredNoticeComponent } from '../shared/ui/session-required-notice.component';
+import { PartyCacheService } from '../core/party-cache.service';
 
 type SupplierWithAp = MoneyCustomer & { ap_balance: number } & AgingInfo;
 type PurchasePaymentMode = 'paid' | 'partial' | 'later';
@@ -156,6 +157,11 @@ interface ParsedPurchaseLine {
         <div role="status" class="alert alert-success mb-3 text-sm">
           <app-icon name="heroCheckCircle" />
           <span>{{ notice() }}</span>
+        </div>
+      }
+      @if (partyCache.loaded() && !partyCache.complete()) {
+        <div role="status" class="alert alert-warning mb-3 text-sm">
+          Supplier limit reached. List, totals, and local filters cover cached suppliers only.
         </div>
       }
 
@@ -1796,6 +1802,7 @@ interface ParsedPurchaseLine {
 export class SuppliersComponent implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly money = inject(MoneyService);
+  protected readonly partyCache = inject(PartyCacheService);
   private readonly pos = inject(PosService);
   private readonly supabase = inject(SupabaseService);
   private readonly receiptData = inject(ReceiptDataService);
@@ -1808,7 +1815,7 @@ export class SuppliersComponent implements OnInit, OnDestroy {
   protected readonly fmt = formatKes;
   protected readonly duplicatePriceTooltip =
     'Same item on multiple lines — the selling price applies once to the product and stays in sync across those lines.';
-  protected readonly suppliers = signal<SupplierWithAp[]>([]);
+  protected readonly suppliers = computed<SupplierWithAp[]>(() => this.partyCache.suppliers());
   protected readonly accounts = signal<LedgerAccount[]>([]);
   protected readonly variants = signal<Variant[]>([]);
   protected readonly label = variantLabel;
@@ -2032,7 +2039,7 @@ export class SuppliersComponent implements OnInit, OnDestroy {
     try {
       const [suppliers, accounts, variants, purchases, drafts, locations, performance] =
         await Promise.all([
-          this.money.suppliersWithAp(),
+          this.partyCache.ensureLoaded().then(() => this.partyCache.suppliers()),
           this.money.transactableAccounts(),
           this.pos.fetchActiveVariants(),
           this.money.purchasesWithPayments(),
@@ -2040,7 +2047,6 @@ export class SuppliersComponent implements OnInit, OnDestroy {
           this.pos.listStockLocations(),
           this.money.supplierVariantPerformance(),
         ]);
-      this.suppliers.set(suppliers);
       this.accounts.set(accounts);
       // Purchases stock goods only (services are rejected server-side).
       this.variants.set(variants.filter(v => v.kind !== 'service'));

@@ -13,7 +13,7 @@ import { NgIcon } from '@ng-icons/core';
   template: `
     <div [class.card]="!embedded()" [class.bg-base-100]="!embedded()">
       <div [class.card-body]="!embedded()">
-        <div class="px-4 py-12 text-center">
+        <div class="px-4 py-10 text-center sm:py-12">
           <div
             class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-base-200"
           >
@@ -21,7 +21,7 @@ import { NgIcon } from '@ng-icons/core';
           </div>
           <h3 class="type-heading">{{ title() }}</h3>
           @if (description()) {
-            <p class="mx-auto mt-2 max-w-md text-sm text-base-content/60">
+            <p class="mx-auto mt-2 max-w-md text-sm text-base-content/70">
               {{ description() }}
             </p>
           }

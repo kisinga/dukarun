@@ -113,8 +113,8 @@ select is(
 
 select ok(
   (select c.commissions_enabled
-     and (t.features ->> 'staffPerformance')::boolean
-     and (t.features ->> 'commissions')::boolean
+     and t.staff_performance_enabled
+     and t.commissions_available
    from public.companies c
    join public.subscription_tiers t on t.id = c.subscription_tier_id
    where c.name = 'Mama Mboga Stores'),

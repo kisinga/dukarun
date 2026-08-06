@@ -32,6 +32,7 @@ import { DrawerComponent } from '../shared/ui/drawer.component';
 import { StatBarComponent } from '../shared/ui/stat-bar.component';
 import { StatCardComponent } from '../shared/ui/stat-card.component';
 import { DeleteConfirmationModalComponent } from '../shared/ui/delete-confirmation-modal.component';
+import { PartyCacheService } from '../core/party-cache.service';
 
 type CustomerWithAr = MoneyCustomer & { ar_balance: number } & AgingInfo;
 type CreditOrder = {
@@ -91,6 +92,11 @@ type CreditOrder = {
       }
       @if (notice()) {
         <div role="status" class="alert alert-success mb-3 text-sm">{{ notice() }}</div>
+      }
+      @if (partyCache.loaded() && !partyCache.complete()) {
+        <div role="status" class="alert alert-warning mb-3 text-sm">
+          Customer limit reached. List, totals, and local filters cover cached customers only.
+        </div>
       }
 
       <!-- Shared list summary and search toolbar -->
@@ -831,12 +837,15 @@ type CreditOrder = {
 export class CustomersComponent implements OnInit {
   protected readonly cashierSession = inject(CashierSessionService);
   private readonly money = inject(MoneyService);
+  protected readonly partyCache = inject(PartyCacheService);
   private readonly pos = inject(PosService);
   private readonly receiptData = inject(ReceiptDataService);
   protected readonly perms = inject(PermissionsService);
   protected readonly fmtKes = formatKes;
 
-  protected readonly customers = signal<CustomerWithAr[]>([]);
+  protected readonly customers = computed<CustomerWithAr[]>(() =>
+    this.partyCache.customerRows(true)
+  );
   protected readonly selectedCustomerId = signal<string | null>(null);
   protected readonly orders = signal<OrderWithCustomer[]>([]);
   protected readonly creditOrders = signal<CreditOrder[]>([]);
@@ -972,7 +981,7 @@ export class CustomersComponent implements OnInit {
   protected async load(): Promise<void> {
     this.loading.set(true);
     try {
-      this.customers.set(await this.money.customersWithAr(true));
+      await this.partyCache.ensureLoaded();
       this.error.set(null);
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Failed to load customers');
