@@ -1,37 +1,24 @@
-# GitHub Actions Workflows
+# GitHub Actions
 
-This directory contains the CI/CD workflows for the dukarun project.
+Two workflows protect the active Supabase system:
 
-## Workflow Overview
+- `test.yml` installs the root workspace, runs the web design guard, and production-builds
+  `apps/web`, `apps/storefront-new`, and `apps/super-admin-new`.
+- `supabase.yml` starts an ephemeral Supabase stack, lints migrations, runs pgTAP, checks
+  generated database types, and deploys migrations/functions from protected branches.
 
-### 1. Test Suite (`test.yml`)
+The archived Vendure frontend is intentionally outside the root workspace and CI. Its last
+coverage badges and implementation live under `archive/vendure/`; they are historical
+evidence, not current merge gates.
 
-- **Purpose**: Runs backend and frontend tests, uploads coverage artifacts, writes a GitHub Actions coverage summary, and refreshes the repository-owned coverage badges on `main`.
-- **Triggers**: `push` and `pull_request` to the `main` branch only.
-- **Jobs**:
-  - **test-backend**: Build and test backend (Node 22). Uploads the backend coverage artifact.
-  - **test-frontend**: Build and test frontend (Node 22, Chrome). Uploads the frontend coverage artifact.
-  - **coverage-combined**: Runs after both test jobs (even if one fails). Downloads available coverage artifacts, writes the coverage table to the GitHub Actions summary, and opens or updates a PR with refreshed backend, frontend, and combined badges after successful pushes to `main`.
-- **Environment**: Both test jobs run with `HUSKY=0` so git hooks are not installed in CI (root `prepare` also skips when `CI=true` or `HUSKY=0`).
-- **Node.js**: v22.23.1 for all jobs.
+## Required branch checks
 
-### 2. Docker image builds
+Protect `main` with these checks:
 
-Docker images are built by **Coolify** (or locally via `docker compose build`) from the Dockerfiles defined in `docker-compose.yml`. There is no separate CI workflow that builds and pushes to a registry.
+1. `Active apps / Build + design guard`
+2. `Supabase / Lint + pgTAP`
 
-## Branch Protection Setup
+The Supabase deploy job runs only after its database checks pass and only on configured
+self-hosted production runners.
 
-To require tests to pass before merging into `main`:
-
-1. Go to repository **Settings → Branches**.
-2. Add or edit a rule for the `main` branch.
-3. Enable **Require status checks to pass before merging**.
-4. Select the status checks from the Test Suite workflow:
-   - **test-backend**
-   - **test-frontend**
-   - (Optional) **coverage-combined** if you want combined coverage to block merge; usually the two test jobs are sufficient.
-5. Save. Merging into main will then be allowed only when CI is green.
-
-## Node.js Version
-
-All workflows use Node.js v22.23.1. The root `package.json` documents this with `"engines": { "node": ">=22.22.1" }`.
+All jobs use Node 22, matching the root `package.json` engine.

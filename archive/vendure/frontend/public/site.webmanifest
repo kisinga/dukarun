@@ -1,0 +1,62 @@
+{
+  "name": "dukarun",
+  "short_name": "dukarun",
+  "description": "point and sell",
+  "display": "standalone",
+  "scope": "/",
+  "start_url": "/dashboard",
+  "icons": [
+    {
+      "src": "/assets/logo/dukarun-icon-dark.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Sell",
+      "short_name": "Sell",
+      "description": "Start a new sale",
+      "url": "/dashboard/sell",
+      "icons": [
+        {
+          "src": "/assets/logo/dukarun-icon-dark.svg",
+          "sizes": "any",
+          "type": "image/svg+xml",
+          "purpose": "any"
+        }
+      ]
+    },
+    {
+      "name": "Inventory",
+      "short_name": "Inventory",
+      "description": "Manage inventory",
+      "url": "/dashboard/inventory",
+      "icons": [
+        {
+          "src": "/assets/logo/dukarun-icon-dark.svg",
+          "sizes": "any",
+          "type": "image/svg+xml",
+          "purpose": "any"
+        }
+      ]
+    },
+    {
+      "name": "Products",
+      "short_name": "Products",
+      "description": "Manage products",
+      "url": "/dashboard/products",
+      "icons": [
+        {
+          "src": "/assets/logo/dukarun-icon-dark.svg",
+          "sizes": "any",
+          "type": "image/svg+xml",
+          "purpose": "any"
+        }
+      ]
+    }
+  ],
+  "theme_color": "#E85D2F",
+  "background_color": "#1A232B"
+}

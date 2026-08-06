@@ -1,37 +1,34 @@
 # Documentation
 
-This directory contains the living documentation for Dukarun. Implementation details live in code comments and TSDoc; these files only index topics and link to source.
+Current system documentation:
 
-## For operators
+| Topic                          | Document                                                              |
+| ------------------------------ | --------------------------------------------------------------------- |
+| Architecture and boundaries    | [`../ARCHITECTURE.md`](../ARCHITECTURE.md)                            |
+| Local setup and infrastructure | [`INFRASTRUCTURE.md`](INFRASTRUCTURE.md)                              |
+| Production deployment          | [`DEPLOYMENT.md`](DEPLOYMENT.md)                                      |
+| Dashboard design language      | [`DESIGN_SYSTEM.md`](DESIGN_SYSTEM.md)                                |
+| Detail-surface rollout scope   | [`DETAIL_SURFACES_ROLLOUT.md`](DETAIL_SURFACES_ROLLOUT.md)            |
+| Transaction workflows          | [`TRANSACTION_WORKFLOWS.md`](TRANSACTION_WORKFLOWS.md)                |
+| Vendure → Supabase cutover     | `V1_V2_MIGRATION.md` — internal, gitignored (references real tenants) |
+| Troubleshooting                | [`GENERAL_TROUBLESHOOTING.md`](GENERAL_TROUBLESHOOTING.md)            |
 
-- [Infrastructure & Deployment](./INFRASTRUCTURE.md) — Docker, environment variables, network setup, and deployment.
-- [Troubleshooting](./GENERAL_TROUBLESHOOTING.md) — Common fixes and reset procedures.
+## Source-of-truth map
 
-## For customers and non-engineers
+- Database behavior: `supabase/migrations` + `supabase/tests/database`
+- Generated database contract: `packages/shared-types/database.types.ts`
+- Business dashboard: `apps/web`
+- Public storefront: `apps/storefront`
+- Platform operations: `apps/super-admin`
+- Provider integrations: `supabase/functions`
+- Migration tooling: `scripts/etl`
 
-- [Feature Catalog](./customer-features/FEATURE_CATALOG.md) — Business-facing capability map.
+## Historical material
 
-## For engineers
+`archive/` is intentionally outside active workspaces and CI. In particular,
+`archive/vendure/` contains the former dashboard, Compose files, deployment notes, and coverage
+artifacts, including the former Vendure feature catalog. Historical documents may contain paths
+and commands from their original repository layout; do not treat them as current instructions.
 
-- [System Architecture](../ARCHITECTURE.md) — High-level design and technology choices.
-- [Design System](./DESIGN_SYSTEM.md) — UI/UX rules for the dashboard.
-- [Backend plugins](../backend/src/plugins/README.md) — Custom GraphQL mutations and permissions by domain.
-- [Root README](../README.md) — Quick start and project overview.
-
-### Key source directories
-
-| Topic | Source |
-|-------|--------|
-| Ledger / accounting | `backend/src/services/financial/`, `backend/src/plugins/ledger/` |
-| Inventory / FIFO / COGS | `backend/src/services/inventory/`, `backend/src/plugins/inventory/` |
-| Authorization & approvals | `backend/src/services/auth/`, `backend/src/plugins/approval/` |
-| Cashier sessions | `backend/src/services/cashier/`, `backend/src/plugins/ledger/` |
-| Subscriptions | `backend/src/services/subscriptions/`, `backend/src/plugins/subscriptions/` |
-| Notifications | `backend/src/services/notifications/`, `backend/src/plugins/notifications/` |
-| Channels & provisioning | `backend/src/services/channels/`, `backend/src/services/provisioning/` |
-| Orders & payments | `backend/src/services/orders/`, `backend/src/services/payments/`, `backend/src/plugins/credit/` |
-| Product recognition | `frontend/src/app/core/services/ml-model/` (embedder/matcher/enrollment) |
-
-## Historical context
-
-Older plans, decisions, and superseded specs are archived under `archive/docs/2026-07-10/`.
+When a current document becomes obsolete, move it into a dated archive location instead of
+leaving two apparently authoritative versions in `docs/`.

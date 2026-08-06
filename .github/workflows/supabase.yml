@@ -1,0 +1,43 @@
+name: Supabase
+
+on:
+  push:
+    branches: [pilot/supabase, main]
+    paths: ['supabase/**', 'packages/shared-types/**', '.github/workflows/supabase.yml']
+  pull_request:
+    paths: ['supabase/**', 'packages/shared-types/**']
+
+concurrency:
+  group: supabase-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Lint + pgTAP
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.111.0
+
+      - name: Start ephemeral local stack
+        run: supabase db start
+
+      - name: Lint migrations
+        # pgtap's own extension functions produce false positives; lint our schema only.
+        run: supabase db lint --schema public
+
+      - name: Run pgTAP tests
+        run: supabase test db
+
+      - name: Verify generated types are checked in
+        run: |
+          if [ -f packages/shared-types/database.types.ts ]; then
+            supabase gen types typescript --local > /tmp/database.types.ts
+            diff /tmp/database.types.ts packages/shared-types/database.types.ts \
+              || (echo "::error::packages/shared-types/database.types.ts is stale. Run: npm run sb:types" && exit 1)
+          else
+            echo "No generated types file yet; skipping check."
+          fi

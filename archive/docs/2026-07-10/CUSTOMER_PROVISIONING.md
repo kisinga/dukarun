@@ -466,4 +466,4 @@ Consider implementing:
 
 ---
 
-**Built with ❤️ for African small businesses**
+**Built with ❤️ for African businesses**

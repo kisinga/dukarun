@@ -1,0 +1,18 @@
+{
+  "name": "Dukarun",
+  "short_name": "Dukarun",
+  "description": "Point of sale for African small shops",
+  "display": "standalone",
+  "scope": "/",
+  "start_url": "/dashboard",
+  "theme_color": "#e85d2f",
+  "background_color": "#fafafa",
+  "icons": [
+    {
+      "src": "/assets/logo/dukarun-icon-dark.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

@@ -1,0 +1,443 @@
+{
+  "system": "vendure",
+  "channelId": 11,
+  "ops": [
+    {
+      "op": "pre-close-lingering-session",
+      "entries": []
+    },
+    {
+      "op": "fixture",
+      "entries": []
+    },
+    {
+      "op": "i1-session-open",
+      "entries": [
+        {
+          "id": "48deaa9e-6954-4538-936d-ea73282da9ee",
+          "sourceType": "variance-adjustment",
+          "sourceId": "1119691b-54f0-4862-8f2f-1ce5338515a9-CASH_ON_HAND-84d09b24-f1b5-4f8f-ba00-da7f25e3a67a",
+          "entryDate": "2026-08-01T21:00:00.000Z",
+          "memo": "Variance adjustment: Opening balance",
+          "lines": [
+            {
+              "account": "CASH_ON_HAND",
+              "debit": 500000,
+              "credit": 0
+            },
+            {
+              "account": "CASH_SHORT_OVER",
+              "debit": 0,
+              "credit": 500000
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "op": "a-purchase-batches",
+      "entries": [
+        {
+          "id": "5eaff453-523a-459f-80be-ae50438b7152",
+          "sourceType": "InventoryPurchase",
+          "sourceId": "6164c0dc-2f4c-4c2c-95ec-384722adc64b",
+          "entryDate": "2026-08-01T21:00:00.000Z",
+          "memo": "Inventory purchase 6164c0dc-2f4c-4c2c-95ec-384722adc64b",
+          "lines": [
+            {
+              "account": "ACCOUNTS_PAYABLE",
+              "debit": 0,
+              "credit": 100000
+            },
+            {
+              "account": "INVENTORY",
+              "debit": 100000,
+              "credit": 0
+            }
+          ]
+        },
+        {
+          "id": "ffb62a5e-c92d-4404-b4c6-23585143ea70",
+          "sourceType": "SupplierPayment",
+          "sourceId": "supplier-payment-6164c0dc-2f4c-4c2c-95ec-384722adc64b-1785664817447",
+          "entryDate": "2026-08-01T21:00:00.000Z",
+          "memo": "Payment to supplier for purchase 6164c0dc-2f4c-4c2c-95ec-384722adc64b",
+          "lines": [
+            {
+              "account": "ACCOUNTS_PAYABLE",
+              "debit": 100000,
+              "credit": 0
+            },
+            {
+              "account": "CASH_ON_HAND",
+              "debit": 0,
+              "credit": 100000
+            }
+          ]
+        },
+        {
+          "id": "773cc287-8e38-45fe-8f43-78361f27826d",
+          "sourceType": "InventoryPurchase",
+          "sourceId": "d6ca563b-4891-4675-839b-0fda4acc2703",
+          "entryDate": "2026-08-01T21:00:00.000Z",
+          "memo": "Inventory purchase d6ca563b-4891-4675-839b-0fda4acc2703",
+          "lines": [
+            {
+              "account": "ACCOUNTS_PAYABLE",
+              "debit": 0,
+              "credit": 150000
+            },
+            {
+              "account": "INVENTORY",
+              "debit": 150000,
+              "credit": 0
+            }
+          ]
+        },
+        {
+          "id": "e837b463-0ccb-4708-9735-f970853fed47",
+          "sourceType": "SupplierPayment",
+          "sourceId": "supplier-payment-d6ca563b-4891-4675-839b-0fda4acc2703-1785664817504",
+          "entryDate": "2026-08-01T21:00:00.000Z",
+          "memo": "Payment to supplier for purchase d6ca563b-4891-4675-839b-0fda4acc2703",
+          "lines": [
+            {
+              "account": "ACCOUNTS_PAYABLE",
+              "debit": 150000,
+              "credit": 0
+            },
+            {
+              "account": "CASH_ON_HAND",
+              "debit": 0,
+              "credit": 150000
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "op": "b-cash-sale-split",
+      "entries": [
+        {
+          "id": "5e4efc29-b6b0-451e-b056-7a4050f41361",
+          "sourceType": "CreditSale",
+          "sourceId": "24",
+          "entryDate": "2026-08-01T21:00:00.000Z",
+          "memo": "Credit sale for order 88LE86SX22DPUZDT",
+          "lines": [
+            {
+              "account": "ACCOUNTS_RECEIVABLE",
+              "debit": 245000,
+              "credit": 0
+            },
+            {
+              "account": "SALES",
+              "debit": 0,
+              "credit": 245000
+            }
+          ]
+        },
+        {
+          "id": "5a916bdc-8d9e-4fc1-a25b-5b70f1d90ccb",
+          "sourceType": "PaymentAllocation",
+          "sourceId": "30",
+          "entryDate": "2026-08-01T21:00:00.000Z",
+          "memo": "Payment allocation for order 88LE86SX22DPUZDT",
+          "lines": [
+            {
+              "account": "ACCOUNTS_RECEIVABLE",
+              "debit": 0,
+              "credit": 45000
+            },
+            {
+              "account": "CLEARING_MPESA",
+              "debit": 45000,
+              "credit": 0
+            }
+          ]
+        },
+        {
+          "id": "adec7905-9372-4c93-a319-78619faf5580",
+          "sourceType": "PaymentAllocation",
+          "sourceId": "29",
+          "entryDate": "2026-08-01T21:00:00.000Z",
+          "memo": "Payment allocation for order 88LE86SX22DPUZDT",
+          "lines": [
+            {
+              "account": "ACCOUNTS_RECEIVABLE",
+              "debit": 0,
+              "credit": 200000
+            },
+            {
+              "account": "CASH_ON_HAND",
+              "debit": 200000,
+              "credit": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "op": "c-credit-sale",
+      "entries": [
+        {
+          "id": "d80c4adf-8354-46b3-9ca5-263291368125",
+          "sourceType": "CreditSale",
+          "sourceId": "25",
+          "entryDate": "2026-08-01T21:00:00.000Z",
+          "memo": "Credit sale for order D9PVV8MWGJBSGZH2",
+          "lines": [
+            {
+              "account": "ACCOUNTS_RECEIVABLE",
+              "debit": 10000,
+              "credit": 0
+            },
+            {
+              "account": "SALES",
+              "debit": 0,
+              "credit": 10000
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "op": "d-ar-repayment",
+      "entries": [
+        {
+          "id": "a1d1c7bc-df01-4d8c-a83e-ddcc1faefec8",
+          "sourceType": "PaymentAllocation",
+          "sourceId": "31",
+          "entryDate": "2026-08-01T21:00:00.000Z",
+          "memo": "Payment allocation for order D9PVV8MWGJBSGZH2",
+          "lines": [
+            {
+              "account": "ACCOUNTS_RECEIVABLE",
+              "debit": 0,
+              "credit": 3000
+            },
+            {
+              "account": "CASH_ON_HAND",
+              "debit": 3000,
+              "credit": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "op": "e-expense",
+      "entries": [
+        {
+          "id": "47d7b4f2-6f4c-4077-a79a-49eb9e622b4a",
+          "sourceType": "Expense",
+          "sourceId": "expense-de31888b-1be3-4f73-8b60-1ef5fdf29e2d",
+          "entryDate": "2026-08-01T21:00:00.000Z",
+          "memo": "tie-out expense",
+          "lines": [
+            {
+              "account": "CASH_ON_HAND",
+              "debit": 0,
+              "credit": 5000
+            },
+            {
+              "account": "EXPENSES",
+              "debit": 5000,
+              "credit": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "op": "f-transfer",
+      "entries": [
+        {
+          "id": "18d826f5-a1b2-45b0-8993-873b8d567466",
+          "sourceType": "inter-account-transfer",
+          "sourceId": "tieout-transfer-1785664816375",
+          "entryDate": "2026-08-01T21:00:00.000Z",
+          "memo": "tie-out transfer",
+          "lines": [
+            {
+              "account": "BANK_MAIN",
+              "debit": 30000,
+              "credit": 0
+            },
+            {
+              "account": "CASH_ON_HAND",
+              "debit": 0,
+              "credit": 30500
+            },
+            {
+              "account": "PROCESSOR_FEES",
+              "debit": 500,
+              "credit": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "op": "g-credit-purchase-and-payment",
+      "entries": [
+        {
+          "id": "d8798dd6-cb09-4669-9077-5bd8be2d6eb3",
+          "sourceType": "InventoryPurchase",
+          "sourceId": "2b6665d0-25ca-4851-982a-08cb106ce57d",
+          "entryDate": "2026-08-01T21:00:00.000Z",
+          "memo": "Inventory purchase 2b6665d0-25ca-4851-982a-08cb106ce57d",
+          "lines": [
+            {
+              "account": "ACCOUNTS_PAYABLE",
+              "debit": 0,
+              "credit": 72000
+            },
+            {
+              "account": "INVENTORY",
+              "debit": 72000,
+              "credit": 0
+            }
+          ]
+        },
+        {
+          "id": "cc827f67-62a2-47bf-b48b-8e2936996fab",
+          "sourceType": "SupplierPayment",
+          "sourceId": "supplier-payment-2b6665d0-25ca-4851-982a-08cb106ce57d-1785664818508",
+          "entryDate": "2026-08-01T21:00:00.000Z",
+          "memo": "Payment to supplier for purchase 2b6665d0-25ca-4851-982a-08cb106ce57d",
+          "lines": [
+            {
+              "account": "ACCOUNTS_PAYABLE",
+              "debit": 36000,
+              "credit": 0
+            },
+            {
+              "account": "CASH_ON_HAND",
+              "debit": 0,
+              "credit": 36000
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "op": "h-write-off",
+      "entries": [
+        {
+          "id": "35d484a9-a217-4787-8315-ba4bbee44151",
+          "sourceType": "InventoryAdjustment",
+          "sourceId": "StockAdjustment:a7ea3a14-a3e8-45d7-be02-15df74df18dc:43:2",
+          "entryDate": "2026-08-01T21:00:00.000Z",
+          "memo": "Inventory adjustment a7ea3a14-a3e8-45d7-be02-15df74df18dc: damaged",
+          "lines": [
+            {
+              "account": "INVENTORY",
+              "debit": 0,
+              "credit": 10000
+            },
+            {
+              "account": "INVENTORY_ADJUSTMENT",
+              "debit": 10000,
+              "credit": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "op": "i2-session-close-short",
+      "entries": [
+        {
+          "id": "6736ff4b-4f26-40f7-baa1-5453a58578d2",
+          "sourceType": "variance-adjustment",
+          "sourceId": "1119691b-54f0-4862-8f2f-1ce5338515a9-CASH_ON_HAND-9149db3f-19b3-4f67-80f5-7d86a218679d",
+          "entryDate": "2026-08-01T21:00:00.000Z",
+          "memo": "Variance adjustment: Closing balance variance",
+          "lines": [
+            {
+              "account": "CASH_ON_HAND",
+              "debit": 0,
+              "credit": 1000
+            },
+            {
+              "account": "CASH_SHORT_OVER",
+              "debit": 1000,
+              "credit": 0
+            }
+          ]
+        },
+        {
+          "id": "e42d2b18-a877-47dd-8c7d-7e80b40f7425",
+          "sourceType": "variance-adjustment",
+          "sourceId": "1119691b-54f0-4862-8f2f-1ce5338515a9-CLEARING_MPESA-9149db3f-19b3-4f67-80f5-7d86a218679d",
+          "entryDate": "2026-08-01T21:00:00.000Z",
+          "memo": "Variance adjustment: Closing balance variance",
+          "lines": [
+            {
+              "account": "CASH_SHORT_OVER",
+              "debit": 0,
+              "credit": 45000
+            },
+            {
+              "account": "CLEARING_MPESA",
+              "debit": 45000,
+              "credit": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "op": "j-void-sale-b",
+      "entries": [
+        {
+          "id": "7bdd7b46-0339-4453-a5e4-bc2a4cffc0d6",
+          "sourceType": "OrderReversal",
+          "sourceId": "24-reversal",
+          "entryDate": "2026-08-01T21:00:00.000Z",
+          "memo": "Order reversal for order 88LE86SX22DPUZDT",
+          "lines": [
+            {
+              "account": "ACCOUNTS_RECEIVABLE",
+              "debit": 245000,
+              "credit": 245000
+            },
+            {
+              "account": "CASH_ON_HAND",
+              "debit": 0,
+              "credit": 200000
+            },
+            {
+              "account": "CLEARING_MPESA",
+              "debit": 0,
+              "credit": 45000
+            },
+            {
+              "account": "SALES",
+              "debit": 245000,
+              "credit": 0
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "fixture": {
+    "variantWidget": "43",
+    "variantService": "44",
+    "customerId": "22",
+    "supplierId": "23",
+    "sessionId": "1119691b-54f0-4862-8f2f-1ce5338515a9",
+    "orderB": "24",
+    "orderC": "25",
+    "purchaseG": "2b6665d0-25ca-4851-982a-08cb106ce57d",
+    "voidResult": {
+      "order": {
+        "id": "24",
+        "state": "Cancelled"
+      },
+      "hadPayments": true
+    }
+  }
+}

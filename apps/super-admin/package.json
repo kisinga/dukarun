@@ -1,0 +1,45 @@
+{
+  "name": "@dukarun/super-admin",
+  "version": "2.0.0",
+  "scripts": {
+    "ng": "ng",
+    "start": "ng serve",
+    "prebuild": "node ../../scripts/generate-environment.mjs super-admin",
+    "build": "ng build",
+    "watch": "ng build --watch --configuration development"
+  },
+  "private": true,
+  "dependencies": {
+    "@angular/common": "^21.0.8",
+    "@angular/compiler": "^21.0.8",
+    "@angular/core": "^21.0.8",
+    "@angular/forms": "^21.0.8",
+    "@angular/platform-browser": "^21.0.8",
+    "@angular/router": "^21.0.8",
+    "@ng-icons/core": "^33.3.0",
+    "@ng-icons/heroicons": "^33.3.0",
+    "@supabase/supabase-js": "^2.76.1",
+    "rxjs": "~7.8.2",
+    "tslib": "^2.8.1"
+  },
+  "devDependencies": {
+    "@angular/build": "^21.0.5",
+    "@angular/cli": "^21.0.5",
+    "@angular/compiler-cli": "^21.0.8",
+    "@tailwindcss/postcss": "^4.1.18",
+    "daisyui": "^5.5.14",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.1.18",
+    "typescript": "~5.9.3"
+  },
+  "optionalDependencies": {
+    "@rolldown/binding-linux-x64-gnu": "^1.0.0-rc.4",
+    "@rolldown/binding-linux-x64-musl": "^1.0.0-rc.4",
+    "@tailwindcss/oxide-linux-x64-gnu": "^4.3.1",
+    "@tailwindcss/oxide-linux-x64-musl": "^4.3.1",
+    "lightningcss-linux-x64-gnu": "^1.32.0",
+    "lightningcss-linux-x64-musl": "^1.32.0",
+    "napi": "*",
+    "version": "^0.1.2"
+  }
+}

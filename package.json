@@ -3,41 +3,51 @@
   "version": "2.0.0",
   "private": true,
   "workspaces": [
-    "backend",
-    "frontend",
-    "super-admin",
-    "storefront"
+    "apps/*"
   ],
   "engines": {
     "node": ">=22.22.1"
   },
   "scripts": {
-    "setup": "ts-node scripts/setup.ts",
-    "predev": "npm run setup -- --quick --fix",
-    "dev": "npm run services:up && npm run dev:all",
-    "dev:all": "concurrently -k -n BE,FE,SA,ST -c blue,green,magenta,cyan npm:dev:backend npm:dev:frontend npm:dev:super-admin npm:dev:storefront",
-    "dev:backend": "npm run dev -w @dukarun/backend",
-    "dev:frontend": "npm start -w @dukarun/frontend",
-    "dev:super-admin": "npm start -w super-admin",
+    "dev": "npm run dev:web",
+    "dev:all": "concurrently -k -n WEB,STORE,ADMIN -c green,blue,magenta npm:dev:web npm:dev:storefront npm:dev:super-admin",
+    "dev:web": "npm start -w @dukarun/web",
+    "build:web": "npm run build -w @dukarun/web",
     "dev:storefront": "npm start -w @dukarun/storefront",
-    "codegen": "npm run codegen -w @dukarun/frontend && npm run codegen -w super-admin && npm run codegen -w @dukarun/storefront",
-    "codegen:watch": "npm run codegen:watch -w @dukarun/frontend",
-    "codegen:super-admin": "npm run codegen -w super-admin",
-    "codegen:super-admin:watch": "npm run codegen:watch -w super-admin",
-    "codegen:storefront": "npm run codegen -w @dukarun/storefront",
-    "codegen:storefront:watch": "npm run codegen:watch -w @dukarun/storefront",
-    "services:up": "docker compose -f docker-compose.services.yml -f docker-compose.services.override.yml up -d",
-    "services:down": "docker compose -f docker-compose.services.yml -f docker-compose.services.override.yml down",
-    "coverage:summary": "node scripts/coverage-summary.mjs --badge-dir badges",
-    "test": "npm run test --workspaces --if-present",
-    "prepare": "node -e \"if (process.env.CI === 'true' || process.env.HUSKY === '0') process.exit(0); require('child_process').execSync('npx husky install', {stdio:'inherit'})\""
+    "build:storefront": "npm run build -w @dukarun/storefront",
+    "dev:super-admin": "npm start -w @dukarun/super-admin",
+    "build:super-admin": "npm run build -w @dukarun/super-admin",
+    "build:active": "npm run build:web && npm run build:storefront && npm run build:super-admin",
+    "check:web": "npm run design-guard -w @dukarun/web && npm run offline-safety-guard -w @dukarun/web && npm run build:web",
+    "test": "npm run build:active",
+    "prepare": "node -e \"if (process.env.CI === 'true' || process.env.HUSKY === '0') process.exit(0); require('child_process').execSync('npx husky install', {stdio:'inherit'})\"",
+    "sb": "supabase",
+    "sb:start": "supabase start",
+    "sb:stop": "supabase stop",
+    "sb:reset": "supabase db reset",
+    "sb:test": "supabase test db",
+    "sb:lint": "supabase db lint",
+    "sb:types": "supabase gen types typescript --local > packages/shared-types/database.types.ts",
+    "sb:studio": "open http://127.0.0.1:54323",
+    "setup": "node scripts/setup.mjs",
+    "deploy": "scripts/deploy-db.sh",
+    "deploy:functions": "scripts/deploy-db.sh --functions",
+    "deploy:apps": "scripts/deploy-apps.sh all",
+    "deploy:apps:rollback": "scripts/deploy-apps.sh rollback",
+    "etl:migrate": "node scripts/etl/migrate.mjs",
+    "etl:verify": "node scripts/etl/verify.mjs",
+    "etl:teardown": "node scripts/etl/teardown.mjs",
+    "etl:diff": "node scripts/etl/ledger-diff.mjs",
+    "etl:export-map": "node scripts/etl/export-map.mjs"
+  },
+  "dependencies": {
+    "pg": "8.22.0"
   },
   "devDependencies": {
-    "@types/node": "^26.0.1",
     "concurrently": "^10.0.3",
     "husky": "^9.1.7",
     "lint-staged": "^17.0.8",
-    "ts-node": "^10.9.2",
-    "typescript": "~5.9.3"
+    "prettier": "^3.9.6",
+    "supabase": "^2.111.0"
   }
 }

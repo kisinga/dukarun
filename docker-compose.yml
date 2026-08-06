@@ -1,228 +1,49 @@
-# =====================================
-# Dukarun Application Services
-# =====================================
+# Coolify production compose — transitional v1 → v2.
 #
-# This file contains only application services (backend, frontend, super-admin).
-# Infrastructure services (databases, cache, observability) are in docker-compose.services.yml
-# Images are built by Coolify (or locally) from Dockerfiles; no registry pull.
+# v2 apps serve the main domains; the v1 backend + storefront stay alive until
+# the v2 storefront ships (the public tenant shops depend on them).
 #
-# Usage:
-#   # Start infrastructure first:
-#   docker compose -f docker-compose.services.yml up -d
-#   # Then start applications:
-#   docker compose up -d
-#   docker compose logs -f
-#   docker compose down
+# Domain mapping (set in Coolify per service):
+#   web          -> dukarun.com         (v2 dashboard, port 80)
+#   super-admin  -> admin.dukarun.com   (v2 platform admin, port 80)
+#   storefront   -> store./jutik.dukarun.com  (v1, port 4202)
+#   backend      -> vendure.dukarun.com (v1 API, port 3000 — v1 storefront's backend)
+#
+# SUPABASE_URL / SUPABASE_ANON_KEY must be set in the Coolify app env; the v1
+# services read their full config from the same env file (DB_*, REDIS_*, etc.).
 
 services:
-  # ========================================
-  # Backend Service (Vendure)
-  # ========================================
-  backend:
+  web:
     build:
       context: .
-      dockerfile: ./backend/Dockerfile
-    platform: linux/amd64
+      dockerfile: apps/Dockerfile
+      args:
+        APP: web
+        SUPABASE_URL: ${SUPABASE_URL}
+        SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
     restart: unless-stopped
-    networks:
-      - dukarun_services_network
-    environment:
-      # Database configuration - uses service name from shared network
-      DB_HOST: ${DB_HOST}
-      DB_PORT: 5432
-      DB_NAME: ${DB_NAME}
-      DB_USERNAME: ${DB_USERNAME}
-      DB_PASSWORD: ${DB_PASSWORD}
-      DB_SCHEMA: ${DB_SCHEMA}
 
-      # Audit Log Database configuration (TimescaleDB) - uses service name
-      AUDIT_DB_HOST: ${AUDIT_DB_HOST}
-      AUDIT_DB_PORT: 5432
-      AUDIT_DB_NAME: ${AUDIT_DB_NAME}
-      AUDIT_DB_USERNAME: ${AUDIT_DB_USERNAME}
-      AUDIT_DB_PASSWORD: ${AUDIT_DB_PASSWORD}
-
-      # Redis configuration - uses service name
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-
-      # Application configuration
-      NODE_ENV: ${NODE_ENV}
-
-      # Admin credentials
-      SUPERADMIN_USERNAME: ${SUPERADMIN_USERNAME}
-      SUPERADMIN_PASSWORD: ${SUPERADMIN_PASSWORD}
-      # Super-admin app origin(s) for CORS (comma-separated if multiple). Default matches typical Docker/local access.
-      SUPERADMIN_URL: ${SUPERADMIN_URL}
-
-      # Security
-      COOKIE_SECRET: ${COOKIE_SECRET}
-      COOKIE_SECURE: ${COOKIE_SECURE}
-
-      # CORS configuration (set CORS_ORIGIN/FRONTEND_URL in env e.g. http://localhost:4200)
-      CORS_ORIGIN: ${CORS_ORIGIN}
-      FRONTEND_URL: ${FRONTEND_URL}
-
-      # Asset storage
-      ASSET_STORAGE_STRATEGY: ${ASSET_STORAGE_STRATEGY}
-      ASSET_UPLOAD_DIR: ${ASSET_UPLOAD_DIR}
-      ASSET_URL_PREFIX: ${ASSET_URL_PREFIX}
-
-      # Email configuration (optional)
-      MAIL_TRANSPORT: ${MAIL_TRANSPORT}
-      SMTP_HOST: ${SMTP_HOST}
-      SMTP_PORT: ${SMTP_PORT}
-      SMTP_USER: ${SMTP_USER}
-      SMTP_PASS: ${SMTP_PASS}
-      SMTP_FROM: ${SMTP_FROM}
-
-      # SMS Provider configuration
-      SMS_PROVIDER: ${SMS_PROVIDER}
-
-      # TextSMS Configuration (default provider)
-      TEXTSMS_API_KEY: ${TEXTSMS_API_KEY}
-      TEXTSMS_PARTNER_ID: ${TEXTSMS_PARTNER_ID}
-      TEXTSMS_SHORTCODE: ${TEXTSMS_SHORTCODE}
-
-      # WhatsApp/OpenWA notification configuration
-      OPENWA_BASE_URL: ${OPENWA_BASE_URL}
-      OPENWA_API_KEY: ${OPENWA_API_KEY}
-      OPENWA_SESSION: ${OPENWA_SESSION}
-
-      # Push Notification Configuration (VAPID) - set VAPID_EMAIL in env e.g. mailto:admin@example.com
-      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY}
-      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY}
-      VAPID_EMAIL: ${VAPID_EMAIL}
-
-      # Logging
-      LOG_LEVEL: ${LOG_LEVEL}
-
-    volumes:
-      - backend_assets:/usr/src/app/static/assets
-      - backend_uploads:/usr/src/app/static/uploads
-      # Note: .env file mount removed - env vars are passed directly via environment section
-      # In platforms like Coolify/Kubernetes, env vars are passed directly, so file mount is not needed
-    # ports:
-    #   - '127.0.0.1:${BACKEND_PORT}:3000'
-    #   - '127.0.0.1:3002:3002'
-    # Note: depends_on removed for external services (postgres_db, redis, timescaledb_audit)
-    # Backend will retry connections gracefully if services are not yet ready
-    healthcheck:
-      test: ['CMD', 'wget', '--no-verbose', '--tries=1', '--spider', 'http://localhost:3000/health']
-      interval: 30s
-      timeout: 15s
-      retries: 5
-      start_period: 60s
-
-  # ========================================
-  # Frontend Service (Angular + Nginx)
-  # ========================================
-  frontend:
-    build:
-      context: .
-      dockerfile: ./frontend/Dockerfile
-    platform: linux/amd64
-    restart: unless-stopped
-    networks:
-      - dukarun_services_network
-    environment:
-      # Backend connection - using service name from shared network
-      BACKEND_HOST: backend
-      BACKEND_PORT: ${BACKEND_PORT}
-
-      # Additional frontend configuration
-      NODE_ENV: ${NODE_ENV}
-
-    # ports:
-    #   - '${FRONTEND_PORT}:4200'
-    depends_on:
-      backend:
-        condition: service_healthy
-    healthcheck:
-      test:
-        - CMD
-        - curl
-        - -f
-        - http://localhost:4200/health
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-
-  # ========================================
-  # Super Admin (Angular + Nginx, port 4201)
-  # ========================================
   super-admin:
     build:
       context: .
-      dockerfile: ./super-admin/Dockerfile
-    platform: linux/amd64
+      dockerfile: apps/Dockerfile
+      args:
+        APP: super-admin
+        SUPABASE_URL: ${SUPABASE_URL}
+        SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
     restart: unless-stopped
-    networks:
-      - dukarun_services_network
-    environment:
-      # Same pattern as frontend: nginx proxies /admin-api to backend; app uses relative URL only.
-      BACKEND_HOST: ${BACKEND_HOST}
-      BACKEND_PORT: ${BACKEND_PORT}
-    ports:
-      - '127.0.0.1:${SUPERADMIN_PORT:-4201}:4201'
-    depends_on:
-      backend:
-        condition: service_healthy
-    healthcheck:
-      test:
-        - CMD
-        - curl
-        - -f
-        - http://localhost:4201/health
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
 
+  # --- v1 remnants (delete this block at final decommission) ---
   storefront:
     build:
       context: .
-      dockerfile: ./storefront/Dockerfile
-    platform: linux/amd64
+      dockerfile: archive/vendure/storefront/Dockerfile
+    env_file: .env
     restart: unless-stopped
-    networks:
-      - dukarun_services_network
-    environment:
-      # nginx proxies /shop-api, /assets and SEO endpoints to backend; app uses relative URLs only.
-      # Route every merchant subdomain (*.dukarun.com) to this service in the reverse proxy / Coolify.
-      BACKEND_HOST: ${BACKEND_HOST}
-      BACKEND_PORT: ${BACKEND_PORT}
-    ports:
-      - '127.0.0.1:${STOREFRONT_PORT:-4202}:4202'
-    depends_on:
-      backend:
-        condition: service_healthy
-    healthcheck:
-      test:
-        - CMD
-        - curl
-        - -f
-        - http://localhost:4202/health
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
 
-# ========================================
-# Networks
-# ========================================
-networks:
-  dukarun_services_network:
-    external: true
-  # For Coolify: Change 'dukarun_services_network' to 'coolify' and enable "Connect to Predefined Network" in Coolify UI
-
-# ========================================
-# Volumes
-# ========================================
-volumes:
-  backend_assets:
-    driver: local
-
-  backend_uploads:
-    driver: local
+  backend:
+    build:
+      context: .
+      dockerfile: archive/vendure/backend/Dockerfile
+    env_file: .env
+    restart: unless-stopped
