@@ -57,10 +57,11 @@ domains until it ships. Do not redeploy storefront.
 ## CI/CD
 
 `.github/workflows/supabase.yml`: lint + pgTAP + type-freshness on GitHub
-runners; deploy job on the self-hosted runner on the Coolify host
-(migrations + functions, hot-reload via volume, docker-cp fallback). Its smoke
-checks now fail the deployment on unexpected REST/function status codes.
+runners. Database migrations and Edge Functions are intentionally deployed with
+`npm run deploy` / `npm run deploy:functions`; Coolify's Git deployment does not
+manage the separate Supabase service.
 `.github/workflows/test.yml`: design guard + builds for all three apps.
+Merging to `main` triggers Coolify's normal Git-connected application rebuild.
 
 ## Lint findings (accepted, by design)
 

@@ -93,11 +93,13 @@ the internal migration runbook (gitignored — references real tenants).
 ## Production boundary
 
 - Self-hosted Supabase on Coolify runs PostgreSQL, Auth, Storage, Realtime, and Edge Runtime.
-- The Angular apps are static builds deployed to the same host (`npm run deploy:apps`);
-  caddy routes dukarun.com → web, admin.dukarun.com → super-admin.
+- The Angular apps are static builds deployed by Coolify from `main`; `npm run deploy:apps`
+  remains the manual fallback. Caddy routes dukarun.com → web and
+  admin.dukarun.com → super-admin.
 - CI production-builds all active apps and runs the web design guard.
-- Database CI starts an ephemeral stack, runs lint + pgTAP, and verifies generated types;
-  a self-hosted runner on the host can also apply migrations + functions on push.
+- Database CI starts an ephemeral stack, runs lint + pgTAP, and verifies generated types.
+- Database migrations and Edge Functions are deployed explicitly with `npm run deploy` or
+  `npm run deploy:functions`; the Git-connected Coolify app does not apply them.
 
 Production frontend builds require `SUPABASE_URL` and `SUPABASE_ANON_KEY`; the shared prebuild
 script generates an ignored Angular environment file. Service-role, provider, and database

@@ -11,9 +11,6 @@ concurrency:
   group: supabase-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  DEPLOY_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
-
 jobs:
   test:
     name: Lint + pgTAP
@@ -44,80 +41,3 @@ jobs:
           else
             echo "No generated types file yet; skipping check."
           fi
-
-  deploy:
-    name: Deploy to Coolify instance
-    # Runs on the self-hosted runner ON the Coolify host — Postgres stays
-    # private (runner reaches it via localhost), edge functions are copied
-    # straight into the edge-runtime container.
-    # Requires a registered self-hosted runner labelled [self-hosted, coolify]
-    # AND repo variable ENABLE_SELF_HOSTED_DEPLOY=true — otherwise the job
-    # would queue forever. We deploy manually for now (npm run deploy*).
-    if: >-
-      github.event_name == 'push'
-      && (github.ref == 'refs/heads/pilot/supabase' || github.ref == 'refs/heads/main')
-      && vars.ENABLE_SELF_HOSTED_DEPLOY == 'true'
-    needs: test
-    runs-on: [self-hosted, coolify]
-    environment: production
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: supabase/setup-cli@v1
-        with:
-          version: 2.111.0
-
-      - name: Apply migrations
-        run: supabase db push --db-url "$DEPLOY_DB_URL"
-        env:
-          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
-
-      - name: Deploy edge functions
-        # Preferred: sync into the edge-runtime's functions VOLUME (hot-reload,
-        # no restart). Set vars.FUNCTIONS_VOLUME on the repo to the host path of
-        # the edge-runtime functions dir (check the service's volumes in Coolify).
-        # Fallback: docker cp into the container + restart.
-        run: |
-          set -e
-          if [ -n "${{ vars.FUNCTIONS_VOLUME }}" ]; then
-            echo "Syncing functions into volume ${{ vars.FUNCTIONS_VOLUME }}"
-            for fn in paystack-charge paystack-webhook notification-flush; do
-              rm -rf "${{ vars.FUNCTIONS_VOLUME }}/$fn"
-              cp -r "supabase/functions/$fn" "${{ vars.FUNCTIONS_VOLUME }}/$fn"
-            done
-            echo "✓ functions synced (hot-reload)"
-          else
-            CONTAINER=$(docker ps --format '{{.Names}}' | grep -i 'edge-runtime' | head -1)
-            if [ -z "$CONTAINER" ]; then
-              echo "::error::edge-runtime not found; set vars.FUNCTIONS_VOLUME or vars.EDGE_RUNTIME_CONTAINER"
-              exit 1
-            fi
-            echo "Deploying functions into container $CONTAINER"
-            docker exec "$CONTAINER" mkdir -p /home/deno/functions
-            for fn in paystack-charge paystack-webhook notification-flush; do
-              docker cp "supabase/functions/$fn" "$CONTAINER:/home/deno/functions/$fn"
-            done
-            docker restart "$CONTAINER" >/dev/null
-            echo "✓ functions deployed (container restart)"
-          fi
-
-      - name: Smoke check
-        run: |
-          set -eu
-          check_status() {
-            name="$1"
-            expected="$2"
-            shift 2
-            actual=$(curl -sS -o /dev/null -w '%{http_code}' "$@")
-            echo "$name: $actual"
-            if [ "$actual" != "$expected" ]; then
-              echo "::error::$name returned $actual; expected $expected"
-              exit 1
-            fi
-          }
-          check_status "REST rejects missing key" 401 https://supa.dukarun.com/rest/v1/
-          check_status "notification flush rejects missing service key" 401 \
-            -X POST https://supa.dukarun.com/functions/v1/notification-flush
-          check_status "Paystack webhook rejects unsigned payload" 401 \
-            -X POST -H 'content-type: application/json' -d '{}' \
-            https://supa.dukarun.com/functions/v1/paystack-webhook
