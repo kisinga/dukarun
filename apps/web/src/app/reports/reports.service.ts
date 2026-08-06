@@ -131,11 +131,14 @@ export class ReportsService {
     if (ids.length === 0) return new Map();
     const { data, error } = await this.db
       .from('customers')
-      .select('id, first_name, last_name')
+      .select('id, first_name, last_name, deleted_at')
       .in('id', ids);
     if (error) throw error;
     return new Map(
-      (data ?? []).map(c => [c.id, [c.first_name, c.last_name].filter(Boolean).join(' ')])
+      (data ?? []).map(c => [
+        c.id,
+        `${[c.first_name, c.last_name].filter(Boolean).join(' ')}${c.deleted_at ? ' (Deleted)' : ''}`,
+      ])
     );
   }
 }

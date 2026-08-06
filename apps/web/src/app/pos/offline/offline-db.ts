@@ -103,14 +103,29 @@ interface PosOfflineDb extends DBSchema {
 let dbPromise: Promise<IDBPDatabase<PosOfflineDb>> | null = null;
 
 export function offlineDb(): Promise<IDBPDatabase<PosOfflineDb>> {
-  dbPromise ??= openDB<PosOfflineDb>('dukarun-pos-offline', 4, {
-    upgrade(db) {
-      const outbox = db.createObjectStore('outbox', { keyPath: 'client_ref' });
-      outbox.createIndex('by-queued-at', 'queued_at');
-      db.createObjectStore('products', { keyPath: 'key' });
-      db.createObjectStore('cart', { keyPath: 'key' });
-      db.createObjectStore('cashier', { keyPath: 'key' });
-      db.createObjectStore('settings', { keyPath: 'key' });
+  // v3 scopes all new records by company + user. Existing records are never
+  // deleted here: unscoped outbox entries are quarantined by SyncService so an
+  // upgrade cannot lose or accidentally replay a sale under another account.
+  dbPromise ??= openDB<PosOfflineDb>('dukarun-pos-offline', 3, {
+    upgrade(db, _oldVersion, _newVersion, transaction) {
+      const outbox = db.objectStoreNames.contains('outbox')
+        ? transaction.objectStore('outbox')
+        : db.createObjectStore('outbox', { keyPath: 'client_ref' });
+      if (!outbox.indexNames.contains('by-queued-at')) {
+        outbox.createIndex('by-queued-at', 'queued_at');
+      }
+      if (!db.objectStoreNames.contains('products')) {
+        db.createObjectStore('products', { keyPath: 'key' });
+      }
+      if (!db.objectStoreNames.contains('cart')) {
+        db.createObjectStore('cart', { keyPath: 'key' });
+      }
+      if (!db.objectStoreNames.contains('cashier')) {
+        db.createObjectStore('cashier', { keyPath: 'key' });
+      }
+      if (!db.objectStoreNames.contains('settings')) {
+        db.createObjectStore('settings', { keyPath: 'key' });
+      }
     },
   });
   return dbPromise;

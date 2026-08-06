@@ -261,13 +261,21 @@ export class MoneyService {
   }
 
   /** Non-supplier customers joined with their AR balance + credit aging (client-side joins). */
-  async customersWithAr(): Promise<(MoneyCustomer & { ar_balance: number } & AgingInfo)[]> {
+  async customersWithAr(
+    includeDeleted = false
+  ): Promise<(MoneyCustomer & { ar_balance: number } & AgingInfo)[]> {
+    let customerQuery = this.db
+      .from('customers')
+      .select('*')
+      .eq('is_supplier', false)
+      .order('first_name');
+    if (!includeDeleted) customerQuery = customerQuery.is('deleted_at', null);
     const [
       { data: customers, error: e1 },
       { data: balances, error: e2 },
       { data: aging, error: e3 },
     ] = await Promise.all([
-      this.db.from('customers').select('*').eq('is_supplier', false).order('first_name'),
+      customerQuery,
       this.db.from('customer_ar_balances').select('*'),
       this.db.from('customer_credit_aging').select('customer_id, days_outstanding, bucket'),
     ]);
@@ -658,6 +666,15 @@ export class MoneyService {
       ...(changes.phone !== undefined ? { p_phone: changes.phone } : {}),
       ...(changes.email !== undefined ? { p_email: changes.email } : {}),
       ...(changes.notes !== undefined ? { p_notes: changes.notes } : {}),
+    });
+    if (error) throw rpcError(error);
+    return data;
+  }
+
+  async setCustomerDeleted(customerId: string, deleted: boolean): Promise<string> {
+    const { data, error } = await this.db.rpc('set_customer_deleted', {
+      p_customer_id: customerId,
+      p_deleted: deleted,
     });
     if (error) throw rpcError(error);
     return data;

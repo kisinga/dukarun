@@ -29,7 +29,7 @@ select is(
 select ok(
   (select permissions <@ array[
     'ManageApprovals', 'OverridePrice', 'ManageStockAdjustments',
-    'ApproveCustomerCredit', 'ManageCustomerCreditLimit', 'ReverseOrder',
+    'ApproveCustomerCredit', 'ManageCustomerCreditLimit', 'ManageCustomers', 'ReverseOrder',
     'OverrideCustomerBalance', 'SettleOrder', 'ManageSupplierCreditPurchases',
     'ViewFinancials', 'ManageReconciliation', 'CloseAccountingPeriod',
     'CreateInterAccountTransfer', 'ManageTeam', 'ViewAuditTrail',

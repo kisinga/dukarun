@@ -50,7 +50,9 @@ export interface DeleteConfirmationData {
                   }
                 </ul>
               }
-              <p class="mt-2 font-semibold text-error">This action cannot be undone.</p>
+              @if (irreversible()) {
+                <p class="mt-2 font-semibold text-error">This action cannot be undone.</p>
+              }
             </div>
           </div>
         } @else if (hasWarningDetails()) {
@@ -62,11 +64,17 @@ export interface DeleteConfirmationData {
                   <li>{{ detail }}</li>
                 }
               </ul>
-              <p class="mt-2 font-semibold text-error">This action cannot be undone.</p>
+              @if (irreversible()) {
+                <p class="mt-2 font-semibold text-error">This action cannot be undone.</p>
+              }
             </div>
           </div>
         } @else {
-          <p class="mb-6 text-center text-sm text-base-content/60">This action cannot be undone.</p>
+          @if (irreversible()) {
+            <p class="mb-6 text-center text-sm text-base-content/60">
+              This action cannot be undone.
+            </p>
+          }
         }
 
         <div class="flex gap-3">
@@ -90,6 +98,7 @@ export class DeleteConfirmationModalComponent {
   readonly entityType = input('item');
   readonly verb = input('delete');
   readonly confirmButtonText = input('Delete');
+  readonly irreversible = input(true);
   readonly confirm = output<void>();
   readonly cancel = output<void>();
 

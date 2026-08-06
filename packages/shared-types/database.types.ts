@@ -967,6 +967,8 @@ export type Database = {
           credit_approved_by: string | null
           credit_limit: number
           credit_terms_days: number | null
+          deleted_at: string | null
+          deleted_by: string | null
           email: string | null
           first_name: string
           id: string
@@ -990,6 +992,8 @@ export type Database = {
           credit_approved_by?: string | null
           credit_limit?: number
           credit_terms_days?: number | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           email?: string | null
           first_name: string
           id?: string
@@ -1013,6 +1017,8 @@ export type Database = {
           credit_approved_by?: string | null
           credit_limit?: number
           credit_terms_days?: number | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           email?: string | null
           first_name?: string
           id?: string
@@ -4414,6 +4420,10 @@ export type Database = {
       set_commissions_enabled: {
         Args: { p_enabled: boolean }
         Returns: boolean
+      }
+      set_customer_deleted: {
+        Args: { p_customer_id: string; p_deleted?: boolean }
+        Returns: string
       }
       set_membership_locations: {
         Args: {

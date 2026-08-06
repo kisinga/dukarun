@@ -423,6 +423,7 @@ export class PosService {
       .from('customers')
       .select('*')
       .eq('is_supplier', false)
+      .is('deleted_at', null)
       .or(`first_name.ilike.${pattern},last_name.ilike.${pattern},phone.ilike.${pattern}`)
       .limit(10);
     if (error) throw error;
@@ -435,6 +436,7 @@ export class PosService {
       .select('*')
       .eq('id', customerId)
       .eq('is_supplier', false)
+      .is('deleted_at', null)
       .maybeSingle();
     if (error) throw error;
     if (!data) return null;

@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal, viewChild } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { formatKes, formatKesInput, parseKes } from '../core/money';
 import { reconciliationLabel, reconciliationTypeForCode } from '../core/payment-methods';
@@ -31,6 +31,7 @@ import { DataTableShellComponent } from '../shared/ui/data-table-shell.component
 import { DrawerComponent } from '../shared/ui/drawer.component';
 import { StatBarComponent } from '../shared/ui/stat-bar.component';
 import { StatCardComponent } from '../shared/ui/stat-card.component';
+import { DeleteConfirmationModalComponent } from '../shared/ui/delete-confirmation-modal.component';
 
 type CustomerWithAr = MoneyCustomer & { ar_balance: number } & AgingInfo;
 type CreditOrder = {
@@ -60,6 +61,7 @@ type CreditOrder = {
     DrawerComponent,
     StatBarComponent,
     StatCardComponent,
+    DeleteConfirmationModalComponent,
   ],
   template: `
     <app-page
@@ -98,6 +100,19 @@ type CreditOrder = {
         (searchQueryChange)="query.set($event); customerPage.set(1)"
       >
         <app-stat-bar summary [stats]="customerStats()" />
+        <div filters class="flex items-center gap-2">
+          <label for="customer-account-status" class="text-sm font-medium">Account status</label>
+          <select
+            id="customer-account-status"
+            class="select select-bordered select-sm"
+            [value]="accountStatus()"
+            (change)="setAccountStatus($event)"
+          >
+            <option value="active">Active</option>
+            <option value="deleted">Deleted</option>
+            <option value="all">All</option>
+          </select>
+        </div>
       </app-list-search-bar>
 
       <!-- List -->
@@ -130,6 +145,7 @@ type CreditOrder = {
                     role="button"
                     tabindex="0"
                     [class.table-row-active]="selectedCustomerId() === c.id"
+                    [class.opacity-60]="c.deleted_at !== null"
                     (click)="openCustomer(c.id)"
                     (keydown.enter)="openCustomer(c.id)"
                   >
@@ -141,7 +157,12 @@ type CreditOrder = {
                           [lastName]="c.last_name ?? ''"
                         />
                         <div class="min-w-0">
-                          <p class="table-primary truncate">{{ name(c) }}</p>
+                          <div class="flex items-center gap-2">
+                            <p class="table-primary truncate">{{ name(c) }}</p>
+                            @if (c.deleted_at) {
+                              <app-status-badge size="xs" type="error" label="Deleted" />
+                            }
+                          </div>
                           <p class="table-secondary truncate">{{ c.notes || 'No notes' }}</p>
                         </div>
                       </div>
@@ -182,17 +203,48 @@ type CreditOrder = {
                       <app-money [amount]="c.ar_balance" [masked]="!perms.has('ViewFinancials')" />
                     </td>
                     <td class="table-actions" (click)="$event.stopPropagation()">
-                      <button
-                        appButton
-                        variant="ghost"
-                        [iconOnly]="true"
-                        type="button"
-                        title="Edit customer"
-                        aria-label="Edit customer"
-                        (click)="startEdit(c)"
-                      >
-                        <app-icon name="heroPencilSquare" />
-                      </button>
+                      @if (c.deleted_at) {
+                        @if (perms.has('ManageCustomers')) {
+                          <button
+                            appButton
+                            variant="ghost"
+                            [iconOnly]="true"
+                            type="button"
+                            title="Restore customer"
+                            aria-label="Restore customer"
+                            [disabled]="busy()"
+                            (click)="restoreCustomer(c)"
+                          >
+                            <app-icon name="heroArrowPath" />
+                          </button>
+                        }
+                      } @else {
+                        <button
+                          appButton
+                          variant="ghost"
+                          [iconOnly]="true"
+                          type="button"
+                          title="Edit customer"
+                          aria-label="Edit customer"
+                          (click)="startEdit(c)"
+                        >
+                          <app-icon name="heroPencilSquare" />
+                        </button>
+                        @if (perms.has('ManageCustomers')) {
+                          <button
+                            appButton
+                            variant="ghost"
+                            [iconOnly]="true"
+                            type="button"
+                            title="Delete customer"
+                            aria-label="Delete customer"
+                            [disabled]="busy()"
+                            (click)="startDelete(c)"
+                          >
+                            <app-icon name="heroArchiveBox" />
+                          </button>
+                        }
+                      }
                     </td>
                   </tr>
                 }
@@ -208,6 +260,7 @@ type CreditOrder = {
               role="button"
               tabindex="0"
               [class.border-primary]="selectedCustomerId() === c.id"
+              [class.opacity-60]="c.deleted_at !== null"
               (click)="openCustomer(c.id)"
               (keydown.enter)="openCustomer(c.id)"
             >
@@ -219,6 +272,9 @@ type CreditOrder = {
                     [lastName]="c.last_name ?? ''"
                   />
                   <span class="font-semibold">{{ name(c) }}</span>
+                  @if (c.deleted_at) {
+                    <app-status-badge size="xs" type="error" label="Deleted" />
+                  }
                   <span class="text-xs text-base-content/60">{{ c.phone ?? '' }}</span>
                   <span
                     class="ml-auto"
@@ -229,13 +285,34 @@ type CreditOrder = {
                     <app-money [amount]="c.ar_balance" [masked]="!perms.has('ViewFinancials')" />
                     owed to us
                   </span>
-                  <button
-                    appButton
-                    variant="ghost"
-                    (click)="$event.stopPropagation(); startEdit(c)"
-                  >
-                    Edit
-                  </button>
+                  @if (c.deleted_at) {
+                    @if (perms.has('ManageCustomers')) {
+                      <button
+                        appButton
+                        variant="ghost"
+                        (click)="$event.stopPropagation(); restoreCustomer(c)"
+                      >
+                        Restore
+                      </button>
+                    }
+                  } @else {
+                    <button
+                      appButton
+                      variant="ghost"
+                      (click)="$event.stopPropagation(); startEdit(c)"
+                    >
+                      Edit
+                    </button>
+                    @if (perms.has('ManageCustomers')) {
+                      <button
+                        appButton
+                        variant="ghost"
+                        (click)="$event.stopPropagation(); startDelete(c)"
+                      >
+                        Delete
+                      </button>
+                    }
+                  }
                 </div>
               </div>
             </div>
@@ -259,18 +336,37 @@ type CreditOrder = {
               />
             }
             @if (detailCustomer(); as c) {
-              <button
-                actions
-                appButton
-                variant="ghost"
-                [iconOnly]="true"
-                type="button"
-                title="Edit customer"
-                aria-label="Edit customer"
-                (click)="editFromDrawer(c)"
-              >
-                <app-icon name="heroPencilSquare" />
-              </button>
+              @if (c.deleted_at) {
+                @if (perms.has('ManageCustomers')) {
+                  <button
+                    actions
+                    appButton
+                    variant="outline"
+                    type="button"
+                    (click)="restoreCustomer(c)"
+                  >
+                    <app-icon name="heroArrowPath" /> Restore
+                  </button>
+                }
+              } @else {
+                <button
+                  actions
+                  appButton
+                  variant="ghost"
+                  [iconOnly]="true"
+                  type="button"
+                  title="Edit customer"
+                  aria-label="Edit customer"
+                  (click)="editFromDrawer(c)"
+                >
+                  <app-icon name="heroPencilSquare" />
+                </button>
+                @if (perms.has('ManageCustomers')) {
+                  <button actions appButton variant="ghost" type="button" (click)="startDelete(c)">
+                    <app-icon name="heroArchiveBox" /> Delete
+                  </button>
+                }
+              }
             }
 
             @if (creating() || drawerEditing()) {
@@ -334,6 +430,15 @@ type CreditOrder = {
                 </div>
               </form>
             } @else if (selectedCustomer(); as c) {
+              @if (c.deleted_at) {
+                <div role="status" class="alert alert-warning mb-3 text-sm">
+                  <app-icon name="heroArchiveBox" />
+                  <span>
+                    Deleted {{ date(c.deleted_at) }}. This account is kept for sales and payment
+                    history, and cannot be selected for new sales.
+                  </span>
+                </div>
+              }
               <div class="grid grid-cols-2 gap-2">
                 <app-stat-card
                   label="Owed to us"
@@ -388,7 +493,8 @@ type CreditOrder = {
                       }
                     </div>
                     @if (
-                      perms.has('ApproveCustomerCredit') || perms.has('ManageCustomerCreditLimit')
+                      !c.deleted_at &&
+                      (perms.has('ApproveCustomerCredit') || perms.has('ManageCustomerCreditLimit'))
                     ) {
                       <form
                         (submit)="$event.preventDefault(); saveCredit(c)"
@@ -709,6 +815,16 @@ type CreditOrder = {
           />
         </div>
       }
+      <app-delete-confirmation-modal
+        [data]="deleteConfirmationData()"
+        title="Delete customer account?"
+        entityType="customer"
+        verb="delete"
+        confirmButtonText="Delete customer"
+        [irreversible]="false"
+        (confirm)="confirmDelete()"
+        (cancel)="deletingCustomer.set(null)"
+      />
     </app-page>
   `,
 })
@@ -731,6 +847,7 @@ export class CustomersComponent implements OnInit {
   protected readonly detailLoading = signal(false);
 
   protected readonly query = signal('');
+  protected readonly accountStatus = signal<'active' | 'deleted' | 'all'>('active');
   protected readonly customerPage = signal(1);
   protected readonly customerPageSize = signal(10);
   /** Drawer edit mode: creating = empty form, drawerEditing = form for the open customer. */
@@ -761,13 +878,19 @@ export class CustomersComponent implements OnInit {
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
+  protected readonly deletingCustomer = signal<CustomerWithAr | null>(null);
+  private readonly deleteModal = viewChild(DeleteConfirmationModalComponent);
 
   protected readonly filtered = computed(() => {
     const q = this.query().toLowerCase();
-    if (!q) return this.customers();
-    return this.customers().filter(
-      c => this.name(c).toLowerCase().includes(q) || (c.phone ?? '').toLowerCase().includes(q)
-    );
+    const status = this.accountStatus();
+    return this.customers().filter(c => {
+      if (status === 'active' && c.deleted_at !== null) return false;
+      if (status === 'deleted' && c.deleted_at === null) return false;
+      return (
+        !q || this.name(c).toLowerCase().includes(q) || (c.phone ?? '').toLowerCase().includes(q)
+      );
+    });
   });
   protected readonly selectedCustomer = computed(() => {
     const id = this.selectedCustomerId();
@@ -786,7 +909,8 @@ export class CustomersComponent implements OnInit {
   protected readonly drawerSubtitle = computed(() => {
     if (this.creating()) return undefined;
     const c = this.selectedCustomer();
-    return c ? c.phone || c.email || undefined : undefined;
+    if (!c) return undefined;
+    return c.deleted_at ? `Deleted ${this.date(c.deleted_at)}` : c.phone || c.email || undefined;
   });
   protected readonly customerTotalPages = computed(() =>
     Math.max(1, Math.ceil(this.filtered().length / this.customerPageSize()))
@@ -798,13 +922,14 @@ export class CustomersComponent implements OnInit {
   });
   protected readonly customerStats = computed(() => {
     const rows = this.customers();
+    const active = rows.filter(customer => customer.deleted_at === null);
     const outstanding = rows.reduce((sum, customer) => sum + Math.max(0, customer.ar_balance), 0);
     const overdue = rows.filter(
       customer =>
         customer.ar_balance > 0 && customer.bucket !== null && customer.bucket !== 'current'
     ).length;
     return [
-      { label: 'Customers', value: rows.length },
+      { label: 'Active customers', value: active.length },
       {
         label: 'Owed to us',
         value: this.perms.has('ViewFinancials') ? formatKes(outstanding) : 'Hidden',
@@ -812,10 +937,25 @@ export class CustomersComponent implements OnInit {
       },
       {
         label: 'Credit approved',
-        value: rows.filter(customer => customer.is_credit_approved).length,
+        value: active.filter(customer => customer.is_credit_approved).length,
       },
       { label: 'Overdue to us', value: overdue, tone: 'error' as const },
+      { label: 'Deleted', value: rows.length - active.length },
     ];
+  });
+  protected readonly deleteConfirmationData = computed(() => {
+    const customer = this.deletingCustomer();
+    const warningDetails = [
+      'The customer will no longer appear when selecting a customer for a new sale.',
+      'Past sales, statements, and payment history will remain available.',
+      'You can restore the account later.',
+    ];
+    if (customer && customer.ar_balance > 0) {
+      warningDetails.unshift(
+        `${this.name(customer)} still owes ${formatKes(customer.ar_balance)}; repayments remain available after deletion.`
+      );
+    }
+    return { entityName: customer ? this.name(customer) : 'customer', warningDetails };
   });
 
   async ngOnInit(): Promise<void> {
@@ -832,7 +972,7 @@ export class CustomersComponent implements OnInit {
   protected async load(): Promise<void> {
     this.loading.set(true);
     try {
-      this.customers.set(await this.money.customersWithAr());
+      this.customers.set(await this.money.customersWithAr(true));
       this.error.set(null);
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Failed to load customers');
@@ -910,8 +1050,59 @@ export class CustomersComponent implements OnInit {
   }
 
   protected startEdit(c: CustomerWithAr): void {
+    if (c.deleted_at) return;
     void this.openCustomer(c.id);
     this.editFromDrawer(c);
+  }
+
+  protected setAccountStatus(event: Event): void {
+    this.accountStatus.set(
+      (event.target as HTMLSelectElement).value as 'active' | 'deleted' | 'all'
+    );
+    this.customerPage.set(1);
+  }
+
+  protected startDelete(customer: CustomerWithAr): void {
+    if (!this.perms.has('ManageCustomers')) return;
+    this.deletingCustomer.set(customer);
+    this.deleteModal()?.show();
+  }
+
+  protected async confirmDelete(): Promise<void> {
+    if (!this.perms.has('ManageCustomers')) return;
+    const customer = this.deletingCustomer();
+    if (!customer) return;
+    this.busy.set(true);
+    this.error.set(null);
+    this.notice.set(null);
+    try {
+      await this.money.setCustomerDeleted(customer.id, true);
+      this.deleteModal()?.hide();
+      this.deletingCustomer.set(null);
+      this.closeCustomerDrawer();
+      await this.load();
+      this.notice.set(`${this.name(customer)} was deleted. Past account activity is preserved.`);
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Customer deletion failed');
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected async restoreCustomer(customer: CustomerWithAr): Promise<void> {
+    if (!this.perms.has('ManageCustomers')) return;
+    this.busy.set(true);
+    this.error.set(null);
+    this.notice.set(null);
+    try {
+      await this.money.setCustomerDeleted(customer.id, false);
+      await this.load();
+      this.notice.set(`${this.name(customer)} was restored and can be selected for new sales.`);
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Customer restore failed');
+    } finally {
+      this.busy.set(false);
+    }
   }
 
   protected closeForm(): void {
