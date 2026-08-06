@@ -6,6 +6,7 @@ import { LocationContextService } from '../core/location-context.service';
 import { PartyCacheService, type PartyQueryResult } from '../core/party-cache.service';
 
 export type Product = Database['public']['Tables']['products']['Row'];
+export type Manufacturer = Database['public']['Tables']['manufacturers']['Row'];
 export type Collection = Database['public']['Tables']['collections']['Row'];
 export type CollectionWithCount = Collection & { product_count: number };
 export type Variant = Database['public']['Views']['variant_catalog']['Row'];
@@ -127,7 +128,8 @@ export class PosService {
       .from('variant_catalog')
       .select('*')
       .or(
-        `product_name.ilike.${pattern},variant_name.ilike.${pattern},sku.ilike.${pattern},barcode.ilike.${pattern}`
+        `product_name.ilike.${pattern},variant_name.ilike.${pattern},sku.ilike.${pattern},barcode.ilike.${pattern}` +
+          `,manufacturer_name.ilike.${pattern}`
       )
       .eq('variant_active', true)
       .eq('product_active', true)
@@ -148,7 +150,8 @@ export class PosService {
     if (trimmed) {
       const pattern = `%${trimmed.replace(/[%_,()]/g, ' ')}%`;
       q = q.or(
-        `product_name.ilike.${pattern},variant_name.ilike.${pattern},sku.ilike.${pattern},barcode.ilike.${pattern}`
+        `product_name.ilike.${pattern},variant_name.ilike.${pattern},sku.ilike.${pattern},barcode.ilike.${pattern}` +
+          `,manufacturer_name.ilike.${pattern}`
       );
     }
     const { data, error } = await q;
@@ -160,6 +163,26 @@ export class PosService {
   async listFamilies(): Promise<Product[]> {
     const { data, error } = await this.client.from('products').select('*').order('name').limit(500);
     if (error) throw error;
+    return data;
+  }
+
+  async listManufacturers(query = ''): Promise<Manufacturer[]> {
+    let request = this.client
+      .from('manufacturers')
+      .select('*')
+      .eq('active', true)
+      .order('name')
+      .limit(50);
+    const term = query.trim();
+    if (term) request = request.ilike('name', `%${term.replace(/[%_]/g, ' ')}%`);
+    const { data, error } = await request;
+    if (error) throw error;
+    return data;
+  }
+
+  async upsertManufacturer(name: string): Promise<string> {
+    const { data, error } = await this.client.rpc('upsert_manufacturer', { p_name: name.trim() });
+    if (error) throw rpcError(error);
     return data;
   }
 
@@ -217,11 +240,13 @@ export class PosService {
   async createProductWithVariants(input: {
     name: string;
     barcode?: string;
+    manufacturer_id?: string | null;
     variants: CatalogVariantInput[];
   }): Promise<string> {
-    const { data, error } = await this.client.rpc('create_catalog_product', {
+    const { data, error } = await this.client.rpc('create_catalog_product_with_manufacturer', {
       p_name: input.name,
       p_variants: input.variants as never,
+      p_manufacturer_id: input.manufacturer_id ?? undefined,
       ...(input.barcode ? { p_barcode: input.barcode } : {}),
     });
     if (error) throw rpcError(error);
@@ -234,13 +259,15 @@ export class PosService {
     name: string;
     barcode: string;
     active: boolean;
+    manufacturer_id?: string | null;
     variants: CatalogVariantInput[];
   }): Promise<string> {
-    const { data, error } = await this.client.rpc('update_catalog_product', {
+    const { data, error } = await this.client.rpc('update_catalog_product_with_manufacturer', {
       p_product_id: input.product_id,
       p_name: input.name,
       p_barcode: input.barcode,
       p_active: input.active,
+      p_manufacturer_id: input.manufacturer_id ?? undefined,
       p_variants: input.variants as never,
     });
     if (error) throw rpcError(error);

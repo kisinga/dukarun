@@ -104,6 +104,11 @@ function formatKes(amount: number): string {
                   }
                   <div class="card-body gap-1 p-3">
                     <p class="text-sm leading-tight font-semibold">{{ label(item) }}</p>
+                    @if (item.manufacturer_name) {
+                      <span class="badge badge-ghost badge-xs w-fit">{{
+                        item.manufacturer_name
+                      }}</span>
+                    }
                     @if (item.kind === 'service') {
                       <span class="badge badge-info badge-xs w-fit">Service</span>
                     }
@@ -177,7 +182,8 @@ export class ShopComponent implements OnInit {
       item =>
         (item.product_name ?? '').toLowerCase().includes(q) ||
         (item.variant_name ?? '').toLowerCase().includes(q) ||
-        (item.sku ?? '').toLowerCase().includes(q)
+        (item.sku ?? '').toLowerCase().includes(q) ||
+        (item.manufacturer_name ?? '').toLowerCase().includes(q)
     );
   });
 

@@ -25,6 +25,9 @@ import { MoneyComponent } from '../../shared/ui/money.component';
             @if (line().variant.sku) {
               <span class="type-caption">{{ line().variant.sku }}</span>
             }
+            @if (line().variant.manufacturer_name) {
+              <span class="badge badge-ghost badge-xs">{{ line().variant.manufacturer_name }}</span>
+            }
             @if (line().variant.allow_fractional) {
               <span class="badge badge-ghost badge-xs">fractional</span>
             }

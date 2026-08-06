@@ -9,6 +9,7 @@ import {
   CatalogVariantInput,
   CollectionWithCount,
   InventoryBatch,
+  Manufacturer,
   PosService,
   Product,
   ProductVariant,
@@ -313,6 +314,24 @@ interface ProductEditorRow {
                         autocomplete="off"
                         [formControl]="familyName"
                       />
+                    </app-form-field>
+                    <app-form-field
+                      label="Manufacturer"
+                      hint="Optional. Select an existing manufacturer or type a new one."
+                    >
+                      <input
+                        type="text"
+                        class="input input-bordered w-full"
+                        autocomplete="off"
+                        list="manufacturer-options"
+                        placeholder="Optional"
+                        [formControl]="familyManufacturer"
+                      />
+                      <datalist id="manufacturer-options">
+                        @for (manufacturer of manufacturers(); track manufacturer.id) {
+                          <option [value]="manufacturer.name"></option>
+                        }
+                      </datalist>
                     </app-form-field>
                     <app-form-field
                       label="Shared barcode"
@@ -791,6 +810,9 @@ interface ProductEditorRow {
                   }
                   <div class="min-w-0 flex-1">
                     <span class="block truncate font-semibold">{{ group.family.name }}</span>
+                    @if (manufacturerName(group.family.manufacturer_id); as manufacturer) {
+                      <span class="badge badge-ghost badge-sm mt-1">{{ manufacturer }}</span>
+                    }
                     <span class="type-caption mt-0.5 block">
                       {{ group.variants.length }}
                       {{ group.variants.length === 1 ? 'variant' : 'variants' }}
@@ -827,6 +849,7 @@ interface ProductEditorRow {
               <thead>
                 <tr>
                   <th>Product</th>
+                  <th>Manufacturer</th>
                   <th class="text-right">Variants</th>
                   <th class="text-right">Inventory</th>
                   <th>Status</th>
@@ -848,6 +871,13 @@ interface ProductEditorRow {
                       <p class="type-caption mt-0.5 font-mono">
                         {{ group.family.barcode || 'No shared barcode' }}
                       </p>
+                    </td>
+                    <td>
+                      @if (manufacturerName(group.family.manufacturer_id); as manufacturer) {
+                        <span class="badge badge-ghost badge-sm">{{ manufacturer }}</span>
+                      } @else {
+                        <span class="type-caption">—</span>
+                      }
                     </td>
                     <td class="text-right font-medium">
                       {{ group.variants.length }}
@@ -1129,6 +1159,7 @@ export class ProductsComponent implements OnInit {
 
   protected readonly editingFamily = signal<Product | null>(null);
   protected readonly familyName = new FormControl('', { nonNullable: true });
+  protected readonly familyManufacturer = new FormControl('', { nonNullable: true });
   protected readonly familyBarcode = new FormControl('', { nonNullable: true });
   protected readonly familyActive = new FormControl(true, { nonNullable: true });
 
@@ -1153,6 +1184,7 @@ export class ProductsComponent implements OnInit {
   /** Collections panel + per-family checkbox editor. */
   protected readonly collectionsOpen = signal(false);
   protected readonly collections = signal<CollectionWithCount[]>([]);
+  protected readonly manufacturers = signal<Manufacturer[]>([]);
   protected readonly stockLocations = signal<StockLocation[]>([]);
   protected readonly collectionForm = signal<{ editing: CollectionWithCount | null } | null>(null);
   protected readonly collectionName = new FormControl('', { nonNullable: true });
@@ -1178,7 +1210,8 @@ export class ProductsComponent implements OnInit {
           (v.product_name ?? '').toLowerCase().includes(q) ||
           (v.variant_name ?? '').toLowerCase().includes(q) ||
           (v.sku ?? '').toLowerCase().includes(q) ||
-          (v.barcode ?? '').toLowerCase().includes(q)
+          (v.barcode ?? '').toLowerCase().includes(q) ||
+          (v.manufacturer_name ?? '').toLowerCase().includes(q)
         )
       ) {
         continue;
@@ -1296,6 +1329,11 @@ export class ProductsComponent implements OnInit {
     this.stockStatusFilter.set('all');
   }
 
+  protected manufacturerName(id: string | null): string | null {
+    if (!id) return null;
+    return this.manufacturers().find(manufacturer => manufacturer.id === id)?.name ?? null;
+  }
+
   async ngOnInit(): Promise<void> {
     this.loading.set(true);
     const hydrated = await this.catalogCache.ensureLoaded();
@@ -1328,12 +1366,14 @@ export class ProductsComponent implements OnInit {
   }
 
   private async loadAuxiliary(): Promise<void> {
-    const [collections, locations] = await Promise.all([
+    const [collections, locations, manufacturers] = await Promise.all([
       this.pos.listCollections(),
       this.pos.listStockLocations(),
+      this.pos.listManufacturers(),
     ]);
     this.collections.set(collections);
     this.stockLocations.set(locations);
+    this.manufacturers.set(manufacturers);
     const defaultLocationId = locations[0]?.id ?? '';
     this.editorRows = this.editorRows.map(row => ({
       ...row,
@@ -1542,6 +1582,7 @@ export class ProductsComponent implements OnInit {
     this.editorLoading.set(false);
     this.editingFamily.set(null);
     this.familyName.setValue('');
+    this.familyManufacturer.setValue('');
     this.familyBarcode.setValue('');
     this.familyActive.setValue(true);
     this.familyCollections.set(new Set());
@@ -1554,6 +1595,7 @@ export class ProductsComponent implements OnInit {
     this.error.set(null);
     this.editingFamily.set(family);
     this.familyName.setValue(family.name);
+    this.familyManufacturer.setValue(this.manufacturerName(family.manufacturer_id) ?? '');
     this.familyBarcode.setValue(family.barcode ?? '');
     this.familyActive.setValue(family.active);
     this.familyCollections.set(new Set());
@@ -1620,10 +1662,18 @@ export class ProductsComponent implements OnInit {
     this.error.set(null);
     this.notice.set(null);
     try {
+      const manufacturerName = this.familyManufacturer.value.trim();
+      const existingManufacturer = this.manufacturers().find(
+        item => item.name.toLocaleLowerCase() === manufacturerName.toLocaleLowerCase()
+      );
+      const manufacturerId = manufacturerName
+        ? (existingManufacturer?.id ?? (await this.pos.upsertManufacturer(manufacturerName)))
+        : null;
       if (mode === 'create') {
         await this.pos.createProductWithVariants({
           name,
           barcode: this.familyBarcode.value.trim() || undefined,
+          manufacturer_id: manufacturerId,
           variants,
         });
         this.notice.set(`Created ${name}`);
@@ -1633,6 +1683,7 @@ export class ProductsComponent implements OnInit {
           name,
           barcode: this.familyBarcode.value.trim(),
           active: this.familyActive.value,
+          manufacturer_id: manufacturerId,
           variants,
         });
         await this.pos.setProductCollections(editing.id, [...this.familyCollections()]);

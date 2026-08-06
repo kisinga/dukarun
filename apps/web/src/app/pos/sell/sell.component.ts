@@ -350,10 +350,9 @@ interface DraftFlag {
                         </span>
                       } @else if (unavailable(v)) {
                         <span class="badge badge-error badge-sm whitespace-nowrap">Out</span>
-                      } @else {
-                        <span class="badge badge-ghost gap-1 text-primary">
-                          <app-icon name="heroPlus" />
-                          Add
+                      } @else if (v.manufacturer_name) {
+                        <span class="badge badge-ghost badge-sm max-w-24 truncate">
+                          {{ v.manufacturer_name }}
                         </span>
                       }
                     </div>

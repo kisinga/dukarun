@@ -913,11 +913,59 @@ try {
     const mappedP = await mapAll(companyId, 'product');
     const mappedV = await mapAll(companyId, 'variant');
     const seenBarcodes = new Set();
+    const productIds = products.map(p => p.id);
+    const { rows: manufacturerRows } = productIds.length
+      ? await src.query(
+          `select pf."productId" as product_id,
+                  coalesce(nullif(btrim(fvt.name), ''), fv.code) as manufacturer
+           from product_facet_values_facet_value pf
+           join facet_value fv on fv.id = pf."facetValueId"
+           join facet f on f.id = fv."facetId" and lower(f.code) = 'manufacturer'
+           left join facet_value_translation fvt
+             on fvt."baseId" = fv.id and fvt."languageCode" = 'en'
+           where pf."productId" = any($1::int[])
+           order by pf."productId", fv.id`,
+          [productIds]
+        )
+      : { rows: [] };
+    const manufacturerByProduct = new Map();
+    for (const row of manufacturerRows) {
+      if (manufacturerByProduct.has(row.product_id)) {
+        throw new Error(`product ${row.product_id} has multiple manufacturer facets`);
+      }
+      manufacturerByProduct.set(row.product_id, row.manufacturer);
+    }
+    const manufacturerIds = new Map();
+
+    async function manufacturerIdFor(productId) {
+      const name = manufacturerByProduct.get(productId);
+      if (!name || DRY) return null;
+      if (manufacturerIds.has(name.toLowerCase())) return manufacturerIds.get(name.toLowerCase());
+      const { rows } = await tgt.query(
+        `insert into public.manufacturers (company_id, name)
+         values ($1, btrim($2))
+         on conflict (company_id, normalized_name)
+         do update set active=true, updated_at=now()
+         returning id`,
+        [companyId, name]
+      );
+      manufacturerIds.set(name.toLowerCase(), rows[0].id);
+      return rows[0].id;
+    }
 
     for (const p of products) {
       let productId = mappedP.get(String(p.id)) ?? null;
-      if (productId) sp.existing++;
-      else if (DRY) {
+      const manufacturerId = await manufacturerIdFor(p.id);
+      if (productId) {
+        sp.existing++;
+        if (!DRY) {
+          await tgt.query(
+            `update public.products set manufacturer_id=$1, updated_at=now()
+             where id=$2 and company_id=$3`,
+            [manufacturerId, productId, companyId]
+          );
+        }
+      } else if (DRY) {
         sp.inserted++;
         productId = crypto.randomUUID();
       } else {
@@ -927,14 +975,15 @@ try {
           barcode = null;
         }
         const { rows } = await tgt.query(
-          `insert into public.products (company_id, name, barcode, active, created_at)
-           values ($1,$2,$3,$4,$5) returning id`,
+          `insert into public.products (company_id, name, barcode, active, created_at, manufacturer_id)
+           values ($1,$2,$3,$4,$5,$6) returning id`,
           [
             companyId,
             (p.tname ?? `Product ${p.id}`).trim(),
             barcode,
             p.resurrected ? false : (p.enabled ?? true),
             p.createdAt,
+            manufacturerId,
           ]
         );
         if (p.resurrected)

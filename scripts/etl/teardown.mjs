@@ -131,6 +131,7 @@ const STEPS = [
   ['cashier_sessions', 'delete from public.cashier_sessions where company_id=$1'],
   ['product_variants', 'delete from public.product_variants where company_id=$1'],
   ['products', 'delete from public.products where company_id=$1'],
+  ['manufacturers', 'delete from public.manufacturers where company_id=$1'],
   ['payment_methods', 'delete from public.payment_methods where company_id=$1'],
   ['ledger_accounts', 'delete from public.ledger_accounts where company_id=$1'],
   ['stock_locations', 'delete from public.stock_locations where company_id=$1'],
