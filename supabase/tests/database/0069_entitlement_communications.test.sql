@@ -1,5 +1,5 @@
 begin;
-select plan(52);
+select plan(53);
 
 select is(
   public.next_monthly_anniversary('2026-01-31 10:00:00+03','2026-02-01 00:00:00+03'),
@@ -203,6 +203,10 @@ select ok(
   position('OPENWA_BASE_URL' in pg_get_functiondef('public.send_sms_hook(jsonb)'::regprocedure))>0
   and position('TEXTSMS_API_KEY' in pg_get_functiondef('public.send_sms_hook(jsonb)'::regprocedure))>0,
   'OTP hook submits through both SMS and WhatsApp provider boundaries'
+);
+select ok(
+  (select prosecdef from pg_proc where oid='public.send_sms_hook(jsonb)'::regprocedure),
+  'OTP hook uses its restricted owner privileges for Vault and pg_net access'
 );
 
 select testkit.as_user(
