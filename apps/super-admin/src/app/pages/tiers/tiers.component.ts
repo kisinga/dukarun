@@ -75,6 +75,41 @@ const FEATURE_FIELDS = [
       </div>
     }
 
+    <form
+      class="card mb-4 grid gap-4 bg-base-100 p-4 md:grid-cols-[1fr_1fr_auto] md:items-end"
+      (submit)="$event.preventDefault(); saveTrialConfig()"
+    >
+      <app-form-field
+        label="Free trial duration"
+        hint="Days granted to newly approved companies. Existing trials keep their end date."
+      >
+        <input
+          type="number"
+          min="1"
+          max="365"
+          class="input input-bordered w-full"
+          [formControl]="trialDays"
+        />
+      </app-form-field>
+      <app-form-field
+        label="Default trial tier"
+        hint="Used when registration does not arrive from a specific pricing plan."
+      >
+        <select class="select select-bordered w-full" [formControl]="defaultTrialTier">
+          @for (tier of activeTiers(); track tier.id) {
+            <option [value]="tier.id">{{ tier.name }}</option>
+          }
+        </select>
+      </app-form-field>
+      <button
+        type="submit"
+        class="btn btn-primary min-h-11"
+        [disabled]="configBusy() || !defaultTrialTier.value"
+      >
+        {{ configBusy() ? 'Saving…' : 'Save trial policy' }}
+      </button>
+    </form>
+
     @if (tiers().length === 0) {
       <app-empty-state
         title="No subscription tiers"
@@ -295,6 +330,7 @@ export class TiersComponent implements OnInit {
   protected readonly limitFields = LIMIT_FIELDS;
   protected readonly featureFields = FEATURE_FIELDS;
   protected readonly tiers = signal<Tier[]>([]);
+  protected readonly activeTiers = signal<Tier[]>([]);
   protected readonly editorMounted = signal(false);
   protected readonly drawerOpen = signal(false);
   protected readonly editing = signal<Tier | null>(null);
@@ -304,10 +340,13 @@ export class TiersComponent implements OnInit {
   protected readonly priceMonthly = new FormControl('', { nonNullable: true });
   protected readonly priceYearly = new FormControl('', { nonNullable: true });
   protected readonly isActive = new FormControl(true, { nonNullable: true });
+  protected readonly trialDays = new FormControl(30, { nonNullable: true });
+  protected readonly defaultTrialTier = new FormControl('', { nonNullable: true });
   protected readonly limits = signal<Record<string, number | undefined>>({});
   protected readonly features = signal<Record<string, boolean>>({});
 
   protected readonly busy = signal(false);
+  protected readonly configBusy = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
 
@@ -316,11 +355,49 @@ export class TiersComponent implements OnInit {
   }
 
   protected async load(): Promise<void> {
-    try {
-      this.tiers.set(await this.platform.tiers());
+    const [tiers, config] = await Promise.allSettled([
+      this.platform.tiers(),
+      this.platform.billingConfig(),
+    ]);
+    if (tiers.status === 'fulfilled') {
+      this.tiers.set(tiers.value);
+      this.activeTiers.set(tiers.value.filter(tier => tier.is_active));
+    } else {
+      this.error.set(tiers.reason instanceof Error ? tiers.reason.message : 'Failed to load tiers');
+      return;
+    }
+    if (config.status === 'fulfilled') {
+      this.trialDays.setValue(config.value.trialDays);
+      this.defaultTrialTier.setValue(
+        tiers.value.find(tier => tier.code === config.value.defaultTrialTierCode)?.id ?? ''
+      );
       this.error.set(null);
+    } else {
+      this.error.set(
+        config.reason instanceof Error
+          ? `Tiers loaded; trial policy unavailable: ${config.reason.message}`
+          : 'Tiers loaded; trial policy unavailable'
+      );
+    }
+  }
+
+  protected async saveTrialConfig(): Promise<void> {
+    const days = Math.round(this.trialDays.value);
+    if (days < 1 || days > 365 || !this.defaultTrialTier.value) {
+      this.error.set('Choose an active default tier and a trial duration from 1 to 365 days');
+      return;
+    }
+    this.configBusy.set(true);
+    this.error.set(null);
+    this.notice.set(null);
+    try {
+      await this.platform.updateBillingConfig(days, this.defaultTrialTier.value);
+      this.trialDays.setValue(days);
+      this.notice.set('Trial policy updated. Existing trials are unchanged.');
     } catch (error) {
-      this.error.set(error instanceof Error ? error.message : 'Failed to load tiers');
+      this.error.set(error instanceof Error ? error.message : 'Trial policy update failed');
+    } finally {
+      this.configBusy.set(false);
     }
   }
 

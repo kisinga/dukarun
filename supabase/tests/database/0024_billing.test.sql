@@ -62,10 +62,13 @@ select ok(
   'renewal extends from current expiry (10 + 30 days)'
 );
 
--- 5. Expiry scan: expired trial flips to expired + grace.
+-- 5. Expiry scan: expired trial flips to expired without paid grace.
 reset role;
 update public.companies
-set subscription_status = 'trial', subscription_expires_at = now() - interval '1 day',
+set subscription_status = 'trial',
+    trial_started_at = now() - interval '31 days',
+    trial_ends_at = now() - interval '1 day',
+    subscription_expires_at = now() - interval '1 day',
     subscription_grace_period_end = null
 where id = (select company_id from bl_company);
 
@@ -77,28 +80,22 @@ select is(
   'scanner flips expired subscriptions'
 );
 
--- 6. Grace period: still entitled (scan set grace = expiry + 3 days = 2 days from now).
-select testkit.as_user((select company_id from bl_company), '11111111-1111-1111-1111-111111111111', 'Admin');
-
-select lives_ok(
-  $$select public.save_draft(null, '[]'::jsonb)$$ || ';',
-  'company in grace period can still create orders'
+-- 6. Trials do not receive the paid-subscription grace period.
+select is(
+  (select subscription_grace_period_end from public.companies where id = (select company_id from bl_company)),
+  null,
+  'expired trial has no grace period'
 );
-reset role;
-delete from public.orders where company_id = (select company_id from bl_company);
-delete from public.order_lines where company_id = (select company_id from bl_company);
 
--- 7. Past grace: hard block.
-reset role;
-update public.companies set subscription_grace_period_end = now() - interval '1 hour'
-where id = (select company_id from bl_company);
+-- 7. Expired trial is blocked immediately.
 select testkit.as_user((select company_id from bl_company), '11111111-1111-1111-1111-111111111111', 'Admin');
 
 select throws_ok(
   $$select public.save_draft(null, '[]')$$,
   'P0001', 'subscription_expired: renew to continue selling',
-  'past grace period, selling is blocked'
+  'expired trial cannot continue selling'
 );
+reset role;
 
 -- 8. Exemption overrides.
 reset role;

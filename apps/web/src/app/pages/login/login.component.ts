@@ -1,6 +1,6 @@
 import { Component, DestroyRef, inject, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { SupabaseService } from '../../core/supabase.service';
 import { normalizeKenyanPhone } from '../../core/phone';
 
@@ -74,6 +74,7 @@ const RESEND_COOLDOWN_SECONDS = 60;
 export class LoginComponent {
   private readonly supabase = inject(SupabaseService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
 
   protected readonly step = signal<'phone' | 'otp'>('phone');
@@ -86,6 +87,7 @@ export class LoginComponent {
   protected readonly otp = new FormControl('', { nonNullable: true });
 
   private cooldownTimer: ReturnType<typeof setInterval> | null = null;
+  private readonly requestedPlanCode = this.route.snapshot.queryParamMap.get('plan');
 
   constructor() {
     this.destroyRef.onDestroy(() => this.clearCooldownTimer());
@@ -126,7 +128,9 @@ export class LoginComponent {
       // refresh so permission-gated RPCs (settle/void/override) work.
       await this.supabase.client.auth.refreshSession();
       const company = await this.supabase.currentCompany();
-      await this.router.navigate(company ? ['/dashboard'] : ['/register']);
+      await this.router.navigate(company ? ['/dashboard'] : ['/register'], {
+        queryParams: company ? undefined : { plan: this.requestedPlanCode ?? undefined },
+      });
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Verification failed');
     } finally {

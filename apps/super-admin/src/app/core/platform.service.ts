@@ -27,6 +27,10 @@ export interface OperationsSnapshot {
   active_memberships: number;
   unbalanced_journals: number;
 }
+export interface BillingConfig {
+  trialDays: number;
+  defaultTrialTierCode: string;
+}
 
 function rpcError(error: { message: string; code?: string }): Error {
   return new Error(error.message);
@@ -154,6 +158,20 @@ export class PlatformService {
       .order('price_monthly');
     if (error) throw error;
     return data;
+  }
+
+  async billingConfig(): Promise<BillingConfig> {
+    const { data, error } = await this.db.rpc('public_billing_config');
+    if (error) throw rpcError(error);
+    return data as unknown as BillingConfig;
+  }
+
+  async updateBillingConfig(trialDays: number, defaultTrialTierId: string): Promise<void> {
+    const { error } = await this.db.rpc('platform_update_billing_config', {
+      p_trial_duration_days: trialDays,
+      p_default_trial_tier_id: defaultTrialTierId,
+    });
+    if (error) throw rpcError(error);
   }
 
   async upsertTier(input: {

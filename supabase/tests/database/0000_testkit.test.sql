@@ -44,7 +44,15 @@ begin
   set cashier_flow_enabled = true,
       cash_control_enabled = true,
       batch_expiry_enabled = true,
-      status = 'approved'
+      status = 'approved',
+      subscription_status = 'trial',
+      trial_started_at = now(),
+      trial_ends_at = now() + make_interval(days => (
+        select trial_duration_days from public.platform_billing_settings where singleton
+      )),
+      subscription_expires_at = now() + make_interval(days => (
+        select trial_duration_days from public.platform_billing_settings where singleton
+      ))
   where id = v_company_id;
   return v_company_id;
 end;

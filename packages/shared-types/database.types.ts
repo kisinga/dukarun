@@ -645,6 +645,7 @@ export type Database = {
           subscription_status: string | null
           subscription_tier_id: string | null
           trial_ends_at: string | null
+          trial_started_at: string | null
           updated_at: string
           variance_notification_threshold: number
         }
@@ -688,6 +689,7 @@ export type Database = {
           subscription_status?: string | null
           subscription_tier_id?: string | null
           trial_ends_at?: string | null
+          trial_started_at?: string | null
           updated_at?: string
           variance_notification_threshold?: number
         }
@@ -731,6 +733,7 @@ export type Database = {
           subscription_status?: string | null
           subscription_tier_id?: string | null
           trial_ends_at?: string | null
+          trial_started_at?: string | null
           updated_at?: string
           variance_notification_threshold?: number
         }
@@ -2105,6 +2108,35 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      platform_billing_settings: {
+        Row: {
+          default_trial_tier_id: string
+          singleton: boolean
+          trial_duration_days: number
+          updated_at: string
+        }
+        Insert: {
+          default_trial_tier_id: string
+          singleton?: boolean
+          trial_duration_days?: number
+          updated_at?: string
+        }
+        Update: {
+          default_trial_tier_id?: string
+          singleton?: boolean
+          trial_duration_days?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_billing_settings_default_trial_tier_id_fkey"
+            columns: ["default_trial_tier_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_tiers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       product_collections: {
         Row: {
@@ -4215,6 +4247,13 @@ export type Database = {
         }
         Returns: string
       }
+      platform_update_billing_config: {
+        Args: {
+          p_default_trial_tier_id: string
+          p_trial_duration_days: number
+        }
+        Returns: Json
+      }
       platform_upsert_tier: {
         Args: {
           p_code: string
@@ -4378,9 +4417,11 @@ export type Database = {
           p_currency?: string
           p_email?: string
           p_store_name?: string
+          p_trial_tier_code?: string
         }
         Returns: string
       }
+      public_billing_config: { Args: never; Returns: Json }
       queue_batch_message: {
         Args: { p_audience?: string; p_body: string; p_channel: string }
         Returns: number

@@ -19,6 +19,11 @@ export type PublicSubscriptionPlan = Pick<
   | 'commissions_available'
 >;
 
+export interface PublicBillingConfig {
+  trialDays: number;
+  defaultTrialTierCode: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class PublicPricingService {
   private readonly supabase = inject(SupabaseService);
@@ -34,5 +39,11 @@ export class PublicPricingService {
 
     if (error) throw error;
     return data ?? [];
+  }
+
+  async billingConfig(): Promise<PublicBillingConfig> {
+    const { data, error } = await this.supabase.client.rpc('public_billing_config');
+    if (error) throw error;
+    return data as unknown as PublicBillingConfig;
   }
 }

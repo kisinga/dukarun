@@ -440,7 +440,11 @@ interface Testimonial {
                   }
                 </ul>
 
-                <a routerLink="/register" class="btn btn-primary mt-6 min-h-11 w-full">
+                <a
+                  routerLink="/register"
+                  [queryParams]="{ plan: plan.code }"
+                  class="btn btn-primary mt-6 min-h-11 w-full"
+                >
                   Start with {{ plan.name }}
                   <app-icon name="heroArrowRight" size="md" />
                 </a>
@@ -448,7 +452,12 @@ interface Testimonial {
             }
           </div>
           <p class="mt-5 mb-0 text-center text-xs text-base-content/60">
-            No card or special hardware required. Pay by M-Pesa when the trial ends.
+            No card or special hardware required.
+            @if (trialDays(); as days) {
+              Your {{ days }}-day free trial starts when your company is approved.
+            } @else {
+              Your free trial starts when your company is approved.
+            }
           </p>
         } @else {
           <div
@@ -526,16 +535,17 @@ export class HomeComponent implements OnInit {
   private readonly publicPricing = inject(PublicPricingService);
 
   protected readonly pricingPlans = signal<PublicSubscriptionPlan[]>([]);
+  protected readonly trialDays = signal<number | null>(null);
   protected readonly pricingLoading = signal(true);
 
   async ngOnInit(): Promise<void> {
-    try {
-      this.pricingPlans.set(await this.publicPricing.activePlans());
-    } catch {
-      this.pricingPlans.set([]);
-    } finally {
-      this.pricingLoading.set(false);
-    }
+    const [plans, config] = await Promise.allSettled([
+      this.publicPricing.activePlans(),
+      this.publicPricing.billingConfig(),
+    ]);
+    this.pricingPlans.set(plans.status === 'fulfilled' ? plans.value : []);
+    this.trialDays.set(config.status === 'fulfilled' ? config.value.trialDays : null);
+    this.pricingLoading.set(false);
   }
 
   protected readonly trustPoints = ['No hardware needed', 'Works offline', 'Cancel anytime'];
