@@ -646,7 +646,12 @@ interface DraftFlag {
                   appButton
                   size="md"
                   class="mt-4 hidden w-full lg:flex"
-                  [disabled]="cart.isEmpty() || busy() || !cashierSession.canTakePayment()"
+                  [disabled]="
+                    cart.isEmpty() ||
+                    busy() ||
+                    !cashierSession.canTakePayment() ||
+                    !perms.has('SettleOrder')
+                  "
                   (click)="openCheckout()"
                 >
                   <app-icon name="heroBanknotes" />
@@ -721,7 +726,12 @@ interface DraftFlag {
             appButton
             size="md"
             class="min-w-40 flex-1"
-            [disabled]="cart.isEmpty() || busy() || !cashierSession.canTakePayment()"
+            [disabled]="
+              cart.isEmpty() ||
+              busy() ||
+              !cashierSession.canTakePayment() ||
+              !perms.has('SettleOrder')
+            "
             (click)="openCheckout()"
           >
             Take payment
@@ -730,7 +740,7 @@ interface DraftFlag {
         </div>
       </div>
 
-      @if (checkoutOpen() && cashierSession.canTakePayment()) {
+      @if (checkoutOpen() && cashierSession.canTakePayment() && perms.has('SettleOrder')) {
         <app-checkout-panel
           [total]="cart.total()"
           [methods]="panelMethods()"
@@ -1199,6 +1209,7 @@ export class SellComponent implements OnInit {
   }
 
   protected async openCheckout(): Promise<void> {
+    if (!this.perms.has('SettleOrder')) return;
     this.error.set(null);
     try {
       await this.cashierSession.assertOpen('taking payment');

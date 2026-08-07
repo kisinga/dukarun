@@ -4,6 +4,7 @@ import { SupabaseService } from '../core/supabase.service';
 import { environment } from '../../environments/environment';
 import { LocationContextService } from '../core/location-context.service';
 import { PartyCacheService, type PartyQueryResult } from '../core/party-cache.service';
+import { ActionExecutorService, type ActionOutcome } from '../core/action-executor.service';
 
 export type Product = Database['public']['Tables']['products']['Row'];
 export type Manufacturer = Database['public']['Tables']['manufacturers']['Row'];
@@ -16,6 +17,7 @@ export type CustomerWithCredit = Customer & { ar_balance: number };
 export type Order = Database['public']['Tables']['orders']['Row'];
 export type OrderLine = Database['public']['Tables']['order_lines']['Row'];
 export type Payment = Database['public']['Tables']['payments']['Row'];
+export type Refund = Database['public']['Tables']['refunds']['Row'];
 export type InventoryBatch = Database['public']['Tables']['inventory_batches']['Row'];
 
 export interface CatalogVariantInput {
@@ -86,9 +88,7 @@ export type PostSaleResult =
   | { status: 'completed' | 'parked'; orderId: string }
   | { status: 'approval_required'; orderId: string; approvalId: string };
 
-/** void_sale result: voided immediately, or parked for approval (supervisor path). */
-export type VoidResult =
-  { status: 'voided'; entry_id?: string } | { status: 'approval_required'; approval_id?: string };
+export type VoidResult = ActionOutcome;
 
 /**
  * RPC failure with the PostgREST/PostgreSQL error code preserved.
@@ -116,6 +116,7 @@ export class PosService {
   private readonly supabase = inject(SupabaseService);
   private readonly locations = inject(LocationContextService);
   private readonly parties = inject(PartyCacheService);
+  private readonly actions = inject(ActionExecutorService);
 
   get client() {
     return this.supabase.client;
@@ -591,6 +592,12 @@ export class PosService {
     return data;
   }
 
+  async orderRefunds(orderId: string): Promise<Refund[]> {
+    const { data, error } = await this.client.from('refunds').select('*').eq('order_id', orderId);
+    if (error) throw error;
+    return data;
+  }
+
   async variantsByIds(ids: string[]): Promise<Variant[]> {
     if (ids.length === 0) return [];
     const { data, error } = await this.client
@@ -734,11 +741,13 @@ export class PosService {
   }
 
   async voidSale(orderId: string, reason: string): Promise<VoidResult> {
-    const { data, error } = await this.client.rpc('void_sale', {
-      p_order_id: orderId,
-      p_reason: reason,
+    return this.actions.run(async () => {
+      const { data, error } = await this.client.rpc('void_sale', {
+        p_order_id: orderId,
+        p_reason: reason,
+      });
+      if (error) throw rpcError(error);
+      return data;
     });
-    if (error) throw rpcError(error);
-    return data as VoidResult;
   }
 }

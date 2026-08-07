@@ -90,7 +90,10 @@ export type Database = {
           id: string
           metadata: Json
           requested_by: string | null
+          result: Json | null
           status: string
+          subject_id: string | null
+          subject_type: string | null
           type: string
         }
         Insert: {
@@ -103,7 +106,10 @@ export type Database = {
           id?: string
           metadata?: Json
           requested_by?: string | null
+          result?: Json | null
           status?: string
+          subject_id?: string | null
+          subject_type?: string | null
           type: string
         }
         Update: {
@@ -116,7 +122,10 @@ export type Database = {
           id?: string
           metadata?: Json
           requested_by?: string | null
+          result?: Json | null
           status?: string
+          subject_id?: string | null
+          subject_type?: string | null
           type?: string
         }
         Relationships: [
@@ -4856,6 +4865,7 @@ export type Database = {
         Returns: string
       }
       credit_reminder_scan: { Args: never; Returns: number }
+      current_access_snapshot: { Args: never; Returns: Json }
       current_company_id: { Args: never; Returns: string }
       current_entitlements: { Args: never; Returns: Json }
       current_role_name: { Args: never; Returns: string }
@@ -4884,6 +4894,19 @@ export type Database = {
       }
       do_void: {
         Args: { p_order_id: string; p_reason: string }
+        Returns: string
+      }
+      execute_payment_reversal: {
+        Args: { p_payment_id: string; p_reason: string }
+        Returns: string
+      }
+      execute_refund: {
+        Args: {
+          p_amount: number
+          p_method_code: string
+          p_order_id: string
+          p_reason?: string
+        }
         Returns: string
       }
       expire_proformas: { Args: never; Returns: number }
@@ -5003,6 +5026,10 @@ export type Database = {
           p_user_id?: string
         }
         Returns: string
+      }
+      notify_approval_requester: {
+        Args: { p_approval_id: string }
+        Returns: undefined
       }
       open_cashier_session: { Args: { p_declarations: Json }; Returns: string }
       open_cashier_session_at_location: {
@@ -5182,7 +5209,10 @@ export type Database = {
         }
         Returns: string
       }
-      post_payment_reversal: { Args: { p_payment_id: string }; Returns: string }
+      post_payment_reversal: {
+        Args: { p_payment_id: string; p_reason?: string }
+        Returns: Json
+      }
       post_refund: {
         Args: {
           p_amount: number
@@ -5190,7 +5220,7 @@ export type Database = {
           p_order_id: string
           p_reason?: string
         }
-        Returns: string
+        Returns: Json
       }
       post_reversal_entry: {
         Args: {
@@ -5387,6 +5417,16 @@ export type Database = {
       remove_team_member: { Args: { p_membership_id: string }; Returns: string }
       render_message_template: {
         Args: { p_body: string; p_values: Json }
+        Returns: string
+      }
+      request_sale_approval: {
+        Args: {
+          p_company_id: string
+          p_metadata: Json
+          p_subject_id: string
+          p_subject_type: string
+          p_type: string
+        }
         Returns: string
       }
       require_asset_leaf_account: {

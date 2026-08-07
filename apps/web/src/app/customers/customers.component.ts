@@ -538,10 +538,7 @@ type CreditOrder = {
                         />
                       }
                     </div>
-                    @if (
-                      !c.deleted_at &&
-                      (perms.has('ApproveCustomerCredit') || perms.has('ManageCustomerCreditLimit'))
-                    ) {
+                    @if (!c.deleted_at && perms.has('ManageCustomerCreditLimit')) {
                       <form
                         (submit)="$event.preventDefault(); saveCredit(c)"
                         class="mt-3 flex flex-col gap-2"

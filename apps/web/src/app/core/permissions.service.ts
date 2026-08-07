@@ -1,5 +1,6 @@
-import { Injectable, effect, inject, signal } from '@angular/core';
+import { Injectable, computed, effect, inject, signal } from '@angular/core';
 import { SupabaseService } from './supabase.service';
+import type { AppIdentity } from './supabase.service';
 
 /** Assignable permissions (role editor checkboxes; mirrored in the DB role templates). */
 export const ALL_PERMISSIONS = [
@@ -26,6 +27,16 @@ export const ALL_PERMISSIONS = [
 ] as const;
 
 export type Permission = (typeof ALL_PERMISSIONS)[number];
+export type ActionKey = 'sale.void' | 'sale.refund' | 'payment.reverse';
+export type ActionMode = 'execute' | 'request' | 'blocked';
+export type AccessState = 'loading' | 'ready' | 'error';
+
+type AccessSnapshot = {
+  company_id: string;
+  user_id: string;
+  permissions: Permission[];
+  actions: Record<ActionKey, ActionMode>;
+};
 
 export const PERMISSION_LABELS: Record<Permission, string> = {
   ManageApprovals: 'Manage approvals',
@@ -61,34 +72,97 @@ export class PermissionsService {
   private readonly supabase = inject(SupabaseService);
 
   private readonly granted = signal<ReadonlySet<Permission>>(new Set());
-  /** False until the first successful load — treat UI as ungated-loading. */
-  readonly ready = signal(false);
+  private readonly actions = signal<Readonly<Record<ActionKey, ActionMode>>>({
+    'sale.void': 'blocked',
+    'sale.refund': 'blocked',
+    'payment.reverse': 'blocked',
+  });
+  readonly state = signal<AccessState>('loading');
+  readonly error = signal<string | null>(null);
+  readonly ready = computed(() => {
+    const identity = this.supabase.offlineIdentity();
+    const key = identity ? `${identity.companyId}:${identity.userId}` : null;
+    return this.state() === 'ready' && key !== null && key === this.contextKey;
+  });
+
+  private sequence = 0;
+  private currentLoad: Promise<void> | null = null;
+  private contextKey: string | null = null;
 
   constructor() {
     effect(() => {
-      if (this.supabase.session()) {
-        void this.load();
-      } else {
-        this.granted.set(new Set());
-        this.ready.set(false);
-      }
+      const identity = this.supabase.offlineIdentity();
+      void this.loadFor(identity);
     });
   }
 
   has(permission: Permission): boolean {
-    return this.granted().has(permission);
+    return this.ready() && this.granted().has(permission);
   }
 
-  private async load(): Promise<void> {
-    const checks = await Promise.all(
-      ALL_PERMISSIONS.map(async p => {
-        const { data, error } = await this.supabase.client.rpc('current_user_has_permission', {
-          p_permission: p,
-        });
-        return error || !data ? null : p;
-      })
-    );
-    this.granted.set(new Set(checks.filter((p): p is Permission => p !== null)));
-    this.ready.set(true);
+  actionMode(action: ActionKey): ActionMode {
+    return this.ready() ? (this.actions()[action] ?? 'blocked') : 'blocked';
+  }
+
+  async ensureLoaded(): Promise<boolean> {
+    if (this.ready()) return true;
+    await this.loadFor(this.supabase.offlineIdentity());
+    return this.ready();
+  }
+
+  async refresh(): Promise<void> {
+    await this.loadFor(this.supabase.offlineIdentity(), true);
+  }
+
+  private loadFor(identity: AppIdentity | null, force = false): Promise<void> {
+    const key = identity ? `${identity.companyId}:${identity.userId}` : null;
+    if (!force && key === this.contextKey) {
+      return this.currentLoad ?? Promise.resolve();
+    }
+
+    const sequence = ++this.sequence;
+    this.contextKey = key;
+    this.clear();
+    if (!identity) {
+      this.currentLoad = null;
+      return Promise.resolve();
+    }
+
+    const load = this.load(identity.companyId, identity.userId, sequence).finally(() => {
+      if (sequence === this.sequence) this.currentLoad = null;
+    });
+    this.currentLoad = load;
+    return load;
+  }
+
+  private clear(): void {
+    this.granted.set(new Set());
+    this.actions.set({
+      'sale.void': 'blocked',
+      'sale.refund': 'blocked',
+      'payment.reverse': 'blocked',
+    });
+    this.error.set(null);
+    this.state.set('loading');
+  }
+
+  private async load(companyId: string, userId: string, sequence: number): Promise<void> {
+    const { data, error } = await this.supabase.client.rpc('current_access_snapshot');
+    if (sequence !== this.sequence) return;
+    if (error) {
+      this.error.set(error.message);
+      this.state.set('error');
+      return;
+    }
+
+    const snapshot = data as unknown as AccessSnapshot;
+    if (snapshot.company_id !== companyId || snapshot.user_id !== userId) {
+      this.error.set('Access context changed');
+      this.state.set('error');
+      return;
+    }
+    this.granted.set(new Set(snapshot.permissions));
+    this.actions.set(snapshot.actions);
+    this.state.set('ready');
   }
 }

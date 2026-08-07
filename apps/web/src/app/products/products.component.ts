@@ -143,9 +143,11 @@ interface ProductEditorRow {
       >
         <app-icon name="heroQueueList" /> Collections
       </button>
-      <button actions appButton variant="primary" (click)="startFamilyCreate()">
-        <app-icon name="heroPlus" /> Add product
-      </button>
+      @if (perms.has('ManageStockAdjustments')) {
+        <button actions appButton variant="primary" (click)="startFamilyCreate()">
+          <app-icon name="heroPlus" /> Add product
+        </button>
+      }
 
       @if (error()) {
         <div role="alert" class="alert alert-error mb-3 text-sm">
@@ -879,16 +881,18 @@ interface ProductEditorRow {
                   }
                 </div>
 
-                <div class="mt-3 flex flex-wrap gap-1.5 border-t border-base-200 pt-3">
-                  <button
-                    appButton
-                    variant="outline"
-                    size="sm"
-                    (click)="$event.stopPropagation(); startFamilyEdit(group.family)"
-                  >
-                    Edit product
-                  </button>
-                </div>
+                @if (perms.has('ManageStockAdjustments')) {
+                  <div class="mt-3 flex flex-wrap gap-1.5 border-t border-base-200 pt-3">
+                    <button
+                      appButton
+                      variant="outline"
+                      size="sm"
+                      (click)="$event.stopPropagation(); startFamilyEdit(group.family)"
+                    >
+                      Edit product
+                    </button>
+                  </div>
+                }
               </div>
             </div>
           }
@@ -953,17 +957,19 @@ interface ProductEditorRow {
                       }
                     </td>
                     <td class="table-actions" (click)="$event.stopPropagation()">
-                      <button
-                        appButton
-                        variant="ghost"
-                        [iconOnly]="true"
-                        type="button"
-                        title="Edit product"
-                        aria-label="Edit product"
-                        (click)="startFamilyEdit(group.family)"
-                      >
-                        <app-icon name="heroPencilSquare" />
-                      </button>
+                      @if (perms.has('ManageStockAdjustments')) {
+                        <button
+                          appButton
+                          variant="ghost"
+                          [iconOnly]="true"
+                          type="button"
+                          title="Edit product"
+                          aria-label="Edit product"
+                          (click)="startFamilyEdit(group.family)"
+                        >
+                          <app-icon name="heroPencilSquare" />
+                        </button>
+                      }
                     </td>
                   </tr>
                 }
@@ -994,18 +1000,20 @@ interface ProductEditorRow {
             group.variants.length + (group.variants.length === 1 ? ' variant' : ' variants')
           "
         >
-          <button
-            actions
-            appButton
-            variant="ghost"
-            [iconOnly]="true"
-            type="button"
-            title="Edit product"
-            aria-label="Edit product"
-            (click)="editFromDrawer(group.family)"
-          >
-            <app-icon name="heroPencilSquare" />
-          </button>
+          @if (perms.has('ManageStockAdjustments')) {
+            <button
+              actions
+              appButton
+              variant="ghost"
+              [iconOnly]="true"
+              type="button"
+              title="Edit product"
+              aria-label="Edit product"
+              (click)="editFromDrawer(group.family)"
+            >
+              <app-icon name="heroPencilSquare" />
+            </button>
+          }
 
           <div class="flex flex-wrap items-center justify-between gap-2">
             <div>
@@ -1106,14 +1114,16 @@ interface ProductEditorRow {
                     </div>
 
                     <div class="mt-3 flex flex-wrap gap-1.5 border-t border-base-200 pt-2">
-                      <button
-                        appButton
-                        variant="outline"
-                        size="sm"
-                        (click)="editVariantFromDrawer(group.family.id)"
-                      >
-                        <app-icon name="heroPencilSquare" /> Edit
-                      </button>
+                      @if (perms.has('ManageStockAdjustments')) {
+                        <button
+                          appButton
+                          variant="outline"
+                          size="sm"
+                          (click)="editVariantFromDrawer(group.family.id)"
+                        >
+                          <app-icon name="heroPencilSquare" /> Edit
+                        </button>
+                      }
                       @if (v.kind !== 'service' && v.track_inventory) {
                         @if (perms.has('ManageStockAdjustments')) {
                           <a
@@ -1704,6 +1714,7 @@ export class ProductsComponent implements OnInit {
   // --- Coupled product editor ---
 
   protected startFamilyCreate(): void {
+    if (!this.perms.has('ManageStockAdjustments')) return;
     this.error.set(null);
     this.editorLoading.set(false);
     this.editingFamily.set(null);
@@ -1718,6 +1729,7 @@ export class ProductsComponent implements OnInit {
   }
 
   protected startFamilyEdit(family: Product, step: 1 | 2 = 1): void {
+    if (!this.perms.has('ManageStockAdjustments')) return;
     this.error.set(null);
     this.editingFamily.set(family);
     this.familyName.setValue(family.name);

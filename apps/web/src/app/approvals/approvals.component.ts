@@ -1,5 +1,6 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
-import { FormControl, ReactiveFormsModule } from '@angular/forms';
+import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
+import type { Subscription } from 'rxjs';
 import { formatKes } from '../core/money';
 import { PosService, variantLabel } from '../pos/pos.service';
 import { EmptyStateComponent } from '../shared/ui/empty-state.component';
@@ -8,7 +9,6 @@ import { PaginationComponent } from '../shared/ui/pagination.component';
 import { Approval, ApprovalsService } from './approvals.service';
 import { ButtonComponent } from '../shared/ui/button.component';
 import { DataTableShellComponent } from '../shared/ui/data-table-shell.component';
-import { FormFieldComponent } from '../shared/ui/form-field.component';
 import { IconComponent } from '../shared/ui/icon.component';
 import {
   ListSearchBarComponent,
@@ -18,8 +18,10 @@ import {
 import { sortList } from '../shared/ui/list-sort';
 import { StatBarComponent } from '../shared/ui/stat-bar.component';
 import { StatusBadgeComponent } from '../shared/ui/status-badge.component';
-
-type DecisionTarget = { approval: Approval; action: 'approve' | 'deny' };
+import {
+  ApprovalDecisionResult,
+  ApprovalReviewDrawerComponent,
+} from './approval-review-drawer.component';
 
 const APPROVAL_SORT_OPTIONS: readonly ListSortOption[] = [
   { value: 'date', label: 'Activity date' },
@@ -34,22 +36,23 @@ const TYPE_BADGE: Record<string, string> = {
   overdraft: 'badge-info',
   customer_credit: 'badge-info',
   external_account_payment: 'badge-warning',
+  sale_refund: 'badge-warning',
+  payment_reversal: 'badge-error',
 };
 
 @Component({
   selector: 'app-approvals',
   imports: [
-    ReactiveFormsModule,
     PageLayoutComponent,
     EmptyStateComponent,
     PaginationComponent,
     ButtonComponent,
     DataTableShellComponent,
-    FormFieldComponent,
     IconComponent,
     ListSearchBarComponent,
     StatBarComponent,
     StatusBadgeComponent,
+    ApprovalReviewDrawerComponent,
   ],
   template: `
     <app-page
@@ -90,6 +93,10 @@ const TYPE_BADGE: Record<string, string> = {
           sign-off.
         </p>
         <p><span class="font-semibold">order reversal</span> — a void needs sign-off.</p>
+        <p><span class="font-semibold">sale refund</span> — a refund needs sign-off.</p>
+        <p>
+          <span class="font-semibold">payment reversal</span> — a settled payment needs sign-off.
+        </p>
         <p>
           <span class="font-semibold">overdraft</span> — a record of who authorized credit over the
           limit.
@@ -130,64 +137,12 @@ const TYPE_BADGE: Record<string, string> = {
               <div class="card-body p-4">
                 <div class="flex flex-wrap items-center gap-3">
                   <span class="badge" [class]="typeBadge(a.type)">{{ typeLabel(a.type) }}</span>
-                  <span class="type-caption">by User …{{ shortId(a.requested_by) }}</span>
+                  <span class="type-caption">by {{ personName(a.requested_by) }}</span>
                   <span class="type-caption">{{ age(a.created_at) }}</span>
                   <span class="ml-auto"></span>
-                  <button appButton size="sm" [disabled]="busy()" (click)="decide(a, 'approve')">
-                    Approve
-                  </button>
-                  <button
-                    appButton
-                    variant="error"
-                    size="sm"
-                    [disabled]="busy()"
-                    (click)="decide(a, 'deny')"
-                  >
-                    Deny
-                  </button>
+                  <button appButton size="sm" (click)="openReview(a)">Review</button>
                 </div>
                 <p class="mt-1 text-sm">{{ summary(a) }}</p>
-
-                @if (deciding(); as d) {
-                  @if (d.approval.id === a.id) {
-                    <form
-                      (submit)="$event.preventDefault(); confirmDecision()"
-                      class="mt-2 flex flex-wrap items-end gap-2 rounded-field bg-base-200 p-2"
-                    >
-                      <app-form-field
-                        class="flex-1"
-                        [label]="'Reason ' + (d.action === 'deny' ? '(required)' : '(optional)')"
-                      >
-                        <input
-                          type="text"
-                          class="input input-bordered input-sm"
-                          [formControl]="decisionReason"
-                        />
-                      </app-form-field>
-                      <button
-                        appButton
-                        type="submit"
-                        size="sm"
-                        [variant]="d.action === 'approve' ? 'primary' : 'error'"
-                        [disabled]="
-                          busy() ||
-                          (d.action === 'deny' && decisionReason.value.trim().length === 0)
-                        "
-                      >
-                        Confirm {{ d.action }}
-                      </button>
-                      <button
-                        appButton
-                        variant="ghost"
-                        size="sm"
-                        type="button"
-                        (click)="deciding.set(null)"
-                      >
-                        Cancel
-                      </button>
-                    </form>
-                  }
-                }
               </div>
             </div>
           }
@@ -218,74 +173,11 @@ const TYPE_BADGE: Record<string, string> = {
                       </span>
                     </td>
                     <td class="max-w-xl">{{ summary(a) }}</td>
-                    <td class="font-mono text-xs">User …{{ shortId(a.requested_by) }}</td>
+                    <td class="text-xs">{{ personName(a.requested_by) }}</td>
                     <td class="table-actions">
-                      <button
-                        appButton
-                        size="sm"
-                        [disabled]="busy()"
-                        (click)="decide(a, 'approve')"
-                      >
-                        Approve
-                      </button>
-                      <button
-                        appButton
-                        variant="error"
-                        size="sm"
-                        class="ml-1"
-                        [disabled]="busy()"
-                        (click)="decide(a, 'deny')"
-                      >
-                        Deny
-                      </button>
+                      <button appButton size="sm" (click)="openReview(a)">Review</button>
                     </td>
                   </tr>
-                  @if (deciding(); as d) {
-                    @if (d.approval.id === a.id) {
-                      <tr class="row-detail">
-                        <td colspan="5">
-                          <form
-                            (submit)="$event.preventDefault(); confirmDecision()"
-                            class="flex items-end gap-2"
-                          >
-                            <app-form-field
-                              class="flex-1"
-                              [label]="
-                                'Reason ' + (d.action === 'deny' ? '(required)' : '(optional)')
-                              "
-                            >
-                              <input
-                                type="text"
-                                class="input input-bordered input-sm w-full"
-                                [formControl]="decisionReason"
-                              />
-                            </app-form-field>
-                            <button
-                              appButton
-                              type="submit"
-                              size="sm"
-                              [variant]="d.action === 'approve' ? 'primary' : 'error'"
-                              [disabled]="
-                                busy() ||
-                                (d.action === 'deny' && decisionReason.value.trim().length === 0)
-                              "
-                            >
-                              Confirm {{ d.action }}
-                            </button>
-                            <button
-                              appButton
-                              variant="ghost"
-                              size="sm"
-                              type="button"
-                              (click)="deciding.set(null)"
-                            >
-                              Cancel
-                            </button>
-                          </form>
-                        </td>
-                      </tr>
-                    }
-                  }
                 }
               </tbody>
             </table>
@@ -322,6 +214,7 @@ const TYPE_BADGE: Record<string, string> = {
                 <th>Status</th>
                 <th>Decided by</th>
                 <th>Reason</th>
+                <th class="text-right">Details</th>
               </tr>
             </thead>
             <tbody>
@@ -340,8 +233,13 @@ const TYPE_BADGE: Record<string, string> = {
                       [label]="a.status"
                     />
                   </td>
-                  <td class="type-caption">User …{{ shortId(a.decided_by) }}</td>
+                  <td class="type-caption">{{ personName(a.decided_by) }}</td>
                   <td class="text-xs text-base-content/60">{{ a.decision_reason ?? '—' }}</td>
+                  <td class="table-actions">
+                    <button appButton variant="ghost" size="sm" (click)="openReview(a)">
+                      View
+                    </button>
+                  </td>
                 </tr>
               }
             </tbody>
@@ -358,16 +256,24 @@ const TYPE_BADGE: Record<string, string> = {
           </div>
         </app-data-table-shell>
       }
+
+      @if (selectedApproval(); as approval) {
+        <app-approval-review-drawer
+          [approval]="approval"
+          (closed)="closeReview()"
+          (decided)="decisionCompleted($event)"
+        />
+      }
     </app-page>
   `,
 })
-export class ApprovalsComponent implements OnInit {
+export class ApprovalsComponent implements OnInit, OnDestroy {
   protected readonly approvals = inject(ApprovalsService);
   private readonly pos = inject(PosService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
 
-  protected readonly deciding = signal<DecisionTarget | null>(null);
-  protected readonly decisionReason = new FormControl('', { nonNullable: true });
-  protected readonly busy = signal(false);
+  protected readonly selectedApproval = signal<Approval | null>(null);
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
@@ -409,7 +315,11 @@ export class ApprovalsComponent implements OnInit {
     },
     {
       label: 'Reversals',
-      value: this.approvals.pending().filter(approval => approval.type === 'order_reversal').length,
+      value: this.approvals
+        .pending()
+        .filter(approval =>
+          ['order_reversal', 'sale_refund', 'payment_reversal'].includes(approval.type)
+        ).length,
       tone: 'error' as const,
     },
     { label: 'Recent decisions', value: this.approvals.decided().length },
@@ -417,9 +327,19 @@ export class ApprovalsComponent implements OnInit {
 
   private readonly orderCodeMap = signal<Map<string, string>>(new Map());
   private readonly variantLabelMap = signal<Map<string, string>>(new Map());
+  private readonly staffNameMap = signal<Map<string, string>>(new Map());
+  private routeSubscription: Subscription | null = null;
+  private routeLoadSequence = 0;
 
   async ngOnInit(): Promise<void> {
     await this.refresh();
+    this.routeSubscription = this.route.queryParamMap.subscribe(params => {
+      void this.openRouteApproval(params.get('approval'));
+    });
+  }
+
+  ngOnDestroy(): void {
+    this.routeSubscription?.unsubscribe();
   }
 
   protected async refresh(): Promise<void> {
@@ -443,6 +363,7 @@ export class ApprovalsComponent implements OnInit {
             this.typeLabel(approval.type),
             this.summary(approval),
             approval.status,
+            this.personName(approval.requested_by),
             approval.requested_by ?? '',
             approval.decision_reason ?? '',
           ]
@@ -474,10 +395,10 @@ export class ApprovalsComponent implements OnInit {
   /** Resolve order codes + variant labels referenced by pending metadata. */
   private async loadSummaries(): Promise<void> {
     try {
+      const rows = [...this.approvals.pending(), ...this.approvals.decided()];
       const orderIds = [
         ...new Set(
-          this.approvals
-            .pending()
+          rows
             .map(a => (a.metadata as { order_id?: string })?.order_id)
             .filter((id): id is string => !!id)
         ),
@@ -486,8 +407,7 @@ export class ApprovalsComponent implements OnInit {
 
       const variantIds = [
         ...new Set(
-          this.approvals
-            .pending()
+          rows
             .filter(a => a.type === 'below_wholesale')
             .flatMap(a => {
               const lines = (a.metadata as { lines?: { variant_id?: string }[] })?.lines ?? [];
@@ -502,6 +422,11 @@ export class ApprovalsComponent implements OnInit {
             v.variant_id!,
             `${variantLabel(v)} · ${v.manufacturer_name || 'Manufacturer not set'}`,
           ])
+        )
+      );
+      this.staffNameMap.set(
+        await this.approvals.staffNames(
+          rows.flatMap(approval => [approval.requested_by, approval.decided_by])
         )
       );
     } catch {
@@ -527,11 +452,18 @@ export class ApprovalsComponent implements OnInit {
       ar_balance?: number;
       order_total?: number;
       credit_limit?: number;
+      payment_id?: string;
+      amount?: number;
+      method_code?: string;
     };
     const code = meta.order_id ? this.orderCode(meta.order_id) : null;
     switch (a.type) {
       case 'order_reversal':
         return `Void ${code ?? 'order'}${meta.reason ? ` — ${meta.reason}` : ''}`;
+      case 'sale_refund':
+        return `Refund ${formatKes(meta.amount ?? 0)} from ${code ?? 'order'} via ${meta.method_code ?? 'payment method'}${meta.reason ? ` — ${meta.reason}` : ''}`;
+      case 'payment_reversal':
+        return `Reverse payment …${meta.payment_id?.slice(-8) ?? ''} on ${code ?? 'order'}${meta.reason ? ` — ${meta.reason}` : ''}`;
       case 'external_account_payment': {
         const tenders = (meta.tenders ?? [])
           .map(
@@ -556,39 +488,50 @@ export class ApprovalsComponent implements OnInit {
     }
   }
 
-  protected decide(approval: Approval, action: 'approve' | 'deny'): void {
-    this.deciding.set({ approval, action });
-    this.decisionReason.setValue('');
+  protected openReview(approval: Approval, updateUrl = true): void {
+    this.selectedApproval.set(approval);
+    if (updateUrl) {
+      void this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams: { approval: approval.id },
+        queryParamsHandling: 'merge',
+        replaceUrl: true,
+      });
+    }
   }
 
-  protected async confirmDecision(): Promise<void> {
-    const target = this.deciding();
-    if (!target) return;
-    const reason = this.decisionReason.value.trim();
-    if (target.action === 'deny' && reason.length === 0) return;
-    this.busy.set(true);
-    this.error.set(null);
-    this.notice.set(null);
-    try {
-      if (target.action === 'approve') {
-        await this.approvals.approve(target.approval.id, reason || undefined);
-      } else {
-        await this.approvals.deny(target.approval.id, reason);
-      }
-      this.notice.set(
-        `${this.typeLabel(target.approval.type)} request ${target.action === 'approve' ? 'approved' : 'denied'}`
-      );
-      this.deciding.set(null);
-      await this.loadSummaries();
-    } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Decision failed');
-    } finally {
-      this.busy.set(false);
-    }
+  protected closeReview(updateUrl = true): void {
+    this.selectedApproval.set(null);
+    if (!updateUrl) return;
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { approval: null },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
+  }
+
+  protected async decisionCompleted(result: ApprovalDecisionResult): Promise<void> {
+    const outcome =
+      result.status === 'expired'
+        ? 'expired because the action is no longer valid'
+        : result.action === 'approve'
+          ? 'approved'
+          : 'denied';
+    this.notice.set(
+      `${this.typeLabel(result.approval.type)} request ${outcome}. Requester notified.`
+    );
+    this.closeReview();
+    await this.loadSummaries();
   }
 
   protected shortId(userId: string | null): string {
     return userId ? userId.slice(-4) : '????';
+  }
+
+  protected personName(userId: string | null): string {
+    if (!userId) return 'Unknown user';
+    return this.staffNameMap().get(userId) ?? `User …${this.shortId(userId)}`;
   }
 
   protected age(iso: string): string {
@@ -601,5 +544,21 @@ export class ApprovalsComponent implements OnInit {
 
   private orderCode(orderId: string): string {
     return this.orderCodeMap().get(orderId) ?? orderId.slice(0, 8);
+  }
+
+  private async openRouteApproval(approvalId: string | null): Promise<void> {
+    const sequence = ++this.routeLoadSequence;
+    if (!approvalId) {
+      if (this.selectedApproval()) this.closeReview(false);
+      return;
+    }
+    if (this.selectedApproval()?.id === approvalId) return;
+    try {
+      const approval = await this.approvals.byId(approvalId);
+      if (sequence === this.routeLoadSequence) this.openReview(approval, false);
+    } catch (error) {
+      if (sequence !== this.routeLoadSequence) return;
+      this.error.set(error instanceof Error ? error.message : 'Approval request not found');
+    }
   }
 }
