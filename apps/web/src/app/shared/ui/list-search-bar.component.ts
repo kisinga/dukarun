@@ -50,29 +50,36 @@ export type ListSortDirection = 'asc' | 'desc';
 
         @if (sortOptions().length > 0) {
           <div
-            class="inline-flex w-fit max-w-full self-start overflow-hidden rounded-field border border-base-300 bg-base-100 lg:ml-auto lg:flex-none lg:self-auto"
+            class="inline-flex w-fit max-w-full self-start overflow-hidden rounded-field border border-base-300 bg-base-100 shadow-xs transition focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/10 lg:ml-auto lg:flex-none lg:self-auto"
           >
-            <select
-              class="select min-h-11 w-48 max-w-[calc(100vw-7rem)] min-w-0 rounded-none border-0 bg-transparent select-sm focus:outline-none"
-              aria-label="Sort by"
-              title="Sort by"
-              [value]="sortKey()"
-              (change)="onSortKeyChange($event)"
-            >
-              @for (option of sortOptions(); track option.value) {
-                <option [value]="option.value">{{ option.label }}</option>
-              }
-            </select>
+            <div class="relative min-w-0">
+              <select
+                class="sort-select select min-h-11 w-52 max-w-[calc(100vw-6.5rem)] min-w-0 cursor-pointer rounded-none border-0 bg-transparent pr-10 select-sm"
+                aria-label="Sort by"
+                [value]="sortKey()"
+                (change)="onSortKeyChange($event)"
+              >
+                @for (option of sortOptions(); track option.value) {
+                  <option [value]="option.value">{{ option.label }}</option>
+                }
+              </select>
+              <ng-icon
+                name="heroChevronDown"
+                size="0.875rem"
+                class="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-base-content/55"
+              />
+            </div>
             <button
               type="button"
-              class="btn min-h-11 w-11 shrink-0 rounded-none border-0 border-l border-base-300 btn-ghost btn-sm"
+              class="btn min-h-11 w-11 shrink-0 rounded-none border-0 border-l border-base-300/70 btn-ghost btn-sm hover:bg-base-200"
               [attr.aria-label]="directionTitle()"
-              [title]="directionTitle()"
               (click)="toggleSortDirection()"
             >
-              <span class="text-lg leading-none font-semibold" aria-hidden="true">{{
-                sortDirection() === 'asc' ? '↑' : '↓'
-              }}</span>
+              <ng-icon
+                [name]="sortDirection() === 'asc' ? 'heroBarsArrowUp' : 'heroBarsArrowDown'"
+                size="1.25rem"
+                aria-hidden="true"
+              />
             </button>
           </div>
         }
@@ -83,6 +90,14 @@ export type ListSortDirection = 'asc' | 'desc';
       </div>
       <ng-content select="[badges]" />
     </section>
+  `,
+  styles: `
+    .sort-select {
+      appearance: none;
+      background-image: none;
+      box-shadow: none;
+      outline: none;
+    }
   `,
 })
 export class ListSearchBarComponent {
