@@ -3,8 +3,18 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 import { SupabaseService } from './supabase.service';
 import { LocationContextService } from './location-context.service';
 import { ConnectivityService } from '../pos/offline/connectivity.service';
-import { offlineDb, offlineScopeKey, type ProductSnapshot } from '../pos/offline/offline-db';
-import type { Product, Variant } from '../pos/pos.service';
+import {
+  offlineDb,
+  offlineScopeKey,
+  type CachedManufacturer,
+  type ProductSnapshot,
+} from '../pos/offline/offline-db';
+import {
+  PosService,
+  type CollectionWithCount,
+  type Product,
+  type Variant,
+} from '../pos/pos.service';
 
 const CATALOG_LIMIT = 2_000;
 const CATALOG_MAX_AGE_MS = 5 * 60_000;
@@ -25,9 +35,12 @@ export class CatalogCacheService {
   private readonly supabase = inject(SupabaseService);
   private readonly connectivity = inject(ConnectivityService);
   private readonly locations = inject(LocationContextService);
+  private readonly pos = inject(PosService);
 
   readonly catalog = signal<Variant[]>([]);
   readonly families = signal<Product[]>([]);
+  readonly manufacturers = signal<CachedManufacturer[]>([]);
+  readonly collections = signal<CollectionWithCount[]>([]);
   readonly stock = signal<Map<string, { stock: number; stock_value: number }>>(new Map());
   readonly fetchedAt = signal<string | null>(null);
   /** True when the catalog exceeds the offline cache — only the first rows are kept. */
@@ -48,6 +61,7 @@ export class CatalogCacheService {
   private readonly deleteVariantIds = new Set<string>();
   private readonly productIds = new Set<string>();
   private stockDirty = false;
+  private referencesDirty = false;
 
   constructor() {
     effect(() => {
@@ -87,7 +101,10 @@ export class CatalogCacheService {
       this.applySnapshot(snapshot);
     }
     const stale =
-      !snapshot || Date.now() - new Date(snapshot.fetched_at).getTime() >= CATALOG_MAX_AGE_MS;
+      !snapshot ||
+      snapshot.manufacturers === undefined ||
+      snapshot.collections === undefined ||
+      Date.now() - new Date(snapshot.fetched_at).getTime() >= CATALOG_MAX_AGE_MS;
     if (this.connectivity.online() && stale) void this.refresh();
     return !!snapshot?.families && !!snapshot.location_stock;
   }
@@ -112,21 +129,24 @@ export class CatalogCacheService {
     if (!identity || !locationId || !this.connectivity.online()) return false;
     const scope = offlineScopeKey(identity, locationId);
     try {
-      const [catalogResult, familyResult, stockResult] = await Promise.all([
-        this.supabase.client
-          .from('variant_catalog')
-          .select('*')
-          .order('product_name')
-          .order('variant_name')
-          .order('variant_id')
-          .limit(CATALOG_LIMIT + 1),
-        this.supabase.client
-          .from('products')
-          .select('*')
-          .order('name')
-          .limit(CATALOG_LIMIT + 1),
-        this.supabase.client.rpc('location_stock_snapshot', { p_location_id: locationId }),
-      ]);
+      const [catalogResult, familyResult, stockResult, manufacturers, collections] =
+        await Promise.all([
+          this.supabase.client
+            .from('variant_catalog')
+            .select('*')
+            .order('product_name')
+            .order('variant_name')
+            .order('variant_id')
+            .limit(CATALOG_LIMIT + 1),
+          this.supabase.client
+            .from('products')
+            .select('*')
+            .order('name')
+            .limit(CATALOG_LIMIT + 1),
+          this.supabase.client.rpc('location_stock_snapshot', { p_location_id: locationId }),
+          this.pos.listManufacturers(),
+          this.pos.listCollections(),
+        ]);
       if (catalogResult.error) throw catalogResult.error;
       if (familyResult.error) throw familyResult.error;
       if (stockResult.error) throw stockResult.error;
@@ -142,6 +162,7 @@ export class CatalogCacheService {
         ...row,
         stock: stockByVariant.get(row.variant_id!)?.stock ?? 0,
       }));
+      const manufacturerOptions = this.mergeManufacturers(manufacturers, products);
       const db = await offlineDb();
       const snapshot: ProductSnapshot = {
         key: scope,
@@ -151,6 +172,8 @@ export class CatalogCacheService {
         products,
         families: (familyResult.data ?? []).slice(0, CATALOG_LIMIT),
         location_stock: locationStock,
+        manufacturers: manufacturerOptions,
+        collections,
         truncated:
           (catalogResult.data?.length ?? 0) > CATALOG_LIMIT ||
           (familyResult.data?.length ?? 0) > CATALOG_LIMIT,
@@ -228,6 +251,21 @@ export class CatalogCacheService {
             this.bufferPatch();
           }
         )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'manufacturers', filter },
+          () => this.onReferenceChange()
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'collections', filter },
+          () => this.onReferenceChange()
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'product_collections', filter },
+          () => this.onReferenceChange()
+        )
         .subscribe();
     } catch {
       // Full refreshes (reconnect/manual) remain the fallback.
@@ -265,6 +303,11 @@ export class CatalogCacheService {
     this.bufferPatch();
   }
 
+  private onReferenceChange(): void {
+    this.referencesDirty = true;
+    this.bufferPatch();
+  }
+
   /** Coalesce bursts; beyond PATCH_BUFFER_MAX one full refresh is cheaper. */
   private bufferPatch(): void {
     this.patchEventCount++;
@@ -285,6 +328,7 @@ export class CatalogCacheService {
     this.deleteVariantIds.clear();
     this.productIds.clear();
     this.stockDirty = false;
+    this.referencesDirty = false;
   }
 
   private async flushPatches(): Promise<void> {
@@ -296,10 +340,11 @@ export class CatalogCacheService {
     const deleteIds = [...this.deleteVariantIds];
     const productIds = [...this.productIds];
     const stockDirty = this.stockDirty;
+    const referencesDirty = this.referencesDirty;
     this.clearPatchBuffer();
     try {
       // Family changes affect both the management rows and all child labels.
-      if (productIds.length > 0) {
+      if (productIds.length > 0 || referencesDirty) {
         await this.refresh();
         return;
       }
@@ -343,6 +388,10 @@ export class CatalogCacheService {
   private applySnapshot(snapshot: ProductSnapshot): void {
     this.catalog.set(snapshot.products);
     this.families.set(snapshot.families ?? []);
+    this.manufacturers.set(
+      this.mergeManufacturers(snapshot.manufacturers ?? [], snapshot.products)
+    );
+    this.collections.set(snapshot.collections ?? []);
     this.stock.set(
       new Map(
         (snapshot.location_stock ?? []).map(row => [
@@ -360,9 +409,27 @@ export class CatalogCacheService {
     this.clearPatchBuffer();
     this.catalog.set([]);
     this.families.set([]);
+    this.manufacturers.set([]);
+    this.collections.set([]);
     this.stock.set(new Map());
     this.fetchedAt.set(null);
     this.catalogTruncated.set(false);
     this.loaded.set(false);
+  }
+
+  private mergeManufacturers(
+    manufacturers: readonly CachedManufacturer[],
+    products: readonly Variant[]
+  ): CachedManufacturer[] {
+    const byId = new Map(manufacturers.map(item => [item.id, item]));
+    for (const product of products) {
+      if (product.manufacturer_id && product.manufacturer_name) {
+        byId.set(product.manufacturer_id, {
+          id: product.manufacturer_id,
+          name: product.manufacturer_name,
+        });
+      }
+    }
+    return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
   }
 }

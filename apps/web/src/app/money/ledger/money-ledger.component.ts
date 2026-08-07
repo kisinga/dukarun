@@ -4,9 +4,19 @@ import { FormsModule } from '@angular/forms';
 import { formatKes } from '../../core/money';
 import { DataTableShellComponent } from '../../shared/ui/data-table-shell.component';
 import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
-import { ListSearchBarComponent } from '../../shared/ui/list-search-bar.component';
+import {
+  ListSearchBarComponent,
+  type ListSortDirection,
+  type ListSortOption,
+} from '../../shared/ui/list-search-bar.component';
 import { PaginationComponent } from '../../shared/ui/pagination.component';
 import { JournalEntryWithLines, LedgerAccountWithBalance, MoneyService } from '../money.service';
+
+const JOURNAL_SORT_OPTIONS: readonly ListSortOption[] = [
+  { value: 'posted_at', label: 'Posted date' },
+  { value: 'source_type', label: 'Source' },
+  { value: 'memo', label: 'Description' },
+];
 
 @Component({
   selector: 'app-money-ledger',
@@ -38,7 +48,15 @@ import { JournalEntryWithLines, LedgerAccountWithBalance, MoneyService } from '.
         </div>
       </section>
 
-      <app-list-search-bar placeholder="Description or source reference…" [(searchQuery)]="search">
+      <app-list-search-bar
+        placeholder="Description or source reference…"
+        [(searchQuery)]="search"
+        [sortOptions]="journalSortOptions"
+        [sortKey]="journalSort()"
+        (sortKeyChange)="changeSort($event, journalSortDirection())"
+        [sortDirection]="journalSortDirection()"
+        (sortDirectionChange)="changeSort(journalSort(), $event)"
+      >
         <div filters class="flex flex-wrap items-end gap-2">
           <label class="form-control">
             <span class="label-text text-xs">Source</span>
@@ -173,6 +191,9 @@ export class MoneyLedgerComponent implements OnInit {
   protected readonly page = signal(1);
   protected readonly pageSize = signal(25);
   protected readonly search = signal('');
+  protected readonly journalSortOptions = JOURNAL_SORT_OPTIONS;
+  protected readonly journalSort = signal('posted_at');
+  protected readonly journalSortDirection = signal<ListSortDirection>('desc');
   protected readonly accountCode = signal('');
   protected readonly sourceType = signal('');
   protected readonly from = signal('');
@@ -211,6 +232,8 @@ export class MoneyLedgerComponent implements OnInit {
         sourceType: this.sourceType(),
         from: this.from(),
         to: this.to(),
+        sortBy: this.journalSort() as 'posted_at' | 'source_type' | 'memo',
+        sortDirection: this.journalSortDirection(),
       });
       this.rows.set(result.rows);
       this.total.set(result.count);
@@ -253,6 +276,12 @@ export class MoneyLedgerComponent implements OnInit {
     this.pageSize.set(size);
     this.page.set(1);
     await this.load();
+  }
+  protected changeSort(key: string, direction: ListSortDirection): void {
+    this.journalSort.set(key);
+    this.journalSortDirection.set(direction);
+    this.page.set(1);
+    void this.load();
   }
   protected toggle(id: string): void {
     this.expanded.set(this.expanded() === id ? null : id);

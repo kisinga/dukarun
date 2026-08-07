@@ -288,6 +288,196 @@ export type Database = {
           },
         ]
       }
+      catalog_export_markers: {
+        Row: {
+          actor: string | null
+          company_id: string
+          exported_at: string
+          id: string
+        }
+        Insert: {
+          actor?: string | null
+          company_id: string
+          exported_at?: string
+          id?: string
+        }
+        Update: {
+          actor?: string | null
+          company_id?: string
+          exported_at?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "catalog_export_markers_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "catalog_export_markers_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      catalog_imports: {
+        Row: {
+          actor: string | null
+          company_id: string
+          completed_at: string | null
+          created_at: string
+          id: string
+          idempotency_key: string
+          mode: string
+          result: Json | null
+          source_export_id: string | null
+          source_exported_at: string | null
+          status: string
+        }
+        Insert: {
+          actor?: string | null
+          company_id: string
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          idempotency_key: string
+          mode: string
+          result?: Json | null
+          source_export_id?: string | null
+          source_exported_at?: string | null
+          status?: string
+        }
+        Update: {
+          actor?: string | null
+          company_id?: string
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          idempotency_key?: string
+          mode?: string
+          result?: Json | null
+          source_export_id?: string | null
+          source_exported_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "catalog_imports_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "catalog_imports_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "catalog_imports_source_export_id_fkey"
+            columns: ["source_export_id"]
+            isOneToOne: false
+            referencedRelation: "catalog_export_markers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      catalog_search_documents: {
+        Row: {
+          barcode_normalized: string | null
+          company_id: string
+          product_id: string
+          search_text: string
+          search_vector: unknown
+          sku_normalized: string
+          updated_at: string
+          variant_id: string
+        }
+        Insert: {
+          barcode_normalized?: string | null
+          company_id: string
+          product_id: string
+          search_text: string
+          search_vector?: unknown
+          sku_normalized: string
+          updated_at?: string
+          variant_id: string
+        }
+        Update: {
+          barcode_normalized?: string | null
+          company_id?: string
+          product_id?: string
+          search_text?: string
+          search_vector?: unknown
+          sku_normalized?: string
+          updated_at?: string
+          variant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "catalog_search_documents_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "catalog_search_documents_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "catalog_search_documents_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "catalog_search_documents_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "variant_catalog"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "catalog_search_documents_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: true
+            referencedRelation: "low_stock_variants"
+            referencedColumns: ["variant_id"]
+          },
+          {
+            foreignKeyName: "catalog_search_documents_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: true
+            referencedRelation: "product_stock"
+            referencedColumns: ["variant_id"]
+          },
+          {
+            foreignKeyName: "catalog_search_documents_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: true
+            referencedRelation: "product_variants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "catalog_search_documents_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: true
+            referencedRelation: "variant_catalog"
+            referencedColumns: ["variant_id"]
+          },
+        ]
+      }
       collections: {
         Row: {
           active: boolean
@@ -1556,6 +1746,51 @@ export type Database = {
           },
         ]
       }
+      manufacturers: {
+        Row: {
+          active: boolean
+          company_id: string
+          created_at: string
+          id: string
+          name: string
+          normalized_name: string | null
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          company_id: string
+          created_at?: string
+          id?: string
+          name: string
+          normalized_name?: string | null
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          company_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+          normalized_name?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "manufacturers_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "manufacturers_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       mpesa_verifications: {
         Row: {
           all_confirmed: boolean
@@ -2275,44 +2510,6 @@ export type Database = {
           },
         ]
       }
-      manufacturers: {
-        Row: {
-          active: boolean
-          company_id: string
-          created_at: string
-          id: string
-          name: string
-          normalized_name: string
-          updated_at: string
-        }
-        Insert: {
-          active?: boolean
-          company_id: string
-          created_at?: string
-          id?: string
-          name: string
-          normalized_name?: string
-          updated_at?: string
-        }
-        Update: {
-          active?: boolean
-          company_id?: string
-          created_at?: string
-          id?: string
-          name?: string
-          normalized_name?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "manufacturers_company_id_fkey"
-            columns: ["company_id"]
-            isOneToOne: false
-            referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       products: {
         Row: {
           active: boolean
@@ -2349,13 +2546,6 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "products_manufacturer_company_fkey"
-            columns: ["company_id", "manufacturer_id"]
-            isOneToOne: false
-            referencedRelation: "manufacturers"
-            referencedColumns: ["company_id", "id"]
-          },
-          {
             foreignKeyName: "products_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
@@ -2368,6 +2558,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "public_storefronts"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "products_manufacturer_company_fkey"
+            columns: ["company_id", "manufacturer_id"]
+            isOneToOne: false
+            referencedRelation: "manufacturers"
+            referencedColumns: ["company_id", "id"]
           },
         ]
       }
@@ -4118,6 +4315,15 @@ export type Database = {
         Args: { p_end_date: string; p_start_date: string }
         Returns: string
       }
+      import_catalog_products: {
+        Args: {
+          p_idempotency_key?: string
+          p_mode?: string
+          p_products: Json
+          p_source_export_id?: string
+        }
+        Returns: Json
+      }
       increment_sms_usage: {
         Args: { p_company_id: string }
         Returns: undefined
@@ -4236,6 +4442,10 @@ export type Database = {
         Returns: string
       }
       platform_stats: { Args: never; Returns: Json }
+      platform_update_billing_config: {
+        Args: { p_default_trial_tier_id: string; p_trial_duration_days: number }
+        Returns: Json
+      }
       platform_update_subscription: {
         Args: {
           p_company_id: string
@@ -4246,13 +4456,6 @@ export type Database = {
           p_tier_id?: string
         }
         Returns: string
-      }
-      platform_update_billing_config: {
-        Args: {
-          p_default_trial_tier_id: string
-          p_trial_duration_days: number
-        }
-        Returns: Json
       }
       platform_upsert_tier: {
         Args: {
@@ -4421,6 +4624,16 @@ export type Database = {
         }
         Returns: string
       }
+      provision_company_base: {
+        Args: {
+          p_address?: string
+          p_company_name: string
+          p_currency?: string
+          p_email?: string
+          p_store_name?: string
+        }
+        Returns: string
+      }
       public_billing_config: { Args: never; Returns: Json }
       queue_batch_message: {
         Args: { p_audience?: string; p_body: string; p_channel: string }
@@ -4489,6 +4702,14 @@ export type Database = {
         Returns: string
       }
       refresh_analytics: { Args: never; Returns: undefined }
+      refresh_catalog_search_product: {
+        Args: { p_product_id: string }
+        Returns: undefined
+      }
+      refresh_catalog_search_variant: {
+        Args: { p_variant_id: string }
+        Returns: undefined
+      }
       remove_team_member: { Args: { p_membership_id: string }; Returns: string }
       require_asset_leaf_account: {
         Args: { p_code: string; p_company_id: string }
@@ -4540,6 +4761,29 @@ export type Database = {
           p_supplier_id: string
         }
         Returns: string
+      }
+      search_catalog_variants: {
+        Args: { p_limit?: number; p_location_id?: string; p_query: string }
+        Returns: {
+          allow_fractional: boolean
+          barcode: string
+          company_id: string
+          image_path: string
+          kind: string
+          manufacturer_id: string
+          manufacturer_name: string
+          price: number
+          product_active: boolean
+          product_id: string
+          product_name: string
+          sku: string
+          stock: number
+          track_inventory: boolean
+          variant_active: boolean
+          variant_id: string
+          variant_name: string
+          wholesale_price: number
+        }[]
       }
       seed_default_company_roles: {
         Args: { p_company_id: string }
@@ -4619,6 +4863,7 @@ export type Database = {
           voids: number
         }[]
       }
+      start_catalog_export: { Args: never; Returns: Json }
       stock_adjustment_history: {
         Args: {
           p_limit?: number
@@ -4730,7 +4975,6 @@ export type Database = {
         }
         Returns: string
       }
-      upsert_manufacturer: { Args: { p_name: string }; Returns: string }
       update_commission_period_status: {
         Args: { p_notes?: string; p_period_id: string; p_status: string }
         Returns: string
@@ -4828,6 +5072,7 @@ export type Database = {
         }
         Returns: string
       }
+      upsert_manufacturer: { Args: { p_name: string }; Returns: string }
       upsert_role: {
         Args: { p_name: string; p_permissions: string[]; p_role_id?: string }
         Returns: string

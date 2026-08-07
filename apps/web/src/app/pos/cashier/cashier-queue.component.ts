@@ -20,10 +20,20 @@ import { ReceiptDataService } from '../../shared/print/receipt-data.service';
 import { OrderQueueCountsService } from '../order-queue-counts.service';
 import { QUEUE_LONG_COUNT, queueAge, waitLabel, type QueueAge } from '../queue-aging';
 import { DataTableShellComponent } from '../../shared/ui/data-table-shell.component';
-import { ListSearchBarComponent } from '../../shared/ui/list-search-bar.component';
+import {
+  ListSearchBarComponent,
+  type ListSortDirection,
+  type ListSortOption,
+} from '../../shared/ui/list-search-bar.component';
 import { PaginationComponent } from '../../shared/ui/pagination.component';
 import { StatBarComponent } from '../../shared/ui/stat-bar.component';
 import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
+
+const QUEUE_SORT_OPTIONS: readonly ListSortOption[] = [
+  { value: 'cashier_pending_at', label: 'Time waiting' },
+  { value: 'code', label: 'Sale code' },
+  { value: 'total', label: 'Sale value' },
+];
 
 @Component({
   selector: 'app-cashier-queue',
@@ -142,6 +152,11 @@ import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
         placeholder="Search sale code or customer…"
         [searchQuery]="query()"
         (searchQueryChange)="onSearch($event)"
+        [sortOptions]="queueSortOptions"
+        [sortKey]="queueSort()"
+        (sortKeyChange)="changeSort($event, queueSortDirection())"
+        [sortDirection]="queueSortDirection()"
+        (sortDirectionChange)="changeSort(queueSort(), $event)"
       >
         <app-stat-bar summary [stats]="queueStats()" />
       </app-list-search-bar>
@@ -227,6 +242,11 @@ import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
                             <div class="min-w-0 flex-1">
                               <p class="truncate font-medium">{{ line.label }}</p>
                               <p class="type-caption mt-1">
+                                {{ line.manufacturer_name || 'Manufacturer not set' }}
+                                @if (line.sku) {
+                                  · {{ line.sku }}
+                                }
+                                ·
                                 {{ line.quantity }} ×
                                 <app-money [amount]="line.custom_price ?? line.unit_price" />
                               </p>
@@ -344,7 +364,15 @@ import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
                             <tbody>
                               @for (line of lines(); track line.id) {
                                 <tr>
-                                  <td>{{ line.label }}</td>
+                                  <td>
+                                    <p>{{ line.label }}</p>
+                                    <p class="type-caption">
+                                      {{ line.manufacturer_name || 'Manufacturer not set' }}
+                                      @if (line.sku) {
+                                        · {{ line.sku }}
+                                      }
+                                    </p>
+                                  </td>
                                   <td class="text-right">{{ line.quantity }}</td>
                                   <td class="table-number">
                                     <app-money [amount]="line.custom_price ?? line.unit_price" />
@@ -421,6 +449,9 @@ export class CashierQueueComponent implements OnInit, OnDestroy {
   protected readonly pageSize = signal(20);
   protected readonly totalItems = signal(0);
   protected readonly query = signal('');
+  protected readonly queueSortOptions = QUEUE_SORT_OPTIONS;
+  protected readonly queueSort = signal('cashier_pending_at');
+  protected readonly queueSortDirection = signal<ListSortDirection>('asc');
   protected readonly live = signal(false);
   protected readonly expandedFor = signal<string | null>(null);
   protected readonly loadingLinesFor = signal<string | null>(null);
@@ -546,7 +577,8 @@ export class CashierQueueComponent implements OnInit, OnDestroy {
         search: this.query(),
         page: this.page(),
         pageSize: this.pageSize(),
-        oldestFirst: true,
+        sortBy: this.queueSort() as 'cashier_pending_at' | 'code' | 'total',
+        sortDirection: this.queueSortDirection(),
       });
       this.parked.set(result.rows);
       this.totalItems.set(result.count);
@@ -571,6 +603,13 @@ export class CashierQueueComponent implements OnInit, OnDestroy {
     this.pageSize.set(size);
     this.page.set(1);
     await this.load();
+  }
+
+  protected changeSort(key: string, direction: ListSortDirection): void {
+    this.queueSort.set(key);
+    this.queueSortDirection.set(direction);
+    this.page.set(1);
+    void this.load();
   }
 
   protected async toggleItems(orderId: string): Promise<void> {

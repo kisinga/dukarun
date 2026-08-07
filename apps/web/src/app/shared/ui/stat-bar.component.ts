@@ -27,14 +27,14 @@ const VALUE_TONE: Record<string, string> = {
 @Component({
   selector: 'app-stat-bar',
   template: `
-    <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+    <div class="grid w-full grid-cols-2 gap-x-3 gap-y-2 sm:grid-cols-3">
       @for (s of stats(); track s.label) {
         @if (s.filter) {
           <button
             type="button"
             (click)="select.emit(s.filter!)"
             [attr.aria-pressed]="!!s.active"
-            class="inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 transition-colors"
+            class="inline-flex min-h-9 w-full cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 transition-colors"
             [class]="
               s.active
                 ? 'border-base-content/25 bg-base-200'
@@ -48,7 +48,7 @@ const VALUE_TONE: Record<string, string> = {
           </button>
         } @else {
           <span
-            class="inline-flex items-baseline gap-1.5 border-r border-base-300 pr-4 last:border-r-0 last:pr-0"
+            class="inline-flex min-w-0 items-baseline gap-1.5 whitespace-nowrap border-l border-base-300 pl-3"
           >
             <span class="text-sm font-bold leading-none tabular-nums" [class]="toneClass(s)">{{
               s.value

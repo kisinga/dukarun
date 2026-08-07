@@ -1,6 +1,13 @@
 import { Component, input, model } from '@angular/core';
 import { NgIcon } from '@ng-icons/core';
 
+export interface ListSortOption {
+  value: string;
+  label: string;
+}
+
+export type ListSortDirection = 'asc' | 'desc';
+
 /**
  * Standardized search bar for all list pages (ported from the old app).
  * Page-specific filters project via [filters], active-filter badges via [badges].
@@ -11,8 +18,8 @@ import { NgIcon } from '@ng-icons/core';
   host: { class: 'mb-4 block' },
   template: `
     <section class="card flex flex-col gap-3 bg-base-100 p-4">
-      <div class="flex flex-col gap-3 lg:flex-row lg:items-center">
-        <div class="relative min-w-0 lg:w-80 lg:flex-none xl:w-96">
+      <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-4">
+        <div class="relative min-w-0 lg:w-72 lg:flex-none xl:w-80">
           <ng-icon
             name="heroMagnifyingGlass"
             size="1rem"
@@ -40,6 +47,35 @@ import { NgIcon } from '@ng-icons/core';
         <div class="min-w-0 flex-1">
           <ng-content select="[summary]" />
         </div>
+
+        @if (sortOptions().length > 0) {
+          <div
+            class="inline-flex w-fit max-w-full self-start overflow-hidden rounded-field border border-base-300 bg-base-100 lg:ml-auto lg:flex-none lg:self-auto"
+          >
+            <select
+              class="select min-h-11 w-48 max-w-[calc(100vw-7rem)] min-w-0 rounded-none border-0 bg-transparent select-sm focus:outline-none"
+              aria-label="Sort by"
+              title="Sort by"
+              [value]="sortKey()"
+              (change)="onSortKeyChange($event)"
+            >
+              @for (option of sortOptions(); track option.value) {
+                <option [value]="option.value">{{ option.label }}</option>
+              }
+            </select>
+            <button
+              type="button"
+              class="btn min-h-11 w-11 shrink-0 rounded-none border-0 border-l border-base-300 btn-ghost btn-sm"
+              [attr.aria-label]="directionTitle()"
+              [title]="directionTitle()"
+              (click)="toggleSortDirection()"
+            >
+              <span class="text-lg leading-none font-semibold" aria-hidden="true">{{
+                sortDirection() === 'asc' ? '↑' : '↓'
+              }}</span>
+            </button>
+          </div>
+        }
       </div>
 
       <div class="-mx-4 border-t border-base-300/60 px-4 pt-3 empty:hidden">
@@ -52,8 +88,25 @@ import { NgIcon } from '@ng-icons/core';
 export class ListSearchBarComponent {
   readonly searchQuery = model<string>('');
   readonly placeholder = input<string>('Search...');
+  readonly sortOptions = input<readonly ListSortOption[]>([]);
+  readonly sortKey = model<string>('');
+  readonly sortDirection = model<ListSortDirection>('asc');
 
   protected onSearchInput(event: Event): void {
     this.searchQuery.set((event.target as HTMLInputElement).value);
+  }
+
+  protected onSortKeyChange(event: Event): void {
+    this.sortKey.set((event.target as HTMLSelectElement).value);
+  }
+
+  protected toggleSortDirection(): void {
+    this.sortDirection.set(this.sortDirection() === 'asc' ? 'desc' : 'asc');
+  }
+
+  protected directionTitle(): string {
+    return this.sortDirection() === 'asc'
+      ? 'Ascending — change to descending'
+      : 'Descending — change to ascending';
   }
 }

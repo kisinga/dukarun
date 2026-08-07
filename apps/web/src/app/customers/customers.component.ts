@@ -15,7 +15,12 @@ import { EmptyStateComponent } from '../shared/ui/empty-state.component';
 import { EntityAvatarComponent } from '../shared/ui/entity-avatar.component';
 import { FormFieldComponent } from '../shared/ui/form-field.component';
 import { IconComponent } from '../shared/ui/icon.component';
-import { ListSearchBarComponent } from '../shared/ui/list-search-bar.component';
+import {
+  ListSearchBarComponent,
+  type ListSortDirection,
+  type ListSortOption,
+} from '../shared/ui/list-search-bar.component';
+import { sortList } from '../shared/ui/list-sort';
 import { MoneyComponent } from '../shared/ui/money.component';
 import { PageLayoutComponent } from '../shared/ui/page-layout.component';
 import { PaginationComponent } from '../shared/ui/pagination.component';
@@ -104,6 +109,11 @@ type CreditOrder = {
         placeholder="Search name or phone…"
         [searchQuery]="query()"
         (searchQueryChange)="query.set($event); customerPage.set(1)"
+        [sortOptions]="customerSortOptions()"
+        [sortKey]="customerSort()"
+        (sortKeyChange)="customerSort.set($event); customerPage.set(1)"
+        [sortDirection]="customerSortDirection()"
+        (sortDirectionChange)="customerSortDirection.set($event); customerPage.set(1)"
       >
         <app-stat-bar summary [stats]="customerStats()" />
         <div filters class="flex items-center gap-2">
@@ -857,6 +867,19 @@ export class CustomersComponent implements OnInit {
 
   protected readonly query = signal('');
   protected readonly accountStatus = signal<'active' | 'deleted' | 'all'>('active');
+  protected readonly customerSort = signal('name');
+  protected readonly customerSortDirection = signal<ListSortDirection>('asc');
+  protected readonly customerSortOptions = computed<readonly ListSortOption[]>(() => [
+    { value: 'name', label: 'Customer name' },
+    { value: 'aging', label: 'Days outstanding' },
+    { value: 'status', label: 'Account status' },
+    ...(this.perms.has('ViewFinancials')
+      ? [
+          { value: 'balance', label: 'Amount owed' },
+          { value: 'credit_limit', label: 'Credit limit' },
+        ]
+      : []),
+  ]);
   protected readonly customerPage = signal(1);
   protected readonly customerPageSize = signal(10);
   /** Drawer edit mode: creating = empty form, drawerEditing = form for the open customer. */
@@ -893,13 +916,33 @@ export class CustomersComponent implements OnInit {
   protected readonly filtered = computed(() => {
     const q = this.query().toLowerCase();
     const status = this.accountStatus();
-    return this.customers().filter(c => {
+    const sortKey = this.customerSort();
+    const rows = this.customers().filter(c => {
       if (status === 'active' && c.deleted_at !== null) return false;
       if (status === 'deleted' && c.deleted_at === null) return false;
       return (
         !q || this.name(c).toLowerCase().includes(q) || (c.phone ?? '').toLowerCase().includes(q)
       );
     });
+    return sortList(
+      rows,
+      this.customerSortDirection(),
+      customer => {
+        switch (sortKey) {
+          case 'aging':
+            return customer.days_outstanding;
+          case 'status':
+            return customer.deleted_at === null;
+          case 'balance':
+            return customer.ar_balance;
+          case 'credit_limit':
+            return customer.credit_limit;
+          default:
+            return this.name(customer);
+        }
+      },
+      customer => this.name(customer)
+    );
   });
   protected readonly selectedCustomer = computed(() => {
     const id = this.selectedCustomerId();

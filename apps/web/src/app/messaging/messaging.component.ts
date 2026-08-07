@@ -9,7 +9,12 @@ import { ButtonComponent } from '../shared/ui/button.component';
 import { DataTableShellComponent } from '../shared/ui/data-table-shell.component';
 import { FormFieldComponent } from '../shared/ui/form-field.component';
 import { IconComponent } from '../shared/ui/icon.component';
-import { ListSearchBarComponent } from '../shared/ui/list-search-bar.component';
+import {
+  ListSearchBarComponent,
+  type ListSortDirection,
+  type ListSortOption,
+} from '../shared/ui/list-search-bar.component';
+import { sortList } from '../shared/ui/list-sort';
 import { StatBarComponent } from '../shared/ui/stat-bar.component';
 
 const STATUS_TYPE: Record<string, 'success' | 'warning' | 'error' | 'neutral'> = {
@@ -17,6 +22,13 @@ const STATUS_TYPE: Record<string, 'success' | 'warning' | 'error' | 'neutral'> =
   sent: 'success',
   failed: 'error',
 };
+
+const MESSAGE_SORT_OPTIONS: readonly ListSortOption[] = [
+  { value: 'queued', label: 'Queued date' },
+  { value: 'recipient', label: 'Recipient' },
+  { value: 'channel', label: 'Channel' },
+  { value: 'status', label: 'Delivery status' },
+];
 
 @Component({
   selector: 'app-messaging',
@@ -161,6 +173,11 @@ const STATUS_TYPE: Record<string, 'success' | 'warning' | 'error' | 'neutral'> =
         placeholder="Search recipient or message…"
         [searchQuery]="query()"
         (searchQueryChange)="query.set($event); outboxPage.set(1)"
+        [sortOptions]="messageSortOptions"
+        [sortKey]="messageSort()"
+        (sortKeyChange)="messageSort.set($event); outboxPage.set(1)"
+        [sortDirection]="messageSortDirection()"
+        (sortDirectionChange)="messageSortDirection.set($event); outboxPage.set(1)"
       >
         <app-stat-bar summary [stats]="messageStats()" />
         <div filters class="grid gap-2 sm:grid-cols-2 lg:flex lg:items-end">
@@ -301,6 +318,9 @@ export class MessagingComponent implements OnInit {
   protected readonly query = signal('');
   protected readonly channelFilter = signal('all');
   protected readonly statusFilter = signal('all');
+  protected readonly messageSortOptions = MESSAGE_SORT_OPTIONS;
+  protected readonly messageSort = signal('queued');
+  protected readonly messageSortDirection = signal<ListSortDirection>('desc');
   protected readonly outboxPage = signal(1);
   protected readonly outboxPageSize = signal(10);
   protected readonly busy = signal(false);
@@ -313,7 +333,7 @@ export class MessagingComponent implements OnInit {
   });
   protected readonly filteredOutbox = computed(() => {
     const query = this.query().trim().toLowerCase();
-    return this.outbox().filter(message => {
+    const rows = this.outbox().filter(message => {
       if (this.channelFilter() !== 'all' && message.channel !== this.channelFilter()) return false;
       if (this.statusFilter() !== 'all' && message.status !== this.statusFilter()) return false;
       if (!query) return true;
@@ -322,6 +342,24 @@ export class MessagingComponent implements OnInit {
         .toLowerCase()
         .includes(query);
     });
+    const sortKey = this.messageSort();
+    return sortList(
+      rows,
+      this.messageSortDirection(),
+      message => {
+        switch (sortKey) {
+          case 'recipient':
+            return message.recipient;
+          case 'channel':
+            return message.channel;
+          case 'status':
+            return message.status;
+          default:
+            return message.created_at;
+        }
+      },
+      message => message.created_at
+    );
   });
   protected readonly hasOutboxFilters = computed(
     () =>

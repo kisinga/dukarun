@@ -146,6 +146,8 @@ export class MoneyService {
     sourceType?: string;
     from?: string;
     to?: string;
+    sortBy?: 'posted_at' | 'source_type' | 'memo';
+    sortDirection?: 'asc' | 'desc';
   }): Promise<{ rows: JournalEntryWithLines[]; count: number }> {
     // Account filter needs inner joins so only entries touching that account
     // match (and their embedded lines are that account's lines).
@@ -164,8 +166,10 @@ export class MoneyService {
     if (input.from) query = query.gte('posted_at', `${input.from}T00:00:00`);
     if (input.to) query = query.lt('posted_at', `${input.to}T23:59:59.999`);
     const start = (input.page - 1) * input.pageSize;
+    const ascending = input.sortDirection === 'asc';
     const { data, error, count } = await query
-      .order('posted_at', { ascending: false })
+      .order(input.sortBy ?? 'posted_at', { ascending })
+      .order('id', { ascending })
       .range(start, start + input.pageSize - 1);
     if (error) throw error;
     return { rows: data ?? [], count: count ?? 0 };

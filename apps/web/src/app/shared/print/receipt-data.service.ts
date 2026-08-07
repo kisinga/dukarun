@@ -144,7 +144,11 @@ export class ReceiptDataService {
             name: v?.variant_name ?? l.label,
             product:
               v?.product_id && v.product_name
-                ? { id: v.product_id, name: v.product_name }
+                ? {
+                    id: v.product_id,
+                    name: v.product_name,
+                    ...(v.manufacturer_name ? { manufacturerName: v.manufacturer_name } : {}),
+                  }
                 : undefined,
           },
         };
@@ -291,7 +295,11 @@ export class ReceiptDataService {
                 name: v.variant_name ?? variantLabel(v),
                 product:
                   v.product_id && v.product_name
-                    ? { id: v.product_id, name: v.product_name }
+                    ? {
+                        id: v.product_id,
+                        name: v.product_name,
+                        ...(v.manufacturer_name ? { manufacturerName: v.manufacturer_name } : {}),
+                      }
                     : undefined,
               }
             : undefined,

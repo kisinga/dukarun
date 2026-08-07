@@ -24,6 +24,8 @@ import {
   heroMagnifyingGlass,
   heroArrowsRightLeft,
   heroArrowPath,
+  heroArrowDownTray,
+  heroArrowUpTray,
   heroArrowRight,
   heroArrowRightOnRectangle,
   heroBanknotes,
@@ -81,6 +83,8 @@ export const appConfig: ApplicationConfig = {
     provideNgIconsConfig({ size: '1rem' }),
     provideIcons({
       heroArrowPath,
+      heroArrowDownTray,
+      heroArrowUpTray,
       heroArrowRight,
       heroChatBubbleLeftRight,
       heroDocumentText,

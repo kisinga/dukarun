@@ -21,6 +21,7 @@ nothing sensitive is stored in the repo.
 
 - [x] Migrations tracked and applied via `supabase db push`
 - [x] GoTrue hooks + SMS provider env (send_sms → TextSMS via vault, custom_access_token)
+- [x] SMS login OTP validity set to five minutes (`GOTRUE_SMS_OTP_EXP=300`)
 - [x] Vault secrets: `TEXTSMS_API_KEY`, `TEXTSMS_PARTNER_ID`, `TEXTSMS_SHORTCODE`,
       `SUPABASE_SERVICE_ROLE_KEY`, `NOTIFY_FLUSH_URL`
 - [x] Edge functions deployed: paystack-charge, paystack-webhook, notification-flush, _shared

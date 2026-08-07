@@ -90,7 +90,7 @@ function formatKes(amount: number): string {
             <input
               type="text"
               class="input input-bordered mb-3 w-full"
-              placeholder="Search products…"
+              placeholder="Search products or manufacturers…"
               [value]="query()"
               (input)="query.set($any($event.target).value)"
             />
@@ -176,15 +176,17 @@ export class ShopComponent implements OnInit {
   protected readonly query = signal('');
 
   protected readonly filtered = computed(() => {
-    const q = this.query().trim().toLowerCase();
+    const q = this.query().trim();
     if (!q) return this.catalog();
-    return this.catalog().filter(
-      item =>
-        (item.product_name ?? '').toLowerCase().includes(q) ||
-        (item.variant_name ?? '').toLowerCase().includes(q) ||
-        (item.sku ?? '').toLowerCase().includes(q) ||
-        (item.manufacturer_name ?? '').toLowerCase().includes(q)
-    );
+    const tokens = this.searchTokens(q);
+    return this.catalog().filter(item => {
+      const searchable = this.searchTokens(
+        [item.product_name, item.variant_name, item.manufacturer_name, item.sku]
+          .filter((value): value is string => !!value)
+          .join(' ')
+      ).join(' ');
+      return tokens.every(token => searchable.includes(token));
+    });
   });
 
   async ngOnInit(): Promise<void> {
@@ -216,6 +218,10 @@ export class ShopComponent implements OnInit {
   protected label(item: CatalogRow): string {
     if (!item.variant_name || item.variant_name === 'Default') return item.product_name ?? '';
     return `${item.product_name} — ${item.variant_name}`;
+  }
+
+  private searchTokens(value: string): string[] {
+    return value.normalize('NFKC').trim().toLowerCase().split(/\s+/).filter(Boolean);
   }
 
   protected fmt = formatKes;

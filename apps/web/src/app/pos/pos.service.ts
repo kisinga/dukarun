@@ -17,7 +17,6 @@ export type Order = Database['public']['Tables']['orders']['Row'];
 export type OrderLine = Database['public']['Tables']['order_lines']['Row'];
 export type Payment = Database['public']['Tables']['payments']['Row'];
 export type InventoryBatch = Database['public']['Tables']['inventory_batches']['Row'];
-export type StockLocation = Database['public']['Tables']['stock_locations']['Row'];
 
 export interface CatalogVariantInput {
   variant_id?: string;
@@ -69,6 +68,8 @@ export type OrderWithCustomer = Order & {
 export type OrderLineWithProduct = OrderLine & {
   /** Resolved from variant_catalog (product — variant). */
   label: string;
+  manufacturer_name: string | null;
+  sku: string | null;
 };
 
 /** One enabled tender method from `available_payment_methods` (credit excluded). */
@@ -121,21 +122,14 @@ export class PosService {
   }
 
   /** POS search: active variants of active products from variant_catalog. */
-  async searchVariants(query: string): Promise<Variant[]> {
-    // Strip characters that would break the PostgREST .or() filter string.
-    const pattern = `%${query.trim().replace(/[%_,()]/g, ' ')}%`;
-    const { data, error } = await this.client
-      .from('variant_catalog')
-      .select('*')
-      .or(
-        `product_name.ilike.${pattern},variant_name.ilike.${pattern},sku.ilike.${pattern},barcode.ilike.${pattern}` +
-          `,manufacturer_name.ilike.${pattern}`
-      )
-      .eq('variant_active', true)
-      .eq('product_active', true)
-      .limit(20);
+  async searchVariants(query: string, limit = 20): Promise<Variant[]> {
+    const { data, error } = await this.client.rpc('search_catalog_variants', {
+      p_query: query,
+      p_limit: Math.min(Math.max(Math.trunc(limit), 1), 100),
+      ...(this.locations.activeId() ? { p_location_id: this.locations.activeId()! } : {}),
+    });
     if (error) throw error;
-    return this.withLocationStock(data);
+    return data;
   }
 
   /** Management list: whole catalog (active + inactive), search across family/variant/sku/barcode. */
@@ -172,7 +166,7 @@ export class PosService {
       .select('*')
       .eq('active', true)
       .order('name')
-      .limit(50);
+      .limit(500);
     const term = query.trim();
     if (term) request = request.ilike('name', `%${term.replace(/[%_]/g, ' ')}%`);
     const { data, error } = await request;
@@ -271,16 +265,6 @@ export class PosService {
       p_variants: input.variants as never,
     });
     if (error) throw rpcError(error);
-    return data;
-  }
-
-  async listStockLocations(): Promise<StockLocation[]> {
-    const { data, error } = await this.client
-      .from('stock_locations')
-      .select('*')
-      .order('is_default', { ascending: false })
-      .order('name');
-    if (error) throw error;
     return data;
   }
 
@@ -497,8 +481,8 @@ export class PosService {
     search?: string;
     page: number;
     pageSize: number;
-    /** Oldest sales first (cashier queue works the backlog top-down). */
-    oldestFirst?: boolean;
+    sortBy?: 'created_at' | 'cashier_pending_at' | 'code' | 'total' | 'status';
+    sortDirection?: 'asc' | 'desc';
   }): Promise<{ rows: OrderWithCustomer[]; count: number }> {
     let customerIds: string[] = [];
     const term = input.search?.trim().replace(/[%_,()]/g, ' ') ?? '';
@@ -523,8 +507,11 @@ export class PosService {
       query = query.or(`code.ilike.%${term}%${customerFilter}`);
     }
     const start = (input.page - 1) * input.pageSize;
+    const sortBy = input.sortBy ?? 'created_at';
+    const ascending = input.sortDirection === 'asc';
     const { data, error, count } = await query
-      .order('created_at', { ascending: input.oldestFirst ?? false })
+      .order(sortBy, { ascending })
+      .order('id', { ascending })
       .range(start, start + input.pageSize - 1);
     if (error) throw error;
     return { rows: data ?? [], count: count ?? 0 };
@@ -573,7 +560,12 @@ export class PosService {
     const byId = new Map(variants.map(v => [v.variant_id, v]));
     return data.map(l => {
       const v = byId.get(l.variant_id);
-      return { ...l, label: v ? variantLabel(v) : l.variant_id.slice(0, 8) };
+      return {
+        ...l,
+        label: v ? variantLabel(v) : l.variant_id.slice(0, 8),
+        manufacturer_name: v?.manufacturer_name ?? null,
+        sku: v?.sku ?? null,
+      };
     });
   }
 
