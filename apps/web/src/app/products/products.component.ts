@@ -43,6 +43,7 @@ import { ProductTransferService, type CatalogImportResult } from './product-tran
 type StockInfo = { stock: number; stock_value: number };
 type ProductStatusFilter = 'all' | 'active' | 'inactive';
 type StockStatusFilter = 'all' | 'in_stock' | 'out_of_stock' | 'not_tracked';
+const DEFAULT_PRODUCT_STATUS_FILTER: ProductStatusFilter = 'active';
 
 const PRODUCT_SORT_OPTIONS: readonly ListSortOption[] = [
   { value: 'name', label: 'Product name' },
@@ -1220,7 +1221,9 @@ export class ProductsComponent implements OnInit {
   protected readonly batches = signal<InventoryBatch[]>([]);
 
   protected readonly query = signal('');
-  protected readonly productStatusFilter = signal<ProductStatusFilter>('all');
+  protected readonly productStatusFilter = signal<ProductStatusFilter>(
+    DEFAULT_PRODUCT_STATUS_FILTER
+  );
   protected readonly stockStatusFilter = signal<StockStatusFilter>('all');
   protected readonly manufacturerFilter = signal<string>('all');
   protected readonly productSortOptions = PRODUCT_SORT_OPTIONS;
@@ -1350,7 +1353,7 @@ export class ProductsComponent implements OnInit {
   protected readonly hasProductFilters = computed(
     () =>
       this.query().trim().length > 0 ||
-      this.productStatusFilter() !== 'all' ||
+      this.productStatusFilter() !== DEFAULT_PRODUCT_STATUS_FILTER ||
       this.stockStatusFilter() !== 'all' ||
       this.manufacturerFilter() !== 'all'
   );
@@ -1433,7 +1436,7 @@ export class ProductsComponent implements OnInit {
 
   protected clearProductFilters(): void {
     this.query.set('');
-    this.productStatusFilter.set('all');
+    this.productStatusFilter.set(DEFAULT_PRODUCT_STATUS_FILTER);
     this.stockStatusFilter.set('all');
     this.manufacturerFilter.set('all');
   }
