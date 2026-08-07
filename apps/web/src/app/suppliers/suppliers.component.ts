@@ -286,24 +286,26 @@ interface ParsedPurchaseLine {
                         >
                           <app-icon name="heroPencilSquare" />
                         </button>
-                        <button
-                          appButton
-                          variant="ghost"
-                          [iconOnly]="true"
-                          type="button"
-                          [disabled]="busy()"
-                          [title]="
-                            supplier.supplier_active ? 'Archive supplier' : 'Reactivate supplier'
-                          "
-                          [attr.aria-label]="
-                            supplier.supplier_active ? 'Archive supplier' : 'Reactivate supplier'
-                          "
-                          (click)="setSupplierActive(supplier)"
-                        >
-                          <app-icon
-                            [name]="supplier.supplier_active ? 'heroArchiveBox' : 'heroArrowPath'"
-                          />
-                        </button>
+                        @if (perms.has('ManageSupplierCreditPurchases')) {
+                          <button
+                            appButton
+                            variant="ghost"
+                            [iconOnly]="true"
+                            type="button"
+                            [disabled]="busy()"
+                            [title]="
+                              supplier.supplier_active ? 'Archive supplier' : 'Reactivate supplier'
+                            "
+                            [attr.aria-label]="
+                              supplier.supplier_active ? 'Archive supplier' : 'Reactivate supplier'
+                            "
+                            (click)="setSupplierActive(supplier)"
+                          >
+                            <app-icon
+                              [name]="supplier.supplier_active ? 'heroArchiveBox' : 'heroArrowPath'"
+                            />
+                          </button>
+                        }
                       </td>
                     </tr>
                   }
@@ -1208,15 +1210,17 @@ interface ParsedPurchaseLine {
                           >
                             Edit
                           </button>
-                          <button
-                            appButton
-                            variant="ghost"
-                            size="sm"
-                            [disabled]="busy()"
-                            (click)="$event.stopPropagation(); setSupplierActive(s)"
-                          >
-                            {{ s.supplier_active ? 'Archive' : 'Reactivate' }}
-                          </button>
+                          @if (perms.has('ManageSupplierCreditPurchases')) {
+                            <button
+                              appButton
+                              variant="ghost"
+                              size="sm"
+                              [disabled]="busy()"
+                              (click)="$event.stopPropagation(); setSupplierActive(s)"
+                            >
+                              {{ s.supplier_active ? 'Archive' : 'Reactivate' }}
+                            </button>
+                          }
                         </div>
                       </div>
                     }
@@ -1390,7 +1394,7 @@ interface ParsedPurchaseLine {
               }
 
               <div class="mt-4 flex flex-col gap-4">
-                @if (perms.has('ViewFinancials')) {
+                @if (perms.has('ManageSupplierCreditPurchases')) {
                   <section>
                     <h3 class="section-title mb-2">Pay this supplier</h3>
                     @if (s.ap_balance <= 0) {

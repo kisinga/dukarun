@@ -440,7 +440,8 @@ export class ShellComponent implements OnInit {
               ? 'badge-warning'
               : 'badge-ghost',
           visible: () =>
-            this.cashierSession.cashierFlowEnabled() || this.orderQueueCounts.cashierQueue() > 0,
+            this.perms.has('SettleOrder') &&
+            (this.cashierSession.cashierFlowEnabled() || this.orderQueueCounts.cashierQueue() > 0),
         },
         { route: '/sales', label: 'Sales', icon: 'heroClipboardDocumentList' },
         {
@@ -486,7 +487,7 @@ export class ShellComponent implements OnInit {
           label: 'Approvals',
           icon: 'heroCheckBadge',
           badge: () => this.approvals.pending().length,
-          visible: () => this.perms.has('ManageApprovals'),
+          visible: () => this.perms.has('ManageApprovals') || this.perms.has('ViewFinancials'),
         },
       ],
     },

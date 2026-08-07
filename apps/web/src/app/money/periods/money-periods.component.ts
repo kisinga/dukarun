@@ -76,82 +76,86 @@ import {
     }
 
     <!-- Manual reconciliation -->
-    <div class="card mb-4 bg-base-100">
-      <div class="card-body p-4">
-        <h2 class="section-title mb-2">Manual reconciliation</h2>
-        <p class="text-xs text-base-content/60">
-          Declare actual balances per cashier-controlled account (e.g. after checking the M-Pesa
-          statement or the bank). A reason is required for accounts with variance.
-        </p>
-        <div class="mt-2 flex flex-col gap-2">
-          @for (account of accounts(); track account.account_code) {
-            <div class="flex flex-wrap items-end gap-2">
-              <app-form-field
-                class="w-48"
-                [label]="account.label + ' (' + account.account_code + ')'"
-              >
-                <input
-                  type="text"
-                  inputmode="numeric"
-                  class="input input-bordered input-sm w-full"
-                  placeholder="0"
-                  [(ngModel)]="declared[account.account_code]"
-                />
-              </app-form-field>
-              <app-form-field label="Reason (optional)" class="flex-1">
-                <input
-                  type="text"
-                  class="input input-bordered input-sm w-full"
-                  [(ngModel)]="reasons[account.account_code]"
-                />
-              </app-form-field>
-            </div>
-          }
-          <button
-            appButton
-            class="mt-2 self-start"
-            [loading]="busy()"
-            [disabled]="accounts().length === 0"
-            (click)="reconcile()"
-          >
-            Record reconciliation
-          </button>
+    @if (perms.has('ManageReconciliation')) {
+      <div class="card mb-4 bg-base-100">
+        <div class="card-body p-4">
+          <h2 class="section-title mb-2">Manual reconciliation</h2>
+          <p class="text-xs text-base-content/60">
+            Declare actual balances per cashier-controlled account (e.g. after checking the M-Pesa
+            statement or the bank). A reason is required for accounts with variance.
+          </p>
+          <div class="mt-2 flex flex-col gap-2">
+            @for (account of accounts(); track account.account_code) {
+              <div class="flex flex-wrap items-end gap-2">
+                <app-form-field
+                  class="w-48"
+                  [label]="account.label + ' (' + account.account_code + ')'"
+                >
+                  <input
+                    type="text"
+                    inputmode="numeric"
+                    class="input input-bordered input-sm w-full"
+                    placeholder="0"
+                    [(ngModel)]="declared[account.account_code]"
+                  />
+                </app-form-field>
+                <app-form-field label="Reason (optional)" class="flex-1">
+                  <input
+                    type="text"
+                    class="input input-bordered input-sm w-full"
+                    [(ngModel)]="reasons[account.account_code]"
+                  />
+                </app-form-field>
+              </div>
+            }
+            <button
+              appButton
+              class="mt-2 self-start"
+              [loading]="busy()"
+              [disabled]="accounts().length === 0"
+              (click)="reconcile()"
+            >
+              Record reconciliation
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+    }
 
     <!-- Close period -->
-    <div class="card mb-4 bg-base-100">
-      <div class="card-body p-4">
-        <h2 class="section-title mb-2">Close accounting period</h2>
-        <p class="text-xs text-base-content/60">
-          Closing locks all posting through the end date. The backend gates this on reconciliations
-          and open sessions — its messages are shown verbatim.
-        </p>
-        <form
-          (submit)="$event.preventDefault(); askClose()"
-          class="mt-2 flex flex-wrap items-end gap-2"
-        >
-          <app-form-field label="Period end date">
-            <input
-              type="date"
-              class="input input-bordered input-sm w-full"
-              [formControl]="endDate"
-            />
-          </app-form-field>
-          @if (confirmClose()) {
-            <button appButton variant="error" type="submit" [loading]="busy()">
-              Confirm close
-            </button>
-            <button appButton variant="ghost" type="button" (click)="confirmClose.set(false)">
-              Cancel
-            </button>
-          } @else {
-            <button appButton variant="outline" type="submit">Close period</button>
-          }
-        </form>
+    @if (perms.has('CloseAccountingPeriod')) {
+      <div class="card mb-4 bg-base-100">
+        <div class="card-body p-4">
+          <h2 class="section-title mb-2">Close accounting period</h2>
+          <p class="text-xs text-base-content/60">
+            Closing locks all posting through the end date. The backend gates this on
+            reconciliations and open sessions — its messages are shown verbatim.
+          </p>
+          <form
+            (submit)="$event.preventDefault(); askClose()"
+            class="mt-2 flex flex-wrap items-end gap-2"
+          >
+            <app-form-field label="Period end date">
+              <input
+                type="date"
+                class="input input-bordered input-sm w-full"
+                [formControl]="endDate"
+              />
+            </app-form-field>
+            @if (confirmClose()) {
+              <button appButton variant="error" type="submit" [loading]="busy()">
+                Confirm close
+              </button>
+              <button appButton variant="ghost" type="button" (click)="confirmClose.set(false)">
+                Cancel
+              </button>
+            } @else {
+              <button appButton variant="outline" type="submit">Close period</button>
+            }
+          </form>
+        </div>
       </div>
-    </div>
+    }
 
     <!-- Recent reconciliations (variance review) -->
     <h2 class="section-title mb-2">Reconciliation history</h2>

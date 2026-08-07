@@ -1,12 +1,13 @@
 -- Checkout rework tests (migration 0054): external-account gating at
 -- checkout — walk-in hard block, approval hold without ViewFinancials,
--- approve settles the held order, deny leaves it pending_payment.
+-- approve settles the held order, and denial terminally voids it.
 begin;
-select plan(16);
+select plan(17);
 
 select testkit.create_user('11111111-1111-1111-1111-111111111111', 'admin@extpay.local');
 select testkit.create_user('22222222-2222-2222-2222-222222222222', 'cashier@extpay.local');
 select testkit.create_user('33333333-3333-3333-3333-333333333333', 'approver@extpay.local');
+select testkit.create_user('44444444-4444-4444-4444-444444444444', 'finance@extpay.local');
 
 create temp table ep_company as
 select testkit.provision('11111111-1111-1111-1111-111111111111', 'Ext Pay Co') as company_id;
@@ -16,6 +17,7 @@ grant select on pg_temp.ep_company to authenticated;
 select testkit.add_member((select company_id from ep_company), '22222222-2222-2222-2222-222222222222', 'Cashier', '{SettleOrder}');
 -- Approvals manager WITHOUT ViewFinancials.
 select testkit.add_member((select company_id from ep_company), '33333333-3333-3333-3333-333333333333', 'Approver', '{ManageApprovals}');
+select testkit.add_member((select company_id from ep_company), '44444444-4444-4444-4444-444444444444', 'Finance', '{ViewFinancials}');
 
 insert into public.products (id, company_id, name)
 select 'a0000000-0000-0000-0000-000000000056', company_id, 'Service' from ep_company;
@@ -90,6 +92,16 @@ select throws_ok(
 -- ---------------------------------------------------------------------------
 select testkit.as_user((select company_id from ep_company), '22222222-2222-2222-2222-222222222222', 'Cashier');
 
+select throws_ok(
+  $$select public.post_sale_at_location(
+    (select id from ep_location),
+    'c0000000-0000-0000-0000-000000000056',
+    '[{"variant_id":"aa000000-0000-0000-0000-000000000056","quantity":1,"unit_price":10000}]',
+    '[{"method":"bank","amount":10000}]')$$,
+  'P0001', 'invalid_external_tenders',
+  'statement-matched external tenders require a reference before requesting approval'
+);
+
 create temp table held_result as
 select public.post_sale_at_location(
   (select id from ep_location),
@@ -118,13 +130,19 @@ select is(
   'approval request records the external tenders'
 );
 
+-- Targeted notifications are user-private, so verify them in the recipient's
+-- session instead of relying on a table-owner bypass.
+select testkit.as_user((select company_id from ep_company), '44444444-4444-4444-4444-444444444444', 'Finance');
 select is(
   (select count(*)::int from public.notifications
    where company_id = (select company_id from ep_company)
-     and type = 'approval' and link = '/approvals' and user_id is null),
+     and type = 'approval'
+     and link = '/approvals?approval=' || (select result ->> 'approval_id' from held_result)
+     and user_id = '44444444-4444-4444-4444-444444444444'),
   1,
-  'finance viewers are notified company-wide'
+  'eligible finance viewer receives a targeted deep-link notification'
 );
+select testkit.as_user((select company_id from ep_company), '22222222-2222-2222-2222-222222222222', 'Cashier');
 
 -- ---------------------------------------------------------------------------
 -- 8-9. Approval is ViewFinancials-gated: cashier and a ManageApprovals-only
@@ -219,19 +237,15 @@ select is(
 
 select is(
   (select status from public.orders where id = (select (result ->> 'order_id')::uuid from denied_result)),
-  'pending_payment',
-  'denied order remains pending settlement'
+  'voided',
+  'denied approval hold is terminally voided'
 );
 
-select public.settle_order(
-  (select (result ->> 'order_id')::uuid from denied_result),
-  '[{"method":"cash","amount":10000}]'
-);
-
-select is(
-  (select status from public.orders where id = (select (result ->> 'order_id')::uuid from denied_result)),
-  'completed',
-  'denied order can still be settled through the cashier queue'
+select throws_ok(
+  format($$select public.settle_order('%s','[{"method":"cash","amount":10000}]')$$,
+    (select result ->> 'order_id' from denied_result)),
+  'P0001', null,
+  'denied approval hold cannot be settled later'
 );
 
 select * from finish();

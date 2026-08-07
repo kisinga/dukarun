@@ -579,7 +579,7 @@ type ReminderDraft = {
             </div>
           </div>
 
-          <!-- Payment methods -->
+          <!-- Commissions -->
           @if (entitlements.enabled('commissions') && perms.has('ManageCommissions')) {
             <div class="card bg-base-100">
               <div class="card-body p-4">
@@ -725,104 +725,108 @@ type ReminderDraft = {
             </div>
           }
 
-          <div class="card bg-base-100">
-            <div class="card-body p-4">
-              <div class="flex items-center justify-between">
-                <h2 class="section-title">Payment methods</h2>
-                <a appButton variant="outline" routerLink="/billing">
-                  Billing &amp; plan
-                  <app-icon name="heroArrowRight" />
-                </a>
-              </div>
-              <div class="table-scroll">
-                <table class="table table-sm mt-2">
-                  <thead>
-                    <tr>
-                      <th>Method</th>
-                      <th>Enabled</th>
-                      <th>Reconciliation</th>
-                      <th>Cashier</th>
-                      <th>Locations</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    @for (pm of paymentMethods(); track pm.code) {
+          @if (perms.has('ManageReconciliation')) {
+            <div class="card bg-base-100">
+              <div class="card-body p-4">
+                <div class="flex items-center justify-between">
+                  <h2 class="section-title">Payment methods</h2>
+                  <a appButton variant="outline" routerLink="/billing">
+                    Billing &amp; plan
+                    <app-icon name="heroArrowRight" />
+                  </a>
+                </div>
+                <div class="table-scroll">
+                  <table class="table table-sm mt-2">
+                    <thead>
                       <tr>
-                        <td>
-                          <span class="text-sm font-medium">{{ pm.name }}</span>
-                          <span class="ml-1 font-mono text-xs text-base-content/60">
-                            {{ pm.code }}
-                          </span>
-                          <p class="type-caption mt-0.5">
-                            {{ reconciliationLabel(pm.reconciliation_type) }}
-                          </p>
-                        </td>
-                        <td>
-                          <input
-                            type="checkbox"
-                            class="toggle toggle-sm"
-                            [checked]="pm.enabled"
-                            (change)="toggleMethod(pm, 'enabled', $event)"
-                            [disabled]="busy()"
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="checkbox"
-                            class="toggle toggle-sm"
-                            [checked]="pm.requires_reconciliation"
-                            (change)="toggleMethod(pm, 'requires_reconciliation', $event)"
-                            [disabled]="busy()"
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="checkbox"
-                            class="toggle toggle-sm"
-                            [checked]="pm.is_cashier_controlled"
-                            (change)="toggleMethod(pm, 'is_cashier_controlled', $event)"
-                            [disabled]="busy()"
-                          />
-                        </td>
-                        <td>
-                          @if (locations().length <= 1) {
-                            <span class="type-caption">Main location</span>
-                          } @else {
-                            <details class="dropdown dropdown-end">
-                              <summary class="btn btn-ghost btn-xs min-h-9">
-                                {{ paymentLocationLabel(pm) }}
-                              </summary>
-                              <div
-                                class="dropdown-content z-20 mt-1 w-56 rounded-box border border-base-300 bg-base-100 p-2 shadow-overlay"
-                              >
-                                @for (location of locations(); track location.id) {
-                                  <label class="label min-h-10 cursor-pointer justify-start gap-2">
-                                    <input
-                                      type="checkbox"
-                                      class="checkbox checkbox-sm"
-                                      [checked]="paymentMethodEnabledAt(pm, location.id)"
-                                      [disabled]="busy()"
-                                      (change)="togglePaymentLocation(pm, location.id, $event)"
-                                    />
-                                    <span class="label-text">{{ location.name }}</span>
-                                  </label>
-                                }
-                              </div>
-                            </details>
-                          }
-                        </td>
+                        <th>Method</th>
+                        <th>Enabled</th>
+                        <th>Reconciliation</th>
+                        <th>Cashier</th>
+                        <th>Locations</th>
                       </tr>
-                    }
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      @for (pm of paymentMethods(); track pm.code) {
+                        <tr>
+                          <td>
+                            <span class="text-sm font-medium">{{ pm.name }}</span>
+                            <span class="ml-1 font-mono text-xs text-base-content/60">
+                              {{ pm.code }}
+                            </span>
+                            <p class="type-caption mt-0.5">
+                              {{ reconciliationLabel(pm.reconciliation_type) }}
+                            </p>
+                          </td>
+                          <td>
+                            <input
+                              type="checkbox"
+                              class="toggle toggle-sm"
+                              [checked]="pm.enabled"
+                              (change)="toggleMethod(pm, 'enabled', $event)"
+                              [disabled]="busy()"
+                            />
+                          </td>
+                          <td>
+                            <input
+                              type="checkbox"
+                              class="toggle toggle-sm"
+                              [checked]="pm.requires_reconciliation"
+                              (change)="toggleMethod(pm, 'requires_reconciliation', $event)"
+                              [disabled]="busy()"
+                            />
+                          </td>
+                          <td>
+                            <input
+                              type="checkbox"
+                              class="toggle toggle-sm"
+                              [checked]="pm.is_cashier_controlled"
+                              (change)="toggleMethod(pm, 'is_cashier_controlled', $event)"
+                              [disabled]="busy()"
+                            />
+                          </td>
+                          <td>
+                            @if (locations().length <= 1) {
+                              <span class="type-caption">Main location</span>
+                            } @else {
+                              <details class="dropdown dropdown-end">
+                                <summary class="btn btn-ghost btn-xs min-h-9">
+                                  {{ paymentLocationLabel(pm) }}
+                                </summary>
+                                <div
+                                  class="dropdown-content z-20 mt-1 w-56 rounded-box border border-base-300 bg-base-100 p-2 shadow-overlay"
+                                >
+                                  @for (location of locations(); track location.id) {
+                                    <label
+                                      class="label min-h-10 cursor-pointer justify-start gap-2"
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        class="checkbox checkbox-sm"
+                                        [checked]="paymentMethodEnabledAt(pm, location.id)"
+                                        [disabled]="busy()"
+                                        (change)="togglePaymentLocation(pm, location.id, $event)"
+                                      />
+                                      <span class="label-text">{{ location.name }}</span>
+                                    </label>
+                                  }
+                                </div>
+                              </details>
+                            }
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+                @if (pmMsg(); as m) {
+                  <p class="mt-2 text-sm" [class.text-success]="m.ok" [class.text-error]="!m.ok">
+                    {{ m.text }}
+                  </p>
+                }
               </div>
-              @if (pmMsg(); as m) {
-                <p class="mt-2 text-sm" [class.text-success]="m.ok" [class.text-error]="!m.ok">
-                  {{ m.text }}
-                </p>
-              }
             </div>
-          </div>
+          }
         </div>
       } @else {
         @if (loadError()) {

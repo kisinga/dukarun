@@ -71,7 +71,15 @@ const TYPE_ICON: Record<string, string> = {
                     <span class="type-caption ml-auto shrink-0">{{ age(n.created_at) }}</span>
                   </div>
                   @if (n.body) {
-                    <p class="mt-0.5 truncate text-sm text-base-content/60">{{ n.body }}</p>
+                    <p class="mt-0.5 line-clamp-2 text-sm text-base-content/60">{{ n.body }}</p>
+                  }
+                  @if (n.link) {
+                    <span
+                      class="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-primary"
+                    >
+                      View details
+                      <app-icon name="heroChevronRight" size="sm" />
+                    </span>
                   }
                 </div>
               </div>
@@ -105,7 +113,7 @@ export class NotificationsComponent {
   protected async open(n: AppNotification): Promise<void> {
     try {
       if (n.read_at === null) await this.notifications.markRead(n.id);
-      if (n.link) await this.router.navigate([n.link]);
+      if (n.link) await this.router.navigateByUrl(n.link);
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Failed');
     }

@@ -4,6 +4,7 @@ import { SupabaseService } from '../core/supabase.service';
 import { environment } from '../../environments/environment';
 import { LocationContextService } from '../core/location-context.service';
 import { PartyCacheService, type PartyQueryResult } from '../core/party-cache.service';
+import { ActionExecutorService, type ActionOutcome } from '../core/action-executor.service';
 
 export type Product = Database['public']['Tables']['products']['Row'];
 export type Manufacturer = Database['public']['Tables']['manufacturers']['Row'];
@@ -16,6 +17,7 @@ export type CustomerWithCredit = Customer & { ar_balance: number };
 export type Order = Database['public']['Tables']['orders']['Row'];
 export type OrderLine = Database['public']['Tables']['order_lines']['Row'];
 export type Payment = Database['public']['Tables']['payments']['Row'];
+export type Refund = Database['public']['Tables']['refunds']['Row'];
 export type InventoryBatch = Database['public']['Tables']['inventory_batches']['Row'];
 
 export interface CatalogVariantInput {
@@ -70,6 +72,9 @@ export type OrderLineWithProduct = OrderLine & {
   label: string;
   manufacturer_name: string | null;
   sku: string | null;
+  wholesale_price: number | null;
+  stock: number;
+  track_inventory: boolean;
 };
 
 /** One enabled tender method from `available_payment_methods` (credit excluded). */
@@ -86,9 +91,7 @@ export type PostSaleResult =
   | { status: 'completed' | 'parked'; orderId: string }
   | { status: 'approval_required'; orderId: string; approvalId: string };
 
-/** void_sale result: voided immediately, or parked for approval (supervisor path). */
-export type VoidResult =
-  { status: 'voided'; entry_id?: string } | { status: 'approval_required'; approval_id?: string };
+export type VoidResult = ActionOutcome;
 
 /**
  * RPC failure with the PostgREST/PostgreSQL error code preserved.
@@ -116,6 +119,7 @@ export class PosService {
   private readonly supabase = inject(SupabaseService);
   private readonly locations = inject(LocationContextService);
   private readonly parties = inject(PartyCacheService);
+  private readonly actions = inject(ActionExecutorService);
 
   get client() {
     return this.supabase.client;
@@ -483,6 +487,7 @@ export class PosService {
     pageSize: number;
     sortBy?: 'created_at' | 'cashier_pending_at' | 'code' | 'total' | 'status';
     sortDirection?: 'asc' | 'desc';
+    cashierQueueOnly?: boolean;
   }): Promise<{ rows: OrderWithCustomer[]; count: number }> {
     let customerIds: string[] = [];
     const term = input.search?.trim().replace(/[%_,()]/g, ' ') ?? '';
@@ -502,6 +507,7 @@ export class PosService {
       .in('status', input.statuses);
     if (input.since) query = query.gte('created_at', input.since);
     if (input.until) query = query.lt('created_at', input.until);
+    if (input.cashierQueueOnly) query = query.not('cashier_pending_at', 'is', null);
     if (term) {
       const customerFilter = customerIds.length ? `,customer_id.in.(${customerIds.join(',')})` : '';
       query = query.or(`code.ilike.%${term}%${customerFilter}`);
@@ -530,6 +536,7 @@ export class PosService {
       .eq('location_id', this.locations.requireActiveId())
       .eq('status', 'pending_payment')
       .eq('created_by', userId)
+      .not('cashier_pending_at', 'is', null)
       .order('cashier_pending_at', { ascending: true })
       .limit(limit);
     if (error) throw error;
@@ -556,7 +563,7 @@ export class PosService {
       .eq('order_id', orderId);
     if (error) throw error;
     const ids = [...new Set(data.map(l => l.variant_id))];
-    const variants = await this.variantsByIds(ids);
+    const variants = await this.variantsByIdsWithStock(ids);
     const byId = new Map(variants.map(v => [v.variant_id, v]));
     return data.map(l => {
       const v = byId.get(l.variant_id);
@@ -565,6 +572,9 @@ export class PosService {
         label: v ? variantLabel(v) : l.variant_id.slice(0, 8),
         manufacturer_name: v?.manufacturer_name ?? null,
         sku: v?.sku ?? null,
+        wholesale_price: v?.wholesale_price ?? null,
+        stock: v?.stock ?? 0,
+        track_inventory: v?.track_inventory ?? false,
       };
     });
   }
@@ -587,6 +597,12 @@ export class PosService {
 
   async orderPayments(orderId: string): Promise<Payment[]> {
     const { data, error } = await this.client.from('payments').select('*').eq('order_id', orderId);
+    if (error) throw error;
+    return data;
+  }
+
+  async orderRefunds(orderId: string): Promise<Refund[]> {
+    const { data, error } = await this.client.from('refunds').select('*').eq('order_id', orderId);
     if (error) throw error;
     return data;
   }
@@ -630,7 +646,8 @@ export class PosService {
     park: boolean,
     clientRef?: string,
     locationId?: string,
-    draftId?: string
+    draftId?: string,
+    approvalReason?: string
   ): Promise<PostSaleResult> {
     const { data, error } = await this.client.rpc('post_sale_at_location', {
       p_location_id: locationId ?? this.locations.requireActiveId(),
@@ -643,6 +660,7 @@ export class PosService {
       ...(clientRef ? { p_client_ref: clientRef } : {}),
       // Proforma being converted: deleted atomically with the posted sale.
       ...(draftId ? { p_draft_id: draftId } : {}),
+      ...(approvalReason ? { p_approval_reason: approvalReason } : {}),
     });
     if (error) throw rpcError(error);
     const result = data as { status: string; order_id: string; approval_id?: string };
@@ -734,11 +752,13 @@ export class PosService {
   }
 
   async voidSale(orderId: string, reason: string): Promise<VoidResult> {
-    const { data, error } = await this.client.rpc('void_sale', {
-      p_order_id: orderId,
-      p_reason: reason,
+    return this.actions.run(async () => {
+      const { data, error } = await this.client.rpc('void_sale', {
+        p_order_id: orderId,
+        p_reason: reason,
+      });
+      if (error) throw rpcError(error);
+      return data;
     });
-    if (error) throw rpcError(error);
-    return data as VoidResult;
   }
 }

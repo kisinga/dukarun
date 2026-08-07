@@ -646,7 +646,12 @@ interface DraftFlag {
                   appButton
                   size="md"
                   class="mt-4 hidden w-full lg:flex"
-                  [disabled]="cart.isEmpty() || busy() || !cashierSession.canTakePayment()"
+                  [disabled]="
+                    cart.isEmpty() ||
+                    busy() ||
+                    !cashierSession.canTakePayment() ||
+                    !perms.has('SettleOrder')
+                  "
                   (click)="openCheckout()"
                 >
                   <app-icon name="heroBanknotes" />
@@ -721,7 +726,12 @@ interface DraftFlag {
             appButton
             size="md"
             class="min-w-40 flex-1"
-            [disabled]="cart.isEmpty() || busy() || !cashierSession.canTakePayment()"
+            [disabled]="
+              cart.isEmpty() ||
+              busy() ||
+              !cashierSession.canTakePayment() ||
+              !perms.has('SettleOrder')
+            "
             (click)="openCheckout()"
           >
             Take payment
@@ -730,7 +740,7 @@ interface DraftFlag {
         </div>
       </div>
 
-      @if (checkoutOpen() && cashierSession.canTakePayment()) {
+      @if (checkoutOpen() && cashierSession.canTakePayment() && perms.has('SettleOrder')) {
         <app-checkout-panel
           [total]="cart.total()"
           [methods]="panelMethods()"
@@ -764,13 +774,42 @@ interface DraftFlag {
                 </div>
                 @if (customer.credit_limit > 0) {
                   <div class="flex items-center justify-between gap-3">
-                    <dt class="text-base-content/60">Credit available after this sale</dt>
+                    <dt class="text-base-content/60">Projected balance</dt>
+                    <dd
+                      class="font-semibold tabular-nums"
+                      [class.text-warning]="creditExceedsLimit()"
+                    >
+                      <app-money [amount]="customer.ar_balance + cart.total()" />
+                    </dd>
+                  </div>
+                  <div class="flex items-center justify-between gap-3">
+                    <dt class="text-base-content/60">Credit limit</dt>
                     <dd class="font-semibold tabular-nums">
-                      <app-money [amount]="customerCreditAvailable(customer) - cart.total()" />
+                      <app-money [amount]="customer.credit_limit" />
                     </dd>
                   </div>
                 }
               </dl>
+              @if (creditApprovalRequired()) {
+                <div role="status" class="alert alert-warning mt-4 text-sm">
+                  <app-icon name="heroExclamationTriangle" />
+                  <span
+                    >This sale exceeds the limit and will be held without changing inventory until
+                    approved.</span
+                  >
+                </div>
+                <app-form-field
+                  class="mt-3 block"
+                  label="Reason for the exception"
+                  [required]="true"
+                >
+                  <textarea
+                    class="textarea textarea-bordered min-h-20 w-full"
+                    [formControl]="creditApprovalReason"
+                    placeholder="Why should this customer exceed their limit?"
+                  ></textarea>
+                </app-form-field>
+              }
             }
             <div class="mt-4 flex justify-end gap-2">
               <button
@@ -788,9 +827,12 @@ interface DraftFlag {
                 size="md"
                 type="button"
                 [loading]="busy()"
+                [disabled]="
+                  creditApprovalRequired() && creditApprovalReason.value.trim().length === 0
+                "
                 (click)="confirmCreditSale()"
               >
-                Confirm credit sale
+                {{ creditApprovalRequired() ? 'Request credit approval' : 'Confirm credit sale' }}
               </button>
             </div>
           </div>
@@ -879,6 +921,7 @@ export class SellComponent implements OnInit {
   protected readonly checkoutOpen = signal(false);
   protected readonly clearCartArmed = signal(false);
   protected readonly creditConfirmOpen = signal(false);
+  protected readonly creditApprovalReason = new FormControl('', { nonNullable: true });
   protected readonly methods = signal<PaymentMethodOption[]>([]);
   protected readonly catalogRefreshing = signal(false);
   protected readonly busy = signal(false);
@@ -902,10 +945,20 @@ export class SellComponent implements OnInit {
     const customer = this.selectedCustomer();
     if (!customer?.is_credit_approved) return false;
     return (
-      customer.credit_limit === 0 ||
-      customer.ar_balance + this.cart.total() <= customer.credit_limit
+      !this.creditExceedsLimit() || this.perms.actionMode('sale.credit_over_limit') !== 'blocked'
     );
   });
+  protected readonly creditExceedsLimit = computed(() => {
+    const customer = this.selectedCustomer();
+    return (
+      !!customer &&
+      customer.credit_limit > 0 &&
+      customer.ar_balance + this.cart.total() > customer.credit_limit
+    );
+  });
+  protected readonly creditApprovalRequired = computed(
+    () => this.creditExceedsLimit() && this.perms.actionMode('sale.credit_over_limit') === 'request'
+  );
   /** Backend-derived tender methods; walk-ins may only use till-controlled accounts. */
   protected readonly panelMethods = computed<PaymentMethodOption[]>(() => {
     const methods = this.methods();
@@ -1199,6 +1252,7 @@ export class SellComponent implements OnInit {
   }
 
   protected async openCheckout(): Promise<void> {
+    if (!this.perms.has('SettleOrder')) return;
     this.error.set(null);
     try {
       await this.cashierSession.assertOpen('taking payment');
@@ -1208,7 +1262,7 @@ export class SellComponent implements OnInit {
     }
   }
 
-  protected async completeSale(payments: PaymentInput[]): Promise<void> {
+  protected async completeSale(payments: PaymentInput[], approvalReason?: string): Promise<void> {
     this.error.set(null);
     this.notice.set(null);
     this.success.set(null);
@@ -1250,7 +1304,8 @@ export class SellComponent implements OnInit {
           false,
           clientRef,
           undefined,
-          completedDraftId
+          completedDraftId,
+          approvalReason
         );
       } catch (err) {
         // The loaded proforma expired or was retired on another device: drop
@@ -1264,7 +1319,16 @@ export class SellComponent implements OnInit {
           throw err;
         }
         this.cart.draftId.set(null);
-        result = await this.pos.postSale(customerId, lines, payments, false, clientRef);
+        result = await this.pos.postSale(
+          customerId,
+          lines,
+          payments,
+          false,
+          clientRef,
+          undefined,
+          undefined,
+          approvalReason
+        );
       }
       this.checkoutOpen.set(false);
       this.cart.clear();
@@ -1293,10 +1357,13 @@ export class SellComponent implements OnInit {
   }
 
   protected confirmCreditSale(): void {
+    const reason = this.creditApprovalReason.value.trim();
+    if (this.creditApprovalRequired() && !reason) return;
     this.creditConfirmOpen.set(false);
     // Credit sale: no tenders — the backend books it against the customer's
     // credit (the same payload the old credit tab emitted).
-    void this.completeSale([]);
+    void this.completeSale([], reason || undefined);
+    this.creditApprovalReason.setValue('');
   }
 
   /** Timed toast for approval-held orders (mirrors the price-floor toast). */

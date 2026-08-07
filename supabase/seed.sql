@@ -79,7 +79,8 @@ where c.name = 'Mama Mboga Stores' and t.code = 'standard';
 update public.roles r
 set permissions = array[
   'ManageApprovals','OverridePrice','ManageStockAdjustments','ApproveCustomerCredit',
-  'ManageCustomerCreditLimit','ManageCatalog','ReverseOrder','OverrideCustomerBalance','SettleOrder',
+  'ManageCustomerCreditLimit','ManageCustomers','ManageCatalog','ManageCommunications',
+  'ReverseOrder','OverrideCustomerBalance','SettleOrder',
   'ManageSupplierCreditPurchases','ViewFinancials','ManageReconciliation',
   'CloseAccountingPeriod','CreateInterAccountTransfer','ManageTeam','ViewAuditTrail',
   'ViewStaffPerformance','ManageCommissions'

@@ -93,7 +93,8 @@ where company_id = (select company_id from mops_company) and status = 'completed
 limit 1;
 
 create temp table ref1 as
-select public.post_refund((select order_id from sale_m), 20000, 'cash', 'defective') as entry_id;
+select (public.post_refund((select order_id from sale_m), 20000, 'cash', 'defective')
+  ->> 'resource_id')::uuid as entry_id;
 
 select results_eq(
   $$select a.code::text, l.debit, l.credit
@@ -118,7 +119,8 @@ create temp table pay_m as
 select id as payment_id from public.payments where order_id = (select order_id from sale_m) limit 1;
 
 create temp table prev1 as
-select public.post_payment_reversal((select payment_id from pay_m)) as entry_id;
+select (public.post_payment_reversal((select payment_id from pay_m), 'duplicate collection')
+  ->> 'resource_id')::uuid as entry_id;
 
 select ok(
   (select reversal_of is not null from public.ledger_journal_entries where id = (select entry_id from prev1)),
@@ -126,7 +128,8 @@ select ok(
 );
 
 select is(
-  public.post_payment_reversal((select payment_id from pay_m)),
+  (public.post_payment_reversal((select payment_id from pay_m), 'idempotent replay')
+    ->> 'resource_id')::uuid,
   (select entry_id from prev1),
   'payment reversal is idempotent'
 );

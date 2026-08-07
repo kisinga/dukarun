@@ -68,6 +68,8 @@ export const routes: Routes = [
       },
       {
         path: 'pos/cashier',
+        canActivate: [permissionGuard],
+        data: { permission: 'SettleOrder' },
         loadComponent: () =>
           import('./pos/cashier/cashier-queue.component').then(m => m.CashierQueueComponent),
       },
@@ -78,6 +80,8 @@ export const routes: Routes = [
       },
       {
         path: 'money',
+        canActivate: [permissionGuard],
+        data: { permission: 'ViewFinancials' },
         loadComponent: () =>
           import('./money/money-layout.component').then(m => m.MoneyLayoutComponent),
         children: [
@@ -93,6 +97,8 @@ export const routes: Routes = [
           },
           {
             path: 'expenses',
+            canActivate: [permissionGuard],
+            data: { permission: 'CreateInterAccountTransfer' },
             loadComponent: () =>
               import('./money/expenses/money-expenses.component').then(
                 m => m.MoneyExpensesComponent
@@ -100,6 +106,8 @@ export const routes: Routes = [
           },
           {
             path: 'transfers',
+            canActivate: [permissionGuard],
+            data: { permission: 'CreateInterAccountTransfer' },
             loadComponent: () =>
               import('./money/transfers/money-transfers.component').then(
                 m => m.MoneyTransfersComponent
@@ -168,6 +176,8 @@ export const routes: Routes = [
       },
       {
         path: 'team',
+        canActivate: [permissionGuard],
+        data: { permission: 'ManageTeam' },
         loadComponent: () => import('./team/team.component').then(m => m.TeamComponent),
       },
       {
@@ -201,10 +211,14 @@ export const routes: Routes = [
       { path: 'orders', redirectTo: 'sales' },
       {
         path: 'reports',
+        canActivate: [permissionGuard],
+        data: { permission: 'ViewFinancials' },
         loadComponent: () => import('./reports/reports.component').then(m => m.ReportsComponent),
       },
       {
         path: 'approvals',
+        canActivate: [permissionGuard],
+        data: { anyPermission: ['ManageApprovals', 'ViewFinancials'] },
         loadComponent: () =>
           import('./approvals/approvals.component').then(m => m.ApprovalsComponent),
       },

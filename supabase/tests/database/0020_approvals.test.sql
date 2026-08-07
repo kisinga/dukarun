@@ -5,12 +5,14 @@ select plan(12);
 
 select testkit.create_user('11111111-1111-1111-1111-111111111111', 'admin@appr.local');
 select testkit.create_user('22222222-2222-2222-2222-222222222222', 'super@appr.local');
+select testkit.create_user('33333333-3333-3333-3333-333333333333', 'approver@appr.local');
 
 create temp table ap_company as select testkit.provision('11111111-1111-1111-1111-111111111111', 'Appr Co') as company_id;
 grant select on pg_temp.ap_company to authenticated;
 
--- Supervisor role: ReverseOrder but NOT ManageApprovals.
-select testkit.add_member((select company_id from ap_company), '22222222-2222-2222-2222-222222222222', 'Supervisor', '{ReverseOrder,SettleOrder}');
+-- Requesters settle sales; approvers hold both decision and execution authority.
+select testkit.add_member((select company_id from ap_company), '22222222-2222-2222-2222-222222222222', 'Supervisor', '{SettleOrder}');
+select testkit.add_member((select company_id from ap_company), '33333333-3333-3333-3333-333333333333', 'Approver', '{ManageApprovals,ReverseOrder}');
 
 insert into public.products (id, company_id, name)
 select 'a0000000-0000-0000-0000-0000000000b1', company_id, 'Shoes' from ap_company;
@@ -54,7 +56,10 @@ select id from public.approvals
 where type = 'below_wholesale' and status = 'pending'
   and metadata ->> 'order_id' = (select order_id::text from bw_draft);
 
+select testkit.as_user((select company_id from ap_company), '33333333-3333-3333-3333-333333333333', 'Approver');
 select public.approve_request((select id from bw_approval), 'ok, known customer');
+
+select testkit.as_user((select company_id from ap_company), '11111111-1111-1111-1111-111111111111', 'Admin');
 
 select lives_ok(
   $$select public.convert_draft((select order_id from bw_draft), '[{"method":"cash","amount":70000}]')$$,
@@ -93,8 +98,8 @@ select is(
   'order-reversal approval request recorded'
 );
 
--- Admin approves -> the void executes.
-select testkit.as_user((select company_id from ap_company), '11111111-1111-1111-1111-111111111111', 'Admin');
+-- A separate approver approves -> the void executes.
+select testkit.as_user((select company_id from ap_company), '33333333-3333-3333-3333-333333333333', 'Approver');
 
 create temp table or_approval as
 select id from public.approvals
@@ -110,6 +115,7 @@ select is(
 );
 
 -- Admin void is instant (no approval) — second sale.
+select testkit.as_user((select company_id from ap_company), '11111111-1111-1111-1111-111111111111', 'Admin');
 create temp table or_sale2 as
 select public.post_sale(null,
   '[{"variant_id":"aa000000-0000-0000-0000-0000000000b1","quantity":1,"unit_price":100000}]',
@@ -167,6 +173,7 @@ select id from public.approvals
 where type = 'below_wholesale' and status = 'pending'
   and metadata ->> 'order_id' = (select order_id::text from deny_draft);
 
+select testkit.as_user((select company_id from ap_company), '33333333-3333-3333-3333-333333333333', 'Approver');
 select public.deny_request((select id from deny_approval), 'too low');
 
 select is(

@@ -4,6 +4,7 @@ import { SupabaseService } from '../core/supabase.service';
 import { rpcError } from '../pos/pos.service';
 import { LocationContextService } from '../core/location-context.service';
 import { PartyCacheService } from '../core/party-cache.service';
+import { ActionExecutorService, type ActionOutcome } from '../core/action-executor.service';
 
 export type LedgerAccount = Database['public']['Tables']['ledger_accounts']['Row'];
 export type JournalEntry = Database['public']['Tables']['ledger_journal_entries']['Row'];
@@ -67,6 +68,7 @@ export class MoneyService {
   private readonly supabase = inject(SupabaseService);
   private readonly locations = inject(LocationContextService);
   private readonly parties = inject(PartyCacheService);
+  private readonly actions = inject(ActionExecutorService);
 
   private get db() {
     return this.supabase.client;
@@ -510,25 +512,32 @@ export class MoneyService {
     amount: number,
     methodCode: string,
     reason: string
-  ): Promise<string> {
-    const { data, error } = await this.db.rpc('post_refund', {
-      p_order_id: orderId,
-      p_amount: amount,
-      p_method_code: methodCode,
-      p_reason: reason,
+  ): Promise<ActionOutcome> {
+    const outcome = await this.actions.run(async () => {
+      const { data, error } = await this.db.rpc('post_refund', {
+        p_order_id: orderId,
+        p_amount: amount,
+        p_method_code: methodCode,
+        p_reason: reason,
+      });
+      if (error) throw rpcError(error);
+      return data;
     });
-    if (error) throw rpcError(error);
-    this.parties.invalidateFinancials();
-    return data;
+    if (outcome.status === 'completed') this.parties.invalidateFinancials();
+    return outcome;
   }
 
-  async reversePayment(paymentId: string): Promise<string> {
-    const { data, error } = await this.db.rpc('post_payment_reversal', {
-      p_payment_id: paymentId,
+  async reversePayment(paymentId: string, reason: string): Promise<ActionOutcome> {
+    const outcome = await this.actions.run(async () => {
+      const { data, error } = await this.db.rpc('post_payment_reversal', {
+        p_payment_id: paymentId,
+        p_reason: reason,
+      });
+      if (error) throw rpcError(error);
+      return data;
     });
-    if (error) throw rpcError(error);
-    this.parties.invalidateFinancials();
-    return data;
+    if (outcome.status === 'completed') this.parties.invalidateFinancials();
+    return outcome;
   }
 
   async adjustCustomerBalance(customerId: string, amount: number, reason: string): Promise<string> {
@@ -568,6 +577,28 @@ export class MoneyService {
     if (error) throw rpcError(error);
     this.parties.invalidate();
     return data;
+  }
+
+  async changeCustomerCredit(
+    customerId: string,
+    creditLimit: number,
+    isApproved: boolean,
+    termsDays: number,
+    reason: string
+  ): Promise<ActionOutcome> {
+    const outcome = await this.actions.run(async () => {
+      const { data, error } = await this.db.rpc('change_customer_credit', {
+        p_customer_id: customerId,
+        p_credit_limit: creditLimit,
+        p_is_approved: isApproved,
+        p_terms_days: termsDays,
+        p_reason: reason,
+      });
+      if (error) throw rpcError(error);
+      return data;
+    });
+    this.parties.invalidate();
+    return outcome;
   }
 
   async updateSupplierCredit(
