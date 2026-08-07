@@ -72,6 +72,9 @@ export type OrderLineWithProduct = OrderLine & {
   label: string;
   manufacturer_name: string | null;
   sku: string | null;
+  wholesale_price: number | null;
+  stock: number;
+  track_inventory: boolean;
 };
 
 /** One enabled tender method from `available_payment_methods` (credit excluded). */
@@ -484,6 +487,7 @@ export class PosService {
     pageSize: number;
     sortBy?: 'created_at' | 'cashier_pending_at' | 'code' | 'total' | 'status';
     sortDirection?: 'asc' | 'desc';
+    cashierQueueOnly?: boolean;
   }): Promise<{ rows: OrderWithCustomer[]; count: number }> {
     let customerIds: string[] = [];
     const term = input.search?.trim().replace(/[%_,()]/g, ' ') ?? '';
@@ -503,6 +507,7 @@ export class PosService {
       .in('status', input.statuses);
     if (input.since) query = query.gte('created_at', input.since);
     if (input.until) query = query.lt('created_at', input.until);
+    if (input.cashierQueueOnly) query = query.not('cashier_pending_at', 'is', null);
     if (term) {
       const customerFilter = customerIds.length ? `,customer_id.in.(${customerIds.join(',')})` : '';
       query = query.or(`code.ilike.%${term}%${customerFilter}`);
@@ -531,6 +536,7 @@ export class PosService {
       .eq('location_id', this.locations.requireActiveId())
       .eq('status', 'pending_payment')
       .eq('created_by', userId)
+      .not('cashier_pending_at', 'is', null)
       .order('cashier_pending_at', { ascending: true })
       .limit(limit);
     if (error) throw error;
@@ -557,7 +563,7 @@ export class PosService {
       .eq('order_id', orderId);
     if (error) throw error;
     const ids = [...new Set(data.map(l => l.variant_id))];
-    const variants = await this.variantsByIds(ids);
+    const variants = await this.variantsByIdsWithStock(ids);
     const byId = new Map(variants.map(v => [v.variant_id, v]));
     return data.map(l => {
       const v = byId.get(l.variant_id);
@@ -566,6 +572,9 @@ export class PosService {
         label: v ? variantLabel(v) : l.variant_id.slice(0, 8),
         manufacturer_name: v?.manufacturer_name ?? null,
         sku: v?.sku ?? null,
+        wholesale_price: v?.wholesale_price ?? null,
+        stock: v?.stock ?? 0,
+        track_inventory: v?.track_inventory ?? false,
       };
     });
   }
@@ -637,7 +646,8 @@ export class PosService {
     park: boolean,
     clientRef?: string,
     locationId?: string,
-    draftId?: string
+    draftId?: string,
+    approvalReason?: string
   ): Promise<PostSaleResult> {
     const { data, error } = await this.client.rpc('post_sale_at_location', {
       p_location_id: locationId ?? this.locations.requireActiveId(),
@@ -650,6 +660,7 @@ export class PosService {
       ...(clientRef ? { p_client_ref: clientRef } : {}),
       // Proforma being converted: deleted atomically with the posted sale.
       ...(draftId ? { p_draft_id: draftId } : {}),
+      ...(approvalReason ? { p_approval_reason: approvalReason } : {}),
     });
     if (error) throw rpcError(error);
     const result = data as { status: string; order_id: string; approval_id?: string };

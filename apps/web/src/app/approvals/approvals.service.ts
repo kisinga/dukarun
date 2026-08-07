@@ -31,7 +31,7 @@ export class ApprovalsService implements OnDestroy {
   constructor() {
     effect(() => {
       const identity = this.supabase.offlineIdentity();
-      const canReadInbox = this.permissions.ready() && this.permissions.has('ManageApprovals');
+      const canReadInbox = this.canReadInbox();
       this.stopRealtime();
       this.pending.set([]);
       this.decided.set([]);
@@ -63,7 +63,7 @@ export class ApprovalsService implements OnDestroy {
   }
 
   async refresh(): Promise<void> {
-    if (!this.permissions.ready() || !this.permissions.has('ManageApprovals')) {
+    if (!this.canReadInbox()) {
       this.pending.set([]);
       this.decided.set([]);
       return;
@@ -149,6 +149,30 @@ export class ApprovalsService implements OnDestroy {
     return data;
   }
 
+  async forCustomer(customerId: string): Promise<Approval[]> {
+    const { data, error } = await this.db
+      .from('approvals')
+      .select('*')
+      .eq('type', 'customer_credit')
+      .eq('subject_id', customerId)
+      .order('created_at', { ascending: false });
+    if (error) throw rpcError(error);
+    return data;
+  }
+
+  async forCustomers(customerIds: string[]): Promise<Approval[]> {
+    if (customerIds.length === 0) return [];
+    const { data, error } = await this.db
+      .from('approvals')
+      .select('*')
+      .eq('type', 'customer_credit')
+      .in('subject_id', customerIds)
+      .order('created_at', { ascending: false })
+      .limit(500);
+    if (error) throw rpcError(error);
+    return data;
+  }
+
   async staffNames(userIds: Array<string | null>): Promise<Map<string, string>> {
     const ids = [...new Set(userIds.filter((id): id is string => !!id))];
     if (ids.length === 0) return new Map();
@@ -190,6 +214,21 @@ export class ApprovalsService implements OnDestroy {
     return new Map((data ?? []).map(o => [o.id, o.code]));
   }
 
+  async customerNames(ids: string[]): Promise<Map<string, string>> {
+    if (ids.length === 0) return new Map();
+    const { data, error } = await this.db
+      .from('customers')
+      .select('id, first_name, last_name')
+      .in('id', ids);
+    if (error) throw rpcError(error);
+    return new Map(
+      data.map(customer => [
+        customer.id,
+        [customer.first_name, customer.last_name].filter(Boolean).join(' '),
+      ])
+    );
+  }
+
   private stopRealtime(): void {
     if (!this.channel) return;
     void this.db.removeChannel(this.channel);
@@ -200,5 +239,12 @@ export class ApprovalsService implements OnDestroy {
     void this.refresh().catch(error => {
       this.error.set(error instanceof Error ? error.message : 'Failed to load approvals');
     });
+  }
+
+  private canReadInbox(): boolean {
+    return (
+      this.permissions.ready() &&
+      (this.permissions.has('ManageApprovals') || this.permissions.has('ViewFinancials'))
+    );
   }
 }

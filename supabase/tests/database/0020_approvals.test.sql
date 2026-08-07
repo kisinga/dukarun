@@ -173,6 +173,7 @@ select id from public.approvals
 where type = 'below_wholesale' and status = 'pending'
   and metadata ->> 'order_id' = (select order_id::text from deny_draft);
 
+select testkit.as_user((select company_id from ap_company), '33333333-3333-3333-3333-333333333333', 'Approver');
 select public.deny_request((select id from deny_approval), 'too low');
 
 select is(

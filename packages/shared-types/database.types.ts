@@ -4690,6 +4690,10 @@ export type Database = {
         Args: { p_approval_id: string; p_reason?: string }
         Returns: string
       }
+      assert_approval_authority: {
+        Args: { p_type: string }
+        Returns: undefined
+      }
       assert_entitled: {
         Args: { p_check?: string; p_company_id: string }
         Returns: undefined
@@ -4725,10 +4729,21 @@ export type Database = {
         }
         Returns: Json
       }
+      can_approve_request_type: { Args: { p_type: string }; Returns: boolean }
       cancel_purchase_draft: { Args: { p_draft_id: string }; Returns: string }
       cashier_session_required_for_source: {
         Args: { p_source_type: string }
         Returns: boolean
+      }
+      change_customer_credit: {
+        Args: {
+          p_credit_limit: number
+          p_customer_id: string
+          p_is_approved: boolean
+          p_reason: string
+          p_terms_days: number
+        }
+        Returns: Json
       }
       close_accounting_period: { Args: { p_end_date: string }; Returns: string }
       close_cashier_session: {
@@ -4909,6 +4924,14 @@ export type Database = {
         }
         Returns: string
       }
+      expire_approval_request: {
+        Args: {
+          p_approval_id: string
+          p_reason: string
+          p_void_held_order?: boolean
+        }
+        Returns: undefined
+      }
       expire_proformas: { Args: never; Returns: number }
       feature_enabled: {
         Args: { p_company_id: string; p_feature: string }
@@ -5026,6 +5049,10 @@ export type Database = {
           p_user_id?: string
         }
         Returns: string
+      }
+      notify_approval_approvers: {
+        Args: { p_approval_id: string }
+        Returns: undefined
       }
       notify_approval_requester: {
         Args: { p_approval_id: string }
@@ -5246,6 +5273,7 @@ export type Database = {
       }
       post_sale_at_location: {
         Args: {
+          p_approval_reason?: string
           p_client_ref?: string
           p_customer_id: string
           p_draft_id?: string
@@ -5866,6 +5894,10 @@ export type Database = {
           p_wholesale_price?: number
         }
         Returns: string
+      }
+      void_approval_held_order: {
+        Args: { p_order_id: string; p_reason: string }
+        Returns: undefined
       }
       void_sale: {
         Args: { p_order_id: string; p_reason: string }

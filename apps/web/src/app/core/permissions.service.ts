@@ -27,7 +27,12 @@ export const ALL_PERMISSIONS = [
 ] as const;
 
 export type Permission = (typeof ALL_PERMISSIONS)[number];
-export type ActionKey = 'sale.void' | 'sale.refund' | 'payment.reverse';
+export type ActionKey =
+  | 'sale.void'
+  | 'sale.refund'
+  | 'payment.reverse'
+  | 'sale.credit_over_limit'
+  | 'customer.credit.update';
 export type ActionMode = 'execute' | 'request' | 'blocked';
 export type AccessState = 'loading' | 'ready' | 'error';
 
@@ -76,12 +81,14 @@ export class PermissionsService {
     'sale.void': 'blocked',
     'sale.refund': 'blocked',
     'payment.reverse': 'blocked',
+    'sale.credit_over_limit': 'blocked',
+    'customer.credit.update': 'blocked',
   });
   readonly state = signal<AccessState>('loading');
   readonly error = signal<string | null>(null);
   readonly ready = computed(() => {
     const identity = this.supabase.offlineIdentity();
-    const key = identity ? `${identity.companyId}:${identity.userId}` : null;
+    const key = this.contextKeyFor(identity, this.supabase.session()?.access_token ?? null);
     return this.state() === 'ready' && key !== null && key === this.contextKey;
   });
 
@@ -92,7 +99,8 @@ export class PermissionsService {
   constructor() {
     effect(() => {
       const identity = this.supabase.offlineIdentity();
-      void this.loadFor(identity);
+      const accessToken = this.supabase.session()?.access_token ?? null;
+      void this.loadFor(identity, accessToken);
     });
   }
 
@@ -106,18 +114,30 @@ export class PermissionsService {
 
   async ensureLoaded(): Promise<boolean> {
     if (this.ready()) return true;
-    await this.loadFor(this.supabase.offlineIdentity());
+    await this.loadFor(
+      this.supabase.offlineIdentity(),
+      this.supabase.session()?.access_token ?? null
+    );
     return this.ready();
   }
 
   async refresh(): Promise<void> {
-    await this.loadFor(this.supabase.offlineIdentity(), true);
+    await this.loadFor(
+      this.supabase.offlineIdentity(),
+      this.supabase.session()?.access_token ?? null,
+      true
+    );
   }
 
-  private loadFor(identity: AppIdentity | null, force = false): Promise<void> {
-    const key = identity ? `${identity.companyId}:${identity.userId}` : null;
+  private loadFor(
+    identity: AppIdentity | null,
+    accessToken: string | null,
+    force = false
+  ): Promise<void> {
+    const key = this.contextKeyFor(identity, accessToken);
     if (!force && key === this.contextKey) {
-      return this.currentLoad ?? Promise.resolve();
+      if (this.currentLoad) return this.currentLoad;
+      if (this.state() === 'ready' || !identity) return Promise.resolve();
     }
 
     const sequence = ++this.sequence;
@@ -135,12 +155,20 @@ export class PermissionsService {
     return load;
   }
 
+  private contextKeyFor(identity: AppIdentity | null, accessToken: string | null): string | null {
+    return identity && accessToken
+      ? `${identity.companyId}:${identity.userId}:${accessToken}`
+      : null;
+  }
+
   private clear(): void {
     this.granted.set(new Set());
     this.actions.set({
       'sale.void': 'blocked',
       'sale.refund': 'blocked',
       'payment.reverse': 'blocked',
+      'sale.credit_over_limit': 'blocked',
+      'customer.credit.update': 'blocked',
     });
     this.error.set(null);
     this.state.set('loading');

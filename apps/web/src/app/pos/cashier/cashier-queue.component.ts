@@ -579,6 +579,7 @@ export class CashierQueueComponent implements OnInit, OnDestroy {
         pageSize: this.pageSize(),
         sortBy: this.queueSort() as 'cashier_pending_at' | 'code' | 'total',
         sortDirection: this.queueSortDirection(),
+        cashierQueueOnly: true,
       });
       this.parked.set(result.rows);
       this.totalItems.set(result.count);

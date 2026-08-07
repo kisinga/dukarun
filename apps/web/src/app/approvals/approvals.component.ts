@@ -327,6 +327,7 @@ export class ApprovalsComponent implements OnInit, OnDestroy {
 
   private readonly orderCodeMap = signal<Map<string, string>>(new Map());
   private readonly variantLabelMap = signal<Map<string, string>>(new Map());
+  private readonly customerNameMap = signal<Map<string, string>>(new Map());
   private readonly staffNameMap = signal<Map<string, string>>(new Map());
   private routeSubscription: Subscription | null = null;
   private routeLoadSequence = 0;
@@ -405,6 +406,16 @@ export class ApprovalsComponent implements OnInit, OnDestroy {
       ];
       this.orderCodeMap.set(await this.approvals.orderCodes(orderIds));
 
+      const customerIds = [
+        ...new Set(
+          rows
+            .filter(approval => approval.type === 'customer_credit')
+            .map(approval => approval.subject_id)
+            .filter((id): id is string => !!id)
+        ),
+      ];
+      this.customerNameMap.set(await this.approvals.customerNames(customerIds));
+
       const variantIds = [
         ...new Set(
           rows
@@ -455,6 +466,9 @@ export class ApprovalsComponent implements OnInit, OnDestroy {
       payment_id?: string;
       amount?: number;
       method_code?: string;
+      projected_balance?: number;
+      previous?: { credit_limit: number; is_credit_approved: boolean; credit_terms_days: number };
+      proposed?: { credit_limit: number; is_credit_approved: boolean; credit_terms_days: number };
     };
     const code = meta.order_id ? this.orderCode(meta.order_id) : null;
     switch (a.type) {
@@ -482,7 +496,13 @@ export class ApprovalsComponent implements OnInit, OnDestroy {
         return `Below-wholesale sale ${code ?? ''} — ${lines}`;
       }
       case 'overdraft':
-        return `Credit sale ${code ?? ''} of ${formatKes(meta.order_total ?? 0)} — balance ${formatKes(meta.ar_balance ?? 0)} vs limit ${formatKes(meta.credit_limit ?? 0)}`;
+        return `Credit sale ${code ?? ''} of ${formatKes(meta.order_total ?? 0)} — projected ${formatKes(meta.projected_balance ?? (meta.ar_balance ?? 0) + (meta.order_total ?? 0))} vs limit ${formatKes(meta.credit_limit ?? 0)}`;
+      case 'customer_credit': {
+        const customer = a.subject_id
+          ? (this.customerNameMap().get(a.subject_id) ?? `customer …${a.subject_id.slice(-8)}`)
+          : 'customer';
+        return `Change ${customer} to ${meta.proposed?.is_credit_approved ? 'approved' : 'not approved'}, ${formatKes(meta.proposed?.credit_limit ?? 0)} limit, ${meta.proposed?.credit_terms_days ?? 0}d terms${meta.reason ? ` — ${meta.reason}` : ''}`;
+      }
       default:
         return code ?? a.type;
     }

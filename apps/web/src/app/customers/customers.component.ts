@@ -1,5 +1,7 @@
 import { Component, OnInit, computed, inject, signal, viewChild } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
+import { ActivatedRoute, Router } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { formatKes, formatKesInput, parseKes } from '../core/money';
 import { reconciliationLabel, reconciliationTypeForCode } from '../core/payment-methods';
 import { PermissionsService } from '../core/permissions.service';
@@ -38,6 +40,7 @@ import { StatBarComponent } from '../shared/ui/stat-bar.component';
 import { StatCardComponent } from '../shared/ui/stat-card.component';
 import { DeleteConfirmationModalComponent } from '../shared/ui/delete-confirmation-modal.component';
 import { PartyCacheService } from '../core/party-cache.service';
+import { Approval, ApprovalsService } from '../approvals/approvals.service';
 
 type CustomerWithAr = MoneyCustomer & { ar_balance: number } & AgingInfo;
 type CreditOrder = {
@@ -194,6 +197,17 @@ type CreditOrder = {
                           [type]="c.is_credit_approved ? 'success' : 'neutral'"
                           [label]="c.is_credit_approved ? 'Approved' : 'Not approved'"
                         />
+                        @if (latestCustomerApproval(c.id); as approval) {
+                          <app-status-badge
+                            size="xs"
+                            [type]="approvalTone(approval.status)"
+                            [label]="
+                              approval.status === 'pending'
+                                ? 'Policy change pending'
+                                : 'Policy ' + approval.status
+                            "
+                          />
+                        }
                       </div>
                       <p class="table-secondary">
                         @if (c.credit_limit > 0) {
@@ -290,6 +304,17 @@ type CreditOrder = {
                   <span class="font-semibold">{{ name(c) }}</span>
                   @if (c.deleted_at) {
                     <app-status-badge size="xs" type="error" label="Deleted" />
+                  }
+                  @if (latestCustomerApproval(c.id); as approval) {
+                    <app-status-badge
+                      size="xs"
+                      [type]="approvalTone(approval.status)"
+                      [label]="
+                        approval.status === 'pending'
+                          ? 'Policy change pending'
+                          : 'Policy ' + approval.status
+                      "
+                    />
                   }
                   <span class="text-xs text-base-content/60">{{ c.phone ?? '' }}</span>
                   <span
@@ -537,8 +562,17 @@ type CreditOrder = {
                           [label]="c.bucket ?? 'current'"
                         />
                       }
+                      @if (pendingCreditApproval(); as pending) {
+                        <app-status-badge
+                          size="xs"
+                          type="warning"
+                          label="Change pending approval"
+                        />
+                      }
                     </div>
-                    @if (!c.deleted_at && perms.has('ManageCustomerCreditLimit')) {
+                    @if (
+                      !c.deleted_at && perms.actionMode('customer.credit.update') !== 'blocked'
+                    ) {
                       <form
                         (submit)="$event.preventDefault(); saveCredit(c)"
                         class="mt-3 flex flex-col gap-2"
@@ -569,18 +603,75 @@ type CreditOrder = {
                           />
                           <span class="label-text">Approved for credit</span>
                         </label>
+                        <app-form-field
+                          label="Reason"
+                          [required]="true"
+                          hint="Included in the approval history."
+                        >
+                          <textarea
+                            class="textarea textarea-bordered min-h-20 w-full"
+                            [formControl]="creditReason"
+                            placeholder="Why is this policy changing?"
+                          ></textarea>
+                        </app-form-field>
                         <button
                           appButton
                           variant="outline"
                           type="submit"
                           class="self-start"
-                          [disabled]="busy()"
+                          [disabled]="
+                            busy() ||
+                            creditReason.value.trim().length === 0 ||
+                            !!pendingCreditApproval()
+                          "
                         >
-                          Save settings
+                          {{
+                            perms.actionMode('customer.credit.update') === 'execute'
+                              ? 'Save settings'
+                              : 'Request change'
+                          }}
                         </button>
                       </form>
                     }
                   </section>
+
+                  @if (customerApprovals().length > 0) {
+                    <section class="border-t border-base-300/60 pt-3">
+                      <h3 class="section-title mb-2">Credit-policy activity</h3>
+                      <ol class="flex flex-col gap-2">
+                        @for (approval of customerApprovals(); track approval.id) {
+                          <li
+                            class="rounded-field border border-base-300 p-3"
+                            [class.ring-2]="highlightedApprovalId() === approval.id"
+                            [class.ring-primary]="highlightedApprovalId() === approval.id"
+                          >
+                            <div class="flex items-center justify-between gap-2">
+                              <app-status-badge
+                                size="xs"
+                                [type]="approvalTone(approval.status)"
+                                [label]="approval.status"
+                              />
+                              <span class="type-caption">{{
+                                date(approval.decided_at ?? approval.created_at)
+                              }}</span>
+                            </div>
+                            <p class="mt-2 text-sm">{{ approvalReason(approval) }}</p>
+                            <p class="type-caption mt-1">
+                              Requested by {{ approvalPerson(approval.requested_by) }}
+                              @if (approval.decided_by) {
+                                · Decided by {{ approvalPerson(approval.decided_by) }}
+                              }
+                            </p>
+                            @if (approval.decision_reason) {
+                              <p class="type-caption mt-1">
+                                Decision: {{ approval.decision_reason }}
+                              </p>
+                            }
+                          </li>
+                        }
+                      </ol>
+                    </section>
+                  }
 
                   <section class="border-t border-base-300/60 pt-3">
                     <h3 class="section-title mb-2">Credit sales</h3>
@@ -878,6 +969,9 @@ export class CustomersComponent implements OnInit {
   private readonly pos = inject(PosService);
   private readonly receiptData = inject(ReceiptDataService);
   protected readonly perms = inject(PermissionsService);
+  private readonly approvals = inject(ApprovalsService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   protected readonly fmtKes = formatKes;
 
   protected readonly customers = computed<CustomerWithAr[]>(() =>
@@ -888,6 +982,10 @@ export class CustomersComponent implements OnInit {
   protected readonly creditOrders = signal<CreditOrder[]>([]);
   protected readonly statement = signal<CustomerStatementRow[]>([]);
   protected readonly companyInfo = signal<CompanyPrintInfo | null>(null);
+  protected readonly customerApprovals = signal<Approval[]>([]);
+  protected readonly pageCustomerApprovals = signal<Map<string, Approval>>(new Map());
+  protected readonly customerApprovalPeople = signal<Map<string, string>>(new Map());
+  protected readonly highlightedApprovalId = signal<string | null>(null);
   protected readonly methods = signal<string[]>([]);
   protected readonly repayFor = signal<string | null>(null);
   protected readonly detailLoading = signal(false);
@@ -935,6 +1033,7 @@ export class CustomersComponent implements OnInit {
   protected readonly creditLimit = new FormControl('', { nonNullable: true });
   protected readonly termsDays = new FormControl(0, { nonNullable: true });
   protected readonly approved = new FormControl(false, { nonNullable: true });
+  protected readonly creditReason = new FormControl('', { nonNullable: true });
 
   protected readonly busy = signal(false);
   protected readonly loading = signal(false);
@@ -942,6 +1041,19 @@ export class CustomersComponent implements OnInit {
   protected readonly notice = signal<string | null>(null);
   protected readonly deletingCustomer = signal<CustomerWithAr | null>(null);
   private readonly deleteModal = viewChild(DeleteConfirmationModalComponent);
+  protected readonly pendingCreditApproval = computed(
+    () => this.customerApprovals().find(approval => approval.status === 'pending') ?? null
+  );
+
+  constructor() {
+    this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe(params => {
+      const customerId = params.get('customer');
+      const approvalId = params.get('approval');
+      this.highlightedApprovalId.set(approvalId);
+      if (customerId && (this.selectedCustomerId() !== customerId || approvalId))
+        void this.openCustomer(customerId, false);
+    });
+  }
 
   protected readonly filtered = computed(() => {
     const q = this.query().toLowerCase();
@@ -1055,6 +1167,15 @@ export class CustomersComponent implements OnInit {
     this.loading.set(true);
     try {
       await this.partyCache.ensureLoaded();
+      const approvals = await this.approvals.forCustomers(
+        this.customers().map(customer => customer.id)
+      );
+      const latest = new Map<string, Approval>();
+      for (const approval of approvals) {
+        if (approval.subject_id && !latest.has(approval.subject_id))
+          latest.set(approval.subject_id, approval);
+      }
+      this.pageCustomerApprovals.set(latest);
       this.error.set(null);
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Failed to load customers');
@@ -1063,25 +1184,30 @@ export class CustomersComponent implements OnInit {
     }
   }
 
-  protected async openCustomer(customerId: string): Promise<void> {
+  protected async openCustomer(customerId: string, updateUrl = true): Promise<void> {
     this.selectedCustomerId.set(customerId);
     this.repayFor.set(null);
     this.orders.set([]);
     this.creditOrders.set([]);
     this.statement.set([]);
+    this.customerApprovals.set([]);
     this.detailLoading.set(true);
-    const customer = this.customers().find(c => c.id === customerId);
+    const customer =
+      this.customers().find(c => c.id === customerId) ??
+      (await this.pos.customerWithCredit(customerId).catch(() => null));
     if (customer) {
       this.creditLimit.setValue(formatKesInput(customer.credit_limit));
       this.termsDays.setValue(customer.credit_terms_days ?? 0);
       this.approved.setValue(customer.is_credit_approved);
+      this.creditReason.setValue('');
     }
     try {
-      const [orders, creditOrders, statement, company] = await Promise.all([
+      const [orders, creditOrders, statement, company, approvals] = await Promise.all([
         this.pos.customerOrders(customerId),
         this.money.creditOrders(customerId),
         this.money.customerStatement(customerId),
         this.receiptData.companyPrintInfo().catch(() => null),
+        this.approvals.forCustomer(customerId),
       ]);
       // Ignore stale results when the drawer was closed (or reopened) meanwhile.
       if (this.selectedCustomerId() !== customerId) return;
@@ -1089,6 +1215,20 @@ export class CustomersComponent implements OnInit {
       this.creditOrders.set(creditOrders);
       this.statement.set(statement);
       this.companyInfo.set(company);
+      this.customerApprovals.set(approvals);
+      this.customerApprovalPeople.set(
+        await this.approvals.staffNames(
+          approvals.flatMap(approval => [approval.requested_by, approval.decided_by])
+        )
+      );
+      if (updateUrl) {
+        void this.router.navigate([], {
+          relativeTo: this.route,
+          queryParams: { customer: customerId, approval: null },
+          queryParamsHandling: 'merge',
+          replaceUrl: true,
+        });
+      }
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Failed to load sales');
     } finally {
@@ -1107,6 +1247,15 @@ export class CustomersComponent implements OnInit {
     this.orders.set([]);
     this.creditOrders.set([]);
     this.statement.set([]);
+    this.customerApprovals.set([]);
+    this.customerApprovalPeople.set(new Map());
+    this.highlightedApprovalId.set(null);
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { customer: null, approval: null },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
   }
 
   /** Edit in place: flip the open drawer to its form without closing it. */
@@ -1377,18 +1526,33 @@ export class CustomersComponent implements OnInit {
       this.error.set('Enter a valid credit limit');
       return;
     }
+    if (!this.creditReason.value.trim()) {
+      this.error.set('Enter a reason for the credit-policy change');
+      return;
+    }
     this.busy.set(true);
     this.error.set(null);
     this.notice.set(null);
     try {
-      await this.money.updateCustomerCredit(
+      const outcome = await this.money.changeCustomerCredit(
         c.id,
         limitAmount,
         this.approved.value,
-        this.termsDays.value > 0 ? this.termsDays.value : undefined
+        Math.max(0, this.termsDays.value),
+        this.creditReason.value.trim()
       );
-      this.notice.set(`Credit settings saved for ${this.name(c)}`);
+      this.creditReason.setValue('');
+      this.notice.set(
+        outcome.status === 'approval_required'
+          ? `Credit-policy change sent for approval for ${this.name(c)}`
+          : `Credit settings saved for ${this.name(c)}`
+      );
       await this.load();
+      const approvals = await this.approvals.forCustomer(c.id);
+      this.customerApprovals.set(approvals);
+      if (approvals[0]) {
+        this.pageCustomerApprovals.update(rows => new Map(rows).set(c.id, approvals[0]));
+      }
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Save failed');
     } finally {
@@ -1398,6 +1562,26 @@ export class CustomersComponent implements OnInit {
 
   protected customerCreditAvailable(customer: CustomerWithAr): number {
     return Math.max(0, customer.credit_limit - customer.ar_balance);
+  }
+
+  protected approvalTone(status: Approval['status']): BadgeType {
+    if (status === 'approved') return 'success';
+    if (status === 'pending') return 'warning';
+    if (status === 'denied' || status === 'expired') return 'error';
+    return 'neutral';
+  }
+
+  protected approvalReason(approval: Approval): string {
+    return (approval.metadata as { reason?: string }).reason ?? 'Credit policy change';
+  }
+
+  protected approvalPerson(userId: string | null): string {
+    if (!userId) return 'Unknown user';
+    return this.customerApprovalPeople().get(userId) ?? `User …${userId.slice(-4)}`;
+  }
+
+  protected latestCustomerApproval(customerId: string): Approval | null {
+    return this.pageCustomerApprovals().get(customerId) ?? null;
   }
 
   protected orderStatusType(status: string): BadgeType {

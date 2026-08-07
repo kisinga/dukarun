@@ -579,6 +579,28 @@ export class MoneyService {
     return data;
   }
 
+  async changeCustomerCredit(
+    customerId: string,
+    creditLimit: number,
+    isApproved: boolean,
+    termsDays: number,
+    reason: string
+  ): Promise<ActionOutcome> {
+    const outcome = await this.actions.run(async () => {
+      const { data, error } = await this.db.rpc('change_customer_credit', {
+        p_customer_id: customerId,
+        p_credit_limit: creditLimit,
+        p_is_approved: isApproved,
+        p_terms_days: termsDays,
+        p_reason: reason,
+      });
+      if (error) throw rpcError(error);
+      return data;
+    });
+    this.parties.invalidate();
+    return outcome;
+  }
+
   async updateSupplierCredit(
     supplierId: string,
     creditLimit: number,

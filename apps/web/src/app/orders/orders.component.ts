@@ -173,7 +173,7 @@ const SALE_SORT_OPTIONS: readonly ListSortOption[] = [
                   <span class="text-sm">{{ customerName(order) }}</span>
                   <app-status-badge
                     [type]="statusType(order.status)"
-                    [label]="statusLabel(order.status)"
+                    [label]="statusLabel(order.status, order.id)"
                   />
                   @if (order.is_credit_sale) {
                     <app-status-badge
@@ -197,7 +197,12 @@ const SALE_SORT_OPTIONS: readonly ListSortOption[] = [
                   <span class="ml-auto font-bold tabular-nums"
                     ><app-money [amount]="order.total"
                   /></span>
-                  @if (order.status === 'pending_payment' && permissions.has('SettleOrder')) {
+                  @if (
+                    order.status === 'pending_payment' &&
+                    order.cashier_pending_at &&
+                    permissions.has('SettleOrder') &&
+                    !pendingApprovalHold(order.id)
+                  ) {
                     <a
                       appButton
                       variant="soft"
@@ -265,7 +270,7 @@ const SALE_SORT_OPTIONS: readonly ListSortOption[] = [
                     <td>
                       <app-status-badge
                         [type]="statusType(order.status)"
-                        [label]="statusLabel(order.status)"
+                        [label]="statusLabel(order.status, order.id)"
                       />
                       @if (order.is_credit_sale) {
                         <app-status-badge
@@ -307,7 +312,10 @@ const SALE_SORT_OPTIONS: readonly ListSortOption[] = [
                           <app-icon name="heroPrinter" />
                         </button>
                       } @else if (
-                        order.status === 'pending_payment' && permissions.has('SettleOrder')
+                        order.status === 'pending_payment' &&
+                        order.cashier_pending_at &&
+                        permissions.has('SettleOrder') &&
+                        !pendingApprovalHold(order.id)
                       ) {
                         <a
                           appButton
@@ -382,7 +390,7 @@ const SALE_SORT_OPTIONS: readonly ListSortOption[] = [
               <app-status-badge
                 size="xs"
                 [type]="statusType(order.status)"
-                [label]="statusLabel(order.status)"
+                [label]="statusLabel(order.status, order.id)"
               />
               @if (order.is_credit_sale) {
                 <app-status-badge
@@ -588,7 +596,12 @@ const SALE_SORT_OPTIONS: readonly ListSortOption[] = [
 
                 @if (order.status === 'pending_payment' || order.status === 'draft') {
                   <section class="border-t border-base-300/60 pt-3">
-                    @if (order.status === 'pending_payment' && permissions.has('SettleOrder')) {
+                    @if (
+                      order.status === 'pending_payment' &&
+                      order.cashier_pending_at &&
+                      permissions.has('SettleOrder') &&
+                      !pendingApprovalHold(order.id)
+                    ) {
                       <a appButton variant="soft" size="sm" routerLink="/pos/cashier">
                         <app-icon name="heroBanknotes" />
                         Collect payment
@@ -1246,9 +1259,14 @@ export class OrdersComponent implements OnInit, OnDestroy {
     return type === '—' ? code : `${code} · ${type}`;
   }
 
-  protected statusLabel(status: string): string {
+  protected statusLabel(status: string, orderId?: string): string {
     switch (status) {
       case 'pending_payment':
+        if (orderId) {
+          const hold = this.pendingApprovalHold(orderId);
+          if (hold?.type === 'overdraft') return 'Credit approval pending';
+          if (hold?.type === 'external_account_payment') return 'Payment approval pending';
+        }
         return 'Cashier queue';
       case 'draft':
         return 'Proforma';
@@ -1264,7 +1282,12 @@ export class OrdersComponent implements OnInit, OnDestroy {
   }
 
   protected paymentLabel(order: OrderWithCustomer): string {
-    if (order.status === 'pending_payment') return 'Awaiting payment';
+    if (order.status === 'pending_payment') {
+      const hold = this.pendingApprovalHold(order.id);
+      if (hold?.type === 'overdraft') return 'Credit approval pending';
+      if (hold?.type === 'external_account_payment') return 'Payment approval pending';
+      return 'Awaiting payment';
+    }
     if (order.status === 'draft') return 'Not posted';
     if (order.status === 'expired') return 'Expired';
     if (order.status === 'voided') return 'Voided';
@@ -1273,6 +1296,16 @@ export class OrdersComponent implements OnInit, OnDestroy {
     if (paid <= 0) return 'Credit · Unpaid';
     if (paid >= order.total) return 'Credit · Settled';
     return `Credit · Part-paid (${formatKes(paid)} of ${formatKes(order.total)})`;
+  }
+
+  protected pendingApprovalHold(orderId: string): Approval | null {
+    return (
+      (this.pageApprovals().get(orderId) ?? []).find(
+        approval =>
+          approval.status === 'pending' &&
+          ['overdraft', 'external_account_payment'].includes(approval.type)
+      ) ?? null
+    );
   }
 
   /** Badge for a credit sale: warning while anything is outstanding, success once settled. */

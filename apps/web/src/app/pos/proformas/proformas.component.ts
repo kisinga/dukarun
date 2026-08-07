@@ -1,6 +1,7 @@
 import { Component, OnDestroy, OnInit, computed, inject, signal, viewChild } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { Subscription } from 'rxjs';
 import { PageLayoutComponent } from '../../shared/ui/page-layout.component';
 import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
 import { formatKes } from '../../core/money';
@@ -31,6 +32,7 @@ import { DataTableShellComponent } from '../../shared/ui/data-table-shell.compon
 import { DrawerComponent } from '../../shared/ui/drawer.component';
 import { StatCardComponent } from '../../shared/ui/stat-card.component';
 import { MoneyComponent } from '../../shared/ui/money.component';
+import { Approval, ApprovalsService } from '../../approvals/approvals.service';
 
 const PROFORMA_STATUSES = ['draft', 'expired'];
 
@@ -89,15 +91,6 @@ const PROFORMA_SORT_OPTIONS: readonly ListSortOption[] = [
         <div role="alert" class="alert alert-error mb-3 text-sm">
           <app-icon name="heroExclamationTriangle" />
           <span>{{ error() }}</span>
-        </div>
-      }
-      @if (approvalPending()) {
-        <div role="status" class="alert alert-warning mb-3 text-sm">
-          <app-icon name="heroExclamationTriangle" />
-          <span>
-            This sale is waiting for a below-wholesale approval in the
-            <a routerLink="/approvals" class="link font-medium">Approvals inbox</a>.
-          </span>
         </div>
       }
       @if (notice()) {
@@ -196,6 +189,13 @@ const PROFORMA_SORT_OPTIONS: readonly ListSortOption[] = [
                         [type]="draft.status === 'expired' ? 'error' : 'info'"
                         [label]="draft.status === 'expired' ? 'Expired' : 'Active'"
                       />
+                      @if (draftApproval(draft.id); as approval) {
+                        <app-status-badge
+                          size="xs"
+                          [type]="approvalTone(approval.status)"
+                          [label]="approvalLabel(approval)"
+                        />
+                      }
                     </div>
                     <p class="type-caption mt-1">
                       {{ customerName(draft) }} · {{ time(draft.created_at) }}
@@ -250,10 +250,19 @@ const PROFORMA_SORT_OPTIONS: readonly ListSortOption[] = [
                       appButton
                       size="sm"
                       class="ml-auto"
-                      [disabled]="!cashierSession.canTakePayment() || busy()"
+                      [disabled]="
+                        !cashierSession.canTakePayment() ||
+                        busy() ||
+                        draftApproval(draft.id)?.status === 'pending'
+                      "
                       (click)="$event.stopPropagation(); startConversion(draft)"
                     >
-                      Convert to sale <app-icon name="heroArrowRight" />
+                      {{
+                        draftApproval(draft.id)?.status === 'approved'
+                          ? 'Continue checkout'
+                          : 'Convert to sale'
+                      }}
+                      <app-icon name="heroArrowRight" />
                     </button>
                   }
                 </div>
@@ -300,6 +309,14 @@ const PROFORMA_SORT_OPTIONS: readonly ListSortOption[] = [
                         [type]="draft.status === 'expired' ? 'error' : 'info'"
                         [label]="draft.status === 'expired' ? 'Expired' : 'Active'"
                       />
+                      @if (draftApproval(draft.id); as approval) {
+                        <app-status-badge
+                          class="ml-1"
+                          size="xs"
+                          [type]="approvalTone(approval.status)"
+                          [label]="approvalLabel(approval)"
+                        />
+                      }
                     </td>
                     <td [class.text-error]="draft.status === 'expired'">
                       {{ validityLabel(draft) }}
@@ -348,10 +365,19 @@ const PROFORMA_SORT_OPTIONS: readonly ListSortOption[] = [
                           appButton
                           size="sm"
                           class="ml-2"
-                          [disabled]="!cashierSession.canTakePayment() || busy()"
+                          [disabled]="
+                            !cashierSession.canTakePayment() ||
+                            busy() ||
+                            draftApproval(draft.id)?.status === 'pending'
+                          "
                           (click)="startConversion(draft)"
                         >
-                          Convert to sale <app-icon name="heroArrowRight" />
+                          {{
+                            draftApproval(draft.id)?.status === 'approved'
+                              ? 'Continue checkout'
+                              : 'Convert to sale'
+                          }}
+                          <app-icon name="heroArrowRight" />
                         </button>
                       }
                     </td>
@@ -433,6 +459,13 @@ const PROFORMA_SORT_OPTIONS: readonly ListSortOption[] = [
               [type]="draft.status === 'expired' ? 'error' : 'info'"
               [label]="draft.status === 'expired' ? 'Expired' : 'Active'"
             />
+            @if (draftApproval(draft.id); as approval) {
+              <app-status-badge
+                size="xs"
+                [type]="approvalTone(approval.status)"
+                [label]="approvalLabel(approval)"
+              />
+            }
             <span class="type-caption">{{ validityLabel(draft) }}</span>
           </div>
 
@@ -479,16 +512,47 @@ const PROFORMA_SORT_OPTIONS: readonly ListSortOption[] = [
 
               @if (draft.status === 'draft') {
                 <section class="border-t border-base-300/60 pt-3">
+                  @if (draftApproval(draft.id); as approval) {
+                    <div
+                      class="mb-3 rounded-field border border-base-300 p-3"
+                      [class.ring-2]="highlightedApprovalId() === approval.id"
+                      [class.ring-primary]="highlightedApprovalId() === approval.id"
+                    >
+                      <div class="flex items-center justify-between gap-2">
+                        <p class="text-sm font-semibold">{{ approvalLabel(approval) }}</p>
+                        <a
+                          appButton
+                          variant="ghost"
+                          size="sm"
+                          [routerLink]="['/approvals']"
+                          [queryParams]="{ approval: approval.id }"
+                          >View request</a
+                        >
+                      </div>
+                      @if (approval.decision_reason) {
+                        <p class="type-caption mt-1">{{ approval.decision_reason }}</p>
+                      }
+                    </div>
+                  }
                   @if (cashierSession.cashControlEnabled() && !cashierSession.isOpen()) {
                     <app-session-required-notice action="converting a proforma to a sale" />
                   }
                   <button
                     appButton
                     size="sm"
-                    [disabled]="!cashierSession.canTakePayment() || busy()"
+                    [disabled]="
+                      !cashierSession.canTakePayment() ||
+                      busy() ||
+                      draftApproval(draft.id)?.status === 'pending'
+                    "
                     (click)="convertFromPreview(draft)"
                   >
-                    Convert to sale <app-icon name="heroArrowRight" />
+                    {{
+                      draftApproval(draft.id)?.status === 'approved'
+                        ? 'Continue checkout'
+                        : 'Convert to sale'
+                    }}
+                    <app-icon name="heroArrowRight" />
                   </button>
                 </section>
               }
@@ -539,6 +603,8 @@ const PROFORMA_SORT_OPTIONS: readonly ListSortOption[] = [
 export class ProformasComponent implements OnInit, OnDestroy {
   private readonly pos = inject(PosService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
+  private readonly approvals = inject(ApprovalsService);
   private readonly receiptData = inject(ReceiptDataService);
   private readonly print = inject(PrintService);
   private readonly perms = inject(PermissionsService);
@@ -560,6 +626,8 @@ export class ProformasComponent implements OnInit, OnDestroy {
   protected readonly converting = signal<OrderWithCustomer | null>(null);
   protected readonly deleting = signal<OrderWithCustomer | null>(null);
   protected readonly selectedDraftId = signal<string | null>(null);
+  protected readonly highlightedApprovalId = signal<string | null>(null);
+  protected readonly draftApprovals = signal<Map<string, Approval>>(new Map());
   protected readonly previewLines = signal<OrderLineWithProduct[]>([]);
   protected readonly previewLoading = signal(false);
   protected readonly fmtKes = formatKes;
@@ -569,7 +637,6 @@ export class ProformasComponent implements OnInit, OnDestroy {
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
   protected readonly completedSale = signal<{ id: string; code: string } | null>(null);
-  protected readonly approvalPending = signal(false);
   protected readonly printerEnabled = signal(false);
   protected readonly directAccountNotice = signal(false);
   private directAccountTimer: ReturnType<typeof setTimeout> | null = null;
@@ -611,6 +678,7 @@ export class ProformasComponent implements OnInit, OnDestroy {
   }));
   private readonly deleteModal = viewChild(DeleteConfirmationModalComponent);
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
+  private routeSubscription: Subscription | null = null;
 
   async ngOnInit(): Promise<void> {
     this.printerEnabled.set(await this.receiptData.printerEnabled());
@@ -628,11 +696,15 @@ export class ProformasComponent implements OnInit, OnDestroy {
       // No methods configured yet; the panel will show an empty method list.
     }
     await this.load();
+    this.routeSubscription = this.route.queryParamMap.subscribe(params => {
+      void this.openRouteDraft(params.get('order'), params.get('approval'));
+    });
   }
 
   ngOnDestroy(): void {
     if (this.searchTimer) clearTimeout(this.searchTimer);
     if (this.directAccountTimer) clearTimeout(this.directAccountTimer);
+    this.routeSubscription?.unsubscribe();
   }
 
   /**
@@ -679,6 +751,14 @@ export class ProformasComponent implements OnInit, OnDestroy {
       });
       this.proformas.set(result.rows);
       this.totalItems.set(result.count);
+      const approvals = await this.approvals.forOrders(result.rows.map(row => row.id));
+      const latest = new Map<string, Approval>();
+      for (const approval of approvals.filter(item => item.type === 'below_wholesale')) {
+        const orderId =
+          (approval.metadata as { order_id?: string }).order_id ?? approval.subject_id;
+        if (orderId && !latest.has(orderId)) latest.set(orderId, approval);
+      }
+      this.draftApprovals.set(latest);
       this.error.set(null);
       void this.orderQueueCounts.refresh();
     } catch (err) {
@@ -739,15 +819,28 @@ export class ProformasComponent implements OnInit, OnDestroy {
     void this.router.navigate(['/pos/sell'], { queryParams: { draft: orderId } });
   }
 
-  protected async openPreview(orderId: string): Promise<void> {
+  protected async openPreview(orderId: string, updateUrl = true): Promise<void> {
     this.selectedDraftId.set(orderId);
     this.previewLines.set([]);
     this.previewLoading.set(true);
     try {
-      const lines = await this.pos.orderLines(orderId);
+      const [lines, history] = await Promise.all([
+        this.pos.orderLines(orderId),
+        this.approvals.forOrder(orderId).catch(() => []),
+      ]);
       // Ignore stale results when the drawer was closed (or reopened) meanwhile.
       if (this.selectedDraftId() !== orderId) return;
       this.previewLines.set(lines);
+      const latest = history.find(item => item.type === 'below_wholesale');
+      if (latest) this.draftApprovals.update(rows => new Map(rows).set(orderId, latest));
+      if (updateUrl) {
+        void this.router.navigate([], {
+          relativeTo: this.route,
+          queryParams: { order: orderId, approval: null },
+          queryParamsHandling: 'merge',
+          replaceUrl: true,
+        });
+      }
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Failed to load proforma lines');
     } finally {
@@ -756,10 +849,19 @@ export class ProformasComponent implements OnInit, OnDestroy {
   }
 
   /** Called by the drawer after its close transition finishes. */
-  protected closePreview(): void {
+  protected closePreview(updateUrl = true): void {
     this.selectedDraftId.set(null);
     this.previewLoading.set(false);
     this.previewLines.set([]);
+    this.highlightedApprovalId.set(null);
+    if (updateUrl) {
+      void this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams: { order: null, approval: null },
+        queryParamsHandling: 'merge',
+        replaceUrl: true,
+      });
+    }
   }
 
   /** Edit happens in the Sell workspace — close the preview first. */
@@ -831,7 +933,14 @@ export class ProformasComponent implements OnInit, OnDestroy {
         this.error.set(message);
       }
       // Below-wholesale drafts wait on an approval before they can complete.
-      this.approvalPending.set(message.includes('below_wholesale_approval_required'));
+      if (message.includes('below_wholesale_approval_required')) {
+        this.notice.set('This proforma is waiting for price approval.');
+        const history = await this.approvals.forOrder(orderId).catch(() => []);
+        const pending = history.find(
+          item => item.type === 'below_wholesale' && item.status === 'pending'
+        );
+        if (pending) this.draftApprovals.update(rows => new Map(rows).set(orderId, pending));
+      }
       this.converting.set(null);
     } finally {
       this.busy.set(false);
@@ -893,5 +1002,45 @@ export class ProformasComponent implements OnInit, OnDestroy {
       minute: '2-digit',
     });
     return order.status === 'expired' ? `Expired ${date}` : `Valid until ${date}`;
+  }
+
+  protected draftApproval(orderId: string): Approval | null {
+    return this.draftApprovals().get(orderId) ?? null;
+  }
+
+  protected approvalTone(status: Approval['status']): 'success' | 'warning' | 'error' | 'neutral' {
+    if (status === 'approved') return 'success';
+    if (status === 'pending') return 'warning';
+    if (status === 'denied' || status === 'expired') return 'error';
+    return 'neutral';
+  }
+
+  protected approvalLabel(approval: Approval): string {
+    if (approval.status === 'pending') return 'Price approval pending';
+    if (approval.status === 'approved') return 'Price approved';
+    if (approval.status === 'denied') return 'Price denied';
+    return 'Price approval expired';
+  }
+
+  private async openRouteDraft(orderId: string | null, approvalId: string | null): Promise<void> {
+    this.highlightedApprovalId.set(approvalId);
+    if (!orderId) {
+      if (this.selectedDraftId()) this.closePreview(false);
+      return;
+    }
+    if (!this.proformas().some(draft => draft.id === orderId)) {
+      try {
+        const linked = await this.pos.getOrder(orderId);
+        if (linked.status !== 'draft')
+          throw new Error('The linked record is no longer a proforma.');
+        this.proformas.update(rows => [linked, ...rows]);
+      } catch (error) {
+        this.error.set(
+          error instanceof Error ? error.message : 'The linked proforma could not be found.'
+        );
+        return;
+      }
+    }
+    if (this.selectedDraftId() !== orderId || approvalId) await this.openPreview(orderId, false);
   }
 }
