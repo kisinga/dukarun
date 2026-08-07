@@ -1,9 +1,20 @@
 import { Injectable, effect, inject, signal } from '@angular/core';
 import { SupabaseService } from './supabase.service';
 
-export type FeatureKey = 'multipleLocations' | 'staffPerformance' | 'commissions';
+export type FeatureKey =
+  | 'multipleLocations'
+  | 'staffPerformance'
+  | 'commissions'
+  | 'storefront'
+  | 'customerCampaigns'
+  | 'paymentReminders';
 export type LimitKey =
-  'maxTeamMembers' | 'maxProducts' | 'maxStockLocations' | 'maxOrdersPerMonth' | 'smsPerPeriod';
+  | 'maxTeamMembers'
+  | 'maxProducts'
+  | 'maxStockLocations'
+  | 'maxOrdersPerMonth'
+  | 'smsPerPeriod'
+  | 'whatsappPerPeriod';
 
 export interface EntitlementSnapshot {
   companyId: string;
@@ -13,6 +24,9 @@ export interface EntitlementSnapshot {
   features: Partial<Record<FeatureKey, boolean>> & Record<string, unknown>;
   settings: {
     commissionsEnabled: boolean;
+    paymentRemindersEnabled: boolean;
+    paymentReminderChannel: 'sms' | 'whatsapp';
+    paymentReminderSmsFallback: boolean;
   };
   limits: Partial<Record<LimitKey, number>> & Record<string, unknown>;
   usage: {
@@ -20,6 +34,9 @@ export interface EntitlementSnapshot {
     products: number;
     ordersThisMonth: number;
     teamMembers: number;
+    sms: { used: number; reserved: number; remaining: number | null };
+    whatsapp: { used: number; reserved: number; remaining: number | null };
+    periodEnd: string | null;
   };
 }
 

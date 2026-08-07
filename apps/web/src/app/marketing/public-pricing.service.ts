@@ -14,6 +14,10 @@ export type PublicSubscriptionPlan = Pick<
   | 'max_stock_locations'
   | 'max_orders_per_month'
   | 'sms_per_period'
+  | 'whatsapp_per_period'
+  | 'storefront_available'
+  | 'customer_campaigns_available'
+  | 'payment_reminders_available'
   | 'multiple_locations_enabled'
   | 'staff_performance_enabled'
   | 'commissions_available'
@@ -32,7 +36,7 @@ export class PublicPricingService {
     const { data, error } = await this.supabase.client
       .from('subscription_tiers')
       .select(
-        'id, code, name, price_monthly, price_yearly, max_team_members, max_products, max_stock_locations, max_orders_per_month, sms_per_period, multiple_locations_enabled, staff_performance_enabled, commissions_available'
+        'id, code, name, price_monthly, price_yearly, max_team_members, max_products, max_stock_locations, max_orders_per_month, sms_per_period, whatsapp_per_period, storefront_available, customer_campaigns_available, payment_reminders_available, multiple_locations_enabled, staff_performance_enabled, commissions_available'
       )
       .eq('is_active', true)
       .order('price_monthly');

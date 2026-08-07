@@ -628,6 +628,22 @@ export class MoneyService {
     return data;
   }
 
+  async updateCustomerCommunicationPreferences(
+    customerId: string,
+    enabled: boolean,
+    smsEnabled: boolean,
+    whatsappEnabled: boolean
+  ): Promise<void> {
+    const { error } = await this.db.rpc('update_customer_communication_preferences', {
+      p_customer_id: customerId,
+      p_enabled: enabled,
+      p_sms_enabled: smsEnabled,
+      p_whatsapp_enabled: whatsappEnabled,
+    });
+    if (error) throw rpcError(error);
+    this.parties.invalidate();
+  }
+
   async setCustomerDeleted(customerId: string, deleted: boolean): Promise<string> {
     const { data, error } = await this.db.rpc('set_customer_deleted', {
       p_customer_id: customerId,

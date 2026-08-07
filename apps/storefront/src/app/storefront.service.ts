@@ -7,6 +7,16 @@ export type StorefrontInfo = Database['public']['Views']['public_storefronts']['
 export type CatalogRow = Database['public']['Functions']['storefront_catalog']['Returns'][number];
 export type ShopCollection =
   Database['public']['Functions']['storefront_collections']['Returns'][number];
+export interface CustomerStatement {
+  store_name: string;
+  logo_path: string | null;
+  whatsapp_number: string | null;
+  payment_instructions: string | null;
+  customer_first_name: string;
+  outstanding_total: number;
+  expires_at: string;
+  orders: Array<{ code: string; sale_date: string; due_date: string; balance: number }>;
+}
 
 /**
  * Anonymous read-only access to the public storefront surface.
@@ -56,5 +66,11 @@ export class StorefrontService {
   imageUrl(path: string | null): string | null {
     if (!path) return null;
     return `${environment.supabaseUrl}/storage/v1/object/public/product-images/${path}`;
+  }
+
+  async customerStatement(token: string): Promise<CustomerStatement | null> {
+    const { data, error } = await this.client.rpc('public_customer_statement', { p_token: token });
+    if (error) throw error;
+    return data as unknown as CustomerStatement | null;
   }
 }

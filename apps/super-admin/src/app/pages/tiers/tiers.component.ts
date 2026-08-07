@@ -21,6 +21,11 @@ const LIMIT_FIELDS = [
   },
   { key: 'max_orders_per_month', label: 'Monthly sales', help: 'Non-voided sales per month.' },
   { key: 'sms_per_period', label: 'Monthly SMS', help: 'Messages in each monthly SMS period.' },
+  {
+    key: 'whatsapp_per_period',
+    label: 'Monthly WhatsApp',
+    help: 'WhatsApp deliveries in each monthly communication period.',
+  },
 ] as const;
 
 const FEATURE_FIELDS = [
@@ -38,6 +43,21 @@ const FEATURE_FIELDS = [
     key: 'commissions_available',
     label: 'Commissions',
     help: 'Makes company-level commission settings available.',
+  },
+  {
+    key: 'storefront_available',
+    label: 'Public storefront',
+    help: 'Publish a public catalogue with seven-day downgrade grace.',
+  },
+  {
+    key: 'customer_campaigns_available',
+    label: 'Customer campaigns',
+    help: 'Send permission-controlled customer broadcasts.',
+  },
+  {
+    key: 'payment_reminders_available',
+    label: 'Payment reminders',
+    help: 'Enable due-date reminder automation and secure statements.',
   },
 ] as const;
 
@@ -435,11 +455,15 @@ export class TiersComponent implements OnInit {
       max_stock_locations: tier.max_stock_locations ?? undefined,
       max_orders_per_month: tier.max_orders_per_month ?? undefined,
       sms_per_period: tier.sms_per_period ?? undefined,
+      whatsapp_per_period: tier.whatsapp_per_period ?? undefined,
     });
     this.features.set({
       multiple_locations_enabled: tier.multiple_locations_enabled,
       staff_performance_enabled: tier.staff_performance_enabled,
       commissions_available: tier.commissions_available,
+      storefront_available: tier.storefront_available,
+      customer_campaigns_available: tier.customer_campaigns_available,
+      payment_reminders_available: tier.payment_reminders_available,
     });
     this.openEditor();
   }
@@ -487,6 +511,10 @@ export class TiersComponent implements OnInit {
         max_stock_locations: this.limits()['max_stock_locations'] ?? null,
         max_orders_per_month: this.limits()['max_orders_per_month'] ?? null,
         sms_per_period: this.limits()['sms_per_period'] ?? null,
+        whatsapp_per_period: this.limits()['whatsapp_per_period'] ?? null,
+        storefront_available: this.features()['storefront_available'] === true,
+        customer_campaigns_available: this.features()['customer_campaigns_available'] === true,
+        payment_reminders_available: this.features()['payment_reminders_available'] === true,
         ...(editing ? { tier_id: editing.id, is_active: this.isActive.value } : {}),
       });
       this.notice.set(editing ? 'Tier updated' : 'Tier created');

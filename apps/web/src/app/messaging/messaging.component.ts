@@ -4,7 +4,14 @@ import { EmptyStateComponent } from '../shared/ui/empty-state.component';
 import { PageLayoutComponent } from '../shared/ui/page-layout.component';
 import { StatusBadgeComponent } from '../shared/ui/status-badge.component';
 import { PaginationComponent } from '../shared/ui/pagination.component';
-import { NotificationsService, OutboxMessage } from '../notifications/notifications.service';
+import {
+  CampaignPreview,
+  MessageCampaign,
+  MessageTemplate,
+  MessagingCustomer,
+  NotificationsService,
+  OutboxMessage,
+} from '../notifications/notifications.service';
 import { ButtonComponent } from '../shared/ui/button.component';
 import { DataTableShellComponent } from '../shared/ui/data-table-shell.component';
 import { FormFieldComponent } from '../shared/ui/form-field.component';
@@ -48,7 +55,7 @@ const MESSAGE_SORT_OPTIONS: readonly ListSortOption[] = [
   template: `
     <app-page
       title="Messaging"
-      subtitle="Send customer updates and monitor SMS or WhatsApp delivery."
+      subtitle="Create customer campaigns and monitor SMS or WhatsApp delivery."
       [wide]="true"
     >
       <button
@@ -104,11 +111,20 @@ const MESSAGE_SORT_OPTIONS: readonly ListSortOption[] = [
               </button>
             </div>
             <form (submit)="$event.preventDefault(); send()" class="mt-3 flex flex-col gap-3">
+              <app-form-field label="Campaign name" [required]="true">
+                <input
+                  class="input input-bordered input-sm w-full"
+                  placeholder="August customer update"
+                  [formControl]="campaignName"
+                />
+              </app-form-field>
               <div class="grid gap-3 sm:grid-cols-2">
                 <app-form-field label="Audience" [required]="true">
                   <select class="select select-bordered select-sm w-full" [formControl]="audience">
                     <option value="all">All customers</option>
-                    <option value="credit_overdue">Customers with overdue credit</option>
+                    <option value="overdue">Customers with overdue credit</option>
+                    <option value="credit_approved">Credit-approved customers</option>
+                    <option value="selected">Selected customers</option>
                   </select>
                 </app-form-field>
                 <app-form-field
@@ -122,6 +138,84 @@ const MESSAGE_SORT_OPTIONS: readonly ListSortOption[] = [
                   </select>
                 </app-form-field>
               </div>
+
+              @if (audience.value === 'selected') {
+                <div class="rounded-box border border-base-300 p-3">
+                  <p class="text-sm font-medium">Choose customers</p>
+                  <div class="mt-2 grid max-h-48 gap-1 overflow-y-auto sm:grid-cols-2">
+                    @for (customer of customers(); track customer.id) {
+                      <label
+                        class="flex min-h-11 cursor-pointer items-center gap-2 rounded px-2 hover:bg-base-200"
+                      >
+                        <input
+                          type="checkbox"
+                          class="checkbox checkbox-sm"
+                          [checked]="selectedCustomerIds().includes(customer.id)"
+                          (change)="toggleCustomer(customer.id, $event)"
+                        />
+                        <span class="text-sm"
+                          >{{ customer.first_name }} {{ customer.last_name ?? '' }}</span
+                        >
+                        @if (!customer.phone) {
+                          <span class="type-caption text-warning">No phone</span>
+                        }
+                      </label>
+                    }
+                  </div>
+                </div>
+              }
+
+              <div class="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+                <app-form-field
+                  label="Saved template"
+                  [hint]="'Variables: {{customer_first_name}}, {{store_name}}, {{store_contact}}'"
+                >
+                  <select
+                    class="select select-bordered select-sm w-full"
+                    [formControl]="templateId"
+                    (change)="applyTemplate()"
+                  >
+                    <option value="">No template</option>
+                    @for (template of templates(); track template.id) {
+                      <option [value]="template.id">
+                        {{ template.name }} · v{{ template.version }}
+                      </option>
+                    }
+                  </select>
+                </app-form-field>
+                <button
+                  appButton
+                  variant="outline"
+                  type="button"
+                  [disabled]="!body.value.trim()"
+                  (click)="saveTemplate()"
+                >
+                  Save as template
+                </button>
+              </div>
+              @if (templateId.value) {
+                <div class="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+                  <app-form-field
+                    label="Test recipient"
+                    hint="A test send uses the selected channel quota."
+                  >
+                    <input
+                      class="input input-bordered input-sm w-full"
+                      placeholder="+254…"
+                      [formControl]="testRecipient"
+                    />
+                  </app-form-field>
+                  <button
+                    appButton
+                    variant="outline"
+                    type="button"
+                    [disabled]="!testRecipient.value.trim()"
+                    (click)="sendTemplateTest()"
+                  >
+                    Send test
+                  </button>
+                </div>
+              }
 
               <app-form-field
                 label="Message"
@@ -137,35 +231,157 @@ const MESSAGE_SORT_OPTIONS: readonly ListSortOption[] = [
                 ></textarea>
               </app-form-field>
 
-              <!-- SMS usage meter -->
-              @if (usage(); as u) {
-                <div class="flex items-center gap-2 text-sm">
-                  <span class="type-caption">SMS this period</span>
-                  <span
-                    class="font-semibold tabular-nums"
-                    [class.text-warning]="nearCap()"
-                    [class.text-error]="u.limit !== null && u.used >= u.limit"
-                  >
-                    {{ u.used }}{{ u.limit !== null ? ' / ' + u.limit : '' }}
-                  </span>
-                  @if (nearCap()) {
-                    <span class="type-caption text-warning">near the monthly cap</span>
+              @if (campaignPreview(); as preview) {
+                <div class="rounded-box border border-base-300 bg-base-200/50 p-3 text-sm">
+                  <p class="font-semibold">Campaign preview</p>
+                  <div class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    <span
+                      ><span class="type-caption block">Eligible</span>{{ preview.eligible }}</span
+                    >
+                    <span
+                      ><span class="type-caption block">Skipped</span>{{ preview.skipped }}</span
+                    >
+                    <span
+                      ><span class="type-caption block">Quota units</span>{{ preview.units }}</span
+                    >
+                    <span
+                      ><span class="type-caption block">Remaining</span
+                      >{{ preview.remaining ?? 'Unlimited' }}</span
+                    >
+                  </div>
+                </div>
+              }
+
+              @if (usage(); as usage) {
+                <div
+                  class="grid gap-2 rounded-box border border-base-300 p-3 text-sm sm:grid-cols-2"
+                >
+                  @for (entry of quotaRows(usage); track entry.label) {
+                    <div>
+                      <span class="type-caption">{{ entry.label }} this period</span>
+                      <p class="font-semibold tabular-nums">
+                        {{ entry.used }} used · {{ entry.reserved }} reserved
+                        @if (entry.limit !== null) {
+                          · {{ entry.remaining }} remaining
+                        }
+                      </p>
+                    </div>
                   }
                 </div>
               }
 
-              <button
-                appButton
-                type="submit"
-                class="self-start"
-                [loading]="busy()"
-                [disabled]="busy() || body.value.trim().length === 0"
-              >
-                <app-icon name="heroChatBubbleLeftRight" /> Queue message
-              </button>
+              <div class="flex flex-wrap gap-2">
+                <button
+                  appButton
+                  variant="outline"
+                  type="button"
+                  [loading]="previewBusy()"
+                  [disabled]="!canCompose()"
+                  (click)="previewCampaign()"
+                >
+                  Preview audience
+                </button>
+                <button
+                  appButton
+                  type="submit"
+                  [loading]="busy()"
+                  [disabled]="busy() || !campaignPreview() || !canCompose()"
+                >
+                  <app-icon name="heroChatBubbleLeftRight" /> Send campaign
+                </button>
+              </div>
             </form>
           </div>
         </div>
+      }
+
+      @if (campaigns().length > 0) {
+        <app-data-table-shell
+          title="Campaign history"
+          description="Pause, resume, cancel, or retry failed recipients."
+        >
+          <table class="table table-sm">
+            <thead>
+              <tr>
+                <th>Campaign</th>
+                <th>Status</th>
+                <th>Progress</th>
+                <th class="text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (campaign of campaigns(); track campaign.id) {
+                <tr>
+                  <td>
+                    <strong>{{ campaign.name }}</strong>
+                    <p class="type-caption">
+                      {{ campaign.channel.toUpperCase() }} · {{ time(campaign.created_at) }}
+                    </p>
+                  </td>
+                  <td>
+                    <app-status-badge
+                      [type]="campaignStatusType(campaign.status)"
+                      [label]="campaign.status"
+                      size="xs"
+                    />
+                  </td>
+                  <td class="tabular-nums">
+                    {{ campaign.sent_count }} sent · {{ campaign.failed_count }} failed ·
+                    {{ campaign.skipped_count }} skipped
+                  </td>
+                  <td>
+                    <div class="flex justify-end gap-1">
+                      @if (campaign.status === 'queued' || campaign.status === 'sending') {
+                        <button
+                          appButton
+                          variant="ghost"
+                          size="sm"
+                          type="button"
+                          (click)="campaignAction(campaign.id, 'pause')"
+                        >
+                          Pause
+                        </button>
+                      }
+                      @if (campaign.status === 'paused') {
+                        <button
+                          appButton
+                          variant="ghost"
+                          size="sm"
+                          type="button"
+                          (click)="campaignAction(campaign.id, 'resume')"
+                        >
+                          Resume
+                        </button>
+                      }
+                      @if (campaign.failed_count > 0) {
+                        <button
+                          appButton
+                          variant="ghost"
+                          size="sm"
+                          type="button"
+                          (click)="retryCampaign(campaign.id)"
+                        >
+                          Retry failed
+                        </button>
+                      }
+                      @if (!['completed', 'cancelled'].includes(campaign.status)) {
+                        <button
+                          appButton
+                          variant="ghost"
+                          size="sm"
+                          type="button"
+                          (click)="campaignAction(campaign.id, 'cancel')"
+                        >
+                          Cancel
+                        </button>
+                      }
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </app-data-table-shell>
       }
 
       <!-- Recent outbox -->
@@ -306,12 +522,25 @@ const MESSAGE_SORT_OPTIONS: readonly ListSortOption[] = [
 export class MessagingComponent implements OnInit {
   private readonly notifications = inject(NotificationsService);
 
-  protected readonly audience = new FormControl<'all' | 'credit_overdue'>('all', {
-    nonNullable: true,
-  });
+  protected readonly campaignName = new FormControl('', { nonNullable: true });
+  protected readonly audience = new FormControl<'all' | 'overdue' | 'credit_approved' | 'selected'>(
+    'all',
+    {
+      nonNullable: true,
+    }
+  );
   protected readonly channel = new FormControl<'sms' | 'whatsapp'>('sms', { nonNullable: true });
   protected readonly body = new FormControl('', { nonNullable: true });
-  protected readonly usage = signal<{ used: number; limit: number | null } | null>(null);
+  protected readonly templateId = new FormControl('', { nonNullable: true });
+  protected readonly testRecipient = new FormControl('', { nonNullable: true });
+  protected readonly templates = signal<MessageTemplate[]>([]);
+  protected readonly campaigns = signal<MessageCampaign[]>([]);
+  protected readonly customers = signal<MessagingCustomer[]>([]);
+  protected readonly selectedCustomerIds = signal<string[]>([]);
+  protected readonly usage = signal<{
+    sms: { used: number; reserved: number; limit: number | null };
+    whatsapp: { used: number; reserved: number; limit: number | null };
+  } | null>(null);
   protected readonly outbox = signal<OutboxMessage[]>([]);
   protected readonly composerOpen = signal(false);
   protected readonly loading = signal(false);
@@ -324,13 +553,11 @@ export class MessagingComponent implements OnInit {
   protected readonly outboxPage = signal(1);
   protected readonly outboxPageSize = signal(10);
   protected readonly busy = signal(false);
+  protected readonly previewBusy = signal(false);
+  protected readonly campaignPreview = signal<CampaignPreview | null>(null);
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
 
-  protected readonly nearCap = computed(() => {
-    const u = this.usage();
-    return !!u && u.limit !== null && u.used >= u.limit * 0.8 && u.used < u.limit;
-  });
   protected readonly filteredOutbox = computed(() => {
     const query = this.query().trim().toLowerCase();
     const rows = this.outbox().filter(message => {
@@ -404,12 +631,18 @@ export class MessagingComponent implements OnInit {
   protected async load(): Promise<void> {
     this.loading.set(true);
     try {
-      const [usage, outbox] = await Promise.all([
-        this.notifications.smsUsage(),
+      const [usage, outbox, templates, campaigns, customers] = await Promise.all([
+        this.notifications.communicationUsage(),
         this.notifications.recentOutbox(),
+        this.notifications.messageTemplates(),
+        this.notifications.recentCampaigns(),
+        this.notifications.messagingCustomers(),
       ]);
       this.usage.set(usage);
       this.outbox.set(outbox);
+      this.templates.set(templates);
+      this.campaigns.set(campaigns);
+      this.customers.set(customers);
       this.error.set(null);
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Failed to load');
@@ -420,19 +653,25 @@ export class MessagingComponent implements OnInit {
 
   protected async send(): Promise<void> {
     const text = this.body.value.trim();
-    if (!text) return;
+    if (!text || !this.campaignName.value.trim() || !this.campaignPreview()) return;
     this.busy.set(true);
     this.error.set(null);
     this.notice.set(null);
     try {
-      const count = await this.notifications.queueBatchMessage(
-        this.channel.value,
-        text,
-        this.audience.value
-      );
-      // sms_limit_reached surfaces verbatim from the backend on failure.
+      const count = await this.notifications.createAndSendCampaign({
+        name: this.campaignName.value.trim(),
+        channel: this.channel.value,
+        body: text,
+        audience: this.audience.value,
+        ...(this.audience.value === 'selected' ? { customerIds: this.selectedCustomerIds() } : {}),
+        ...(this.templateId.value ? { templateId: this.templateId.value } : {}),
+      });
       this.notice.set(`Queued for ${count} customer(s)`);
+      this.campaignName.setValue('');
       this.body.setValue('');
+      this.templateId.setValue('');
+      this.selectedCustomerIds.set([]);
+      this.campaignPreview.set(null);
       this.composerOpen.set(false);
       await this.load();
     } catch (err) {
@@ -442,8 +681,159 @@ export class MessagingComponent implements OnInit {
     }
   }
 
+  protected canCompose(): boolean {
+    return (
+      this.campaignName.value.trim().length > 0 &&
+      this.body.value.trim().length > 0 &&
+      (this.audience.value !== 'selected' || this.selectedCustomerIds().length > 0)
+    );
+  }
+
+  protected async previewCampaign(): Promise<void> {
+    if (!this.canCompose()) return;
+    this.previewBusy.set(true);
+    this.error.set(null);
+    try {
+      this.campaignPreview.set(
+        await this.notifications.previewCampaign(
+          this.channel.value,
+          this.body.value.trim(),
+          this.audience.value,
+          this.audience.value === 'selected' ? this.selectedCustomerIds() : undefined
+        )
+      );
+    } catch (err) {
+      this.campaignPreview.set(null);
+      this.error.set(err instanceof Error ? err.message : 'Preview failed');
+    } finally {
+      this.previewBusy.set(false);
+    }
+  }
+
+  protected toggleCustomer(customerId: string, event: Event): void {
+    const checked = (event.target as HTMLInputElement).checked;
+    this.selectedCustomerIds.update(ids =>
+      checked ? [...ids, customerId] : ids.filter(id => id !== customerId)
+    );
+    this.campaignPreview.set(null);
+  }
+
+  protected applyTemplate(): void {
+    const template = this.templates().find(item => item.id === this.templateId.value);
+    if (!template) return;
+    this.body.setValue(
+      (this.channel.value === 'sms' ? template.sms_body : template.whatsapp_body) ?? ''
+    );
+    this.campaignPreview.set(null);
+  }
+
+  protected async saveTemplate(): Promise<void> {
+    const name = this.campaignName.value.trim();
+    const text = this.body.value.trim();
+    if (!name || !text) {
+      this.error.set('Add a campaign name and message before saving a template.');
+      return;
+    }
+    this.busy.set(true);
+    try {
+      const existing = this.templates().find(item => item.id === this.templateId.value);
+      const smsBody = this.channel.value === 'sms' ? text : (existing?.sms_body ?? text);
+      const whatsappBody =
+        this.channel.value === 'whatsapp' ? text : (existing?.whatsapp_body ?? text);
+      const id = await this.notifications.saveMessageTemplate(
+        name,
+        smsBody,
+        whatsappBody,
+        existing?.company_id ? existing.id : undefined
+      );
+      this.templates.set(await this.notifications.messageTemplates());
+      this.templateId.setValue(id);
+      this.notice.set(existing?.company_id ? 'Template updated.' : 'Template saved.');
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Template save failed');
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected async sendTemplateTest(): Promise<void> {
+    if (!this.templateId.value || !this.testRecipient.value.trim()) return;
+    this.busy.set(true);
+    try {
+      await this.notifications.testMessageTemplate(
+        this.templateId.value,
+        this.channel.value,
+        this.testRecipient.value.trim()
+      );
+      this.notice.set('Test message queued.');
+      await this.load();
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Test send failed');
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected quotaRows(usage: {
+    sms: { used: number; reserved: number; limit: number | null };
+    whatsapp: { used: number; reserved: number; limit: number | null };
+  }): Array<{
+    label: string;
+    used: number;
+    reserved: number;
+    limit: number | null;
+    remaining: number | null;
+  }> {
+    return (['sms', 'whatsapp'] as const).map(channel => ({
+      label: channel === 'sms' ? 'SMS' : 'WhatsApp',
+      ...usage[channel],
+      remaining:
+        usage[channel].limit === null
+          ? null
+          : Math.max(usage[channel].limit - usage[channel].used - usage[channel].reserved, 0),
+    }));
+  }
+
   protected statusType(status: string): 'success' | 'warning' | 'error' | 'neutral' {
     return STATUS_TYPE[status] ?? 'neutral';
+  }
+
+  protected campaignStatusType(status: string): 'success' | 'warning' | 'error' | 'neutral' {
+    if (status === 'completed') return 'success';
+    if (status === 'failed' || status === 'partial') return 'error';
+    if (status === 'cancelled') return 'neutral';
+    return 'warning';
+  }
+
+  protected async campaignAction(
+    campaignId: string,
+    action: 'pause' | 'resume' | 'cancel'
+  ): Promise<void> {
+    this.busy.set(true);
+    try {
+      await this.notifications.setCampaignStatus(campaignId, action);
+      this.notice.set(
+        `Campaign ${action === 'pause' ? 'paused' : action === 'resume' ? 'resumed' : 'cancelled'}.`
+      );
+      await this.load();
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Campaign update failed');
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected async retryCampaign(campaignId: string): Promise<void> {
+    this.busy.set(true);
+    try {
+      const count = await this.notifications.retryFailedCampaignRecipients(campaignId);
+      this.notice.set(`${count} failed recipient(s) queued again.`);
+      await this.load();
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Campaign retry failed');
+    } finally {
+      this.busy.set(false);
+    }
   }
 
   protected setFilter(kind: 'channel' | 'status', event: Event): void {

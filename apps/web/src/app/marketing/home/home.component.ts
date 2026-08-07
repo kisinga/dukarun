@@ -595,6 +595,11 @@ export class HomeComponent implements OnInit {
       features.push(`${plan.max_orders_per_month.toLocaleString('en-KE')} sales per month`);
     if (plan.sms_per_period !== null)
       features.push(`${plan.sms_per_period.toLocaleString('en-KE')} SMS per month`);
+    if (plan.whatsapp_per_period !== null)
+      features.push(`${plan.whatsapp_per_period.toLocaleString('en-KE')} WhatsApp per month`);
+    if (plan.storefront_available) features.push('Public storefront');
+    if (plan.customer_campaigns_available) features.push('Customer campaigns');
+    if (plan.payment_reminders_available) features.push('Payment reminders');
     if (plan.staff_performance_enabled) features.push('Staff performance reports');
     if (plan.commissions_available) features.push('Sales commissions');
     if (plan.multiple_locations_enabled && plan.max_stock_locations === null)

@@ -231,7 +231,7 @@ max_frequency = "1s"
 # Number of characters used in the email OTP.
 otp_length = 6
 # Number of seconds before the email OTP expires (defaults to 1 hour).
-otp_expiry = 3600
+otp_expiry = 600
 
 # Use a production-ready SMTP server
 # [auth.email.smtp]
@@ -262,7 +262,7 @@ enable_confirmations = true
 # Template for sending OTP to users
 template = "Your Dukahub code is {{ .Code }}"
 # Controls the minimum amount of time that must pass before sending another sms otp.
-max_frequency = "5s"
+max_frequency = "60s"
 
 # Use pre-defined map of phone number to OTP for testing.
 # NOTE: test numbers bypass SMS delivery (and the send_sms hook) entirely.

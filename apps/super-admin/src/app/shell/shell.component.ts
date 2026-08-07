@@ -96,6 +96,7 @@ export class ShellComponent {
     { route: '/', label: 'Dashboard', icon: 'heroHome' },
     { route: '/companies', label: 'Companies', icon: 'heroBuildingOffice2' },
     { route: '/tiers', label: 'Subscription tiers', icon: 'heroChartBar' },
+    { route: '/communications', label: 'Communications', icon: 'heroChatBubbleLeftRight' },
     { route: '/operations', label: 'Operations', icon: 'heroServerStack' },
     { route: '/audit', label: 'Audit log', icon: 'heroClipboardDocumentList' },
   ];

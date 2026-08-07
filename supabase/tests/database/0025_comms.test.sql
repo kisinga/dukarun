@@ -48,9 +48,9 @@ select is(
 );
 
 select is(
-  (select sms_used_this_period from public.companies where id = (select company_id from cm_company)),
+  (select sms_reserved_this_period from public.companies where id = (select company_id from cm_company)),
   1,
-  'SMS capacity is reserved when queued rather than after delivery'
+  'SMS capacity is reserved until provider acceptance'
 );
 
 -- 4. WhatsApp quiet-hours: scheduled_after always lands in the 08:00-19:00
@@ -68,25 +68,25 @@ select ok(
 -- 5. SMS metering: tier with smsPerPeriod=1 blocks the second.
 reset role;
 update public.subscription_tiers set sms_per_period = 1 where code = 'standard';
-update public.companies set sms_used_this_period = 1,
+update public.companies set sms_used_this_period = 1, sms_reserved_this_period = 0,
   subscription_tier_id = (select id from public.subscription_tiers where code = 'standard')
 where id = (select company_id from cm_company);
 
 select throws_ok(
   format($$select public.queue_message('%s', 'sms', '0711000000', 'over the cap')$$, (select company_id from cm_company)),
-  'P0001', 'sms_limit_reached: 1 of 1 used this period',
+  'P0001', 'sms_limit_reached: 0 of 1 remaining',
   'sms cap enforced at the tier limit'
 );
 
 update public.companies
-set sms_used_this_period = 50, sms_period_end = now() - interval '1 second'
+set sms_used_this_period = 50, communication_period_end = now() - interval '1 second'
 where id = (select company_id from cm_company);
 select public.queue_message((select company_id from cm_company), 'sms', '0711999999', 'new period');
 
 select is(
-  (select sms_used_this_period from public.companies where id = (select company_id from cm_company)),
+  (select sms_reserved_this_period from public.companies where id = (select company_id from cm_company)),
   1,
-  'expired SMS usage resets before reserving the new message'
+  'expired communication usage resets before reserving the new message'
 );
 
 select ok(
@@ -98,7 +98,7 @@ delete from public.outbox
 where company_id = (select company_id from cm_company) and recipient = '0711999999';
 
 -- restore headroom for later tests
-update public.companies set sms_used_this_period = 0 where id = (select company_id from cm_company);
+update public.companies set sms_used_this_period = 0, sms_reserved_this_period = 1 where id = (select company_id from cm_company);
 update public.subscription_tiers set sms_per_period = 500 where code = 'standard';
 
 -- 6-8. Credit reminders: overdue customer gets notified once, deduped on rerun.
@@ -109,18 +109,20 @@ select public.post_sale('c0000000-0000-0000-0000-0000000000aa',
   '[{"variant_id":"aa000000-0000-0000-0000-0000000000aa","quantity":1,"unit_price":10000}]', '[]') as order_id;
 
 reset role;
-select set_config('app.allow_ledger_mutation', 'on', true);
-update public.ledger_journal_entries set entry_date = entry_date - 10
-where source_id = (select order_id::text from cm_sale) and source_type = 'CreditSale';
-select set_config('app.allow_ledger_mutation', 'off', true);
+update public.orders set credit_due_at = (now() at time zone 'Africa/Nairobi')::date - 3
+where id = (select order_id from cm_sale);
+update public.companies set payment_reminders_enabled = true,
+  payment_reminder_channel = 'sms'
+where id = (select company_id from cm_company);
+select vault.create_secret('https://storefront.test', 'STOREFRONT_PUBLIC_URL');
 
 select public.credit_reminder_scan();
 
 select is(
-  (select count(*)::int from public.notifications
-   where company_id = (select company_id from cm_company) and type = 'credit_reminder'),
+  (select count(*)::int from public.outbox
+   where company_id = (select company_id from cm_company) and source = 'reminder'),
   1,
-  'credit reminder notification created'
+  'due-stage reminder is queued'
 );
 
 select is(
@@ -133,10 +135,10 @@ select is(
 select public.credit_reminder_scan();
 
 select is(
-  (select count(*)::int from public.notifications
-   where company_id = (select company_id from cm_company) and type = 'credit_reminder'),
+  (select count(*)::int from public.outbox
+   where company_id = (select company_id from cm_company) and source = 'reminder'),
   1,
-  'rerun within 10 days is deduped (checkpoint)'
+  'same reminder stage is deduped by checkpoint'
 );
 
 -- 9. Batch messaging to all customers.

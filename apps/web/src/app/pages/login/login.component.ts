@@ -35,7 +35,8 @@ const RESEND_COOLDOWN_SECONDS = 60;
           } @else {
             <form (submit)="$event.preventDefault(); verifyOtp()" class="mt-4 flex flex-col gap-4">
               <p class="text-sm">
-                Enter the 6-digit code sent to <strong>{{ phoneE164() }}</strong>
+                Enter the 6-digit code sent by SMS and WhatsApp to
+                <strong>{{ phoneE164() }}</strong>
               </p>
               <input
                 type="text"

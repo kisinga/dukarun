@@ -229,6 +229,8 @@ export const routes: Routes = [
       },
       {
         path: 'messaging',
+        canActivate: [featureGuard, permissionGuard],
+        data: { feature: 'customerCampaigns', permission: 'ManageCommunications' },
         loadComponent: () =>
           import('./messaging/messaging.component').then(m => m.MessagingComponent),
       },

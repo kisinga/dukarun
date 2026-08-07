@@ -431,6 +431,36 @@ type CreditOrder = {
                     [formControl]="notes"
                   />
                 </app-form-field>
+                <fieldset class="rounded-box border border-base-300 p-3">
+                  <legend class="px-1 text-sm font-medium">Customer messages</legend>
+                  <label class="label cursor-pointer justify-start gap-2">
+                    <input
+                      type="checkbox"
+                      class="checkbox checkbox-sm"
+                      [formControl]="notificationsEnabled"
+                    />
+                    <span class="label-text">Allow customer notifications</span>
+                  </label>
+                  <div
+                    class="ml-6 flex flex-wrap gap-4"
+                    [class.opacity-40]="!notificationsEnabled.value"
+                  >
+                    <label class="label cursor-pointer gap-2"
+                      ><input
+                        type="checkbox"
+                        class="checkbox checkbox-sm"
+                        [formControl]="smsNotificationsEnabled"
+                      /><span class="label-text">SMS</span></label
+                    >
+                    <label class="label cursor-pointer gap-2"
+                      ><input
+                        type="checkbox"
+                        class="checkbox checkbox-sm"
+                        [formControl]="whatsappNotificationsEnabled"
+                      /><span class="label-text">WhatsApp</span></label
+                    >
+                  </div>
+                </fieldset>
                 <div class="flex gap-2">
                   <button
                     appButton
@@ -892,6 +922,9 @@ export class CustomersComponent implements OnInit {
   protected readonly phone = new FormControl('', { nonNullable: true });
   protected readonly email = new FormControl('', { nonNullable: true });
   protected readonly notes = new FormControl('', { nonNullable: true });
+  protected readonly notificationsEnabled = new FormControl(true, { nonNullable: true });
+  protected readonly smsNotificationsEnabled = new FormControl(true, { nonNullable: true });
+  protected readonly whatsappNotificationsEnabled = new FormControl(true, { nonNullable: true });
 
   protected readonly repayAmount = new FormControl('', { nonNullable: true });
   protected readonly repayMethod = new FormControl('cash', { nonNullable: true });
@@ -1087,6 +1120,9 @@ export class CustomersComponent implements OnInit {
     this.phone.setValue(c.phone ?? '');
     this.email.setValue(c.email ?? '');
     this.notes.setValue(c.notes ?? '');
+    this.notificationsEnabled.setValue(c.notifications_enabled);
+    this.smsNotificationsEnabled.setValue(c.sms_notifications_enabled);
+    this.whatsappNotificationsEnabled.setValue(c.whatsapp_notifications_enabled);
     this.drawerEditing.set(true);
   }
 
@@ -1097,6 +1133,9 @@ export class CustomersComponent implements OnInit {
     this.phone.setValue('');
     this.email.setValue('');
     this.notes.setValue('');
+    this.notificationsEnabled.setValue(true);
+    this.smsNotificationsEnabled.setValue(true);
+    this.whatsappNotificationsEnabled.setValue(true);
     this.drawerEditing.set(false);
     this.creating.set(true);
   }
@@ -1173,6 +1212,7 @@ export class CustomersComponent implements OnInit {
     this.notice.set(null);
     try {
       const editing = this.editing();
+      let savedId: string;
       if (editing) {
         await this.money.updateCustomer(editing.id, {
           first_name: this.firstName.value.trim(),
@@ -1181,6 +1221,7 @@ export class CustomersComponent implements OnInit {
           email: this.email.value.trim() || undefined,
           notes: this.notes.value.trim() || undefined,
         });
+        savedId = editing.id;
         this.notice.set(`Updated ${this.firstName.value.trim()}`);
       } else {
         const customerId = await this.money.createCustomer(
@@ -1192,8 +1233,15 @@ export class CustomersComponent implements OnInit {
         if (this.notes.value.trim()) {
           await this.money.updateCustomer(customerId, { notes: this.notes.value.trim() });
         }
+        savedId = customerId;
         this.notice.set(`Created ${this.firstName.value.trim()}`);
       }
+      await this.money.updateCustomerCommunicationPreferences(
+        savedId,
+        this.notificationsEnabled.value,
+        this.smsNotificationsEnabled.value,
+        this.whatsappNotificationsEnabled.value
+      );
       if (editing) {
         // Return to the drawer's detail view with fresh data.
         this.drawerEditing.set(false);

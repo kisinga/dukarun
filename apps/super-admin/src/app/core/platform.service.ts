@@ -6,6 +6,8 @@ export type Company = Database['public']['Tables']['companies']['Row'];
 export type Tier = Database['public']['Tables']['subscription_tiers']['Row'];
 export type AuditRow = Database['public']['Tables']['audit_log']['Row'];
 export type OutboxRow = Database['public']['Tables']['outbox']['Row'];
+export type CampaignRow = Database['public']['Tables']['message_campaigns']['Row'];
+export type MessageTemplateRow = Database['public']['Tables']['message_templates']['Row'];
 export type FailedOutboxRow = OutboxRow & {
   companies: Pick<Company, 'name' | 'code'> | null;
 };
@@ -30,6 +32,11 @@ export interface OperationsSnapshot {
 export interface BillingConfig {
   trialDays: number;
   defaultTrialTierCode: string;
+}
+export interface PlatformCampaignPreview {
+  total: number;
+  eligible: number;
+  skipped: number;
 }
 
 function rpcError(error: { message: string; code?: string }): Error {
@@ -66,6 +73,47 @@ export class PlatformService {
       .limit(100);
     if (error) throw error;
     return data;
+  }
+
+  async platformCampaigns(): Promise<CampaignRow[]> {
+    const { data, error } = await this.db
+      .from('message_campaigns')
+      .select('*')
+      .eq('scope', 'platform')
+      .order('created_at', { ascending: false })
+      .limit(50);
+    if (error) throw error;
+    return data;
+  }
+
+  async platformTemplates(): Promise<MessageTemplateRow[]> {
+    const { data, error } = await this.db
+      .from('message_templates')
+      .select('*')
+      .eq('context', 'platform')
+      .is('company_id', null)
+      .order('name');
+    if (error) throw error;
+    return data;
+  }
+
+  async savePlatformTemplate(input: {
+    id: string;
+    name: string;
+    smsBody: string;
+    whatsappBody: string;
+    inAppTitle: string;
+    inAppBody: string;
+  }): Promise<void> {
+    const { error } = await this.db.rpc('platform_upsert_message_template', {
+      p_template_id: input.id,
+      p_name: input.name,
+      p_sms_body: input.smsBody,
+      p_whatsapp_body: input.whatsappBody,
+      p_in_app_title: input.inAppTitle,
+      p_in_app_body: input.inAppBody,
+    });
+    if (error) throw rpcError(error);
   }
 
   async pendingCompanies(): Promise<Company[]> {
@@ -187,10 +235,14 @@ export class PlatformService {
     max_stock_locations: number | null;
     max_orders_per_month: number | null;
     sms_per_period: number | null;
+    whatsapp_per_period: number | null;
+    storefront_available: boolean;
+    customer_campaigns_available: boolean;
+    payment_reminders_available: boolean;
     tier_id?: string;
     is_active?: boolean;
-  }): Promise<void> {
-    const { error } = await this.db.rpc('platform_upsert_tier', {
+  }): Promise<string> {
+    const { data, error } = await this.db.rpc('platform_save_tier', {
       p_code: input.code,
       p_name: input.name,
       p_price_monthly: input.price_monthly,
@@ -198,19 +250,62 @@ export class PlatformService {
       p_multiple_locations_enabled: input.multiple_locations_enabled,
       p_staff_performance_enabled: input.staff_performance_enabled,
       p_commissions_available: input.commissions_available,
-      ...(input.max_team_members !== null ? { p_max_team_members: input.max_team_members } : {}),
-      ...(input.max_products !== null ? { p_max_products: input.max_products } : {}),
-      ...(input.max_stock_locations !== null
-        ? { p_max_stock_locations: input.max_stock_locations }
-        : {}),
-      ...(input.max_orders_per_month !== null
-        ? { p_max_orders_per_month: input.max_orders_per_month }
-        : {}),
-      ...(input.sms_per_period !== null ? { p_sms_per_period: input.sms_per_period } : {}),
+      p_storefront_available: input.storefront_available,
+      p_customer_campaigns_available: input.customer_campaigns_available,
+      p_payment_reminders_available: input.payment_reminders_available,
+      p_max_team_members: input.max_team_members ?? undefined,
+      p_max_products: input.max_products ?? undefined,
+      p_max_stock_locations: input.max_stock_locations ?? undefined,
+      p_max_orders_per_month: input.max_orders_per_month ?? undefined,
+      p_sms_per_period: input.sms_per_period ?? undefined,
+      p_whatsapp_per_period: input.whatsapp_per_period ?? undefined,
       ...(input.tier_id ? { p_tier_id: input.tier_id } : {}),
       ...(input.is_active !== undefined ? { p_is_active: input.is_active } : {}),
     });
     if (error) throw rpcError(error);
+    return data;
+  }
+
+  async previewCampaign(input: {
+    channel: 'in_app' | 'sms' | 'whatsapp';
+    audience: 'all' | 'tier' | 'subscription_status' | 'selected';
+    tierId?: string;
+    subscriptionStatus?: string;
+    companyIds?: string[];
+  }): Promise<PlatformCampaignPreview> {
+    const { data, error } = await this.db.rpc('platform_campaign_preview', {
+      p_channel: input.channel,
+      p_audience: input.audience,
+      ...(input.tierId ? { p_tier_id: input.tierId } : {}),
+      ...(input.subscriptionStatus ? { p_subscription_status: input.subscriptionStatus } : {}),
+      ...(input.companyIds?.length ? { p_company_ids: input.companyIds } : {}),
+    });
+    if (error) throw rpcError(error);
+    return data as unknown as PlatformCampaignPreview;
+  }
+
+  async sendCampaign(input: {
+    name: string;
+    title: string;
+    body: string;
+    channel: 'in_app' | 'sms' | 'whatsapp';
+    audience: 'all' | 'tier' | 'subscription_status' | 'selected';
+    tierId?: string;
+    subscriptionStatus?: string;
+    companyIds?: string[];
+  }): Promise<{ queued: number; skipped: number }> {
+    const { data, error } = await this.db.rpc('platform_send_campaign', {
+      p_name: input.name,
+      p_title: input.title,
+      p_body: input.body,
+      p_channel: input.channel,
+      p_audience: input.audience,
+      ...(input.tierId ? { p_tier_id: input.tierId } : {}),
+      ...(input.subscriptionStatus ? { p_subscription_status: input.subscriptionStatus } : {}),
+      ...(input.companyIds?.length ? { p_company_ids: input.companyIds } : {}),
+    });
+    if (error) throw rpcError(error);
+    return data as unknown as { queued: number; skipped: number };
   }
 
   async auditLog(filters: {
