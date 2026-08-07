@@ -1,5 +1,4 @@
-import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { formatKes } from '../core/money';
 import { normalizeKenyanPhone } from '../core/phone';
@@ -117,9 +116,9 @@ const POLL_TIMEOUT_MS = 60_000;
         </div>
       }
 
-      <!-- Plans -->
+      <!-- Subscription plans -->
       <div class="mb-3 flex items-center justify-between">
-        <h2 class="type-heading">Plans</h2>
+        <h2 class="type-heading">Subscription plans</h2>
         <div role="tablist" class="tabs tabs-boxed">
           <a
             role="tab"
@@ -142,7 +141,7 @@ const POLL_TIMEOUT_MS = 60_000;
         <app-empty-state
           icon="heroBanknotes"
           title="No plans available"
-          description="Subscription tiers aren't configured for this environment."
+          description="Subscription plans aren't configured for this environment."
         />
       } @else {
         <div class="grid gap-3 sm:grid-cols-2">
@@ -156,7 +155,13 @@ const POLL_TIMEOUT_MS = 60_000;
                 <div class="flex items-center gap-2">
                   <h3 class="type-heading">{{ tier.name }}</h3>
                   @if (isCurrent(tier)) {
-                    <app-status-badge type="success" label="current" size="xs" />
+                    <app-status-badge
+                      [type]="billing()?.subscription_status === 'active' ? 'success' : 'info'"
+                      [label]="
+                        billing()?.subscription_status === 'active' ? 'current' : 'your plan'
+                      "
+                      size="xs"
+                    />
                   }
                 </div>
                 <p class="type-hero mt-1">{{ fmt(priceFor(tier)) }}</p>
@@ -167,7 +172,7 @@ const POLL_TIMEOUT_MS = 60_000;
                   }
                 </ul>
 
-                @if (!isCurrent(tier)) {
+                @if (canPurchase(tier)) {
                   @if (choosing() === tier.id) {
                     <form
                       (submit)="$event.preventDefault(); pay(tier)"
@@ -203,7 +208,7 @@ const POLL_TIMEOUT_MS = 60_000;
                       [disabled]="busy() || pending() !== null"
                       (click)="choose(tier)"
                     >
-                      Choose {{ tier.name }}
+                      {{ purchaseLabel(tier) }}
                     </button>
                   }
                 }
@@ -282,6 +287,19 @@ export class BillingComponent implements OnInit, OnDestroy {
     return this.billing()?.subscription_tier_id === tier.id;
   }
 
+  protected canPurchase(tier: Tier): boolean {
+    const billing = this.billing();
+    return billing?.subscription_tier_id !== tier.id || billing.subscription_status !== 'active';
+  }
+
+  protected purchaseLabel(tier: Tier): string {
+    const status = this.billing()?.subscription_status;
+    if (this.isCurrent(tier) && (status === 'expired' || status === 'cancelled')) {
+      return `Renew ${tier.name}`;
+    }
+    return `Subscribe to ${tier.name}`;
+  }
+
   protected priceFor(tier: Tier): number {
     return this.cycle() === 'monthly' ? tier.price_monthly : tier.price_yearly;
   }
@@ -289,11 +307,23 @@ export class BillingComponent implements OnInit, OnDestroy {
   /** Human-readable tier limits: "500 sales/mo", "5 team members", "50 SMS/mo". */
   protected limitLines(tier: Tier): string[] {
     const lines: string[] = [];
-    if (tier.max_orders_per_month) lines.push(`${tier.max_orders_per_month} sales/mo`);
-    if (tier.max_team_members) lines.push(`${tier.max_team_members} team members`);
-    if (tier.max_products) lines.push(`${tier.max_products} products`);
-    if (tier.max_stock_locations) lines.push(`${tier.max_stock_locations} stock location(s)`);
-    if (tier.sms_per_period) lines.push(`${tier.sms_per_period} SMS/mo`);
+    if (tier.max_orders_per_month !== null)
+      lines.push(`${tier.max_orders_per_month.toLocaleString('en-KE')} sales/mo`);
+    if (tier.max_team_members !== null) lines.push(`${tier.max_team_members} team members`);
+    if (tier.max_products !== null)
+      lines.push(`${tier.max_products.toLocaleString('en-KE')} products`);
+    if (tier.max_stock_locations !== null)
+      lines.push(`${tier.max_stock_locations} stock location(s)`);
+    if (tier.sms_per_period !== null)
+      lines.push(`${tier.sms_per_period.toLocaleString('en-KE')} SMS/mo`);
+    if (tier.whatsapp_per_period !== null)
+      lines.push(`${tier.whatsapp_per_period.toLocaleString('en-KE')} WhatsApp/mo`);
+    if (tier.storefront_available) lines.push('Public storefront');
+    if (tier.customer_campaigns_available) lines.push('Customer campaigns');
+    if (tier.payment_reminders_available) lines.push('Payment reminders');
+    if (tier.multiple_locations_enabled) lines.push('Multiple stock locations');
+    if (tier.staff_performance_enabled) lines.push('Staff performance');
+    if (tier.commissions_available) lines.push('Sales commissions');
     return lines;
   }
 

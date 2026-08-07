@@ -270,9 +270,9 @@ export class DocsComponent {
       id: 'billing',
       icon: 'heroCreditCard',
       title: 'Subscription billing via M-Pesa',
-      summary: 'One flat monthly price, paid the way you already pay.',
+      summary: 'Flexible plans, paid the way you already pay.',
       details: [
-        'The subscription is a single flat monthly amount covering the whole product, every feature in this guide, with no tiers.',
+        'Choose the subscription plan whose features and usage limits fit your shop, with monthly or discounted yearly billing.',
         'Billing runs through M-Pesa: you get a prompt on your phone, approve it, and you are done. No card required, no dollar invoices.',
         'Pause or cancel anytime from the app. Your data stays yours and can be exported whenever you like.',
       ],

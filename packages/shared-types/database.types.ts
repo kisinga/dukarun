@@ -172,6 +172,134 @@ export type Database = {
         }
         Relationships: []
       }
+      auth_otp_delivery_requests: {
+        Row: {
+          checked_at: string | null
+          created_at: string
+          id: string
+          phone_hash: string
+          phone_suffix: string
+          sms_request_id: number | null
+          sms_status: string | null
+          whatsapp_request_id: number | null
+          whatsapp_status: string | null
+        }
+        Insert: {
+          checked_at?: string | null
+          created_at?: string
+          id?: string
+          phone_hash: string
+          phone_suffix: string
+          sms_request_id?: number | null
+          sms_status?: string | null
+          whatsapp_request_id?: number | null
+          whatsapp_status?: string | null
+        }
+        Update: {
+          checked_at?: string | null
+          created_at?: string
+          id?: string
+          phone_hash?: string
+          phone_suffix?: string
+          sms_request_id?: number | null
+          sms_status?: string | null
+          whatsapp_request_id?: number | null
+          whatsapp_status?: string | null
+        }
+        Relationships: []
+      }
+      campaign_recipients: {
+        Row: {
+          campaign_id: string
+          company_id: string | null
+          created_at: string
+          customer_id: string | null
+          id: string
+          outbox_id: string | null
+          recipient: string | null
+          rendered_body: string | null
+          skip_reason: string | null
+          status: string
+          user_id: string | null
+        }
+        Insert: {
+          campaign_id: string
+          company_id?: string | null
+          created_at?: string
+          customer_id?: string | null
+          id?: string
+          outbox_id?: string | null
+          recipient?: string | null
+          rendered_body?: string | null
+          skip_reason?: string | null
+          status?: string
+          user_id?: string | null
+        }
+        Update: {
+          campaign_id?: string
+          company_id?: string | null
+          created_at?: string
+          customer_id?: string | null
+          id?: string
+          outbox_id?: string | null
+          recipient?: string | null
+          rendered_body?: string | null
+          skip_reason?: string | null
+          status?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_recipients_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "message_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_recipients_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_recipients_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_recipients_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_ar_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "campaign_recipients_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_recipients_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_ap_balances"
+            referencedColumns: ["supplier_id"]
+          },
+          {
+            foreignKeyName: "campaign_recipients_outbox_fkey"
+            columns: ["outbox_id"]
+            isOneToOne: false
+            referencedRelation: "outbox"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cash_drawer_counts: {
         Row: {
           company_id: string
@@ -285,6 +413,196 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "stock_locations"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      catalog_export_markers: {
+        Row: {
+          actor: string | null
+          company_id: string
+          exported_at: string
+          id: string
+        }
+        Insert: {
+          actor?: string | null
+          company_id: string
+          exported_at?: string
+          id?: string
+        }
+        Update: {
+          actor?: string | null
+          company_id?: string
+          exported_at?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "catalog_export_markers_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "catalog_export_markers_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      catalog_imports: {
+        Row: {
+          actor: string | null
+          company_id: string
+          completed_at: string | null
+          created_at: string
+          id: string
+          idempotency_key: string
+          mode: string
+          result: Json | null
+          source_export_id: string | null
+          source_exported_at: string | null
+          status: string
+        }
+        Insert: {
+          actor?: string | null
+          company_id: string
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          idempotency_key: string
+          mode: string
+          result?: Json | null
+          source_export_id?: string | null
+          source_exported_at?: string | null
+          status?: string
+        }
+        Update: {
+          actor?: string | null
+          company_id?: string
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          idempotency_key?: string
+          mode?: string
+          result?: Json | null
+          source_export_id?: string | null
+          source_exported_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "catalog_imports_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "catalog_imports_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "catalog_imports_source_export_id_fkey"
+            columns: ["source_export_id"]
+            isOneToOne: false
+            referencedRelation: "catalog_export_markers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      catalog_search_documents: {
+        Row: {
+          barcode_normalized: string | null
+          company_id: string
+          product_id: string
+          search_text: string
+          search_vector: unknown
+          sku_normalized: string
+          updated_at: string
+          variant_id: string
+        }
+        Insert: {
+          barcode_normalized?: string | null
+          company_id: string
+          product_id: string
+          search_text: string
+          search_vector?: unknown
+          sku_normalized: string
+          updated_at?: string
+          variant_id: string
+        }
+        Update: {
+          barcode_normalized?: string | null
+          company_id?: string
+          product_id?: string
+          search_text?: string
+          search_vector?: unknown
+          sku_normalized?: string
+          updated_at?: string
+          variant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "catalog_search_documents_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "catalog_search_documents_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "catalog_search_documents_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "catalog_search_documents_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "variant_catalog"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "catalog_search_documents_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: true
+            referencedRelation: "low_stock_variants"
+            referencedColumns: ["variant_id"]
+          },
+          {
+            foreignKeyName: "catalog_search_documents_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: true
+            referencedRelation: "product_stock"
+            referencedColumns: ["variant_id"]
+          },
+          {
+            foreignKeyName: "catalog_search_documents_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: true
+            referencedRelation: "product_variants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "catalog_search_documents_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: true
+            referencedRelation: "variant_catalog"
+            referencedColumns: ["variant_id"]
           },
         ]
       }
@@ -613,8 +931,10 @@ export type Database = {
           cashier_flow_enabled: boolean
           code: string
           commissions_enabled: boolean
+          communication_period_end: string | null
           created_at: string
           currency: string
+          customer_payment_instructions: string | null
           email: string | null
           enable_printer: boolean
           id: string
@@ -625,6 +945,9 @@ export type Database = {
           low_stock_threshold: number
           name: string
           notification_category_preferences: Json | null
+          payment_reminder_channel: string
+          payment_reminder_sms_fallback: boolean
+          payment_reminders_enabled: boolean
           paystack_customer_code: string | null
           paystack_subscription_code: string | null
           proforma_validity_days: number
@@ -633,9 +956,11 @@ export type Database = {
           public_whatsapp_number: string | null
           require_opening_count: boolean
           sms_period_end: string | null
+          sms_reserved_this_period: number
           sms_usage_by_category: Json | null
           sms_used_this_period: number
           status: string
+          storefront_entitlement_grace_end: string | null
           subscription_exempt_reason: string | null
           subscription_exempt_until: string | null
           subscription_expired_reminder_sent_at: string | null
@@ -645,8 +970,11 @@ export type Database = {
           subscription_status: string | null
           subscription_tier_id: string | null
           trial_ends_at: string | null
+          trial_started_at: string | null
           updated_at: string
           variance_notification_threshold: number
+          whatsapp_reserved_this_period: number
+          whatsapp_used_this_period: number
         }
         Insert: {
           address?: string | null
@@ -656,8 +984,10 @@ export type Database = {
           cashier_flow_enabled?: boolean
           code: string
           commissions_enabled?: boolean
+          communication_period_end?: string | null
           created_at?: string
           currency?: string
+          customer_payment_instructions?: string | null
           email?: string | null
           enable_printer?: boolean
           id?: string
@@ -668,6 +998,9 @@ export type Database = {
           low_stock_threshold?: number
           name: string
           notification_category_preferences?: Json | null
+          payment_reminder_channel?: string
+          payment_reminder_sms_fallback?: boolean
+          payment_reminders_enabled?: boolean
           paystack_customer_code?: string | null
           paystack_subscription_code?: string | null
           proforma_validity_days?: number
@@ -676,9 +1009,11 @@ export type Database = {
           public_whatsapp_number?: string | null
           require_opening_count?: boolean
           sms_period_end?: string | null
+          sms_reserved_this_period?: number
           sms_usage_by_category?: Json | null
           sms_used_this_period?: number
           status?: string
+          storefront_entitlement_grace_end?: string | null
           subscription_exempt_reason?: string | null
           subscription_exempt_until?: string | null
           subscription_expired_reminder_sent_at?: string | null
@@ -688,8 +1023,11 @@ export type Database = {
           subscription_status?: string | null
           subscription_tier_id?: string | null
           trial_ends_at?: string | null
+          trial_started_at?: string | null
           updated_at?: string
           variance_notification_threshold?: number
+          whatsapp_reserved_this_period?: number
+          whatsapp_used_this_period?: number
         }
         Update: {
           address?: string | null
@@ -699,8 +1037,10 @@ export type Database = {
           cashier_flow_enabled?: boolean
           code?: string
           commissions_enabled?: boolean
+          communication_period_end?: string | null
           created_at?: string
           currency?: string
+          customer_payment_instructions?: string | null
           email?: string | null
           enable_printer?: boolean
           id?: string
@@ -711,6 +1051,9 @@ export type Database = {
           low_stock_threshold?: number
           name?: string
           notification_category_preferences?: Json | null
+          payment_reminder_channel?: string
+          payment_reminder_sms_fallback?: boolean
+          payment_reminders_enabled?: boolean
           paystack_customer_code?: string | null
           paystack_subscription_code?: string | null
           proforma_validity_days?: number
@@ -719,9 +1062,11 @@ export type Database = {
           public_whatsapp_number?: string | null
           require_opening_count?: boolean
           sms_period_end?: string | null
+          sms_reserved_this_period?: number
           sms_usage_by_category?: Json | null
           sms_used_this_period?: number
           status?: string
+          storefront_entitlement_grace_end?: string | null
           subscription_exempt_reason?: string | null
           subscription_exempt_until?: string | null
           subscription_expired_reminder_sent_at?: string | null
@@ -731,8 +1076,11 @@ export type Database = {
           subscription_status?: string | null
           subscription_tier_id?: string | null
           trial_ends_at?: string | null
+          trial_started_at?: string | null
           updated_at?: string
           variance_notification_threshold?: number
+          whatsapp_reserved_this_period?: number
+          whatsapp_used_this_period?: number
         }
         Relationships: [
           {
@@ -960,6 +1308,72 @@ export type Database = {
           },
         ]
       }
+      customer_statement_links: {
+        Row: {
+          company_id: string
+          created_at: string
+          customer_id: string
+          expires_at: string
+          id: string
+          revoked_at: string | null
+          token_hash: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          customer_id: string
+          expires_at: string
+          id?: string
+          revoked_at?: string | null
+          token_hash: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          customer_id?: string
+          expires_at?: string
+          id?: string
+          revoked_at?: string | null
+          token_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_statement_links_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_statement_links_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_statement_links_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_ar_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "customer_statement_links_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_statement_links_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_ap_balances"
+            referencedColumns: ["supplier_id"]
+          },
+        ]
+      }
       customers: {
         Row: {
           company_id: string
@@ -981,10 +1395,12 @@ export type Database = {
           notifications_enabled: boolean
           payment_terms: string | null
           phone: string | null
+          sms_notifications_enabled: boolean
           supplier_active: boolean
           supplier_credit_limit: number
           supplier_credit_terms_days: number | null
           updated_at: string
+          whatsapp_notifications_enabled: boolean
         }
         Insert: {
           company_id: string
@@ -1006,10 +1422,12 @@ export type Database = {
           notifications_enabled?: boolean
           payment_terms?: string | null
           phone?: string | null
+          sms_notifications_enabled?: boolean
           supplier_active?: boolean
           supplier_credit_limit?: number
           supplier_credit_terms_days?: number | null
           updated_at?: string
+          whatsapp_notifications_enabled?: boolean
         }
         Update: {
           company_id?: string
@@ -1031,10 +1449,12 @@ export type Database = {
           notifications_enabled?: boolean
           payment_terms?: string | null
           phone?: string | null
+          sms_notifications_enabled?: boolean
           supplier_active?: boolean
           supplier_credit_limit?: number
           supplier_credit_terms_days?: number | null
           updated_at?: string
+          whatsapp_notifications_enabled?: boolean
         }
         Relationships: [
           {
@@ -1049,6 +1469,47 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      delivery_attempts: {
+        Row: {
+          accepted: boolean
+          attempt_number: number
+          created_at: string
+          error: string | null
+          id: string
+          outbox_id: string
+          provider: string
+          response_status: number | null
+        }
+        Insert: {
+          accepted: boolean
+          attempt_number: number
+          created_at?: string
+          error?: string | null
+          id?: string
+          outbox_id: string
+          provider: string
+          response_status?: number | null
+        }
+        Update: {
+          accepted?: boolean
+          attempt_number?: number
+          created_at?: string
+          error?: string | null
+          id?: string
+          outbox_id?: string
+          provider?: string
+          response_status?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_attempts_outbox_id_fkey"
+            columns: ["outbox_id"]
+            isOneToOne: false
+            referencedRelation: "outbox"
             referencedColumns: ["id"]
           },
         ]
@@ -1553,6 +2014,208 @@ export type Database = {
           },
         ]
       }
+      manufacturers: {
+        Row: {
+          active: boolean
+          company_id: string
+          created_at: string
+          id: string
+          name: string
+          normalized_name: string | null
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          company_id: string
+          created_at?: string
+          id?: string
+          name: string
+          normalized_name?: string | null
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          company_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+          normalized_name?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "manufacturers_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "manufacturers_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      message_campaigns: {
+        Row: {
+          audience: string
+          audience_config: Json
+          body: string
+          channel: string
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          failed_count: number
+          id: string
+          name: string
+          recipient_count: number
+          scope: string
+          sent_at: string | null
+          sent_count: number
+          skipped_count: number
+          status: string
+          template_id: string | null
+          template_version: number | null
+          title: string | null
+        }
+        Insert: {
+          audience: string
+          audience_config?: Json
+          body: string
+          channel: string
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          failed_count?: number
+          id?: string
+          name: string
+          recipient_count?: number
+          scope: string
+          sent_at?: string | null
+          sent_count?: number
+          skipped_count?: number
+          status?: string
+          template_id?: string | null
+          template_version?: number | null
+          title?: string | null
+        }
+        Update: {
+          audience?: string
+          audience_config?: Json
+          body?: string
+          channel?: string
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          failed_count?: number
+          id?: string
+          name?: string
+          recipient_count?: number
+          scope?: string
+          sent_at?: string | null
+          sent_count?: number
+          skipped_count?: number
+          status?: string
+          template_id?: string | null
+          template_version?: number | null
+          title?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_campaigns_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_campaigns_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_campaigns_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "message_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      message_templates: {
+        Row: {
+          active: boolean
+          company_id: string | null
+          context: string
+          created_at: string
+          created_by: string | null
+          id: string
+          in_app_body: string | null
+          in_app_title: string | null
+          is_system: boolean
+          name: string
+          sms_body: string | null
+          template_key: string
+          updated_at: string
+          version: number
+          whatsapp_body: string | null
+        }
+        Insert: {
+          active?: boolean
+          company_id?: string | null
+          context: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          in_app_body?: string | null
+          in_app_title?: string | null
+          is_system?: boolean
+          name: string
+          sms_body?: string | null
+          template_key: string
+          updated_at?: string
+          version?: number
+          whatsapp_body?: string | null
+        }
+        Update: {
+          active?: boolean
+          company_id?: string | null
+          context?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          in_app_body?: string | null
+          in_app_title?: string | null
+          is_system?: boolean
+          name?: string
+          sms_body?: string | null
+          template_key?: string
+          updated_at?: string
+          version?: number
+          whatsapp_body?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_templates_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_templates_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       mpesa_verifications: {
         Row: {
           all_confirmed: boolean
@@ -1769,6 +2432,7 @@ export type Database = {
           completed_by: string | null
           created_at: string
           created_by: string | null
+          credit_due_at: string | null
           customer_id: string | null
           expires_at: string
           id: string
@@ -1791,6 +2455,7 @@ export type Database = {
           completed_by?: string | null
           created_at?: string
           created_by?: string | null
+          credit_due_at?: string | null
           customer_id?: string | null
           expires_at: string
           id?: string
@@ -1813,6 +2478,7 @@ export type Database = {
           completed_by?: string | null
           created_at?: string
           created_by?: string | null
+          credit_due_at?: string | null
           customer_id?: string | null
           expires_at?: string
           id?: string
@@ -1874,46 +2540,96 @@ export type Database = {
         Row: {
           attempts: number
           body: string
+          campaign_id: string | null
+          campaign_recipient_id: string | null
           channel: string
           company_id: string
           created_at: string
+          customer_id: string | null
           error: string | null
+          fallback_body: string | null
+          fallback_channel: string | null
+          fallback_for_outbox_id: string | null
           id: string
+          max_attempts: number
+          quota_state: string
+          quota_units: number
           recipient: string
           scheduled_after: string
           sent_at: string | null
+          source: string
           status: string
           subject: string | null
+          template_key: string | null
+          template_version: number | null
         }
         Insert: {
           attempts?: number
           body: string
+          campaign_id?: string | null
+          campaign_recipient_id?: string | null
           channel: string
           company_id: string
           created_at?: string
+          customer_id?: string | null
           error?: string | null
+          fallback_body?: string | null
+          fallback_channel?: string | null
+          fallback_for_outbox_id?: string | null
           id?: string
+          max_attempts?: number
+          quota_state?: string
+          quota_units?: number
           recipient: string
           scheduled_after?: string
           sent_at?: string | null
+          source?: string
           status?: string
           subject?: string | null
+          template_key?: string | null
+          template_version?: number | null
         }
         Update: {
           attempts?: number
           body?: string
+          campaign_id?: string | null
+          campaign_recipient_id?: string | null
           channel?: string
           company_id?: string
           created_at?: string
+          customer_id?: string | null
           error?: string | null
+          fallback_body?: string | null
+          fallback_channel?: string | null
+          fallback_for_outbox_id?: string | null
           id?: string
+          max_attempts?: number
+          quota_state?: string
+          quota_units?: number
           recipient?: string
           scheduled_after?: string
           sent_at?: string | null
+          source?: string
           status?: string
           subject?: string | null
+          template_key?: string | null
+          template_version?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "outbox_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "message_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "outbox_campaign_recipient_id_fkey"
+            columns: ["campaign_recipient_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_recipients"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "outbox_company_id_fkey"
             columns: ["company_id"]
@@ -1926,6 +2642,34 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "outbox_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_ar_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "outbox_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "outbox_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_ap_balances"
+            referencedColumns: ["supplier_id"]
+          },
+          {
+            foreignKeyName: "outbox_fallback_for_outbox_id_fkey"
+            columns: ["fallback_for_outbox_id"]
+            isOneToOne: false
+            referencedRelation: "outbox"
             referencedColumns: ["id"]
           },
         ]
@@ -1983,6 +2727,45 @@ export type Database = {
           },
           {
             foreignKeyName: "payment_methods_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payment_reminder_rules: {
+        Row: {
+          company_id: string
+          enabled: boolean
+          id: string
+          stage_days: number
+          template_key: string
+        }
+        Insert: {
+          company_id: string
+          enabled?: boolean
+          id?: string
+          stage_days: number
+          template_key: string
+        }
+        Update: {
+          company_id?: string
+          enabled?: boolean
+          id?: string
+          stage_days?: number
+          template_key?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_reminder_rules_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_reminder_rules_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "public_storefronts"
@@ -2105,6 +2888,35 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      platform_billing_settings: {
+        Row: {
+          default_trial_tier_id: string
+          singleton: boolean
+          trial_duration_days: number
+          updated_at: string
+        }
+        Insert: {
+          default_trial_tier_id: string
+          singleton?: boolean
+          trial_duration_days?: number
+          updated_at?: string
+        }
+        Update: {
+          default_trial_tier_id?: string
+          singleton?: boolean
+          trial_duration_days?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_billing_settings_default_trial_tier_id_fkey"
+            columns: ["default_trial_tier_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_tiers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       product_collections: {
         Row: {
@@ -2243,44 +3055,6 @@ export type Database = {
           },
         ]
       }
-      manufacturers: {
-        Row: {
-          active: boolean
-          company_id: string
-          created_at: string
-          id: string
-          name: string
-          normalized_name: string
-          updated_at: string
-        }
-        Insert: {
-          active?: boolean
-          company_id: string
-          created_at?: string
-          id?: string
-          name: string
-          normalized_name?: string
-          updated_at?: string
-        }
-        Update: {
-          active?: boolean
-          company_id?: string
-          created_at?: string
-          id?: string
-          name?: string
-          normalized_name?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "manufacturers_company_id_fkey"
-            columns: ["company_id"]
-            isOneToOne: false
-            referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       products: {
         Row: {
           active: boolean
@@ -2317,13 +3091,6 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "products_manufacturer_company_fkey"
-            columns: ["company_id", "manufacturer_id"]
-            isOneToOne: false
-            referencedRelation: "manufacturers"
-            referencedColumns: ["company_id", "id"]
-          },
-          {
             foreignKeyName: "products_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
@@ -2336,6 +3103,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "public_storefronts"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "products_manufacturer_company_fkey"
+            columns: ["company_id", "manufacturer_id"]
+            isOneToOne: false
+            referencedRelation: "manufacturers"
+            referencedColumns: ["company_id", "id"]
           },
         ]
       }
@@ -3108,6 +3882,7 @@ export type Database = {
           code: string
           commissions_available: boolean
           created_at: string
+          customer_campaigns_available: boolean
           id: string
           is_active: boolean
           max_orders_per_month: number | null
@@ -3116,16 +3891,20 @@ export type Database = {
           max_team_members: number | null
           multiple_locations_enabled: boolean
           name: string
+          payment_reminders_available: boolean
           price_monthly: number
           price_yearly: number
           sms_per_period: number | null
           staff_performance_enabled: boolean
+          storefront_available: boolean
           updated_at: string
+          whatsapp_per_period: number | null
         }
         Insert: {
           code: string
           commissions_available?: boolean
           created_at?: string
+          customer_campaigns_available?: boolean
           id?: string
           is_active?: boolean
           max_orders_per_month?: number | null
@@ -3134,16 +3913,20 @@ export type Database = {
           max_team_members?: number | null
           multiple_locations_enabled?: boolean
           name: string
+          payment_reminders_available?: boolean
           price_monthly: number
           price_yearly: number
           sms_per_period?: number | null
           staff_performance_enabled?: boolean
+          storefront_available?: boolean
           updated_at?: string
+          whatsapp_per_period?: number | null
         }
         Update: {
           code?: string
           commissions_available?: boolean
           created_at?: string
+          customer_campaigns_available?: boolean
           id?: string
           is_active?: boolean
           max_orders_per_month?: number | null
@@ -3152,11 +3935,14 @@ export type Database = {
           max_team_members?: number | null
           multiple_locations_enabled?: boolean
           name?: string
+          payment_reminders_available?: boolean
           price_monthly?: number
           price_yearly?: number
           sms_per_period?: number | null
           staff_performance_enabled?: boolean
+          storefront_available?: boolean
           updated_at?: string
+          whatsapp_per_period?: number | null
         }
         Relationships: []
       }
@@ -3921,6 +4707,15 @@ export type Database = {
           requires_reconciliation: boolean
         }[]
       }
+      campaign_preview: {
+        Args: {
+          p_audience?: string
+          p_body: string
+          p_channel: string
+          p_customer_ids?: string[]
+        }
+        Returns: Json
+      }
       cancel_purchase_draft: { Args: { p_draft_id: string }; Returns: string }
       cashier_session_required_for_source: {
         Args: { p_source_type: string }
@@ -3950,6 +4745,10 @@ export type Database = {
         }[]
       }
       commissions_available: {
+        Args: { p_company_id: string }
+        Returns: boolean
+      }
+      company_subscription_accessible: {
         Args: { p_company_id: string }
         Returns: boolean
       }
@@ -4028,6 +4827,17 @@ export type Database = {
         }
         Returns: string
       }
+      create_message_campaign: {
+        Args: {
+          p_audience?: string
+          p_body: string
+          p_channel: string
+          p_customer_ids?: string[]
+          p_name: string
+          p_template_id?: string
+        }
+        Returns: string
+      }
       create_product: {
         Args: { p_barcode?: string; p_image_path?: string; p_name: string }
         Returns: string
@@ -4081,10 +4891,23 @@ export type Database = {
         Args: { p_company_id: string; p_feature: string }
         Returns: boolean
       }
+      finalize_message_quota: {
+        Args: { p_accepted: boolean; p_outbox_id: string }
+        Returns: undefined
+      }
       flush_outbox_trigger: { Args: never; Returns: undefined }
       generate_commission_period: {
         Args: { p_end_date: string; p_start_date: string }
         Returns: string
+      }
+      import_catalog_products: {
+        Args: {
+          p_idempotency_key?: string
+          p_mode?: string
+          p_products: Json
+          p_source_export_id?: string
+        }
+        Returns: Json
       }
       increment_sms_usage: {
         Args: { p_company_id: string }
@@ -4095,6 +4918,10 @@ export type Database = {
         Returns: boolean
       }
       is_platform_admin: { Args: never; Returns: boolean }
+      issue_customer_statement_link: {
+        Args: { p_company_id: string; p_customer_id: string }
+        Returns: string
+      }
       list_audit_actors: {
         Args: never
         Returns: {
@@ -4162,6 +4989,10 @@ export type Database = {
           role_name: string
         }[]
       }
+      next_monthly_anniversary: {
+        Args: { p_after?: string; p_anchor: string }
+        Returns: string
+      }
       notify: {
         Args: {
           p_body?: string
@@ -4198,12 +5029,62 @@ export type Database = {
         Args: { p_body: string; p_link?: string; p_title: string }
         Returns: number
       }
+      platform_campaign_preview: {
+        Args: {
+          p_audience?: string
+          p_channel: string
+          p_company_ids?: string[]
+          p_subscription_status?: string
+          p_tier_id?: string
+        }
+        Returns: Json
+      }
       platform_operations_snapshot: { Args: never; Returns: Json }
+      platform_save_tier: {
+        Args: {
+          p_code: string
+          p_commissions_available: boolean
+          p_customer_campaigns_available: boolean
+          p_is_active?: boolean
+          p_max_orders_per_month?: number
+          p_max_products?: number
+          p_max_stock_locations?: number
+          p_max_team_members?: number
+          p_multiple_locations_enabled: boolean
+          p_name: string
+          p_payment_reminders_available: boolean
+          p_price_monthly: number
+          p_price_yearly: number
+          p_sms_per_period?: number
+          p_staff_performance_enabled: boolean
+          p_storefront_available: boolean
+          p_tier_id?: string
+          p_whatsapp_per_period?: number
+        }
+        Returns: string
+      }
+      platform_send_campaign: {
+        Args: {
+          p_audience?: string
+          p_body: string
+          p_channel: string
+          p_company_ids?: string[]
+          p_name: string
+          p_subscription_status?: string
+          p_tier_id?: string
+          p_title: string
+        }
+        Returns: Json
+      }
       platform_set_company_status: {
         Args: { p_company_id: string; p_status: string }
         Returns: string
       }
       platform_stats: { Args: never; Returns: Json }
+      platform_update_billing_config: {
+        Args: { p_default_trial_tier_id: string; p_trial_duration_days: number }
+        Returns: Json
+      }
       platform_update_subscription: {
         Args: {
           p_company_id: string
@@ -4212,6 +5093,27 @@ export type Database = {
           p_expires_at?: string
           p_subscription_status?: string
           p_tier_id?: string
+        }
+        Returns: string
+      }
+      platform_update_tier_communications: {
+        Args: {
+          p_customer_campaigns_available: boolean
+          p_payment_reminders_available: boolean
+          p_storefront_available: boolean
+          p_tier_id: string
+          p_whatsapp_per_period?: number
+        }
+        Returns: undefined
+      }
+      platform_upsert_message_template: {
+        Args: {
+          p_in_app_body: string
+          p_in_app_title: string
+          p_name: string
+          p_sms_body: string
+          p_template_id: string
+          p_whatsapp_body: string
         }
         Returns: string
       }
@@ -4378,9 +5280,22 @@ export type Database = {
           p_currency?: string
           p_email?: string
           p_store_name?: string
+          p_trial_tier_code?: string
         }
         Returns: string
       }
+      provision_company_base: {
+        Args: {
+          p_address?: string
+          p_company_name: string
+          p_currency?: string
+          p_email?: string
+          p_store_name?: string
+        }
+        Returns: string
+      }
+      public_billing_config: { Args: never; Returns: Json }
+      public_customer_statement: { Args: { p_token: string }; Returns: Json }
       queue_batch_message: {
         Args: { p_audience?: string; p_body: string; p_channel: string }
         Returns: number
@@ -4394,6 +5309,18 @@ export type Database = {
           p_subject?: string
         }
         Returns: string
+      }
+      queue_sms_fallback: { Args: { p_outbox_id: string }; Returns: string }
+      record_auth_otp_delivery_request: {
+        Args: {
+          p_phone_hash: string
+          p_phone_suffix: string
+          p_sms_request_id: number
+          p_sms_status: string
+          p_whatsapp_request_id: number
+          p_whatsapp_status: string
+        }
+        Returns: undefined
       }
       record_manual_reconciliation: {
         Args: { p_declarations: Json }
@@ -4448,7 +5375,20 @@ export type Database = {
         Returns: string
       }
       refresh_analytics: { Args: never; Returns: undefined }
+      refresh_auth_otp_delivery_status: { Args: never; Returns: number }
+      refresh_catalog_search_product: {
+        Args: { p_product_id: string }
+        Returns: undefined
+      }
+      refresh_catalog_search_variant: {
+        Args: { p_variant_id: string }
+        Returns: undefined
+      }
       remove_team_member: { Args: { p_membership_id: string }; Returns: string }
+      render_message_template: {
+        Args: { p_body: string; p_values: Json }
+        Returns: string
+      }
       require_asset_leaf_account: {
         Args: { p_code: string; p_company_id: string }
         Returns: string
@@ -4457,9 +5397,25 @@ export type Database = {
         Args: { p_company_id: string }
         Returns: string
       }
+      reserve_message_quota: {
+        Args: { p_channel: string; p_company_id: string; p_units: number }
+        Returns: undefined
+      }
+      reset_communication_period_locked: {
+        Args: { p_company_id: string }
+        Returns: undefined
+      }
+      reset_message_template: {
+        Args: { p_template_key: string }
+        Returns: boolean
+      }
       resolve_business_location: {
         Args: { p_location_id?: string }
         Returns: string
+      }
+      retry_failed_campaign_recipients: {
+        Args: { p_campaign_id: string }
+        Returns: number
       }
       revert_variance: {
         Args: { p_reason?: string; p_recon_account_id: string }
@@ -4500,11 +5456,39 @@ export type Database = {
         }
         Returns: string
       }
+      search_catalog_variants: {
+        Args: { p_limit?: number; p_location_id?: string; p_query: string }
+        Returns: {
+          allow_fractional: boolean
+          barcode: string
+          company_id: string
+          image_path: string
+          kind: string
+          manufacturer_id: string
+          manufacturer_name: string
+          price: number
+          product_active: boolean
+          product_id: string
+          product_name: string
+          sku: string
+          stock: number
+          track_inventory: boolean
+          variant_active: boolean
+          variant_id: string
+          variant_name: string
+          wholesale_price: number
+        }[]
+      }
       seed_default_company_roles: {
         Args: { p_company_id: string }
         Returns: undefined
       }
+      send_message_campaign: { Args: { p_campaign_id: string }; Returns: Json }
       send_sms_hook: { Args: { event: Json }; Returns: Json }
+      set_campaign_status: {
+        Args: { p_action: string; p_campaign_id: string }
+        Returns: string
+      }
       set_commissions_enabled: {
         Args: { p_enabled: boolean }
         Returns: boolean
@@ -4541,6 +5525,7 @@ export type Database = {
         Args: { p_client_ref?: string; p_order_id: string; p_payments: Json }
         Returns: string
       }
+      sms_segment_count: { Args: { p_body: string }; Returns: number }
       staff_fallback_name: { Args: { p_user_id: string }; Returns: string }
       staff_sales_daily: {
         Args: { p_from: string; p_staff_user_id: string; p_to: string }
@@ -4578,6 +5563,7 @@ export type Database = {
           voids: number
         }[]
       }
+      start_catalog_export: { Args: never; Returns: Json }
       stock_adjustment_history: {
         Args: {
           p_limit?: number
@@ -4659,6 +5645,10 @@ export type Database = {
         }
       }
       subscription_expiry_scan: { Args: never; Returns: number }
+      test_message_template: {
+        Args: { p_channel: string; p_recipient: string; p_template_id: string }
+        Returns: string
+      }
       transfer_stock: {
         Args: {
           p_from_location_id: string
@@ -4689,10 +5679,19 @@ export type Database = {
         }
         Returns: string
       }
-      upsert_manufacturer: { Args: { p_name: string }; Returns: string }
       update_commission_period_status: {
         Args: { p_notes?: string; p_period_id: string; p_status: string }
         Returns: string
+      }
+      update_communication_settings: {
+        Args: {
+          p_channel: string
+          p_payment_instructions: string
+          p_reminders_enabled: boolean
+          p_rules?: Json
+          p_sms_fallback: boolean
+        }
+        Returns: undefined
       }
       update_customer: {
         Args: {
@@ -4704,6 +5703,15 @@ export type Database = {
           p_phone?: string
         }
         Returns: string
+      }
+      update_customer_communication_preferences: {
+        Args: {
+          p_customer_id: string
+          p_enabled: boolean
+          p_sms_enabled: boolean
+          p_whatsapp_enabled: boolean
+        }
+        Returns: undefined
       }
       update_customer_credit: {
         Args: {
@@ -4784,6 +5792,18 @@ export type Database = {
           p_name: string
           p_plan_id?: string
           p_rate_bps: number
+        }
+        Returns: string
+      }
+      upsert_manufacturer: { Args: { p_name: string }; Returns: string }
+      upsert_message_template: {
+        Args: {
+          p_context: string
+          p_name: string
+          p_sms_body: string
+          p_template_id?: string
+          p_template_key: string
+          p_whatsapp_body: string
         }
         Returns: string
       }

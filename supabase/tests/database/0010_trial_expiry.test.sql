@@ -37,7 +37,8 @@ select is(
 
 -- Fast-forward past the trial: the scan flips to expired and sets grace.
 update public.companies
-set trial_ends_at = now() - interval '1 day',
+set trial_started_at = now() - interval '31 days',
+    trial_ends_at = now() - interval '1 day',
     subscription_expires_at = now() - interval '1 day'
 where id = (select company_id from trial_company);
 

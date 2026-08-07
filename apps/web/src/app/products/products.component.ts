@@ -9,16 +9,20 @@ import {
   CatalogVariantInput,
   CollectionWithCount,
   InventoryBatch,
-  Manufacturer,
   PosService,
   Product,
   ProductVariant,
-  StockLocation,
   Variant,
 } from '../pos/pos.service';
+import { matchesCatalogQuery } from '../pos/catalog-search';
 import { imageExtension, resizeImage } from '../shared/ui/image.util';
 import { DeleteConfirmationModalComponent } from '../shared/ui/delete-confirmation-modal.component';
-import { ListSearchBarComponent } from '../shared/ui/list-search-bar.component';
+import {
+  ListSearchBarComponent,
+  type ListSortDirection,
+  type ListSortOption,
+} from '../shared/ui/list-search-bar.component';
+import { sortList } from '../shared/ui/list-sort';
 import { StatusBadgeComponent } from '../shared/ui/status-badge.component';
 import { PaginationComponent } from '../shared/ui/pagination.component';
 import { DataTableShellComponent } from '../shared/ui/data-table-shell.component';
@@ -32,10 +36,24 @@ import { DrawerComponent } from '../shared/ui/drawer.component';
 import { CompanyPreferencesService } from '../core/company-preferences.service';
 import { PermissionsService } from '../core/permissions.service';
 import { CatalogCacheService } from '../core/catalog-cache.service';
+import { LocationContextService } from '../core/location-context.service';
+import { ProductImportDialogComponent } from './product-import-dialog.component';
+import { ProductTransferService, type CatalogImportResult } from './product-transfer.service';
 
 type StockInfo = { stock: number; stock_value: number };
 type ProductStatusFilter = 'all' | 'active' | 'inactive';
 type StockStatusFilter = 'all' | 'in_stock' | 'out_of_stock' | 'not_tracked';
+const DEFAULT_PRODUCT_STATUS_FILTER: ProductStatusFilter = 'active';
+
+const PRODUCT_SORT_OPTIONS: readonly ListSortOption[] = [
+  { value: 'name', label: 'Product name' },
+  { value: 'manufacturer', label: 'Manufacturer' },
+  { value: 'stock', label: 'Stock quantity' },
+  { value: 'cost_value', label: 'Cost value' },
+  { value: 'wholesale_value', label: 'Wholesale value' },
+  { value: 'retail_value', label: 'Retail value' },
+  { value: 'variants', label: 'Variant count' },
+];
 
 /** One variant in the coupled create/edit product editor. */
 type DeactivateTarget = { kind: 'collection'; collection: CollectionWithCount };
@@ -79,6 +97,7 @@ interface ProductEditorRow {
     IconComponent,
     MoneyComponent,
     StatBarComponent,
+    ProductImportDialogComponent,
   ],
   template: `
     <app-page
@@ -99,6 +118,23 @@ interface ProductEditorRow {
       >
         <app-icon name="heroArrowPath" />
       </button>
+      @if (perms.has('ManageCatalog')) {
+        <button
+          actions
+          appButton
+          variant="secondary"
+          [loading]="transferBusy()"
+          type="button"
+          (click)="exportProducts()"
+        >
+          <app-icon name="heroArrowDownTray" /> Export
+        </button>
+      }
+      @if (perms.has('ManageCatalog')) {
+        <button actions appButton variant="secondary" type="button" (click)="importOpen.set(true)">
+          <app-icon name="heroArrowUpTray" /> Import
+        </button>
+      }
       <button
         actions
         appButton
@@ -732,34 +768,51 @@ interface ProductEditorRow {
 
       <!-- Search -->
       <app-list-search-bar
-        placeholder="Search product, variant, SKU, or barcode…"
+        placeholder="Search product, manufacturer, variant, SKU, or barcode…"
         [(searchQuery)]="query"
+        [sortOptions]="productSortOptions"
+        [(sortKey)]="productSort"
+        [(sortDirection)]="productSortDirection"
       >
         <app-stat-bar summary [stats]="productStats()" />
-        <div filters class="grid gap-2 sm:grid-cols-2 lg:flex lg:items-end">
-          <app-form-field label="Product status" class="lg:w-44">
-            <select
-              class="select select-bordered select-sm w-full"
-              [value]="productStatusFilter()"
-              (change)="setProductStatusFilter($event)"
-            >
-              <option value="all">All statuses</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
-          </app-form-field>
-          <app-form-field label="Stock" class="lg:w-44">
-            <select
-              class="select select-bordered select-sm w-full"
-              [value]="stockStatusFilter()"
-              (change)="setStockStatusFilter($event)"
-            >
-              <option value="all">All stock states</option>
-              <option value="in_stock">In stock</option>
-              <option value="out_of_stock">Out of stock</option>
-              <option value="not_tracked">Not tracked</option>
-            </select>
-          </app-form-field>
+        <div filters class="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+          <span class="type-caption mr-1 font-semibold uppercase tracking-wide">Filters</span>
+          <select
+            class="select select-bordered min-h-10 w-full select-sm sm:w-40"
+            aria-label="Product status"
+            title="Product status"
+            [value]="productStatusFilter()"
+            (change)="setProductStatusFilter($event)"
+          >
+            <option value="all">All statuses</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+          <select
+            class="select select-bordered min-h-10 w-full select-sm sm:w-44"
+            aria-label="Stock status"
+            title="Stock status"
+            [value]="stockStatusFilter()"
+            (change)="setStockStatusFilter($event)"
+          >
+            <option value="all">All stock states</option>
+            <option value="in_stock">In stock</option>
+            <option value="out_of_stock">Out of stock</option>
+            <option value="not_tracked">Not tracked</option>
+          </select>
+          <select
+            class="select select-bordered min-h-10 w-full select-sm sm:w-56"
+            aria-label="Manufacturer"
+            title="Manufacturer"
+            [value]="manufacturerFilter()"
+            (change)="setManufacturerFilter($event)"
+          >
+            <option value="all">All manufacturers</option>
+            <option value="unassigned">Not specified</option>
+            @for (manufacturer of manufacturers(); track manufacturer.id) {
+              <option [value]="manufacturer.id">{{ manufacturer.name }}</option>
+            }
+          </select>
           @if (hasProductFilters()) {
             <button
               appButton
@@ -886,7 +939,7 @@ interface ProductEditorRow {
                       @if (familyTracksInventory(group.variants)) {
                         <p class="font-medium tabular-nums">{{ familyStock(group.variants) }}</p>
                         <p class="type-caption tabular-nums">
-                          <app-money [amount]="familyStockValue(group.variants)" /> value
+                          Retail <app-money [amount]="familyRetailStockValue(group.variants)" />
                         </p>
                       } @else {
                         <span class="text-sm text-base-content/50">Not tracked</span>
@@ -955,12 +1008,20 @@ interface ProductEditorRow {
           </button>
 
           <div class="flex flex-wrap items-center justify-between gap-2">
-            <p class="type-caption">Product status</p>
-            <app-status-badge
-              size="xs"
-              [type]="group.family.active ? 'neutral' : 'warning'"
-              [label]="group.family.active ? 'active' : 'inactive'"
-            />
+            <div>
+              <p class="type-caption">Manufacturer</p>
+              <p class="mt-0.5 text-sm font-semibold">
+                {{ manufacturerName(group.family.manufacturer_id) || 'Manufacturer not set' }}
+              </p>
+            </div>
+            <div class="text-right">
+              <p class="type-caption">Product status</p>
+              <app-status-badge
+                size="xs"
+                [type]="group.family.active ? 'neutral' : 'warning'"
+                [label]="group.family.active ? 'active' : 'inactive'"
+              />
+            </div>
           </div>
 
           <div class="mt-3 grid grid-cols-2 gap-2">
@@ -974,7 +1035,7 @@ interface ProductEditorRow {
               "
               [sub]="
                 familyTracksInventory(group.variants)
-                  ? fmt(familyStockValue(group.variants)) + ' value'
+                  ? fmt(familyRetailStockValue(group.variants)) + ' retail value'
                   : undefined
               "
             />
@@ -1037,7 +1098,7 @@ interface ProductEditorRow {
                           <span class="font-semibold text-base-content/80">
                             {{ stockOf(v.variant_id!)?.stock ?? 0 }} in stock
                           </span>
-                          · <app-money [amount]="stockOf(v.variant_id!)?.stock_value ?? 0" /> value
+                          · <app-money [amount]="variantRetailStockValue(v)" /> retail value
                         </p>
                       } @else {
                         <p class="type-caption">Inventory not tracked</p>
@@ -1120,6 +1181,10 @@ interface ProductEditorRow {
         confirmButtonText="Deactivate"
         (confirm)="executeDeactivate()"
       />
+      <app-product-import-dialog
+        [(open)]="importOpen"
+        (imported)="productImportCompleted($event)"
+      />
     </app-page>
   `,
   styles: `
@@ -1140,6 +1205,8 @@ export class ProductsComponent implements OnInit {
   private readonly pos = inject(PosService);
   private readonly supabase = inject(SupabaseService);
   private readonly catalogCache = inject(CatalogCacheService);
+  private readonly locationContext = inject(LocationContextService);
+  private readonly productTransfer = inject(ProductTransferService);
   protected readonly preferences = inject(CompanyPreferencesService);
   protected readonly perms = inject(PermissionsService);
 
@@ -1154,8 +1221,14 @@ export class ProductsComponent implements OnInit {
   protected readonly batches = signal<InventoryBatch[]>([]);
 
   protected readonly query = signal('');
-  protected readonly productStatusFilter = signal<ProductStatusFilter>('all');
+  protected readonly productStatusFilter = signal<ProductStatusFilter>(
+    DEFAULT_PRODUCT_STATUS_FILTER
+  );
   protected readonly stockStatusFilter = signal<StockStatusFilter>('all');
+  protected readonly manufacturerFilter = signal<string>('all');
+  protected readonly productSortOptions = PRODUCT_SORT_OPTIONS;
+  protected readonly productSort = signal('name');
+  protected readonly productSortDirection = signal<ListSortDirection>('asc');
 
   protected readonly editingFamily = signal<Product | null>(null);
   protected readonly familyName = new FormControl('', { nonNullable: true });
@@ -1174,6 +1247,8 @@ export class ProductsComponent implements OnInit {
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
+  protected readonly transferBusy = signal(false);
+  protected readonly importOpen = signal(false);
   protected readonly page = signal(1);
   protected readonly pageSize = signal(25);
 
@@ -1183,9 +1258,9 @@ export class ProductsComponent implements OnInit {
 
   /** Collections panel + per-family checkbox editor. */
   protected readonly collectionsOpen = signal(false);
-  protected readonly collections = signal<CollectionWithCount[]>([]);
-  protected readonly manufacturers = signal<Manufacturer[]>([]);
-  protected readonly stockLocations = signal<StockLocation[]>([]);
+  protected readonly collections = this.catalogCache.collections;
+  protected readonly manufacturers = this.catalogCache.manufacturers;
+  protected readonly stockLocations = this.locationContext.locations;
   protected readonly collectionForm = signal<{ editing: CollectionWithCount | null } | null>(null);
   protected readonly collectionName = new FormControl('', { nonNullable: true });
   protected readonly collectionSlug = new FormControl('', { nonNullable: true });
@@ -1198,29 +1273,23 @@ export class ProductsComponent implements OnInit {
 
   /** Families with their variants; search filters the cached catalog client-side. */
   protected readonly grouped = computed(() => {
-    const q = this.query().trim().toLowerCase();
+    const q = this.query().trim();
     const productStatus = this.productStatusFilter();
     const stockStatus = this.stockStatusFilter();
+    const manufacturer = this.manufacturerFilter();
+    const sortKey = this.productSort();
+    const sortDirection = this.productSortDirection();
     const byProduct = new Map<string, Variant[]>();
     for (const v of this.catalog()) {
       if (!v.product_id) continue;
-      if (
-        q &&
-        !(
-          (v.product_name ?? '').toLowerCase().includes(q) ||
-          (v.variant_name ?? '').toLowerCase().includes(q) ||
-          (v.sku ?? '').toLowerCase().includes(q) ||
-          (v.barcode ?? '').toLowerCase().includes(q) ||
-          (v.manufacturer_name ?? '').toLowerCase().includes(q)
-        )
-      ) {
+      if (q && !matchesCatalogQuery(v, q)) {
         continue;
       }
       const list = byProduct.get(v.product_id) ?? [];
       list.push(v);
       byProduct.set(v.product_id, list);
     }
-    return this.families()
+    const groups = this.families()
       .map(family => ({ family, variants: byProduct.get(family.id) ?? [] }))
       .filter(g => {
         const matchesSearch =
@@ -1230,6 +1299,10 @@ export class ProductsComponent implements OnInit {
           const isActive = g.family.active;
           if (productStatus === 'active' ? !isActive : isActive) return false;
         }
+        if (manufacturer === 'unassigned' && g.family.manufacturer_id !== null) return false;
+        if (manufacturer !== 'all' && manufacturer !== 'unassigned') {
+          if (g.family.manufacturer_id !== manufacturer) return false;
+        }
         if (stockStatus === 'all') return true;
         const tracksInventory = this.familyTracksInventory(g.variants);
         if (stockStatus === 'not_tracked') return !tracksInventory;
@@ -1237,6 +1310,29 @@ export class ProductsComponent implements OnInit {
         const quantity = this.familyStock(g.variants);
         return stockStatus === 'in_stock' ? quantity > 0 : quantity <= 0;
       });
+    return sortList(
+      groups,
+      sortDirection,
+      group => {
+        switch (sortKey) {
+          case 'manufacturer':
+            return this.manufacturerName(group.family.manufacturer_id);
+          case 'stock':
+            return this.familyStock(group.variants);
+          case 'cost_value':
+            return this.familyStockValue(group.variants);
+          case 'wholesale_value':
+            return this.familyWholesaleStockValue(group.variants);
+          case 'retail_value':
+            return this.familyRetailStockValue(group.variants);
+          case 'variants':
+            return group.variants.length;
+          default:
+            return group.family.name;
+        }
+      },
+      group => group.family.name
+    );
   });
 
   protected readonly totalStockValue = computed(() => {
@@ -1248,11 +1344,18 @@ export class ProductsComponent implements OnInit {
       0
     );
   });
+  protected readonly totalWholesaleStockValue = computed(() => {
+    return this.grouped().reduce(
+      (sum, group) => sum + this.familyWholesaleStockValue(group.variants),
+      0
+    );
+  });
   protected readonly hasProductFilters = computed(
     () =>
       this.query().trim().length > 0 ||
-      this.productStatusFilter() !== 'all' ||
-      this.stockStatusFilter() !== 'all'
+      this.productStatusFilter() !== DEFAULT_PRODUCT_STATUS_FILTER ||
+      this.stockStatusFilter() !== 'all' ||
+      this.manufacturerFilter() !== 'all'
   );
   protected readonly productStats = computed(() => {
     const groups = this.grouped();
@@ -1271,13 +1374,14 @@ export class ProductsComponent implements OnInit {
     return [
       { label: 'Matching products', value: groups.length },
       { label: 'Variants shown', value: variants },
-      { label: 'Cost value', value: this.fmt(this.totalStockValue()) },
-      { label: 'Retail value', value: this.fmt(this.totalRetailStockValue()) },
       {
         label: 'Out of stock',
         value: outOfStock,
         tone: outOfStock > 0 ? ('warning' as const) : ('neutral' as const),
       },
+      { label: 'Cost value', value: this.fmt(this.totalStockValue()) },
+      { label: 'Wholesale value', value: this.fmt(this.totalWholesaleStockValue()) },
+      { label: 'Retail value', value: this.fmt(this.totalRetailStockValue()) },
     ];
   });
   protected readonly totalPages = computed(() =>
@@ -1302,6 +1406,9 @@ export class ProductsComponent implements OnInit {
       this.query();
       this.productStatusFilter();
       this.stockStatusFilter();
+      this.manufacturerFilter();
+      this.productSort();
+      this.productSortDirection();
       if (firstRun) {
         firstRun = false;
         return;
@@ -1323,15 +1430,24 @@ export class ProductsComponent implements OnInit {
     this.stockStatusFilter.set((event.target as HTMLSelectElement).value as StockStatusFilter);
   }
 
+  protected setManufacturerFilter(event: Event): void {
+    this.manufacturerFilter.set((event.target as HTMLSelectElement).value);
+  }
+
   protected clearProductFilters(): void {
     this.query.set('');
-    this.productStatusFilter.set('all');
+    this.productStatusFilter.set(DEFAULT_PRODUCT_STATUS_FILTER);
     this.stockStatusFilter.set('all');
+    this.manufacturerFilter.set('all');
   }
 
   protected manufacturerName(id: string | null): string | null {
     if (!id) return null;
-    return this.manufacturers().find(manufacturer => manufacturer.id === id)?.name ?? null;
+    return (
+      this.manufacturers().find(manufacturer => manufacturer.id === id)?.name ??
+      this.catalog().find(variant => variant.manufacturer_id === id)?.manufacturer_name ??
+      null
+    );
   }
 
   async ngOnInit(): Promise<void> {
@@ -1339,9 +1455,6 @@ export class ProductsComponent implements OnInit {
     const hydrated = await this.catalogCache.ensureLoaded();
     if (hydrated) this.loading.set(false);
     void this.preferences.refresh();
-    void this.loadAuxiliary().catch(err => {
-      this.error.set(err instanceof Error ? err.message : 'Failed to load product settings');
-    });
     if (!hydrated) {
       const refreshed = await this.catalogCache.refresh();
       if (!refreshed) this.error.set('Could not load the catalog; check your connection.');
@@ -1352,11 +1465,7 @@ export class ProductsComponent implements OnInit {
   protected async load(): Promise<void> {
     this.loading.set(true);
     try {
-      await Promise.all([
-        this.catalogCache.refresh(),
-        this.preferences.refresh(),
-        this.loadAuxiliary(),
-      ]);
+      await Promise.all([this.catalogCache.refresh(), this.preferences.refresh()]);
       this.error.set(null);
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Failed to load products');
@@ -1365,20 +1474,24 @@ export class ProductsComponent implements OnInit {
     }
   }
 
-  private async loadAuxiliary(): Promise<void> {
-    const [collections, locations, manufacturers] = await Promise.all([
-      this.pos.listCollections(),
-      this.pos.listStockLocations(),
-      this.pos.listManufacturers(),
-    ]);
-    this.collections.set(collections);
-    this.stockLocations.set(locations);
-    this.manufacturers.set(manufacturers);
-    const defaultLocationId = locations[0]?.id ?? '';
-    this.editorRows = this.editorRows.map(row => ({
-      ...row,
-      openingLocationId: row.openingLocationId || defaultLocationId,
-    }));
+  protected async exportProducts(): Promise<void> {
+    this.transferBusy.set(true);
+    this.error.set(null);
+    try {
+      await this.productTransfer.exportCatalog();
+      this.notice.set('Product export downloaded');
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Export failed');
+    } finally {
+      this.transferBusy.set(false);
+    }
+  }
+
+  protected async productImportCompleted(result: CatalogImportResult): Promise<void> {
+    this.notice.set(
+      `Import complete: ${result.created ?? 0} created, ${result.updated ?? 0} updated, ${result.deactivated_products ?? 0} deactivated`
+    );
+    await this.load();
   }
 
   // --- Images ---
@@ -1535,6 +1648,19 @@ export class ProductsComponent implements OnInit {
       if (variant.kind === 'service' || !variant.track_inventory || !variant.variant_id) return sum;
       const quantity = this.stockOf(variant.variant_id)?.stock ?? 0;
       return sum + quantity * (variant.price ?? 0);
+    }, 0);
+  }
+
+  protected variantRetailStockValue(variant: Variant): number {
+    if (variant.kind === 'service' || !variant.track_inventory || !variant.variant_id) return 0;
+    return (this.stockOf(variant.variant_id)?.stock ?? 0) * (variant.price ?? 0);
+  }
+
+  protected familyWholesaleStockValue(variants: Variant[]): number {
+    return variants.reduce((sum, variant) => {
+      if (variant.kind === 'service' || !variant.track_inventory || !variant.variant_id) return sum;
+      const quantity = this.stockOf(variant.variant_id)?.stock ?? 0;
+      return sum + quantity * (variant.wholesale_price ?? 0);
     }, 0);
   }
 
@@ -1781,7 +1907,7 @@ export class ProductsComponent implements OnInit {
       allowFractional: false,
       openingQuantity: '',
       openingUnitCost: '',
-      openingLocationId: this.stockLocations()[0]?.id ?? '',
+      openingLocationId: this.locationContext.activeId() ?? this.stockLocations()[0]?.id ?? '',
       batchNumber: '',
       expiryDate: '',
       active: true,

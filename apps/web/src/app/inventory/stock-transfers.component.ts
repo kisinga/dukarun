@@ -5,7 +5,8 @@ import { RouterLink } from '@angular/router';
 import { DatePipe } from '@angular/common';
 import { debounceTime, distinctUntilChanged } from 'rxjs';
 import { LocationContextService } from '../core/location-context.service';
-import { PosService, Variant, variantLabel } from '../pos/pos.service';
+import { CatalogSearchService } from '../core/catalog-search.service';
+import { Variant, variantLabel } from '../pos/pos.service';
 import { SyncService } from '../pos/offline/sync.service';
 import { ButtonComponent } from '../shared/ui/button.component';
 import { EmptyStateComponent } from '../shared/ui/empty-state.component';
@@ -85,7 +86,7 @@ interface TransferLine {
                 <input
                   type="search"
                   class="input input-bordered w-full"
-                  placeholder="Search product, SKU, or barcode"
+                  placeholder="Search product, manufacturer, SKU, or barcode"
                   [formControl]="search"
                 />
               </app-form-field>
@@ -101,9 +102,13 @@ interface TransferLine {
                       [disabled]="Number(variant.stock ?? 0) <= 0"
                       (click)="addLine(variant)"
                     >
-                      <span class="min-w-0 flex-1 truncate text-sm font-medium">{{
-                        label(variant)
-                      }}</span>
+                      <span class="min-w-0 flex-1">
+                        <span class="block truncate text-sm font-medium">{{ label(variant) }}</span>
+                        <span class="type-caption block truncate">
+                          {{ variant.manufacturer_name || 'Manufacturer not set' }} ·
+                          {{ variant.sku }}
+                        </span>
+                      </span>
                       <span class="type-caption">{{ quantity(variant.stock ?? 0) }} available</span>
                     </button>
                   }
@@ -126,6 +131,8 @@ interface TransferLine {
                           <td>
                             <p class="font-medium">{{ label(line.variant) }}</p>
                             <p class="type-caption">
+                              {{ line.variant.manufacturer_name || 'Manufacturer not set' }} ·
+                              {{ line.variant.sku }} ·
                               {{ quantity(line.variant.stock ?? 0) }} available
                             </p>
                           </td>
@@ -209,7 +216,7 @@ interface TransferLine {
 })
 export class StockTransfersComponent implements OnInit {
   private readonly transfers = inject(StockTransfersService);
-  private readonly pos = inject(PosService);
+  private readonly catalogSearch = inject(CatalogSearchService);
   private readonly sync = inject(SyncService);
   protected readonly locations = inject(LocationContextService);
   protected readonly Number = Number;
@@ -311,7 +318,8 @@ export class StockTransfersComponent implements OnInit {
       return;
     }
     try {
-      this.results.set(await this.pos.searchVariants(query));
+      const result = await this.catalogSearch.search(query, 20);
+      this.results.set(result.variants.filter(variant => variant.kind !== 'service'));
       this.searchError.set(null);
     } catch {
       this.results.set([]);

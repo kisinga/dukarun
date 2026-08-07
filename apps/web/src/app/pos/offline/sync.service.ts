@@ -4,6 +4,7 @@ import { PosRpcError, PosService, Variant } from '../pos.service';
 import { ConnectivityService } from './connectivity.service';
 import { LocationContextService } from '../../core/location-context.service';
 import { CatalogCacheService } from '../../core/catalog-cache.service';
+import { CatalogSearchService } from '../../core/catalog-search.service';
 import {
   OutboxEntry,
   belongsToIdentity,
@@ -39,6 +40,7 @@ export class SyncService {
   private readonly supabase = inject(SupabaseService);
   private readonly locations = inject(LocationContextService);
   private readonly catalogCache = inject(CatalogCacheService);
+  private readonly catalogSearch = inject(CatalogSearchService);
 
   /** All outbox entries (queued + failed), FIFO by queued_at. */
   readonly entries = signal<OutboxEntry[]>([]);
@@ -210,21 +212,11 @@ export class SyncService {
 
   /** Local search is instant; oversized catalogs retain server-side search. */
   async searchProducts(query: string): Promise<Variant[]> {
-    await this.catalogCache.ensureLoaded();
-    if (this.catalogCache.getCatalog().length === 0 && this.connectivity.online()) {
-      await this.catalogCache.refresh();
-    }
-    if (this.catalogCache.catalogTruncated() && this.connectivity.online()) {
-      try {
-        const variants = await this.pos.searchVariants(query);
-        this.usingCachedCatalog.set(false);
-        return variants;
-      } catch {
-        // Fall through to the local snapshot.
-      }
-    }
-    this.usingCachedCatalog.set(!this.connectivity.online());
-    return this.searchProductsOffline(query);
+    const result = await this.catalogSearch.search(query, 20);
+    this.usingCachedCatalog.set(
+      result.source === 'cache' && (!this.connectivity.online() || result.incomplete)
+    );
+    return result.variants;
   }
 
   /** Offline quick-pick source: first active rows of the snapshot. */
@@ -237,19 +229,7 @@ export class SyncService {
   /** Offline product search over the last successful snapshot. */
   async searchProductsOffline(query: string): Promise<Variant[]> {
     this.usingCachedCatalog.set(true);
-    await this.catalogCache.ensureLoaded();
-    const q = query.trim().toLowerCase();
-    if (!q) return [];
-    return this.sellable(this.catalogCache.getCatalog())
-      .filter(
-        v =>
-          (v.product_name ?? '').toLowerCase().includes(q) ||
-          (v.variant_name ?? '').toLowerCase().includes(q) ||
-          (v.sku ?? '').toLowerCase().includes(q) ||
-          (v.barcode ?? '').toLowerCase().includes(q) ||
-          (v.manufacturer_name ?? '').toLowerCase().includes(q)
-      )
-      .slice(0, 20);
+    return (await this.catalogSearch.searchCached(query, 20)).variants;
   }
 
   /** The shared cache holds the full catalog; the Sell screen only sells active rows. */

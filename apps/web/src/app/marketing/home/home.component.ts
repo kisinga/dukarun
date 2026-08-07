@@ -1,6 +1,14 @@
-import { ChangeDetectionStrategy, Component, computed, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  OnInit,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { IconComponent } from '../../shared/ui/icon.component';
+import { PublicPricingService, PublicSubscriptionPlan } from '../public-pricing.service';
 
 interface DemoProduct {
   readonly id: string;
@@ -375,8 +383,98 @@ interface Testimonial {
       </div>
     </section>
 
+    <!-- Pricing -->
+    <section
+      id="pricing"
+      class="scroll-mt-20 bg-base-200/60 py-14 sm:py-20"
+      aria-labelledby="pricing-heading"
+    >
+      <div class="mkt-container">
+        <div class="text-center">
+          <span class="mkt-eyebrow">Simple pricing</span>
+          <h2 id="pricing-heading" class="mkt-h2 mt-2">Choose the plan that fits your shop</h2>
+          <p class="mkt-lead mx-auto mt-3 max-w-xl">
+            Compare the available plans, then pay monthly or save with yearly billing.
+          </p>
+        </div>
+
+        @if (pricingLoading()) {
+          <div class="mkt-card mx-auto mt-10 max-w-4xl animate-pulse p-6 sm:p-8">
+            <div class="h-5 w-28 rounded bg-base-300"></div>
+            <div class="mt-4 h-10 w-52 rounded bg-base-300"></div>
+            <div class="mt-8 grid gap-3 sm:grid-cols-2">
+              <div class="h-4 rounded bg-base-300"></div>
+              <div class="h-4 rounded bg-base-300"></div>
+            </div>
+          </div>
+        } @else if (pricingPlans().length > 0) {
+          <div class="mx-auto mt-10 grid max-w-6xl gap-4 md:grid-cols-2 xl:grid-cols-3">
+            @for (plan of pricingPlans(); track plan.id) {
+              <article class="mkt-card flex flex-col p-6 sm:p-7">
+                <h3 class="text-xl font-semibold">{{ plan.name }}</h3>
+                <div class="mt-4 flex items-end gap-2">
+                  <strong class="mkt-h2 tabular-nums">{{ kes(plan.price_monthly) }}</strong>
+                  <span class="pb-1 text-sm text-base-content/60">/ month</span>
+                </div>
+                <p class="mt-2 mb-0 min-h-10 text-sm text-base-content/70">
+                  {{ kes(plan.price_yearly) }} per year
+                  @if (yearlySaving(plan) > 0) {
+                    <span class="font-semibold text-primary">
+                      — save {{ kes(yearlySaving(plan)) }}
+                    </span>
+                  }
+                </p>
+
+                <div class="my-5 border-t border-base-300/60"></div>
+                <p class="text-sm font-semibold">Plan includes</p>
+                <ul class="mt-3 flex flex-col gap-2.5 text-sm">
+                  @for (feature of planFeatures(plan); track feature) {
+                    <li class="flex items-start gap-2">
+                      <app-icon
+                        name="heroCheckCircle"
+                        size="md"
+                        class="mt-0.5 shrink-0 text-primary"
+                      />
+                      <span>{{ feature }}</span>
+                    </li>
+                  }
+                </ul>
+
+                <a
+                  routerLink="/register"
+                  [queryParams]="{ plan: plan.code }"
+                  class="btn btn-primary mt-6 min-h-11 w-full"
+                >
+                  Start with {{ plan.name }}
+                  <app-icon name="heroArrowRight" size="md" />
+                </a>
+              </article>
+            }
+          </div>
+          <p class="mt-5 mb-0 text-center text-xs text-base-content/60">
+            No card or special hardware required.
+            @if (trialDays(); as days) {
+              Your {{ days }}-day free trial starts when your company is approved.
+            } @else {
+              Your free trial starts when your company is approved.
+            }
+          </p>
+        } @else {
+          <div
+            class="mx-auto mt-10 max-w-xl rounded-box border border-base-300 bg-base-100 p-6 text-center"
+          >
+            <h3 class="font-semibold">Pricing is temporarily unavailable</h3>
+            <p class="mt-2 mb-0 text-sm text-base-content/70">
+              Please <a routerLink="/contact" class="link link-primary">contact us</a> for the
+              current price.
+            </p>
+          </div>
+        }
+      </div>
+    </section>
+
     <!-- FAQ -->
-    <section class="bg-base-200/60 py-14 sm:py-20" aria-labelledby="faq-heading">
+    <section class="bg-base-100 py-14 sm:py-20" aria-labelledby="faq-heading">
       <div class="mkt-container max-w-3xl">
         <div class="text-center">
           <span class="mkt-eyebrow">Questions</span>
@@ -433,7 +531,23 @@ interface Testimonial {
     </section>
   `,
 })
-export class HomeComponent {
+export class HomeComponent implements OnInit {
+  private readonly publicPricing = inject(PublicPricingService);
+
+  protected readonly pricingPlans = signal<PublicSubscriptionPlan[]>([]);
+  protected readonly trialDays = signal<number | null>(null);
+  protected readonly pricingLoading = signal(true);
+
+  async ngOnInit(): Promise<void> {
+    const [plans, config] = await Promise.allSettled([
+      this.publicPricing.activePlans(),
+      this.publicPricing.billingConfig(),
+    ]);
+    this.pricingPlans.set(plans.status === 'fulfilled' ? plans.value : []);
+    this.trialDays.set(config.status === 'fulfilled' ? config.value.trialDays : null);
+    this.pricingLoading.set(false);
+  }
+
   protected readonly trustPoints = ['No hardware needed', 'Works offline', 'Cancel anytime'];
 
   protected readonly products: DemoProduct[] = [
@@ -464,6 +578,33 @@ export class HomeComponent {
 
   protected kes(amount: number): string {
     return `KES ${amount.toLocaleString('en-KE')}`;
+  }
+
+  protected yearlySaving(plan: PublicSubscriptionPlan): number {
+    return Math.max(0, plan.price_monthly * 12 - plan.price_yearly);
+  }
+
+  protected planFeatures(plan: PublicSubscriptionPlan): string[] {
+    const features: string[] = [];
+    if (plan.max_team_members !== null) features.push(`${plan.max_team_members} team members`);
+    if (plan.max_products !== null)
+      features.push(`${plan.max_products.toLocaleString('en-KE')} products`);
+    if (plan.max_stock_locations !== null)
+      features.push(`${plan.max_stock_locations} stock locations`);
+    if (plan.max_orders_per_month !== null)
+      features.push(`${plan.max_orders_per_month.toLocaleString('en-KE')} sales per month`);
+    if (plan.sms_per_period !== null)
+      features.push(`${plan.sms_per_period.toLocaleString('en-KE')} SMS per month`);
+    if (plan.whatsapp_per_period !== null)
+      features.push(`${plan.whatsapp_per_period.toLocaleString('en-KE')} WhatsApp per month`);
+    if (plan.storefront_available) features.push('Public storefront');
+    if (plan.customer_campaigns_available) features.push('Customer campaigns');
+    if (plan.payment_reminders_available) features.push('Payment reminders');
+    if (plan.staff_performance_enabled) features.push('Staff performance reports');
+    if (plan.commissions_available) features.push('Sales commissions');
+    if (plan.multiple_locations_enabled && plan.max_stock_locations === null)
+      features.push('Multiple stock locations');
+    return features;
   }
 
   protected addToCart(product: DemoProduct): void {
@@ -604,7 +745,7 @@ export class HomeComponent {
     {
       question: 'How is the subscription billed?',
       answer:
-        'Monthly, through M-Pesa. You get a prompt on your phone, approve it, and you are done.',
+        'Monthly or yearly, through M-Pesa. You get a prompt on your phone, approve it, and you are done.',
     },
   ];
 }

@@ -27,10 +27,13 @@ import { CompanyPreferencesService } from '../../core/company-preferences.servic
 type TopVariant = {
   variantId: string;
   label: string;
+  manufacturer: string;
   quantity: number;
   revenue: number;
   margin: number;
 };
+type LowStockDisplay = LowStockVariant & { manufacturer_name: string | null };
+type ExpiringDisplay = ExpiringBatch & { manufacturer_name: string | null };
 type SalesChartPoint = DailySummary & { day: string; revenue: number; heightPercent: number };
 
 @Component({
@@ -448,8 +451,11 @@ type SalesChartPoint = DailySummary & { day: string; revenue: number; heightPerc
                       @for (variant of topVariants(); track variant.variantId) {
                         <tr>
                           <td>
-                            <span class="font-medium">{{ variant.label }}</span>
-                            <span class="type-caption ml-2">#{{ $index + 1 }}</span>
+                            <p>
+                              <span class="font-medium">{{ variant.label }}</span>
+                              <span class="type-caption ml-2">#{{ $index + 1 }}</span>
+                            </p>
+                            <p class="type-caption">{{ variant.manufacturer }}</p>
                           </td>
                           <td class="text-right">{{ quantity(variant.quantity) }}</td>
                           <td class="text-right font-medium">
@@ -516,7 +522,10 @@ type SalesChartPoint = DailySummary & { day: string; revenue: number; heightPerc
                       <div class="flex items-center gap-3 py-3">
                         <div class="min-w-0 flex-1">
                           <p class="truncate text-sm font-medium">{{ item.product_name }}</p>
-                          <p class="type-caption truncate">{{ item.variant_name }}</p>
+                          <p class="type-caption truncate">
+                            {{ item.manufacturer_name || 'Manufacturer not set' }} ·
+                            {{ item.variant_name }}
+                          </p>
                         </div>
                         <div class="text-right">
                           <p class="font-medium tabular-nums text-warning">{{ item.stock }}</p>
@@ -564,7 +573,10 @@ type SalesChartPoint = DailySummary & { day: string; revenue: number; heightPerc
                         <div class="flex items-center gap-3 py-3">
                           <div class="min-w-0 flex-1">
                             <p class="truncate text-sm font-medium">{{ batch.product_name }}</p>
-                            <p class="type-caption truncate">{{ batch.variant_name }}</p>
+                            <p class="type-caption truncate">
+                              {{ batch.manufacturer_name || 'Manufacturer not set' }} ·
+                              {{ batch.variant_name }}
+                            </p>
                           </div>
                           <div class="text-right">
                             <p class="font-medium tabular-nums text-warning">
@@ -609,8 +621,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
   protected readonly summary = signal<DailySummary[]>([]);
   protected readonly productSales = signal<DailyProductSales[]>([]);
   protected readonly topVariants = signal<TopVariant[]>([]);
-  protected readonly lowStock = signal<LowStockVariant[]>([]);
-  protected readonly expiring = signal<ExpiringBatch[]>([]);
+  protected readonly lowStock = signal<LowStockDisplay[]>([]);
+  protected readonly expiring = signal<ExpiringDisplay[]>([]);
   protected readonly locationRows = signal<DashboardLocationSummary[]>([]);
   protected readonly comparison = signal<DashboardPeriodComparison>({
     current_revenue: 0,
@@ -773,8 +785,27 @@ export class DashboardComponent implements OnInit, OnDestroy {
         this.comparison.set(sales.comparison);
         await this.computeTopVariants(sales.productSales);
       }
-      this.lowStock.set(lowStock);
-      this.expiring.set(expiring);
+      const attentionIds = [
+        ...new Set(
+          [...lowStock, ...expiring].map(item => item.variant_id).filter((id): id is string => !!id)
+        ),
+      ];
+      const attentionVariants = await this.pos.variantsByIds(attentionIds);
+      const manufacturerByVariant = new Map(
+        attentionVariants.map(variant => [variant.variant_id, variant.manufacturer_name])
+      );
+      this.lowStock.set(
+        lowStock.map(item => ({
+          ...item,
+          manufacturer_name: manufacturerByVariant.get(item.variant_id) ?? null,
+        }))
+      );
+      this.expiring.set(
+        expiring.map(item => ({
+          ...item,
+          manufacturer_name: manufacturerByVariant.get(item.variant_id) ?? null,
+        }))
+      );
       this.lastUpdated.set(new Date());
       this.loadError.set(null);
     } catch (err) {
@@ -837,6 +868,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
         label: byId.has(variantId)
           ? variantLabel(byId.get(variantId) as Variant)
           : variantId.slice(0, 8),
+        manufacturer: byId.get(variantId)?.manufacturer_name || 'Manufacturer not set',
         quantity: totals.quantity,
         revenue: totals.revenue,
         margin: totals.margin,

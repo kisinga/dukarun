@@ -10,6 +10,7 @@ import {
   CompanySettings,
   PaymentMethodRow,
   LocationPaymentMethodRow,
+  ReminderTemplate,
   SettingsService,
   StockLocationRow,
 } from './settings.service';
@@ -23,6 +24,16 @@ import { ReceiptDataService } from '../shared/print/receipt-data.service';
 import { imageExtension, resizeImage } from '../shared/ui/image.util';
 
 type SectionKey = 'profile' | 'pos' | 'inventory' | 'cash';
+type ReminderDraft = {
+  stageDays: number;
+  enabled: boolean;
+  key: string;
+  name: string;
+  smsBody: string;
+  whatsappBody: string;
+  overrideId?: string;
+  dirty: boolean;
+};
 
 @Component({
   selector: 'app-settings',
@@ -168,9 +179,16 @@ type SectionKey = 'profile' | 'pos' | 'inventory' | 'cash';
                     type="checkbox"
                     class="checkbox checkbox-sm"
                     [formControl]="storefrontEnabled"
+                    [attr.disabled]="!entitlements.enabled('storefront') ? '' : null"
                   />
                   <span class="label-text">Public storefront enabled</span>
                 </label>
+                @if (!entitlements.enabled('storefront')) {
+                  <p class="type-caption text-warning sm:col-span-2">
+                    Storefront publishing is unavailable on this plan.
+                    <a routerLink="/billing" class="link">View plans</a>
+                  </p>
+                }
                 <div class="sm:col-span-2">
                   @if (msg('profile'); as m) {
                     <p class="mb-2 text-sm" [class.text-success]="m.ok" [class.text-error]="!m.ok">
@@ -592,6 +610,121 @@ type SectionKey = 'profile' | 'pos' | 'inventory' | 'cash';
             </div>
           }
 
+          @if (perms.has('ManageCommunications')) {
+            <div class="card bg-base-100">
+              <div class="card-body p-4">
+                <div class="flex items-start justify-between gap-4">
+                  <div>
+                    <h2 class="section-title">Payment reminders</h2>
+                    <p class="type-caption mt-1">
+                      Send due-day, 3-, 7-, and 14-day reminders automatically.
+                    </p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    class="toggle toggle-primary"
+                    [formControl]="paymentRemindersEnabled"
+                    [disabled]="!entitlements.enabled('paymentReminders')"
+                  />
+                </div>
+                @if (!entitlements.enabled('paymentReminders')) {
+                  <p class="mt-3 text-sm text-warning">
+                    Payment reminders are unavailable on this plan.
+                    <a routerLink="/billing" class="link">View plans</a>
+                  </p>
+                } @else {
+                  <div class="mt-4 grid gap-3 sm:grid-cols-2">
+                    <app-form-field label="Default channel">
+                      <select
+                        class="select select-bordered select-sm w-full"
+                        [formControl]="reminderChannel"
+                      >
+                        <option value="whatsapp">WhatsApp</option>
+                        <option value="sms">SMS</option>
+                      </select>
+                    </app-form-field>
+                    <label class="label cursor-pointer justify-start gap-3 self-end">
+                      <input
+                        type="checkbox"
+                        class="checkbox checkbox-sm"
+                        [formControl]="reminderSmsFallback"
+                      />
+                      <span class="label-text">Use SMS if WhatsApp permanently fails</span>
+                    </label>
+                    <div class="sm:col-span-2">
+                      <p class="text-sm font-medium">Reminder stages and templates</p>
+                      <div class="mt-2 space-y-2">
+                        @for (draft of reminderDrafts(); track draft.key) {
+                          <details class="rounded-box border border-base-300 p-3">
+                            <summary class="flex cursor-pointer items-center justify-between gap-3">
+                              <span class="font-medium">{{
+                                reminderStageLabel(draft.stageDays)
+                              }}</span>
+                              <input
+                                type="checkbox"
+                                class="toggle toggle-sm toggle-primary"
+                                [checked]="draft.enabled"
+                                (click)="$event.stopPropagation()"
+                                (change)="setReminderStageEnabled(draft.key, $event)"
+                              />
+                            </summary>
+                            <div class="mt-3 grid gap-3">
+                              <app-form-field label="SMS template">
+                                <textarea
+                                  rows="2"
+                                  class="textarea textarea-bordered w-full"
+                                  [value]="draft.smsBody"
+                                  (input)="setReminderTemplateBody(draft.key, 'sms', $event)"
+                                ></textarea>
+                              </app-form-field>
+                              <app-form-field label="WhatsApp template">
+                                <textarea
+                                  rows="3"
+                                  class="textarea textarea-bordered w-full"
+                                  [value]="draft.whatsappBody"
+                                  (input)="setReminderTemplateBody(draft.key, 'whatsapp', $event)"
+                                ></textarea>
+                              </app-form-field>
+                              <p class="type-caption">
+                                Variables: customer_first_name, outstanding_balance, due_date,
+                                statement_url, store_name, days_overdue.
+                              </p>
+                            </div>
+                          </details>
+                        }
+                      </div>
+                    </div>
+                    <app-form-field
+                      class="sm:col-span-2"
+                      label="Customer payment instructions"
+                      hint="Shown on secure statement links. Do not include private account credentials."
+                    >
+                      <textarea
+                        rows="3"
+                        class="textarea textarea-bordered w-full"
+                        [formControl]="paymentInstructions"
+                      ></textarea>
+                    </app-form-field>
+                  </div>
+                  @if (msg('communications'); as m) {
+                    <p class="mt-2 text-sm" [class.text-success]="m.ok" [class.text-error]="!m.ok">
+                      {{ m.text }}
+                    </p>
+                  }
+                  <button
+                    appButton
+                    type="button"
+                    class="mt-3"
+                    [loading]="busy()"
+                    (click)="saveCommunicationSettings()"
+                  >
+                    Save reminders
+                  </button>
+                }
+              </div>
+            </div>
+          }
+
           <div class="card bg-base-100">
             <div class="card-body p-4">
               <div class="flex items-center justify-between">
@@ -772,6 +905,13 @@ export class SettingsComponent implements OnInit {
   protected readonly batchExpiry = new FormControl(false, { nonNullable: true });
 
   protected readonly varianceThreshold = new FormControl('', { nonNullable: true });
+  protected readonly paymentRemindersEnabled = new FormControl(false, { nonNullable: true });
+  protected readonly reminderChannel = new FormControl<'sms' | 'whatsapp'>('whatsapp', {
+    nonNullable: true,
+  });
+  protected readonly reminderSmsFallback = new FormControl(true, { nonNullable: true });
+  protected readonly paymentInstructions = new FormControl('', { nonNullable: true });
+  protected readonly reminderDrafts = signal<ReminderDraft[]>([]);
   protected readonly locationName = new FormControl('', { nonNullable: true });
   protected readonly locationCode = new FormControl('', { nonNullable: true });
   protected readonly locationDefault = new FormControl(false, { nonNullable: true });
@@ -783,13 +923,15 @@ export class SettingsComponent implements OnInit {
   protected async load(): Promise<void> {
     this.loadError.set(null);
     try {
-      const [settings, methods, locations, paymentAssignments] = await Promise.all([
-        this.settingsService.getSettings(),
-        this.settingsService.paymentMethods(),
-        this.settingsService.stockLocations(),
-        this.settingsService.paymentMethodLocations(),
-        this.entitlements.refresh(),
-      ]);
+      const [settings, methods, locations, paymentAssignments, reminderConfiguration] =
+        await Promise.all([
+          this.settingsService.getSettings(),
+          this.settingsService.paymentMethods(),
+          this.settingsService.stockLocations(),
+          this.settingsService.paymentMethodLocations(),
+          this.settingsService.reminderConfiguration(),
+          this.entitlements.refresh(),
+        ]);
       this.settings.set(settings);
       this.paymentMethods.set(methods);
       this.locations.set(locations);
@@ -808,6 +950,21 @@ export class SettingsComponent implements OnInit {
       this.lowStock.setValue(settings.low_stock_threshold);
       this.batchExpiry.setValue(settings.batch_expiry_enabled);
       this.varianceThreshold.setValue(formatKesInput(settings.variance_notification_threshold));
+      this.paymentRemindersEnabled.setValue(settings.payment_reminders_enabled);
+      this.reminderChannel.setValue(settings.payment_reminder_channel);
+      this.reminderSmsFallback.setValue(settings.payment_reminder_sms_fallback);
+      this.paymentInstructions.setValue(settings.customer_payment_instructions ?? '');
+      this.reminderDrafts.set(
+        reminderConfiguration.rules.map(rule => {
+          const matching = reminderConfiguration.templates.filter(
+            template => template.template_key === rule.template_key
+          );
+          const template =
+            matching.find(item => item.company_id !== null) ??
+            matching.find(item => item.is_system);
+          return this.reminderDraft(rule.stage_days, rule.enabled, rule.template_key, template);
+        })
+      );
     } catch (err) {
       this.loadError.set(err instanceof Error ? err.message : 'Failed to load settings');
     }
@@ -1071,6 +1228,95 @@ export class SettingsComponent implements OnInit {
     } finally {
       this.busy.set(false);
     }
+  }
+
+  protected async saveCommunicationSettings(): Promise<void> {
+    const current = this.settings();
+    if (!current) return;
+    this.busy.set(true);
+    try {
+      await this.settingsService.updateCommunicationSettings({
+        enabled: this.paymentRemindersEnabled.value,
+        channel: this.reminderChannel.value,
+        smsFallback: this.reminderSmsFallback.value,
+        paymentInstructions: this.paymentInstructions.value.trim(),
+        rules: this.reminderDrafts().map(draft => ({
+          stage_days: draft.stageDays,
+          enabled: draft.enabled,
+          template_key: draft.key,
+        })),
+      });
+      await Promise.all(
+        this.reminderDrafts()
+          .filter(draft => draft.dirty)
+          .map(draft =>
+            this.settingsService.saveReminderTemplate({
+              id: draft.overrideId,
+              key: draft.key,
+              name: draft.name,
+              smsBody: draft.smsBody,
+              whatsappBody: draft.whatsappBody,
+            })
+          )
+      );
+      this.settings.set({
+        ...current,
+        payment_reminders_enabled: this.paymentRemindersEnabled.value,
+        payment_reminder_channel: this.reminderChannel.value,
+        payment_reminder_sms_fallback: this.reminderSmsFallback.value,
+        customer_payment_instructions: this.paymentInstructions.value.trim() || null,
+      });
+      await this.entitlements.refresh();
+      this.flash('communications', true, 'Reminder settings saved');
+    } catch (err) {
+      this.flash('communications', false, err instanceof Error ? err.message : 'Save failed');
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  private reminderDraft(
+    stageDays: number,
+    enabled: boolean,
+    key: string,
+    template?: ReminderTemplate
+  ): ReminderDraft {
+    return {
+      stageDays,
+      enabled,
+      key,
+      name: template?.name ?? this.reminderStageLabel(stageDays),
+      smsBody: template?.sms_body ?? '',
+      whatsappBody: template?.whatsapp_body ?? '',
+      overrideId: template?.company_id ? template.id : undefined,
+      dirty: false,
+    };
+  }
+
+  protected reminderStageLabel(days: number): string {
+    return days === 0 ? 'Due today' : `${days} days overdue`;
+  }
+
+  protected setReminderStageEnabled(key: string, event: Event): void {
+    const enabled = (event.target as HTMLInputElement).checked;
+    this.reminderDrafts.update(rows =>
+      rows.map(row => (row.key === key ? { ...row, enabled } : row))
+    );
+  }
+
+  protected setReminderTemplateBody(key: string, channel: 'sms' | 'whatsapp', event: Event): void {
+    const value = (event.target as HTMLTextAreaElement).value;
+    this.reminderDrafts.update(rows =>
+      rows.map(row =>
+        row.key === key
+          ? {
+              ...row,
+              ...(channel === 'sms' ? { smsBody: value } : { whatsappBody: value }),
+              dirty: true,
+            }
+          : row
+      )
+    );
   }
 
   protected paymentMethodEnabledAt(method: PaymentMethodRow, locationId: string): boolean {

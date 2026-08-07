@@ -2,7 +2,14 @@ import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import type { Database } from '@dukarun/shared-types';
 import type { AppIdentity } from '../../core/supabase.service';
 import type { CartLine } from '../cart.service';
-import type { PaymentInput, Product, SaleLineInput, Variant } from '../pos.service';
+import type {
+  CollectionWithCount,
+  Manufacturer,
+  PaymentInput,
+  Product,
+  SaleLineInput,
+  Variant,
+} from '../pos.service';
 
 type CashierSession = Database['public']['Tables']['cashier_sessions']['Row'];
 type Customer = Database['public']['Tables']['customers']['Row'];
@@ -18,6 +25,8 @@ export type CachedSupplier = Customer & {
   days_outstanding: number | null;
   bucket: string | null;
 };
+
+export type CachedManufacturer = Pick<Manufacturer, 'id' | 'name'>;
 
 interface ScopedRecord {
   company_id: string;
@@ -53,6 +62,9 @@ export interface ProductSnapshot {
   families?: Product[];
   /** Location-correct stock; variant_catalog.stock is company-wide. */
   location_stock?: Array<{ variant_id: string; stock: number; stock_value: number }>;
+  /** Catalog reference data, hydrated with products to avoid staggered labels and filters. */
+  manufacturers?: CachedManufacturer[];
+  collections?: CollectionWithCount[];
   truncated?: boolean;
   fetched_at: string; // ISO
 }

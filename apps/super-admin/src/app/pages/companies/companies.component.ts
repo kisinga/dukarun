@@ -277,6 +277,28 @@ const SUB_TYPE: Record<string, BadgeType> = {
                   }
                 </select>
               </app-form-field>
+              @if (tierImpact(company); as impact) {
+                @if (impact.length > 0) {
+                  <div class="alert alert-warning text-sm">
+                    <span>
+                      This change removes {{ impact.join(', ') }}.
+                      @if (impact.includes('storefront')) {
+                        The full catalogue remains available for seven days, then becomes
+                        contact-only.
+                      }
+                    </span>
+                  </div>
+                }
+              }
+              <div class="rounded-box bg-base-200 p-3 text-sm">
+                <p class="font-medium">Communication usage</p>
+                <p class="type-caption mt-1">
+                  SMS: {{ company.sms_used_this_period }} used,
+                  {{ company.sms_reserved_this_period }} reserved · WhatsApp:
+                  {{ company.whatsapp_used_this_period }} used,
+                  {{ company.whatsapp_reserved_this_period }} reserved
+                </p>
+              </div>
               <app-form-field label="Status">
                 <select class="select select-bordered w-full" [formControl]="subStatus">
                   <option value="">Leave unchanged</option>
@@ -419,6 +441,21 @@ export class CompaniesComponent implements OnInit {
     } catch (error) {
       this.error.set(error instanceof Error ? error.message : 'Failed to load company details');
     }
+  }
+
+  protected tierImpact(company: CompanyRow): string[] {
+    const current = this.tiers().find(tier => tier.id === company.subscription_tier_id);
+    const target = this.tiers().find(tier => tier.id === this.subTier.value);
+    if (!current || !target || current.id === target.id) return [];
+    return [
+      current.storefront_available && !target.storefront_available ? 'storefront' : null,
+      current.customer_campaigns_available && !target.customer_campaigns_available
+        ? 'customer campaigns'
+        : null,
+      current.payment_reminders_available && !target.payment_reminders_available
+        ? 'payment reminders'
+        : null,
+    ].filter((value): value is string => value !== null);
   }
 
   protected clearSelected(): void {

@@ -2,15 +2,21 @@ import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
 import { SupabaseService } from './supabase.service';
 
-export const authGuard: CanActivateFn = async () => {
+export const authGuard: CanActivateFn = async route => {
   const supabase = inject(SupabaseService);
   const router = inject(Router);
   try {
     const session = await supabase.initializeSession();
-    return session ? true : router.createUrlTree(['/login']);
+    return session
+      ? true
+      : router.createUrlTree(['/login'], {
+          queryParams: { plan: route.queryParamMap.get('plan') ?? undefined },
+        });
   } catch {
     // A stale or unreachable persisted session must not freeze navigation.
-    return router.createUrlTree(['/login']);
+    return router.createUrlTree(['/login'], {
+      queryParams: { plan: route.queryParamMap.get('plan') ?? undefined },
+    });
   }
 };
 

@@ -79,7 +79,7 @@ where c.name = 'Mama Mboga Stores' and t.code = 'standard';
 update public.roles r
 set permissions = array[
   'ManageApprovals','OverridePrice','ManageStockAdjustments','ApproveCustomerCredit',
-  'ManageCustomerCreditLimit','ReverseOrder','OverrideCustomerBalance','SettleOrder',
+  'ManageCustomerCreditLimit','ManageCatalog','ReverseOrder','OverrideCustomerBalance','SettleOrder',
   'ManageSupplierCreditPurchases','ViewFinancials','ManageReconciliation',
   'CloseAccountingPeriod','CreateInterAccountTransfer','ManageTeam','ViewAuditTrail',
   'ViewStaffPerformance','ManageCommissions'
@@ -137,7 +137,7 @@ on conflict (id) do nothing;
 insert into public.roles (company_id, name, permissions)
 select c.id, 'Manager', array[
   'ManageApprovals', 'OverridePrice', 'ManageStockAdjustments',
-  'ApproveCustomerCredit', 'ManageCustomerCreditLimit', 'ReverseOrder',
+  'ApproveCustomerCredit', 'ManageCustomerCreditLimit', 'ManageCatalog', 'ReverseOrder',
   'SettleOrder', 'ManageSupplierCreditPurchases',
   'ViewFinancials', 'ManageReconciliation',
   'CreateInterAccountTransfer', 'ManageTeam'
@@ -180,9 +180,23 @@ set name = excluded.name,
 -- ---------------------------------------------------------------------------
 -- Demo catalog: family + variants + stock
 -- ---------------------------------------------------------------------------
-insert into public.products (id, company_id, name, barcode)
-select 'd0000000-0000-0000-0000-000000000001', id, 'Unga wa Dola 2kg', '6001234567890'
-from public.companies where name = 'Mama Mboga Stores'
+insert into public.manufacturers (id, company_id, name)
+select manufacturer.id::uuid, c.id, manufacturer.name
+from public.companies c
+cross join (
+  values
+    ('d1000000-0000-0000-0000-000000000001', 'Kitui Flour Mills'),
+    ('d1000000-0000-0000-0000-000000000002', 'Mumias Sugar')
+) as manufacturer(id, name)
+where c.name = 'Mama Mboga Stores'
+on conflict do nothing;
+
+insert into public.products (id, company_id, name, barcode, manufacturer_id)
+select 'd0000000-0000-0000-0000-000000000001', c.id, 'Unga wa Dola 2kg',
+       '6001234567890', m.id
+from public.companies c
+join public.manufacturers m on m.company_id=c.id and m.normalized_name='kitui flour mills'
+where c.name = 'Mama Mboga Stores'
 on conflict do nothing;
 
 insert into public.product_variants (id, product_id, company_id, name, sku, price, wholesale_price)
@@ -190,9 +204,11 @@ select 'dd000000-0000-0000-0000-000000000001', 'd0000000-0000-0000-0000-00000000
 from public.companies c where c.name = 'Mama Mboga Stores'
 on conflict do nothing;
 
-insert into public.products (id, company_id, name)
-select 'd0000000-0000-0000-0000-000000000002', id, 'Sugar'
-from public.companies where name = 'Mama Mboga Stores'
+insert into public.products (id, company_id, name, manufacturer_id)
+select 'd0000000-0000-0000-0000-000000000002', c.id, 'Sugar', m.id
+from public.companies c
+join public.manufacturers m on m.company_id=c.id and m.normalized_name='mumias sugar'
+where c.name = 'Mama Mboga Stores'
 on conflict do nothing;
 
 insert into public.product_variants (id, product_id, company_id, name, sku, price, allow_fractional)
@@ -281,9 +297,17 @@ set subscription_tier_id = t.id,
 from public.subscription_tiers t
 where c.name = 'Jiko Electronics' and t.code = 'standard';
 
-insert into public.products (id, company_id, name, barcode)
-select 'd0000000-0000-0000-0000-000000000011', id, 'Jiko Energy Saver Stove', '6001234567906'
+insert into public.manufacturers (id, company_id, name)
+select 'd1000000-0000-0000-0000-000000000011', id, 'Jiko Electronics'
 from public.companies where name = 'Jiko Electronics'
+on conflict do nothing;
+
+insert into public.products (id, company_id, name, barcode, manufacturer_id)
+select 'd0000000-0000-0000-0000-000000000011', c.id, 'Jiko Energy Saver Stove',
+       '6001234567906', m.id
+from public.companies c
+join public.manufacturers m on m.company_id=c.id and m.normalized_name='jiko electronics'
+where c.name = 'Jiko Electronics'
 on conflict do nothing;
 
 insert into public.product_variants (id, product_id, company_id, name, sku, price)

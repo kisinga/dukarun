@@ -1,6 +1,8 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
 import { SupabaseService } from '../../core/supabase.service';
+import { PublicPricingService } from '../../marketing/public-pricing.service';
 
 @Component({
   selector: 'app-register',
@@ -17,6 +19,11 @@ import { SupabaseService } from '../../core/supabase.service';
               This creates your company workspace — ledger, locations, and payment methods are set
               up automatically.
             </p>
+            @if (trialDays(); as days) {
+              <p class="mt-2 text-sm font-medium text-primary">
+                Your {{ days }}-day free trial starts when the company is approved.
+              </p>
+            }
           </div>
 
           @if (createdPending()) {
@@ -117,12 +124,16 @@ import { SupabaseService } from '../../core/supabase.service';
 })
 export class RegisterComponent implements OnInit {
   private readonly supabase = inject(SupabaseService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly publicPricing = inject(PublicPricingService);
 
   protected readonly saving = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly createdPending = signal(false);
   /** True when the user already belongs to a company and is adding another. */
   protected readonly hasCompany = signal(false);
+  protected readonly trialDays = signal<number | null>(null);
+  private readonly requestedPlanCode = this.route.snapshot.queryParamMap.get('plan');
 
   protected readonly ownerName = new FormControl('', { nonNullable: true });
   protected readonly companyName = new FormControl('', {
@@ -138,11 +149,16 @@ export class RegisterComponent implements OnInit {
 
   /** Multi-company: existing users may register additional companies from here. */
   async ngOnInit(): Promise<void> {
-    try {
-      this.hasCompany.set((await this.supabase.currentCompany()) !== null);
-    } catch {
-      // Stay put; a failed lookup must not strand the user either.
-    }
+    await Promise.all([
+      this.supabase
+        .currentCompany()
+        .then(company => this.hasCompany.set(company !== null))
+        .catch(() => undefined),
+      this.publicPricing
+        .billingConfig()
+        .then(config => this.trialDays.set(config.trialDays))
+        .catch(() => undefined),
+    ]);
   }
 
   protected async provision(): Promise<void> {
@@ -156,6 +172,7 @@ export class RegisterComponent implements OnInit {
         p_currency: 'KES',
         p_email: this.companyEmail.value.trim() || undefined,
         p_address: this.companyAddress.value.trim() || undefined,
+        ...(this.requestedPlanCode ? { p_trial_tier_code: this.requestedPlanCode } : {}),
       });
       if (error) throw error;
       // Refresh the session first: the new JWT carries the company claims that

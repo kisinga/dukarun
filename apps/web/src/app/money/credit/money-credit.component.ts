@@ -7,7 +7,12 @@ import { DataTableShellComponent } from '../../shared/ui/data-table-shell.compon
 import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
 import { EntityAvatarComponent } from '../../shared/ui/entity-avatar.component';
 import { IconComponent } from '../../shared/ui/icon.component';
-import { ListSearchBarComponent } from '../../shared/ui/list-search-bar.component';
+import {
+  ListSearchBarComponent,
+  type ListSortDirection,
+  type ListSortOption,
+} from '../../shared/ui/list-search-bar.component';
+import { sortList } from '../../shared/ui/list-sort';
 import { MoneyComponent } from '../../shared/ui/money.component';
 import { PaginationComponent } from '../../shared/ui/pagination.component';
 import { StatBarComponent } from '../../shared/ui/stat-bar.component';
@@ -17,6 +22,15 @@ import { PartyCacheService } from '../../core/party-cache.service';
 type CreditMode = 'receivables' | 'payables';
 type CustomerWithAr = MoneyCustomer & { ar_balance: number } & AgingInfo;
 type SupplierWithAp = MoneyCustomer & { ap_balance: number } & AgingInfo;
+
+const CREDIT_SORT_OPTIONS: readonly ListSortOption[] = [
+  { value: 'name', label: 'Name' },
+  { value: 'outstanding', label: 'Outstanding value' },
+  { value: 'aging', label: 'Days outstanding' },
+  { value: 'limit', label: 'Credit limit' },
+  { value: 'available', label: 'Available credit' },
+  { value: 'status', label: 'Credit status' },
+];
 
 interface CreditParty {
   id: string;
@@ -96,6 +110,11 @@ interface CreditParty {
         [placeholder]="mode() === 'receivables' ? 'Search customers…' : 'Search suppliers…'"
         [searchQuery]="query()"
         (searchQueryChange)="query.set($event); page.set(1)"
+        [sortOptions]="creditSortOptions"
+        [sortKey]="creditSort()"
+        (sortKeyChange)="creditSort.set($event); page.set(1)"
+        [sortDirection]="creditSortDirection()"
+        (sortDirectionChange)="creditSortDirection.set($event); page.set(1)"
       >
         <app-stat-bar summary [stats]="positionStats()" />
         <div filters class="flex flex-wrap gap-1 rounded-field bg-base-200 p-1">
@@ -276,6 +295,9 @@ export class MoneyCreditComponent implements OnInit {
   protected readonly suppliers = computed<SupplierWithAp[]>(() => this.partyCache.suppliers());
   protected readonly mode = signal<CreditMode>('receivables');
   protected readonly query = signal('');
+  protected readonly creditSortOptions = CREDIT_SORT_OPTIONS;
+  protected readonly creditSort = signal('name');
+  protected readonly creditSortDirection = signal<ListSortDirection>('asc');
   protected readonly page = signal(1);
   protected readonly pageSize = 15;
   protected readonly loading = signal(false);
@@ -328,11 +350,34 @@ export class MoneyCreditComponent implements OnInit {
   );
   protected readonly filteredParties = computed(() => {
     const query = this.query().trim().toLowerCase();
-    if (!query) return this.parties();
-    return this.parties().filter(party =>
-      [party.name, party.phone, party.email]
-        .filter(Boolean)
-        .some(value => value!.toLowerCase().includes(query))
+    const rows = query
+      ? this.parties().filter(party =>
+          [party.name, party.phone, party.email]
+            .filter(Boolean)
+            .some(value => value!.toLowerCase().includes(query))
+        )
+      : this.parties();
+    const sortKey = this.creditSort();
+    return sortList(
+      rows,
+      this.creditSortDirection(),
+      party => {
+        switch (sortKey) {
+          case 'outstanding':
+            return party.outstanding;
+          case 'aging':
+            return party.daysOutstanding;
+          case 'limit':
+            return party.limit;
+          case 'available':
+            return party.available;
+          case 'status':
+            return party.status;
+          default:
+            return party.name;
+        }
+      },
+      party => party.name
     );
   });
   protected readonly totalPages = computed(() =>

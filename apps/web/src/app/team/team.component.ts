@@ -23,9 +23,21 @@ import { ButtonComponent } from '../shared/ui/button.component';
 import { IconComponent } from '../shared/ui/icon.component';
 import { DataTableShellComponent } from '../shared/ui/data-table-shell.component';
 import { FormFieldComponent } from '../shared/ui/form-field.component';
-import { ListSearchBarComponent } from '../shared/ui/list-search-bar.component';
+import {
+  ListSearchBarComponent,
+  type ListSortDirection,
+  type ListSortOption,
+} from '../shared/ui/list-search-bar.component';
+import { sortList } from '../shared/ui/list-sort';
 import { StatBarComponent } from '../shared/ui/stat-bar.component';
 import { EmptyStateComponent } from '../shared/ui/empty-state.component';
+
+const MEMBER_SORT_OPTIONS: readonly ListSortOption[] = [
+  { value: 'name', label: 'Member name' },
+  { value: 'role', label: 'Role' },
+  { value: 'status', label: 'Access status' },
+  { value: 'joined', label: 'Date joined' },
+];
 
 @Component({
   selector: 'app-team',
@@ -163,6 +175,11 @@ import { EmptyStateComponent } from '../shared/ui/empty-state.component';
         placeholder="Search member, role, or status…"
         [searchQuery]="memberQuery()"
         (searchQueryChange)="memberQuery.set($event); memberPage.set(1)"
+        [sortOptions]="memberSortOptions"
+        [sortKey]="memberSort()"
+        (sortKeyChange)="memberSort.set($event); memberPage.set(1)"
+        [sortDirection]="memberSortDirection()"
+        (sortDirectionChange)="memberSortDirection.set($event); memberPage.set(1)"
       >
         <app-stat-bar summary [stats]="teamStats()" />
       </app-list-search-bar>
@@ -586,21 +603,43 @@ export class TeamComponent implements OnInit {
   protected readonly primaryLocationId = signal<string | null>(null);
   protected readonly memberFormOpen = signal(false);
   protected readonly memberQuery = signal('');
+  protected readonly memberSortOptions = MEMBER_SORT_OPTIONS;
+  protected readonly memberSort = signal('name');
+  protected readonly memberSortDirection = signal<ListSortDirection>('asc');
   protected readonly memberPage = signal(1);
   protected readonly memberPageSize = signal(10);
   protected readonly filteredMembers = computed(() => {
     const query = this.memberQuery().trim().toLowerCase();
-    if (!query) return this.members();
-    return this.members().filter(member =>
-      [
-        member.user_id,
-        member.staff_profile?.display_name ?? '',
-        member.roles?.name ?? '',
-        member.authorization_status,
-      ]
-        .join(' ')
-        .toLowerCase()
-        .includes(query)
+    const rows = query
+      ? this.members().filter(member =>
+          [
+            member.user_id,
+            member.staff_profile?.display_name ?? '',
+            member.roles?.name ?? '',
+            member.authorization_status,
+          ]
+            .join(' ')
+            .toLowerCase()
+            .includes(query)
+        )
+      : this.members();
+    const sortKey = this.memberSort();
+    return sortList(
+      rows,
+      this.memberSortDirection(),
+      member => {
+        switch (sortKey) {
+          case 'role':
+            return member.roles?.name;
+          case 'status':
+            return member.authorization_status;
+          case 'joined':
+            return member.created_at;
+          default:
+            return this.memberNameFor(member);
+        }
+      },
+      member => this.memberNameFor(member)
     );
   });
   protected readonly memberTotalPages = computed(() =>

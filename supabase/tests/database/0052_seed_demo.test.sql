@@ -1,6 +1,6 @@
 -- The local demo must stay fully walkable as features and permissions grow.
 begin;
-select plan(12);
+select plan(14);
 
 select is(
   (select count(*)::int from public.companies where name = 'Mama Mboga Stores'),
@@ -38,11 +38,11 @@ select results_eq(
 select ok(
   (select r.permissions @> array[
     'ManageApprovals','OverridePrice','ManageStockAdjustments','ApproveCustomerCredit',
-    'ManageCustomerCreditLimit','ReverseOrder','OverrideCustomerBalance','SettleOrder',
+    'ManageCustomerCreditLimit','ManageCatalog','ReverseOrder','OverrideCustomerBalance','SettleOrder',
     'ManageSupplierCreditPurchases','ViewFinancials','ManageReconciliation',
     'CloseAccountingPeriod','CreateInterAccountTransfer','ManageTeam','ViewAuditTrail',
     'ViewStaffPerformance','ManageCommissions'
-  ]::text[] and cardinality(r.permissions) = 17
+  ]::text[] and cardinality(r.permissions) = 18
   from public.roles r
   join public.companies c on c.id = r.company_id
   where c.name = 'Mama Mboga Stores' and r.name = 'Admin'),
@@ -119,6 +119,28 @@ select ok(
    join public.subscription_tiers t on t.id = c.subscription_tier_id
    where c.name = 'Mama Mboga Stores'),
   'premium staff features are enabled for the walkable demo'
+);
+
+select is(
+  (select count(*)::int
+   from public.manufacturers m
+   join public.companies c on c.id=m.company_id
+   where c.name='Mama Mboga Stores'),
+  2,
+  'the demo company has canonical manufacturers for autocomplete'
+);
+
+select results_eq(
+  $$select p.name::text, m.name::text
+    from public.products p
+    join public.manufacturers m on m.id=p.manufacturer_id
+    join public.companies c on c.id=p.company_id
+    where c.name='Mama Mboga Stores'
+    order by p.name$$,
+  $$values
+    ('Sugar'::text, 'Mumias Sugar'::text),
+    ('Unga wa Dola 2kg'::text, 'Kitui Flour Mills'::text)$$,
+  'seeded products link to their manufacturers'
 );
 
 select * from finish();

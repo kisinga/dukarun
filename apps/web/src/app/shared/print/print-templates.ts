@@ -31,7 +31,7 @@ export interface OrderData {
     productVariant: {
       id: string;
       name: string;
-      product?: { id: string; name: string };
+      product?: { id: string; name: string; manufacturerName?: string };
     };
   }>;
   payments?: Array<{
@@ -126,7 +126,7 @@ export interface PurchaseData {
     variant?: {
       id: string;
       name: string;
-      product?: { id: string; name: string };
+      product?: { id: string; name: string; manufacturerName?: string };
     };
   }>;
 }
@@ -214,10 +214,12 @@ export abstract class PrintTemplate {
     const v = line.productVariant;
     const productName = v.product?.name;
     const variantName = v.name;
+    const manufacturer = v.product?.manufacturerName;
+    let label = variantName;
     if (productName && variantName !== productName) {
-      return `${productName} – ${variantName}`;
+      label = `${productName} – ${variantName}`;
     }
-    return variantName;
+    return manufacturer ? `${label} · ${manufacturer}` : label;
   }
 }
 
@@ -949,8 +951,11 @@ export class A4PurchaseTemplate {
         `;
 
     purchase.lines.forEach(line => {
-      const itemName =
+      const baseName =
         line.variant?.name ?? line.variant?.product?.name ?? `Variant ${line.variantId}`;
+      const itemName = line.variant?.product?.manufacturerName
+        ? `${baseName} · ${line.variant.product.manufacturerName}`
+        : baseName;
       const quantity = line.quantity;
       const unitCost = Number(line.unitCost);
       const lineTotal = Number(line.totalCost);

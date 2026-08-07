@@ -8,7 +8,11 @@ import { OrderLineWithProduct, OrderWithCustomer, Payment, PosService } from '..
 import { PrintService } from '../shared/print/print.service';
 import { ReceiptDataService } from '../shared/print/receipt-data.service';
 import { EmptyStateComponent } from '../shared/ui/empty-state.component';
-import { ListSearchBarComponent } from '../shared/ui/list-search-bar.component';
+import {
+  ListSearchBarComponent,
+  type ListSortDirection,
+  type ListSortOption,
+} from '../shared/ui/list-search-bar.component';
 import { PageLayoutComponent } from '../shared/ui/page-layout.component';
 import { PaginationComponent } from '../shared/ui/pagination.component';
 import { ORDER_STATUS_MAP, StatusBadgeComponent } from '../shared/ui/status-badge.component';
@@ -23,6 +27,13 @@ import { StatBarComponent } from '../shared/ui/stat-bar.component';
 import { MoneyComponent } from '../shared/ui/money.component';
 
 const ALL_STATUSES = ['completed', 'voided', 'draft', 'expired', 'pending_payment'];
+
+const SALE_SORT_OPTIONS: readonly ListSortOption[] = [
+  { value: 'created_at', label: 'Sale date' },
+  { value: 'code', label: 'Sale code' },
+  { value: 'total', label: 'Sale value' },
+  { value: 'status', label: 'Status' },
+];
 
 /**
  * Sales history — the canonical sales screen. Defaults to "today" with realtime
@@ -91,6 +102,11 @@ const ALL_STATUSES = ['completed', 'voided', 'draft', 'expired', 'pending_paymen
         placeholder="Search sale code or customer…"
         [searchQuery]="query()"
         (searchQueryChange)="onSearch($event)"
+        [sortOptions]="saleSortOptions"
+        [sortKey]="saleSort()"
+        (sortKeyChange)="changeSort($event, saleSortDirection())"
+        [sortDirection]="saleSortDirection()"
+        (sortDirectionChange)="changeSort(saleSort(), $event)"
       >
         <app-stat-bar summary [stats]="salesStats()" />
         <div filters class="grid gap-2 sm:grid-cols-2 lg:flex lg:flex-wrap lg:items-end">
@@ -376,6 +392,11 @@ const ALL_STATUSES = ['completed', 'voided', 'draft', 'expired', 'pending_paymen
                           <div class="min-w-0 flex-1">
                             <p class="truncate text-sm font-medium">{{ line.label }}</p>
                             <p class="type-caption">
+                              {{ line.manufacturer_name || 'Manufacturer not set' }}
+                              @if (line.sku) {
+                                · {{ line.sku }}
+                              }
+                              ·
                               {{ line.quantity }} ×
                               <app-money [amount]="line.custom_price ?? line.unit_price" />
                             </p>
@@ -591,6 +612,9 @@ export class OrdersComponent implements OnInit, OnDestroy {
   protected readonly printerEnabled = signal(false);
   protected readonly page = signal(1);
   protected readonly query = signal('');
+  protected readonly saleSortOptions = SALE_SORT_OPTIONS;
+  protected readonly saleSort = signal('created_at');
+  protected readonly saleSortDirection = signal<ListSortDirection>('desc');
 
   protected readonly status = new FormControl('all', { nonNullable: true });
   protected readonly from = new FormControl(this.todayIso(), { nonNullable: true });
@@ -689,6 +713,8 @@ export class OrdersComponent implements OnInit, OnDestroy {
         search: this.query(),
         page: this.page(),
         pageSize: this.pageSize(),
+        sortBy: this.saleSort() as 'created_at' | 'code' | 'total' | 'status',
+        sortDirection: this.saleSortDirection(),
       });
       this.orders.set(result.rows);
       this.totalItems.set(result.count);
@@ -716,6 +742,13 @@ export class OrdersComponent implements OnInit, OnDestroy {
     this.pageSize.set(size);
     this.page.set(1);
     await this.load();
+  }
+
+  protected changeSort(key: string, direction: ListSortDirection): void {
+    this.saleSort.set(key);
+    this.saleSortDirection.set(direction);
+    this.page.set(1);
+    void this.load();
   }
 
   protected async openOrder(orderId: string): Promise<void> {

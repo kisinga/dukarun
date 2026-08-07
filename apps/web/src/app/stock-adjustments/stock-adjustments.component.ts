@@ -13,6 +13,7 @@ import { IconComponent } from '../shared/ui/icon.component';
 import { EmptyStateComponent } from '../shared/ui/empty-state.component';
 import { PaginationComponent } from '../shared/ui/pagination.component';
 import { LocationContextService } from '../core/location-context.service';
+import { CatalogSearchService } from '../core/catalog-search.service';
 import {
   StockAdjustmentsService,
   type StockAdjustmentHistoryRow,
@@ -27,6 +28,10 @@ const ADJUSTMENT_REASONS = [
   'Customer return',
   'Other',
 ] as const;
+
+type StockAdjustmentHistoryDisplay = StockAdjustmentHistoryRow & {
+  manufacturer_name: string | null;
+};
 
 @Component({
   selector: 'app-stock-adjustments',
@@ -77,7 +82,7 @@ const ADJUSTMENT_REASONS = [
                 <div class="min-w-0 flex-1">
                   <p class="truncate text-sm font-semibold">{{ label(variant) }}</p>
                   <p class="type-caption mt-0.5">
-                    {{ variant.sku }}
+                    {{ variant.manufacturer_name || 'Manufacturer not set' }} · {{ variant.sku }}
                     @if (variant.allow_fractional) {
                       · Fractional quantities enabled
                     }
@@ -93,9 +98,9 @@ const ADJUSTMENT_REASONS = [
                   <input
                     type="search"
                     class="input input-bordered min-h-11 w-full"
-                    placeholder="Search product, SKU, or barcode"
+                    placeholder="Search product, manufacturer, SKU, or barcode"
                     autocomplete="off"
-                    aria-label="Search product, SKU, or barcode"
+                    aria-label="Search product, manufacturer, SKU, or barcode"
                     [formControl]="search"
                   />
                   @if (searching()) {
@@ -122,6 +127,7 @@ const ADJUSTMENT_REASONS = [
                               label(variant)
                             }}</span>
                             <span class="type-caption block">
+                              {{ variant.manufacturer_name || 'Manufacturer not set' }} ·
                               {{ variant.sku }} · {{ formatQuantity(variant.stock ?? 0) }} currently
                             </span>
                           </span>
@@ -345,7 +351,10 @@ const ADJUSTMENT_REASONS = [
                     <div class="flex items-start justify-between gap-3">
                       <div class="min-w-0">
                         <p class="truncate text-sm font-semibold">{{ historyProduct(row) }}</p>
-                        <p class="type-caption mt-0.5">{{ time(row.adjusted_at) }}</p>
+                        <p class="type-caption mt-0.5">
+                          {{ row.manufacturer_name || 'Manufacturer not set' }} ·
+                          {{ time(row.adjusted_at) }}
+                        </p>
                       </div>
                       <span
                         class="font-bold tabular-nums"
@@ -388,7 +397,10 @@ const ADJUSTMENT_REASONS = [
                         <td class="whitespace-nowrap text-xs">{{ time(row.adjusted_at) }}</td>
                         <td>
                           <p class="font-medium">{{ historyProduct(row) }}</p>
-                          <p class="type-caption font-mono">{{ row.sku }}</p>
+                          <p class="type-caption">
+                            {{ row.manufacturer_name || 'Manufacturer not set' }} ·
+                            <span class="font-mono">{{ row.sku }}</span>
+                          </p>
                         </td>
                         <td
                           class="text-right font-bold tabular-nums"
@@ -437,6 +449,7 @@ const ADJUSTMENT_REASONS = [
 export class StockAdjustmentsComponent implements OnInit {
   private readonly money = inject(MoneyService);
   private readonly pos = inject(PosService);
+  private readonly catalogSearch = inject(CatalogSearchService);
   private readonly route = inject(ActivatedRoute);
   private readonly history = inject(StockAdjustmentsService);
   protected readonly locations = inject(LocationContextService);
@@ -459,7 +472,7 @@ export class StockAdjustmentsComponent implements OnInit {
   protected readonly busy = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
-  protected readonly historyRows = signal<StockAdjustmentHistoryRow[]>([]);
+  protected readonly historyRows = signal<StockAdjustmentHistoryDisplay[]>([]);
   protected readonly historyTotal = signal(0);
   protected readonly historyPage = signal(1);
   protected readonly historyVariantId = signal<string | null>(null);
@@ -533,7 +546,7 @@ export class StockAdjustmentsComponent implements OnInit {
 
     this.searching.set(true);
     try {
-      const variants = await this.pos.searchVariants(q);
+      const variants = (await this.catalogSearch.search(q, 20)).variants;
       if (request !== this.searchRequest) return;
       this.results.set(
         variants.filter(variant => variant.track_inventory && variant.kind !== 'service')
@@ -706,7 +719,16 @@ export class StockAdjustmentsComponent implements OnInit {
         page: this.historyPage(),
         pageSize: this.historyPageSize,
       });
-      this.historyRows.set(result.rows);
+      const variants = await this.pos.variantsByIds(result.rows.map(row => row.variant_id));
+      const manufacturerByVariant = new Map(
+        variants.map(variant => [variant.variant_id, variant.manufacturer_name])
+      );
+      this.historyRows.set(
+        result.rows.map(row => ({
+          ...row,
+          manufacturer_name: manufacturerByVariant.get(row.variant_id) ?? null,
+        }))
+      );
       this.historyTotal.set(result.total);
     } catch (err) {
       this.historyError.set(err instanceof Error ? err.message : 'Adjustment history failed');

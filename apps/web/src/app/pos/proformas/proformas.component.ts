@@ -18,7 +18,11 @@ import { ButtonComponent } from '../../shared/ui/button.component';
 import { DeleteConfirmationModalComponent } from '../../shared/ui/delete-confirmation-modal.component';
 import { IconComponent } from '../../shared/ui/icon.component';
 import { OrderQueueCountsService } from '../order-queue-counts.service';
-import { ListSearchBarComponent } from '../../shared/ui/list-search-bar.component';
+import {
+  ListSearchBarComponent,
+  type ListSortDirection,
+  type ListSortOption,
+} from '../../shared/ui/list-search-bar.component';
 import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
 import { PaginationComponent } from '../../shared/ui/pagination.component';
 import { StatBarComponent } from '../../shared/ui/stat-bar.component';
@@ -29,6 +33,13 @@ import { StatCardComponent } from '../../shared/ui/stat-card.component';
 import { MoneyComponent } from '../../shared/ui/money.component';
 
 const PROFORMA_STATUSES = ['draft', 'expired'];
+
+const PROFORMA_SORT_OPTIONS: readonly ListSortOption[] = [
+  { value: 'created_at', label: 'Created date' },
+  { value: 'code', label: 'Proforma code' },
+  { value: 'total', label: 'Proforma value' },
+  { value: 'status', label: 'Status' },
+];
 
 @Component({
   selector: 'app-proformas',
@@ -121,6 +132,11 @@ const PROFORMA_STATUSES = ['draft', 'expired'];
         placeholder="Search proforma code or customer…"
         [searchQuery]="query()"
         (searchQueryChange)="onSearch($event)"
+        [sortOptions]="proformaSortOptions"
+        [sortKey]="proformaSort()"
+        (sortKeyChange)="changeSort($event, proformaSortDirection())"
+        [sortDirection]="proformaSortDirection()"
+        (sortDirectionChange)="changeSort(proformaSort(), $event)"
       >
         <app-stat-bar summary [stats]="proformaStats()" />
         <div filters class="grid gap-2 sm:grid-cols-2 lg:flex lg:flex-wrap lg:items-end">
@@ -443,6 +459,11 @@ const PROFORMA_STATUSES = ['draft', 'expired'];
                         <div class="min-w-0 flex-1">
                           <p class="truncate text-sm font-medium">{{ line.label }}</p>
                           <p class="type-caption">
+                            {{ line.manufacturer_name || 'Manufacturer not set' }}
+                            @if (line.sku) {
+                              · {{ line.sku }}
+                            }
+                            ·
                             {{ line.quantity }} ×
                             <app-money [amount]="line.custom_price ?? line.unit_price" />
                           </p>
@@ -530,6 +551,9 @@ export class ProformasComponent implements OnInit, OnDestroy {
   protected readonly pageSize = signal(20);
   protected readonly totalItems = signal(0);
   protected readonly query = signal('');
+  protected readonly proformaSortOptions = PROFORMA_SORT_OPTIONS;
+  protected readonly proformaSort = signal('created_at');
+  protected readonly proformaSortDirection = signal<ListSortDirection>('desc');
   protected readonly status = new FormControl('all', { nonNullable: true });
   protected readonly from = new FormControl('', { nonNullable: true });
   protected readonly to = new FormControl('', { nonNullable: true });
@@ -650,6 +674,8 @@ export class ProformasComponent implements OnInit, OnDestroy {
         search: this.query(),
         page: this.page(),
         pageSize: this.pageSize(),
+        sortBy: this.proformaSort() as 'created_at' | 'code' | 'total' | 'status',
+        sortDirection: this.proformaSortDirection(),
       });
       this.proformas.set(result.rows);
       this.totalItems.set(result.count);
@@ -684,6 +710,13 @@ export class ProformasComponent implements OnInit, OnDestroy {
     this.pageSize.set(size);
     this.page.set(1);
     await this.load();
+  }
+
+  protected changeSort(key: string, direction: ListSortDirection): void {
+    this.proformaSort.set(key);
+    this.proformaSortDirection.set(direction);
+    this.page.set(1);
+    void this.load();
   }
 
   protected async printProforma(orderId: string): Promise<void> {

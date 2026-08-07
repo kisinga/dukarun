@@ -247,7 +247,7 @@ interface DraftFlag {
                 <div>
                   <h2 class="type-heading">Add products</h2>
                   <p class="mt-0.5 text-sm text-base-content/60">
-                    Search by name or SKU, or scan a barcode.
+                    Search by product, manufacturer, or SKU, or scan a barcode.
                   </p>
                 </div>
                 @if (!cart.isEmpty()) {
@@ -350,14 +350,13 @@ interface DraftFlag {
                         </span>
                       } @else if (unavailable(v)) {
                         <span class="badge badge-error badge-sm whitespace-nowrap">Out</span>
-                      } @else if (v.manufacturer_name) {
-                        <span class="badge badge-ghost badge-sm max-w-24 truncate">
-                          {{ v.manufacturer_name }}
-                        </span>
                       }
                     </div>
                     <span class="line-clamp-2 text-sm leading-tight font-semibold">
                       {{ label(v) }}
+                    </span>
+                    <span class="type-caption w-full truncate">
+                      {{ v.manufacturer_name || 'Manufacturer not set' }}
                     </span>
                     <span class="mt-auto flex w-full items-end justify-between gap-1">
                       <span class="text-sm font-bold whitespace-nowrap">

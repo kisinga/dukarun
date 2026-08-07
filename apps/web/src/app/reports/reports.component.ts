@@ -12,6 +12,7 @@ type Tab = 'sales' | 'products' | 'customers' | 'inventory';
 type ProductRow = {
   variantId: string;
   label: string;
+  manufacturer: string;
   quantity: number;
   revenue: number;
   cogs: number;
@@ -28,6 +29,7 @@ type CustomerRow = {
 type InventoryRow = {
   variantId: string;
   label: string;
+  manufacturer: string;
   stock: number;
   value: number;
   retailValue: number;
@@ -185,7 +187,10 @@ type InventoryRow = {
                 <tbody>
                   @for (p of products(); track p.variantId) {
                     <tr>
-                      <td class="text-sm font-medium">{{ p.label }}</td>
+                      <td>
+                        <p class="text-sm font-medium">{{ p.label }}</p>
+                        <p class="type-caption">{{ p.manufacturer }}</p>
+                      </td>
                       <td class="text-right">{{ p.quantity }}</td>
                       <td class="text-right">{{ fmt(p.revenue) }}</td>
                       <td class="text-right">{{ fmt(p.cogs) }}</td>
@@ -292,7 +297,10 @@ type InventoryRow = {
                 <tbody>
                   @for (row of inventory(); track row.variantId) {
                     <tr>
-                      <td class="font-medium">{{ row.label }}</td>
+                      <td>
+                        <p class="font-medium">{{ row.label }}</p>
+                        <p class="type-caption">{{ row.manufacturer }}</p>
+                      </td>
                       <td class="text-right">{{ row.stock }}</td>
                       <td class="text-right">{{ fmt(row.value) }}</td>
                       <td class="text-right">{{ fmt(row.retailValue) }}</td>
@@ -390,6 +398,7 @@ export class ReportsComponent implements OnInit {
             return {
               variantId: v.variant_id!,
               label: variantLabel(v),
+              manufacturer: v.manufacturer_name || 'Manufacturer not set',
               stock: current.stock,
               value: current.stock_value,
               retailValue: retail,
@@ -421,14 +430,18 @@ export class ReportsComponent implements OnInit {
     const variants = await this.pos.variantsByIds(top.map(([id]) => id));
     const byId = new Map(variants.map(v => [v.variant_id, v]));
     this.products.set(
-      top.map(([variantId, acc]) => ({
-        variantId,
-        label: byId.has(variantId) ? variantLabel(byId.get(variantId)!) : variantId.slice(0, 8),
-        quantity: acc.quantity,
-        revenue: acc.revenue,
-        cogs: acc.cogs,
-        margin: acc.revenue - acc.cogs,
-      }))
+      top.map(([variantId, acc]) => {
+        const variant = byId.get(variantId);
+        return {
+          variantId,
+          label: variant ? variantLabel(variant) : variantId.slice(0, 8),
+          manufacturer: variant?.manufacturer_name || 'Manufacturer not set',
+          quantity: acc.quantity,
+          revenue: acc.revenue,
+          cogs: acc.cogs,
+          margin: acc.revenue - acc.cogs,
+        };
+      })
     );
   }
 

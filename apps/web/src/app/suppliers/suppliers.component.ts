@@ -15,7 +15,9 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 import { formatKes, formatKesInput, parseKes } from '../core/money';
 import { PermissionsService } from '../core/permissions.service';
 import { SupabaseService } from '../core/supabase.service';
-import { PosService, StockLocation, Variant, variantLabel } from '../pos/pos.service';
+import { CatalogSearchService } from '../core/catalog-search.service';
+import { PosService, Variant, variantLabel } from '../pos/pos.service';
+import { LocationContextService } from '../core/location-context.service';
 import { PrintService } from '../shared/print/print.service';
 import { ReceiptDataService } from '../shared/print/receipt-data.service';
 import { ButtonComponent } from '../shared/ui/button.component';
@@ -23,7 +25,12 @@ import { EmptyStateComponent } from '../shared/ui/empty-state.component';
 import { EntityAvatarComponent } from '../shared/ui/entity-avatar.component';
 import { FormFieldComponent } from '../shared/ui/form-field.component';
 import { IconComponent } from '../shared/ui/icon.component';
-import { ListSearchBarComponent } from '../shared/ui/list-search-bar.component';
+import {
+  ListSearchBarComponent,
+  type ListSortDirection,
+  type ListSortOption,
+} from '../shared/ui/list-search-bar.component';
+import { sortList } from '../shared/ui/list-sort';
 import { MoneyComponent } from '../shared/ui/money.component';
 import { PageLayoutComponent } from '../shared/ui/page-layout.component';
 import { PaginationComponent } from '../shared/ui/pagination.component';
@@ -170,6 +177,9 @@ interface ParsedPurchaseLine {
           placeholder="Search supplier name, phone, or email…"
           [searchQuery]="supplierQuery()"
           (searchQueryChange)="supplierQuery.set($event)"
+          [sortOptions]="supplierSortOptions()"
+          [(sortKey)]="supplierSort"
+          [(sortDirection)]="supplierSortDirection"
         >
           <app-stat-bar summary [stats]="supplierSummary()" />
         </app-list-search-bar>
@@ -309,24 +319,26 @@ interface ParsedPurchaseLine {
         [class.mb-4]="isPurchasePage() && (purchaseFormOpen() || drafts().length > 0)"
       >
         @if (isPurchasePage() && purchaseFormOpen()) {
-          <section id="purchase-form" class="card bg-base-100">
-            <div class="card-body p-4">
-              <div class="flex items-start justify-between gap-3">
+          <section id="purchase-form" class="card overflow-visible bg-base-100">
+            <div class="card-body p-0">
+              <div
+                class="flex items-start justify-between gap-3 rounded-t-box border-b border-base-300 bg-base-200/30 px-5 py-4"
+              >
                 <div>
                   <h2 class="section-title">Record a purchase</h2>
                   <p class="type-caption mt-1">Stock is added as soon as this purchase is saved.</p>
                 </div>
-                <a routerLink="/suppliers" class="link link-hover shrink-0 text-xs">
+                <a routerLink="/suppliers" class="link link-hover shrink-0 text-sm">
                   Manage suppliers
                 </a>
               </div>
 
               <form
                 (submit)="$event.preventDefault(); recordPurchase()"
-                class="mt-2 flex flex-col gap-3"
+                class="flex flex-col gap-5 p-5"
               >
-                <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-12">
-                  <div class="relative sm:col-span-2 lg:col-span-6">
+                <div class="grid gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-12">
+                  <div class="relative sm:col-span-2 lg:col-span-6 xl:col-span-4">
                     <span class="form-field-label mb-1.5 block">
                       Supplier <span class="text-error">*</span>
                     </span>
@@ -343,32 +355,44 @@ interface ParsedPurchaseLine {
                         variant="outline"
                         size="sm"
                         type="button"
-                        class="w-full justify-between px-3 text-left"
+                        class="h-auto min-h-14 w-full justify-between gap-3 px-3 py-2 text-left"
                         [attr.aria-expanded]="supplierPickerOpen()"
                         aria-haspopup="listbox"
                         (click)="supplierPickerOpen.set(!supplierPickerOpen())"
                       >
                         @if (selectedSupplier(); as supplier) {
-                          <span class="min-w-0 truncate font-semibold">{{ name(supplier) }}</span>
+                          <span class="min-w-0 flex-1">
+                            <span class="block truncate font-semibold">{{ name(supplier) }}</span>
+                            <span class="type-caption block truncate font-normal">
+                              {{ supplier.phone || supplier.email || 'No contact details' }}
+                              @if (supplier.supplier_credit_terms_days) {
+                                · {{ supplier.supplier_credit_terms_days }}d terms
+                              }
+                            </span>
+                          </span>
+                          @if (perms.has('ViewFinancials')) {
+                            <span class="shrink-0 text-right font-normal">
+                              <span
+                                class="block text-xs font-semibold"
+                                [class.text-warning]="supplier.ap_balance > 0"
+                              >
+                                We owe <app-money [amount]="supplier.ap_balance" />
+                              </span>
+                              <span class="type-caption block">
+                                @if (supplier.supplier_credit_limit > 0) {
+                                  <app-money [amount]="supplierCreditAvailable(supplier)" />
+                                  available
+                                } @else {
+                                  No credit cap
+                                }
+                              </span>
+                            </span>
+                          }
                         } @else {
                           <span>Choose supplier</span>
                         }
-                        <app-icon name="heroChevronDown" />
+                        <app-icon class="shrink-0" name="heroChevronDown" />
                       </button>
-                      @if (selectedSupplier(); as supplier) {
-                        <p class="type-caption mt-1 truncate">
-                          {{ supplier.phone || supplier.email || 'No contact details' }}
-                          @if (perms.has('ViewFinancials')) {
-                            · We owe <app-money [amount]="supplier.ap_balance" />
-                            @if (supplier.supplier_credit_limit > 0) {
-                              · <app-money [amount]="supplierCreditAvailable(supplier)" /> credit
-                              left
-                            } @else {
-                              · No credit cap
-                            }
-                          }
-                        </p>
-                      }
 
                       @if (supplierPickerOpen()) {
                         <div
@@ -394,7 +418,7 @@ interface ParsedPurchaseLine {
                             @for (supplier of filteredSuppliers(); track supplier.id) {
                               <button
                                 type="button"
-                                class="flex min-h-12 w-full items-center gap-3 rounded-field px-3 py-2 text-left hover:bg-base-200"
+                                class="flex min-h-14 w-full items-center gap-3 rounded-field px-3 py-2 text-left hover:bg-base-200"
                                 role="option"
                                 [attr.aria-selected]="supplier.id === purchaseSupplier.value"
                                 (click)="chooseSupplier(supplier)"
@@ -405,18 +429,36 @@ interface ParsedPurchaseLine {
                                   </span>
                                   <span class="type-caption block truncate">
                                     {{ supplier.phone || supplier.email || 'No contact details' }}
+                                    @if (supplier.supplier_credit_terms_days) {
+                                      · {{ supplier.supplier_credit_terms_days }}d terms
+                                    }
                                   </span>
                                 </span>
-                                @if (supplierStats(supplier.id); as stats) {
-                                  <span class="shrink-0 text-right">
+                                <span class="shrink-0 text-right">
+                                  @if (perms.has('ViewFinancials')) {
+                                    <span
+                                      class="block text-xs font-semibold"
+                                      [class.text-warning]="supplier.ap_balance > 0"
+                                    >
+                                      We owe <app-money [amount]="supplier.ap_balance" />
+                                    </span>
+                                    <span class="type-caption">
+                                      @if (supplier.supplier_credit_limit > 0) {
+                                        <app-money [amount]="supplierCreditAvailable(supplier)" />
+                                        available
+                                      } @else {
+                                        No credit cap
+                                      }
+                                    </span>
+                                  } @else if (supplierStats(supplier.id); as stats) {
                                     <span class="block text-xs font-medium">
                                       {{ stats.purchases }} purchase(s)
                                     </span>
-                                    <span class="type-caption">
-                                      {{ stats.products }} product(s)
-                                    </span>
-                                  </span>
-                                }
+                                    <span class="type-caption"
+                                      >{{ stats.products }} product(s)</span
+                                    >
+                                  }
+                                </span>
                               </button>
                             } @empty {
                               <p class="p-3 text-sm text-base-content/60">No matching suppliers.</p>
@@ -426,24 +468,24 @@ interface ParsedPurchaseLine {
                       }
                     }
                   </div>
-                  <app-form-field label="Invoice / reference" class="lg:col-span-3">
+                  <app-form-field label="Invoice / reference" class="lg:col-span-3 xl:col-span-2">
                     <input
                       type="text"
-                      class="input input-bordered input-sm w-full"
+                      class="input input-bordered h-14 w-full"
                       placeholder="Optional"
                       [formControl]="purchaseReference"
                     />
                   </app-form-field>
-                  <app-form-field label="Purchase date" class="lg:col-span-3">
+                  <app-form-field label="Purchase date" class="lg:col-span-3 xl:col-span-2">
                     <input
                       type="date"
-                      class="input input-bordered input-sm w-full"
+                      class="input input-bordered h-14 w-full"
                       [formControl]="purchaseDate"
                     />
                   </app-form-field>
-                  <app-form-field label="Receive into" class="lg:col-span-3">
+                  <app-form-field label="Receive into" class="lg:col-span-3 xl:col-span-2">
                     <select
-                      class="select select-bordered select-sm w-full"
+                      class="select select-bordered h-14 w-full"
                       [formControl]="purchaseLocation"
                     >
                       @for (location of locations(); track location.id) {
@@ -451,25 +493,37 @@ interface ParsedPurchaseLine {
                       }
                     </select>
                   </app-form-field>
-                  <app-form-field label="Notes" class="sm:col-span-2 lg:col-span-9">
+                  <app-form-field label="Notes" class="sm:col-span-2 lg:col-span-9 xl:col-span-2">
                     <input
-                      class="input input-bordered input-sm w-full"
-                      placeholder="Delivery condition, invoice notes…"
+                      class="input input-bordered h-14 w-full"
+                      placeholder="Delivery notes…"
                       [formControl]="purchaseNotes"
                     />
                   </app-form-field>
                 </div>
 
-                <section class="border-t border-base-300 pt-3">
-                  <div class="grid items-start gap-3 lg:grid-cols-2">
+                <section class="rounded-box border border-base-300 bg-base-200/30 p-4">
+                  <div class="flex items-center justify-between gap-3">
                     <div>
-                      <span class="form-field-label mb-1.5 block">Payment method</span>
+                      <h3 class="text-sm font-semibold">Payment</h3>
+                      <p class="type-caption">Choose when and where the supplier is paid.</p>
+                    </div>
+                    <div class="shrink-0 text-right">
+                      <p class="type-caption">Current total</p>
+                      <p class="font-semibold tabular-nums">
+                        <app-money [amount]="purchaseTotal()" />
+                      </p>
+                    </div>
+                  </div>
+                  <div class="mt-3 grid items-start gap-4 lg:grid-cols-2">
+                    <div>
+                      <span class="form-field-label mb-1.5 block">Payment option</span>
                       <div class="grid gap-2 sm:grid-cols-3">
                         <button
                           type="button"
-                          class="flex min-h-9 items-center justify-center gap-2 rounded-field border px-3 text-sm font-semibold transition-colors"
+                          class="flex h-14 items-center justify-start gap-2 rounded-field border bg-base-100 px-3 text-left transition-colors"
                           [class.border-primary]="purchasePaymentMode.value === 'paid'"
-                          [class.bg-base-200]="purchasePaymentMode.value === 'paid'"
+                          [class.shadow-sm]="purchasePaymentMode.value === 'paid'"
                           [class.border-base-300]="purchasePaymentMode.value !== 'paid'"
                           (click)="setPurchasePaymentMode('paid')"
                         >
@@ -479,14 +533,17 @@ interface ParsedPurchaseLine {
                             tabindex="-1"
                             [checked]="purchasePaymentMode.value === 'paid'"
                           />
-                          Paid now
+                          <span>
+                            <span class="block text-sm font-semibold">Paid now</span>
+                            <span class="type-caption block font-normal">Full payment</span>
+                          </span>
                         </button>
                         @if (perms.has('ManageSupplierCreditPurchases')) {
                           <button
                             type="button"
-                            class="flex min-h-9 items-center justify-center gap-2 rounded-field border px-3 text-sm font-semibold transition-colors"
+                            class="flex h-14 items-center justify-start gap-2 rounded-field border bg-base-100 px-3 text-left transition-colors"
                             [class.border-primary]="purchasePaymentMode.value === 'partial'"
-                            [class.bg-base-200]="purchasePaymentMode.value === 'partial'"
+                            [class.shadow-sm]="purchasePaymentMode.value === 'partial'"
                             [class.border-base-300]="purchasePaymentMode.value !== 'partial'"
                             (click)="setPurchasePaymentMode('partial')"
                           >
@@ -496,13 +553,16 @@ interface ParsedPurchaseLine {
                               tabindex="-1"
                               [checked]="purchasePaymentMode.value === 'partial'"
                             />
-                            Part-paid
+                            <span>
+                              <span class="block text-sm font-semibold">Part-paid</span>
+                              <span class="type-caption block font-normal">Split payment</span>
+                            </span>
                           </button>
                           <button
                             type="button"
-                            class="flex min-h-9 items-center justify-center gap-2 rounded-field border px-3 text-sm font-semibold transition-colors"
+                            class="flex h-14 items-center justify-start gap-2 rounded-field border bg-base-100 px-3 text-left transition-colors"
                             [class.border-warning]="purchasePaymentMode.value === 'later'"
-                            [class.bg-base-200]="purchasePaymentMode.value === 'later'"
+                            [class.shadow-sm]="purchasePaymentMode.value === 'later'"
                             [class.border-base-300]="purchasePaymentMode.value !== 'later'"
                             (click)="setPurchasePaymentMode('later')"
                           >
@@ -512,7 +572,10 @@ interface ParsedPurchaseLine {
                               tabindex="-1"
                               [checked]="purchasePaymentMode.value === 'later'"
                             />
-                            Pay later
+                            <span>
+                              <span class="block text-sm font-semibold">Pay later</span>
+                              <span class="type-caption block font-normal">Supplier credit</span>
+                            </span>
                           </button>
                         }
                       </div>
@@ -535,7 +598,7 @@ interface ParsedPurchaseLine {
                           [error]="partialPaymentError()"
                         >
                           <input
-                            class="input input-bordered input-sm w-full"
+                            class="input input-bordered h-14 w-full"
                             inputmode="numeric"
                             placeholder="0"
                             [formControl]="purchaseAmountPaid"
@@ -543,7 +606,7 @@ interface ParsedPurchaseLine {
                         </app-form-field>
                         <app-form-field label="Paid from">
                           <select
-                            class="select select-bordered select-sm w-full"
+                            class="select select-bordered h-14 w-full"
                             [formControl]="purchaseAccount"
                           >
                             @for (a of accounts(); track a.code) {
@@ -551,31 +614,46 @@ interface ParsedPurchaseLine {
                             }
                           </select>
                         </app-form-field>
+                        <p class="type-caption sm:col-span-2">
+                          The payment is recorded against the selected account when this purchase is
+                          saved.
+                        </p>
                       </div>
                     } @else if (purchasePaymentMode.value === 'paid') {
-                      <app-form-field label="Paid from">
-                        <select
-                          class="select select-bordered select-sm w-full"
-                          [formControl]="purchaseAccount"
-                        >
-                          @for (a of accounts(); track a.code) {
-                            <option [value]="a.code">{{ a.code }} — {{ a.name }}</option>
-                          }
-                        </select>
-                      </app-form-field>
+                      <div>
+                        <app-form-field label="Paid from">
+                          <select
+                            class="select select-bordered h-14 w-full"
+                            [formControl]="purchaseAccount"
+                          >
+                            @for (a of accounts(); track a.code) {
+                              <option [value]="a.code">{{ a.code }} — {{ a.name }}</option>
+                            }
+                          </select>
+                        </app-form-field>
+                        <p class="type-caption mt-1">
+                          The full purchase total is recorded against this account when saved.
+                        </p>
+                      </div>
                     } @else if (selectedSupplier(); as supplier) {
                       <div>
                         <span class="form-field-label mb-1.5 block">Supplier credit</span>
-                        <div class="flex min-h-9 items-center text-sm">
-                          @if (supplier.supplier_credit_limit > 0) {
-                            <strong
-                              ><app-money [amount]="supplierCreditAvailable(supplier)"
-                            /></strong>
-                            <span class="ml-1 text-base-content/60">available</span>
-                          } @else {
-                            <span class="text-base-content/60">No configured credit cap</span>
-                          }
+                        <div
+                          class="flex h-14 items-center justify-between rounded-field border border-base-300 bg-base-100 px-3 text-sm"
+                        >
+                          <span class="text-base-content/60">Available</span>
+                          <strong>
+                            @if (supplier.supplier_credit_limit > 0) {
+                              <app-money [amount]="supplierCreditAvailable(supplier)" />
+                            } @else {
+                              No configured cap
+                            }
+                          </strong>
                         </div>
+                        <p class="type-caption mt-1">
+                          <app-money [amount]="purchaseBalanceDue()" /> will be added to what we owe
+                          {{ name(supplier) }}.
+                        </p>
                       </div>
                     }
                   </div>
@@ -591,7 +669,7 @@ interface ParsedPurchaseLine {
                   }
                 </section>
 
-                <section class="flex flex-col gap-2 border-t border-base-300 pt-3">
+                <section class="flex flex-col gap-3 border-t border-base-300 pt-4">
                   <div class="flex items-center justify-between gap-2">
                     <div>
                       <span class="section-title">Items</span>
@@ -611,20 +689,26 @@ interface ParsedPurchaseLine {
                   </div>
                   @for (line of lines; track $index) {
                     <div
-                      class="relative grid gap-2 rounded-box border border-base-300 bg-base-200/40 p-3 md:grid-cols-2 lg:grid-cols-12"
+                      class="relative grid gap-x-3 gap-y-4 rounded-box border border-base-300 bg-base-200/40 p-4 md:grid-cols-2 lg:grid-cols-12"
                     >
                       <div class="relative md:col-span-2 lg:col-span-4">
                         <span class="form-field-label mb-1 block">Product</span>
                         <button
                           type="button"
-                          class="flex min-h-10 w-full items-center justify-between gap-2 rounded-field border border-base-300 bg-base-100 px-3 text-left text-sm hover:border-base-content/30"
+                          class="flex h-12 w-full items-center justify-between gap-2 rounded-field border border-base-300 bg-base-100 px-3 text-left text-sm hover:border-base-content/30"
                           [attr.aria-expanded]="variantPickerFor() === $index"
                           (click)="openVariantPicker($index)"
                         >
                           @if (variantFor(line); as selectedVariant) {
-                            <span class="min-w-0 truncate font-medium">{{
-                              label(selectedVariant)
-                            }}</span>
+                            <span class="min-w-0">
+                              <span class="block truncate font-medium">{{
+                                label(selectedVariant)
+                              }}</span>
+                              <span class="type-caption block truncate">
+                                {{ selectedVariant.manufacturer_name || 'Manufacturer not set' }}
+                                · {{ selectedVariant.sku }}
+                              </span>
+                            </span>
                           } @else {
                             <span class="text-base-content/60">Choose a product</span>
                           }
@@ -645,9 +729,9 @@ interface ParsedPurchaseLine {
                                   type="search"
                                   #variantSearch
                                   class="input input-bordered input-sm w-full pl-9"
-                                  placeholder="Search product, SKU, or barcode…"
+                                  placeholder="Search product, manufacturer, SKU, or barcode…"
                                   [value]="variantQuery()"
-                                  (input)="variantQuery.set($any($event.target).value)"
+                                  (input)="updateVariantQuery($any($event.target).value)"
                                 />
                               </div>
                             </div>
@@ -666,10 +750,11 @@ interface ParsedPurchaseLine {
                                     <span class="block truncate text-sm font-medium">{{
                                       label(variant)
                                     }}</span>
-                                    <span class="type-caption block truncate"
-                                      >{{ variant.sku
-                                      }}{{ variant.barcode ? ' · ' + variant.barcode : '' }}</span
-                                    >
+                                    <span class="type-caption block truncate">
+                                      {{ variant.manufacturer_name || 'Manufacturer not set' }} ·
+                                      {{ variant.sku
+                                      }}{{ variant.barcode ? ' · ' + variant.barcode : '' }}
+                                    </span>
                                   </span>
                                   <span class="type-caption shrink-0 tabular-nums"
                                     >{{ variant.stock ?? 0 }} in stock</span
@@ -692,7 +777,7 @@ interface ParsedPurchaseLine {
                             size="sm"
                             [iconOnly]="true"
                             type="button"
-                            class="join-item"
+                            class="join-item h-12"
                             aria-label="Decrease quantity"
                             (click)="stepPurchaseQuantity(line, -1)"
                           >
@@ -700,7 +785,7 @@ interface ParsedPurchaseLine {
                           </button>
                           <input
                             type="number"
-                            class="input input-bordered input-sm join-item min-h-9 min-w-10 flex-1 px-1 text-center tabular-nums"
+                            class="input input-bordered join-item h-12 min-w-10 flex-1 px-1 text-center tabular-nums"
                             [min]="variantFor(line)?.allow_fractional ? 0.01 : 1"
                             [step]="variantFor(line)?.allow_fractional ? 0.5 : 1"
                             [ngModel]="line.quantity"
@@ -713,7 +798,7 @@ interface ParsedPurchaseLine {
                             size="sm"
                             [iconOnly]="true"
                             type="button"
-                            class="join-item"
+                            class="join-item h-12"
                             aria-label="Increase quantity"
                             (click)="stepPurchaseQuantity(line, 1)"
                           >
@@ -725,7 +810,7 @@ interface ParsedPurchaseLine {
                         <input
                           type="text"
                           inputmode="numeric"
-                          class="input input-bordered input-sm min-h-9 w-full text-right tabular-nums"
+                          class="input input-bordered h-12 w-full text-right tabular-nums"
                           [ngModel]="line.unitCost"
                           [ngModelOptions]="{ standalone: true }"
                           (ngModelChange)="updateUnitCost(line, $event)"
@@ -740,7 +825,7 @@ interface ParsedPurchaseLine {
                         <input
                           type="text"
                           inputmode="numeric"
-                          class="input input-bordered input-sm min-h-9 w-full text-right font-semibold tabular-nums"
+                          class="input input-bordered h-12 w-full text-right font-semibold tabular-nums"
                           [ngModel]="line.lineTotal"
                           [ngModelOptions]="{ standalone: true }"
                           (ngModelChange)="updateLineTotal(line, $event)"
@@ -762,13 +847,15 @@ interface ParsedPurchaseLine {
                       }
                       @if (variantFor(line); as variant) {
                         <div
-                          class="grid gap-2 md:col-span-2 md:grid-cols-2 lg:col-span-12 lg:grid-cols-4"
+                          class="grid gap-3 md:col-span-2 md:grid-cols-2 lg:col-span-12"
+                          [class.lg:grid-cols-4]="preferences.batchExpiryEnabled()"
+                          [class.lg:grid-cols-3]="!preferences.batchExpiryEnabled()"
                         >
                           @if (preferences.batchExpiryEnabled()) {
                             <app-form-field label="Expiry (optional)">
                               <input
                                 type="date"
-                                class="input input-bordered input-sm w-full"
+                                class="input input-bordered h-11 w-full"
                                 [(ngModel)]="line.expiryDate"
                                 [ngModelOptions]="{ standalone: true }"
                               />
@@ -776,7 +863,7 @@ interface ParsedPurchaseLine {
                           }
                           <app-form-field label="Batch (optional)">
                             <input
-                              class="input input-bordered input-sm w-full"
+                              class="input input-bordered h-11 w-full"
                               [(ngModel)]="line.batchNumber"
                               [ngModelOptions]="{ standalone: true }"
                             />
@@ -786,7 +873,7 @@ interface ParsedPurchaseLine {
                               <input
                                 type="text"
                                 inputmode="numeric"
-                                class="input input-bordered input-sm w-full tabular-nums"
+                                class="input input-bordered h-11 w-full text-right tabular-nums"
                                 [class.bg-base-200]="!perms.has('ManageStockAdjustments')"
                                 [class.pr-8]="hasDuplicateVariant(line)"
                                 [readonly]="!perms.has('ManageStockAdjustments')"
@@ -814,7 +901,7 @@ interface ParsedPurchaseLine {
                               <input
                                 type="text"
                                 inputmode="numeric"
-                                class="input input-bordered input-sm w-full tabular-nums"
+                                class="input input-bordered h-11 w-full text-right tabular-nums"
                                 [class.bg-base-200]="!perms.has('ManageStockAdjustments')"
                                 [class.pr-8]="hasDuplicateVariant(line)"
                                 [readonly]="!perms.has('ManageStockAdjustments')"
@@ -845,16 +932,16 @@ interface ParsedPurchaseLine {
                         </div>
 
                         <div
-                          class="grid gap-3 border-t border-base-300 pt-3 sm:grid-cols-2 md:col-span-2 lg:col-span-12 lg:grid-cols-5"
+                          class="grid overflow-hidden rounded-field border border-base-300 bg-base-100/70 sm:grid-cols-2 md:col-span-2 lg:col-span-12 lg:grid-cols-5 lg:divide-x lg:divide-base-300"
                         >
-                          <div>
+                          <div class="min-w-0 space-y-1 p-3">
                             <p class="type-caption">SKU · current stock</p>
                             <p class="font-semibold tabular-nums">
                               {{ variant.sku }} · {{ variant.stock ?? 0 }}
                               {{ variant.allow_fractional ? 'units' : 'in stock' }}
                             </p>
                           </div>
-                          <div>
+                          <div class="min-w-0 space-y-1 border-t border-base-300 p-3 sm:border-t-0">
                             <p class="type-caption">This supplier</p>
                             @if (supplierInsight(line); as insight) {
                               <p class="font-semibold">
@@ -867,7 +954,7 @@ interface ParsedPurchaseLine {
                               <p class="text-sm text-base-content/60">No purchase history</p>
                             }
                           </div>
-                          <div>
+                          <div class="min-w-0 space-y-1 border-t border-base-300 p-3 lg:border-t-0">
                             <p class="type-caption">Wholesale margin</p>
                             <app-status-badge
                               size="xs"
@@ -875,7 +962,7 @@ interface ParsedPurchaseLine {
                               [label]="marginLabel(line, enteredCatalogPrice(line.wholesalePrice))"
                             />
                           </div>
-                          <div>
+                          <div class="min-w-0 space-y-1 border-t border-base-300 p-3 lg:border-t-0">
                             <p class="type-caption">Retail margin</p>
                             <app-status-badge
                               size="xs"
@@ -883,7 +970,7 @@ interface ParsedPurchaseLine {
                               [label]="marginLabel(line, enteredCatalogPrice(line.retailPrice))"
                             />
                           </div>
-                          <div>
+                          <div class="min-w-0 space-y-1 border-t border-base-300 p-3 lg:border-t-0">
                             <p class="type-caption">Best recorded price</p>
                             @if (bestSupplierHint(line); as best) {
                               <p class="text-sm font-semibold">{{ fmt(best.cost) }}</p>
@@ -1506,6 +1593,11 @@ interface ParsedPurchaseLine {
             placeholder="Search supplier or reference…"
             [searchQuery]="purchaseQuery()"
             (searchQueryChange)="purchaseQuery.set($event); purchasePage.set(1)"
+            [sortOptions]="purchaseSortOptions()"
+            [sortKey]="purchaseSort()"
+            (sortKeyChange)="purchaseSort.set($event); purchasePage.set(1)"
+            [sortDirection]="purchaseSortDirection()"
+            (sortDirectionChange)="purchaseSortDirection.set($event); purchasePage.set(1)"
           >
             <app-stat-bar summary [stats]="purchaseSummary()" />
           </app-list-search-bar>
@@ -1678,6 +1770,11 @@ interface ParsedPurchaseLine {
                                   {{ purchaseLineLabel(line.variant_id) }}
                                 </p>
                                 <p class="type-caption">
+                                  {{ purchaseLineManufacturer(line.variant_id) }}
+                                  @if (purchaseLineSku(line.variant_id); as sku) {
+                                    · {{ sku }}
+                                  }
+                                  ·
                                   {{ line.quantity }} ×
                                   <app-money
                                     [amount]="line.unit_cost"
@@ -1823,6 +1920,8 @@ export class SuppliersComponent implements OnInit, OnDestroy {
   private readonly money = inject(MoneyService);
   protected readonly partyCache = inject(PartyCacheService);
   private readonly pos = inject(PosService);
+  private readonly catalogSearch = inject(CatalogSearchService);
+  private readonly locationContext = inject(LocationContextService);
   private readonly supabase = inject(SupabaseService);
   private readonly receiptData = inject(ReceiptDataService);
   private readonly print = inject(PrintService);
@@ -1840,11 +1939,24 @@ export class SuppliersComponent implements OnInit, OnDestroy {
   protected readonly label = variantLabel;
   protected readonly purchases = signal<PurchaseRow[]>([]);
   protected readonly purchaseQuery = signal('');
+  protected readonly purchaseSort = signal('created');
+  protected readonly purchaseSortDirection = signal<ListSortDirection>('desc');
+  protected readonly purchaseSortOptions = computed<readonly ListSortOption[]>(() => [
+    { value: 'created', label: 'Purchase date' },
+    { value: 'supplier', label: 'Supplier name' },
+    { value: 'status', label: 'Payment status' },
+    ...(this.perms.has('ViewFinancials')
+      ? [
+          { value: 'total', label: 'Purchase value' },
+          { value: 'outstanding', label: 'Outstanding value' },
+        ]
+      : []),
+  ]);
   protected readonly purchasePage = signal(1);
   protected readonly purchasePageSize = signal(10);
   protected readonly drafts = signal<PurchaseDraft[]>([]);
   protected readonly performance = signal<SupplierVariantPerformance[]>([]);
-  protected readonly locations = signal<StockLocation[]>([]);
+  protected readonly locations = this.locationContext.locations;
   protected readonly activeDraftId = signal<string | null>(null);
   protected readonly purchaseFormOpen = signal(false);
   /** Drawer edit mode: supplierCreating = empty form, drawerEditing = form for the open supplier. */
@@ -1862,6 +1974,14 @@ export class SuppliersComponent implements OnInit, OnDestroy {
   protected readonly purchaseSupplier = new FormControl('', { nonNullable: true });
   protected readonly supplierPickerOpen = signal(false);
   protected readonly supplierQuery = signal('');
+  protected readonly supplierSort = signal('name');
+  protected readonly supplierSortDirection = signal<ListSortDirection>('asc');
+  protected readonly supplierSortOptions = computed<readonly ListSortOption[]>(() => [
+    { value: 'name', label: 'Supplier name' },
+    { value: 'aging', label: 'Days outstanding' },
+    { value: 'status', label: 'Account status' },
+    ...(this.perms.has('ViewFinancials') ? [{ value: 'balance', label: 'Amount owed' }] : []),
+  ]);
   protected readonly purchaseReference = new FormControl('', { nonNullable: true });
   protected readonly purchaseNotes = new FormControl('', { nonNullable: true });
   protected readonly purchaseDate = new FormControl(new Date().toISOString().slice(0, 10), {
@@ -1875,6 +1995,8 @@ export class SuppliersComponent implements OnInit, OnDestroy {
   protected readonly purchaseAccount = new FormControl('', { nonNullable: true });
   protected readonly variantPickerFor = signal<number | null>(null);
   protected readonly variantQuery = signal('');
+  protected readonly variantSearchResults = signal<Variant[] | null>(null);
+  private variantSearchRequest = 0;
   private readonly variantSearchInput = viewChild<string, ElementRef<HTMLInputElement>>(
     'variantSearch',
     { read: ElementRef }
@@ -1913,11 +2035,30 @@ export class SuppliersComponent implements OnInit, OnDestroy {
   protected readonly filteredSuppliers = computed(() => {
     const query = this.supplierQuery().trim().toLowerCase();
     const source = this.isPurchasePage() ? this.activeSuppliers() : this.suppliers();
-    if (!query) return source;
-    return source.filter(supplier =>
-      [this.name(supplier), supplier.phone, supplier.email]
-        .filter(Boolean)
-        .some(value => value!.toLowerCase().includes(query))
+    const rows = query
+      ? source.filter(supplier =>
+          [this.name(supplier), supplier.phone, supplier.email]
+            .filter(Boolean)
+            .some(value => value!.toLowerCase().includes(query))
+        )
+      : source;
+    const sortKey = this.supplierSort();
+    return sortList(
+      rows,
+      this.supplierSortDirection(),
+      supplier => {
+        switch (sortKey) {
+          case 'aging':
+            return supplier.days_outstanding;
+          case 'status':
+            return supplier.supplier_active;
+          case 'balance':
+            return supplier.ap_balance;
+          default:
+            return this.name(supplier);
+        }
+      },
+      supplier => this.name(supplier)
     );
   });
   protected readonly suppliersOwed = computed(() =>
@@ -1987,11 +2128,32 @@ export class SuppliersComponent implements OnInit, OnDestroy {
   ]);
   protected readonly filteredPurchases = computed(() => {
     const query = this.purchaseQuery().trim().toLowerCase();
-    if (!query) return this.purchases();
-    return this.purchases().filter(purchase =>
-      [this.supplierName(purchase.supplier_id), purchase.reference]
-        .filter(Boolean)
-        .some(value => value!.toLowerCase().includes(query))
+    const rows = query
+      ? this.purchases().filter(purchase =>
+          [this.supplierName(purchase.supplier_id), purchase.reference]
+            .filter(Boolean)
+            .some(value => value!.toLowerCase().includes(query))
+        )
+      : this.purchases();
+    const sortKey = this.purchaseSort();
+    return sortList(
+      rows,
+      this.purchaseSortDirection(),
+      purchase => {
+        switch (sortKey) {
+          case 'supplier':
+            return this.supplierName(purchase.supplier_id);
+          case 'status':
+            return this.purchaseStatusLabel(purchase);
+          case 'total':
+            return purchase.total_cost;
+          case 'outstanding':
+            return Math.max(0, purchase.total_cost - purchase.paid);
+          default:
+            return purchase.created_at;
+        }
+      },
+      purchase => purchase.created_at
     );
   });
   protected readonly purchaseSummary = computed(() => {
@@ -2056,22 +2218,19 @@ export class SuppliersComponent implements OnInit, OnDestroy {
     }
     if (!silent) this.loading.set(true);
     try {
-      const [suppliers, accounts, variants, purchases, drafts, locations, performance] =
-        await Promise.all([
-          this.partyCache.ensureLoaded().then(() => this.partyCache.suppliers()),
-          this.money.transactableAccounts(),
-          this.pos.fetchActiveVariants(),
-          this.money.purchasesWithPayments(),
-          this.money.purchaseDrafts(),
-          this.pos.listStockLocations(),
-          this.money.supplierVariantPerformance(),
-        ]);
+      const [suppliers, accounts, variants, purchases, drafts, performance] = await Promise.all([
+        this.partyCache.ensureLoaded().then(() => this.partyCache.suppliers()),
+        this.money.transactableAccounts(),
+        this.catalogSearch.activeCatalog(),
+        this.money.purchasesWithPayments(),
+        this.money.purchaseDrafts(),
+        this.money.supplierVariantPerformance(),
+      ]);
       this.accounts.set(accounts);
       // Purchases stock goods only (services are rejected server-side).
       this.variants.set(variants.filter(v => v.kind !== 'service'));
       this.purchases.set(purchases as PurchaseRow[]);
       this.drafts.set(drafts);
-      this.locations.set(locations);
       this.performance.set(performance);
       const activeSuppliers = suppliers.filter(supplier => supplier.supplier_active);
       if (
@@ -2092,8 +2251,10 @@ export class SuppliersComponent implements OnInit, OnDestroy {
       if (!this.payAccount.value && accounts.length > 0) this.payAccount.setValue(accounts[0].code);
       if (!this.selectedPayAccount.value && accounts.length > 0)
         this.selectedPayAccount.setValue(accounts[0].code);
-      if (!this.purchaseLocation.value && locations.length > 0)
-        this.purchaseLocation.setValue(locations[0].id);
+      const locations = this.locations();
+      if (!this.purchaseLocation.value && locations.length > 0) {
+        this.purchaseLocation.setValue(this.locationContext.activeId() ?? locations[0].id);
+      }
       // Realtime: keep an open purchase drawer's payment history in sync.
       const openPurchaseId = this.drawerPurchaseId();
       if (openPurchaseId && purchases.some(p => p.id === openPurchaseId)) {
@@ -2288,24 +2449,38 @@ export class SuppliersComponent implements OnInit, OnDestroy {
   }
 
   protected filteredPurchaseVariants(): Variant[] {
-    const query = this.variantQuery().trim().toLowerCase();
-    if (!query) return this.variants();
-    return this.variants().filter(variant =>
-      [this.label(variant), variant.sku, variant.barcode]
-        .filter(Boolean)
-        .some(value => value!.toLowerCase().includes(query))
-    );
+    return (this.variantSearchResults() ?? this.variants()).slice(0, 50);
+  }
+
+  protected updateVariantQuery(value: string): void {
+    this.variantQuery.set(value);
+    const request = ++this.variantSearchRequest;
+    const query = value.trim();
+    if (!query) {
+      this.variantSearchResults.set(null);
+      return;
+    }
+    void this.catalogSearch.search(query, 50).then(result => {
+      if (request !== this.variantSearchRequest) return;
+      this.variantSearchResults.set(result.variants.filter(variant => variant.kind !== 'service'));
+    });
   }
 
   protected openVariantPicker(index: number): void {
     this.variantQuery.set('');
+    this.variantSearchResults.set(null);
     this.variantPickerFor.set(this.variantPickerFor() === index ? null : index);
   }
 
   protected chooseVariantForLine(line: PurchaseLineForm, index: number, variantId: string): void {
+    const selected = this.variantSearchResults()?.find(variant => variant.variant_id === variantId);
+    if (selected && !this.variants().some(variant => variant.variant_id === variantId)) {
+      this.variants.update(variants => [...variants, selected]);
+    }
     this.selectVariantForLine(line, variantId);
     this.variantPickerFor.set(null);
     this.variantQuery.set('');
+    this.variantSearchResults.set(null);
   }
 
   protected catalogPriceChanged(line: PurchaseLineForm): boolean {
@@ -2607,6 +2782,17 @@ export class SuppliersComponent implements OnInit, OnDestroy {
   protected purchaseLineLabel(variantId: string): string {
     const variant = this.variants().find(v => v.variant_id === variantId);
     return variant ? this.label(variant) : 'Item';
+  }
+
+  protected purchaseLineManufacturer(variantId: string): string {
+    return (
+      this.variants().find(variant => variant.variant_id === variantId)?.manufacturer_name ??
+      'Manufacturer not set'
+    );
+  }
+
+  protected purchaseLineSku(variantId: string): string | null {
+    return this.variants().find(variant => variant.variant_id === variantId)?.sku ?? null;
   }
 
   protected async paySelectedPurchase(): Promise<void> {

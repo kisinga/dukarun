@@ -10,11 +10,23 @@ import { ButtonComponent } from '../shared/ui/button.component';
 import { DataTableShellComponent } from '../shared/ui/data-table-shell.component';
 import { FormFieldComponent } from '../shared/ui/form-field.component';
 import { IconComponent } from '../shared/ui/icon.component';
-import { ListSearchBarComponent } from '../shared/ui/list-search-bar.component';
+import {
+  ListSearchBarComponent,
+  type ListSortDirection,
+  type ListSortOption,
+} from '../shared/ui/list-search-bar.component';
+import { sortList } from '../shared/ui/list-sort';
 import { StatBarComponent } from '../shared/ui/stat-bar.component';
 import { StatusBadgeComponent } from '../shared/ui/status-badge.component';
 
 type DecisionTarget = { approval: Approval; action: 'approve' | 'deny' };
+
+const APPROVAL_SORT_OPTIONS: readonly ListSortOption[] = [
+  { value: 'date', label: 'Activity date' },
+  { value: 'type', label: 'Request type' },
+  { value: 'status', label: 'Decision status' },
+  { value: 'requester', label: 'Requested by' },
+];
 
 const TYPE_BADGE: Record<string, string> = {
   below_wholesale: 'badge-warning',
@@ -92,6 +104,13 @@ const TYPE_BADGE: Record<string, string> = {
         placeholder="Search request type, order, or details…"
         [searchQuery]="query()"
         (searchQueryChange)="query.set($event); pendingPage.set(1); decidedPage.set(1)"
+        [sortOptions]="approvalSortOptions"
+        [sortKey]="approvalSort()"
+        (sortKeyChange)="approvalSort.set($event); pendingPage.set(1); decidedPage.set(1)"
+        [sortDirection]="approvalSortDirection()"
+        (sortDirectionChange)="
+          approvalSortDirection.set($event); pendingPage.set(1); decidedPage.set(1)
+        "
       >
         <app-stat-bar summary [stats]="approvalStats()" />
       </app-list-search-bar>
@@ -353,6 +372,9 @@ export class ApprovalsComponent implements OnInit {
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
   protected readonly query = signal('');
+  protected readonly approvalSortOptions = APPROVAL_SORT_OPTIONS;
+  protected readonly approvalSort = signal('date');
+  protected readonly approvalSortDirection = signal<ListSortDirection>('desc');
   protected readonly pageSize = signal(10);
   protected readonly pendingPage = signal(1);
   protected readonly decidedPage = signal(1);
@@ -415,18 +437,37 @@ export class ApprovalsComponent implements OnInit {
 
   private filterRows(rows: Approval[]): Approval[] {
     const query = this.query().trim().toLowerCase();
-    if (!query) return rows;
-    return rows.filter(approval =>
-      [
-        this.typeLabel(approval.type),
-        this.summary(approval),
-        approval.status,
-        approval.requested_by ?? '',
-        approval.decision_reason ?? '',
-      ]
-        .join(' ')
-        .toLowerCase()
-        .includes(query)
+    const filtered = query
+      ? rows.filter(approval =>
+          [
+            this.typeLabel(approval.type),
+            this.summary(approval),
+            approval.status,
+            approval.requested_by ?? '',
+            approval.decision_reason ?? '',
+          ]
+            .join(' ')
+            .toLowerCase()
+            .includes(query)
+        )
+      : rows;
+    const sortKey = this.approvalSort();
+    return sortList(
+      filtered,
+      this.approvalSortDirection(),
+      approval => {
+        switch (sortKey) {
+          case 'type':
+            return this.typeLabel(approval.type);
+          case 'status':
+            return approval.status;
+          case 'requester':
+            return approval.requested_by;
+          default:
+            return approval.decided_at ?? approval.created_at;
+        }
+      },
+      approval => approval.created_at
     );
   }
 
@@ -455,7 +496,14 @@ export class ApprovalsComponent implements OnInit {
         ),
       ];
       const variants = await this.pos.variantsByIds(variantIds);
-      this.variantLabelMap.set(new Map(variants.map(v => [v.variant_id!, variantLabel(v)])));
+      this.variantLabelMap.set(
+        new Map(
+          variants.map(v => [
+            v.variant_id!,
+            `${variantLabel(v)} · ${v.manufacturer_name || 'Manufacturer not set'}`,
+          ])
+        )
+      );
     } catch {
       // summaries fall back to raw ids
     }
