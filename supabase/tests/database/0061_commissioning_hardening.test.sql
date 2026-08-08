@@ -37,9 +37,9 @@ select ok(
   exists (
     select 1 from pg_publication_tables
     where pubname = 'supabase_realtime'
-      and schemaname = 'public' and tablename = 'inventory_batches'
+      and schemaname = 'public' and tablename = 'cache_change_log'
   ),
-  'inventory changes are published for cache hydration'
+  'durable cache changes are the Realtime hydration source'
 );
 
 select * from finish();

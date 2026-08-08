@@ -1,5 +1,5 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { Component, OnInit, computed, effect, inject, signal, untracked } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { DatePipe } from '@angular/common';
@@ -245,11 +245,17 @@ export class StockTransfersComponent implements OnInit {
       ) &&
       !this.saving()
   );
+  private readonly debouncedSearch = toSignal(
+    this.search.valueChanges.pipe(debounceTime(200), distinctUntilChanged()),
+    { initialValue: undefined }
+  );
 
   constructor() {
-    this.search.valueChanges
-      .pipe(debounceTime(200), distinctUntilChanged(), takeUntilDestroyed())
-      .subscribe(value => void this.find(value));
+    effect(() => {
+      const query = this.debouncedSearch();
+      if (query === undefined) return;
+      untracked(() => void this.find(query));
+    });
   }
 
   async ngOnInit(): Promise<void> {

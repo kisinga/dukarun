@@ -5,6 +5,7 @@ import { SupabaseService, type AppIdentity } from './supabase.service';
 import { offlineDb, offlineScopeKey } from '../pos/offline/offline-db';
 import { LocationContextService } from './location-context.service';
 import { CompanyPreferencesService } from './company-preferences.service';
+import { CacheJournalService, type CacheStreamHandler } from './cache-journal.service';
 
 type CashierSession = Database['public']['Tables']['cashier_sessions']['Row'];
 
@@ -26,11 +27,12 @@ export class CashierSessionService {
   private activeScope: string | null = null;
   private refreshPromise: Promise<void> | null = null;
   private channel: RealtimeChannel | null = null;
-  private pollTimer: ReturnType<typeof setInterval> | null = null;
+  private handler: CacheStreamHandler | null = null;
 
   constructor(
     private readonly supabase: SupabaseService,
-    private readonly locations: LocationContextService
+    private readonly locations: LocationContextService,
+    private readonly journal: CacheJournalService
   ) {}
 
   async start(): Promise<void> {
@@ -41,7 +43,7 @@ export class CashierSessionService {
       try {
         await this.refresh();
       } catch {
-        // Polling/realtime will retry; keep the last confirmed state.
+        // Journal reconciliation will retry; keep the last confirmed state.
       }
       return;
     }
@@ -52,26 +54,33 @@ export class CashierSessionService {
       // A transient startup failure must not prevent later refreshes.
     }
 
-    try {
-      this.channel = this.supabase.client
-        .channel(`cashier-session:${identity.companyId}:${this.locations.activeId()}`)
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'cashier_sessions',
-            filter: `company_id=eq.${identity.companyId}`,
-          },
-          () => void this.refresh().catch(() => undefined)
-        )
-        .subscribe();
-    } catch {
-      // Polling below remains the fallback if subscription setup fails.
-    }
-
-    // Realtime is the fast path; polling covers suspended tabs and reconnects.
-    this.pollTimer = setInterval(() => void this.refresh().catch(() => undefined), 30_000);
+    const scope = this.activeScope;
+    if (!scope) return;
+    this.handler = {
+      apply: async changes => {
+        const locationId = this.locations.activeId();
+        if (
+          changes.some(
+            change =>
+              change.entityType === 'cashier_session' &&
+              (!change.locationId || change.locationId === locationId)
+          )
+        ) {
+          await this.refresh();
+        }
+      },
+      reset: async () => {
+        await this.refresh();
+        return true;
+      },
+    };
+    this.channel = this.journal.subscribe(
+      'settings',
+      scope,
+      identity.companyId,
+      this.handler,
+      'cashier-session'
+    );
   }
 
   async refreshConfiguration(): Promise<void> {
@@ -175,9 +184,8 @@ export class CashierSessionService {
     }
 
     if (this.channel) void this.supabase.client.removeChannel(this.channel);
-    if (this.pollTimer) clearInterval(this.pollTimer);
     this.channel = null;
-    this.pollTimer = null;
+    this.handler = null;
     this.started = false;
     this.activeScope = key;
     this.session.set(null);

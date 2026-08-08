@@ -156,7 +156,7 @@ export class RegisterComponent implements OnInit {
         .catch(() => undefined),
       this.publicPricing
         .billingConfig()
-        .then(config => this.trialDays.set(config.trialDays))
+        .then(config => this.trialDays.set(config?.trialDays ?? null))
         .catch(() => undefined),
     ]);
   }

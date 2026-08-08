@@ -45,9 +45,9 @@ export class PublicPricingService {
     return data ?? [];
   }
 
-  async billingConfig(): Promise<PublicBillingConfig> {
+  async billingConfig(): Promise<PublicBillingConfig | null> {
     const { data, error } = await this.supabase.client.rpc('public_billing_config');
     if (error) throw error;
-    return data as unknown as PublicBillingConfig;
+    return data as unknown as PublicBillingConfig | null;
   }
 }

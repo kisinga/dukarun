@@ -4,6 +4,12 @@ import type { Database } from '@dukarun/shared-types';
 import { SupabaseService } from '../core/supabase.service';
 import { rpcError } from '../pos/pos.service';
 import { PermissionsService } from '../core/permissions.service';
+import { offlineDb, offlineScopeKey, type NamedSnapshot } from '../pos/offline/offline-db';
+import {
+  CacheJournalService,
+  type CacheChange,
+  type CacheStreamHandler,
+} from '../core/cache-journal.service';
 
 export type Approval = Database['public']['Tables']['approvals']['Row'];
 
@@ -15,6 +21,7 @@ export type Approval = Database['public']['Tables']['approvals']['Row'];
 export class ApprovalsService implements OnDestroy {
   private readonly supabase = inject(SupabaseService);
   private readonly permissions = inject(PermissionsService);
+  private readonly journal = inject(CacheJournalService);
 
   readonly pending = signal<Approval[]>([]);
   readonly decided = signal<Approval[]>([]);
@@ -23,6 +30,8 @@ export class ApprovalsService implements OnDestroy {
 
   private channel: RealtimeChannel | null = null;
   private refreshSequence = 0;
+  private scope: string | null = null;
+  private handler: CacheStreamHandler | null = null;
 
   private get db() {
     return this.supabase.client;
@@ -37,24 +46,26 @@ export class ApprovalsService implements OnDestroy {
       this.decided.set([]);
       this.error.set(null);
       this.refreshSequence++;
+      this.scope = identity ? offlineScopeKey(identity) : null;
+      this.handler = null;
       if (!identity) return;
-      if (canReadInbox) this.refreshSafely();
-      this.channel = this.db
-        .channel(`approvals-inbox:${identity.companyId}`)
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'approvals',
-            filter: `company_id=eq.${identity.companyId}`,
-          },
-          () => {
-            this.revision.update(value => value + 1);
-            if (canReadInbox) this.refreshSafely();
-          }
-        )
-        .subscribe();
+      const scope = this.scope;
+      if (!scope) return;
+      this.handler = {
+        apply: changes => this.applyChanges(changes, canReadInbox),
+        reset: async () => {
+          if (canReadInbox) await this.refresh();
+          return true;
+        },
+      };
+      this.channel = this.journal.subscribe(
+        'inbox',
+        scope,
+        identity.companyId,
+        this.handler,
+        'approvals'
+      );
+      if (canReadInbox) void this.restoreOrRefresh(scope);
     });
   }
 
@@ -84,6 +95,7 @@ export class ApprovalsService implements OnDestroy {
     this.pending.set(pending.data);
     this.decided.set(decided.data);
     this.error.set(null);
+    await this.persist();
   }
 
   /** Requester-visible lookup used to show pending state and prevent duplicates. */
@@ -233,6 +245,65 @@ export class ApprovalsService implements OnDestroy {
     if (!this.channel) return;
     void this.db.removeChannel(this.channel);
     this.channel = null;
+  }
+
+  private async restoreOrRefresh(scope: string): Promise<void> {
+    const cached = await (await offlineDb()).get('snapshots', `${scope}:approvals`);
+    if (cached && scope === this.scope) {
+      const value = cached.value as { pending: Approval[]; decided: Approval[] };
+      this.pending.set(value.pending);
+      this.decided.set(value.decided);
+    } else {
+      this.refreshSafely();
+    }
+  }
+
+  private async applyChanges(
+    changes: readonly CacheChange[],
+    canReadInbox: boolean
+  ): Promise<void> {
+    const ids = [
+      ...new Set(changes.filter(row => row.entityType === 'approval').map(row => row.entityId)),
+    ];
+    if (!ids.length) return;
+    this.revision.update(value => value + 1);
+    if (!canReadInbox) return;
+    const { data, error } = await this.db.from('approvals').select('*').in('id', ids);
+    if (error) throw rpcError(error);
+    const idSet = new Set(ids);
+    const all = [
+      ...this.pending().filter(row => !idSet.has(row.id)),
+      ...this.decided().filter(row => !idSet.has(row.id)),
+      ...(data ?? []),
+    ];
+    this.pending.set(
+      all
+        .filter(row => row.status === 'pending')
+        .sort((a, b) => a.created_at.localeCompare(b.created_at))
+        .slice(0, 100)
+    );
+    this.decided.set(
+      all
+        .filter(row => row.status !== 'pending')
+        .sort((a, b) => (b.decided_at ?? b.created_at).localeCompare(a.decided_at ?? a.created_at))
+        .slice(0, 20)
+    );
+    await this.persist();
+  }
+
+  private async persist(): Promise<void> {
+    const identity = this.supabase.offlineIdentity();
+    const scope = this.scope;
+    if (!identity || !scope || !this.canReadInbox()) return;
+    const snapshot: NamedSnapshot = {
+      key: `${scope}:approvals`,
+      name: 'approvals',
+      company_id: identity.companyId,
+      user_id: identity.userId,
+      value: { pending: this.pending(), decided: this.decided() },
+      fetched_at: new Date().toISOString(),
+    };
+    await (await offlineDb()).put('snapshots', snapshot);
   }
 
   private refreshSafely(): void {

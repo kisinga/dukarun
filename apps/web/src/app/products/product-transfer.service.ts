@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { Workbook, type Cell, type Worksheet } from 'exceljs';
+import type { Cell, Workbook, Worksheet } from 'exceljs';
 import { SupabaseService } from '../core/supabase.service';
 
 export type ProductImportMode = 'merge' | 'replace';
@@ -110,7 +110,7 @@ type VariantRow = {
 // PostgreSQL's uuid type accepts any canonical 8-4-4-4-12 hexadecimal value,
 // including legacy IDs without RFC version/variant bits.
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const MAX_ROWS = 5_000;
+const MAX_ROWS = 10_000;
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 
 @Injectable({ providedIn: 'root' })
@@ -127,7 +127,7 @@ export class ProductTransferService {
     ]);
     const manufacturerNames = new Map(manufacturers.map(item => [item.id, item.name]));
     const exportedAt = marker.exportedAt;
-    const workbook = this.baseWorkbook(locations.map(item => item.code));
+    const workbook = await this.baseWorkbook(locations.map(item => item.code));
     const sheet = workbook.getWorksheet('Products')!;
 
     for (const product of products) {
@@ -166,7 +166,7 @@ export class ProductTransferService {
 
   async downloadTemplate(): Promise<void> {
     const locations = await this.allLocations();
-    const workbook = this.baseWorkbook(locations.map(item => item.code));
+    const workbook = await this.baseWorkbook(locations.map(item => item.code));
     const sheet = workbook.getWorksheet('Products')!;
     sheet.addRow([
       'NEW-001',
@@ -198,6 +198,7 @@ export class ProductTransferService {
 
   async preview(file: File): Promise<CatalogImportPreview> {
     if (file.size > MAX_FILE_BYTES) throw new Error('Workbook must be 10 MB or smaller.');
+    const { Workbook } = await import('exceljs');
     const workbook = new Workbook();
     await workbook.xlsx.load(await file.arrayBuffer());
     const sheet = workbook.getWorksheet('Products');
@@ -386,19 +387,68 @@ export class ProductTransferService {
           : {}),
       })),
     }));
-    const { data, error } = await this.supabase.client.rpc('import_catalog_products', {
-      p_products: products as never,
+    const begin = await this.supabase.client.rpc('begin_catalog_import', {
       p_mode: mode,
       p_idempotency_key: preview.idempotencyKey,
       p_source_export_id: mode === 'replace' ? preview.exportId! : undefined,
     });
-    if (error) throw error;
-    const result = data as unknown as CatalogImportResult;
+    if (begin.error) throw begin.error;
+    const started = begin.data as unknown as {
+      import_id: string;
+      status: CatalogImportResult['status'];
+      mode: ProductImportMode;
+      result: CatalogImportResult | null;
+    };
+    if (started.mode !== mode) {
+      throw new Error(
+        `This preview already started as a ${started.mode} import. Create a new preview to use ${mode} mode.`
+      );
+    }
+    if (started.status === 'completed' && started.result) return started.result;
+    if (started.status === 'failed') {
+      throw new Error(started.result?.error ?? 'This import attempt already failed');
+    }
+    const importId = started.import_id;
+    const chunks = this.importChunks(products);
+    for (let index = 0; index < chunks.length; index++) {
+      const appended = await this.supabase.client.rpc('append_catalog_import_chunk', {
+        p_import_id: importId,
+        p_chunk_index: index,
+        p_products: chunks[index] as never,
+      });
+      if (appended.error) throw appended.error;
+    }
+    const finalized = await this.supabase.client.rpc('finalize_catalog_import', {
+      p_import_id: importId,
+    });
+    if (finalized.error) throw finalized.error;
+    const result = finalized.data as unknown as CatalogImportResult;
     if (result.status === 'failed') throw new Error(result.error ?? 'Import failed');
     return result;
   }
 
-  private baseWorkbook(locationCodes: string[]): Workbook {
+  private importChunks(products: CatalogImportProduct[]): CatalogImportProduct[][] {
+    const chunks: CatalogImportProduct[][] = [];
+    let current: CatalogImportProduct[] = [];
+    let variants = 0;
+    for (const product of products) {
+      if (product.variants.length > 2_000) {
+        throw new Error('One product cannot contain more than 2,000 variants per import.');
+      }
+      if (current.length >= 500 || variants + product.variants.length > 2_000) {
+        chunks.push(current);
+        current = [];
+        variants = 0;
+      }
+      current.push(product);
+      variants += product.variants.length;
+    }
+    if (current.length) chunks.push(current);
+    return chunks;
+  }
+
+  private async baseWorkbook(locationCodes: string[]): Promise<Workbook> {
+    const { Workbook } = await import('exceljs');
     const workbook = new Workbook();
     workbook.creator = 'DukaRun';
     workbook.created = new Date();

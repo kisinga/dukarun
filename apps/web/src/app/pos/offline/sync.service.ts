@@ -1,4 +1,5 @@
 import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
+import type { RealtimeChannel } from '@supabase/supabase-js';
 import { SupabaseService, type AppIdentity } from '../../core/supabase.service';
 import { PosRpcError, PosService, Variant } from '../pos.service';
 import { ConnectivityService } from './connectivity.service';
@@ -13,6 +14,7 @@ import {
   type CachedPaymentMethod,
   type PosSettingsSnapshot,
 } from './offline-db';
+import { CacheJournalService, type CacheStreamHandler } from '../../core/cache-journal.service';
 
 const SYNC_INTERVAL_MS = 30_000;
 
@@ -41,6 +43,7 @@ export class SyncService {
   private readonly locations = inject(LocationContextService);
   private readonly catalogCache = inject(CatalogCacheService);
   private readonly catalogSearch = inject(CatalogSearchService);
+  private readonly journal = inject(CacheJournalService);
 
   /** All outbox entries (queued + failed), FIFO by queued_at. */
   readonly entries = signal<OutboxEntry[]>([]);
@@ -55,6 +58,9 @@ export class SyncService {
   /** Mirror of the shared catalog cache timestamp (CatalogCacheService owns the snapshot). */
   readonly productSnapshotFetchedAt = computed(() => this.catalogCache.fetchedAt());
   private catalogScope: string | null = null;
+  private settingsScope: string | null = null;
+  private settingsChannel: RealtimeChannel | null = null;
+  private settingsHandler: CacheStreamHandler | null = null;
 
   constructor() {
     // App start, account change, reconnect, and resume-from-suspension triggers.
@@ -68,6 +74,35 @@ export class SyncService {
         if (scope !== this.catalogScope) {
           this.catalogScope = scope;
           this.usingCachedCatalog.set(false);
+        }
+        if (scope !== this.settingsScope) {
+          if (this.settingsChannel) void this.supabase.client.removeChannel(this.settingsChannel);
+          this.settingsScope = scope;
+          this.settingsChannel = null;
+          this.settingsHandler = null;
+          if (identity && locationId && scope) {
+            this.settingsHandler = {
+              apply: async changes => {
+                if (changes.some(change => change.entityType === 'payment_method')) {
+                  await this.refreshPaymentMethods(identity, locationId, scope);
+                }
+              },
+              reset: async () => {
+                await this.refreshPaymentMethods(identity, locationId, scope);
+                return true;
+              },
+            };
+            this.settingsChannel = this.journal.subscribe(
+              'settings',
+              scope,
+              identity.companyId,
+              this.settingsHandler,
+              'payment-methods'
+            );
+          }
+        }
+        if (online && scope && this.settingsHandler) {
+          void this.journal.reconcile('settings', scope, this.settingsHandler, 'payment-methods');
         }
         if (!identity) {
           this.entries.set([]);
@@ -243,33 +278,54 @@ export class SyncService {
     const locationId = this.locations.activeId();
     if (!identity || !locationId) return [];
     const key = offlineScopeKey(identity, locationId);
+    const db = await offlineDb();
+    const cached = await db.get('settings', key);
+    if (cached?.payment_methods_fetched_at) return cached.payment_methods;
     if (this.connectivity.online()) {
       try {
-        const methods = (await this.pos.enabledPaymentMethods()).map(method => ({
-          code: method.code,
-          name: method.name,
-          isCashierControlled: method.is_cashier_controlled,
-          reconciliationType: method.reconciliation_type ?? null,
-        }));
-        const db = await offlineDb();
-        const existing = await db.get('settings', key);
-        const snapshot: PosSettingsSnapshot = {
-          ...existing,
-          key,
-          company_id: identity.companyId,
-          user_id: identity.userId,
-          location_id: locationId,
-          payment_methods: methods,
-          fetched_at: new Date().toISOString(),
-        };
-        await db.put('settings', snapshot);
-        return methods;
+        return await this.refreshPaymentMethods(identity, locationId, key);
       } catch {
         // Use the last confirmed configuration below.
       }
     }
+    return cached?.payment_methods ?? [];
+  }
+
+  private async refreshPaymentMethods(
+    identity: AppIdentity,
+    locationId: string,
+    key: string
+  ): Promise<CachedPaymentMethod[]> {
+    const methods = (await this.pos.enabledPaymentMethods()).map(method => ({
+      code: method.code,
+      name: method.name,
+      isCashierControlled: method.is_cashier_controlled,
+      reconciliationType: method.reconciliation_type ?? null,
+    }));
+    const currentIdentity = this.supabase.offlineIdentity();
+    const currentLocationId = this.locations.activeId();
+    if (
+      !currentIdentity ||
+      !currentLocationId ||
+      offlineScopeKey(currentIdentity, currentLocationId) !== key
+    ) {
+      throw new Error('cache_scope_changed');
+    }
     const db = await offlineDb();
-    return (await db.get('settings', key))?.payment_methods ?? [];
+    const existing = await db.get('settings', key);
+    const now = new Date().toISOString();
+    const snapshot: PosSettingsSnapshot = {
+      ...existing,
+      key,
+      company_id: identity.companyId,
+      user_id: identity.userId,
+      location_id: locationId,
+      payment_methods: methods,
+      payment_methods_fetched_at: now,
+      fetched_at: now,
+    };
+    await db.put('settings', snapshot);
+    return methods;
   }
 
   catalogStatusLabel(): string {

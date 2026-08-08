@@ -1,5 +1,4 @@
-import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
-import type { RealtimeChannel } from '@supabase/supabase-js';
+import { Component, OnDestroy, OnInit, effect, inject, signal, untracked } from '@angular/core';
 import { OrderWithCustomer, PosService } from '../pos.service';
 import { queueAge, waitLabel, type QueueAge } from '../queue-aging';
 import { ButtonComponent } from '../../shared/ui/button.component';
@@ -7,6 +6,8 @@ import { DrawerComponent } from '../../shared/ui/drawer.component';
 import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
 import { IconComponent } from '../../shared/ui/icon.component';
 import { MoneyComponent } from '../../shared/ui/money.component';
+import { RecentSalesCacheService } from '../../core/recent-sales-cache.service';
+import { SupabaseService } from '../../core/supabase.service';
 
 /**
  * Personal follow-up affordance for the salesperson: a subtle header chip on
@@ -78,6 +79,8 @@ import { MoneyComponent } from '../../shared/ui/money.component';
 })
 export class MyPendingSalesComponent implements OnInit, OnDestroy {
   private readonly pos = inject(PosService);
+  private readonly recentSales = inject(RecentSalesCacheService);
+  private readonly supabase = inject(SupabaseService);
 
   protected readonly orders = signal<OrderWithCustomer[]>([]);
   protected readonly loading = signal(false);
@@ -85,24 +88,36 @@ export class MyPendingSalesComponent implements OnInit, OnDestroy {
   /** Ticks once a minute so wait labels and aging tones stay current. */
   protected readonly now = signal(Date.now());
 
-  private channel: RealtimeChannel | null = null;
   private nowTimer: ReturnType<typeof setInterval> | null = null;
+
+  constructor() {
+    effect(() => {
+      this.recentSales.revision();
+      untracked(() => {
+        const userId = this.supabase.offlineIdentity()?.userId;
+        if (this.recentSales.loaded() && userId) {
+          this.orders.set(
+            this.recentSales
+              .orders()
+              .filter(
+                order =>
+                  order.created_by === userId &&
+                  order.status === 'pending_payment' &&
+                  order.cashier_pending_at !== null
+              )
+          );
+        }
+        void this.load();
+      });
+    });
+  }
 
   ngOnInit(): void {
     void this.load();
     this.nowTimer = setInterval(() => this.now.set(Date.now()), 60_000);
-    this.channel = this.pos.client
-      .channel('my-pending-sales-live')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'orders' },
-        () => void this.load()
-      )
-      .subscribe();
   }
 
   ngOnDestroy(): void {
-    if (this.channel) void this.pos.client.removeChannel(this.channel);
     if (this.nowTimer) clearInterval(this.nowTimer);
   }
 

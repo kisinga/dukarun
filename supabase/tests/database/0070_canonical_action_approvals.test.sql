@@ -7,10 +7,18 @@ select testkit.create_user('22222222-2222-2222-2222-222222222222','cashier@canon
 select testkit.create_user('33333333-3333-3333-3333-333333333333','approver@canonical.local');
 select testkit.create_user('44444444-4444-4444-4444-444444444444','reverser@canonical.local');
 select testkit.create_user('55555555-5555-5555-5555-555555555555','viewer@canonical.local');
+select testkit.create_user('66666666-6666-6666-6666-666666666666','other@canonical.local');
 
 create temp table ca_company as
 select testkit.provision('11111111-1111-1111-1111-111111111111','Canonical Co') company_id;
 grant select on pg_temp.ca_company to authenticated;
+
+create temp table ca_other_company as
+select testkit.provision('66666666-6666-6666-6666-666666666666','Other Canonical Co') company_id;
+insert into public.notifications(company_id,user_id,type,title,body,link)
+select company_id,'66666666-6666-6666-6666-666666666666','approval',
+  'Sale void needs approval','Unrelated tenant fixture','/unrelated'
+from ca_other_company;
 
 select testkit.add_member((select company_id from ca_company),
   '22222222-2222-2222-2222-222222222222','Cashier','{SettleOrder}');
@@ -73,7 +81,9 @@ select is((select status from public.orders where id=(select order_id from ca_sa
   'completed','requesting does not execute the void');
 reset role;
 select results_eq(
-  $$select user_id from public.notifications where title='Sale void needs approval' order by user_id$$,
+  $$select user_id from public.notifications
+    where company_id=(select company_id from ca_company)
+      and title='Sale void needs approval' order by user_id$$,
   $$values ('11111111-1111-1111-1111-111111111111'::uuid),
            ('33333333-3333-3333-3333-333333333333'::uuid)$$,
   'only users holding both approval and reversal authority are notified');
@@ -94,7 +104,10 @@ select is((select count(*)::int from public.approvals
   where id=(select (result->>'approval_id')::uuid from ca_void)),1,
   'eligible approver can read the request');
 select is(
-  (select link from public.notifications where title='Sale void needs approval' limit 1),
+  (select link from public.notifications
+   where company_id=(select company_id from ca_company)
+     and user_id='33333333-3333-3333-3333-333333333333'
+     and title='Sale void needs approval' limit 1),
   '/approvals?approval='||(select result->>'approval_id' from ca_void),
   'approver notification opens the exact approval request'
 );
@@ -107,7 +120,10 @@ select ok((select result->>'resource_id' is not null from public.approvals
 select testkit.as_user((select company_id from ca_company),
   '22222222-2222-2222-2222-222222222222','Cashier');
 select is(
-  (select link from public.notifications where title='Void request approved' limit 1),
+  (select link from public.notifications
+   where company_id=(select company_id from ca_company)
+     and user_id='22222222-2222-2222-2222-222222222222'
+     and title='Void request approved' limit 1),
   format('/sales?order=%s&approval=%s',
     (select order_id from ca_sales where n=1),
     (select result->>'approval_id' from ca_void)),
@@ -116,7 +132,8 @@ select is(
 select testkit.as_user((select company_id from ca_company),
   '55555555-5555-5555-5555-555555555555','Viewer');
 select is((select count(*)::int from public.notifications
-  where title='Void request approved'),0,
+  where company_id=(select company_id from ca_company)
+    and title='Void request approved'),0,
   'targeted decision notifications are private to the requester');
 
 -- 13-15. Refund request validates first and posts only after approval.
@@ -201,7 +218,10 @@ select is((select count(*)::int from public.refunds
 select testkit.as_user((select company_id from ca_company),
   '22222222-2222-2222-2222-222222222222','Cashier');
 select is(
-  (select body from public.notifications where title='Refund request denied' limit 1),
+  (select body from public.notifications
+   where company_id=(select company_id from ca_company)
+     and user_id='22222222-2222-2222-2222-222222222222'
+     and title='Refund request denied' limit 1),
   (select 'Sale '||o.code||' — not accepted' from public.orders o
     where o.id=(select order_id from ca_sales where n=4)),
   'denial notification explains the decision to the requester'

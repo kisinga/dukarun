@@ -1,5 +1,5 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { PageLayoutComponent } from '../shared/ui/page-layout.component';
 import { ButtonComponent } from '../shared/ui/button.component';
@@ -117,7 +117,9 @@ export class ProfileComponent implements OnInit {
   protected readonly photoPreview = signal<string | null>(null);
   private readonly pendingPhoto = signal<{ blob: Blob; ext: string } | null>(null);
   // FormControl values aren't reactive — mirror into signals so `dirty` recomputes.
-  private readonly nameValue = signal('');
+  private readonly nameValue = toSignal(this.displayName.valueChanges, {
+    initialValue: this.displayName.value,
+  });
   private readonly savedName = signal('');
 
   protected readonly busy = signal(false);
@@ -128,18 +130,11 @@ export class ProfileComponent implements OnInit {
   protected readonly dirty = computed(() => this.nameValue().trim() !== this.savedName());
   protected readonly photoDirty = computed(() => this.pendingPhoto() !== null);
 
-  constructor() {
-    this.displayName.valueChanges
-      .pipe(takeUntilDestroyed())
-      .subscribe(value => this.nameValue.set(value));
-  }
-
   async ngOnInit(): Promise<void> {
     try {
       const me = await this.profile.myProfile();
       if (me) {
         this.displayName.setValue(me.display_name);
-        this.nameValue.set(me.display_name);
         this.savedName.set(me.display_name);
         this.avatarPath.set(me.avatar_path);
       }

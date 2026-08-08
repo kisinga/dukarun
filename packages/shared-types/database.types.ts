@@ -217,6 +217,89 @@ export type Database = {
         }
         Relationships: []
       }
+      cache_change_log: {
+        Row: {
+          changed_at: string
+          company_id: string
+          entity_id: string
+          entity_type: string
+          location_id: string | null
+          operation: string
+          sequence: number
+          stream: string
+          user_id: string | null
+        }
+        Insert: {
+          changed_at?: string
+          company_id: string
+          entity_id: string
+          entity_type: string
+          location_id?: string | null
+          operation: string
+          sequence: number
+          stream: string
+          user_id?: string | null
+        }
+        Update: {
+          changed_at?: string
+          company_id?: string
+          entity_id?: string
+          entity_type?: string
+          location_id?: string | null
+          operation?: string
+          sequence?: number
+          stream?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cache_change_log_company_id_stream_fkey"
+            columns: ["company_id", "stream"]
+            isOneToOne: false
+            referencedRelation: "cache_stream_heads"
+            referencedColumns: ["company_id", "stream"]
+          },
+        ]
+      }
+      cache_stream_heads: {
+        Row: {
+          company_id: string
+          head_sequence: number
+          pruned_through_sequence: number
+          stream: string
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          head_sequence?: number
+          pruned_through_sequence?: number
+          stream: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          head_sequence?: number
+          pruned_through_sequence?: number
+          stream?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cache_stream_heads_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cache_stream_heads_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       campaign_recipients: {
         Row: {
           campaign_id: string
@@ -457,6 +540,176 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      catalog_import_chunks: {
+        Row: {
+          chunk_index: number
+          company_id: string
+          created_at: string
+          import_id: string
+          product_count: number
+          products: Json
+          variant_count: number
+        }
+        Insert: {
+          chunk_index: number
+          company_id: string
+          created_at?: string
+          import_id: string
+          product_count: number
+          products: Json
+          variant_count: number
+        }
+        Update: {
+          chunk_index?: number
+          company_id?: string
+          created_at?: string
+          import_id?: string
+          product_count?: number
+          products?: Json
+          variant_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "catalog_import_chunks_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "catalog_import_chunks_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "catalog_import_chunks_import_id_fkey"
+            columns: ["import_id"]
+            isOneToOne: false
+            referencedRelation: "catalog_imports"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      catalog_import_staged_products: {
+        Row: {
+          chunk_index: number
+          company_id: string
+          data: Json
+          import_id: string
+          product_id: string | null
+          product_index: number
+        }
+        Insert: {
+          chunk_index: number
+          company_id: string
+          data: Json
+          import_id: string
+          product_id?: string | null
+          product_index: number
+        }
+        Update: {
+          chunk_index?: number
+          company_id?: string
+          data?: Json
+          import_id?: string
+          product_id?: string | null
+          product_index?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "catalog_import_staged_products_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "catalog_import_staged_products_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "catalog_import_staged_products_import_id_chunk_index_fkey"
+            columns: ["import_id", "chunk_index"]
+            isOneToOne: false
+            referencedRelation: "catalog_import_chunks"
+            referencedColumns: ["import_id", "chunk_index"]
+          },
+          {
+            foreignKeyName: "catalog_import_staged_products_import_id_fkey"
+            columns: ["import_id"]
+            isOneToOne: false
+            referencedRelation: "catalog_imports"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      catalog_import_staged_variants: {
+        Row: {
+          chunk_index: number
+          company_id: string
+          data: Json
+          import_id: string
+          product_id: string | null
+          product_index: number
+          variant_id: string | null
+          variant_index: number
+        }
+        Insert: {
+          chunk_index: number
+          company_id: string
+          data: Json
+          import_id: string
+          product_id?: string | null
+          product_index: number
+          variant_id?: string | null
+          variant_index: number
+        }
+        Update: {
+          chunk_index?: number
+          company_id?: string
+          data?: Json
+          import_id?: string
+          product_id?: string | null
+          product_index?: number
+          variant_id?: string | null
+          variant_index?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "catalog_import_staged_variant_import_id_chunk_index_produc_fkey"
+            columns: ["import_id", "chunk_index", "product_index"]
+            isOneToOne: false
+            referencedRelation: "catalog_import_staged_products"
+            referencedColumns: ["import_id", "chunk_index", "product_index"]
+          },
+          {
+            foreignKeyName: "catalog_import_staged_variants_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "catalog_import_staged_variants_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "catalog_import_staged_variants_import_id_fkey"
+            columns: ["import_id"]
+            isOneToOne: false
+            referencedRelation: "catalog_imports"
             referencedColumns: ["id"]
           },
         ]
@@ -1252,6 +1505,42 @@ export type Database = {
             foreignKeyName: "company_staff_profiles_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      company_usage_counters: {
+        Row: {
+          active_variants: number
+          company_id: string
+          reconciled_at: string
+          updated_at: string
+        }
+        Insert: {
+          active_variants?: number
+          company_id: string
+          reconciled_at?: string
+          updated_at?: string
+        }
+        Update: {
+          active_variants?: number
+          company_id?: string
+          reconciled_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_usage_counters_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_usage_counters_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
             referencedRelation: "public_storefronts"
             referencedColumns: ["id"]
           },
@@ -3895,7 +4184,7 @@ export type Database = {
           id: string
           is_active: boolean
           max_orders_per_month: number | null
-          max_products: number | null
+          max_products: number
           max_stock_locations: number | null
           max_team_members: number | null
           multiple_locations_enabled: boolean
@@ -3917,7 +4206,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           max_orders_per_month?: number | null
-          max_products?: number | null
+          max_products?: number
           max_stock_locations?: number | null
           max_team_members?: number | null
           multiple_locations_enabled?: boolean
@@ -3939,7 +4228,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           max_orders_per_month?: number | null
-          max_products?: number | null
+          max_products?: number
           max_stock_locations?: number | null
           max_team_members?: number | null
           multiple_locations_enabled?: boolean
@@ -4685,6 +4974,10 @@ export type Database = {
         Args: { p_phone: string; p_role_id: string }
         Returns: string
       }
+      append_catalog_import_chunk: {
+        Args: { p_chunk_index: number; p_import_id: string; p_products: Json }
+        Returns: Json
+      }
       apply_role_template: { Args: { p_template_id: string }; Returns: string }
       approve_request: {
         Args: { p_approval_id: string; p_reason?: string }
@@ -4720,6 +5013,14 @@ export type Database = {
           requires_reconciliation: boolean
         }[]
       }
+      begin_catalog_import: {
+        Args: {
+          p_idempotency_key?: string
+          p_mode?: string
+          p_source_export_id?: string
+        }
+        Returns: Json
+      }
       campaign_preview: {
         Args: {
           p_audience?: string
@@ -4735,6 +5036,67 @@ export type Database = {
         Args: { p_source_type: string }
         Returns: boolean
       }
+      catalog_cache_entities: {
+        Args: { p_product_ids?: string[]; p_variant_ids?: string[] }
+        Returns: Json
+      }
+      catalog_cache_families: {
+        Args: { p_after_product_id?: string; p_limit?: number }
+        Returns: {
+          active: boolean
+          barcode: string | null
+          company_id: string
+          created_at: string
+          id: string
+          image_path: string | null
+          manufacturer_id: string | null
+          name: string
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "products"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      catalog_cache_page: {
+        Args: { p_after_variant_id?: string; p_limit?: number }
+        Returns: {
+          allow_fractional: boolean
+          barcode: string
+          company_id: string
+          image_path: string
+          kind: string
+          manufacturer_id: string
+          manufacturer_name: string
+          price: number
+          product_active: boolean
+          product_id: string
+          product_name: string
+          sku: string
+          stock: number
+          track_inventory: boolean
+          variant_active: boolean
+          variant_id: string
+          variant_name: string
+          wholesale_price: number
+        }[]
+      }
+      catalog_management_page: {
+        Args: {
+          p_direction?: string
+          p_location_id?: string
+          p_manufacturer?: string
+          p_page?: number
+          p_page_size?: number
+          p_search?: string
+          p_sort?: string
+          p_status?: string
+          p_stock_status?: string
+        }
+        Returns: Json
+      }
       change_customer_credit: {
         Args: {
           p_credit_limit: number
@@ -4745,6 +5107,7 @@ export type Database = {
         }
         Returns: Json
       }
+      cleanup_abandoned_catalog_imports: { Args: never; Returns: number }
       close_accounting_period: { Args: { p_end_date: string }; Returns: string }
       close_cashier_session: {
         Args: { p_declarations: Json; p_session_id: string }
@@ -4911,6 +5274,22 @@ export type Database = {
         Args: { p_order_id: string; p_reason: string }
         Returns: string
       }
+      emit_cache_change: {
+        Args: {
+          p_company_id: string
+          p_entity_id: string
+          p_entity_type: string
+          p_location_id?: string
+          p_operation?: string
+          p_stream: string
+          p_user_id?: string
+        }
+        Returns: number
+      }
+      emit_cache_reset: {
+        Args: { p_company_id: string; p_stream: string }
+        Returns: number
+      }
       execute_payment_reversal: {
         Args: { p_payment_id: string; p_reason: string }
         Returns: string
@@ -4937,6 +5316,7 @@ export type Database = {
         Args: { p_company_id: string; p_feature: string }
         Returns: boolean
       }
+      finalize_catalog_import: { Args: { p_import_id: string }; Returns: Json }
       finalize_message_quota: {
         Args: { p_accepted: boolean; p_outbox_id: string }
         Returns: undefined
@@ -4945,15 +5325,6 @@ export type Database = {
       generate_commission_period: {
         Args: { p_end_date: string; p_start_date: string }
         Returns: string
-      }
-      import_catalog_products: {
-        Args: {
-          p_idempotency_key?: string
-          p_mode?: string
-          p_products: Json
-          p_source_export_id?: string
-        }
-        Returns: Json
       }
       increment_sms_usage: {
         Args: { p_company_id: string }
@@ -5015,6 +5386,14 @@ export type Database = {
           staff_count: number
           start_date: string
           status: string
+        }[]
+      }
+      location_stock_for_variants: {
+        Args: { p_location_id: string; p_variant_ids: string[] }
+        Returns: {
+          stock: number
+          stock_value: number
+          variant_id: string
         }[]
       }
       location_stock_snapshot: {
@@ -5369,6 +5748,11 @@ export type Database = {
         Returns: string
       }
       queue_sms_fallback: { Args: { p_outbox_id: string }; Returns: string }
+      reconcile_all_company_usage: { Args: never; Returns: number }
+      reconcile_company_usage: {
+        Args: { p_company_id?: string }
+        Returns: number
+      }
       record_auth_otp_delivery_request: {
         Args: {
           p_phone_hash: string
@@ -5713,6 +6097,10 @@ export type Database = {
         }
       }
       subscription_expiry_scan: { Args: never; Returns: number }
+      sync_cache_stream: {
+        Args: { p_after_sequence?: number; p_limit?: number; p_stream: string }
+        Returns: Json
+      }
       test_message_template: {
         Args: { p_channel: string; p_recipient: string; p_template_id: string }
         Returns: string
@@ -6038,3 +6426,4 @@ export const Constants = {
     Enums: {},
   },
 } as const
+

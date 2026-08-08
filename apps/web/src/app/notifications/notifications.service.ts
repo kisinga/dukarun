@@ -1,8 +1,15 @@
-import { Injectable, OnDestroy, inject, signal } from '@angular/core';
+import { Injectable, OnDestroy, effect, inject, signal, untracked } from '@angular/core';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { Database } from '@dukarun/shared-types';
 import { SupabaseService } from '../core/supabase.service';
 import { rpcError } from '../pos/pos.service';
+import { ConnectivityService } from '../pos/offline/connectivity.service';
+import { offlineDb, offlineScopeKey, type NamedSnapshot } from '../pos/offline/offline-db';
+import {
+  CacheJournalService,
+  type CacheChange,
+  type CacheStreamHandler,
+} from '../core/cache-journal.service';
 
 export type AppNotification = Database['public']['Tables']['notifications']['Row'];
 export type OutboxMessage = Database['public']['Tables']['outbox']['Row'];
@@ -29,60 +36,150 @@ export interface MessagingCustomer {
 @Injectable({ providedIn: 'root' })
 export class NotificationsService implements OnDestroy {
   private readonly supabase = inject(SupabaseService);
+  private readonly connectivity = inject(ConnectivityService);
+  private readonly journal = inject(CacheJournalService);
 
   readonly notifications = signal<AppNotification[]>([]);
   readonly unreadCount = signal(0);
 
   private channel: RealtimeChannel | null = null;
+  private scope: string | null = null;
+  private handler: CacheStreamHandler | null = null;
 
   private get db() {
     return this.supabase.client;
   }
 
   constructor() {
-    void this.refresh();
-    this.channel = this.db
-      .channel('notifications-live')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'notifications' },
-        () => void this.refresh()
-      )
-      .subscribe();
+    effect(() => {
+      const identity = this.supabase.offlineIdentity();
+      const online = this.connectivity.online();
+      untracked(() => {
+        const scope = identity ? offlineScopeKey(identity) : null;
+        if (scope !== this.scope) {
+          if (this.channel) void this.db.removeChannel(this.channel);
+          this.channel = null;
+          this.scope = scope;
+          this.notifications.set([]);
+          this.unreadCount.set(0);
+          this.handler = null;
+          if (identity && scope) void this.start(identity.companyId, scope).catch(() => undefined);
+        }
+        if (online && scope && this.handler) {
+          void this.journal.reconcile('inbox', scope, this.handler, 'notifications');
+        }
+      });
+    });
   }
 
   ngOnDestroy(): void {
     if (this.channel) void this.db.removeChannel(this.channel);
   }
 
-  async refresh(): Promise<void> {
+  async refresh(expectedScope: string | null = this.scope): Promise<void> {
+    if (!expectedScope) return;
     const { data, error } = await this.db
       .from('notifications')
       .select('*')
       .order('created_at', { ascending: false })
       .limit(50);
-    if (error) return;
-    this.notifications.set(data);
-    this.unreadCount.set(data.filter(n => n.read_at === null).length);
+    if (error) throw error;
+    if (expectedScope !== this.scope) throw new Error('cache_scope_changed');
+    await this.persist(data, expectedScope);
+    if (expectedScope !== this.scope) throw new Error('cache_scope_changed');
+    this.applyRows(data);
   }
 
   /** The column-limited grant allows ONLY read_at updates. */
   async markRead(id: string): Promise<void> {
+    const scope = this.scope;
+    if (!scope) return;
     const { error } = await this.db
       .from('notifications')
       .update({ read_at: new Date().toISOString() })
       .eq('id', id);
     if (error) throw new Error(error.message);
-    await this.refresh();
+    if (scope !== this.scope) return;
+    this.notifications.update(rows =>
+      rows.map(row => (row.id === id ? { ...row, read_at: new Date().toISOString() } : row))
+    );
+    this.unreadCount.set(this.notifications().filter(row => row.read_at === null).length);
+    await this.persist(this.notifications(), scope);
   }
 
   async markAllRead(): Promise<void> {
+    const scope = this.scope;
+    if (!scope) return;
     const { error } = await this.db
       .from('notifications')
       .update({ read_at: new Date().toISOString() })
       .is('read_at', null);
     if (error) throw new Error(error.message);
-    await this.refresh();
+    if (scope !== this.scope) return;
+    const readAt = new Date().toISOString();
+    this.notifications.update(rows =>
+      rows.map(row => ({ ...row, read_at: row.read_at ?? readAt }))
+    );
+    this.unreadCount.set(0);
+    await this.persist(this.notifications(), scope);
+  }
+
+  private async start(companyId: string, scope: string): Promise<void> {
+    const cached = await (await offlineDb()).get('snapshots', `${scope}:inbox`);
+    if (scope !== this.scope) return;
+    if (cached) this.applyRows(cached.value as AppNotification[]);
+    this.handler = {
+      apply: changes => this.applyChanges(changes),
+      reset: async () => {
+        await this.refresh(scope);
+        return true;
+      },
+    };
+    this.channel = this.journal.subscribe('inbox', scope, companyId, this.handler, 'notifications');
+    if (!cached && this.connectivity.online()) await this.refresh(scope);
+  }
+
+  private async applyChanges(changes: readonly CacheChange[]): Promise<void> {
+    const scope = this.scope;
+    if (!scope) throw new Error('cache_scope_changed');
+    const ids = [
+      ...new Set(changes.filter(row => row.entityType === 'notification').map(row => row.entityId)),
+    ];
+    if (!ids.length) return;
+    const { data, error } = await this.db.from('notifications').select('*').in('id', ids);
+    if (error) throw error;
+    if (scope !== this.scope) throw new Error('cache_scope_changed');
+    const idSet = new Set(ids);
+    const rows = this.notifications().filter(row => !idSet.has(row.id));
+    rows.push(...(data ?? []));
+    rows.sort((a, b) => b.created_at.localeCompare(a.created_at));
+    const limited = rows.slice(0, 50);
+    await this.persist(limited, scope);
+    if (scope !== this.scope) throw new Error('cache_scope_changed');
+    this.applyRows(limited);
+  }
+
+  private applyRows(rows: AppNotification[]): void {
+    this.notifications.set(rows);
+    this.unreadCount.set(rows.filter(row => row.read_at === null).length);
+  }
+
+  private async persist(rows: AppNotification[], expectedScope: string): Promise<void> {
+    const db = await offlineDb();
+    const identity = this.supabase.offlineIdentity();
+    const currentScope = identity ? offlineScopeKey(identity) : null;
+    if (!identity || expectedScope !== this.scope || expectedScope !== currentScope) {
+      throw new Error('cache_scope_changed');
+    }
+    const snapshot: NamedSnapshot = {
+      key: `${expectedScope}:inbox`,
+      name: 'inbox',
+      company_id: identity.companyId,
+      user_id: identity.userId,
+      value: rows,
+      fetched_at: new Date().toISOString(),
+    };
+    await db.put('snapshots', snapshot);
   }
 
   // --- Batch messaging ---

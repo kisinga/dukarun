@@ -13,7 +13,11 @@ import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
 
 const LIMIT_FIELDS = [
   { key: 'max_team_members', label: 'Team members', help: 'Approved company memberships.' },
-  { key: 'max_products', label: 'Products', help: 'Active product variants.' },
+  {
+    key: 'max_products',
+    label: 'Products',
+    help: 'Active product variants. Above 10,000 requires Enterprise.',
+  },
   {
     key: 'max_stock_locations',
     label: 'Stock locations',
@@ -386,12 +390,16 @@ export class TiersComponent implements OnInit {
       this.error.set(tiers.reason instanceof Error ? tiers.reason.message : 'Failed to load tiers');
       return;
     }
-    if (config.status === 'fulfilled') {
-      this.trialDays.setValue(config.value.trialDays);
+    if (config.status === 'fulfilled' && config.value) {
+      const billingConfig = config.value;
+      this.trialDays.setValue(billingConfig.trialDays);
       this.defaultTrialTier.setValue(
-        tiers.value.find(tier => tier.code === config.value.defaultTrialTierCode)?.id ?? ''
+        tiers.value.find(tier => tier.code === billingConfig.defaultTrialTierCode)?.id ?? ''
       );
       this.error.set(null);
+    } else if (config.status === 'fulfilled') {
+      this.defaultTrialTier.setValue(this.activeTiers()[0]?.id ?? '');
+      this.error.set('Tiers loaded; trial policy is not configured yet');
     } else {
       this.error.set(
         config.reason instanceof Error
@@ -437,7 +445,7 @@ export class TiersComponent implements OnInit {
     this.priceMonthly.setValue('');
     this.priceYearly.setValue('');
     this.isActive.setValue(true);
-    this.limits.set({});
+    this.limits.set({ max_products: 10_000 });
     this.features.set({});
     this.openEditor();
   }
@@ -493,6 +501,11 @@ export class TiersComponent implements OnInit {
       this.error.set('A tier code is required');
       return;
     }
+    const productLimit = this.limits()['max_products'] ?? 10_000;
+    if (productLimit > 10_000) {
+      this.error.set('Product limits above 10,000 require Enterprise');
+      return;
+    }
     this.busy.set(true);
     this.error.set(null);
     this.notice.set(null);
@@ -507,7 +520,7 @@ export class TiersComponent implements OnInit {
         staff_performance_enabled: this.features()['staff_performance_enabled'] === true,
         commissions_available: this.features()['commissions_available'] === true,
         max_team_members: this.limits()['max_team_members'] ?? null,
-        max_products: this.limits()['max_products'] ?? null,
+        max_products: productLimit,
         max_stock_locations: this.limits()['max_stock_locations'] ?? null,
         max_orders_per_month: this.limits()['max_orders_per_month'] ?? null,
         sms_per_period: this.limits()['sms_per_period'] ?? null,

@@ -1,6 +1,6 @@
-import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, effect, inject, signal, untracked } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import type { Subscription } from 'rxjs';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { formatKes } from '../core/money';
 import { PosService, variantLabel } from '../pos/pos.service';
 import { EmptyStateComponent } from '../shared/ui/empty-state.component';
@@ -267,11 +267,15 @@ const TYPE_BADGE: Record<string, string> = {
     </app-page>
   `,
 })
-export class ApprovalsComponent implements OnInit, OnDestroy {
+export class ApprovalsComponent implements OnInit {
   protected readonly approvals = inject(ApprovalsService);
   private readonly pos = inject(PosService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly routeParams = toSignal(this.route.queryParamMap, {
+    initialValue: this.route.snapshot.queryParamMap,
+  });
+  private readonly routeReady = signal(false);
 
   protected readonly selectedApproval = signal<Approval | null>(null);
   protected readonly loading = signal(false);
@@ -329,18 +333,19 @@ export class ApprovalsComponent implements OnInit, OnDestroy {
   private readonly variantLabelMap = signal<Map<string, string>>(new Map());
   private readonly customerNameMap = signal<Map<string, string>>(new Map());
   private readonly staffNameMap = signal<Map<string, string>>(new Map());
-  private routeSubscription: Subscription | null = null;
   private routeLoadSequence = 0;
 
-  async ngOnInit(): Promise<void> {
-    await this.refresh();
-    this.routeSubscription = this.route.queryParamMap.subscribe(params => {
-      void this.openRouteApproval(params.get('approval'));
+  constructor() {
+    effect(() => {
+      const params = this.routeParams();
+      if (!this.routeReady()) return;
+      untracked(() => void this.openRouteApproval(params.get('approval')));
     });
   }
 
-  ngOnDestroy(): void {
-    this.routeSubscription?.unsubscribe();
+  async ngOnInit(): Promise<void> {
+    await this.refresh();
+    this.routeReady.set(true);
   }
 
   protected async refresh(): Promise<void> {

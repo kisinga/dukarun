@@ -208,10 +208,10 @@ export class PlatformService {
     return data;
   }
 
-  async billingConfig(): Promise<BillingConfig> {
+  async billingConfig(): Promise<BillingConfig | null> {
     const { data, error } = await this.db.rpc('public_billing_config');
     if (error) throw rpcError(error);
-    return data as unknown as BillingConfig;
+    return data as unknown as BillingConfig | null;
   }
 
   async updateBillingConfig(trialDays: number, defaultTrialTierId: string): Promise<void> {
@@ -242,6 +242,9 @@ export class PlatformService {
     tier_id?: string;
     is_active?: boolean;
   }): Promise<string> {
+    if ((input.max_products ?? 10_000) > 10_000) {
+      throw new Error('Product limits above 10,000 require Enterprise');
+    }
     const { data, error } = await this.db.rpc('platform_save_tier', {
       p_code: input.code,
       p_name: input.name,
@@ -254,7 +257,7 @@ export class PlatformService {
       p_customer_campaigns_available: input.customer_campaigns_available,
       p_payment_reminders_available: input.payment_reminders_available,
       p_max_team_members: input.max_team_members ?? undefined,
-      p_max_products: input.max_products ?? undefined,
+      p_max_products: input.max_products ?? 10_000,
       p_max_stock_locations: input.max_stock_locations ?? undefined,
       p_max_orders_per_month: input.max_orders_per_month ?? undefined,
       p_sms_per_period: input.sms_per_period ?? undefined,

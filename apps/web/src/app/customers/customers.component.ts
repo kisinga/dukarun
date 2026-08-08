@@ -1,7 +1,16 @@
-import { Component, OnInit, computed, inject, signal, viewChild } from '@angular/core';
+import {
+  Component,
+  OnInit,
+  computed,
+  effect,
+  inject,
+  signal,
+  untracked,
+  viewChild,
+} from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { formatKes, formatKesInput, parseKes } from '../core/money';
 import { reconciliationLabel, reconciliationTypeForCode } from '../core/payment-methods';
 import { PermissionsService } from '../core/permissions.service';
@@ -972,6 +981,9 @@ export class CustomersComponent implements OnInit {
   private readonly approvals = inject(ApprovalsService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly routeParams = toSignal(this.route.queryParamMap, {
+    initialValue: this.route.snapshot.queryParamMap,
+  });
   protected readonly fmtKes = formatKes;
 
   protected readonly customers = computed<CustomerWithAr[]>(() =>
@@ -1046,12 +1058,16 @@ export class CustomersComponent implements OnInit {
   );
 
   constructor() {
-    this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe(params => {
-      const customerId = params.get('customer');
-      const approvalId = params.get('approval');
-      this.highlightedApprovalId.set(approvalId);
-      if (customerId && (this.selectedCustomerId() !== customerId || approvalId))
-        void this.openCustomer(customerId, false);
+    effect(() => {
+      const params = this.routeParams();
+      untracked(() => {
+        const customerId = params.get('customer');
+        const approvalId = params.get('approval');
+        this.highlightedApprovalId.set(approvalId);
+        if (customerId && (this.selectedCustomerId() !== customerId || approvalId)) {
+          void this.openCustomer(customerId, false);
+        }
+      });
     });
   }
 
