@@ -10,8 +10,7 @@ import {
 } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import type { RealtimeChannel } from '@supabase/supabase-js';
-import type { Subscription } from 'rxjs';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { formatKes, formatKesInput, parseKes } from '../core/money';
 import { reconciliationLabel, reconciliationTypeForCode } from '../core/payment-methods';
 import { OrderLineWithProduct, OrderWithCustomer, Payment, PosService } from '../pos/pos.service';
@@ -37,6 +36,7 @@ import { StatBarComponent } from '../shared/ui/stat-bar.component';
 import { MoneyComponent } from '../shared/ui/money.component';
 import { PermissionsService } from '../core/permissions.service';
 import { Approval, ApprovalsService } from '../approvals/approvals.service';
+import { RecentSalesCacheService } from '../core/recent-sales-cache.service';
 
 const ALL_STATUSES = ['completed', 'voided', 'draft', 'expired', 'pending_payment'];
 
@@ -774,8 +774,13 @@ export class OrdersComponent implements OnInit, OnDestroy {
   private readonly money = inject(MoneyService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly routeParams = toSignal(this.route.queryParamMap, {
+    initialValue: this.route.snapshot.queryParamMap,
+  });
+  private readonly routeReady = signal(false);
   protected readonly permissions = inject(PermissionsService);
   private readonly approvals = inject(ApprovalsService);
+  private readonly recentSales = inject(RecentSalesCacheService);
   protected readonly fmtKes = formatKes;
 
   protected readonly pageSize = signal(20);
@@ -816,10 +821,10 @@ export class OrdersComponent implements OnInit, OnDestroy {
   protected readonly from = new FormControl(this.todayIso(), { nonNullable: true });
   protected readonly to = new FormControl(this.todayIso(), { nonNullable: true });
 
-  private channel: RealtimeChannel | null = null;
-  private routeSubscription: Subscription | null = null;
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
   private pageApprovalSequence = 0;
+  private loadSequence = 0;
+  private authoritativeLoaded = false;
   constructor() {
     effect(() => {
       const revision = this.approvals.revision();
@@ -834,6 +839,24 @@ export class OrdersComponent implements OnInit, OnDestroy {
           });
         }
         void this.loadPageApprovals();
+      });
+    });
+    effect(() => {
+      const revision = this.recentSales.revision();
+      if (revision === 0) return;
+      untracked(() => {
+        if (this.authoritativeLoaded) void this.load();
+        else this.applyRecentCache();
+      });
+    });
+    effect(() => {
+      const params = this.routeParams();
+      if (!this.routeReady()) return;
+      untracked(() => {
+        const orderId = params.get('order');
+        this.highlightedApprovalId.set(params.get('approval'));
+        if (orderId && this.selectedOrderId() !== orderId) void this.openOrder(orderId, false);
+        if (!orderId && this.selectedOrderId()) this.closeOrderDrawer(false);
       });
     });
   }
@@ -868,32 +891,13 @@ export class OrdersComponent implements OnInit, OnDestroy {
 
   async ngOnInit(): Promise<void> {
     this.printerEnabled.set(await this.receiptData.printerEnabled());
+    await this.recentSales.ensureLoaded();
+    this.applyRecentCache();
     await this.load();
-    this.routeSubscription = this.route.queryParamMap.subscribe(params => {
-      const orderId = params.get('order');
-      this.highlightedApprovalId.set(params.get('approval'));
-      if (orderId && this.selectedOrderId() !== orderId) void this.openOrder(orderId, false);
-      if (!orderId && this.selectedOrderId()) this.closeOrderDrawer(false);
-    });
-    // Realtime: today's list refreshes on any order/payment change.
-    this.channel = this.pos.client
-      .channel('orders-live')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'orders' },
-        () => void this.load()
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'payments' },
-        () => void this.load()
-      )
-      .subscribe();
+    this.routeReady.set(true);
   }
 
   ngOnDestroy(): void {
-    if (this.channel) void this.pos.client.removeChannel(this.channel);
-    this.routeSubscription?.unsubscribe();
     if (this.searchTimer) clearTimeout(this.searchTimer);
   }
 
@@ -922,6 +926,7 @@ export class OrdersComponent implements OnInit, OnDestroy {
   }
 
   protected async load(): Promise<void> {
+    const sequence = ++this.loadSequence;
     this.loading.set(true);
     try {
       await this.pos.expireProformas();
@@ -939,11 +944,17 @@ export class OrdersComponent implements OnInit, OnDestroy {
         sortBy: this.saleSort() as 'created_at' | 'code' | 'total' | 'status',
         sortDirection: this.saleSortDirection(),
       });
+      const creditIds = result.rows.filter(order => order.is_credit_sale).map(order => order.id);
+      const paidTotals = await this.pos.paidTotalsByOrder(creditIds);
+      if (sequence !== this.loadSequence) return;
+      // Publish the page and all derived metadata together after every request
+      // succeeds; journal revisions never patch only one part of this state.
       this.orders.set(result.rows);
       this.totalItems.set(result.count);
-      const creditIds = result.rows.filter(order => order.is_credit_sale).map(order => order.id);
-      this.creditPaid.set(await this.pos.paidTotalsByOrder(creditIds));
+      this.creditPaid.set(paidTotals);
+      this.authoritativeLoaded = true;
       await this.loadPageApprovals();
+      if (sequence !== this.loadSequence) return;
       // Keep an open drawer's lines/payments in sync with realtime refreshes.
       const openId = this.selectedOrderId();
       if (openId && result.rows.some(order => order.id === openId)) {
@@ -951,9 +962,11 @@ export class OrdersComponent implements OnInit, OnDestroy {
       }
       this.error.set(null);
     } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Failed to load sales');
+      if (sequence === this.loadSequence) {
+        this.error.set(err instanceof Error ? err.message : 'Failed to load sales');
+      }
     } finally {
-      this.loading.set(false);
+      if (sequence === this.loadSequence) this.loading.set(false);
     }
   }
 
@@ -986,6 +999,17 @@ export class OrdersComponent implements OnInit, OnDestroy {
     this.pendingActions.set(new Set());
     this.approvalHistory.set([]);
     this.detailLoading.set(true);
+    const cached = await this.recentSales.detail<{
+      lines: OrderLineWithProduct[];
+      payments: Payment[];
+      history: Approval[];
+    }>(orderId);
+    if (cached && this.selectedOrderId() === orderId) {
+      this.lines.set(cached.lines);
+      this.payments.set(cached.payments);
+      this.setApprovalHistory(cached.history);
+      this.detailLoading.set(false);
+    }
     if (!this.selectedOrderRecord()) {
       try {
         this.selectedOrderRecord.set(await this.pos.getOrder(orderId));
@@ -1018,11 +1042,37 @@ export class OrdersComponent implements OnInit, OnDestroy {
       this.lines.set(lines);
       this.payments.set(payments);
       this.setApprovalHistory(history);
+      await this.recentSales.rememberDetail(orderId, { lines, payments, history });
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Failed to load order details');
     } finally {
       if (this.selectedOrderId() === orderId) this.detailLoading.set(false);
     }
+  }
+
+  private applyRecentCache(): void {
+    if (!this.recentSales.loaded() || this.page() !== 1 || this.query().trim()) return;
+    if (this.saleSort() !== 'created_at' || this.saleSortDirection() !== 'desc') return;
+    const today = this.todayIso();
+    // The 100-row cache is only authoritative enough for the first page of the
+    // unfiltered live view. Historical/status-filtered pages stay server-owned.
+    if (this.status.value !== 'all' || this.from.value !== today || this.to.value !== today) return;
+    const since = new Date(`${this.from.value}T00:00:00`).toISOString();
+    const until = new Date(`${this.to.value}T00:00:00`);
+    until.setDate(until.getDate() + 1);
+    const statuses =
+      this.status.value === 'all' ? new Set(ALL_STATUSES) : new Set([this.status.value]);
+    const rows = this.recentSales
+      .orders()
+      .filter(
+        order =>
+          statuses.has(order.status) &&
+          order.created_at >= since &&
+          order.created_at < until.toISOString()
+      )
+      .slice(0, this.pageSize());
+    this.orders.set(rows);
+    if (this.totalItems() === 0) this.totalItems.set(rows.length);
   }
 
   /** Called by the drawer after its close transition finishes. */

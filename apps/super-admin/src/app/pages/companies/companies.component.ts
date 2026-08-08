@@ -1,5 +1,5 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { Component, OnInit, effect, inject, signal, untracked } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { NgIcon } from '@ng-icons/core';
 import { debounceTime, distinctUntilChanged } from 'rxjs';
@@ -380,6 +380,10 @@ export class CompaniesComponent implements OnInit {
   protected readonly drawerOpen = signal(false);
   protected readonly counts = signal<{ members: number; orders: number } | null>(null);
   protected readonly search = new FormControl('', { nonNullable: true });
+  private readonly debouncedSearch = toSignal(
+    this.search.valueChanges.pipe(debounceTime(200), distinctUntilChanged()),
+    { initialValue: undefined }
+  );
 
   protected readonly subTier = new FormControl('', { nonNullable: true });
   protected readonly subStatus = new FormControl('', { nonNullable: true });
@@ -393,9 +397,10 @@ export class CompaniesComponent implements OnInit {
   protected readonly notice = signal<string | null>(null);
 
   constructor() {
-    this.search.valueChanges
-      .pipe(debounceTime(200), distinctUntilChanged(), takeUntilDestroyed())
-      .subscribe(() => void this.load());
+    effect(() => {
+      if (this.debouncedSearch() === undefined) return;
+      untracked(() => void this.load());
+    });
   }
 
   async ngOnInit(): Promise<void> {

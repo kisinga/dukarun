@@ -1,5 +1,5 @@
 begin;
-select plan(7);
+select plan(8);
 
 select is(
   (select count(*)::integer
@@ -77,6 +77,24 @@ select is(
    where id = '64646464-6464-6464-6464-646464646464'),
   'Grant Test Updated',
   'platform tier update is persisted'
+);
+
+select throws_ok(
+  $$select public.platform_upsert_tier(
+      p_code => 'grant-test',
+      p_name => 'Unsupported Enterprise Limit',
+      p_price_monthly => 2500,
+      p_price_yearly => 25000,
+      p_multiple_locations_enabled => false,
+      p_staff_performance_enabled => true,
+      p_commissions_available => false,
+      p_max_products => 10001,
+      p_max_stock_locations => 1,
+      p_tier_id => '64646464-6464-6464-6464-646464646464'
+    )$$,
+  'P0001',
+  'enterprise_required: product limits above 10,000 require Enterprise',
+  'platform tier RPC rejects limits above the supported ceiling'
 );
 
 select set_config(

@@ -1,5 +1,5 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { parseKes } from '../../core/money';
 import { ButtonComponent } from '../../shared/ui/button.component';
@@ -130,8 +130,8 @@ export class MoneyTransfersComponent implements OnInit {
   protected readonly entries = signal<JournalEntryWithLines[]>([]);
   protected readonly from = new FormControl('', { nonNullable: true });
   protected readonly to = new FormControl('', { nonNullable: true });
-  private readonly fromValue = signal('');
-  private readonly toValue = signal('');
+  private readonly fromValue = toSignal(this.from.valueChanges, { initialValue: this.from.value });
+  private readonly toValue = toSignal(this.to.valueChanges, { initialValue: this.to.value });
   protected readonly principal = new FormControl('', { nonNullable: true });
   protected readonly fee = new FormControl('', { nonNullable: true });
   protected readonly memo = new FormControl('', { nonNullable: true });
@@ -145,11 +145,6 @@ export class MoneyTransfersComponent implements OnInit {
 
   /** Idempotency key for the in-progress transfer form (regenerated after success). */
   private transferId = crypto.randomUUID();
-
-  constructor() {
-    this.from.valueChanges.pipe(takeUntilDestroyed()).subscribe(v => this.fromValue.set(v));
-    this.to.valueChanges.pipe(takeUntilDestroyed()).subscribe(v => this.toValue.set(v));
-  }
 
   async ngOnInit(): Promise<void> {
     await this.load();

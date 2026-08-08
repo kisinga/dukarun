@@ -1,4 +1,13 @@
-import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
+import {
+  Component,
+  OnDestroy,
+  OnInit,
+  computed,
+  effect,
+  inject,
+  signal,
+  untracked,
+} from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { formatKes } from '../../core/money';
@@ -23,6 +32,13 @@ import { MoneyComponent } from '../../shared/ui/money.component';
 import { PageLayoutComponent } from '../../shared/ui/page-layout.component';
 import { StatCardComponent } from '../../shared/ui/stat-card.component';
 import { CompanyPreferencesService } from '../../core/company-preferences.service';
+import {
+  offlineDb,
+  offlineScopeKey,
+  type CacheStream,
+  type NamedSnapshot,
+} from '../../pos/offline/offline-db';
+import { CacheJournalService, type CacheStreamHandler } from '../../core/cache-journal.service';
 
 type TopVariant = {
   variantId: string;
@@ -606,6 +622,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   protected readonly locations = inject(LocationContextService);
   protected readonly preferences = inject(CompanyPreferencesService);
   private readonly perms = inject(PermissionsService);
+  private readonly journal = inject(CacheJournalService);
   protected readonly canViewFinancials = computed(() => this.perms.has('ViewFinancials'));
 
   protected readonly fmt = formatKes;
@@ -702,10 +719,26 @@ export class DashboardComponent implements OnInit, OnDestroy {
   });
   protected readonly initialLoading = computed(() => this.loading() && !this.lastUpdated());
 
-  private liveChannel: RealtimeChannel | null = null;
-  private refreshTimer: ReturnType<typeof setTimeout> | null = null;
-  private fallbackTimer: ReturnType<typeof setInterval> | null = null;
+  private liveChannels: RealtimeChannel[] = [];
   private loadQueued = false;
+  private readonly loadWaiters: Array<() => void> = [];
+  private lastLoadSucceeded = false;
+  private cacheHandler: CacheStreamHandler | null = null;
+  private journalScope: string | null = null;
+  private readonly connectedConsumers = new Set<string>();
+  private readonly journalConsumers: ReadonlyArray<readonly [CacheStream, string]> = [
+    ['sales', 'dashboard-sales'],
+    ['catalog', 'dashboard-catalog'],
+    ['parties', 'dashboard-parties'],
+  ];
+  private serverLoadVersion = 0;
+
+  constructor() {
+    effect(() => {
+      const canView = this.canViewFinancials();
+      if (!canView) untracked(() => this.clearFinancials());
+    });
+  }
 
   async ngOnInit(): Promise<void> {
     try {
@@ -719,6 +752,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
       await this.preferences.refresh();
       if (!this.locations.isMultiLocation())
         this.dashboardLocationId.set(this.locations.activeId());
+      await this.restoreDashboard();
       this.connectLiveUpdates(company.id);
     } catch (err) {
       this.loadError.set(err instanceof Error ? err.message : 'Failed to load company');
@@ -726,13 +760,18 @@ export class DashboardComponent implements OnInit, OnDestroy {
     }
 
     void this.loadReports();
-    this.fallbackTimer = setInterval(() => void this.loadReports(), 60_000);
   }
 
   ngOnDestroy(): void {
-    if (this.liveChannel) void this.supabase.client.removeChannel(this.liveChannel);
-    if (this.refreshTimer) clearTimeout(this.refreshTimer);
-    if (this.fallbackTimer) clearInterval(this.fallbackTimer);
+    for (const channel of this.liveChannels) void this.supabase.client.removeChannel(channel);
+    if (this.journalScope && this.cacheHandler) {
+      for (const [stream, consumer] of this.journalConsumers) {
+        this.journal.unsubscribe(stream, this.journalScope, this.cacheHandler, consumer);
+      }
+    }
+    this.journalScope = null;
+    this.connectedConsumers.clear();
+    this.liveConnected.set(false);
   }
 
   protected refresh(): void {
@@ -745,12 +784,17 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   protected changeDashboardLocation(event: Event): void {
     this.dashboardLocationId.set((event.target as HTMLSelectElement).value || null);
-    void this.loadReports();
+    void this.restoreThenLoad();
   }
 
   protected showLocation(locationId: string): void {
     this.dashboardLocationId.set(locationId);
-    void this.loadReports();
+    void this.restoreThenLoad();
+  }
+
+  private async restoreThenLoad(): Promise<void> {
+    await this.restoreDashboard();
+    await this.loadReports();
   }
 
   protected changeLabel(current: number, previous: number): string {
@@ -762,29 +806,35 @@ export class DashboardComponent implements OnInit, OnDestroy {
   private async loadReports(): Promise<void> {
     if (this.loading()) {
       this.loadQueued = true;
-      return;
+      return new Promise(resolve => this.loadWaiters.push(resolve));
     }
 
+    ++this.serverLoadVersion;
     this.loading.set(true);
     try {
+      const requestedLocationId = this.dashboardLocationId();
       const since = this.daysAgoIso(6);
       const canView = this.canViewFinancials();
+      if (!canView) this.clearFinancials();
       const [sales, lowStock, expiring] = await Promise.all([
-        canView
-          ? this.reports.dashboardSales(since, this.dashboardLocationId())
-          : Promise.resolve(null),
+        canView ? this.reports.dashboardSales(since, requestedLocationId) : Promise.resolve(null),
         this.reports.lowStock(),
         this.preferences.batchExpiryEnabled()
           ? this.reports.expiringBatches()
           : Promise.resolve([]),
       ]);
-      if (sales) {
+      if (requestedLocationId !== this.dashboardLocationId()) {
+        this.loadQueued = true;
+        return;
+      }
+      if (sales && this.canViewFinancials()) {
         this.summary.set(sales.summary);
         this.productSales.set(sales.productSales);
         this.locationRows.set(sales.locations);
         this.comparison.set(sales.comparison);
         await this.computeTopVariants(sales.productSales);
       }
+      if (!this.canViewFinancials()) this.clearFinancials();
       const attentionIds = [
         ...new Set(
           [...lowStock, ...expiring].map(item => item.variant_id).filter((id): id is string => !!id)
@@ -806,46 +856,148 @@ export class DashboardComponent implements OnInit, OnDestroy {
           manufacturer_name: manufacturerByVariant.get(item.variant_id) ?? null,
         }))
       );
+      // A role update can land while the report RPCs or variant projection are
+      // in flight. Never let their old authorization decision win afterward.
+      if (!this.canViewFinancials()) this.clearFinancials();
       this.lastUpdated.set(new Date());
       this.loadError.set(null);
+      await this.persistDashboard(requestedLocationId);
+      this.lastLoadSucceeded = true;
     } catch (err) {
+      this.lastLoadSucceeded = false;
       this.loadError.set(err instanceof Error ? err.message : 'Failed to load dashboard');
     } finally {
       this.loading.set(false);
       if (this.loadQueued) {
         this.loadQueued = false;
         void this.loadReports();
+      } else {
+        for (const resolve of this.loadWaiters.splice(0)) resolve();
       }
     }
   }
 
   private connectLiveUpdates(companyId: string): void {
-    this.liveChannel = this.supabase.client
-      .channel(`dashboard-live-${companyId}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'orders', filter: `company_id=eq.${companyId}` },
-        () => this.queueLiveRefresh()
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'purchases',
-          filter: `company_id=eq.${companyId}`,
-        },
-        () => this.queueLiveRefresh()
-      )
-      .subscribe(status => this.liveConnected.set(status === 'SUBSCRIBED'));
+    const identity = this.supabase.offlineIdentity();
+    if (!identity) return;
+    const scope = offlineScopeKey(identity, this.dashboardLocationId() ?? 'all');
+    this.journalScope = scope;
+    this.connectedConsumers.clear();
+    this.liveConnected.set(false);
+    this.cacheHandler = {
+      apply: async () => {
+        await this.loadReports();
+        if (!this.lastLoadSucceeded) throw new Error('dashboard_refresh_failed');
+      },
+      reset: async () => {
+        await this.loadReports();
+        return this.lastLoadSucceeded;
+      },
+      purge: () => {
+        this.clearFinancials();
+        this.lastUpdated.set(null);
+      },
+    };
+    this.liveChannels = this.journalConsumers.map(([stream, consumer]) =>
+      this.journal.subscribe(stream, scope, companyId, this.cacheHandler!, consumer, status => {
+        if (scope !== this.journalScope) return;
+        if (status === 'SUBSCRIBED') this.connectedConsumers.add(consumer);
+        else this.connectedConsumers.delete(consumer);
+        this.liveConnected.set(this.connectedConsumers.size === this.journalConsumers.length);
+      })
+    );
   }
 
-  private queueLiveRefresh(): void {
-    if (this.refreshTimer) clearTimeout(this.refreshTimer);
-    this.refreshTimer = setTimeout(() => {
-      this.refreshTimer = null;
-      void this.loadReports();
-    }, 250);
+  private async restoreDashboard(): Promise<void> {
+    const identity = this.supabase.offlineIdentity();
+    if (!identity || !this.canViewFinancials()) return;
+    const serverLoadVersion = this.serverLoadVersion;
+    const scope = offlineScopeKey(identity, this.dashboardLocationId() ?? 'all');
+    const cached = await (await offlineDb()).get('snapshots', `${scope}:dashboard`);
+    const currentIdentity = this.supabase.offlineIdentity();
+    const currentScope = currentIdentity
+      ? offlineScopeKey(currentIdentity, this.dashboardLocationId() ?? 'all')
+      : null;
+    if (
+      !cached ||
+      currentScope !== scope ||
+      serverLoadVersion !== this.serverLoadVersion ||
+      !this.canViewFinancials()
+    ) {
+      return;
+    }
+    const value = cached.value as {
+      summary: DailySummary[];
+      productSales: DailyProductSales[];
+      topVariants: TopVariant[];
+      lowStock: LowStockDisplay[];
+      expiring: ExpiringDisplay[];
+      locationRows: DashboardLocationSummary[];
+      comparison: DashboardPeriodComparison;
+    };
+    this.summary.set(value.summary);
+    this.productSales.set(value.productSales);
+    this.topVariants.set(value.topVariants);
+    this.lowStock.set(value.lowStock);
+    this.expiring.set(value.expiring);
+    this.locationRows.set(value.locationRows);
+    this.comparison.set(value.comparison);
+    this.lastUpdated.set(new Date(cached.fetched_at));
+  }
+
+  private async persistDashboard(locationId: string | null): Promise<void> {
+    const identity = this.supabase.offlineIdentity();
+    if (!identity || !this.canViewFinancials()) return;
+    if (locationId !== this.dashboardLocationId()) return;
+    const scope = offlineScopeKey(identity, locationId ?? 'all');
+    const snapshot: NamedSnapshot = {
+      key: `${scope}:dashboard`,
+      name: 'dashboard',
+      company_id: identity.companyId,
+      user_id: identity.userId,
+      location_id: locationId ?? undefined,
+      value: {
+        summary: this.summary(),
+        productSales: this.productSales(),
+        topVariants: this.topVariants(),
+        lowStock: this.lowStock(),
+        expiring: this.expiring(),
+        locationRows: this.locationRows(),
+        comparison: this.comparison(),
+      },
+      fetched_at: new Date().toISOString(),
+    };
+    const db = await offlineDb();
+    const currentIdentity = this.supabase.offlineIdentity();
+    const currentScope = currentIdentity
+      ? offlineScopeKey(currentIdentity, this.dashboardLocationId() ?? 'all')
+      : null;
+    if (!this.canViewFinancials() || currentScope !== scope) return;
+    await db.put('snapshots', snapshot);
+    // IndexedDB writes cannot be cancelled. Remove the just-written snapshot
+    // if permission or identity changed while the transaction was committing.
+    const committedIdentity = this.supabase.offlineIdentity();
+    const committedScope = committedIdentity
+      ? offlineScopeKey(committedIdentity, this.dashboardLocationId() ?? 'all')
+      : null;
+    if (!this.canViewFinancials() || committedScope !== scope) {
+      await db.delete('snapshots', snapshot.key);
+    }
+  }
+
+  private clearFinancials(): void {
+    this.summary.set([]);
+    this.productSales.set([]);
+    this.topVariants.set([]);
+    this.locationRows.set([]);
+    this.comparison.set({
+      current_revenue: 0,
+      current_quantity: 0,
+      current_orders: 0,
+      previous_revenue: 0,
+      previous_quantity: 0,
+      previous_orders: 0,
+    });
   }
 
   private async computeTopVariants(rows: DailyProductSales[]): Promise<void> {

@@ -1,6 +1,9 @@
 import { Injectable, computed, effect, inject, signal } from '@angular/core';
 import { SupabaseService } from './supabase.service';
 import type { AppIdentity } from './supabase.service';
+import type { RealtimeChannel } from '@supabase/supabase-js';
+import { offlineScopeKey } from '../pos/offline/offline-db';
+import { CacheJournalService, type CacheStreamHandler } from './cache-journal.service';
 
 /** Assignable permissions (role editor checkboxes; mirrored in the DB role templates). */
 export const ALL_PERMISSIONS = [
@@ -75,6 +78,7 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
 @Injectable({ providedIn: 'root' })
 export class PermissionsService {
   private readonly supabase = inject(SupabaseService);
+  private readonly journal = inject(CacheJournalService);
 
   private readonly granted = signal<ReadonlySet<Permission>>(new Set());
   private readonly actions = signal<Readonly<Record<ActionKey, ActionMode>>>({
@@ -95,6 +99,10 @@ export class PermissionsService {
   private sequence = 0;
   private currentLoad: Promise<void> | null = null;
   private contextKey: string | null = null;
+  private teamScope: string | null = null;
+  private teamChannel: RealtimeChannel | null = null;
+  private teamHandler: CacheStreamHandler | null = null;
+  private teamIdentity: AppIdentity | null = null;
 
   constructor() {
     effect(() => {
@@ -134,6 +142,14 @@ export class PermissionsService {
     accessToken: string | null,
     force = false
   ): Promise<void> {
+    if (
+      this.teamIdentity &&
+      (!identity ||
+        identity.companyId !== this.teamIdentity.companyId ||
+        identity.userId !== this.teamIdentity.userId)
+    ) {
+      this.stopTeamWatch();
+    }
     const key = this.contextKeyFor(identity, accessToken);
     if (!force && key === this.contextKey) {
       if (this.currentLoad) return this.currentLoad;
@@ -144,6 +160,7 @@ export class PermissionsService {
     this.contextKey = key;
     this.clear();
     if (!identity) {
+      this.stopTeamWatch();
       this.currentLoad = null;
       return Promise.resolve();
     }
@@ -192,5 +209,42 @@ export class PermissionsService {
     this.granted.set(new Set(snapshot.permissions));
     this.actions.set(snapshot.actions);
     this.state.set('ready');
+    this.watchTeam({ companyId, userId });
+  }
+
+  private watchTeam(identity: AppIdentity): void {
+    const scope = offlineScopeKey(identity);
+    if (scope === this.teamScope) return;
+    if (this.teamIdentity) void this.journal.purgeSensitive(this.teamIdentity);
+    if (this.teamChannel) void this.supabase.client.removeChannel(this.teamChannel);
+    this.teamScope = scope;
+    this.teamIdentity = identity;
+    this.teamHandler = {
+      apply: async () => {
+        await this.journal.purgeSensitive(identity);
+        await this.loadFor(identity, this.supabase.session()?.access_token ?? null, true);
+      },
+      reset: async () => {
+        await this.journal.purgeSensitive(identity);
+        await this.loadFor(identity, this.supabase.session()?.access_token ?? null, true);
+        return true;
+      },
+    };
+    this.teamChannel = this.journal.subscribe(
+      'team',
+      scope,
+      identity.companyId,
+      this.teamHandler,
+      'permissions'
+    );
+  }
+
+  private stopTeamWatch(): void {
+    if (this.teamIdentity) void this.journal.purgeSensitive(this.teamIdentity);
+    if (this.teamChannel) void this.supabase.client.removeChannel(this.teamChannel);
+    this.teamChannel = null;
+    this.teamHandler = null;
+    this.teamScope = null;
+    this.teamIdentity = null;
   }
 }

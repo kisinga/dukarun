@@ -561,7 +561,7 @@ export class ShellComponent implements OnInit {
     const locationId = (event.target as HTMLSelectElement).value;
     if (!locationId || locationId === this.locations.activeId()) return;
     this.locations.select(locationId);
-    void this.cashierSession.refresh().catch(() => undefined);
+    void this.cashierSession.start().catch(() => undefined);
     void this.orderQueueCounts.refresh();
   }
 

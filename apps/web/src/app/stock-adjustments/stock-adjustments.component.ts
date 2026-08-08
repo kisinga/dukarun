@@ -1,5 +1,5 @@
 import { Component, OnInit, computed, effect, inject, signal, untracked } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute } from '@angular/router';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { debounceTime, distinctUntilChanged } from 'rxjs';
@@ -485,6 +485,14 @@ export class StockAdjustmentsComponent implements OnInit {
     Math.max(1, Math.ceil(this.historyTotal() / this.historyPageSize))
   );
   protected readonly label = variantLabel;
+  private readonly debouncedSearch = toSignal(
+    this.search.valueChanges.pipe(debounceTime(200), distinctUntilChanged()),
+    { initialValue: undefined }
+  );
+  private readonly debouncedHistorySearch = toSignal(
+    this.historySearch.valueChanges.pipe(debounceTime(250), distinctUntilChanged()),
+    { initialValue: undefined }
+  );
 
   constructor() {
     effect(() => {
@@ -493,15 +501,18 @@ export class StockAdjustmentsComponent implements OnInit {
       // (selected, historyVariantId, ...) which must not re-trigger this effect.
       if (this.initialized && activeId) untracked(() => void this.reloadForLocation());
     });
-    this.search.valueChanges
-      .pipe(debounceTime(200), distinctUntilChanged(), takeUntilDestroyed())
-      .subscribe(query => void this.onSearch(query));
-    this.historySearch.valueChanges
-      .pipe(debounceTime(250), distinctUntilChanged(), takeUntilDestroyed())
-      .subscribe(() => {
+    effect(() => {
+      const query = this.debouncedSearch();
+      if (query === undefined) return;
+      untracked(() => void this.onSearch(query));
+    });
+    effect(() => {
+      if (this.debouncedHistorySearch() === undefined) return;
+      untracked(() => {
         this.historyPage.set(1);
         void this.loadHistory();
       });
+    });
   }
 
   async ngOnInit(): Promise<void> {

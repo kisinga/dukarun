@@ -1,7 +1,17 @@
-import { Component, OnDestroy, OnInit, computed, inject, signal, viewChild } from '@angular/core';
+import {
+  Component,
+  OnDestroy,
+  OnInit,
+  computed,
+  effect,
+  inject,
+  signal,
+  untracked,
+  viewChild,
+} from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { Subscription } from 'rxjs';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { PageLayoutComponent } from '../../shared/ui/page-layout.component';
 import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
 import { formatKes } from '../../core/money';
@@ -604,6 +614,10 @@ export class ProformasComponent implements OnInit, OnDestroy {
   private readonly pos = inject(PosService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+  private readonly routeParams = toSignal(this.route.queryParamMap, {
+    initialValue: this.route.snapshot.queryParamMap,
+  });
+  private readonly routeReady = signal(false);
   private readonly approvals = inject(ApprovalsService);
   private readonly receiptData = inject(ReceiptDataService);
   private readonly print = inject(PrintService);
@@ -678,7 +692,14 @@ export class ProformasComponent implements OnInit, OnDestroy {
   }));
   private readonly deleteModal = viewChild(DeleteConfirmationModalComponent);
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
-  private routeSubscription: Subscription | null = null;
+
+  constructor() {
+    effect(() => {
+      const params = this.routeParams();
+      if (!this.routeReady()) return;
+      untracked(() => void this.openRouteDraft(params.get('order'), params.get('approval')));
+    });
+  }
 
   async ngOnInit(): Promise<void> {
     this.printerEnabled.set(await this.receiptData.printerEnabled());
@@ -696,15 +717,12 @@ export class ProformasComponent implements OnInit, OnDestroy {
       // No methods configured yet; the panel will show an empty method list.
     }
     await this.load();
-    this.routeSubscription = this.route.queryParamMap.subscribe(params => {
-      void this.openRouteDraft(params.get('order'), params.get('approval'));
-    });
+    this.routeReady.set(true);
   }
 
   ngOnDestroy(): void {
     if (this.searchTimer) clearTimeout(this.searchTimer);
     if (this.directAccountTimer) clearTimeout(this.directAccountTimer);
-    this.routeSubscription?.unsubscribe();
   }
 
   /**

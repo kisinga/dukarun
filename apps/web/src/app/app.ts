@@ -1,7 +1,7 @@
-import { Component, DestroyRef, inject, isDevMode } from '@angular/core';
+import { Component, effect, inject, isDevMode } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { SwUpdate } from '@angular/service-worker';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { SyncService } from './pos/offline/sync.service';
 
 @Component({
@@ -22,17 +22,18 @@ export class App {
   // app start, 30s interval). Screens read its queue state signals.
   private readonly sync = inject(SyncService);
   private readonly updates = inject(SwUpdate);
-  private readonly destroyRef = inject(DestroyRef);
 
   constructor() {
     if (isDevMode() || !this.updates.isEnabled) return;
 
-    this.updates.versionUpdates.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(event => {
-      if (event.type === 'VERSION_READY') window.location.reload();
+    const versionEvent = toSignal(this.updates.versionUpdates, { initialValue: null });
+    const unrecoverable = toSignal(this.updates.unrecoverable, { initialValue: null });
+    effect(() => {
+      const event = versionEvent();
+      if (event?.type === 'VERSION_READY') window.location.reload();
     });
-
-    this.updates.unrecoverable
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe(() => window.location.reload());
+    effect(() => {
+      if (unrecoverable()) window.location.reload();
+    });
   }
 }

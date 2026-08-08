@@ -1,8 +1,8 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, effect, inject, signal, untracked } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { debounceTime, distinctUntilChanged } from 'rxjs';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { parseKes } from '../../core/money';
 import { PermissionsService } from '../../core/permissions.service';
 import { CashierSessionService } from '../../core/cashier-session.service';
@@ -970,17 +970,29 @@ export class SellComponent implements OnInit {
   private searchSeq = 0;
   private customerSearchSeq = 0;
   private priceFloorTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly debouncedSearch = toSignal(
+    this.search.valueChanges.pipe(debounceTime(200), distinctUntilChanged()),
+    { initialValue: undefined }
+  );
+  private readonly debouncedCustomerSearch = toSignal(
+    this.customerSearch.valueChanges.pipe(debounceTime(200), distinctUntilChanged()),
+    { initialValue: undefined }
+  );
 
   constructor() {
-    this.search.valueChanges
-      .pipe(debounceTime(200), distinctUntilChanged(), takeUntilDestroyed())
-      .subscribe(q => {
-        this.searchQuery.set(q);
-        void this.onSearch(q);
+    effect(() => {
+      const query = this.debouncedSearch();
+      if (query === undefined) return;
+      untracked(() => {
+        this.searchQuery.set(query);
+        void this.onSearch(query);
       });
-    this.customerSearch.valueChanges
-      .pipe(debounceTime(200), distinctUntilChanged(), takeUntilDestroyed())
-      .subscribe(q => void this.onCustomerSearch(q));
+    });
+    effect(() => {
+      const query = this.debouncedCustomerSearch();
+      if (query === undefined) return;
+      untracked(() => void this.onCustomerSearch(query));
+    });
   }
 
   async ngOnInit(): Promise<void> {

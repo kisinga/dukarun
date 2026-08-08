@@ -1,6 +1,21 @@
 begin;
 select plan(15);
 
+create function pg_temp.run_catalog_import(
+  p_products jsonb,
+  p_mode text default 'merge',
+  p_idempotency_key uuid default gen_random_uuid(),
+  p_source_export_id uuid default null
+) returns jsonb language plpgsql as $$
+declare v_started jsonb;
+begin
+  v_started := public.begin_catalog_import(p_mode,p_idempotency_key,p_source_export_id);
+  if v_started->>'status' = 'completed' then return v_started->'result'; end if;
+  perform public.append_catalog_import_chunk((v_started->>'import_id')::uuid,0,p_products);
+  return public.finalize_catalog_import((v_started->>'import_id')::uuid);
+end;
+$$;
+
 select testkit.create_user('66666666-6666-4666-8666-666666666661', 'catalog-admin@local.test');
 select testkit.create_user('66666666-6666-4666-8666-666666666662', 'catalog-cashier@local.test');
 create temp table catalog_company as
@@ -17,7 +32,7 @@ select testkit.as_user((select company_id from catalog_company),
   '66666666-6666-4666-8666-666666666661', 'Admin');
 
 create temp table first_import as
-select public.import_catalog_products(
+select pg_temp.run_catalog_import(
   '[{"product_key":"NEW-1","name":"Flour","manufacturer_name":"Millers","active":false,"variants":[
     {"name":"1kg","sku":"FLOUR-1","price":180,"kind":"good"},
     {"name":"2kg","sku":"FLOUR-2","price":340,"kind":"good","active":false}
@@ -37,7 +52,7 @@ select is((select active from public.products where name = 'Flour'), false,
 select is((select active from public.product_variants where sku = 'FLOUR-2'), false,
   'new variant active flag retained');
 select is(
-  public.import_catalog_products(
+  pg_temp.run_catalog_import(
     '[{"product_key":"NEW-1","name":"Flour","variants":[{"name":"1kg","sku":"OTHER","price":1}]}]',
     'merge', '66666666-6666-4666-8666-666666666610'
   ),
@@ -51,7 +66,7 @@ create temp table export_marker as
 select public.start_catalog_export() marker;
 
 select throws_ok(
-  $$select public.import_catalog_products(
+  $$select pg_temp.run_catalog_import(
     '[{"product_id":"00000000-0000-0000-0000-000000000001","name":"Forged","variants":[{"price":1}]}]',
     'replace',
     '66666666-6666-4666-8666-666666666612',
@@ -70,7 +85,7 @@ from public.products p join public.product_variants v on v.product_id = p.id
 where p.name = 'Flour' group by p.id;
 
 create temp table replace_import as
-select public.import_catalog_products(
+select pg_temp.run_catalog_import(
   jsonb_build_array(jsonb_build_object(
     'product_id', product_id, 'name', 'Flour', 'active', true, 'variants', variants
   )),
@@ -91,7 +106,7 @@ select is((select count(*)::int from public.catalog_imports), 2, 'jobs recorded 
 select testkit.as_user((select company_id from catalog_company),
   '66666666-6666-4666-8666-666666666662', 'Import Cashier');
 select throws_ok(
-  $$select public.import_catalog_products('[{"name":"Denied","variants":[{"price":1}]}]')$$,
+  $$select pg_temp.run_catalog_import('[{"name":"Denied","variants":[{"price":1}]}]')$$,
   'P0001', 'permission_denied: ManageCatalog required', 'permission required'
 );
 select is((select count(*)::int from public.products where name = 'Denied'), 0,

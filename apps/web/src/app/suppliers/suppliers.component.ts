@@ -1,20 +1,19 @@
 import {
   Component,
   ElementRef,
-  OnDestroy,
   OnInit,
   afterRenderEffect,
   computed,
+  effect,
   inject,
   signal,
+  untracked,
   viewChild,
 } from '@angular/core';
 import { FormControl, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import type { RealtimeChannel } from '@supabase/supabase-js';
 import { formatKes, formatKesInput, parseKes } from '../core/money';
 import { PermissionsService } from '../core/permissions.service';
-import { SupabaseService } from '../core/supabase.service';
 import { CatalogSearchService } from '../core/catalog-search.service';
 import { PosService, Variant, variantLabel } from '../pos/pos.service';
 import { LocationContextService } from '../core/location-context.service';
@@ -1919,14 +1918,13 @@ interface ParsedPurchaseLine {
     </app-page>
   `,
 })
-export class SuppliersComponent implements OnInit, OnDestroy {
+export class SuppliersComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly money = inject(MoneyService);
   protected readonly partyCache = inject(PartyCacheService);
   private readonly pos = inject(PosService);
   private readonly catalogSearch = inject(CatalogSearchService);
   private readonly locationContext = inject(LocationContextService);
-  private readonly supabase = inject(SupabaseService);
   private readonly receiptData = inject(ReceiptDataService);
   private readonly print = inject(PrintService);
   protected readonly perms = inject(PermissionsService);
@@ -2013,6 +2011,15 @@ export class SuppliersComponent implements OnInit, OnDestroy {
       if (this.variantPickerFor() !== null) {
         this.variantSearchInput()?.nativeElement.focus({ preventScroll: true });
       }
+    });
+    let initialPartyRevision = true;
+    effect(() => {
+      this.partyCache.revision();
+      if (initialPartyRevision) {
+        initialPartyRevision = false;
+        return;
+      }
+      untracked(() => void this.load(this.suppliers().length > 0));
     });
   }
   protected lines: PurchaseLineForm[] = [this.emptyLine()];
@@ -2194,8 +2201,6 @@ export class SuppliersComponent implements OnInit, OnDestroy {
     return this.filteredPurchases().slice(start, start + this.purchasePageSize());
   });
 
-  private liveChannel: RealtimeChannel | null = null;
-  private refreshTimer: ReturnType<typeof setTimeout> | null = null;
   private loadQueued = false;
 
   async ngOnInit(): Promise<void> {
@@ -2205,13 +2210,6 @@ export class SuppliersComponent implements OnInit, OnDestroy {
     ]);
     this.printerEnabled.set(printerEnabled);
     await this.load();
-    const companyId = this.supabase.claims()?.company_id;
-    if (companyId) this.connectLiveUpdates(companyId);
-  }
-
-  ngOnDestroy(): void {
-    if (this.liveChannel) void this.supabase.client.removeChannel(this.liveChannel);
-    if (this.refreshTimer) clearTimeout(this.refreshTimer);
   }
 
   /** Silent reloads (realtime events) refresh data without flashing the header spinner. */
@@ -3134,42 +3132,6 @@ export class SuppliersComponent implements OnInit, OnDestroy {
       month: 'short',
       day: 'numeric',
     });
-  }
-
-  private connectLiveUpdates(companyId: string): void {
-    this.liveChannel = this.supabase.client
-      .channel(`suppliers-live-${companyId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'purchases',
-          filter: `company_id=eq.${companyId}`,
-        },
-        () => this.queueLiveRefresh()
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'purchase_payments',
-          filter: `company_id=eq.${companyId}`,
-        },
-        () => this.queueLiveRefresh()
-      )
-      .subscribe();
-  }
-
-  private queueLiveRefresh(): void {
-    if (this.refreshTimer) clearTimeout(this.refreshTimer);
-    this.refreshTimer = setTimeout(() => {
-      this.refreshTimer = null;
-      // Silent when data is already on screen — background events shouldn't
-      // flash the header spinner.
-      void this.load(this.suppliers().length > 0);
-    }, 250);
   }
 
   private unitCostValue(line: PurchaseLineForm): number | null {

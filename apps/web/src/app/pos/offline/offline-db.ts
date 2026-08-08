@@ -7,6 +7,7 @@ import type {
   Manufacturer,
   PaymentInput,
   Product,
+  OrderWithCustomer,
   SaleLineInput,
   Variant,
 } from '../pos.service';
@@ -60,13 +61,34 @@ export interface ProductSnapshot {
   products: Variant[];
   /** Cached separately so management can render products with no variants. */
   families?: Product[];
-  /** Location-correct stock; variant_catalog.stock is company-wide. */
+  /** Location-correct stock for the cached variants. */
   location_stock?: Array<{ variant_id: string; stock: number; stock_value: number }>;
   /** Catalog reference data, hydrated with products to avoid staggered labels and filters. */
   manufacturers?: CachedManufacturer[];
   collections?: CollectionWithCount[];
   truncated?: boolean;
   fetched_at: string; // ISO
+}
+
+/** One hot catalogue row so stock/variant patches never rewrite all 10k rows. */
+export interface CatalogVariantRecord extends ScopedRecord {
+  key: string;
+  scope_key: string;
+  location_id: string;
+  variant_id: string;
+  variant: Variant;
+  stock_value: number;
+}
+
+/** Family/reference data changes far less often and is stored separately. */
+export interface CatalogMetadata extends ScopedRecord {
+  key: string;
+  location_id: string;
+  families: Product[];
+  manufacturers: CachedManufacturer[];
+  collections: CollectionWithCount[];
+  truncated: boolean;
+  fetched_at: string;
 }
 
 export interface PartySnapshot extends ScopedRecord {
@@ -104,10 +126,41 @@ export interface CachedPaymentMethod {
 export interface PosSettingsSnapshot extends ScopedRecord {
   key: string;
   payment_methods: CachedPaymentMethod[];
+  payment_methods_fetched_at?: string;
   cashier_flow_enabled?: boolean;
   cash_control_enabled?: boolean;
   require_opening_count?: boolean;
   batch_expiry_enabled?: boolean;
+  fetched_at: string;
+}
+
+export type CacheStream = 'catalog' | 'parties' | 'sales' | 'settings' | 'inbox' | 'team';
+
+export interface CacheWatermark extends ScopedRecord {
+  key: string;
+  stream: CacheStream;
+  sequence: number;
+  updated_at: string;
+}
+
+export interface RecentSalesSnapshot extends ScopedRecord {
+  key: string;
+  orders: OrderWithCustomer[];
+  fetched_at: string;
+}
+
+export interface SaleDetailSnapshot extends ScopedRecord {
+  key: string;
+  scope_key: string;
+  order_id: string;
+  detail: unknown;
+  opened_at: string;
+}
+
+export interface NamedSnapshot extends ScopedRecord {
+  key: string;
+  name: 'dashboard' | 'settings' | 'locations' | 'inbox' | 'approvals' | 'team' | 'cashier-display';
+  value: unknown;
   fetched_at: string;
 }
 
@@ -120,6 +173,15 @@ interface PosOfflineDb extends DBSchema {
   products: {
     key: string;
     value: ProductSnapshot;
+  };
+  catalogVariants: {
+    key: string;
+    value: CatalogVariantRecord;
+    indexes: { 'by-scope': string };
+  };
+  catalogMetadata: {
+    key: string;
+    value: CatalogMetadata;
   };
   parties: {
     key: string;
@@ -137,6 +199,23 @@ interface PosOfflineDb extends DBSchema {
     key: string;
     value: PosSettingsSnapshot;
   };
+  watermarks: {
+    key: string;
+    value: CacheWatermark;
+  };
+  recentSales: {
+    key: string;
+    value: RecentSalesSnapshot;
+  };
+  saleDetails: {
+    key: string;
+    value: SaleDetailSnapshot;
+    indexes: { 'by-scope-opened': [string, string] };
+  };
+  snapshots: {
+    key: string;
+    value: NamedSnapshot;
+  };
 }
 
 let dbPromise: Promise<IDBPDatabase<PosOfflineDb>> | null = null;
@@ -145,7 +224,7 @@ export function offlineDb(): Promise<IDBPDatabase<PosOfflineDb>> {
   // v3 scopes all new records by company + user. Existing records are never
   // deleted here: unscoped outbox entries are quarantined by SyncService so an
   // upgrade cannot lose or accidentally replay a sale under another account.
-  dbPromise ??= openDB<PosOfflineDb>('dukarun-pos-offline', 4, {
+  dbPromise ??= openDB<PosOfflineDb>('dukarun-pos-offline', 6, {
     upgrade(db, _oldVersion, _newVersion, transaction) {
       const outbox = db.objectStoreNames.contains('outbox')
         ? transaction.objectStore('outbox')
@@ -155,6 +234,13 @@ export function offlineDb(): Promise<IDBPDatabase<PosOfflineDb>> {
       }
       if (!db.objectStoreNames.contains('products')) {
         db.createObjectStore('products', { keyPath: 'key' });
+      }
+      if (!db.objectStoreNames.contains('catalogVariants')) {
+        const variants = db.createObjectStore('catalogVariants', { keyPath: 'key' });
+        variants.createIndex('by-scope', 'scope_key');
+      }
+      if (!db.objectStoreNames.contains('catalogMetadata')) {
+        db.createObjectStore('catalogMetadata', { keyPath: 'key' });
       }
       if (!db.objectStoreNames.contains('parties')) {
         db.createObjectStore('parties', { keyPath: 'key' });
@@ -168,6 +254,19 @@ export function offlineDb(): Promise<IDBPDatabase<PosOfflineDb>> {
       if (!db.objectStoreNames.contains('settings')) {
         db.createObjectStore('settings', { keyPath: 'key' });
       }
+      if (!db.objectStoreNames.contains('watermarks')) {
+        db.createObjectStore('watermarks', { keyPath: 'key' });
+      }
+      if (!db.objectStoreNames.contains('recentSales')) {
+        db.createObjectStore('recentSales', { keyPath: 'key' });
+      }
+      if (!db.objectStoreNames.contains('saleDetails')) {
+        const details = db.createObjectStore('saleDetails', { keyPath: 'key' });
+        details.createIndex('by-scope-opened', ['scope_key', 'opened_at']);
+      }
+      if (!db.objectStoreNames.contains('snapshots')) {
+        db.createObjectStore('snapshots', { keyPath: 'key' });
+      }
     },
   });
   return dbPromise;
@@ -179,4 +278,8 @@ export function offlineScopeKey(identity: AppIdentity, locationId?: string | nul
 
 export function belongsToIdentity(record: Partial<ScopedRecord>, identity: AppIdentity): boolean {
   return record.company_id === identity.companyId && record.user_id === identity.userId;
+}
+
+export function cacheWatermarkKey(scope: string, stream: CacheStream): string {
+  return `${scope}:stream:${stream}`;
 }

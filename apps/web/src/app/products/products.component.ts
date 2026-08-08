@@ -43,6 +43,8 @@ import { ProductTransferService, type CatalogImportResult } from './product-tran
 type StockInfo = { stock: number; stock_value: number };
 type ProductStatusFilter = 'all' | 'active' | 'inactive';
 type StockStatusFilter = 'all' | 'in_stock' | 'out_of_stock' | 'not_tracked';
+type ManagementVariant = Variant & { stock_value?: number | null };
+type ProductGroup = { family: Product; variants: ManagementVariant[] };
 const DEFAULT_PRODUCT_STATUS_FILTER: ProductStatusFilter = 'active';
 
 const PRODUCT_SORT_OPTIONS: readonly ListSortOption[] = [
@@ -165,7 +167,8 @@ interface ProductEditorRow {
         <div role="status" class="alert alert-warning mb-3 text-sm">
           <app-icon name="heroExclamationTriangle" />
           <span
-            >Catalog too large for offline cache — showing first 2,000 products; use search.</span
+            >This catalogue exceeds the supported 10,000 active-variant cache. Enterprise is
+            required.</span
           >
         </div>
       }
@@ -981,11 +984,11 @@ interface ProductEditorRow {
           <app-pagination
             [currentPage]="page()"
             [totalPages]="totalPages()"
-            [totalItems]="grouped().length"
+            [totalItems]="serverMode() ? serverTotal() : grouped().length"
             [itemsPerPage]="pageSize()"
             [showItemsPerPage]="true"
             itemLabel="products"
-            (pageChange)="page.set($event)"
+            (pageChange)="changePage($event)"
             (itemsPerPageChange)="changePageSize($event)"
           />
         </div>
@@ -1263,6 +1266,13 @@ export class ProductsComponent implements OnInit {
   protected readonly importOpen = signal(false);
   protected readonly page = signal(1);
   protected readonly pageSize = signal(25);
+  private readonly serverGroups = signal<ProductGroup[]>([]);
+  private readonly serverStock = signal<Map<string, StockInfo>>(new Map());
+  protected readonly serverTotal = signal(0);
+  private readonly serverLoaded = signal(false);
+  private serverRequest = 0;
+  private serverSearchTimer: ReturnType<typeof setTimeout> | null = null;
+  protected readonly serverMode = computed(() => this.productStatusFilter() !== 'active');
 
   /** Image picker state (family edit panel). */
   protected readonly imageBusy = signal(false);
@@ -1291,6 +1301,7 @@ export class ProductsComponent implements OnInit {
     const manufacturer = this.manufacturerFilter();
     const sortKey = this.productSort();
     const sortDirection = this.productSortDirection();
+    if (productStatus !== 'active') return this.serverGroups();
     const byProduct = new Map<string, Variant[]>();
     for (const v of this.catalog()) {
       if (!v.product_id) continue;
@@ -1307,10 +1318,7 @@ export class ProductsComponent implements OnInit {
         const matchesSearch =
           g.variants.length > 0 || !q || g.family.name.toLowerCase().includes(q);
         if (!matchesSearch) return false;
-        if (productStatus !== 'all') {
-          const isActive = g.family.active;
-          if (productStatus === 'active' ? !isActive : isActive) return false;
-        }
+        if (!g.family.active) return false;
         if (manufacturer === 'unassigned' && g.family.manufacturer_id !== null) return false;
         if (manufacturer !== 'all' && manufacturer !== 'unassigned') {
           if (g.family.manufacturer_id !== manufacturer) return false;
@@ -1387,7 +1395,10 @@ export class ProductsComponent implements OnInit {
       0
     );
     return [
-      { label: 'Matching products', value: groups.length },
+      {
+        label: 'Matching products',
+        value: this.serverMode() && this.serverLoaded() ? this.serverTotal() : groups.length,
+      },
       { label: 'Variants shown', value: variants },
       {
         label: 'Out of stock',
@@ -1400,9 +1411,16 @@ export class ProductsComponent implements OnInit {
     ];
   });
   protected readonly totalPages = computed(() =>
-    Math.max(1, Math.ceil(this.grouped().length / this.pageSize()))
+    Math.max(
+      1,
+      Math.ceil(
+        (this.serverMode() && this.serverLoaded() ? this.serverTotal() : this.grouped().length) /
+          this.pageSize()
+      )
+    )
   );
   protected readonly pagedGroups = computed(() => {
+    if (this.serverMode()) return this.serverGroups();
     const page = Math.min(this.page(), this.totalPages());
     const start = (page - 1) * this.pageSize();
     return this.grouped().slice(start, start + this.pageSize());
@@ -1418,6 +1436,7 @@ export class ProductsComponent implements OnInit {
     // typing only resets pagination. Skip the effect's initial run.
     let firstRun = true;
     effect(() => {
+      this.catalogCache.revision();
       this.query();
       this.productStatusFilter();
       this.stockStatusFilter();
@@ -1429,12 +1448,25 @@ export class ProductsComponent implements OnInit {
         return;
       }
       this.page.set(1);
+      if (this.serverMode()) this.scheduleManagementLoad();
+      else {
+        this.serverGroups.set([]);
+        this.serverStock.set(new Map());
+        this.serverTotal.set(0);
+        this.serverLoaded.set(false);
+      }
     });
   }
 
   protected changePageSize(size: number): void {
     this.pageSize.set(size);
     this.page.set(1);
+    if (this.serverMode()) void this.loadManagementPage();
+  }
+
+  protected changePage(page: number): void {
+    this.page.set(page);
+    if (this.serverMode()) void this.loadManagementPage();
   }
 
   protected setProductStatusFilter(event: Event): void {
@@ -1477,7 +1509,67 @@ export class ProductsComponent implements OnInit {
     }
   }
 
+  private scheduleManagementLoad(): void {
+    if (this.serverSearchTimer) clearTimeout(this.serverSearchTimer);
+    this.serverSearchTimer = setTimeout(() => void this.loadManagementPage(), 250);
+  }
+
+  private async loadManagementPage(): Promise<void> {
+    if (!this.serverMode()) return;
+    const request = ++this.serverRequest;
+    this.loading.set(true);
+    try {
+      const { data, error } = await this.supabase.client.rpc('catalog_management_page', {
+        p_status: this.productStatusFilter(),
+        p_stock_status: this.stockStatusFilter(),
+        p_manufacturer: this.manufacturerFilter(),
+        p_search: this.query().trim() || undefined,
+        p_sort: this.productSort(),
+        p_direction: this.productSortDirection(),
+        p_page: this.page(),
+        p_page_size: this.pageSize(),
+        p_location_id: this.locationContext.activeId() ?? undefined,
+      });
+      if (error) throw error;
+      if (request !== this.serverRequest) return;
+      const result = data as unknown as { total: number; groups: ProductGroup[] };
+      this.serverGroups.set(result.groups);
+      this.serverStock.set(
+        new Map(
+          result.groups.flatMap(group =>
+            group.variants.flatMap(variant =>
+              variant.variant_id
+                ? [
+                    [
+                      variant.variant_id,
+                      {
+                        stock: Number(variant.stock ?? 0),
+                        stock_value: Number(variant.stock_value ?? 0),
+                      },
+                    ] as const,
+                  ]
+                : []
+            )
+          )
+        )
+      );
+      this.serverTotal.set(result.total);
+      this.serverLoaded.set(true);
+      this.error.set(null);
+    } catch (error) {
+      if (request === this.serverRequest) {
+        this.error.set(error instanceof Error ? error.message : 'Could not load product history');
+      }
+    } finally {
+      if (request === this.serverRequest) this.loading.set(false);
+    }
+  }
+
   protected async load(): Promise<void> {
+    if (this.serverMode()) {
+      await this.loadManagementPage();
+      return;
+    }
     this.loading.set(true);
     try {
       await Promise.all([this.catalogCache.refresh(), this.preferences.refresh()]);
@@ -1633,7 +1725,9 @@ export class ProductsComponent implements OnInit {
   }
 
   protected stockOf(variantId: string): StockInfo | undefined {
-    return this.stock().get(variantId);
+    return this.serverMode()
+      ? (this.serverStock().get(variantId) ?? this.stock().get(variantId))
+      : this.stock().get(variantId);
   }
 
   protected familyStock(variants: Variant[]): number {

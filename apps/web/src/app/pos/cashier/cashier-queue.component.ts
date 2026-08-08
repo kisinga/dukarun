@@ -1,6 +1,14 @@
-import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
+import {
+  Component,
+  OnDestroy,
+  OnInit,
+  computed,
+  effect,
+  inject,
+  signal,
+  untracked,
+} from '@angular/core';
 import { RouterLink } from '@angular/router';
-import type { RealtimeChannel } from '@supabase/supabase-js';
 import { formatKes } from '../../core/money';
 import { PageLayoutComponent } from '../../shared/ui/page-layout.component';
 import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
@@ -28,6 +36,9 @@ import {
 import { PaginationComponent } from '../../shared/ui/pagination.component';
 import { StatBarComponent } from '../../shared/ui/stat-bar.component';
 import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
+import { RecentSalesCacheService } from '../../core/recent-sales-cache.service';
+import { ConnectivityService } from '../offline/connectivity.service';
+import { SyncService } from '../offline/sync.service';
 
 const QUEUE_SORT_OPTIONS: readonly ListSortOption[] = [
   { value: 'cashier_pending_at', label: 'Time waiting' },
@@ -441,6 +452,9 @@ export class CashierQueueComponent implements OnInit, OnDestroy {
   private readonly receiptData = inject(ReceiptDataService);
   private readonly print = inject(PrintService);
   private readonly perms = inject(PermissionsService);
+  private readonly recentSales = inject(RecentSalesCacheService);
+  private readonly connectivity = inject(ConnectivityService);
+  private readonly sync = inject(SyncService);
   protected readonly cashierSession = inject(CashierSessionService);
   protected readonly orderQueueCounts = inject(OrderQueueCountsService);
 
@@ -511,41 +525,49 @@ export class CashierQueueComponent implements OnInit, OnDestroy {
     ];
   });
 
-  private channel: RealtimeChannel | null = null;
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
+
+  constructor() {
+    effect(() => {
+      this.recentSales.revision();
+      const online = this.connectivity.online();
+      const loaded = this.recentSales.loaded();
+      untracked(() => {
+        this.live.set(online && loaded);
+        this.applyCachedQueue();
+        void this.load(true);
+      });
+    });
+  }
 
   async ngOnInit(): Promise<void> {
     this.printerEnabled.set(await this.receiptData.printerEnabled());
     try {
-      const methods = await this.pos.enabledPaymentMethods();
-      this.methods.set(
-        methods.map(m => ({
-          code: m.code,
-          name: m.name,
-          isCashierControlled: m.is_cashier_controlled,
-          reconciliationType: m.reconciliation_type ?? null,
-        }))
-      );
+      this.methods.set(await this.sync.paymentMethods());
     } catch {
       // No methods configured yet; the panel will show an empty method list.
     }
     await this.load();
     this.nowTimer = setInterval(() => this.now.set(Date.now()), 60_000);
-    this.channel = this.pos.client
-      .channel('cashier-queue-live')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'orders' },
-        () => void this.load(true)
-      )
-      .subscribe(status => this.live.set(status === 'SUBSCRIBED'));
   }
 
   ngOnDestroy(): void {
-    if (this.channel) void this.pos.client.removeChannel(this.channel);
     if (this.nowTimer) clearInterval(this.nowTimer);
     if (this.searchTimer) clearTimeout(this.searchTimer);
     if (this.directAccountTimer) clearTimeout(this.directAccountTimer);
+  }
+
+  private applyCachedQueue(): void {
+    if (!this.recentSales.loaded() || this.page() !== 1 || this.query().trim()) return;
+    const rows = this.recentSales
+      .orders()
+      .filter(order => order.status === 'pending_payment' && order.cashier_pending_at !== null)
+      .sort((a, b) =>
+        (a.cashier_pending_at ?? a.created_at).localeCompare(b.cashier_pending_at ?? b.created_at)
+      )
+      .slice(0, this.pageSize());
+    this.parked.set(rows);
+    if (this.totalItems() === 0) this.totalItems.set(rows.length);
   }
 
   /**

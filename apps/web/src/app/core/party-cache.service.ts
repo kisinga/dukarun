@@ -10,6 +10,11 @@ import {
   type PartySnapshot,
 } from '../pos/offline/offline-db';
 import { SupabaseService } from './supabase.service';
+import {
+  CacheJournalService,
+  type CacheChange,
+  type CacheStreamHandler,
+} from './cache-journal.service';
 
 type Customer = Database['public']['Tables']['customers']['Row'];
 type CustomerBalance = Database['public']['Views']['customer_ar_balances']['Row'];
@@ -41,7 +46,6 @@ export interface PartyQueryResult<T> {
 
 const PAGE_SIZE = 500;
 const PARTY_RETENTION_LIMIT = 5_000;
-const PARTY_MAX_AGE_MS = 5 * 60_000;
 const SEARCH_LIMIT = 10;
 
 /**
@@ -55,6 +59,7 @@ const SEARCH_LIMIT = 10;
 export class PartyCacheService {
   private readonly supabase = inject(SupabaseService);
   private readonly connectivity = inject(ConnectivityService);
+  private readonly journal = inject(CacheJournalService);
 
   readonly customers = signal<CachedCustomer[]>([]);
   readonly suppliers = signal<CachedSupplier[]>([]);
@@ -62,17 +67,15 @@ export class PartyCacheService {
   readonly loaded = signal(false);
   readonly directoryFetchedAt = signal<string | null>(null);
   readonly financialFetchedAt = signal<string | null>(null);
+  readonly revision = signal(0);
 
   private scope: string | null = null;
   private companyId: string | null = null;
   private channel: RealtimeChannel | null = null;
   private refreshPromise: Promise<boolean> | null = null;
-  private financialRefreshPromise: Promise<boolean> | null = null;
-  private wasOnline = true;
-  private refreshTimer: ReturnType<typeof setTimeout> | null = null;
   private invalidated = false;
   private financialInvalidated = false;
-  private directoryDirty = false;
+  private handler: CacheStreamHandler | null = null;
 
   constructor() {
     effect(() => {
@@ -88,8 +91,9 @@ export class PartyCacheService {
           this.subscribeChannel();
           if (scope) void this.ensureLoaded();
         }
-        if (online && !this.wasOnline && scope) void this.refresh();
-        this.wasOnline = online;
+        if (online && scope && this.handler) {
+          void this.journal.reconcile('parties', scope, this.handler, 'party-cache');
+        }
       });
     });
   }
@@ -102,21 +106,13 @@ export class PartyCacheService {
       if (this.scope !== requestedScope) return false;
       if (snapshot) this.applySnapshot(snapshot);
     }
-    const fetchedAt = this.directoryFetchedAt();
-    const stale =
-      this.invalidated ||
-      !fetchedAt ||
-      Date.now() - new Date(fetchedAt).getTime() >= PARTY_MAX_AGE_MS;
-    if (this.connectivity.online() && stale) {
-      // Mutation callers await confirmed fresh rows; ordinary TTL expiry stays SWR.
-      if (this.invalidated) return this.refresh();
-      // Cold callers need data; warm callers get stale-while-revalidate.
-      if (!this.loaded()) return this.refresh();
-      void this.refresh();
-    }
-    if (this.connectivity.online() && this.financialInvalidated) {
-      return this.refreshFinancials();
-    }
+    if (this.connectivity.online() && !this.loaded()) return this.refresh();
+    if (
+      this.connectivity.online() &&
+      (this.invalidated || this.financialInvalidated) &&
+      this.handler
+    )
+      await this.journal.reconcile('parties', requestedScope, this.handler, 'party-cache');
     return this.loaded();
   }
 
@@ -129,12 +125,14 @@ export class PartyCacheService {
   /** Mark derived and directory rows stale after a successful RPC mutation. */
   invalidate(): void {
     this.invalidated = true;
-    if (this.connectivity.online()) void this.refresh();
+    if (this.connectivity.online() && this.scope && this.handler)
+      void this.journal.reconcile('parties', this.scope, this.handler, 'party-cache');
   }
 
   invalidateFinancials(): void {
     this.financialInvalidated = true;
-    if (this.connectivity.online()) void this.refreshFinancials();
+    if (this.connectivity.online() && this.scope && this.handler)
+      void this.journal.reconcile('parties', this.scope, this.handler, 'party-cache');
   }
 
   customerRows(includeDeleted = false): CachedCustomer[] {
@@ -234,32 +232,6 @@ export class PartyCacheService {
     } catch {
       return false;
     }
-  }
-
-  private refreshFinancials(): Promise<boolean> {
-    if (this.financialRefreshPromise) return this.financialRefreshPromise;
-    const run = async (): Promise<boolean> => {
-      const scope = this.scope;
-      if (!scope || !this.loaded() || !this.connectivity.online()) return this.refresh();
-      try {
-        const financials = await this.fetchFinancialProjection();
-        if (scope !== this.scope) return false;
-        this.customers.update(rows =>
-          rows.map(row => this.customerWithFinancials(row, financials))
-        );
-        this.suppliers.update(rows =>
-          rows.map(row => this.supplierWithFinancials(row, financials))
-        );
-        this.financialFetchedAt.set(new Date().toISOString());
-        this.financialInvalidated = false;
-        await this.persistCurrent();
-        return true;
-      } catch {
-        return false;
-      }
-    };
-    this.financialRefreshPromise = run().finally(() => (this.financialRefreshPromise = null));
-    return this.financialRefreshPromise;
   }
 
   private async fetchFinancialProjection(): Promise<FinancialProjection> {
@@ -378,59 +350,95 @@ export class PartyCacheService {
     }));
   }
 
-  private async persistCurrent(): Promise<void> {
-    const identity = this.supabase.offlineIdentity();
-    const scope = this.scope;
-    if (!identity || !scope || !this.loaded()) return;
-    const snapshot: PartySnapshot = {
-      key: scope,
-      company_id: identity.companyId,
-      user_id: identity.userId,
-      customers: this.customers(),
-      suppliers: this.suppliers(),
-      complete: this.complete(),
-      directory_fetched_at: this.directoryFetchedAt()!,
-      financial_fetched_at: this.financialFetchedAt()!,
-    };
-    await (await offlineDb()).put('parties', snapshot);
-  }
-
   private subscribeChannel(): void {
     if (this.channel) void this.supabase.client.removeChannel(this.channel);
     this.channel = null;
-    if (!this.companyId) return;
-    const filter = `company_id=eq.${this.companyId}`;
-    try {
-      let channel = this.supabase.client
-        .channel(`parties-live:${this.companyId}`)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'customers', filter }, () =>
-          this.queueRefresh(true)
-        );
-      for (const table of ['orders', 'payments', 'purchases', 'purchase_payments'] as const) {
-        channel = channel.on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table, filter },
-          () => this.queueRefresh(false)
-        );
-      }
-      this.channel = channel.subscribe();
-    } catch {
-      // TTL and reconnect refresh remain authoritative fallbacks.
-    }
+    if (!this.companyId || !this.scope) return;
+    this.handler = {
+      apply: changes => this.applyJournalChanges(changes),
+      reset: () => this.refresh(),
+      purge: () => this.clearState(),
+    };
+    this.channel = this.journal.subscribe(
+      'parties',
+      this.scope,
+      this.companyId,
+      this.handler,
+      'party-cache'
+    );
   }
 
-  private queueRefresh(directoryChanged: boolean): void {
-    this.directoryDirty ||= directoryChanged;
-    if (directoryChanged) this.invalidated = true;
-    else this.financialInvalidated = true;
-    if (this.refreshTimer) clearTimeout(this.refreshTimer);
-    this.refreshTimer = setTimeout(() => {
-      this.refreshTimer = null;
-      const refreshDirectory = this.directoryDirty;
-      this.directoryDirty = false;
-      if (refreshDirectory) void this.refresh();
-      else void this.refreshFinancials();
-    }, 300);
+  private async applyJournalChanges(changes: readonly CacheChange[]): Promise<void> {
+    const scope = this.scope;
+    if (!scope || !this.connectivity.online()) throw new Error('cache_scope_changed');
+    const ids = [...new Set(changes.map(change => change.entityId))];
+    if (!ids.length) return;
+
+    const [directoryResult, arResult, apResult, arAgingResult, apAgingResult] = await Promise.all([
+      this.supabase.client.from('customers').select('*').in('id', ids),
+      this.supabase.client.from('customer_ar_balances').select('*').in('customer_id', ids),
+      this.supabase.client.from('supplier_ap_balances').select('*').in('supplier_id', ids),
+      this.supabase.client
+        .from('customer_credit_aging')
+        .select('customer_id, days_outstanding, bucket')
+        .in('customer_id', ids),
+      this.supabase.client
+        .from('supplier_ap_aging')
+        .select('supplier_id, days_outstanding, bucket')
+        .in('supplier_id', ids),
+    ]);
+    for (const result of [directoryResult, arResult, apResult, arAgingResult, apAgingResult]) {
+      if (result.error) throw result.error;
+    }
+
+    const projection: FinancialProjection = {
+      ar: new Map((arResult.data ?? []).map(row => [row.customer_id, row.balance ?? 0])),
+      ap: new Map((apResult.data ?? []).map(row => [row.supplier_id, row.balance ?? 0])),
+      arAging: new Map(
+        (arAgingResult.data ?? [])
+          .filter(row => row.customer_id !== null)
+          .map(row => [row.customer_id!, row])
+      ),
+      apAging: new Map(
+        (apAgingResult.data ?? [])
+          .filter(row => row.supplier_id !== null)
+          .map(row => [row.supplier_id!, row])
+      ),
+    };
+    const idSet = new Set(ids);
+    let customers = this.customers().filter(row => !idSet.has(row.id));
+    let suppliers = this.suppliers().filter(row => !idSet.has(row.id));
+    for (const row of directoryResult.data ?? []) {
+      if (row.is_supplier) suppliers.push(this.supplierWithFinancials(row, projection));
+      else customers.push(this.customerWithFinancials(row, projection));
+    }
+
+    const existing = await (await offlineDb()).get('parties', scope);
+    if (!existing || scope !== this.scope) throw new Error('cache_scope_changed');
+    if (!existing?.complete && customers.length + suppliers.length > PARTY_RETENTION_LIMIT) {
+      const retained = new Set(
+        [...customers, ...suppliers]
+          .sort((a, b) => a.id.localeCompare(b.id))
+          .slice(0, PARTY_RETENTION_LIMIT)
+          .map(row => row.id)
+      );
+      customers = customers.filter(row => retained.has(row.id));
+      suppliers = suppliers.filter(row => retained.has(row.id));
+    }
+
+    const now = new Date().toISOString();
+    const snapshot: PartySnapshot = {
+      ...existing,
+      customers: sortParties(customers),
+      suppliers: sortParties(suppliers),
+      directory_fetched_at: now,
+      financial_fetched_at: now,
+    };
+    await (await offlineDb()).put('parties', snapshot);
+    if (scope !== this.scope) throw new Error('cache_scope_changed');
+    this.applySnapshot(snapshot);
+    this.invalidated = false;
+    this.financialInvalidated = false;
   }
 
   private applySnapshot(snapshot: PartySnapshot): void {
@@ -440,20 +448,19 @@ export class PartyCacheService {
     this.directoryFetchedAt.set(snapshot.directory_fetched_at);
     this.financialFetchedAt.set(snapshot.financial_fetched_at);
     this.loaded.set(true);
+    this.revision.update(value => value + 1);
   }
 
   private isFinancialStale(): boolean {
-    const fetchedAt = this.financialFetchedAt();
-    return (
-      this.financialInvalidated ||
-      !fetchedAt ||
-      Date.now() - new Date(fetchedAt).getTime() >= PARTY_MAX_AGE_MS
-    );
+    return this.financialInvalidated || !this.financialFetchedAt();
   }
 
   private reset(): void {
-    if (this.refreshTimer) clearTimeout(this.refreshTimer);
-    this.refreshTimer = null;
+    this.handler = null;
+    this.clearState();
+  }
+
+  private clearState(): void {
     this.customers.set([]);
     this.suppliers.set([]);
     this.complete.set(false);
@@ -462,7 +469,6 @@ export class PartyCacheService {
     this.financialFetchedAt.set(null);
     this.invalidated = false;
     this.financialInvalidated = false;
-    this.directoryDirty = false;
   }
 }
 
