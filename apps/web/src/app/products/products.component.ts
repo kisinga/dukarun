@@ -1037,9 +1037,11 @@ interface ProductEditorRow {
             <app-stat-card
               label="Stock"
               [value]="
-                familyTracksInventory(group.variants)
-                  ? familyStock(group.variants) + ' units'
-                  : 'Not tracked'
+                group.variants.length === 0
+                  ? 'No variants'
+                  : familyTracksInventory(group.variants)
+                    ? familyStock(group.variants) + ' units'
+                    : 'Not tracked'
               "
               [sub]="
                 familyTracksInventory(group.variants)
@@ -1314,11 +1316,14 @@ export class ProductsComponent implements OnInit {
           if (g.family.manufacturer_id !== manufacturer) return false;
         }
         if (stockStatus === 'all') return true;
-        const tracksInventory = this.familyTracksInventory(g.variants);
-        if (stockStatus === 'not_tracked') return !tracksInventory;
-        if (!tracksInventory) return false;
-        const quantity = this.familyStock(g.variants);
-        return stockStatus === 'in_stock' ? quantity > 0 : quantity <= 0;
+        const tracked = g.variants.filter(
+          variant => variant.kind !== 'service' && variant.track_inventory
+        );
+        if (stockStatus === 'not_tracked') return tracked.length === 0;
+        return tracked.some(variant => {
+          const quantity = this.stockOf(variant.variant_id!)?.stock ?? 0;
+          return stockStatus === 'in_stock' ? quantity > 0 : quantity <= 0;
+        });
       });
     return sortList(
       groups,

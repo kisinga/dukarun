@@ -17,7 +17,6 @@ import {
 } from '../pos/pos.service';
 
 const CATALOG_LIMIT = 2_000;
-const CATALOG_MAX_AGE_MS = 5 * 60_000;
 /** Row-level patch fetches are buffered this long to coalesce bursts. */
 const PATCH_BUFFER_MS = 500;
 /** More buffered events than this falls back to one full silent refresh. */
@@ -97,21 +96,35 @@ export class CatalogCacheService {
     if (this.scope !== requestedScope) return false;
     // Pre-location-stock snapshots are unsafe for POS availability and must be
     // rehydrated once instead of presenting company-wide stock as local stock.
-    if (snapshot?.location_stock) {
+    if (snapshot?.location_stock && !this.loaded()) {
       this.applySnapshot(snapshot);
     }
-    const stale =
-      !snapshot ||
-      snapshot.manufacturers === undefined ||
-      snapshot.collections === undefined ||
-      Date.now() - new Date(snapshot.fetched_at).getTime() >= CATALOG_MAX_AGE_MS;
-    if (this.connectivity.online() && stale) void this.refresh();
+    // Cached rows make first paint fast, but they are never authoritative while
+    // online. Revalidate every hydration so a realtime subscription race cannot
+    // leave families and variants from different catalog versions for five minutes.
+    if (this.connectivity.online()) void this.refresh();
     return !!snapshot?.families && !!snapshot.location_stock;
   }
 
   /** Current in-memory catalog rows (empty until ensureLoaded resolves). */
   getCatalog(): Variant[] {
     return this.catalog();
+  }
+
+  /** Apply a quantity confirmed by a successful counted-stock RPC immediately. */
+  applyConfirmedStock(variantId: string, quantity: number): void {
+    const currentStock = this.stock().get(variantId);
+    this.stock.update(rows => {
+      const next = new Map(rows);
+      next.set(variantId, {
+        stock: quantity,
+        stock_value: currentStock?.stock_value ?? 0,
+      });
+      return next;
+    });
+    this.catalog.update(rows =>
+      rows.map(row => (row.variant_id === variantId ? { ...row, stock: quantity } : row))
+    );
   }
 
   /** Full silent refresh; all callers share one in-flight request. */

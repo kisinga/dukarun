@@ -14,6 +14,7 @@ import { EmptyStateComponent } from '../shared/ui/empty-state.component';
 import { PaginationComponent } from '../shared/ui/pagination.component';
 import { LocationContextService } from '../core/location-context.service';
 import { CatalogSearchService } from '../core/catalog-search.service';
+import { CatalogCacheService } from '../core/catalog-cache.service';
 import {
   StockAdjustmentsService,
   type StockAdjustmentHistoryRow,
@@ -450,6 +451,7 @@ export class StockAdjustmentsComponent implements OnInit {
   private readonly money = inject(MoneyService);
   private readonly pos = inject(PosService);
   private readonly catalogSearch = inject(CatalogSearchService);
+  private readonly catalogCache = inject(CatalogCacheService);
   private readonly route = inject(ActivatedRoute);
   private readonly history = inject(StockAdjustmentsService);
   protected readonly locations = inject(LocationContextService);
@@ -677,6 +679,7 @@ export class StockAdjustmentsComponent implements OnInit {
         adjustmentReason,
         unitCost ?? undefined
       );
+      this.catalogCache.applyConfirmedStock(variant.variant_id, next);
       this.currentQuantity.set(next);
       this.newQuantity.setValue(next);
       this.selected.set({ ...variant, stock: next });
