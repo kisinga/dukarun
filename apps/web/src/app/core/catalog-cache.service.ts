@@ -17,6 +17,7 @@ import {
 } from '../pos/pos.service';
 
 const CATALOG_LIMIT = 2_000;
+const CATALOG_PAGE_SIZE = 1_000;
 /** Row-level patch fetches are buffered this long to coalesce bursts. */
 const PATCH_BUFFER_MS = 500;
 /** More buffered events than this falls back to one full silent refresh. */
@@ -142,26 +143,13 @@ export class CatalogCacheService {
     if (!identity || !locationId || !this.connectivity.online()) return false;
     const scope = offlineScopeKey(identity, locationId);
     try {
-      const [catalogResult, familyResult, stockResult, manufacturers, collections] =
-        await Promise.all([
-          this.supabase.client
-            .from('variant_catalog')
-            .select('*')
-            .order('product_name')
-            .order('variant_name')
-            .order('variant_id')
-            .limit(CATALOG_LIMIT + 1),
-          this.supabase.client
-            .from('products')
-            .select('*')
-            .order('name')
-            .limit(CATALOG_LIMIT + 1),
-          this.supabase.client.rpc('location_stock_snapshot', { p_location_id: locationId }),
-          this.pos.listManufacturers(),
-          this.pos.listCollections(),
-        ]);
-      if (catalogResult.error) throw catalogResult.error;
-      if (familyResult.error) throw familyResult.error;
+      const [catalogRows, familyRows, stockResult, manufacturers, collections] = await Promise.all([
+        this.fetchCatalogRows(),
+        this.fetchFamilyRows(),
+        this.supabase.client.rpc('location_stock_snapshot', { p_location_id: locationId }),
+        this.pos.listManufacturers(),
+        this.pos.listCollections(),
+      ]);
       if (stockResult.error) throw stockResult.error;
       // Discard the write if the user switched company/location mid-flight.
       if (scope !== this.scope) return false;
@@ -171,7 +159,7 @@ export class CatalogCacheService {
         stock_value: row.stock_value ?? 0,
       }));
       const stockByVariant = new Map(locationStock.map(row => [row.variant_id, row]));
-      const products = (catalogResult.data ?? []).slice(0, CATALOG_LIMIT).map(row => ({
+      const products = catalogRows.slice(0, CATALOG_LIMIT).map(row => ({
         ...row,
         stock: stockByVariant.get(row.variant_id!)?.stock ?? 0,
       }));
@@ -183,13 +171,11 @@ export class CatalogCacheService {
         user_id: identity.userId,
         location_id: locationId,
         products,
-        families: (familyResult.data ?? []).slice(0, CATALOG_LIMIT),
+        families: familyRows.slice(0, CATALOG_LIMIT),
         location_stock: locationStock,
         manufacturers: manufacturerOptions,
         collections,
-        truncated:
-          (catalogResult.data?.length ?? 0) > CATALOG_LIMIT ||
-          (familyResult.data?.length ?? 0) > CATALOG_LIMIT,
+        truncated: catalogRows.length > CATALOG_LIMIT || familyRows.length > CATALOG_LIMIT,
         fetched_at: new Date().toISOString(),
       };
       await db.put('products', snapshot);
@@ -199,6 +185,41 @@ export class CatalogCacheService {
       // Snapshot refresh is best-effort; a stale cache beats none.
       return false;
     }
+  }
+
+  private async fetchCatalogRows(): Promise<Variant[]> {
+    const rows: Variant[] = [];
+    for (let start = 0; start <= CATALOG_LIMIT; start += CATALOG_PAGE_SIZE) {
+      const end = Math.min(start + CATALOG_PAGE_SIZE - 1, CATALOG_LIMIT);
+      const { data, error } = await this.supabase.client
+        .from('variant_catalog')
+        .select('*')
+        .order('product_name')
+        .order('variant_name')
+        .order('variant_id')
+        .range(start, end);
+      if (error) throw error;
+      rows.push(...(data ?? []));
+      if ((data?.length ?? 0) < end - start + 1) break;
+    }
+    return rows;
+  }
+
+  private async fetchFamilyRows(): Promise<Product[]> {
+    const rows: Product[] = [];
+    for (let start = 0; start <= CATALOG_LIMIT; start += CATALOG_PAGE_SIZE) {
+      const end = Math.min(start + CATALOG_PAGE_SIZE - 1, CATALOG_LIMIT);
+      const { data, error } = await this.supabase.client
+        .from('products')
+        .select('*')
+        .order('name')
+        .order('id')
+        .range(start, end);
+      if (error) throw error;
+      rows.push(...(data ?? []));
+      if ((data?.length ?? 0) < end - start + 1) break;
+    }
+    return rows;
   }
 
   /** Inventory events only need a location-stock refresh, not a full catalog download. */
