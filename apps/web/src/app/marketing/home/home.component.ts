@@ -544,7 +544,7 @@ export class HomeComponent implements OnInit {
       this.publicPricing.billingConfig(),
     ]);
     this.pricingPlans.set(plans.status === 'fulfilled' ? plans.value : []);
-    this.trialDays.set(config.status === 'fulfilled' ? config.value.trialDays : null);
+    this.trialDays.set(config.status === 'fulfilled' ? (config.value?.trialDays ?? null) : null);
     this.pricingLoading.set(false);
   }
 

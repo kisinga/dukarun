@@ -386,12 +386,16 @@ export class TiersComponent implements OnInit {
       this.error.set(tiers.reason instanceof Error ? tiers.reason.message : 'Failed to load tiers');
       return;
     }
-    if (config.status === 'fulfilled') {
-      this.trialDays.setValue(config.value.trialDays);
+    if (config.status === 'fulfilled' && config.value) {
+      const billingConfig = config.value;
+      this.trialDays.setValue(billingConfig.trialDays);
       this.defaultTrialTier.setValue(
-        tiers.value.find(tier => tier.code === config.value.defaultTrialTierCode)?.id ?? ''
+        tiers.value.find(tier => tier.code === billingConfig.defaultTrialTierCode)?.id ?? ''
       );
       this.error.set(null);
+    } else if (config.status === 'fulfilled') {
+      this.defaultTrialTier.setValue(this.activeTiers()[0]?.id ?? '');
+      this.error.set('Tiers loaded; trial policy is not configured yet');
     } else {
       this.error.set(
         config.reason instanceof Error

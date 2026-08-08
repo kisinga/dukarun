@@ -1,5 +1,11 @@
 begin;
-select plan(16);
+select plan(19);
+
+select is(
+  (select count(*)::integer from public.platform_billing_settings where singleton),
+  1,
+  'billing settings has exactly one singleton row'
+);
 
 insert into public.subscription_tiers (
   code, name, price_monthly, price_yearly,
@@ -181,6 +187,29 @@ select is(
    where id = (select company_id from configured_trial_company)),
   null,
   'expired trials receive no paid-subscription grace period'
+);
+
+-- A missing singleton used to make the platform settings save update zero
+-- rows, leaving public_billing_config() null indefinitely.
+delete from public.platform_billing_settings where singleton;
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"69696969-6969-6969-6969-696969696969","role":"authenticated","is_platform_admin":true}';
+
+select lives_ok(
+  $$select public.platform_update_billing_config(
+    21,
+    (select id from public.subscription_tiers where code = 'standard')
+  )$$,
+  'saving trial policy recreates a missing billing settings singleton'
+);
+
+reset role;
+
+select is(
+  (public.public_billing_config() ->> 'trialDays')::integer,
+  21,
+  'recreated billing settings are publicly readable'
 );
 
 select * from finish();

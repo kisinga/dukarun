@@ -208,10 +208,10 @@ export class PlatformService {
     return data;
   }
 
-  async billingConfig(): Promise<BillingConfig> {
+  async billingConfig(): Promise<BillingConfig | null> {
     const { data, error } = await this.db.rpc('public_billing_config');
     if (error) throw rpcError(error);
-    return data as unknown as BillingConfig;
+    return data as unknown as BillingConfig | null;
   }
 
   async updateBillingConfig(trialDays: number, defaultTrialTierId: string): Promise<void> {
