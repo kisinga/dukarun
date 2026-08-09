@@ -1,12 +1,13 @@
 import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { SupabaseService } from '../core/supabase.service';
 import { CompanyLegalStatus, LegalService } from './legal.service';
+import { siteUrl } from '../core/public-url';
 
 @Component({
   selector: 'app-legal-accept',
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [ReactiveFormsModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <main class="flex min-h-screen items-center justify-center bg-base-200 p-4">
@@ -29,16 +30,15 @@ import { CompanyLegalStatus, LegalService } from './legal.service';
               </p>
               <div class="mt-3 flex flex-wrap gap-3">
                 <a
-                  routerLink="/terms"
-                  [queryParams]="{ version: current.version }"
+                  [href]="siteUrl('/terms', { version: current.version ?? '' })"
                   target="_blank"
                   class="link link-primary"
                   >Read Terms version {{ current.version }}</a
                 >
-                <a routerLink="/privacy" target="_blank" class="link link-primary"
+                <a [href]="siteUrl('/privacy')" target="_blank" class="link link-primary"
                   >Read Privacy Notice</a
                 >
-                <a routerLink="/dpa" target="_blank" class="link link-primary">Read DPA</a>
+                <a [href]="siteUrl('/dpa')" target="_blank" class="link link-primary">Read DPA</a>
               </div>
             </div>
 
@@ -83,6 +83,7 @@ import { CompanyLegalStatus, LegalService } from './legal.service';
   `,
 })
 export class LegalAcceptComponent implements OnInit {
+  protected readonly siteUrl = siteUrl;
   private readonly legal = inject(LegalService);
   private readonly supabase = inject(SupabaseService);
   private readonly router = inject(Router);

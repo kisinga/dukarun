@@ -10,7 +10,6 @@ import {
 } from '@angular/router';
 import { SwUpdate } from '@angular/service-worker';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
-import { SyncService } from './pos/offline/sync.service';
 
 @Component({
   selector: 'app-root',
@@ -54,9 +53,6 @@ import { SyncService } from './pos/offline/sync.service';
   ],
 })
 export class App {
-  // Instantiate the sync engine at app start (triggers: online event,
-  // app start, 30s interval). Screens read its queue state signals.
-  private readonly sync = inject(SyncService);
   private readonly updates = inject(SwUpdate);
   private readonly router = inject(Router);
   protected readonly showNavigationProgress = signal(false);

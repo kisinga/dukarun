@@ -24,6 +24,7 @@ Local endpoints:
 
 | Service           | URL                                                       |
 | ----------------- | --------------------------------------------------------- |
+| Public site       | `http://localhost:4202`                                   |
 | Dashboard/POS     | `http://localhost:4203`                                   |
 | Public storefront | `http://localhost:4204`                                   |
 | Platform admin    | `http://localhost:4205`                                   |
@@ -31,7 +32,7 @@ Local endpoints:
 | Supabase Studio   | `http://127.0.0.1:54323`                                  |
 | Local PostgreSQL  | `postgresql://postgres:postgres@127.0.0.1:54322/postgres` |
 
-`npm run dev` starts only the dashboard. Use `npm run dev:all` for all three Angular apps.
+`npm run dev` starts only the dashboard. Use `npm run dev:all` for all four Angular apps.
 The Supabase CLI manages its own local containers; the old root Docker Compose stack is not
 part of active development.
 
@@ -72,12 +73,15 @@ full or rolls back.
 
 ## Frontend environment generation
 
-Angular cannot read Cloudflare environment variables directly at runtime. Each active app has
+Angular cannot read deployment environment variables directly at runtime. Each active app has
 a `prebuild` script that calls `scripts/generate-environment.mjs`. It writes an ignored
 `environment.generated.ts` containing only:
 
 - `SUPABASE_URL`
 - `SUPABASE_ANON_KEY`
+- `SITE_PUBLIC_URL`, `APP_PUBLIC_URL`, `STOREFRONT_PUBLIC_URL`
+- `MARKETING_VIDEO_BASE_URL`
+- `PUBLIC_DATA_MODE` (`fixture` in CI, `live` in production)
 
 Local builds fall back to the local Supabase URL and public demo anon key. Production build
 providers must set both variables. The generator validates the URL and JSON-escapes values
@@ -90,7 +94,7 @@ Vault values to a frontend build. Those belong on the Supabase/Coolify side.
 
 ```bash
 npm run check:web       # The Counter guard + dashboard build
-npm run build:active    # all three production apps
+npm run build:active    # all four production apps
 npm test                # current root merge build alias
 ```
 
@@ -98,6 +102,7 @@ Expected outputs:
 
 | App            | Output directory                            |
 | -------------- | ------------------------------------------- |
+| Public site    | `apps/site/dist/site/browser`               |
 | Dashboard      | `apps/web/dist/web/browser`                 |
 | Storefront     | `apps/storefront/dist/storefront/browser`   |
 | Platform admin | `apps/super-admin/dist/super-admin/browser` |
@@ -105,8 +110,9 @@ Expected outputs:
 ## Production topology
 
 ```text
-Cloudflare Pages
-  ├─ dashboard
+Coolify / Nginx
+  ├─ public site
+  ├─ authenticated dashboard/POS
   ├─ storefront
   └─ platform admin
           |
@@ -123,7 +129,7 @@ GitHub Actions has separate responsibilities:
 - `supabase.yml`: ephemeral database lint/pgTAP/type check, then protected database/function
   deployment from a self-hosted Coolify runner.
 
-Cloudflare Pages owns frontend deployment. See `docs/DEPLOYMENT.md` for current production
+Coolify owns frontend deployment. See `docs/DEPLOYMENT.md` for current production
 variables, outputs, auth hooks, provider secrets, and smoke tests.
 
 ## Vendure migration source

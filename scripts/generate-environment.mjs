@@ -5,7 +5,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const app = process.argv[2];
-const allowedApps = new Set(['web', 'storefront', 'super-admin']);
+const allowedApps = new Set(['site', 'web', 'storefront', 'super-admin']);
 
 if (!allowedApps.has(app)) {
   console.error(`Usage: node scripts/generate-environment.mjs <${[...allowedApps].join('|')}>`);
@@ -17,18 +17,25 @@ const localAnonKey =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
 const supabaseUrl = process.env.SUPABASE_URL?.trim() || localUrl;
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY?.trim() || localAnonKey;
-const webPublicUrl = process.env.WEB_PUBLIC_URL?.trim() || 'http://localhost:4200';
+const sitePublicUrl = process.env.SITE_PUBLIC_URL?.trim() || 'http://localhost:4202';
+const appPublicUrl = process.env.APP_PUBLIC_URL?.trim() || 'http://localhost:4203';
+const storefrontPublicUrl = process.env.STOREFRONT_PUBLIC_URL?.trim() || 'http://localhost:4204';
 const marketingVideoBaseUrl =
   process.env.MARKETING_VIDEO_BASE_URL?.trim().replace(/\/+$/, '') || '';
-
+const publicDataMode =
+  process.env.PUBLIC_DATA_MODE === 'fixture' || process.env.PUBLIC_DATA_MODE === 'live'
+    ? process.env.PUBLIC_DATA_MODE
+    : process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY
+      ? 'live'
+      : 'fixture';
 try {
   new URL(supabaseUrl);
-  new URL(webPublicUrl);
+  new URL(sitePublicUrl);
+  new URL(appPublicUrl);
+  new URL(storefrontPublicUrl);
   if (marketingVideoBaseUrl) new URL(marketingVideoBaseUrl);
 } catch {
-  console.error(
-    'SUPABASE_URL, WEB_PUBLIC_URL, and MARKETING_VIDEO_BASE_URL must be valid absolute URLs.'
-  );
+  console.error('Public app URLs and MARKETING_VIDEO_BASE_URL must be valid absolute URLs.');
   process.exit(2);
 }
 
@@ -53,8 +60,11 @@ const contents =
   `  production: true,\n` +
   `  supabaseUrl: ${JSON.stringify(supabaseUrl)},\n` +
   `  supabaseAnonKey: ${JSON.stringify(supabaseAnonKey)},\n` +
-  `  webPublicUrl: ${JSON.stringify(webPublicUrl)},\n` +
+  `  sitePublicUrl: ${JSON.stringify(sitePublicUrl)},\n` +
+  `  appPublicUrl: ${JSON.stringify(appPublicUrl)},\n` +
+  `  storefrontPublicUrl: ${JSON.stringify(storefrontPublicUrl)},\n` +
   `  marketingVideoBaseUrl: ${JSON.stringify(marketingVideoBaseUrl)},\n` +
+  `  publicDataMode: ${JSON.stringify(publicDataMode)} as 'fixture' | 'live',\n` +
   `};\n`;
 
 mkdirSync(dirname(target), { recursive: true });

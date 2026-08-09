@@ -220,13 +220,9 @@ export class SyncService {
 
   async refresh(): Promise<void> {
     const identity = this.supabase.offlineIdentity();
-    if (!identity) {
-      this.entries.set([]);
-      return;
-    }
     const db = await offlineDb();
     const all = await db.getAllFromIndex('outbox', 'by-queued-at');
-    this.entries.set(all.filter(entry => belongsToIdentity(entry, identity)));
+    this.entries.set(identity ? all.filter(entry => belongsToIdentity(entry, identity)) : []);
     this.legacyEntryCount.set(all.filter(entry => !entry.company_id || !entry.user_id).length);
   }
 

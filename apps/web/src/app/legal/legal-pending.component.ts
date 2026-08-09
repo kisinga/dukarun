@@ -1,12 +1,12 @@
 import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { CompanyContextService } from '../core/company-context.service';
 import { SupabaseService } from '../core/supabase.service';
 import { LegalService } from './legal.service';
+import { siteUrl } from '../core/public-url';
 
 @Component({
   selector: 'app-legal-pending',
-  imports: [RouterLink],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <main class="flex min-h-screen items-center justify-center bg-base-200 p-4">
@@ -57,7 +57,7 @@ import { LegalService } from './legal.service';
 
           <div class="flex flex-col gap-2 sm:flex-row sm:justify-center">
             @if (!approvalPending()) {
-              <a routerLink="/terms" target="_blank" class="btn btn-ghost">Read Terms</a>
+              <a [href]="siteUrl('/terms')" target="_blank" class="btn btn-ghost">Read Terms</a>
             }
             <button
               type="button"
@@ -75,6 +75,7 @@ import { LegalService } from './legal.service';
   `,
 })
 export class LegalPendingComponent implements OnInit {
+  protected readonly siteUrl = siteUrl;
   private readonly legal = inject(LegalService);
   private readonly supabase = inject(SupabaseService);
   private readonly router = inject(Router);

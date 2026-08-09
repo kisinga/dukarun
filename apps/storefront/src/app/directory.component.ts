@@ -1,6 +1,8 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, PLATFORM_ID, inject, signal } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { StorefrontInfo, StorefrontService } from './storefront.service';
+import { StorefrontSeoService } from './storefront-seo.service';
 
 /** `/` is the directory of public storefronts. */
 @Component({
@@ -61,16 +63,26 @@ import { StorefrontInfo, StorefrontService } from './storefront.service';
 })
 export class DirectoryComponent implements OnInit {
   private readonly storefront = inject(StorefrontService);
+  private readonly seo = inject(StorefrontSeoService);
+  private readonly platformId = inject(PLATFORM_ID);
+  private readonly initialShops = this.storefront.transferredDirectory();
 
-  protected readonly shops = signal<StorefrontInfo[]>([]);
-  protected readonly loading = signal(true);
+  protected readonly shops = signal<StorefrontInfo[]>(this.initialShops ?? []);
+  protected readonly loading = signal(this.initialShops === null);
   protected readonly error = signal<string | null>(null);
 
   async ngOnInit(): Promise<void> {
+    this.seo.set('Dukarun shops', 'Browse public Dukarun shops and order on WhatsApp.', '/');
     try {
-      this.shops.set(await this.storefront.directory());
+      this.shops.set(
+        await this.storefront.directory(
+          isPlatformBrowser(this.platformId) && this.initialShops !== null
+        )
+      );
     } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Failed to load shops');
+      if (this.initialShops === null) {
+        this.error.set(err instanceof Error ? err.message : 'Failed to load shops');
+      }
     } finally {
       this.loading.set(false);
     }

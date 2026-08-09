@@ -6,55 +6,6 @@ import { featureGuard } from './core/feature.guard';
 import { legalAcceptanceGuard } from './legal/legal.guard';
 
 export const routes: Routes = [
-  // Public marketing surface — no auth required. Placed first so '/', '/about'
-  // and '/contact' resolve here; app paths (dashboard, sales, …) fall through
-  // to the guarded shell below.
-  {
-    path: '',
-    loadComponent: () =>
-      import('./marketing/marketing-layout.component').then(m => m.MarketingLayoutComponent),
-    children: [
-      {
-        path: '',
-        pathMatch: 'full',
-        loadComponent: () => import('./marketing/home/home.component').then(m => m.HomeComponent),
-      },
-      {
-        path: 'about',
-        loadComponent: () =>
-          import('./marketing/about/about.component').then(m => m.AboutComponent),
-      },
-      {
-        path: 'contact',
-        loadComponent: () =>
-          import('./marketing/contact/contact.component').then(m => m.ContactComponent),
-      },
-      {
-        path: 'docs',
-        loadComponent: () => import('./marketing/docs/docs.component').then(m => m.DocsComponent),
-      },
-      {
-        path: 'privacy',
-        data: { documentType: 'privacy' },
-        loadComponent: () => import('./legal/legal-page.component').then(m => m.LegalPageComponent),
-      },
-      {
-        path: 'terms',
-        data: { documentType: 'terms' },
-        loadComponent: () => import('./legal/legal-page.component').then(m => m.LegalPageComponent),
-      },
-      {
-        path: 'dpa',
-        data: { documentType: 'dpa' },
-        loadComponent: () => import('./legal/legal-page.component').then(m => m.LegalPageComponent),
-      },
-      {
-        path: 'subprocessors',
-        data: { documentType: 'subprocessors' },
-        loadComponent: () => import('./legal/legal-page.component').then(m => m.LegalPageComponent),
-      },
-    ],
-  },
   {
     path: 'login',
     canActivate: [guestGuard],

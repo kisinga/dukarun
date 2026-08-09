@@ -33,6 +33,7 @@ yarn-error.log
 .gitnexus
 # Generated production frontend configuration (created by each app's prebuild).
 apps/*/src/environments/environment.generated.ts
+apps/storefront/public/sitemap.xml
 
 # Local ETL reports and dry-run captures.
 scripts/etl/out/

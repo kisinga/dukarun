@@ -8,13 +8,12 @@
 # domain and rollback is one command.
 #
 # Usage:
-#   scripts/deploy-apps.sh web          # dukarun.com
+#   scripts/deploy-apps.sh site         # dukarun.com
+#   scripts/deploy-apps.sh web          # app.dukarun.com
+#   scripts/deploy-apps.sh storefront   # storefront public domain
 #   scripts/deploy-apps.sh super-admin  # admin.dukarun.com
-#   scripts/deploy-apps.sh all          # both
+#   scripts/deploy-apps.sh all          # all four apps
 #   scripts/deploy-apps.sh rollback web # restore the latest backup container
-#
-# storefront is deliberately excluded: v2 apps/storefront is a placeholder;
-# the live v1 storefront keeps serving the tenant storefront domains until then.
 #
 # Env:
 #   .env.deploy (gitignored; see .env.deploy.example) provides:
@@ -30,15 +29,29 @@ set -euo pipefail
 SSH_HOST="${DEPLOY_SSH_HOST:?missing DEPLOY_SSH_HOST — copy .env.deploy.example to .env.deploy and fill it in}"
 COOLIFY_SERVICE_DIR="${COOLIFY_SERVICE_DIR:?missing COOLIFY_SERVICE_DIR — see .env.deploy.example}"
 SUPABASE_URL="${SUPABASE_URL:-https://supa.dukarun.com}"
-WEB_PUBLIC_URL="${WEB_PUBLIC_URL:-https://dukarun.com}"
+SITE_PUBLIC_URL="${SITE_PUBLIC_URL:-https://dukarun.com}"
+APP_PUBLIC_URL="${APP_PUBLIC_URL:-https://app.dukarun.com}"
+STOREFRONT_PUBLIC_URL="${STOREFRONT_PUBLIC_URL:-https://store.dukarun.com}"
+MARKETING_VIDEO_BASE_URL="${MARKETING_VIDEO_BASE_URL:-https://cdn.dukarun.com/video}"
 SSH_OPTS=(-o BatchMode=no -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new)
 
 # app -> container name prefix of the v1 container it replaces
 container_prefix() {
   case "$1" in
-    web) echo "web-" ;;
+    site) echo "site-" ;;
+    web) echo "app-" ;;
+    storefront) echo "storefront-" ;;
     super-admin) echo "super-admin-" ;;
-    *) echo "unknown app: $1 (web|super-admin)" >&2; exit 2 ;;
+    *) echo "unknown app: $1 (site|web|storefront|super-admin)" >&2; exit 2 ;;
+  esac
+}
+
+app_domain() {
+  case "$1" in
+    site) echo "${SITE_PUBLIC_URL#*://}" ;;
+    web) echo "${APP_PUBLIC_URL#*://}" ;;
+    storefront) echo "${STOREFRONT_PUBLIC_URL#*://}" ;;
+    super-admin) echo "admin.dukarun.com" ;;
   esac
 }
 
@@ -53,6 +66,7 @@ fetch_anon_key() {
 deploy_one() {
   local app="$1" image="dukarun-$1:deploy"
   local prefix; prefix=$(container_prefix "$app")
+  local domain; domain=$(app_domain "$app")
 
   echo "▶ [$app] fetching prod anon key"
   local anon_key; anon_key=$(fetch_anon_key)
@@ -63,7 +77,11 @@ deploy_one() {
     --build-arg "APP=$app" \
     --build-arg "SUPABASE_URL=$SUPABASE_URL" \
     --build-arg "SUPABASE_ANON_KEY=$anon_key" \
-    --build-arg "WEB_PUBLIC_URL=$WEB_PUBLIC_URL" \
+    --build-arg "SITE_PUBLIC_URL=$SITE_PUBLIC_URL" \
+    --build-arg "APP_PUBLIC_URL=$APP_PUBLIC_URL" \
+    --build-arg "STOREFRONT_PUBLIC_URL=$STOREFRONT_PUBLIC_URL" \
+    --build-arg "MARKETING_VIDEO_BASE_URL=$MARKETING_VIDEO_BASE_URL" \
+    --build-arg "PUBLIC_DATA_MODE=live" \
     -t "$image" .
 
   echo "▶ [$app] shipping image to $SSH_HOST"
@@ -71,11 +89,43 @@ deploy_one() {
 
   echo "▶ [$app] swapping container (prefix $prefix)"
   # shellcheck disable=SC2087
-  ssh "${SSH_OPTS[@]}" "$SSH_HOST" bash -s -- "$prefix" "$image" <<'REMOTE'
+  ssh "${SSH_OPTS[@]}" "$SSH_HOST" bash -s -- "$prefix" "$image" "$domain" <<'REMOTE'
 set -euo pipefail
-PREFIX="$1"; IMAGE="$2"
-OLD=$(docker ps --format '{{.Names}}' | grep "^${PREFIX}" | head -1)
-[ -n "$OLD" ] || { echo "✗ no running container with prefix $PREFIX" >&2; exit 1; }
+PREFIX="$1"; IMAGE="$2"; DOMAIN="$3"
+
+wait_healthy() {
+  local name="$1" status health attempt
+  for attempt in $(seq 1 45); do
+    status=$(docker inspect "$name" --format '{{.State.Status}}' 2>/dev/null || true)
+    health=$(docker inspect "$name" --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' 2>/dev/null || true)
+    case "$status" in
+      running) [ "$health" = "healthy" ] && return 0 ;;
+      exited|dead) return 1 ;;
+    esac
+    sleep 1
+  done
+  return 1
+}
+
+OLD=$(docker ps --format '{{.Names}}' | grep "^${PREFIX}" | head -1 || true)
+if [ -z "$OLD" ]; then
+  CONFLICT=$(docker ps --filter "label=caddy=://$DOMAIN" --format '{{.Names}}' | head -1)
+  [ -z "$CONFLICT" ] || {
+    echo "✗ $DOMAIN is still routed to $CONFLICT; move or remove that route before deployment" >&2
+    exit 1
+  }
+  NAME="${PREFIX}primary"
+  docker run -d --name "$NAME" --restart unless-stopped --network coolify \
+    --label "caddy=://$DOMAIN" --label 'caddy.reverse_proxy={{upstreams 80}}' "$IMAGE" >/dev/null
+  if ! wait_healthy "$NAME"; then
+    echo "✗ $NAME did not become healthy" >&2
+    docker logs --tail 50 "$NAME" >&2 || true
+    docker rm -f "$NAME" >/dev/null 2>&1 || true
+    exit 1
+  fi
+  echo "  ✓ $NAME created for $DOMAIN"
+  exit 0
+fi
 
 TS=$(date +%Y%m%d%H%M%S)
 BACKUP="${OLD}-backup-${TS}"
@@ -101,16 +151,15 @@ if ! docker run -d --name "$OLD" --restart unless-stopped \
   exit 1
 fi
 rm -f "$LABEL_FILE"
-docker ps --format '{{.Names}} {{.Networks}}' | grep "^${OLD} " >/dev/null
 # Join any additional networks.
 for net in $NETWORKS; do
   [ "$net" = "$PRIMARY_NETWORK" ] && continue
   docker network connect "$net" "$OLD" 2>/dev/null || true
 done
 
-sleep 3
-if ! docker ps --filter "name=^${OLD}$" --format '{{.Status}}' | grep -q Up; then
-  echo "✗ new container failed to start; rolling back"
+if ! wait_healthy "$OLD"; then
+  echo "✗ new container failed its health check; rolling back"
+  docker logs --tail 50 "$OLD" >&2 || true
   docker rm -f "$OLD" >/dev/null 2>&1 || true
   docker rename "$BACKUP" "$OLD"
   docker start "$OLD" >/dev/null
@@ -125,8 +174,8 @@ rollback_one() {
   ssh "${SSH_OPTS[@]}" "$SSH_HOST" bash -s -- "$prefix" <<'REMOTE'
 set -euo pipefail
 PREFIX="$1"
-CUR=$(docker ps -a --format '{{.Names}}' | grep "^${PREFIX}" | grep -v backup | head -1)
-BACKUP=$(docker ps -a --format '{{.Names}}' | grep "^${CUR}-backup-" | sort -r | head -1)
+CUR=$(docker ps -a --format '{{.Names}}' | grep "^${PREFIX}" | grep -v backup | head -1 || true)
+BACKUP=$(docker ps -a --format '{{.Names}}' | grep "^${CUR}-backup-" | sort -r | head -1 || true)
 [ -n "$CUR" ] && [ -n "$BACKUP" ] || { echo "✗ no current/backup pair for prefix $PREFIX" >&2; exit 1; }
 echo "  rollback: $CUR <- $BACKUP"
 docker rm -f "$CUR" >/dev/null
@@ -137,10 +186,10 @@ REMOTE
 }
 
 case "${1:-}" in
-  web|super-admin) deploy_one "$1" ;;
-  all) deploy_one web; deploy_one super-admin ;;
-  rollback) rollback_one "${2:?usage: deploy-apps.sh rollback web|super-admin}" ;;
-  *) echo "usage: scripts/deploy-apps.sh [web|super-admin|all|rollback <app>]" >&2; exit 2 ;;
+  site|web|storefront|super-admin) deploy_one "$1" ;;
+  all) deploy_one web; deploy_one storefront; deploy_one super-admin; deploy_one site ;;
+  rollback) rollback_one "${2:?usage: deploy-apps.sh rollback site|web|storefront|super-admin}" ;;
+  *) echo "usage: scripts/deploy-apps.sh [site|web|storefront|super-admin|all|rollback <app>]" >&2; exit 2 ;;
 esac
 
 echo "✓ done"

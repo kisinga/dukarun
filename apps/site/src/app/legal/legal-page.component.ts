@@ -3,9 +3,11 @@ import {
   Component,
   DestroyRef,
   OnInit,
+  PLATFORM_ID,
   inject,
   signal,
 } from '@angular/core';
+import { isPlatformBrowser, isPlatformServer } from '@angular/common';
 import { Meta, Title } from '@angular/platform-browser';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { renderLegalMarkdown } from '@dukarun/legal-markdown';
@@ -16,6 +18,7 @@ import {
   LegalService,
   PublishedLegalDocument,
 } from './legal.service';
+import { environment } from '../../environments/environment';
 
 const LABELS: Record<LegalDocumentType, string> = {
   privacy: 'Privacy Notice',
@@ -178,14 +181,20 @@ export class LegalPageComponent implements OnInit {
   private readonly legal = inject(LegalService);
   private readonly title = inject(Title);
   private readonly meta = inject(Meta);
+  private readonly platformId = inject(PLATFORM_ID);
   protected readonly type = this.route.snapshot.data['documentType'] as LegalDocumentType;
   protected readonly label = LABELS[this.type];
-  protected readonly document = signal<PublishedLegalDocument | null>(null);
-  protected readonly history = signal<LegalDocumentHistoryItem[]>([]);
-  protected readonly rendered = signal(
-    renderLegalMarkdown(`# ${this.label}`, { includeTitle: false })
+  private readonly initialDocument = this.legal.transferredDocument(this.type);
+  protected readonly document = signal<PublishedLegalDocument | null>(this.initialDocument ?? null);
+  protected readonly history = signal<LegalDocumentHistoryItem[]>(
+    this.legal.transferredHistory(this.type) ?? []
   );
-  protected readonly loading = signal(true);
+  protected readonly rendered = signal(
+    renderLegalMarkdown(this.initialDocument?.content_markdown ?? `# ${this.label}`, {
+      includeTitle: false,
+    })
+  );
+  protected readonly loading = signal(this.initialDocument === undefined);
   protected readonly error = signal<string | null>(null);
 
   ngOnInit(): void {
@@ -195,12 +204,16 @@ export class LegalPageComponent implements OnInit {
   }
 
   protected async load(): Promise<void> {
-    this.loading.set(true);
+    if (!this.document()) this.loading.set(true);
     this.error.set(null);
     try {
       const version = this.route.snapshot.queryParamMap.get('version');
-      const document = await this.legal.publishedDocument(this.type, version);
-      const history = await this.legal.documentHistory(this.type).catch(() => []);
+      const refresh = isPlatformBrowser(this.platformId) && this.initialDocument !== undefined;
+      const document = await this.legal.publishedDocument(this.type, version, refresh);
+      if (!document && isPlatformServer(this.platformId) && environment.publicDataMode === 'live') {
+        throw new Error(`Published ${this.type} document is required for prerendering.`);
+      }
+      const history = await this.legal.documentHistory(this.type, refresh).catch(() => []);
       this.document.set(document);
       this.history.set(history);
       if (document) {
@@ -211,7 +224,15 @@ export class LegalPageComponent implements OnInit {
       } else {
         this.title.setTitle(`${this.label} | Dukarun`);
       }
-    } catch {
+    } catch (error) {
+      if (isPlatformServer(this.platformId) && environment.publicDataMode === 'live') throw error;
+      if (
+        isPlatformBrowser(this.platformId) &&
+        this.initialDocument &&
+        !this.route.snapshot.queryParamMap.get('version')
+      ) {
+        return;
+      }
       this.document.set(null);
       this.error.set('The document could not be loaded. Check your connection and try again.');
     } finally {

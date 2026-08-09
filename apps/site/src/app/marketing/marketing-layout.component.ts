@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { IconComponent } from '../shared/ui/icon.component';
+import { appUrl } from '../core/public-url';
 
 interface NavLink {
   readonly label: string;
@@ -42,10 +43,13 @@ interface NavLink {
           </div>
 
           <div class="ml-auto flex items-center gap-2 md:ml-4">
-            <a routerLink="/login" class="btn btn-ghost btn-sm hidden min-h-11 sm:inline-flex">
+            <a
+              [href]="appUrl('/login')"
+              class="btn btn-ghost btn-sm hidden min-h-11 sm:inline-flex"
+            >
               Log in
             </a>
-            <a routerLink="/register" class="btn btn-primary btn-sm min-h-11">
+            <a [href]="appUrl('/register')" class="btn btn-primary btn-sm min-h-11">
               Get started
               <app-icon name="heroArrowRight" size="sm" />
             </a>
@@ -78,7 +82,7 @@ interface NavLink {
                 </a>
               }
               <a
-                routerLink="/login"
+                [href]="appUrl('/login')"
                 class="flex min-h-11 items-center rounded-field px-3 text-sm font-medium text-base-content/80"
                 (click)="menuOpen.set(false)"
               >
@@ -122,13 +126,13 @@ interface NavLink {
           <nav class="flex flex-col gap-1" aria-label="Account">
             <span class="mkt-eyebrow mb-1">Account</span>
             <a
-              routerLink="/register"
+              [href]="appUrl('/register')"
               class="flex min-h-8 items-center text-sm text-base-content/70 hover:text-base-content"
             >
               Get started
             </a>
             <a
-              routerLink="/login"
+              [href]="appUrl('/login')"
               class="flex min-h-8 items-center text-sm text-base-content/70 hover:text-base-content"
             >
               Log in
@@ -171,6 +175,7 @@ interface NavLink {
   `,
 })
 export class MarketingLayoutComponent {
+  protected readonly appUrl = appUrl;
   protected readonly linkActiveOptions = {
     paths: 'exact',
     queryParams: 'ignored',

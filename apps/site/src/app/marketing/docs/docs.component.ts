@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { IconComponent } from '../../shared/ui/icon.component';
+import { appUrl } from '../../core/public-url';
 
 interface Step {
   readonly title: string;
@@ -36,7 +37,7 @@ interface DocSection {
           care about; everything here is live today.
         </p>
         <div class="mt-8 flex flex-col gap-3 sm:flex-row">
-          <a routerLink="/register" class="btn btn-primary min-h-11">
+          <a [href]="appUrl('/register')" class="btn btn-primary min-h-11">
             Create your account
             <app-icon name="heroArrowRight" size="md" />
           </a>
@@ -137,7 +138,7 @@ interface DocSection {
         </p>
         <div class="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
           <a
-            routerLink="/register"
+            [href]="appUrl('/register')"
             class="btn btn-lg min-h-11 border-white bg-white text-primary hover:bg-white/90"
           >
             Get started
@@ -155,6 +156,7 @@ interface DocSection {
   `,
 })
 export class DocsComponent {
+  protected readonly appUrl = appUrl;
   protected readonly steps: Step[] = [
     {
       title: 'Create your account',

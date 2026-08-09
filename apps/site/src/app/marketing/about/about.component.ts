@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { IconComponent } from '../../shared/ui/icon.component';
+import { appUrl } from '../../core/public-url';
 
 /**
  * Public about page — why Dukarun exists and what it believes.
@@ -88,7 +89,7 @@ import { IconComponent } from '../../shared/ui/icon.component';
         </p>
         <div class="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
           <a
-            routerLink="/register"
+            [href]="appUrl('/register')"
             class="btn btn-lg min-h-11 border-white bg-white text-primary hover:bg-white/90"
           >
             Get started
@@ -106,6 +107,7 @@ import { IconComponent } from '../../shared/ui/icon.component';
   `,
 })
 export class AboutComponent {
+  protected readonly appUrl = appUrl;
   protected readonly beliefs = [
     {
       icon: 'heroBanknotes',

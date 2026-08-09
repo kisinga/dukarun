@@ -2,15 +2,18 @@ import {
   ChangeDetectionStrategy,
   Component,
   OnInit,
+  PLATFORM_ID,
   computed,
   inject,
   signal,
 } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { environment } from '../../../environments/environment';
 import { IconComponent } from '../../shared/ui/icon.component';
 import { MarketingVideoComponent } from '../marketing-video.component';
 import { PublicPricingService, PublicSubscriptionPlan } from '../public-pricing.service';
+import { appUrl } from '../../core/public-url';
 
 interface DemoProduct {
   readonly id: string;
@@ -69,11 +72,11 @@ interface Testimonial {
           double-entry ledger, so your books are always up to date.
         </p>
         <div class="mt-8 flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
-          <a routerLink="/register" class="btn btn-primary btn-lg min-h-11">
+          <a [href]="appUrl('/register')" class="btn btn-primary btn-lg min-h-11">
             Get started
             <app-icon name="heroArrowRight" size="md" />
           </a>
-          <a routerLink="/login" class="btn btn-outline btn-lg min-h-11">Log in</a>
+          <a [href]="appUrl('/login')" class="btn btn-outline btn-lg min-h-11">Log in</a>
         </div>
         <ul class="mt-7 flex flex-wrap justify-center gap-x-5 gap-y-2 text-sm text-base-content/60">
           @for (point of trustPoints; track point) {
@@ -247,7 +250,7 @@ interface Testimonial {
                   </div>
                   <div class="receipt-edge shrink-0" aria-hidden="true"></div>
                   <div class="mt-3 flex flex-col gap-1.5">
-                    <a routerLink="/register" class="btn btn-primary btn-sm w-full min-h-11">
+                    <a [href]="appUrl('/register')" class="btn btn-primary btn-sm w-full min-h-11">
                       Make it yours. Get started
                     </a>
                     <button
@@ -491,8 +494,7 @@ interface Testimonial {
                 </ul>
 
                 <a
-                  routerLink="/register"
-                  [queryParams]="{ plan: plan.code }"
+                  [href]="appUrl('/register', { plan: plan.code })"
                   class="btn btn-primary mt-6 min-h-11 w-full"
                 >
                   Start with {{ plan.name }}
@@ -561,7 +563,7 @@ interface Testimonial {
         </p>
         <div class="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
           <a
-            routerLink="/register"
+            [href]="appUrl('/register')"
             class="btn btn-lg min-h-11 border-white bg-white text-primary hover:bg-white/90"
           >
             Get started
@@ -582,11 +584,15 @@ interface Testimonial {
   `,
 })
 export class HomeComponent implements OnInit {
+  protected readonly appUrl = appUrl;
   private readonly publicPricing = inject(PublicPricingService);
+  private readonly platformId = inject(PLATFORM_ID);
+  private readonly initialPlans = this.publicPricing.transferredPlans();
+  private readonly initialConfig = this.publicPricing.transferredBillingConfig();
 
-  protected readonly pricingPlans = signal<PublicSubscriptionPlan[]>([]);
-  protected readonly trialDays = signal<number | null>(null);
-  protected readonly pricingLoading = signal(true);
+  protected readonly pricingPlans = signal<PublicSubscriptionPlan[]>(this.initialPlans ?? []);
+  protected readonly trialDays = signal<number | null>(this.initialConfig?.trialDays ?? null);
+  protected readonly pricingLoading = signal(this.initialPlans === null);
   protected readonly marketingVideoBaseUrl = environment.marketingVideoBaseUrl.replace(/\/+$/, '');
   protected readonly workflowVideos = [
     {
@@ -614,12 +620,13 @@ export class HomeComponent implements OnInit {
   }
 
   async ngOnInit(): Promise<void> {
+    const refresh = isPlatformBrowser(this.platformId) && this.initialPlans !== null;
     const [plans, config] = await Promise.allSettled([
-      this.publicPricing.activePlans(),
-      this.publicPricing.billingConfig(),
+      this.publicPricing.activePlans(refresh),
+      this.publicPricing.billingConfig(refresh),
     ]);
-    this.pricingPlans.set(plans.status === 'fulfilled' ? plans.value : []);
-    this.trialDays.set(config.status === 'fulfilled' ? (config.value?.trialDays ?? null) : null);
+    if (plans.status === 'fulfilled') this.pricingPlans.set(plans.value);
+    if (config.status === 'fulfilled') this.trialDays.set(config.value?.trialDays ?? null);
     this.pricingLoading.set(false);
   }
 

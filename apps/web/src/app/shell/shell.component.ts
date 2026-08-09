@@ -19,6 +19,7 @@ import { CompanyContextService } from '../core/company-context.service';
 import { ProfileService } from '../profile/profile.service';
 import { EntityAvatarComponent } from '../shared/ui/entity-avatar.component';
 import { LegalService } from '../legal/legal.service';
+import { siteUrl } from '../core/public-url';
 
 interface NavItem {
   route: string;
@@ -200,10 +201,10 @@ interface NavSection {
                   </a>
                 </li>
                 <li>
-                  <a routerLink="/privacy"><app-icon name="heroLockClosed" />Privacy</a>
+                  <a [href]="siteUrl('/privacy')"><app-icon name="heroLockClosed" />Privacy</a>
                 </li>
                 <li>
-                  <a routerLink="/terms"><app-icon name="heroDocumentText" />Terms</a>
+                  <a [href]="siteUrl('/terms')"><app-icon name="heroDocumentText" />Terms</a>
                 </li>
                 <li>
                   <button type="button" [disabled]="sync.syncing()" (click)="requestSignOut()">
@@ -427,6 +428,7 @@ interface NavSection {
   `,
 })
 export class ShellComponent implements OnInit {
+  protected readonly siteUrl = siteUrl;
   private readonly supabase = inject(SupabaseService);
   private readonly router = inject(Router);
   protected readonly theme = inject(ThemeService);

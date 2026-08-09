@@ -6,7 +6,7 @@ This document describes the active Supabase system. Vendure-era architecture is 
 ## System shape
 
 ```text
-Angular apps (Cloudflare Pages)
+Four static Angular apps on Coolify/Nginx
         |
         | supabase-js / HTTPS / WebSocket
         v
@@ -29,11 +29,14 @@ back as one transaction.
 
 | Path               | Responsibility                                                   | Local port |
 | ------------------ | ---------------------------------------------------------------- | ---------: |
+| `apps/site`        | Marketing, pricing, docs, and public legal content               |       4202 |
 | `apps/web`         | Authenticated dashboard, POS, stock, customers, suppliers, money |       4203 |
 | `apps/storefront`  | Public merchant catalog/storefront                               |       4204 |
 | `apps/super-admin` | Platform operations                                              |       4205 |
 
-All applications are Angular 21 standalone applications. The dashboard uses the normative
+All applications are Angular 21 standalone applications. Site prerenders its eight public
+routes. Storefront prerenders its directory and known public shop identities while loading
+catalog data live. Token pages stay client-only. The dashboard uses the normative
 design language in `docs/DESIGN_SYSTEM.md` and shared primitives in
 `apps/web/src/app/shared/ui`.
 
@@ -93,7 +96,7 @@ secrets live in the Supabase deployment/Vault, never Angular build variables.
 
 ## Deployment
 
-Cloudflare Pages builds each Angular app. A build pre-step generates
+Coolify builds each static Angular app into Nginx. A build pre-step generates
 `environment.generated.ts` from public `SUPABASE_URL` and `SUPABASE_ANON_KEY` values. Coolify
 hosts Supabase; GitHub Actions runs migrations and synchronizes Edge Functions from a protected
 self-hosted runner. See `docs/DEPLOYMENT.md` for the exact runbook.
