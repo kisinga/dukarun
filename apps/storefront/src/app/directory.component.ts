@@ -2,12 +2,13 @@ import { Component, OnInit, PLATFORM_ID, inject, signal } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { StorefrontInfo, StorefrontService } from './storefront.service';
+import { StorefrontBrandComponent } from './storefront-brand.component';
 import { StorefrontSeoService } from './storefront-seo.service';
 
 /** `/` is the directory of public storefronts. */
 @Component({
   selector: 'app-directory',
-  imports: [RouterLink],
+  imports: [RouterLink, StorefrontBrandComponent],
   template: `
     <main class="min-h-screen bg-base-200 p-4">
       <div class="mx-auto max-w-md py-8">
@@ -37,9 +38,11 @@ import { StorefrontSeoService } from './storefront-seo.service';
                 class="card bg-base-100 shadow-sm transition-shadow hover:shadow-md"
               >
                 <div class="card-body flex-row items-center gap-3 p-4">
-                  @if (imageUrl(shop.logo_path); as logo) {
-                    <img [src]="logo" alt="" class="h-10 w-10 rounded-lg object-cover" />
-                  }
+                  <app-storefront-brand
+                    [name]="shop.name"
+                    [logoUrl]="companyLogoUrl(shop.logo_path)"
+                    [compact]="true"
+                  />
                   <div class="min-w-0 flex-1">
                     <p class="truncate font-semibold">{{ shop.name }}</p>
                     @if (!shop.catalogue_visible) {
@@ -88,8 +91,8 @@ export class DirectoryComponent implements OnInit {
     }
   }
 
-  protected imageUrl(path: string | null): string | null {
-    return this.storefront.imageUrl(path);
+  protected companyLogoUrl(path: string | null): string | null {
+    return this.storefront.companyLogoUrl(path);
   }
 
   protected legalUrl(path: 'privacy' | 'terms'): string {

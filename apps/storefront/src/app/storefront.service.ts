@@ -12,9 +12,15 @@ import type { Database } from '@dukarun/shared-types';
 import { environment } from '../environments/environment';
 
 export type StorefrontInfo = Database['public']['Views']['public_storefronts']['Row'];
-export type CatalogRow = Database['public']['Functions']['storefront_catalog']['Returns'][number];
+export type CatalogRow =
+  Database['public']['Functions']['storefront_catalog_page']['Returns'][number];
 export type ShopCollection =
   Database['public']['Functions']['storefront_collections']['Returns'][number];
+export interface CatalogPage {
+  rows: CatalogRow[];
+  total: number;
+  offset: number;
+}
 export interface CustomerStatement {
   store_name: string;
   logo_path: string | null;
@@ -142,11 +148,52 @@ export class StorefrontService {
     return shop;
   }
 
-  /** Catalog rows for a slug. Empty when the shop lapsed or hid the catalogue. */
-  async catalog(slug: string): Promise<CatalogRow[]> {
+  /** One server-side product-family page. No full-catalog cache is created in the browser. */
+  async catalogPage(
+    slug: string,
+    options: {
+      search?: string;
+      collectionId?: string | null;
+      limit?: number;
+      offset?: number;
+    } = {}
+  ): Promise<CatalogPage> {
+    if (environment.publicDataMode === 'fixture') return { rows: [], total: 0, offset: 0 };
+    return this.track(async () => {
+      const limit = options.limit ?? 12;
+      const requestedOffset = options.offset ?? 0;
+      const search = options.search?.trim();
+      const collectionId = options.collectionId;
+      const fetchPage = async (offset: number): Promise<CatalogPage> => {
+        const { data, error } = await this.client.rpc('storefront_catalog_page', {
+          p_slug: slug,
+          p_limit: limit,
+          p_offset: offset,
+          ...(search ? { p_search: search } : {}),
+          ...(collectionId ? { p_collection_id: collectionId } : {}),
+        });
+        if (error) throw error;
+        return { rows: data, total: Number(data[0]?.total_count ?? 0), offset };
+      };
+
+      const requestedPage = await fetchPage(requestedOffset);
+      if (requestedPage.rows.length > 0 || requestedOffset === 0) return requestedPage;
+
+      const firstPage = await fetchPage(0);
+      if (firstPage.total === 0) return firstPage;
+      const lastOffset = Math.floor((firstPage.total - 1) / limit) * limit;
+      return lastOffset === 0 ? firstPage : fetchPage(lastOffset);
+    });
+  }
+
+  /** The variants needed by one product detail route only. */
+  async product(slug: string, productId: string): Promise<CatalogRow[]> {
     if (environment.publicDataMode === 'fixture') return [];
     return this.track(async () => {
-      const { data, error } = await this.client.rpc('storefront_catalog', { p_slug: slug });
+      const { data, error } = await this.client.rpc('storefront_product', {
+        p_slug: slug,
+        p_product_id: productId,
+      });
       if (error) throw error;
       return data;
     });

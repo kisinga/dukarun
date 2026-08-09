@@ -14,7 +14,7 @@ import { StorefrontSeoService } from './storefront-seo.service';
           <section class="card bg-base-100 shadow-sm">
             <div class="card-body p-5 sm:p-7">
               <div class="flex items-center gap-3">
-                @if (imageUrl(s.logo_path); as logo) {
+                @if (companyLogoUrl(s.logo_path); as logo) {
                   <img [src]="logo" alt="" class="h-12 w-12 rounded-xl object-cover" />
                 }
                 <div>
@@ -109,8 +109,8 @@ export class StatementComponent implements OnInit {
   protected date(value: string): string {
     return new Date(value).toLocaleDateString('en-KE', { dateStyle: 'medium' });
   }
-  protected imageUrl(path: string | null): string | null {
-    return this.storefront.imageUrl(path);
+  protected companyLogoUrl(path: string | null): string | null {
+    return this.storefront.companyLogoUrl(path);
   }
   protected waLink(phone: string, store: string): string {
     return `https://wa.me/${phone.replace(/\D/g, '')}?text=${encodeURIComponent(`Hello ${store}, I have a question about my statement.`)}`;
