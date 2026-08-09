@@ -67,6 +67,8 @@ export interface ProductSnapshot {
   manufacturers?: CachedManufacturer[];
   collections?: CollectionWithCount[];
   truncated?: boolean;
+  /** True when the cache writer probed beyond its row ceiling. */
+  catalog_complete?: boolean;
   fetched_at: string; // ISO
 }
 
@@ -88,6 +90,7 @@ export interface CatalogMetadata extends ScopedRecord {
   manufacturers: CachedManufacturer[];
   collections: CollectionWithCount[];
   truncated: boolean;
+  catalog_complete?: boolean;
   fetched_at: string;
 }
 

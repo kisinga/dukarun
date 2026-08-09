@@ -23,6 +23,8 @@
     "@ng-icons/core": "^33.3.0",
     "@ng-icons/heroicons": "^33.3.0",
     "@supabase/supabase-js": "^2.76.1",
+    "@zxing/browser": "^0.1.5",
+    "bwip-js": "^4.11.2",
     "exceljs": "^4.4.0",
     "idb": "^8.0.0",
     "rxjs": "~7.8.2",

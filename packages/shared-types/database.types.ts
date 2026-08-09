@@ -5227,6 +5227,14 @@ export type Database = {
         }
         Returns: string
       }
+      assign_missing_variant_barcodes: {
+        Args: { p_assignments: Json }
+        Returns: {
+          assigned: boolean
+          barcode: string
+          variant_id: string
+        }[]
+      }
       available_payment_methods: {
         Args: { p_location_id?: string }
         Returns: {
@@ -6257,6 +6265,29 @@ export type Database = {
       resolve_business_location: {
         Args: { p_location_id?: string }
         Returns: string
+      }
+      resolve_catalog_barcode: {
+        Args: { p_barcode: string; p_location_id?: string }
+        Returns: {
+          allow_fractional: boolean
+          barcode: string
+          company_id: string
+          image_path: string
+          kind: string
+          manufacturer_id: string
+          manufacturer_name: string
+          price: number
+          product_active: boolean
+          product_id: string
+          product_name: string
+          sku: string
+          stock: number
+          track_inventory: boolean
+          variant_active: boolean
+          variant_id: string
+          variant_name: string
+          wholesale_price: number
+        }[]
       }
       revert_variance: {
         Args: { p_reason?: string; p_recon_account_id: string }

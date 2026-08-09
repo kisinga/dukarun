@@ -19,6 +19,8 @@ export type OrderLine = Database['public']['Tables']['order_lines']['Row'];
 export type Payment = Database['public']['Tables']['payments']['Row'];
 export type Refund = Database['public']['Tables']['refunds']['Row'];
 export type InventoryBatch = Database['public']['Tables']['inventory_batches']['Row'];
+export type BarcodeAssignmentResult =
+  Database['public']['Functions']['assign_missing_variant_barcodes']['Returns'][number];
 
 export interface CatalogVariantInput {
   variant_id?: string;
@@ -133,6 +135,29 @@ export class PosService {
       ...(this.locations.activeId() ? { p_location_id: this.locations.activeId()! } : {}),
     });
     if (error) throw error;
+    return data;
+  }
+
+  /** Exact, tenant-scoped barcode lookup with current price and location stock. */
+  async resolveBarcode(barcode: string): Promise<Variant | null> {
+    const value = barcode.trim();
+    if (!value) return null;
+    const { data, error } = await this.client.rpc('resolve_catalog_barcode', {
+      p_barcode: value,
+      ...(this.locations.activeId() ? { p_location_id: this.locations.activeId()! } : {}),
+    });
+    if (error) throw rpcError(error);
+    return data[0] ?? null;
+  }
+
+  /** Atomically assign labels only to variants that still lack their own barcode. */
+  async assignMissingVariantBarcodes(
+    assignments: Array<{ variant_id: string; barcode: string }>
+  ): Promise<BarcodeAssignmentResult[]> {
+    const { data, error } = await this.client.rpc('assign_missing_variant_barcodes', {
+      p_assignments: assignments,
+    });
+    if (error) throw rpcError(error);
     return data;
   }
 

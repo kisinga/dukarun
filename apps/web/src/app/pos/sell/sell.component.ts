@@ -25,6 +25,7 @@ import { SellCartLineComponent } from './sell-cart-line.component';
 import { MyPendingSalesComponent } from './my-pending-sales.component';
 import { SessionRequiredNoticeComponent } from '../../shared/ui/session-required-notice.component';
 import { BarcodeScannerComponent } from '../../shared/ui/barcode-scanner.component';
+import { ScanFeedbackService } from '../../shared/ui/scan-feedback.service';
 import {
   Customer,
   CustomerWithCredit,
@@ -269,6 +270,7 @@ interface DraftFlag {
                     autocomplete="off"
                     aria-label="Search products or scan barcode"
                     [formControl]="search"
+                    (keydown.enter)="$event.preventDefault(); scanTypedBarcode()"
                   />
                   @if (search.value) {
                     <button
@@ -886,6 +888,7 @@ export class SellComponent implements OnInit {
   private readonly receiptData = inject(ReceiptDataService);
   private readonly pos = inject(PosService);
   private readonly route = inject(ActivatedRoute);
+  private readonly scanFeedback = inject(ScanFeedbackService);
 
   protected readonly search = new FormControl('', { nonNullable: true });
   protected readonly searchQuery = signal('');
@@ -968,6 +971,7 @@ export class SellComponent implements OnInit {
   protected readonly approvalSent = signal(false);
   private approvalSentTimer: ReturnType<typeof setTimeout> | null = null;
   private searchSeq = 0;
+  private barcodeQueue: Promise<void> = Promise.resolve();
   private customerSearchSeq = 0;
   private priceFloorTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly debouncedSearch = toSignal(
@@ -1039,17 +1043,21 @@ export class SellComponent implements OnInit {
     const q = query.trim();
     // Sequence guard: a slower earlier response must not overwrite newer results.
     const seq = ++this.searchSeq;
+    // A scanner Enter clears the control before a pending debounce emits. Do
+    // not resurrect or resolve that stale value as a second scan.
+    if (this.search.value.trim() !== q) return;
     if (q.length < 2) {
       this.results.set([]);
       return;
     }
     try {
       const variants = await this.sync.searchProducts(q);
-      if (seq !== this.searchSeq) return;
-      const exact = variants.find(v => v.barcode === q);
-      if (exact) {
-        this.addVariant(exact);
+      if (seq !== this.searchSeq || this.search.value.trim() !== q) return;
+      if (variants.some(v => v.barcode === q)) {
+        // Clear first so a scanner-sent Enter cannot enqueue the same physical
+        // read while this exact search result is waiting in the queue.
         this.clearSearch();
+        this.enqueueBarcode(q);
         return;
       }
       this.results.set(variants);
@@ -1060,6 +1068,7 @@ export class SellComponent implements OnInit {
   }
 
   protected clearSearch(): void {
+    this.searchSeq++;
     this.search.setValue('', { emitEvent: false });
     this.searchQuery.set('');
     this.results.set([]);
@@ -1067,7 +1076,58 @@ export class SellComponent implements OnInit {
 
   protected barcodeScanned(value: string): void {
     this.scannerOpen.set(false);
-    this.search.setValue(value);
+    this.clearSearch();
+    this.enqueueBarcode(value);
+  }
+
+  protected scanTypedBarcode(): void {
+    const barcode = this.search.value.trim();
+    if (!barcode) return;
+    // Invalidates any pending debounced search before queueing this Enter event.
+    this.clearSearch();
+    this.enqueueBarcode(barcode);
+  }
+
+  private enqueueBarcode(value: string): void {
+    const barcode = value.trim();
+    if (!barcode) return;
+    const resolve = () => this.resolveScannedBarcode(barcode);
+    // Keep the queue usable even if an unforeseen UI-side exception escapes a
+    // previous lookup; one failed read must not disable later scans.
+    this.barcodeQueue = this.barcodeQueue.then(resolve, resolve);
+  }
+
+  private async resolveScannedBarcode(value: string): Promise<void> {
+    const barcode = value.trim();
+    if (!barcode) return;
+    this.error.set(null);
+    try {
+      const result = await this.sync.resolveBarcode(barcode);
+      if (result.status === 'unknown') {
+        this.error.set(`No active product or service uses barcode “${barcode}”.`);
+        return;
+      }
+      if (result.status === 'ambiguous') {
+        this.error.set(
+          `Barcode “${barcode}” belongs to more than one variant. Assign individual barcodes before selling it.`
+        );
+        return;
+      }
+      if (result.status === 'incomplete') {
+        this.error.set(
+          'This offline catalogue is incomplete, so barcode matching is disabled. Reconnect and refresh the catalogue.'
+        );
+        return;
+      }
+      if (this.unavailable(result.variant)) {
+        this.error.set(`${this.label(result.variant)} is out of stock at this location.`);
+        return;
+      }
+      this.addVariant(result.variant);
+      this.scanFeedback.playSuccess();
+    } catch (error) {
+      this.error.set(error instanceof Error ? error.message : 'Barcode lookup failed.');
+    }
   }
 
   protected addVariant(variant: Variant): void {
