@@ -1,0 +1,43 @@
+{
+  "name": "@dukarun/video",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "studio": "remotion studio src/index.ts",
+    "compositions": "remotion compositions src/index.ts",
+    "approve-script": "tsx scripts/video-cli.ts approve-script",
+    "voice": "tsx scripts/video-cli.ts voice",
+    "preview": "remotion studio src/index.ts",
+    "render-review": "tsx scripts/video-cli.ts render-review",
+    "approve-final": "tsx scripts/video-cli.ts approve-final",
+    "render-final": "tsx scripts/video-cli.ts render-final",
+    "validate:cta": "tsx scripts/validate-cta.ts",
+    "check": "npm run typecheck && npm run test && npm run compositions",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@fontsource/outfit": "^5.2.8",
+    "@heroicons/react": "^2.2.0",
+    "@remotion/bundler": "4.0.507",
+    "@remotion/captions": "4.0.507",
+    "@remotion/cli": "4.0.507",
+    "@remotion/media": "4.0.507",
+    "@remotion/renderer": "4.0.507",
+    "@remotion/transitions": "4.0.507",
+    "dotenv": "^17.2.3",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "remotion": "4.0.507",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.0",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
+    "tsx": "^4.20.6",
+    "typescript": "~5.9.3",
+    "vitest": "4.1.10"
+  }
+}

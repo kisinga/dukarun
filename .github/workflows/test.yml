@@ -37,5 +37,8 @@ jobs:
       - name: Enforce The Counter design system
         run: npm run design-guard -w @dukarun/web
 
+      - name: Validate video compositions
+        run: npm run check:video
+
       - name: Build active Angular applications
         run: npm run build:active

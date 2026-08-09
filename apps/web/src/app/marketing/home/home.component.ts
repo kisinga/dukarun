@@ -7,7 +7,9 @@ import {
   signal,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { environment } from '../../../environments/environment';
 import { IconComponent } from '../../shared/ui/icon.component';
+import { MarketingVideoComponent } from '../marketing-video.component';
 import { PublicPricingService, PublicSubscriptionPlan } from '../public-pricing.service';
 
 interface DemoProduct {
@@ -47,7 +49,7 @@ interface Testimonial {
  */
 @Component({
   selector: 'app-marketing-home',
-  imports: [RouterLink, IconComponent],
+  imports: [RouterLink, IconComponent, MarketingVideoComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <!-- Hero -->
@@ -83,6 +85,29 @@ interface Testimonial {
         </ul>
       </div>
     </section>
+
+    @if (marketingVideoBaseUrl) {
+      <!-- Product overview -->
+      <section class="bg-base-100 py-14 sm:py-20" aria-labelledby="overview-video-heading">
+        <div class="mkt-container">
+          <div class="text-center">
+            <span class="mkt-eyebrow">See it in action</span>
+            <h2 id="overview-video-heading" class="mkt-h2 mt-2">From the counter to the books</h2>
+            <p class="mkt-lead mx-auto mt-3 max-w-xl">
+              One sale, one minute: sell offline, sync safely, and see the books update.
+            </p>
+          </div>
+          <div class="mt-10">
+            <app-marketing-video
+              title="Dukarun offline point-of-sale walkthrough"
+              [src]="videoUrl('offline-pos-full-wide.mp4')"
+              [poster]="videoUrl('offline-pos-full-wide.png')"
+              [captions]="videoUrl('offline-pos.en-KE.vtt')"
+            />
+          </div>
+        </div>
+      </section>
+    }
 
     <!-- Interactive till demo -->
     <section class="bg-base-100 py-14 sm:py-20" aria-labelledby="demo-heading">
@@ -353,6 +378,31 @@ interface Testimonial {
       </div>
     </section>
 
+    @if (marketingVideoBaseUrl) {
+      <!-- Focused walkthroughs -->
+      <section class="bg-base-100 py-14 sm:py-20" aria-labelledby="workflow-videos-heading">
+        <div class="mkt-container">
+          <div class="text-center">
+            <span class="mkt-eyebrow">Fifteen-second walkthroughs</span>
+            <h2 id="workflow-videos-heading" class="mkt-h2 mt-2">The important parts, up close</h2>
+          </div>
+          <div class="mt-10 grid gap-6 md:grid-cols-3">
+            @for (video of workflowVideos; track video.file) {
+              <article class="mkt-card p-4 sm:p-5">
+                <app-marketing-video
+                  [title]="video.title"
+                  [src]="videoUrl(video.file)"
+                  [poster]="videoUrl(video.poster)"
+                  [caption]="video.caption"
+                  preload="none"
+                />
+              </article>
+            }
+          </div>
+        </div>
+      </section>
+    }
+
     <!-- A day at the duka -->
     <section class="bg-base-100 py-14 sm:py-20" aria-labelledby="day-heading">
       <div class="mkt-container">
@@ -537,6 +587,31 @@ export class HomeComponent implements OnInit {
   protected readonly pricingPlans = signal<PublicSubscriptionPlan[]>([]);
   protected readonly trialDays = signal<number | null>(null);
   protected readonly pricingLoading = signal(true);
+  protected readonly marketingVideoBaseUrl = environment.marketingVideoBaseUrl.replace(/\/+$/, '');
+  protected readonly workflowVideos = [
+    {
+      title: 'Offline selling and safe synchronization',
+      file: 'offline-pos-offline-square.mp4',
+      poster: 'offline-pos-offline-square.png',
+      caption: 'Keep serving customers while sales wait safely for the network.',
+    },
+    {
+      title: 'Automatic double-entry ledger posting',
+      file: 'offline-pos-ledger-square.mp4',
+      poster: 'offline-pos-ledger-square.png',
+      caption: 'See the payment and sale land in balanced books.',
+    },
+    {
+      title: 'Owner dashboard update',
+      file: 'offline-pos-dashboard-square.mp4',
+      poster: 'offline-pos-dashboard-square.png',
+      caption: 'Review revenue, sales, margin, and synchronization status.',
+    },
+  ] as const;
+
+  protected videoUrl(file: string): string {
+    return `${this.marketingVideoBaseUrl}/${file}`;
+  }
 
   async ngOnInit(): Promise<void> {
     const [plans, config] = await Promise.allSettled([

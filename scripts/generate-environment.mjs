@@ -18,12 +18,17 @@ const localAnonKey =
 const supabaseUrl = process.env.SUPABASE_URL?.trim() || localUrl;
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY?.trim() || localAnonKey;
 const webPublicUrl = process.env.WEB_PUBLIC_URL?.trim() || 'http://localhost:4200';
+const marketingVideoBaseUrl =
+  process.env.MARKETING_VIDEO_BASE_URL?.trim().replace(/\/+$/, '') || '';
 
 try {
   new URL(supabaseUrl);
   new URL(webPublicUrl);
+  if (marketingVideoBaseUrl) new URL(marketingVideoBaseUrl);
 } catch {
-  console.error('SUPABASE_URL and WEB_PUBLIC_URL must be valid absolute URLs.');
+  console.error(
+    'SUPABASE_URL, WEB_PUBLIC_URL, and MARKETING_VIDEO_BASE_URL must be valid absolute URLs.'
+  );
   process.exit(2);
 }
 
@@ -49,6 +54,7 @@ const contents =
   `  supabaseUrl: ${JSON.stringify(supabaseUrl)},\n` +
   `  supabaseAnonKey: ${JSON.stringify(supabaseAnonKey)},\n` +
   `  webPublicUrl: ${JSON.stringify(webPublicUrl)},\n` +
+  `  marketingVideoBaseUrl: ${JSON.stringify(marketingVideoBaseUrl)},\n` +
   `};\n`;
 
 mkdirSync(dirname(target), { recursive: true });
