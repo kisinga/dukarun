@@ -86,8 +86,8 @@ function formatKes(amount: number): string {
                     <div
                       class="grid h-full place-content-center bg-gradient-to-br from-[#f3eee7] to-[#e8dfd3] text-center text-base-content/30"
                     >
-                      <span class="text-7xl font-bold">{{ p.name.charAt(0) }}</span
-                      ><span class="mt-3 text-xs font-semibold tracking-[0.16em] uppercase"
+                      <span
+                        class="rounded-full border border-current/20 bg-white/25 px-4 py-2 text-xs font-semibold tracking-[0.16em] uppercase"
                         >Photo coming soon</span
                       >
                     </div>
