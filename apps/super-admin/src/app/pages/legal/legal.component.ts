@@ -393,7 +393,7 @@ export class LegalComponent implements OnInit {
     );
   }
 
-  protected async saveDraft(): Promise<void> {
+  protected async saveDraft(): Promise<boolean> {
     const validationError = this.draftValidationError();
     if (validationError) {
       this.version.markAsTouched();
@@ -401,7 +401,7 @@ export class LegalComponent implements OnInit {
       this.markdown.markAsTouched();
       this.error.set(validationError);
       this.notice.set(null);
-      return;
+      return false;
     }
     this.saving.set(true);
     this.error.set(null);
@@ -423,16 +423,20 @@ export class LegalComponent implements OnInit {
       await this.load(id);
       this.expectedHash.setValue(expectedHash);
       this.notice.set('Draft saved.');
+      return true;
     } catch (error) {
       this.error.set(this.errorMessage(error, 'Draft could not be saved.'));
+      return false;
     } finally {
       this.saving.set(false);
     }
   }
 
   protected async publishDocument(): Promise<void> {
+    if (!this.selectedId() || !this.canPublish()) return;
+    const saved = await this.saveDraft();
     const id = this.selectedId();
-    if (!id || !this.canPublish()) return;
+    if (!saved || !id) return;
     this.publishing.set(true);
     this.error.set(null);
     this.notice.set(null);
@@ -441,7 +445,12 @@ export class LegalComponent implements OnInit {
       await this.load(id);
       this.notice.set('Document published.');
     } catch (error) {
-      this.error.set(error instanceof Error ? error.message : 'Document could not be published.');
+      const message = this.errorMessage(error, 'Document could not be published.');
+      this.error.set(
+        message.includes('effective_date_in_future')
+          ? 'The effective date must be today or earlier.'
+          : message
+      );
     } finally {
       this.publishing.set(false);
     }
