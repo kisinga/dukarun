@@ -53,17 +53,12 @@ export class BarcodeScannerComponent implements AfterViewInit, OnDestroy {
   protected readonly error = signal<string | null>(null);
   protected readonly status = signal('Starting camera…');
   private stream: MediaStream | null = null;
+  private fallbackControls: { stop(): void } | null = null;
   private frame = 0;
   private stopped = false;
   async ngAfterViewInit(): Promise<void> {
     const DetectorClass = (globalThis as unknown as { BarcodeDetector?: DetectorConstructor })
       .BarcodeDetector;
-    if (!DetectorClass) {
-      this.error.set(
-        'Camera barcode scanning is not supported in this browser. Use a scanner or type the code.'
-      );
-      return;
-    }
     try {
       this.stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: { ideal: 'environment' } },
@@ -73,6 +68,10 @@ export class BarcodeScannerComponent implements AfterViewInit, OnDestroy {
       video.srcObject = this.stream;
       await video.play();
       this.status.set('Scanning…');
+      if (!DetectorClass) {
+        await this.startFallback(video);
+        return;
+      }
       const detector = new DetectorClass({
         formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39', 'qr_code'],
       });
@@ -94,9 +93,29 @@ export class BarcodeScannerComponent implements AfterViewInit, OnDestroy {
       this.error.set(error instanceof Error ? error.message : 'Camera permission was denied.');
     }
   }
+
+  private async startFallback(video: HTMLVideoElement): Promise<void> {
+    this.status.set('Loading camera scanner…');
+    const { BrowserMultiFormatReader } = await import('@zxing/browser');
+    if (this.stopped) return;
+    const reader = new BrowserMultiFormatReader();
+    this.status.set('Scanning…');
+    this.fallbackControls = await reader.decodeFromVideoElement(
+      video,
+      (result, _error, controls) => {
+        if (this.stopped || !result) return;
+        const value = result.getText().trim();
+        if (!value) return;
+        controls.stop();
+        this.scanned.emit(value);
+      }
+    );
+  }
+
   ngOnDestroy(): void {
     this.stopped = true;
     cancelAnimationFrame(this.frame);
+    this.fallbackControls?.stop();
     this.stream?.getTracks().forEach(track => track.stop());
   }
 }

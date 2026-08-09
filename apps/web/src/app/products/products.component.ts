@@ -39,6 +39,9 @@ import { CatalogCacheService } from '../core/catalog-cache.service';
 import { LocationContextService } from '../core/location-context.service';
 import { ProductImportDialogComponent } from './product-import-dialog.component';
 import { ProductTransferService, type CatalogImportResult } from './product-transfer.service';
+import { BarcodeScannerComponent } from '../shared/ui/barcode-scanner.component';
+import { BarcodeLabelDialogComponent } from './barcode-label-dialog.component';
+import { BARCODE_MAX_LENGTH, generateDukarunBarcode } from './barcode-labels';
 
 type StockInfo = { stock: number; stock_value: number };
 type ProductStatusFilter = 'all' | 'active' | 'inactive';
@@ -67,6 +70,7 @@ interface ProductEditorRow {
   price: string; // KES text
   sku: string;
   barcode: string;
+  pendingBarcode: string | null;
   wholesale: string; // KES text
   kind: string;
   trackInventory: boolean;
@@ -100,6 +104,8 @@ interface ProductEditorRow {
     MoneyComponent,
     StatBarComponent,
     ProductImportDialogComponent,
+    BarcodeScannerComponent,
+    BarcodeLabelDialogComponent,
   ],
   template: `
     <app-page
@@ -119,6 +125,9 @@ interface ProductEditorRow {
         (click)="load()"
       >
         <app-icon name="heroArrowPath" />
+      </button>
+      <button actions appButton variant="secondary" type="button" (click)="openCatalogueLabels()">
+        <app-icon name="heroPrinter" /> Print labels
       </button>
       @if (perms.has('ManageCatalog')) {
         <button
@@ -376,18 +385,29 @@ interface ProductEditorRow {
                     </app-form-field>
                     <app-form-field
                       label="Shared barcode"
-                      hint="Used when a variant does not have its own barcode."
+                      hint="Only suitable for products with one variant."
                     >
                       <input
                         type="text"
                         class="input input-bordered w-full"
-                        inputmode="numeric"
                         autocomplete="off"
                         placeholder="Optional"
+                        [maxLength]="barcodeMaxLength"
                         [formControl]="familyBarcode"
+                        (keydown.enter)="$event.preventDefault()"
                       />
                     </app-form-field>
                   </section>
+
+                  @if (familyBarcode.value.trim() && editorRows.length > 1) {
+                    <div class="alert alert-warning mt-4 text-sm">
+                      <app-icon name="heroExclamationTriangle" />
+                      <span>
+                        A shared barcode can be ambiguous across multiple variants. Assign a barcode
+                        to each variant instead.
+                      </span>
+                    </div>
+                  }
 
                   @if (mode === 'edit') {
                     <section class="mt-6 border-t border-base-300 pt-4">
@@ -585,14 +605,37 @@ interface ProductEditorRow {
                                   label="Variant barcode"
                                   hint="Overrides the shared barcode."
                                 >
-                                  <input
-                                    type="text"
-                                    inputmode="numeric"
-                                    class="input input-bordered w-full"
-                                    placeholder="Optional"
-                                    [(ngModel)]="row.barcode"
-                                    [ngModelOptions]="{ standalone: true }"
-                                  />
+                                  <div class="flex gap-1.5">
+                                    <input
+                                      type="text"
+                                      class="input input-bordered min-w-0 flex-1 font-mono"
+                                      placeholder="Optional"
+                                      [maxLength]="barcodeMaxLength"
+                                      [(ngModel)]="row.barcode"
+                                      [ngModelOptions]="{ standalone: true }"
+                                      (keydown.enter)="$event.preventDefault()"
+                                    />
+                                    <button
+                                      appButton
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      title="Scan barcode"
+                                      aria-label="Scan variant barcode"
+                                      (click)="scanEditorBarcode(index)"
+                                    >
+                                      <app-icon name="heroCamera" />
+                                    </button>
+                                    <button
+                                      appButton
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      (click)="generateEditorBarcode(index)"
+                                    >
+                                      Generate
+                                    </button>
+                                  </div>
                                 </app-form-field>
                                 <app-form-field label="Wholesale price (KES)" hint="Optional">
                                   <input
@@ -605,6 +648,38 @@ interface ProductEditorRow {
                                   />
                                 </app-form-field>
                               </div>
+                              @if (row.pendingBarcode; as replacement) {
+                                <div
+                                  class="mt-2 rounded-field border border-warning/50 bg-warning/5 p-3"
+                                >
+                                  <p class="text-sm font-medium">Replace this variant's barcode?</p>
+                                  <p class="mt-1 break-all text-xs">
+                                    <span class="font-mono">{{ effectiveEditorBarcode(row) }}</span>
+                                    <span class="mx-1.5">→</span>
+                                    <span class="font-mono">{{ replacement }}</span>
+                                  </p>
+                                  <div class="mt-2 flex gap-2">
+                                    <button
+                                      appButton
+                                      type="button"
+                                      variant="primary"
+                                      size="sm"
+                                      (click)="confirmEditorBarcode(index)"
+                                    >
+                                      Replace
+                                    </button>
+                                    <button
+                                      appButton
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      (click)="cancelEditorBarcode(index)"
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
+                                </div>
+                              }
                             </details>
 
                             @if (row.kind !== 'service') {
@@ -725,6 +800,12 @@ interface ProductEditorRow {
                       @if (duplicateLabels()) {
                         <p class="mt-3 text-sm text-warning">Variant labels must be unique.</p>
                       }
+                      @if (effectiveBarcodeConflict()) {
+                        <p class="mt-3 text-sm text-warning">
+                          Each variant needs a unique effective barcode. Clear the shared barcode or
+                          assign individual variant barcodes before saving.
+                        </p>
+                      }
                     }
                   </section>
                 }
@@ -756,7 +837,10 @@ interface ProductEditorRow {
                     variant="primary"
                     [loading]="busy()"
                     [disabled]="
-                      editorLoading() || duplicateLabels() || familyName.value.trim().length === 0
+                      editorLoading() ||
+                      duplicateLabels() ||
+                      familyName.value.trim().length === 0 ||
+                      effectiveBarcodeConflict()
                     "
                   >
                     {{ mode === 'create' ? 'Create product' : 'Save product' }}
@@ -1054,6 +1138,17 @@ interface ProductEditorRow {
             />
           </div>
 
+          @if (familyBarcodeAmbiguous(group)) {
+            <div class="alert alert-warning mt-4 text-sm">
+              <app-icon name="heroExclamationTriangle" />
+              <span>
+                The shared barcode <span class="font-mono">{{ group.family.barcode }}</span>
+                resolves to multiple variants. Assign individual variant barcodes before scanning or
+                printing it.
+              </span>
+            </div>
+          }
+
           <div class="mt-4 border-t border-base-300/60 pt-4">
             <div class="mb-2 flex items-end justify-between gap-3">
               <div>
@@ -1103,6 +1198,10 @@ interface ProductEditorRow {
                           Barcode
                           <span class="font-mono text-base-content/80">{{ v.barcode }}</span>
                         </p>
+                      } @else {
+                        <p class="type-caption text-warning">
+                          No barcode · edit this variant or generate one from Print labels
+                        </p>
                       }
                       @if (v.kind === 'service') {
                         <p class="type-caption">Service · Inventory not tracked</p>
@@ -1119,6 +1218,16 @@ interface ProductEditorRow {
                     </div>
 
                     <div class="mt-3 flex flex-wrap gap-1.5 border-t border-base-200 pt-2">
+                      <button
+                        appButton
+                        variant="outline"
+                        size="sm"
+                        type="button"
+                        [disabled]="!v.variant_active || !v.product_active"
+                        (click)="openSingleLabel(v.variant_id!)"
+                      >
+                        <app-icon name="heroPrinter" /> Print label
+                      </button>
                       @if (perms.has('ManageStockAdjustments')) {
                         <button
                           appButton
@@ -1200,6 +1309,22 @@ interface ProductEditorRow {
         [(open)]="importOpen"
         (imported)="productImportCompleted($event)"
       />
+      @if (editorScannerIndex() !== null) {
+        <app-barcode-scanner
+          (scanned)="editorBarcodeScanned($event)"
+          (close)="editorScannerIndex.set(null)"
+        />
+      }
+      @defer (when labelDialogMode() !== null) {
+        @if (labelDialogMode(); as labelMode) {
+          <app-barcode-label-dialog
+            [mode]="labelMode"
+            [variants]="catalog()"
+            [variantId]="labelVariantId()"
+            (closed)="closeLabelDialog()"
+          />
+        }
+      }
     </app-page>
   `,
   styles: `
@@ -1226,6 +1351,7 @@ export class ProductsComponent implements OnInit {
   protected readonly perms = inject(PermissionsService);
 
   protected readonly fmt = formatKes;
+  protected readonly barcodeMaxLength = BARCODE_MAX_LENGTH;
   protected readonly families = this.catalogCache.families;
   /** Live view of the shared realtime-backed catalog cache (works offline). */
   protected readonly catalog = this.catalogCache.catalog;
@@ -1257,6 +1383,9 @@ export class ProductsComponent implements OnInit {
   protected readonly editorLoading = signal(false);
   private editorRowSequence = 0;
   protected editorRows: ProductEditorRow[] = [];
+  protected readonly editorScannerIndex = signal<number | null>(null);
+  protected readonly labelDialogMode = signal<'catalogue' | 'single' | null>(null);
+  protected readonly labelVariantId = signal<string | null>(null);
 
   protected readonly busy = signal(false);
   protected readonly loading = signal(false);
@@ -1867,6 +1996,7 @@ export class ProductsComponent implements OnInit {
     this.editorLoading.set(false);
     this.editorMode.set(null);
     this.editingFamily.set(null);
+    this.editorScannerIndex.set(null);
     this.error.set(null);
   }
 
@@ -1886,11 +2016,105 @@ export class ProductsComponent implements OnInit {
     return new Set(labels).size !== labels.length;
   }
 
+  protected effectiveBarcodeConflict(): boolean {
+    const seen = new Set<string>();
+    for (const row of this.editorRows) {
+      const barcode = this.effectiveEditorBarcode(row);
+      if (!barcode) continue;
+      if (seen.has(barcode)) return true;
+      seen.add(barcode);
+    }
+    return false;
+  }
+
+  protected effectiveEditorBarcode(row: ProductEditorRow): string {
+    return row.barcode.trim() || this.familyBarcode.value.trim();
+  }
+
+  protected scanEditorBarcode(index: number): void {
+    this.error.set(null);
+    this.editorScannerIndex.set(index);
+  }
+
+  protected editorBarcodeScanned(value: string): void {
+    const index = this.editorScannerIndex();
+    this.editorScannerIndex.set(null);
+    if (index === null) return;
+    this.proposeEditorBarcode(index, value);
+  }
+
+  protected generateEditorBarcode(index: number): void {
+    this.proposeEditorBarcode(index, generateDukarunBarcode());
+  }
+
+  protected confirmEditorBarcode(index: number): void {
+    const row = this.editorRows[index];
+    if (!row?.pendingBarcode) return;
+    row.barcode = row.pendingBarcode;
+    row.pendingBarcode = null;
+  }
+
+  protected cancelEditorBarcode(index: number): void {
+    const row = this.editorRows[index];
+    if (row) row.pendingBarcode = null;
+  }
+
+  private proposeEditorBarcode(index: number, scannedValue: string): void {
+    const row = this.editorRows[index];
+    const barcode = scannedValue.trim();
+    if (!row || !barcode) return;
+    if (barcode.length > BARCODE_MAX_LENGTH) {
+      this.error.set(`Barcodes can be at most ${BARCODE_MAX_LENGTH} characters.`);
+      return;
+    }
+    const current = this.effectiveEditorBarcode(row);
+    if (barcode === current) {
+      row.pendingBarcode = null;
+      return;
+    }
+    if (current) {
+      row.pendingBarcode = barcode;
+      return;
+    }
+    row.barcode = barcode;
+    row.pendingBarcode = null;
+  }
+
+  protected openCatalogueLabels(): void {
+    this.labelVariantId.set(null);
+    this.labelDialogMode.set('catalogue');
+  }
+
+  protected openSingleLabel(variantId: string): void {
+    this.labelVariantId.set(variantId);
+    this.labelDialogMode.set('single');
+  }
+
+  protected closeLabelDialog(): void {
+    this.labelDialogMode.set(null);
+    this.labelVariantId.set(null);
+  }
+
+  protected familyBarcodeAmbiguous(group: ProductGroup): boolean {
+    const shared = group.family.barcode?.trim();
+    return !!shared && group.variants.filter(variant => variant.barcode === shared).length > 1;
+  }
+
   protected async saveProductEditor(): Promise<void> {
     const mode = this.editorMode();
     const editing = this.editingFamily();
     const name = this.familyName.value.trim();
     if (!mode || !name || this.editorLoading() || this.duplicateLabels()) return;
+    if (this.effectiveBarcodeConflict()) {
+      this.error.set(
+        'Each variant needs a unique barcode. Clear the shared barcode or assign individual variant barcodes.'
+      );
+      return;
+    }
+    if (this.familyBarcode.value.trim().length > BARCODE_MAX_LENGTH) {
+      this.error.set(`Barcodes can be at most ${BARCODE_MAX_LENGTH} characters.`);
+      return;
+    }
 
     const variants = this.buildVariantInputs();
     if (!variants) return;
@@ -1932,7 +2156,12 @@ export class ProductsComponent implements OnInit {
       this.editingFamily.set(null);
       await this.load();
     } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Save failed');
+      const message = err instanceof Error ? err.message : 'Save failed';
+      this.error.set(
+        message.toLowerCase().includes('duplicate') && message.toLowerCase().includes('barcode')
+          ? 'That barcode is already assigned to another variant.'
+          : message
+      );
     } finally {
       this.busy.set(false);
     }
@@ -1941,6 +2170,10 @@ export class ProductsComponent implements OnInit {
   private buildVariantInputs(): CatalogVariantInput[] | null {
     const variants: CatalogVariantInput[] = [];
     for (const row of this.editorRows) {
+      if (row.barcode.trim().length > BARCODE_MAX_LENGTH) {
+        this.error.set(`Barcodes can be at most ${BARCODE_MAX_LENGTH} characters.`);
+        return null;
+      }
       const price = parseKes(row.price);
       if (price === null) {
         this.error.set('Every variant needs a valid retail price.');
@@ -2012,6 +2245,7 @@ export class ProductsComponent implements OnInit {
       price: '',
       sku: '',
       barcode: '',
+      pendingBarcode: null,
       wholesale: '',
       kind: 'good',
       trackInventory: true,

@@ -7,12 +7,12 @@ TCP/Postgres; always `?sslmode=disable`). Host address lives in the gitignored
 
 ## Deploy commands (first-party)
 
-| Command                        | What it does                                                                                                                  |
-| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
-| `npm run deploy`               | Apply pending DB migrations via SSH tunnel (`scripts/deploy-db.sh`)                                                           |
-| `npm run deploy:functions`     | Migrations + sync edge functions into the edge-runtime volume                                                                 |
-| `npm run deploy:apps`          | Build + ship `web` (dukarun.com) and `super-admin` (admin.dukarun.com), container swap with backup (`scripts/deploy-apps.sh`) |
-| `npm run deploy:apps:rollback` | Restore the previous app container                                                                                            |
+| Command                        | What it does                                                              |
+| ------------------------------ | ------------------------------------------------------------------------- |
+| `npm run deploy`               | Apply pending DB migrations via SSH tunnel (`scripts/deploy-db.sh`)       |
+| `npm run deploy:functions`     | Migrations + sync edge functions into the edge-runtime volume             |
+| `npm run deploy:apps`          | Build and ship all four frontends, keeping one rollback container per app |
+| `npm run deploy:apps:rollback` | Restore the previous app container                                        |
 
 All secrets (PG password, anon key) are fetched from the host at deploy time;
 nothing sensitive is stored in the repo.
@@ -50,11 +50,25 @@ show a 200 and the company row updating).
   `EMAIL_FROM` are configured. Run one controlled delivery before commissioning;
   SMS/WhatsApp are independent.
 
-### 3. Storefront
+### Frontend URLs and build data
 
-The storefront is not part of the commissioned production compose. The v2
-`apps/storefront` remains a placeholder and the Vendure storefront/backend are
-retired from Coolify deployment.
+Production builds require `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SITE_PUBLIC_URL`,
+`APP_PUBLIC_URL`, and `STOREFRONT_PUBLIC_URL`. Site and storefront builds use
+`PUBLIC_DATA_MODE=live`; required public legal content failing to load fails the site build.
+CI uses typed fixtures.
+
+The normal `all` deployment starts web first, checks every new container is healthy, and
+deploys site last.
+
+Storefront publish, unpublish, slug, name, and branding changes must trigger a storefront
+rebuild. Until automation is connected, run the storefront deployment manually.
+
+Publishing or changing public legal documents or pricing must trigger a site rebuild. Until
+automation is connected, run the site deployment manually.
+
+Rollback each frontend with `scripts/deploy-apps.sh rollback <app>`. The deploy script refuses
+to create a second container for an already-routed
+domain.
 
 ## CI/CD
 
@@ -62,7 +76,7 @@ retired from Coolify deployment.
 runners. Database migrations and Edge Functions are intentionally deployed with
 `npm run deploy` / `npm run deploy:functions`; Coolify's Git deployment does not
 manage the separate Supabase service.
-`.github/workflows/test.yml`: design guard + builds for all three apps.
+`.github/workflows/test.yml`: design guards + fixture-backed builds for all four apps.
 Merging to `main` triggers Coolify's normal Git-connected application rebuild.
 
 ## Lint findings (accepted, by design)
@@ -84,8 +98,7 @@ Merging to `main` triggers Coolify's normal Git-connected application rebuild.
 ## Backups
 
 Host cron runs `/opt/backups/backup-dukarun.sh` nightly at 00:17 UTC (03:17 EAT):
-custom-format `pg_dump` of the Supabase DB and (until cutover completes) the v1
-Vendure DB into `/opt/backups/`, restore-verified with `pg_restore --list`,
+custom-format `pg_dump` of the Supabase DB into `/opt/backups/`, restore-verified with `pg_restore --list`,
 14-day rotation, append log at `/opt/backups/backup.log`.
 
 - Manual run: `ssh <host> /opt/backups/backup-dukarun.sh`

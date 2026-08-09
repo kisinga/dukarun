@@ -19,6 +19,10 @@ jobs:
       HUSKY: 0
       SUPABASE_URL: http://127.0.0.1:54321
       SUPABASE_ANON_KEY: local-ci-placeholder
+      SITE_PUBLIC_URL: https://dukarun.com
+      APP_PUBLIC_URL: https://app.dukarun.com
+      STOREFRONT_PUBLIC_URL: https://store.dukarun.com
+      PUBLIC_DATA_MODE: fixture
 
     steps:
       - name: Checkout code
@@ -36,6 +40,12 @@ jobs:
 
       - name: Enforce The Counter design system
         run: npm run design-guard -w @dukarun/web
+
+      - name: Enforce offline data safety
+        run: npm run offline-safety-guard -w @dukarun/web
+
+      - name: Enforce public design rules
+        run: npm run public-design-guard
 
       - name: Build active Angular applications
         run: npm run build:active

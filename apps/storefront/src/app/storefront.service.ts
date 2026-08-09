@@ -1,4 +1,12 @@
-import { Injectable } from '@angular/core';
+import {
+  Injectable,
+  PLATFORM_ID,
+  PendingTasks,
+  TransferState,
+  inject,
+  makeStateKey,
+} from '@angular/core';
+import { isPlatformServer } from '@angular/common';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@dukarun/shared-types';
 import { environment } from '../environments/environment';
@@ -49,48 +57,109 @@ export interface ExternalDocument {
   expires_at: string;
 }
 
+const DIRECTORY_KEY = makeStateKey<StorefrontInfo[]>('storefront:directory');
+const shopKey = (slug: string) => makeStateKey<StorefrontInfo | null>(`storefront:shop:${slug}`);
+
 /**
  * Anonymous read-only access to the public storefront surface.
  * No authentication. This bare client uses the anonymous key. RLS and security-definer RPCs gate the data.
  */
 @Injectable({ providedIn: 'root' })
 export class StorefrontService {
+  private readonly pendingTasks = inject(PendingTasks);
+  private readonly transferState = inject(TransferState);
+  private readonly platformId = inject(PLATFORM_ID);
   private readonly client: SupabaseClient<Database> = createClient<Database>(
     environment.supabaseUrl,
     environment.supabaseAnonKey,
-    { auth: { persistSession: false } }
+    { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } }
   );
 
+  private readonly fixtureShop: StorefrontInfo = {
+    id: '00000000-0000-0000-0000-000000000001',
+    name: 'Fixture Shop',
+    slug: 'fixture-shop',
+    logo_path: null,
+    public_whatsapp_number: '+254700000000',
+    catalogue_visible: true,
+  };
+
   /** All public storefronts (the directory at `/`). */
-  async directory(): Promise<StorefrontInfo[]> {
-    const { data, error } = await this.client.from('public_storefronts').select('*').order('name');
-    if (error) throw error;
-    return data;
+  transferredDirectory(): StorefrontInfo[] | null {
+    return this.transferState.hasKey(DIRECTORY_KEY)
+      ? this.transferState.get(DIRECTORY_KEY, [])
+      : null;
+  }
+
+  transferredStorefront(slug: string): StorefrontInfo | null | undefined {
+    const key = shopKey(slug);
+    return this.transferState.hasKey(key) ? this.transferState.get(key, null) : undefined;
+  }
+
+  async directory(force = false): Promise<StorefrontInfo[]> {
+    if (!force && this.transferState.hasKey(DIRECTORY_KEY))
+      return this.transferState.get(DIRECTORY_KEY, []);
+    const shops =
+      environment.publicDataMode === 'fixture'
+        ? [this.fixtureShop]
+        : await this.track(async () => {
+            const { data, error } = await this.client
+              .from('public_storefronts')
+              .select('*')
+              .order('name');
+            if (error) throw error;
+            return data;
+          });
+    if (isPlatformServer(this.platformId)) this.transferState.set(DIRECTORY_KEY, shops);
+    return shops;
+  }
+
+  async prerenderSlugs(): Promise<string[]> {
+    return (await this.directory())
+      .map(shop => shop.slug)
+      .filter((slug): slug is string => Boolean(slug));
   }
 
   /** Shop identity by slug (null = unknown slug → 404 state). */
-  async storefront(slug: string): Promise<StorefrontInfo | null> {
-    const { data, error } = await this.client
-      .from('public_storefronts')
-      .select('*')
-      .eq('slug', slug)
-      .maybeSingle();
-    if (error) throw error;
-    return data;
+  async storefront(slug: string, force = false): Promise<StorefrontInfo | null> {
+    const key = shopKey(slug);
+    if (!force && this.transferState.hasKey(key)) return this.transferState.get(key, null);
+    const shop =
+      environment.publicDataMode === 'fixture'
+        ? slug === this.fixtureShop.slug
+          ? this.fixtureShop
+          : null
+        : await this.track(async () => {
+            const { data, error } = await this.client
+              .from('public_storefronts')
+              .select('*')
+              .eq('slug', slug)
+              .maybeSingle();
+            if (error) throw error;
+            return data;
+          });
+    if (isPlatformServer(this.platformId)) this.transferState.set(key, shop);
+    return shop;
   }
 
   /** Catalog rows for a slug. Empty when the shop lapsed or hid the catalogue. */
   async catalog(slug: string): Promise<CatalogRow[]> {
-    const { data, error } = await this.client.rpc('storefront_catalog', { p_slug: slug });
-    if (error) throw error;
-    return data;
+    if (environment.publicDataMode === 'fixture') return [];
+    return this.track(async () => {
+      const { data, error } = await this.client.rpc('storefront_catalog', { p_slug: slug });
+      if (error) throw error;
+      return data;
+    });
   }
 
   /** Active collections for the shop. */
   async collections(slug: string): Promise<ShopCollection[]> {
-    const { data, error } = await this.client.rpc('storefront_collections', { p_slug: slug });
-    if (error) throw error;
-    return data;
+    if (environment.publicDataMode === 'fixture') return [];
+    return this.track(async () => {
+      const { data, error } = await this.client.rpc('storefront_collections', { p_slug: slug });
+      if (error) throw error;
+      return data;
+    });
   }
 
   /** Public product-image URL from a storage path. */
@@ -106,18 +175,29 @@ export class StorefrontService {
   }
 
   legalUrl(path: 'privacy' | 'terms'): string {
-    return `${environment.webPublicUrl.replace(/\/$/, '')}/${path}`;
+    return `${environment.sitePublicUrl.replace(/\/$/, '')}/${path}`;
   }
 
   async customerStatement(token: string): Promise<CustomerStatement | null> {
-    const { data, error } = await this.client.rpc('public_customer_statement', { p_token: token });
-    if (error) throw error;
-    return data as unknown as CustomerStatement | null;
+    return this.track(async () => {
+      const { data, error } = await this.client.rpc('public_customer_statement', {
+        p_token: token,
+      });
+      if (error) throw error;
+      return data as unknown as CustomerStatement | null;
+    });
   }
 
   async externalDocument(token: string): Promise<ExternalDocument | null> {
-    const { data, error } = await this.client.rpc('public_external_document', { p_token: token });
-    if (error) throw error;
-    return data as unknown as ExternalDocument | null;
+    return this.track(async () => {
+      const { data, error } = await this.client.rpc('public_external_document', { p_token: token });
+      if (error) throw error;
+      return data as unknown as ExternalDocument | null;
+    });
+  }
+
+  private track<T>(task: () => Promise<T>): Promise<T> {
+    const done = this.pendingTasks.add();
+    return task().finally(done);
   }
 }

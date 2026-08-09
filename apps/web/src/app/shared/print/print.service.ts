@@ -64,7 +64,7 @@ export class PrintService {
     const template = this.templates.get(templateId ?? this.format());
     if (!template) return;
     const html = template.render(order, companyLogo, companyName, printMeta, companyAddress);
-    await this.printInFrame(`Print Order ${order.code}`, html, template.getStyles());
+    await this.printDocument(`Print Order ${order.code}`, html, template.getStyles());
   }
 
   /** Print a purchase order (A4-only by design). */
@@ -86,7 +86,7 @@ export class PrintService {
       companyAddress
     );
     const ref = purchase.referenceNumber ?? purchase.id;
-    await this.printInFrame(`Purchase Order ${ref}`, html, this.a4PurchaseTemplate.getStyles());
+    await this.printDocument(`Purchase Order ${ref}`, html, this.a4PurchaseTemplate.getStyles());
   }
 
   /**
@@ -104,8 +104,8 @@ export class PrintService {
     return template.render(order, companyLogo, companyName, printMeta, companyAddress);
   }
 
-  /** Hidden-iframe print (ported from the old app's PrintService). */
-  private printInFrame(title: string, html: string, styles: string): Promise<void> {
+  /** Shared hidden-iframe print orchestration for receipts, documents, and labels. */
+  printDocument(title: string, html: string, styles: string): Promise<void> {
     let printFrame = document.getElementById('print-frame') as HTMLIFrameElement;
     if (!printFrame) {
       printFrame = document.createElement('iframe');
@@ -146,7 +146,7 @@ export class PrintService {
                 <!DOCTYPE html>
                 <html>
                 <head>
-                    <title>${title}</title>
+                    <title>${this.escapeText(title)}</title>
                     <meta charset="utf-8">
                     <style>
                         * {
@@ -198,6 +198,15 @@ export class PrintService {
         }
       }, 500);
     });
+  }
+
+  private escapeText(value: string): string {
+    return value
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#039;');
   }
 
   private loadFormat(): PrintFormat {

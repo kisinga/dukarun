@@ -1,15 +1,16 @@
 import { Component, DestroyRef, inject, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { SupabaseService } from '../../core/supabase.service';
 import { normalizeKenyanPhone } from '../../core/phone';
 import { LegalService } from '../../legal/legal.service';
+import { siteUrl } from '../../core/public-url';
 
 const RESEND_COOLDOWN_SECONDS = 60;
 
 @Component({
   selector: 'app-login',
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [ReactiveFormsModule],
   template: `
     <main class="dashboard-main flex min-h-screen items-center justify-center bg-base-200 p-4">
       <div class="card w-full max-w-sm bg-base-100">
@@ -69,9 +70,9 @@ const RESEND_COOLDOWN_SECONDS = 60;
             <p class="mt-2 text-sm text-error">{{ error() }}</p>
           }
           <p class="mt-5 text-center text-xs text-base-content/55">
-            <a routerLink="/privacy" class="link link-hover">Privacy</a>
+            <a [href]="siteUrl('/privacy')" class="link link-hover">Privacy</a>
             <span aria-hidden="true"> · </span>
-            <a routerLink="/terms" class="link link-hover">Terms</a>
+            <a [href]="siteUrl('/terms')" class="link link-hover">Terms</a>
           </p>
         </div>
       </div>
@@ -79,6 +80,7 @@ const RESEND_COOLDOWN_SECONDS = 60;
   `,
 })
 export class LoginComponent {
+  protected readonly siteUrl = siteUrl;
   private readonly supabase = inject(SupabaseService);
   private readonly legal = inject(LegalService);
   private readonly router = inject(Router);

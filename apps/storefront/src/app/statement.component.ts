@@ -1,6 +1,7 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { CustomerStatement, StorefrontService } from './storefront.service';
+import { StorefrontSeoService } from './storefront-seo.service';
 
 @Component({
   selector: 'app-statement',
@@ -88,10 +89,12 @@ import { CustomerStatement, StorefrontService } from './storefront.service';
 export class StatementComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly storefront = inject(StorefrontService);
+  private readonly seo = inject(StorefrontSeoService);
   protected readonly statement = signal<CustomerStatement | null>(null);
   protected readonly loading = signal(true);
 
   async ngOnInit(): Promise<void> {
+    this.seo.set('Private customer statement', 'Secure customer statement.', '/statement', true);
     try {
       const token = this.route.snapshot.paramMap.get('token');
       if (token) this.statement.set(await this.storefront.customerStatement(token));

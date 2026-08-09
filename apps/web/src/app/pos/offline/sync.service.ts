@@ -16,6 +16,12 @@ import {
 } from './offline-db';
 import { CacheJournalService, type CacheStreamHandler } from '../../core/cache-journal.service';
 
+export type BarcodeResolution =
+  | { status: 'found'; variant: Variant; source: 'server' | 'cache' }
+  | { status: 'unknown' }
+  | { status: 'ambiguous' }
+  | { status: 'incomplete' };
+
 const SYNC_INTERVAL_MS = 30_000;
 
 /**
@@ -214,13 +220,9 @@ export class SyncService {
 
   async refresh(): Promise<void> {
     const identity = this.supabase.offlineIdentity();
-    if (!identity) {
-      this.entries.set([]);
-      return;
-    }
     const db = await offlineDb();
     const all = await db.getAllFromIndex('outbox', 'by-queued-at');
-    this.entries.set(all.filter(entry => belongsToIdentity(entry, identity)));
+    this.entries.set(identity ? all.filter(entry => belongsToIdentity(entry, identity)) : []);
     this.legacyEntryCount.set(all.filter(entry => !entry.company_id || !entry.user_id).length);
   }
 
@@ -252,6 +254,35 @@ export class SyncService {
       result.source === 'cache' && (!this.connectivity.online() || result.incomplete)
     );
     return result.variants;
+  }
+
+  /** Server-authoritative online lookup with a duplicate-safe offline fallback. */
+  async resolveBarcode(value: string): Promise<BarcodeResolution> {
+    const barcode = value.trim();
+    if (!barcode) return { status: 'unknown' };
+    await this.catalogCache.ensureLoaded();
+    if (this.connectivity.online()) {
+      try {
+        const variant = await this.pos.resolveBarcode(barcode);
+        this.usingCachedCatalog.set(false);
+        return variant ? { status: 'found', variant, source: 'server' } : { status: 'unknown' };
+      } catch (error) {
+        if (error instanceof PosRpcError && error.message.startsWith('barcode_ambiguous')) {
+          return { status: 'ambiguous' };
+        }
+        // Supabase reports fetch/transport failures through the same error
+        // shape, but without a PostgreSQL/PostgREST code. Only coded server
+        // responses are authoritative rejections.
+        if (error instanceof PosRpcError && error.code !== '') throw error;
+        // A transport failure can happen before the connectivity signal catches up.
+        // Preserve offline selling by consulting the last confirmed snapshot.
+      }
+    }
+    this.usingCachedCatalog.set(true);
+    const cached = this.catalogCache.resolveCachedBarcode(barcode);
+    return cached.status === 'found'
+      ? { status: 'found', variant: cached.variant, source: 'cache' }
+      : cached;
   }
 
   /** Offline quick-pick source: first active rows of the snapshot. */

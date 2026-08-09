@@ -1,13 +1,14 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute } from '@angular/router';
 import { SupabaseService } from '../../core/supabase.service';
-import { PublicPricingService } from '../../marketing/public-pricing.service';
+import { BillingConfigService } from '../../core/billing-config.service';
+import { siteUrl } from '../../core/public-url';
 import { LegalService, PublishedLegalDocument } from '../../legal/legal.service';
 
 @Component({
   selector: 'app-register',
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [ReactiveFormsModule],
   template: `
     <main class="dashboard-main flex min-h-screen items-center justify-center bg-base-200 p-4">
       <div class="card w-full max-w-md bg-base-100">
@@ -114,10 +115,10 @@ import { LegalService, PublishedLegalDocument } from '../../legal/legal.service'
                   />
                   <span class="text-sm">
                     I am authorized to bind this company and agree to the
-                    <a routerLink="/terms" target="_blank" class="link link-primary"
+                    <a [href]="siteUrl('/terms')" target="_blank" class="link link-primary"
                       >Terms of Service</a
                     >. The
-                    <a routerLink="/privacy" target="_blank" class="link link-primary"
+                    <a [href]="siteUrl('/privacy')" target="_blank" class="link link-primary"
                       >Privacy Notice</a
                     >
                     explains data handling and is not marketing consent.
@@ -170,10 +171,11 @@ import { LegalService, PublishedLegalDocument } from '../../legal/legal.service'
 export class RegisterComponent implements OnInit {
   private readonly supabase = inject(SupabaseService);
   private readonly route = inject(ActivatedRoute);
-  private readonly publicPricing = inject(PublicPricingService);
+  private readonly billingConfig = inject(BillingConfigService);
   private readonly legal = inject(LegalService);
 
   protected readonly saving = signal(false);
+  protected readonly siteUrl = siteUrl;
   protected readonly error = signal<string | null>(null);
   protected readonly createdPending = signal(false);
   /** True when the user already belongs to a company and is adding another. */
@@ -205,8 +207,8 @@ export class RegisterComponent implements OnInit {
   async ngOnInit(): Promise<void> {
     this.hasCompany.set(Boolean(this.supabase.claims()?.company_id));
     await Promise.all([
-      this.publicPricing
-        .billingConfig()
+      this.billingConfig
+        .load()
         .then(config => this.trialDays.set(config?.trialDays ?? null))
         .catch(() => undefined),
       this.loadTerms(),

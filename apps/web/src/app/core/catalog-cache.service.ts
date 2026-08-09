@@ -1,4 +1,4 @@
-import { Injectable, effect, inject, signal, untracked } from '@angular/core';
+import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { SupabaseService } from './supabase.service';
 import { LocationContextService } from './location-context.service';
@@ -26,6 +26,12 @@ import {
 const CATALOG_LIMIT = 10_000;
 const CATALOG_PAGE_SIZE = 1_000;
 
+export type CachedBarcodeResolution =
+  | { status: 'found'; variant: Variant }
+  | { status: 'unknown' }
+  | { status: 'ambiguous' }
+  | { status: 'incomplete' };
+
 /**
  * Shared journal-backed catalog cache — the single writer of the
  * `products` IndexedDB snapshot. Reads emit the complete cached snapshot
@@ -48,9 +54,22 @@ export class CatalogCacheService {
   readonly fetchedAt = signal<string | null>(null);
   /** Defensive compatibility flag for snapshots created before the 10k ceiling. */
   readonly catalogTruncated = signal(false);
+  private readonly catalogCompletenessKnown = signal(false);
   /** True once a snapshot (cached or fresh) is available for the current scope. */
   readonly loaded = signal(false);
   readonly revision = signal(0);
+  private readonly barcodeIndex = computed(() => {
+    const index = new Map<string, Variant[]>();
+    for (const variant of this.catalog()) {
+      if (!variant.variant_active || !variant.product_active) continue;
+      const barcode = variant.barcode?.trim();
+      if (!barcode) continue;
+      const matches = index.get(barcode) ?? [];
+      matches.push(variant);
+      index.set(barcode, matches);
+    }
+    return index;
+  });
 
   private scope: string | null = null;
   private companyId: string | null = null;
@@ -106,6 +125,19 @@ export class CatalogCacheService {
     return this.catalog();
   }
 
+  /** Exact offline barcode lookup. Duplicate effective values are never guessed. */
+  resolveCachedBarcode(value: string): CachedBarcodeResolution {
+    const barcode = value.trim();
+    if (!barcode) return { status: 'unknown' };
+    // A match inside a capped snapshot is not proof of uniqueness: an omitted
+    // variant may carry the same effective barcode.
+    if (this.catalogTruncated()) return { status: 'incomplete' };
+    const matches = this.barcodeIndex().get(barcode) ?? [];
+    if (matches.length === 0) return { status: 'unknown' };
+    if (matches.length > 1) return { status: 'ambiguous' };
+    return { status: 'found', variant: matches[0]! };
+  }
+
   /** Apply a quantity confirmed by a successful counted-stock RPC immediately. */
   applyConfirmedStock(variantId: string, quantity: number): void {
     const currentStock = this.stock().get(variantId);
@@ -142,12 +174,13 @@ export class CatalogCacheService {
     const scope = offlineScopeKey(identity, locationId);
     if (scope !== expectedScope || scope !== this.scope) return false;
     try {
-      const [catalogRows, familyRows, manufacturers, collections] = await Promise.all([
+      const [catalogResult, familyRows, manufacturers, collections] = await Promise.all([
         this.fetchCatalogRows(),
         this.fetchFamilyRows(),
         this.pos.listManufacturers(),
         this.pos.listCollections(),
       ]);
+      const catalogRows = catalogResult.rows;
       const locationStock = await this.fetchLocationStock(
         locationId,
         catalogRows.flatMap(row => (row.variant_id ? [row.variant_id] : []))
@@ -170,7 +203,8 @@ export class CatalogCacheService {
         location_stock: locationStock,
         manufacturers: manufacturerOptions,
         collections,
-        truncated: false,
+        truncated: catalogResult.truncated,
+        catalog_complete: true,
         fetched_at: new Date().toISOString(),
       };
       await this.replaceSnapshot(snapshot);
@@ -182,7 +216,7 @@ export class CatalogCacheService {
     }
   }
 
-  private async fetchCatalogRows(): Promise<Variant[]> {
+  private async fetchCatalogRows(): Promise<{ rows: Variant[]; truncated: boolean }> {
     const rows: Variant[] = [];
     let cursor: string | undefined;
     while (rows.length < CATALOG_LIMIT) {
@@ -193,10 +227,19 @@ export class CatalogCacheService {
       if (error) throw error;
       const page = (data ?? []) as Variant[];
       rows.push(...page);
-      if (page.length < CATALOG_PAGE_SIZE) break;
+      if (page.length < CATALOG_PAGE_SIZE) {
+        return { rows: this.sortVariants(rows), truncated: false };
+      }
       cursor = page.at(-1)?.variant_id ?? undefined;
     }
-    return this.sortVariants(rows);
+    // Probe one row beyond the supported ceiling. Without this probe, exactly
+    // 10k cached rows could hide an omitted duplicate barcode.
+    const { data, error } = await this.supabase.client.rpc('catalog_cache_page', {
+      p_after_variant_id: cursor,
+      p_limit: 1,
+    });
+    if (error) throw error;
+    return { rows: this.sortVariants(rows), truncated: (data ?? []).length > 0 };
   }
 
   private async fetchFamilyRows(): Promise<Product[]> {
@@ -369,7 +412,8 @@ export class CatalogCacheService {
       location_stock: [...nextStock].map(([variant_id, value]) => ({ variant_id, ...value })),
       manufacturers: this.mergeManufacturers(manufacturers, nextCatalog),
       collections,
-      truncated: false,
+      truncated: this.catalogTruncated(),
+      catalog_complete: this.catalogCompletenessKnown(),
       fetched_at: new Date().toISOString(),
     };
     await this.persistPatch(snapshot, affectedVariants, familyIds.size > 0 || referencesChanged);
@@ -393,7 +437,10 @@ export class CatalogCacheService {
       )
     );
     this.fetchedAt.set(snapshot.fetched_at);
-    this.catalogTruncated.set(snapshot.truncated ?? false);
+    const completenessKnown =
+      snapshot.catalog_complete === true || snapshot.products.length < CATALOG_LIMIT;
+    this.catalogCompletenessKnown.set(completenessKnown);
+    this.catalogTruncated.set((snapshot.truncated ?? false) || !completenessKnown);
     this.loaded.set(true);
     this.revision.update(value => value + 1);
   }
@@ -433,6 +480,7 @@ export class CatalogCacheService {
     this.stock.set(new Map());
     this.fetchedAt.set(null);
     this.catalogTruncated.set(false);
+    this.catalogCompletenessKnown.set(false);
     this.loaded.set(false);
   }
 
@@ -491,6 +539,7 @@ export class CatalogCacheService {
         manufacturers: metadata.manufacturers,
         collections: metadata.collections,
         truncated: metadata.truncated,
+        catalog_complete: metadata.catalog_complete,
         fetched_at: metadata.fetched_at,
       };
     }
@@ -546,6 +595,7 @@ export class CatalogCacheService {
       manufacturers: snapshot.manufacturers ?? [],
       collections: snapshot.collections ?? [],
       truncated: snapshot.truncated ?? false,
+      catalog_complete: snapshot.catalog_complete,
       fetched_at: snapshot.fetched_at,
     };
     writes.push(tx.objectStore('catalogMetadata').put(metadata));
@@ -590,6 +640,7 @@ export class CatalogCacheService {
         manufacturers: snapshot.manufacturers ?? [],
         collections: snapshot.collections ?? [],
         truncated: snapshot.truncated ?? false,
+        catalog_complete: snapshot.catalog_complete,
         fetched_at: snapshot.fetched_at,
       };
       writes.push(tx.objectStore('catalogMetadata').put(metadata));

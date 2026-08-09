@@ -24,7 +24,7 @@ Open the dashboard at `http://localhost:4203`. Supabase Studio: `npm run sb:stud
 Useful commands:
 
 ```bash
-npm run dev:all              # dashboard + storefront + platform admin
+npm run dev:all              # site + dashboard + storefront + platform admin
 npm run build:active         # production-build all active Angular apps
 npm run check:web            # design guard + dashboard production build
 npm run sb:test              # pgTAP database suite
@@ -41,7 +41,7 @@ is committed.
 ```bash
 npm run deploy               # apply pending DB migrations (SSH tunnel)
 npm run deploy:functions     # migrations + sync edge functions (hot-reload)
-npm run deploy:apps          # build + ship web + super-admin, container swap with backup
+npm run deploy:apps          # build + ship all four frontends
 npm run deploy:apps:rollback # restore previous app container
 ```
 
@@ -62,6 +62,7 @@ The migration runbook (`docs/V1_V2_MIGRATION.md`) is internal — gitignored bec
 
 ```text
 apps/
+  site/                Static marketing, docs, and public legal pages
   web/                 Business dashboard and POS
   storefront/          Public merchant storefront
   super-admin/         Platform administration
@@ -93,10 +94,10 @@ the internal migration runbook (gitignored — references real tenants).
 ## Production boundary
 
 - Self-hosted Supabase on Coolify runs PostgreSQL, Auth, Storage, Realtime, and Edge Runtime.
-- The Angular apps are static builds deployed by Coolify from `main`; `npm run deploy:apps`
-  remains the manual fallback. Caddy routes dukarun.com → web and
-  admin.dukarun.com → super-admin.
-- CI production-builds all active apps and runs the web design guard.
+- The four Angular apps are static Nginx builds deployed on Coolify. Caddy routes
+  `dukarun.com` to site, `app.dukarun.com` to web, merchant domains to storefront,
+  and `admin.dukarun.com` to super-admin.
+- CI production-builds all active apps and runs public and web design guards.
 - Database CI starts an ephemeral stack, runs lint + pgTAP, and verifies generated types.
 - Database migrations and Edge Functions are deployed explicitly with `npm run deploy` or
   `npm run deploy:functions`; the Git-connected Coolify app does not apply them.

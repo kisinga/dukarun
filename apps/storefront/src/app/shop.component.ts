@@ -1,4 +1,5 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, PLATFORM_ID, computed, inject, signal } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import {
   CatalogRow,
@@ -6,6 +7,8 @@ import {
   StorefrontInfo,
   StorefrontService,
 } from './storefront.service';
+import { StorefrontSeoService } from './storefront-seo.service';
+import { environment } from '../environments/environment';
 
 /** Format integer shillings as KES for display. */
 function formatKes(amount: number): string {
@@ -74,6 +77,25 @@ function formatKes(amount: number): string {
                     Message {{ s.name }}
                   </a>
                 }
+              </div>
+            </div>
+          } @else if (catalogLoading()) {
+            <div class="card mt-6 bg-base-100 shadow-sm">
+              <div class="card-body p-6 text-center">
+                <span
+                  class="loading loading-spinner loading-md mx-auto"
+                  aria-label="Loading products"
+                ></span>
+                <p class="mt-2 text-sm text-base-content/60">Loading current products…</p>
+              </div>
+            </div>
+          } @else if (catalogError()) {
+            <div class="card mt-6 border border-error/30 bg-base-100">
+              <div class="card-body p-6 text-center">
+                <p class="font-semibold">Catalog unavailable</p>
+                <p class="mt-1 text-sm text-base-content/60">
+                  Products could not load. Check your connection and try again.
+                </p>
               </div>
             </div>
           } @else if (catalog().length === 0) {
@@ -172,10 +194,18 @@ function formatKes(amount: number): string {
 export class ShopComponent implements OnInit {
   private readonly storefront = inject(StorefrontService);
   private readonly route = inject(ActivatedRoute);
+  private readonly platformId = inject(PLATFORM_ID);
+  private readonly seo = inject(StorefrontSeoService);
+  private readonly slug = this.route.snapshot.paramMap.get('slug') ?? '';
+  private readonly initialShop = this.slug
+    ? this.storefront.transferredStorefront(this.slug)
+    : undefined;
 
-  protected readonly shop = signal<StorefrontInfo | null>(null);
+  protected readonly shop = signal<StorefrontInfo | null>(this.initialShop ?? null);
   protected readonly catalog = signal<CatalogRow[]>([]);
   protected readonly collections = signal<ShopCollection[]>([]);
+  protected readonly catalogLoading = signal(true);
+  protected readonly catalogError = signal(false);
   protected readonly notFound = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly query = signal('');
@@ -195,28 +225,53 @@ export class ShopComponent implements OnInit {
   });
 
   async ngOnInit(): Promise<void> {
-    const slug = this.route.snapshot.paramMap.get('slug');
+    const slug = this.slug;
     if (!slug) {
       this.notFound.set(true);
+      this.catalogLoading.set(false);
       return;
     }
     try {
-      const shop = await this.storefront.storefront(slug);
+      const shop = await this.storefront.storefront(
+        slug,
+        isPlatformBrowser(this.platformId) && this.initialShop !== undefined
+      );
       if (!shop) {
         this.notFound.set(true);
+        this.catalogLoading.set(false);
         return;
       }
       this.shop.set(shop);
-      if (shop.catalogue_visible) {
-        const [catalog, collections] = await Promise.all([
-          this.storefront.catalog(slug),
-          this.storefront.collections(slug),
-        ]);
-        this.catalog.set(catalog);
-        this.collections.set(collections);
+      const name = shop.name ?? 'Dukarun shop';
+      this.seo.set(
+        `${name} | Dukarun shops`,
+        `Browse ${name} and order directly on WhatsApp.`,
+        `/${slug}`
+      );
+      this.seo.setStructuredData(this.shopStructuredData(shop, slug));
+      if (shop.catalogue_visible && isPlatformBrowser(this.platformId)) {
+        try {
+          const [catalog, collections] = await Promise.all([
+            this.storefront.catalog(slug),
+            this.storefront.collections(slug),
+          ]);
+          this.catalog.set(catalog);
+          this.collections.set(collections);
+        } catch {
+          this.catalogError.set(true);
+        } finally {
+          this.catalogLoading.set(false);
+        }
+      } else if (!shop.catalogue_visible) {
+        this.catalogLoading.set(false);
       }
     } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Failed to load this shop');
+      this.catalogLoading.set(false);
+      if (this.shop()) {
+        this.catalogError.set(true);
+      } else {
+        this.error.set(err instanceof Error ? err.message : 'Failed to load this shop');
+      }
     }
   }
 
@@ -242,5 +297,19 @@ export class ShopComponent implements OnInit {
 
   protected legalUrl(path: 'privacy' | 'terms'): string {
     return this.storefront.legalUrl(path);
+  }
+
+  private shopStructuredData(shop: StorefrontInfo, slug: string): object {
+    return {
+      '@context': 'https://schema.org',
+      '@type': 'Store',
+      name: shop.name ?? 'Dukarun shop',
+      url: new URL(
+        `/${slug}`,
+        `${environment.storefrontPublicUrl.replace(/\/+$/, '')}/`
+      ).toString(),
+      telephone: shop.public_whatsapp_number,
+      image: this.imageUrl(shop.logo_path),
+    };
   }
 }

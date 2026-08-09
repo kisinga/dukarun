@@ -1,0 +1,15 @@
+# Derived renders and validation frames
+output/
+out/
+.cache/
+
+# Static source media stays local or in external asset storage
+public/media/
+
+# Generated or imported narration masters
+public/generated/
+
+# Local workflow state
+projects/*/script.draft.json
+projects/*/voice.json
+projects/*/approval.*.json

@@ -1,0 +1,30 @@
+[
+  {
+    "id": "offline-selling",
+    "wording": "Keep selling when the network drops; sales wait safely and sync when connectivity returns.",
+    "status": "shipped",
+    "source": "apps/web/src/app/marketing/home/home.component.ts",
+    "contexts": ["overview", "walkthrough", "marketing"]
+  },
+  {
+    "id": "cash-mpesa",
+    "wording": "Take payment by cash or M-Pesa from the point of sale.",
+    "status": "shipped",
+    "source": "apps/web/src/app/marketing/home/home.component.ts",
+    "contexts": ["overview", "walkthrough", "marketing"]
+  },
+  {
+    "id": "ledger-posting",
+    "wording": "Completed transactions post into a double-entry ledger.",
+    "status": "shipped",
+    "source": "docs/TRANSACTION_WORKFLOWS.md",
+    "contexts": ["overview", "walkthrough", "marketing"]
+  },
+  {
+    "id": "owner-dashboard",
+    "wording": "Owners can review revenue, sales, margin, stock attention, and sync status from the dashboard.",
+    "status": "shipped",
+    "source": "apps/web/src/app/pages/dashboard/dashboard.component.ts",
+    "contexts": ["overview", "walkthrough", "marketing"]
+  }
+]

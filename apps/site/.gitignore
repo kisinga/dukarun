@@ -1,0 +1,4 @@
+dist/
+.angular/
+public/robots.txt
+public/sitemap.xml

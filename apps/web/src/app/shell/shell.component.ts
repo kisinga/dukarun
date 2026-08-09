@@ -19,6 +19,7 @@ import { CompanyContextService } from '../core/company-context.service';
 import { ProfileService } from '../profile/profile.service';
 import { EntityAvatarComponent } from '../shared/ui/entity-avatar.component';
 import { LegalService } from '../legal/legal.service';
+import { siteUrl } from '../core/public-url';
 
 interface NavItem {
   route: string;
@@ -200,10 +201,10 @@ interface NavSection {
                   </a>
                 </li>
                 <li>
-                  <a routerLink="/privacy"><app-icon name="heroLockClosed" />Privacy</a>
+                  <a [href]="siteUrl('/privacy')"><app-icon name="heroLockClosed" />Privacy</a>
                 </li>
                 <li>
-                  <a routerLink="/terms"><app-icon name="heroDocumentText" />Terms</a>
+                  <a [href]="siteUrl('/terms')"><app-icon name="heroDocumentText" />Terms</a>
                 </li>
                 <li>
                   <button type="button" [disabled]="sync.syncing()" (click)="requestSignOut()">
@@ -304,10 +305,13 @@ interface NavSection {
                     <li>
                       <button
                         type="button"
-                        [disabled]="companies.switching()"
+                        [disabled]="companies.switching() || c.status !== 'approved'"
                         (click)="switchCompany(c.company_id)"
                       >
                         <span class="flex-1 truncate">{{ c.name }}</span>
+                        @if (c.status === 'unapproved') {
+                          <span class="badge badge-warning badge-xs">Pending</span>
+                        }
                         @if (c.company_id === company()?.id) {
                           <app-icon name="heroCheck" size="sm" />
                         }
@@ -424,6 +428,7 @@ interface NavSection {
   `,
 })
 export class ShellComponent implements OnInit {
+  protected readonly siteUrl = siteUrl;
   private readonly supabase = inject(SupabaseService);
   private readonly router = inject(Router);
   protected readonly theme = inject(ThemeService);
@@ -596,7 +601,9 @@ export class ShellComponent implements OnInit {
       // brand falls back to 'Dukarun'
     }
     void this.profile.myProfile().catch(() => null);
-    void this.companies.load().catch(() => undefined);
+    void this.companies
+      .load()
+      .catch(error => console.warn('Company switcher could not load', error));
     await Promise.all([this.locations.load(), this.entitlements.refresh().catch(() => undefined)]);
     await this.cashierSession.start();
     await this.orderQueueCounts.refresh();

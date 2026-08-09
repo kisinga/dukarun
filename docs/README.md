@@ -18,6 +18,7 @@ Current system documentation:
 - Database behavior: `supabase/migrations` + `supabase/tests/database`
 - Generated database contract: `packages/shared-types/database.types.ts`
 - Business dashboard: `apps/web`
+- Public site and legal content: `apps/site`
 - Public storefront: `apps/storefront`
 - Platform operations: `apps/super-admin`
 - Provider integrations: `supabase/functions`

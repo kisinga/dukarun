@@ -1,6 +1,6 @@
 -- Auth hook tests (migration 0002).
 begin;
-select plan(16);
+select plan(17);
 
 -- Fixtures
 select testkit.create_user('11111111-1111-1111-1111-111111111111', 'member@test.local');
@@ -117,6 +117,11 @@ select testkit.as_user(
   'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
   '11111111-1111-1111-1111-111111111111',
   'Cashier'
+);
+select is(
+  (select count(*)::int from public.my_companies()),
+  2,
+  'company switcher keeps pending companies visible'
 );
 select ok(
   public.current_company_id() is null,

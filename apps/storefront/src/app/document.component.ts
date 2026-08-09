@@ -1,6 +1,7 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { ExternalDocument, StorefrontService } from './storefront.service';
+import { StorefrontSeoService } from './storefront-seo.service';
 
 @Component({
   selector: 'app-document',
@@ -133,10 +134,12 @@ import { ExternalDocument, StorefrontService } from './storefront.service';
 export class DocumentComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly storefront = inject(StorefrontService);
+  private readonly seo = inject(StorefrontSeoService);
   protected readonly document = signal<ExternalDocument | null>(null);
   protected readonly loading = signal(true);
 
   async ngOnInit(): Promise<void> {
+    this.seo.set('Private business document', 'Secure business document.', '/document', true);
     try {
       const token = this.route.snapshot.paramMap.get('token');
       if (token) this.document.set(await this.storefront.externalDocument(token));

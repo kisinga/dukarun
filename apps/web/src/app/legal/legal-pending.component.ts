@@ -1,12 +1,12 @@
 import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { CompanyContextService } from '../core/company-context.service';
 import { SupabaseService } from '../core/supabase.service';
 import { LegalService } from './legal.service';
+import { siteUrl } from '../core/public-url';
 
 @Component({
   selector: 'app-legal-pending',
-  imports: [RouterLink],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <main class="flex min-h-screen items-center justify-center bg-base-200 p-4">
@@ -41,8 +41,14 @@ import { LegalService } from './legal.service';
               <span class="label-text mb-1">Switch company</span>
               <select class="select select-bordered" (change)="switchCompany($event)">
                 @for (company of companies.companies(); track company.company_id) {
-                  <option [value]="company.company_id" [selected]="company.is_active">
-                    {{ company.name }}
+                  <option
+                    [value]="company.company_id"
+                    [selected]="company.is_active"
+                    [disabled]="company.status !== 'approved'"
+                  >
+                    {{
+                      company.name + (company.status === 'unapproved' ? ' — Pending approval' : '')
+                    }}
                   </option>
                 }
               </select>
@@ -51,7 +57,7 @@ import { LegalService } from './legal.service';
 
           <div class="flex flex-col gap-2 sm:flex-row sm:justify-center">
             @if (!approvalPending()) {
-              <a routerLink="/terms" target="_blank" class="btn btn-ghost">Read Terms</a>
+              <a [href]="siteUrl('/terms')" target="_blank" class="btn btn-ghost">Read Terms</a>
             }
             <button
               type="button"
@@ -69,6 +75,7 @@ import { LegalService } from './legal.service';
   `,
 })
 export class LegalPendingComponent implements OnInit {
+  protected readonly siteUrl = siteUrl;
   private readonly legal = inject(LegalService);
   private readonly supabase = inject(SupabaseService);
   private readonly router = inject(Router);
@@ -80,7 +87,9 @@ export class LegalPendingComponent implements OnInit {
   protected readonly approvalPending = signal(false);
 
   ngOnInit(): void {
-    void this.companies.load().catch(() => undefined);
+    void this.companies
+      .load()
+      .catch(() => this.error.set('Companies could not be loaded. Try again.'));
     void this.checkAgain(false);
   }
 

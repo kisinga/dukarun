@@ -1,0 +1,158 @@
+{
+  "projectId": "offline-pos",
+  "title": "Keep selling when the network drops",
+  "language": "en-KE",
+  "fps": 30,
+  "durationInFrames": 1800,
+  "promptVersion": "offline-pos-v1",
+  "model": "human-authored",
+  "callToAction": "Get started",
+  "narration": [
+    {
+      "id": "hook",
+      "text": "When the network drops, the queue at your counter should not stop with it.",
+      "source": "file",
+      "audioFile": "media/offline-pos/audio/hook.m4a",
+      "startFrame": 0,
+      "endFrame": 210
+    },
+    {
+      "id": "sell",
+      "text": "With Dukarun, your cashier keeps selling from the same simple counter. Add the items, check the total, and complete the sale without waiting for the signal to return.",
+      "source": "script",
+      "audioFile": null,
+      "startFrame": 210,
+      "endFrame": 690
+    },
+    {
+      "id": "queue",
+      "text": "The sale is stored safely on the device and clearly marked as waiting to sync.",
+      "source": "script",
+      "audioFile": null,
+      "startFrame": 690,
+      "endFrame": 960
+    },
+    {
+      "id": "sync",
+      "text": "When connectivity comes back, Dukarun synchronizes it automatically.",
+      "source": "script",
+      "audioFile": null,
+      "startFrame": 960,
+      "endFrame": 1140
+    },
+    {
+      "id": "books",
+      "text": "The M-Pesa payment is recorded, the customer gets a receipt, and the transaction posts to the double-entry ledger.",
+      "source": "script",
+      "audioFile": null,
+      "startFrame": 1140,
+      "endFrame": 1470
+    },
+    {
+      "id": "owner",
+      "text": "The owner sees the updated revenue, margin, and sync status from the dashboard. Every shilling, accounted for.",
+      "source": "script",
+      "audioFile": null,
+      "startFrame": 1470,
+      "endFrame": 1740
+    },
+    {
+      "id": "cta",
+      "text": "Run your shop with Dukarun.",
+      "source": "script",
+      "audioFile": null,
+      "startFrame": 1740,
+      "endFrame": 1800
+    }
+  ],
+  "scenes": [
+    {
+      "id": "hook",
+      "template": "brand-hook",
+      "startFrame": 0,
+      "durationInFrames": 210,
+      "headline": "The network dropped.",
+      "body": "The counter keeps moving.",
+      "claimIds": ["offline-selling"],
+      "narrationSegmentIds": ["hook"],
+      "data": {}
+    },
+    {
+      "id": "sell",
+      "template": "phone-pos",
+      "startFrame": 210,
+      "durationInFrames": 480,
+      "headline": "Keep selling",
+      "body": "Add products and complete the sale from the same counter.",
+      "claimIds": ["offline-selling", "cash-mpesa"],
+      "narrationSegmentIds": ["sell"],
+      "data": { "total": 790 }
+    },
+    {
+      "id": "queue",
+      "template": "offline-state",
+      "startFrame": 690,
+      "durationInFrames": 270,
+      "headline": "Stored safely",
+      "body": "1 sale waiting to sync",
+      "claimIds": ["offline-selling"],
+      "narrationSegmentIds": ["queue"],
+      "data": {}
+    },
+    {
+      "id": "sync",
+      "template": "sync-state",
+      "startFrame": 960,
+      "durationInFrames": 180,
+      "headline": "Signal restored",
+      "body": "Sale synchronized",
+      "claimIds": ["offline-selling"],
+      "narrationSegmentIds": ["sync"],
+      "data": {}
+    },
+    {
+      "id": "receipt",
+      "template": "receipt",
+      "startFrame": 1140,
+      "durationInFrames": 210,
+      "headline": "M-Pesa recorded",
+      "body": "Receipt ready",
+      "claimIds": ["cash-mpesa"],
+      "narrationSegmentIds": ["books"],
+      "data": { "total": 790 }
+    },
+    {
+      "id": "ledger",
+      "template": "ledger-posting",
+      "startFrame": 1350,
+      "durationInFrames": 120,
+      "headline": "Posted to the ledger",
+      "body": "Debit and credit stay balanced.",
+      "claimIds": ["ledger-posting"],
+      "narrationSegmentIds": ["books"],
+      "data": { "total": 790 }
+    },
+    {
+      "id": "dashboard",
+      "template": "dashboard-summary",
+      "startFrame": 1470,
+      "durationInFrames": 270,
+      "headline": "Know how the shop is doing",
+      "body": "Revenue, margin, stock, and sync status in one place.",
+      "claimIds": ["owner-dashboard"],
+      "narrationSegmentIds": ["owner"],
+      "data": { "revenue": 18450, "sales": 27, "margin": 4260 }
+    },
+    {
+      "id": "cta",
+      "template": "cta",
+      "startFrame": 1740,
+      "durationInFrames": 60,
+      "headline": "Every shilling, accounted for.",
+      "body": "Run your shop with dukarun.",
+      "claimIds": [],
+      "narrationSegmentIds": ["cta"],
+      "data": {}
+    }
+  ]
+}

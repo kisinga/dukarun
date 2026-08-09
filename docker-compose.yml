@@ -1,12 +1,28 @@
 # Coolify production compose — Supabase v2 applications.
 #
 # Domain mapping (set in Coolify per service):
-#   web          -> dukarun.com       (port 80)
+#   site         -> dukarun.com       (port 80)
+#   web          -> app.dukarun.com   (port 80)
+#   storefront   -> store domain      (port 80)
 #   super-admin  -> admin.dukarun.com (port 80)
 #
 # SUPABASE_URL / SUPABASE_ANON_KEY must be set in the Coolify app env.
 
 services:
+  site:
+    build:
+      context: .
+      dockerfile: apps/Dockerfile
+      args:
+        APP: site
+        SUPABASE_URL: ${SUPABASE_URL}
+        SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
+        SITE_PUBLIC_URL: ${SITE_PUBLIC_URL:-https://dukarun.com}
+        APP_PUBLIC_URL: ${APP_PUBLIC_URL:-https://app.dukarun.com}
+        STOREFRONT_PUBLIC_URL: ${STOREFRONT_PUBLIC_URL:-https://store.dukarun.com}
+        PUBLIC_DATA_MODE: live
+    restart: unless-stopped
+
   web:
     build:
       context: .
@@ -15,7 +31,23 @@ services:
         APP: web
         SUPABASE_URL: ${SUPABASE_URL}
         SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
-        WEB_PUBLIC_URL: ${WEB_PUBLIC_URL:-https://dukarun.com}
+        SITE_PUBLIC_URL: ${SITE_PUBLIC_URL:-https://dukarun.com}
+        APP_PUBLIC_URL: ${APP_PUBLIC_URL:-https://app.dukarun.com}
+        STOREFRONT_PUBLIC_URL: ${STOREFRONT_PUBLIC_URL:-https://store.dukarun.com}
+    restart: unless-stopped
+
+  storefront:
+    build:
+      context: .
+      dockerfile: apps/Dockerfile
+      args:
+        APP: storefront
+        SUPABASE_URL: ${SUPABASE_URL}
+        SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
+        SITE_PUBLIC_URL: ${SITE_PUBLIC_URL:-https://dukarun.com}
+        APP_PUBLIC_URL: ${APP_PUBLIC_URL:-https://app.dukarun.com}
+        STOREFRONT_PUBLIC_URL: ${STOREFRONT_PUBLIC_URL:-https://store.dukarun.com}
+        PUBLIC_DATA_MODE: live
     restart: unless-stopped
 
   super-admin:
@@ -26,5 +58,7 @@ services:
         APP: super-admin
         SUPABASE_URL: ${SUPABASE_URL}
         SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
-        WEB_PUBLIC_URL: ${WEB_PUBLIC_URL:-https://dukarun.com}
+        SITE_PUBLIC_URL: ${SITE_PUBLIC_URL:-https://dukarun.com}
+        APP_PUBLIC_URL: ${APP_PUBLIC_URL:-https://app.dukarun.com}
+        STOREFRONT_PUBLIC_URL: ${STOREFRONT_PUBLIC_URL:-https://store.dukarun.com}
     restart: unless-stopped
