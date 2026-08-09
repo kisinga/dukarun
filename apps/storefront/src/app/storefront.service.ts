@@ -162,13 +162,15 @@ export class StorefrontService {
     return this.track(async () => {
       const limit = options.limit ?? 12;
       const requestedOffset = options.offset ?? 0;
+      const search = options.search?.trim();
+      const collectionId = options.collectionId;
       const fetchPage = async (offset: number): Promise<CatalogPage> => {
         const { data, error } = await this.client.rpc('storefront_catalog_page', {
           p_slug: slug,
-          p_search: options.search?.trim() || null,
-          p_collection_id: options.collectionId ?? null,
           p_limit: limit,
           p_offset: offset,
+          ...(search ? { p_search: search } : {}),
+          ...(collectionId ? { p_collection_id: collectionId } : {}),
         });
         if (error) throw error;
         return { rows: data, total: Number(data[0]?.total_count ?? 0), offset };
