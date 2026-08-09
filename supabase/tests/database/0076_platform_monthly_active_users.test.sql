@@ -24,6 +24,10 @@ where id = '22222222-2222-2222-2222-222222222222';
 insert into public.platform_admins (user_id)
 values ('99999999-9999-9999-9999-999999999999');
 
+create temp table mau_expected as
+select count(*)::int as users_total from auth.users;
+grant select on pg_temp.mau_expected to authenticated;
+
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
@@ -39,7 +43,7 @@ select is(
 
 select is(
   (public.platform_stats() ->> 'users_total')::int,
-  (select count(*)::int from auth.users),
+  (select users_total from mau_expected),
   'platform stats includes the registered user total'
 );
 
