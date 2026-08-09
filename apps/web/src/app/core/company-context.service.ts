@@ -8,6 +8,7 @@ export interface CompanyMembership {
   code: string;
   role_name: string;
   is_active: boolean;
+  status: string;
 }
 
 /**
@@ -50,6 +51,9 @@ export class CompanyContextService {
    */
   async switchCompany(companyId: string): Promise<void> {
     if (this.switching()) return;
+    const target = this.companies().find(company => company.company_id === companyId);
+    if (!target) throw new Error('Company is not available.');
+    if (target.status !== 'approved') throw new Error('Company approval is still pending.');
     const userId = this.supabase.session()?.user.id;
     if (!userId) throw new Error('Sign in again to switch companies.');
     this.switching.set(true);

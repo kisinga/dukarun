@@ -5703,6 +5703,7 @@ export type Database = {
           is_active: boolean
           name: string
           role_name: string
+          status: string
         }[]
       }
       next_monthly_anniversary: {
@@ -6812,4 +6813,3 @@ export const Constants = {
     Enums: {},
   },
 } as const
-

@@ -304,10 +304,13 @@ interface NavSection {
                     <li>
                       <button
                         type="button"
-                        [disabled]="companies.switching()"
+                        [disabled]="companies.switching() || c.status !== 'approved'"
                         (click)="switchCompany(c.company_id)"
                       >
                         <span class="flex-1 truncate">{{ c.name }}</span>
+                        @if (c.status === 'unapproved') {
+                          <span class="badge badge-warning badge-xs">Pending</span>
+                        }
                         @if (c.company_id === company()?.id) {
                           <app-icon name="heroCheck" size="sm" />
                         }
@@ -596,7 +599,9 @@ export class ShellComponent implements OnInit {
       // brand falls back to 'Dukarun'
     }
     void this.profile.myProfile().catch(() => null);
-    void this.companies.load().catch(() => undefined);
+    void this.companies
+      .load()
+      .catch(error => console.warn('Company switcher could not load', error));
     await Promise.all([this.locations.load(), this.entitlements.refresh().catch(() => undefined)]);
     await this.cashierSession.start();
     await this.orderQueueCounts.refresh();

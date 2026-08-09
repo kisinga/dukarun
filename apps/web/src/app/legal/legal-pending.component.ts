@@ -41,8 +41,14 @@ import { LegalService } from './legal.service';
               <span class="label-text mb-1">Switch company</span>
               <select class="select select-bordered" (change)="switchCompany($event)">
                 @for (company of companies.companies(); track company.company_id) {
-                  <option [value]="company.company_id" [selected]="company.is_active">
-                    {{ company.name }}
+                  <option
+                    [value]="company.company_id"
+                    [selected]="company.is_active"
+                    [disabled]="company.status !== 'approved'"
+                  >
+                    {{
+                      company.name + (company.status === 'unapproved' ? ' — Pending approval' : '')
+                    }}
                   </option>
                 }
               </select>
@@ -80,7 +86,9 @@ export class LegalPendingComponent implements OnInit {
   protected readonly approvalPending = signal(false);
 
   ngOnInit(): void {
-    void this.companies.load().catch(() => undefined);
+    void this.companies
+      .load()
+      .catch(() => this.error.set('Companies could not be loaded. Try again.'));
     void this.checkAgain(false);
   }
 
