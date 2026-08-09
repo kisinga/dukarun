@@ -17,11 +17,13 @@ const localAnonKey =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
 const supabaseUrl = process.env.SUPABASE_URL?.trim() || localUrl;
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY?.trim() || localAnonKey;
+const webPublicUrl = process.env.WEB_PUBLIC_URL?.trim() || 'http://localhost:4200';
 
 try {
   new URL(supabaseUrl);
+  new URL(webPublicUrl);
 } catch {
-  console.error('SUPABASE_URL must be a valid absolute URL.');
+  console.error('SUPABASE_URL and WEB_PUBLIC_URL must be valid absolute URLs.');
   process.exit(2);
 }
 
@@ -46,6 +48,7 @@ const contents =
   `  production: true,\n` +
   `  supabaseUrl: ${JSON.stringify(supabaseUrl)},\n` +
   `  supabaseAnonKey: ${JSON.stringify(supabaseAnonKey)},\n` +
+  `  webPublicUrl: ${JSON.stringify(webPublicUrl)},\n` +
   `};\n`;
 
 mkdirSync(dirname(target), { recursive: true });

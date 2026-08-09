@@ -15,7 +15,8 @@
     "module": "preserve",
     "baseUrl": "./",
     "paths": {
-      "@dukarun/shared-types": ["../../packages/shared-types/database.types.ts"]
+      "@dukarun/shared-types": ["../../packages/shared-types/database.types.ts"],
+      "@dukarun/legal-markdown": ["../../packages/legal-markdown.ts"]
     }
   },
   "angularCompilerOptions": {

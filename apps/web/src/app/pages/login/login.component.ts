@@ -1,14 +1,15 @@
 import { Component, DestroyRef, inject, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { SupabaseService } from '../../core/supabase.service';
 import { normalizeKenyanPhone } from '../../core/phone';
+import { LegalService } from '../../legal/legal.service';
 
 const RESEND_COOLDOWN_SECONDS = 60;
 
 @Component({
   selector: 'app-login',
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, RouterLink],
   template: `
     <main class="dashboard-main flex min-h-screen items-center justify-center bg-base-200 p-4">
       <div class="card w-full max-w-sm bg-base-100">
@@ -67,6 +68,11 @@ const RESEND_COOLDOWN_SECONDS = 60;
           @if (error()) {
             <p class="mt-2 text-sm text-error">{{ error() }}</p>
           }
+          <p class="mt-5 text-center text-xs text-base-content/55">
+            <a routerLink="/privacy" class="link link-hover">Privacy</a>
+            <span aria-hidden="true"> · </span>
+            <a routerLink="/terms" class="link link-hover">Terms</a>
+          </p>
         </div>
       </div>
     </main>
@@ -74,6 +80,7 @@ const RESEND_COOLDOWN_SECONDS = 60;
 })
 export class LoginComponent {
   private readonly supabase = inject(SupabaseService);
+  private readonly legal = inject(LegalService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
@@ -128,9 +135,25 @@ export class LoginComponent {
       // OTP-issued tokens lack the custom claims (company_id, user_role);
       // refresh so permission-gated RPCs (settle/void/override) work.
       await this.supabase.client.auth.refreshSession();
-      const company = await this.supabase.currentCompany();
-      await this.router.navigate(company ? ['/dashboard'] : ['/register'], {
-        queryParams: company ? undefined : { plan: this.requestedPlanCode ?? undefined },
+      const hasCompanyClaim = Boolean(this.supabase.claims()?.company_id);
+      if (hasCompanyClaim) {
+        await this.router.navigate(['/dashboard']);
+        return;
+      }
+
+      let target = '/register';
+      try {
+        const legalStatus = await this.legal.refresh();
+        if (legalStatus.company_status === 'unapproved') target = '/company/pending';
+      } catch {
+        await this.router.navigate(['/company/pending'], {
+          queryParams: { returnUrl: '/register' },
+        });
+        return;
+      }
+      await this.router.navigate([target], {
+        queryParams:
+          target === '/register' ? { plan: this.requestedPlanCode ?? undefined } : undefined,
       });
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Verification failed');

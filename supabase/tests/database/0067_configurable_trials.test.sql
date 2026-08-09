@@ -16,13 +16,14 @@ values ('trial-plus', 'Trial Plus', 2500, 25000, true, true, true, 10, 10000, 5,
 
 select testkit.create_user('69696969-6969-6969-6969-696969696969', 'trial-config@test.local');
 
-set local role authenticated;
+set local role service_role;
 set local request.jwt.claims = '{"sub":"69696969-6969-6969-6969-696969696969","role":"authenticated"}';
 
 create temp table configured_trial_company as
 select public.provision_company(
   'Configured Trial Co', 'Main', 'KES', null, null, 'trial-plus'
 ) company_id;
+grant select on pg_temp.configured_trial_company to authenticated;
 
 reset role;
 
@@ -110,11 +111,12 @@ select lives_ok(
 
 reset role;
 select testkit.create_user('68686868-6868-6868-6868-686868686868', 'default-trial@test.local');
-set local role authenticated;
+set local role service_role;
 set local request.jwt.claims = '{"sub":"68686868-6868-6868-6868-686868686868","role":"authenticated"}';
 
 create temp table default_trial_company as
 select public.provision_company('Default Trial Co') company_id;
+grant select on pg_temp.default_trial_company to authenticated;
 
 reset role;
 

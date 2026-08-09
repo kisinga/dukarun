@@ -1354,6 +1354,55 @@ export type Database = {
           },
         ]
       }
+      company_legal_acceptances: {
+        Row: {
+          accepted_at: string
+          accepted_by: string
+          company_id: string
+          document_version_id: string
+          id: string
+          source: string
+        }
+        Insert: {
+          accepted_at?: string
+          accepted_by: string
+          company_id: string
+          document_version_id: string
+          id?: string
+          source: string
+        }
+        Update: {
+          accepted_at?: string
+          accepted_by?: string
+          company_id?: string
+          document_version_id?: string
+          id?: string
+          source?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_legal_acceptances_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_legal_acceptances_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_legal_acceptances_document_version_id_fkey"
+            columns: ["document_version_id"]
+            isOneToOne: false
+            referencedRelation: "legal_document_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       company_membership_locations: {
         Row: {
           company_id: string
@@ -2243,6 +2292,57 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      legal_document_versions: {
+        Row: {
+          content_markdown: string | null
+          content_sha256: string
+          created_at: string
+          created_by: string | null
+          document_type: string
+          effective_at: string
+          enforcement_at: string | null
+          id: string
+          publication_state: string
+          published_at: string | null
+          published_by: string | null
+          requires_company_acceptance: boolean
+          updated_at: string
+          version: string
+        }
+        Insert: {
+          content_markdown?: string | null
+          content_sha256: string
+          created_at?: string
+          created_by?: string | null
+          document_type: string
+          effective_at: string
+          enforcement_at?: string | null
+          id?: string
+          publication_state?: string
+          published_at?: string | null
+          published_by?: string | null
+          requires_company_acceptance?: boolean
+          updated_at?: string
+          version: string
+        }
+        Update: {
+          content_markdown?: string | null
+          content_sha256?: string
+          created_at?: string
+          created_by?: string | null
+          document_type?: string
+          effective_at?: string
+          enforcement_at?: string | null
+          id?: string
+          publication_state?: string
+          published_at?: string | null
+          published_by?: string | null
+          requires_company_acceptance?: boolean
+          updated_at?: string
+          version?: string
+        }
+        Relationships: []
       }
       location_payment_methods: {
         Row: {
@@ -4937,6 +5037,10 @@ export type Database = {
       }
     }
     Functions: {
+      accept_company_terms: {
+        Args: { p_content_sha256: string; p_source?: string; p_version: string }
+        Returns: string
+      }
       accessible_business_locations: {
         Args: never
         Returns: {
@@ -5245,6 +5349,7 @@ export type Database = {
       credit_reminder_scan: { Args: never; Returns: number }
       current_access_snapshot: { Args: never; Returns: Json }
       current_company_id: { Args: never; Returns: string }
+      current_company_legal_status: { Args: never; Returns: Json }
       current_entitlements: { Args: never; Returns: Json }
       current_role_name: { Args: never; Returns: string }
       current_user_can_access_location: {
@@ -5339,6 +5444,7 @@ export type Database = {
         Args: { p_company_id: string; p_customer_id: string }
         Returns: string
       }
+      legal_markdown_sha256: { Args: { p_content: string }; Returns: string }
       list_audit_actors: {
         Args: never
         Returns: {
@@ -5418,6 +5524,7 @@ export type Database = {
         Args: { p_after?: string; p_anchor: string }
         Returns: string
       }
+      normalize_legal_markdown: { Args: { p_content: string }; Returns: string }
       notify: {
         Args: {
           p_body?: string
@@ -5472,7 +5579,63 @@ export type Database = {
         }
         Returns: Json
       }
+      platform_company_legal_status: {
+        Args: never
+        Returns: {
+          accepted_at: string
+          accepted_by: string
+          company_id: string
+          company_name: string
+          legal_status: string
+          terms_version: string
+        }[]
+      }
+      platform_discard_legal_draft: {
+        Args: { p_id: string }
+        Returns: undefined
+      }
+      platform_legal_documents: {
+        Args: never
+        Returns: {
+          content_markdown: string | null
+          content_sha256: string
+          created_at: string
+          created_by: string | null
+          document_type: string
+          effective_at: string
+          enforcement_at: string | null
+          id: string
+          publication_state: string
+          published_at: string | null
+          published_by: string | null
+          requires_company_acceptance: boolean
+          updated_at: string
+          version: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "legal_document_versions"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       platform_operations_snapshot: { Args: never; Returns: Json }
+      platform_publish_legal_document: {
+        Args: { p_expected_sha256: string; p_id: string }
+        Returns: Json
+      }
+      platform_save_legal_draft: {
+        Args: {
+          p_content_markdown: string
+          p_document_type: string
+          p_effective_at: string
+          p_enforcement_at?: string
+          p_id: string
+          p_requires_company_acceptance?: boolean
+          p_version: string
+        }
+        Returns: string
+      }
       platform_save_tier: {
         Args: {
           p_code: string
@@ -5731,8 +5894,34 @@ export type Database = {
         }
         Returns: string
       }
+      provision_company_with_terms: {
+        Args: {
+          p_address?: string
+          p_company_name: string
+          p_currency?: string
+          p_email?: string
+          p_owner_name?: string
+          p_store_name?: string
+          p_terms_content_sha256?: string
+          p_terms_version?: string
+          p_trial_tier_code?: string
+        }
+        Returns: string
+      }
       public_billing_config: { Args: never; Returns: Json }
       public_customer_statement: { Args: { p_token: string }; Returns: Json }
+      published_legal_document: {
+        Args: { p_document_type: string }
+        Returns: Json
+      }
+      published_legal_document_history: {
+        Args: { p_document_type: string }
+        Returns: Json
+      }
+      published_legal_document_version: {
+        Args: { p_document_type: string; p_version: string }
+        Returns: Json
+      }
       queue_batch_message: {
         Args: { p_audience?: string; p_body: string; p_channel: string }
         Returns: number
@@ -6426,4 +6615,3 @@ export const Constants = {
     Enums: {},
   },
 } as const
-

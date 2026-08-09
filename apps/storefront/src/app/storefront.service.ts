@@ -20,7 +20,7 @@ export interface CustomerStatement {
 
 /**
  * Anonymous read-only access to the public storefront surface.
- * No auth — bare client with the anon key; RLS/security-definer RPCs gate the data.
+ * No authentication. This bare client uses the anonymous key. RLS and security-definer RPCs gate the data.
  */
 @Injectable({ providedIn: 'root' })
 export class StorefrontService {
@@ -66,6 +66,10 @@ export class StorefrontService {
   imageUrl(path: string | null): string | null {
     if (!path) return null;
     return `${environment.supabaseUrl}/storage/v1/object/public/product-images/${path}`;
+  }
+
+  legalUrl(path: 'privacy' | 'terms'): string {
+    return `${environment.webPublicUrl.replace(/\/$/, '')}/${path}`;
   }
 
   async customerStatement(token: string): Promise<CustomerStatement | null> {

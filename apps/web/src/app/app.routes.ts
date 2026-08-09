@@ -3,6 +3,7 @@ import { authGuard, guestGuard } from './core/auth.guard';
 import { locationGuard } from './core/location.guard';
 import { permissionGuard } from './core/permission.guard';
 import { featureGuard } from './core/feature.guard';
+import { legalAcceptanceGuard } from './legal/legal.guard';
 
 export const routes: Routes = [
   // Public marketing surface — no auth required. Placed first so '/', '/about'
@@ -32,6 +33,26 @@ export const routes: Routes = [
         path: 'docs',
         loadComponent: () => import('./marketing/docs/docs.component').then(m => m.DocsComponent),
       },
+      {
+        path: 'privacy',
+        data: { documentType: 'privacy' },
+        loadComponent: () => import('./legal/legal-page.component').then(m => m.LegalPageComponent),
+      },
+      {
+        path: 'terms',
+        data: { documentType: 'terms' },
+        loadComponent: () => import('./legal/legal-page.component').then(m => m.LegalPageComponent),
+      },
+      {
+        path: 'dpa',
+        data: { documentType: 'dpa' },
+        loadComponent: () => import('./legal/legal-page.component').then(m => m.LegalPageComponent),
+      },
+      {
+        path: 'subprocessors',
+        data: { documentType: 'subprocessors' },
+        loadComponent: () => import('./legal/legal-page.component').then(m => m.LegalPageComponent),
+      },
     ],
   },
   {
@@ -46,9 +67,26 @@ export const routes: Routes = [
       import('./pages/register/register.component').then(m => m.RegisterComponent),
   },
   {
-    path: '',
+    path: 'legal/accept',
     canActivate: [authGuard],
-    canActivateChild: [locationGuard],
+    loadComponent: () => import('./legal/legal-accept.component').then(m => m.LegalAcceptComponent),
+  },
+  {
+    path: 'legal/pending',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./legal/legal-pending.component').then(m => m.LegalPendingComponent),
+  },
+  {
+    path: 'company/pending',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./legal/legal-pending.component').then(m => m.LegalPendingComponent),
+  },
+  {
+    path: '',
+    canActivate: [authGuard, legalAcceptanceGuard],
+    canActivateChild: [legalAcceptanceGuard, locationGuard],
     loadComponent: () => import('./shell/shell.component').then(m => m.ShellComponent),
     children: [
       {

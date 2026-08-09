@@ -6,6 +6,7 @@
 #   APP                web | storefront | super-admin
 #   SUPABASE_URL       e.g. https://supa.dukarun.com
 #   SUPABASE_ANON_KEY  the supabase service's anon key
+#   WEB_PUBLIC_URL     canonical public web URL, e.g. https://dukarun.com
 # SUPABASE_* are baked into the bundle by scripts/generate-environment.mjs (prebuild).
 # ========================================
 
@@ -19,14 +20,16 @@ WORKDIR /app
 COPY apps/$APP/package.json apps/$APP/package.json
 RUN cd apps/$APP && npm install --quiet --no-audit --no-fund --include=dev
 
-# Sources the build needs: the app, the env generator, the shared types
+# Sources the build needs: the app, the env generator, and shared packages
 COPY scripts/generate-environment.mjs scripts/generate-environment.mjs
 COPY packages/shared-types packages/shared-types
+COPY packages/legal-markdown.ts packages/legal-markdown.ts
 COPY apps/$APP apps/$APP
 
 ARG SUPABASE_URL
 ARG SUPABASE_ANON_KEY
-ENV SUPABASE_URL=$SUPABASE_URL SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY
+ARG WEB_PUBLIC_URL
+ENV SUPABASE_URL=$SUPABASE_URL SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY WEB_PUBLIC_URL=$WEB_PUBLIC_URL
 
 RUN cd apps/$APP && npm run build
 

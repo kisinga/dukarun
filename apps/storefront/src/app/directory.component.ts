@@ -2,7 +2,7 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { StorefrontInfo, StorefrontService } from './storefront.service';
 
-/** `/` — directory of public storefronts. */
+/** `/` is the directory of public storefronts. */
 @Component({
   selector: 'app-directory',
   imports: [RouterLink],
@@ -50,6 +50,11 @@ import { StorefrontInfo, StorefrontService } from './storefront.service';
             }
           </div>
         }
+        <p class="mt-8 text-center text-xs text-base-content/50">
+          <a [href]="legalUrl('privacy')" class="link link-hover">Privacy</a>
+          <span aria-hidden="true"> · </span>
+          <a [href]="legalUrl('terms')" class="link link-hover">Terms</a>
+        </p>
       </div>
     </main>
   `,
@@ -73,5 +78,9 @@ export class DirectoryComponent implements OnInit {
 
   protected imageUrl(path: string | null): string | null {
     return this.storefront.imageUrl(path);
+  }
+
+  protected legalUrl(path: 'privacy' | 'terms'): string {
+    return this.storefront.legalUrl(path);
   }
 }

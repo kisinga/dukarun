@@ -18,6 +18,7 @@ import { LocationContextService } from '../core/location-context.service';
 import { CompanyContextService } from '../core/company-context.service';
 import { ProfileService } from '../profile/profile.service';
 import { EntityAvatarComponent } from '../shared/ui/entity-avatar.component';
+import { LegalService } from '../legal/legal.service';
 
 interface NavItem {
   route: string;
@@ -26,7 +27,7 @@ interface NavItem {
   badge?: () => number;
   /** Badge tone override; defaults to `badge-warning`. */
   badgeClass?: () => string;
-  /** Permission predicate — item renders only when it returns true. */
+  /** Permission predicate. The item renders only when it returns true. */
   visible?: () => boolean;
 }
 
@@ -36,8 +37,8 @@ interface NavSection {
 }
 
 /**
- * Authenticated app shell (v1 pattern): sticky top navbar + daisyUI drawer —
- * sidebar always open on desktop, slide-over on mobile — plus a mobile
+ * Authenticated app shell (v1 pattern): sticky top navbar and daisyUI drawer.
+ * The sidebar is always open on desktop and slides over on mobile. A mobile
  * bottom tab bar for the core destinations.
  */
 
@@ -199,6 +200,12 @@ interface NavSection {
                   </a>
                 </li>
                 <li>
+                  <a routerLink="/privacy"><app-icon name="heroLockClosed" />Privacy</a>
+                </li>
+                <li>
+                  <a routerLink="/terms"><app-icon name="heroDocumentText" />Terms</a>
+                </li>
+                <li>
                   <button type="button" [disabled]="sync.syncing()" (click)="requestSignOut()">
                     <app-icon name="heroArrowRightOnRectangle" />
                     Sign out
@@ -211,6 +218,27 @@ interface NavSection {
 
         <!-- Page content -->
         <main class="flex-1 overflow-auto bg-base-200/40 pb-20 lg:pb-0">
+          @if (legal.status(); as legalStatus) {
+            @if (
+              legalStatus.required && !legalStatus.accepted && !legalStatus.enforcement_started
+            ) {
+              <div class="border-b border-warning/30 bg-warning/10 px-4 py-3 text-sm" role="status">
+                <div class="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3">
+                  <span>
+                    Updated Terms require company acceptance before
+                    {{ dateTime(legalStatus.enforcement_at) }}.
+                  </span>
+                  @if (legalStatus.can_accept) {
+                    <a routerLink="/legal/accept" class="btn btn-warning btn-sm min-h-9"
+                      >Review Terms</a
+                    >
+                  } @else {
+                    <span class="font-medium">Ask a company administrator to review them.</span>
+                  }
+                </div>
+              </div>
+            }
+          }
           <router-outlet />
         </main>
 
@@ -410,6 +438,7 @@ export class ShellComponent implements OnInit {
   protected readonly locations = inject(LocationContextService);
   protected readonly companies = inject(CompanyContextService);
   protected readonly profile = inject(ProfileService);
+  protected readonly legal = inject(LegalService);
 
   protected readonly myName = computed(() => this.profile.me()?.display_name ?? 'Account');
   protected readonly myAvatarUrl = computed(() =>
@@ -538,6 +567,14 @@ export class ShellComponent implements OnInit {
     return `${count} sale${count === 1 ? '' : 's'} waiting to sync`;
   }
 
+  protected dateTime(value?: string | null): string {
+    if (!value) return 'the enforcement date';
+    return new Date(value).toLocaleDateString('en-KE', {
+      dateStyle: 'medium',
+      timeZone: 'Africa/Nairobi',
+    });
+  }
+
   async ngOnInit(): Promise<void> {
     try {
       this.company.set(await this.supabase.currentCompany());
@@ -551,7 +588,7 @@ export class ShellComponent implements OnInit {
     await this.orderQueueCounts.refresh();
   }
 
-  /** Switch active company — CompanyContextService ends this in a full reload. */
+  /** Switch active company. CompanyContextService ends this in a full reload. */
   protected switchCompany(companyId: string): void {
     if (companyId === this.company()?.id) return;
     void this.companies.switchCompany(companyId).catch(() => undefined);

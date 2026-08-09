@@ -4,8 +4,9 @@ select plan(15);
 
 select testkit.create_user('11111111-1111-1111-1111-111111111111', 'founder@test.local');
 
--- Provision as the authenticated founder.
-set local role authenticated;
+-- Exercise the internal provisioning primitive. Public registration uses the
+-- Terms-aware wrapper and authenticated access to this primitive is revoked.
+set local role service_role;
 set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
 
 create temp table provision_result as
@@ -13,6 +14,7 @@ select public.provision_company(
   'Mama Mboga Stores', 'Kiosk 1', 'KES',
   'info@mamamboga.co.ke', 'Kiosk 1, Tom Mboya Street, Nairobi'
 ) as company_id;
+grant select on pg_temp.provision_result to authenticated;
 
 reset role;
 
@@ -89,11 +91,12 @@ select is(
 
 -- Second provision by the same user now succeeds (multi-company, 0018) and
 -- becomes the active company via user_preferences.
-set local role authenticated;
+set local role service_role;
 set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
 
 create temp table provision_result_2 as
 select public.provision_company('Another Shop') as company_id;
+grant select on pg_temp.provision_result_2 to authenticated;
 
 reset role;
 
