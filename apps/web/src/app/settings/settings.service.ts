@@ -36,6 +36,8 @@ export interface CompanySettings {
   payment_reminders_enabled: boolean;
   payment_reminder_channel: 'sms' | 'whatsapp';
   payment_reminder_sms_fallback: boolean;
+  automated_customer_notifications_enabled: boolean;
+  automated_customer_notifications_override: boolean | null;
 }
 
 const SELECT_COLUMNS = [
@@ -60,6 +62,8 @@ const SELECT_COLUMNS = [
   'payment_reminders_enabled',
   'payment_reminder_channel',
   'payment_reminder_sms_fallback',
+  'automated_customer_notifications_enabled',
+  'automated_customer_notifications_override',
 ].join(', ');
 
 @Injectable({ providedIn: 'root' })
@@ -192,6 +196,14 @@ export class SettingsService {
       p_rules: input.rules,
     });
     if (error) throw rpcError(error);
+  }
+
+  async setAutomatedCustomerNotifications(enabled: boolean): Promise<number> {
+    const { data, error } = await this.db.rpc('set_automated_customer_notifications', {
+      p_enabled: enabled,
+    });
+    if (error) throw rpcError(error);
+    return data;
   }
 
   async reminderConfiguration(): Promise<ReminderRule[]> {

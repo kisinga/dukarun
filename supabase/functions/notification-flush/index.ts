@@ -291,6 +291,19 @@ Deno.serve(async req => {
       .maybeSingle();
     if (current?.status !== 'pending') continue;
 
+    // Customer reminders and fixed document deliveries must re-check the
+    // platform/company controls at the last possible moment. The RPC also
+    // cancels a disallowed pending row and releases its quota reservation.
+    const { data: deliveryAllowed, error: policyError } = await db.rpc(
+      'prepare_controlled_outbox_delivery',
+      { p_outbox_id: row.id }
+    );
+    if (policyError) {
+      console.error('outbox policy check failed', row.id, policyError);
+      continue; // fail closed; the lease makes the row retryable
+    }
+    if (!deliveryAllowed) continue;
+
     // A crash between claim and send burns an attempt without reaching the
     // catch path, so a row can arrive here already exhausted; fail it instead
     // of re-claiming it forever.

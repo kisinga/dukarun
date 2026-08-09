@@ -10,6 +10,10 @@ export const routes: Routes = [
     loadComponent: () => import('./statement.component').then(m => m.StatementComponent),
   },
   {
+    path: 'document/:token',
+    loadComponent: () => import('./document.component').then(m => m.DocumentComponent),
+  },
+  {
     path: ':slug',
     loadComponent: () => import('./shop.component').then(m => m.ShopComponent),
   },

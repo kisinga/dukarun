@@ -17,6 +17,37 @@ export interface CustomerStatement {
   expires_at: string;
   orders: Array<{ code: string; sale_date: string; due_date: string; balance: number }>;
 }
+export interface ExternalDocumentLine {
+  description: string;
+  quantity: number;
+  unit_price: number;
+  line_total: number;
+}
+export interface ExternalDocumentPayment {
+  method: string;
+  amount: number;
+  reference: string | null;
+  date: string;
+}
+export interface ExternalDocument {
+  document_type: 'receipt' | 'invoice' | 'proforma' | 'purchase_order';
+  document_number: string;
+  company_name: string;
+  company_address: string | null;
+  company_whatsapp: string | null;
+  company_logo_path: string | null;
+  party_name: string;
+  issue_date: string;
+  valid_until: string | null;
+  total: number;
+  paid: number;
+  balance: number;
+  status: string;
+  notes: string | null;
+  lines: ExternalDocumentLine[];
+  payments: ExternalDocumentPayment[];
+  expires_at: string;
+}
 
 /**
  * Anonymous read-only access to the public storefront surface.
@@ -68,6 +99,12 @@ export class StorefrontService {
     return `${environment.supabaseUrl}/storage/v1/object/public/product-images/${path}`;
   }
 
+  companyLogoUrl(path: string | null): string | null {
+    if (!path) return null;
+    if (path.startsWith('http')) return path;
+    return `${environment.supabaseUrl}/storage/v1/object/public/company-logos/${path}`;
+  }
+
   legalUrl(path: 'privacy' | 'terms'): string {
     return `${environment.webPublicUrl.replace(/\/$/, '')}/${path}`;
   }
@@ -76,5 +113,11 @@ export class StorefrontService {
     const { data, error } = await this.client.rpc('public_customer_statement', { p_token: token });
     if (error) throw error;
     return data as unknown as CustomerStatement | null;
+  }
+
+  async externalDocument(token: string): Promise<ExternalDocument | null> {
+    const { data, error } = await this.client.rpc('public_external_document', { p_token: token });
+    if (error) throw error;
+    return data as unknown as ExternalDocument | null;
   }
 }

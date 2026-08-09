@@ -37,6 +37,11 @@ import { MoneyComponent } from '../shared/ui/money.component';
 import { PermissionsService } from '../core/permissions.service';
 import { Approval, ApprovalsService } from '../approvals/approvals.service';
 import { RecentSalesCacheService } from '../core/recent-sales-cache.service';
+import {
+  ExternalDocumentChannel,
+  ExternalDocumentType,
+  ExternalDocumentsService,
+} from '../communications/external-documents.service';
 
 const ALL_STATUSES = ['completed', 'voided', 'draft', 'expired', 'pending_payment'];
 
@@ -107,6 +112,12 @@ const SALE_SORT_OPTIONS: readonly ListSortOption[] = [
         <div role="status" class="alert alert-warning mb-3 text-sm">
           <app-icon name="heroExclamationTriangle" />
           <span>{{ warning() }}</span>
+        </div>
+      }
+      @if (notice()) {
+        <div role="status" class="alert alert-success mb-3 text-sm">
+          <app-icon name="heroCheckCircle" />
+          <span>{{ notice() }}</span>
         </div>
       }
 
@@ -421,6 +432,51 @@ const SALE_SORT_OPTIONS: readonly ListSortOption[] = [
                 />
               }
             </div>
+
+            @if (
+              order.status === 'completed' &&
+              order.customer_id &&
+              permissions.has('ManageCommunications')
+            ) {
+              <section class="mt-3 rounded-box border border-base-300 p-3">
+                <p class="text-sm font-medium">Send document</p>
+                <p class="type-caption">Fixed wording · customer and totals come from this sale.</p>
+                <div class="mt-2 flex flex-wrap gap-2">
+                  @if (canSendReceipt(order)) {
+                    <button
+                      class="btn btn-outline btn-sm"
+                      [disabled]="documentBusy()"
+                      (click)="sendDocument('receipt', order.id, 'sms')"
+                    >
+                      Receipt · SMS
+                    </button>
+                    <button
+                      class="btn btn-outline btn-sm"
+                      [disabled]="documentBusy()"
+                      (click)="sendDocument('receipt', order.id, 'whatsapp')"
+                    >
+                      Receipt · WhatsApp
+                    </button>
+                  }
+                  @if (order.is_credit_sale) {
+                    <button
+                      class="btn btn-outline btn-sm"
+                      [disabled]="documentBusy()"
+                      (click)="sendDocument('invoice', order.id, 'sms')"
+                    >
+                      Invoice · SMS
+                    </button>
+                    <button
+                      class="btn btn-outline btn-sm"
+                      [disabled]="documentBusy()"
+                      (click)="sendDocument('invoice', order.id, 'whatsapp')"
+                    >
+                      Invoice · WhatsApp
+                    </button>
+                  }
+                </div>
+              </section>
+            }
 
             @if (detailLoading()) {
               <div class="flex items-center justify-center gap-2 py-8 text-base-content/60">
@@ -781,6 +837,7 @@ export class OrdersComponent implements OnInit, OnDestroy {
   protected readonly permissions = inject(PermissionsService);
   private readonly approvals = inject(ApprovalsService);
   private readonly recentSales = inject(RecentSalesCacheService);
+  private readonly documents = inject(ExternalDocumentsService);
   protected readonly fmtKes = formatKes;
 
   protected readonly pageSize = signal(20);
@@ -810,6 +867,8 @@ export class OrdersComponent implements OnInit, OnDestroy {
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly warning = signal<string | null>(null);
+  protected readonly notice = signal<string | null>(null);
+  protected readonly documentBusy = signal(false);
   protected readonly printerEnabled = signal(false);
   protected readonly page = signal(1);
   protected readonly query = signal('');
@@ -874,6 +933,48 @@ export class OrdersComponent implements OnInit, OnDestroy {
     if (!id) return null;
     return this.orders().find(order => order.id === id) ?? this.selectedOrderRecord();
   });
+
+  protected canSendReceipt(order: OrderWithCustomer): boolean {
+    if (order.status !== 'completed') return false;
+    const paid = this.payments()
+      .filter(payment => payment.status === 'settled')
+      .reduce((sum, payment) => sum + payment.amount, 0);
+    return paid >= order.total;
+  }
+
+  protected async sendDocument(
+    type: Extract<ExternalDocumentType, 'receipt' | 'invoice'>,
+    subjectId: string,
+    channel: ExternalDocumentChannel
+  ): Promise<void> {
+    const includeCompanyCopy =
+      type === 'invoice' &&
+      window.confirm('Also send a company copy to the configured company WhatsApp number?');
+    this.documentBusy.set(true);
+    this.error.set(null);
+    this.notice.set(null);
+    try {
+      const preview = await this.documents.preview(type, subjectId, channel, includeCompanyCopy);
+      const copy = preview.company_copy_body
+        ? `\n\nCompany copy:\n${preview.company_copy_body}`
+        : '';
+      if (
+        !window.confirm(
+          `Send to ${preview.party_name} (${preview.recipient})?\n\n${preview.body}${copy}`
+        )
+      )
+        return;
+      const result = await this.documents.send(type, subjectId, channel, includeCompanyCopy);
+      this.notice.set(
+        `${type === 'invoice' ? 'Invoice' : 'Receipt'} queued for ${result.recipient}` +
+          (result.company_copy_error ? `; company copy failed: ${result.company_copy_error}` : '')
+      );
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Document could not be sent');
+    } finally {
+      this.documentBusy.set(false);
+    }
+  }
   protected readonly salesStats = computed(() => {
     const rows = this.orders();
     const completed = rows.filter(order => order.status === 'completed');

@@ -5,6 +5,7 @@ import {
   Company,
   FailedOutboxRow,
   MessageTemplateRow,
+  PlatformCommunicationSettings,
   PlatformCampaignPreview,
   PlatformService,
   Tier,
@@ -34,6 +35,30 @@ import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
     @if (notice()) {
       <div class="alert alert-success mb-4">{{ notice() }}</div>
     }
+
+    <section class="card mb-5 bg-base-100">
+      <div class="card-body flex flex-row items-start justify-between gap-4 p-4">
+        <div>
+          <h2 class="type-heading">External messaging</h2>
+          <p class="type-caption mt-1 max-w-2xl">
+            Master control for automated customer reminders and manually reviewed receipts,
+            invoices, proformas and purchase orders across every company. Security messages and
+            merchant-admin campaigns are unaffected.
+          </p>
+          @if (!communicationSettings()?.external_messaging_enabled) {
+            <p class="mt-2 text-sm font-medium text-error">Paused across all companies</p>
+          }
+        </div>
+        <input
+          type="checkbox"
+          class="toggle toggle-primary"
+          [checked]="communicationSettings()?.external_messaging_enabled ?? false"
+          [disabled]="busy() || !communicationSettings()"
+          (change)="toggleExternalMessaging($event)"
+          aria-label="Enable external messaging"
+        />
+      </div>
+    </section>
 
     <section class="card mb-5 bg-base-100">
       <form class="card-body grid gap-4 p-4" (submit)="$event.preventDefault(); send()">
@@ -249,6 +274,7 @@ export class CommunicationsComponent implements OnInit {
   protected readonly selectedCompanyIds = signal<string[]>([]);
   protected readonly templates = signal<MessageTemplateRow[]>([]);
   protected readonly failedDeliveries = signal<FailedOutboxRow[]>([]);
+  protected readonly communicationSettings = signal<PlatformCommunicationSettings | null>(null);
   protected readonly preview = signal<PlatformCampaignPreview | null>(null);
   protected readonly busy = signal(false);
   protected readonly error = signal<string | null>(null);
@@ -267,20 +293,53 @@ export class CommunicationsComponent implements OnInit {
   protected readonly templateId = new FormControl('', { nonNullable: true });
 
   async ngOnInit(): Promise<void> {
-    const [campaigns, tiers, templates, failedDeliveries, companies] = await Promise.all([
-      this.platform.platformCampaigns(),
-      this.platform.tiers(),
-      this.platform.platformTemplates(),
-      this.platform.failedOutbox(),
-      this.platform.companies(),
-    ]);
+    const [campaigns, tiers, templates, failedDeliveries, companies, communicationSettings] =
+      await Promise.all([
+        this.platform.platformCampaigns(),
+        this.platform.tiers(),
+        this.platform.platformTemplates(),
+        this.platform.failedOutbox(),
+        this.platform.companies(),
+        this.platform.communicationSettings(),
+      ]);
     this.campaigns.set(campaigns);
     this.tiers.set(tiers);
     this.templates.set(templates);
     this.failedDeliveries.set(failedDeliveries);
     this.companies.set(companies);
+    this.communicationSettings.set(communicationSettings);
     this.tierId.setValue(tiers[0]?.id ?? '');
     this.templateId.setValue(templates[0]?.id ?? '');
+  }
+  protected async toggleExternalMessaging(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const enabled = input.checked;
+    if (
+      !enabled &&
+      !window.confirm(
+        'Pause controlled external messaging across every company? Pending controlled messages will be cancelled.'
+      )
+    ) {
+      input.checked = true;
+      return;
+    }
+    this.busy.set(true);
+    this.error.set(null);
+    this.notice.set(null);
+    try {
+      const cancelled = await this.platform.setExternalMessaging(enabled);
+      this.communicationSettings.set(await this.platform.communicationSettings());
+      this.notice.set(
+        enabled
+          ? 'External messaging enabled across the platform.'
+          : `External messaging paused${cancelled ? `; ${cancelled} pending message(s) cancelled` : ''}.`
+      );
+    } catch (e) {
+      input.checked = !enabled;
+      this.error.set(e instanceof Error ? e.message : 'Update failed');
+    } finally {
+      this.busy.set(false);
+    }
   }
   protected valid(): boolean {
     return (
