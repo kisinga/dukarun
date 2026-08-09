@@ -5336,7 +5336,6 @@ export type Database = {
       }
       credit_reminder_scan: { Args: never; Returns: number }
       current_access_snapshot: { Args: never; Returns: Json }
-      team_management_snapshot: { Args: never; Returns: Json }
       current_company_id: { Args: never; Returns: string }
       current_company_id_unchecked: { Args: never; Returns: string }
       current_company_legal_status: { Args: never; Returns: Json }
@@ -6317,6 +6316,7 @@ export type Database = {
         Args: { p_after_sequence?: number; p_limit?: number; p_stream: string }
         Returns: Json
       }
+      team_management_snapshot: { Args: never; Returns: Json }
       transfer_stock: {
         Args: {
           p_from_location_id: string
@@ -6631,3 +6631,4 @@ export const Constants = {
     Enums: {},
   },
 } as const
+
