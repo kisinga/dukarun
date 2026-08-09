@@ -18,9 +18,16 @@ RUN case "$APP" in site|web|storefront|super-admin) ;; *) echo "APP must be site
 
 WORKDIR /app
 
-# Standalone per-app install (same pattern as the proven v1 frontend build)
-COPY apps/$APP/package.json apps/$APP/package.json
-RUN cd apps/$APP && npm install --quiet --no-audit --no-fund --include=dev
+# Install the selected workspace from the committed dependency graph. All workspace
+# manifests are required for npm to validate the root lockfile.
+COPY package.json package-lock.json ./
+COPY apps/site/package.json apps/site/package.json
+COPY apps/web/package.json apps/web/package.json
+COPY apps/storefront/package.json apps/storefront/package.json
+COPY apps/super-admin/package.json apps/super-admin/package.json
+COPY apps/video/package.json apps/video/package.json
+RUN HUSKY=0 npm ci --quiet --no-audit --no-fund --include=dev \
+    --workspace "@dukarun/$APP" --include-workspace-root=false
 
 # Sources the build needs: the app, the env generator, and shared packages
 COPY scripts/generate-environment.mjs scripts/generate-environment.mjs
