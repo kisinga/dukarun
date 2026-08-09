@@ -32,11 +32,14 @@ const TYPES: { value: LegalDocumentType; label: string }[] = [
         <button type="button" class="btn btn-primary" (click)="newDraft()">New draft</button>
       </header>
 
-      @if (error()) {
-        <div class="alert alert-error" role="alert">{{ error() }}</div>
-      }
-      @if (notice()) {
-        <div class="alert alert-success" role="status">{{ notice() }}</div>
+      @if (error() || notice()) {
+        <div class="toast toast-end toast-top z-50 mt-14">
+          @if (error()) {
+            <div class="alert alert-error" role="alert">{{ error() }}</div>
+          } @else if (notice()) {
+            <div class="alert alert-success" role="status">{{ notice() }}</div>
+          }
+        </div>
       }
 
       <div class="grid gap-5 xl:grid-cols-[20rem_minmax(0,1fr)]">
@@ -337,12 +340,13 @@ export class LegalComponent implements OnInit {
   }
 
   protected newDraft(): void {
+    const today = this.nairobiDate(new Date().toISOString());
     this.setDocumentControlsDisabled(false);
     this.selectedId.set(null);
     this.selectedState.set('draft');
     this.type.setValue('privacy');
-    this.version.setValue('');
-    this.effectiveDate.setValue('');
+    this.version.setValue(today);
+    this.effectiveDate.setValue(today);
     this.enforcementDate.setValue('');
     this.requiresAcceptance.setValue(false);
     this.markdown.setValue('');
@@ -390,13 +394,15 @@ export class LegalComponent implements OnInit {
   }
 
   protected async saveDraft(): Promise<void> {
-    if (
-      this.version.invalid ||
-      this.effectiveDate.invalid ||
-      this.markdown.invalid ||
-      this.readOnly()
-    )
+    const validationError = this.draftValidationError();
+    if (validationError) {
+      this.version.markAsTouched();
+      this.effectiveDate.markAsTouched();
+      this.markdown.markAsTouched();
+      this.error.set(validationError);
+      this.notice.set(null);
       return;
+    }
     this.saving.set(true);
     this.error.set(null);
     this.notice.set(null);
@@ -418,7 +424,7 @@ export class LegalComponent implements OnInit {
       this.expectedHash.setValue(expectedHash);
       this.notice.set('Draft saved.');
     } catch (error) {
-      this.error.set(error instanceof Error ? error.message : 'Draft could not be saved.');
+      this.error.set(this.errorMessage(error, 'Draft could not be saved.'));
     } finally {
       this.saving.set(false);
     }
@@ -501,5 +507,24 @@ export class LegalComponent implements OnInit {
     const part = (type: Intl.DateTimeFormatPartTypes) =>
       parts.find(item => item.type === type)?.value ?? '';
     return `${part('year')}-${part('month')}-${part('day')}`;
+  }
+
+  private draftValidationError(): string | null {
+    if (this.readOnly()) return 'Published documents cannot be edited.';
+    if (this.version.hasError('required')) return 'Enter a version date.';
+    if (this.version.hasError('pattern')) return 'Use YYYY-MM-DD for the version.';
+    if (this.effectiveDate.invalid) return 'Choose an effective date.';
+    if (this.markdown.hasError('required')) return 'Paste the Markdown document before saving.';
+    if (this.markdown.hasError('minlength')) return 'The Markdown document is too short.';
+    return null;
+  }
+
+  private errorMessage(error: unknown, fallback: string): string {
+    if (error instanceof Error) return error.message;
+    if (typeof error === 'object' && error && 'message' in error) {
+      const message = (error as { message?: unknown }).message;
+      if (typeof message === 'string' && message) return message;
+    }
+    return fallback;
   }
 }
