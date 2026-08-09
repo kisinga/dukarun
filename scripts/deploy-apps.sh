@@ -32,7 +32,6 @@ SUPABASE_URL="${SUPABASE_URL:-https://supa.dukarun.com}"
 SITE_PUBLIC_URL="${SITE_PUBLIC_URL:-https://dukarun.com}"
 APP_PUBLIC_URL="${APP_PUBLIC_URL:-https://app.dukarun.com}"
 STOREFRONT_PUBLIC_URL="${STOREFRONT_PUBLIC_URL:-https://store.dukarun.com}"
-MARKETING_VIDEO_BASE_URL="${MARKETING_VIDEO_BASE_URL:-https://cdn.dukarun.com/video}"
 SSH_OPTS=(-o BatchMode=no -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new)
 
 # app -> container name prefix of the v1 container it replaces
@@ -80,7 +79,6 @@ deploy_one() {
     --build-arg "SITE_PUBLIC_URL=$SITE_PUBLIC_URL" \
     --build-arg "APP_PUBLIC_URL=$APP_PUBLIC_URL" \
     --build-arg "STOREFRONT_PUBLIC_URL=$STOREFRONT_PUBLIC_URL" \
-    --build-arg "MARKETING_VIDEO_BASE_URL=$MARKETING_VIDEO_BASE_URL" \
     --build-arg "PUBLIC_DATA_MODE=live" \
     -t "$image" .
 

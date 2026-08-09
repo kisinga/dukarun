@@ -65,7 +65,7 @@ The checked-in manifest references assets relative to `public/`. For example, th
 
 Final output includes MP4s, PNG thumbnails, an English SRT caption file, and `delivery-manifest.json` with SHA-256 hashes. Generated media and local approval identities are intentionally gitignored.
 
-The renderer also emits WebVTT captions for browsers. Upload the finalized files to one public directory and set `MARKETING_VIDEO_BASE_URL` in the web deployment; the homepage then shows the full walkthrough and the three square cutdowns. With the variable unset, no video markup or network requests are added.
+The renderer also emits WebVTT captions for local review. `apps/video` is development tooling and is not deployed. Production keeps `MARKETING_VIDEO_BASE_URL` unset, so the homepage adds no video markup or network requests.
 
 ## Automation boundary
 

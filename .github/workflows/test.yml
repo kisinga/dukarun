@@ -22,7 +22,6 @@ jobs:
       SITE_PUBLIC_URL: https://dukarun.com
       APP_PUBLIC_URL: https://app.dukarun.com
       STOREFRONT_PUBLIC_URL: https://store.dukarun.com
-      MARKETING_VIDEO_BASE_URL: https://cdn.dukarun.com/video
       PUBLIC_DATA_MODE: fixture
 
     steps:

@@ -80,7 +80,6 @@ a `prebuild` script that calls `scripts/generate-environment.mjs`. It writes an 
 - `SUPABASE_URL`
 - `SUPABASE_ANON_KEY`
 - `SITE_PUBLIC_URL`, `APP_PUBLIC_URL`, `STOREFRONT_PUBLIC_URL`
-- `MARKETING_VIDEO_BASE_URL`
 - `PUBLIC_DATA_MODE` (`fixture` in CI, `live` in production)
 
 Local builds fall back to the local Supabase URL and public demo anon key. Production build
