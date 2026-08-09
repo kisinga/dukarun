@@ -5230,7 +5230,15 @@ export type Database = {
         Args: { p_company_id: string }
         Returns: boolean
       }
+      company_has_terms_acceptance_at_or_after: {
+        Args: { p_company_id: string; p_required_version: string }
+        Returns: boolean
+      }
       company_subscription_accessible: {
+        Args: { p_company_id: string }
+        Returns: boolean
+      }
+      company_terms_access_allowed: {
         Args: { p_company_id: string }
         Returns: boolean
       }
@@ -5329,8 +5337,34 @@ export type Database = {
       credit_reminder_scan: { Args: never; Returns: number }
       current_access_snapshot: { Args: never; Returns: Json }
       current_company_id: { Args: never; Returns: string }
+      current_company_id_unchecked: { Args: never; Returns: string }
       current_company_legal_status: { Args: never; Returns: Json }
       current_entitlements: { Args: never; Returns: Json }
+      current_published_company_terms: {
+        Args: never
+        Returns: {
+          content_markdown: string | null
+          content_sha256: string
+          created_at: string
+          created_by: string | null
+          document_type: string
+          effective_at: string
+          enforcement_at: string | null
+          id: string
+          publication_state: string
+          published_at: string | null
+          published_by: string | null
+          requires_company_acceptance: boolean
+          updated_at: string
+          version: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "legal_document_versions"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       current_role_name: { Args: never; Returns: string }
       current_user_can_access_location: {
         Args: { p_location_id: string }
@@ -5420,9 +5454,38 @@ export type Database = {
         Returns: boolean
       }
       is_platform_admin: { Args: never; Returns: boolean }
+      is_valid_legal_document_version: {
+        Args: { p_version: string }
+        Returns: boolean
+      }
       issue_customer_statement_link: {
         Args: { p_company_id: string; p_customer_id: string }
         Returns: string
+      }
+      latest_required_company_terms: {
+        Args: never
+        Returns: {
+          content_markdown: string | null
+          content_sha256: string
+          created_at: string
+          created_by: string | null
+          document_type: string
+          effective_at: string
+          enforcement_at: string | null
+          id: string
+          publication_state: string
+          published_at: string | null
+          published_by: string | null
+          requires_company_acceptance: boolean
+          updated_at: string
+          version: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "legal_document_versions"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       legal_markdown_sha256: { Args: { p_content: string }; Returns: string }
       list_audit_actors: {
@@ -6420,6 +6483,10 @@ export type Database = {
         }
         Returns: string
       }
+      user_has_company_permission_unchecked: {
+        Args: { p_company_id: string; p_permission: string }
+        Returns: boolean
+      }
       void_approval_held_order: {
         Args: { p_order_id: string; p_reason: string }
         Returns: undefined
@@ -6563,3 +6630,4 @@ export const Constants = {
     Enums: {},
   },
 } as const
+
