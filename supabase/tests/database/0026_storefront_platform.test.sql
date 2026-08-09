@@ -1,6 +1,6 @@
 -- Storefront + platform tests (migration 0026).
 begin;
-select plan(11);
+select plan(15);
 
 select testkit.create_user('11111111-1111-1111-1111-111111111111', 'admin@sf.local');
 select testkit.create_user('99999999-9999-9999-9999-999999999999', 'root@sf.local');
@@ -45,8 +45,34 @@ select is(
 );
 
 select ok(
-  (select count(*) from public.storefront_catalog('sf-co')) > 0,
-  'catalog function returns variants for the slug'
+  (select count(*) from public.storefront_catalog_page('sf-co')) > 0,
+  'paged catalog returns variants for the slug'
+);
+
+select is(
+  (select total_count from public.storefront_catalog_page('sf-co', 'Tea') limit 1),
+  1::bigint,
+  'paged catalog searches and counts product families'
+);
+
+select is(
+  (select bool_and(available) from public.storefront_product(
+    'sf-co', 'a0000000-0000-0000-0000-0000000000aa'
+  )),
+  false,
+  'public product reports tracked variants without stock as unavailable'
+);
+
+select throws_ok(
+  $$select * from public.storefront_catalog_page('sf-co', null, null, 49, 0)$$,
+  'P0001', 'invalid_storefront_page_size',
+  'storefront page size is bounded'
+);
+
+select throws_ok(
+  $$select * from public.storefront_catalog_page('sf-co', null, null, null, 0)$$,
+  'P0001', 'invalid_storefront_page_size',
+  'storefront page size cannot bypass bounds with null'
 );
 
 -- 4. Lapsed subscription: identity stays, catalogue hides.
@@ -71,7 +97,7 @@ select ok(
 
 -- 5. Catalog function returns nothing for lapsed.
 select is(
-  (select count(*)::int from public.storefront_catalog('sf-co')),
+  (select count(*)::int from public.storefront_catalog_page('sf-co')),
   0,
   'catalog empty when lapsed'
 );

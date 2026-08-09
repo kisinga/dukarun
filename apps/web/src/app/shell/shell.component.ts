@@ -288,47 +288,43 @@ interface NavSection {
         <aside class="flex min-h-screen w-64 flex-col border-r border-base-300 bg-base-200">
           <div class="flex min-h-16 items-center gap-2.5 border-b border-base-300 px-4">
             <img src="/assets/logo/dukarun-icon-dark.svg" alt="Dukarun" class="h-8 w-8" />
-            @if (companies.isMultiCompany()) {
-              <div class="dropdown min-w-0 flex-1">
-                <button
-                  type="button"
-                  class="btn btn-ghost btn-sm w-full justify-between gap-1 px-1"
-                  aria-label="Switch company"
-                >
-                  <span class="truncate text-sm font-bold">{{ company()?.name ?? 'Dukarun' }}</span>
-                  <app-icon name="heroChevronDown" size="sm" />
-                </button>
-                <ul
-                  class="dropdown-content menu menu-sm z-50 mt-2 w-56 rounded-box border border-base-300 bg-base-100 p-2 shadow-overlay"
-                >
-                  @for (c of companies.companies(); track c.company_id) {
-                    <li>
-                      <button
-                        type="button"
-                        [disabled]="companies.switching() || c.status !== 'approved'"
-                        (click)="switchCompany(c.company_id)"
-                      >
-                        <span class="flex-1 truncate">{{ c.name }}</span>
-                        @if (c.status === 'unapproved') {
-                          <span class="badge badge-warning badge-xs">Pending</span>
-                        }
-                        @if (c.company_id === company()?.id) {
-                          <app-icon name="heroCheck" size="sm" />
-                        }
-                      </button>
-                    </li>
-                  }
-                  <li class="mt-1 border-t border-base-300 pt-1">
-                    <a routerLink="/register" (click)="closeDrawer()">
-                      <app-icon name="heroPlus" />
-                      Add company
-                    </a>
+            <div class="dropdown min-w-0 flex-1">
+              <button
+                type="button"
+                class="btn btn-ghost btn-sm w-full justify-between gap-1 px-1"
+                aria-label="Switch company"
+              >
+                <span class="truncate text-sm font-bold">{{ company()?.name ?? 'Dukarun' }}</span>
+                <app-icon name="heroChevronDown" size="sm" />
+              </button>
+              <ul
+                class="dropdown-content menu menu-sm z-50 mt-2 w-56 rounded-box border border-base-300 bg-base-100 p-2 shadow-overlay"
+              >
+                @for (c of companies.companies(); track c.company_id) {
+                  <li>
+                    <button
+                      type="button"
+                      [disabled]="companies.switching() || c.status !== 'approved'"
+                      (click)="switchCompany(c.company_id)"
+                    >
+                      <span class="flex-1 truncate">{{ c.name }}</span>
+                      @if (c.status === 'unapproved') {
+                        <span class="badge badge-warning badge-xs">Pending</span>
+                      }
+                      @if (c.company_id === company()?.id) {
+                        <app-icon name="heroCheck" size="sm" />
+                      }
+                    </button>
                   </li>
-                </ul>
-              </div>
-            } @else {
-              <span class="truncate text-sm font-bold">{{ company()?.name ?? 'Dukarun' }}</span>
-            }
+                }
+                <li class="mt-1 border-t border-base-300 pt-1">
+                  <a routerLink="/register" (click)="closeDrawer()">
+                    <app-icon name="heroPlus" />
+                    Add company
+                  </a>
+                </li>
+              </ul>
+            </div>
           </div>
 
           <div class="flex-1 overflow-y-auto px-2 py-2">
@@ -394,6 +390,22 @@ interface NavSection {
       <app-cashier-session-modal />
       <app-persona-switcher />
 
+      @if (companySwitchError()) {
+        <div class="toast toast-top toast-end z-[60]" aria-live="assertive">
+          <div class="alert alert-error max-w-sm text-sm" role="alert">
+            <span>{{ companySwitchError() }}</span>
+            <button
+              type="button"
+              class="btn btn-ghost btn-xs"
+              aria-label="Dismiss company switch error"
+              (click)="companySwitchError.set(null)"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      }
+
       @if (signOutWarning()) {
         <div
           class="modal modal-open"
@@ -451,6 +463,7 @@ export class ShellComponent implements OnInit {
   );
 
   protected readonly company = signal<Company | null>(null);
+  protected readonly companySwitchError = signal<string | null>(null);
   protected readonly pendingSyncCount = computed(
     () => this.sync.queuedCount() + this.sync.failedCount()
   );
@@ -601,18 +614,26 @@ export class ShellComponent implements OnInit {
       // brand falls back to 'Dukarun'
     }
     void this.profile.myProfile().catch(() => null);
-    void this.companies
-      .load()
-      .catch(error => console.warn('Company switcher could not load', error));
+    void this.companies.load().catch(error => {
+      console.warn('Company switcher could not load', error);
+      this.companySwitchError.set('Company menu could not be loaded. Reload and try again.');
+    });
     await Promise.all([this.locations.load(), this.entitlements.refresh().catch(() => undefined)]);
     await this.cashierSession.start();
     await this.orderQueueCounts.refresh();
   }
 
   /** Switch active company. CompanyContextService ends this in a full reload. */
-  protected switchCompany(companyId: string): void {
+  protected async switchCompany(companyId: string): Promise<void> {
     if (companyId === this.company()?.id) return;
-    void this.companies.switchCompany(companyId).catch(() => undefined);
+    this.companySwitchError.set(null);
+    try {
+      await this.companies.switchCompany(companyId);
+    } catch (error) {
+      this.companySwitchError.set(
+        error instanceof Error ? error.message : 'Company could not be switched. Try again.'
+      );
+    }
   }
 
   protected changeLocation(event: Event): void {

@@ -6501,6 +6501,29 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      storefront_catalog_page: {
+        Args: {
+          p_collection_id?: string
+          p_limit?: number
+          p_offset?: number
+          p_search?: string
+          p_slug: string
+        }
+        Returns: {
+          available: boolean
+          image_path: string
+          kind: string
+          manufacturer_id: string
+          manufacturer_name: string
+          price: number
+          product_id: string
+          product_name: string
+          sku: string
+          total_count: number
+          variant_id: string
+          variant_name: string
+        }[]
+      }
       storefront_catalogue_visible: {
         Args: { c: Database["public"]["Tables"]["companies"]["Row"] }
         Returns: boolean
@@ -6523,6 +6546,23 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      storefront_product: {
+        Args: { p_product_id: string; p_slug: string }
+        Returns: {
+          available: boolean
+          image_path: string
+          kind: string
+          manufacturer_id: string
+          manufacturer_name: string
+          price: number
+          product_id: string
+          product_name: string
+          sku: string
+          total_count: number
+          variant_id: string
+          variant_name: string
+        }[]
       }
       subscription_expiry_scan: { Args: never; Returns: number }
       sync_cache_stream: {

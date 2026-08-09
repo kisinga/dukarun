@@ -21,11 +21,11 @@
   prefersdark: false;
   color-scheme: light;
 
-  --color-base-100: #fafafa;
-  --color-base-200: #ebebeb;
-  --color-base-300: #dedede;
-  --color-base-content: #2b2b2f;
-  --color-primary: #e85d2f;
+  --color-base-100: #fffdf9;
+  --color-base-200: #f7f4ef;
+  --color-base-300: #e4ded5;
+  --color-base-content: #201f1c;
+  --color-primary: #df5b32;
   --color-primary-content: #ffffff;
   --color-secondary: #5a5a5a;
   --color-secondary-content: #fafafa;
@@ -43,8 +43,8 @@
   --color-error-content: #ffffff;
 
   --radius-selector: 0.375rem;
-  --radius-field: 0.5rem;
-  --radius-box: 0.75rem;
+  --radius-field: 0.75rem;
+  --radius-box: 1rem;
   --size-selector: 0.25rem;
   --size-field: 0.25rem;
   --border: 1px;
@@ -53,6 +53,21 @@
 }
 
 body {
+  min-height: 100vh;
+  margin: 0;
+  background: #f7f4ef;
   font-family: var(--font-sans);
+  color: #201f1c;
   -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+:focus-visible {
+  outline: 3px solid rgb(223 91 50 / 35%);
+  outline-offset: 2px;
 }
