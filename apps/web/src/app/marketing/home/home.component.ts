@@ -174,7 +174,7 @@ interface Testimonial {
                     [disabled]="cart().size === 0"
                     class="btn btn-primary mt-3 w-full min-h-11"
                   >
-                    Charge with M-Pesa
+                    Record M-Pesa payment
                   </button>
                   @if (cart().size > 0) {
                     <button
@@ -215,7 +215,7 @@ interface Testimonial {
                     </p>
                     <p class="mb-0 mt-2 flex items-center gap-1 text-xs font-bold text-success">
                       <app-icon name="heroCheckCircle" size="sm" />
-                      M-PESA CONFIRMED · POSTED TO LEDGER
+                      M-PESA RECORDED · POSTED TO LEDGER
                     </p>
                     <div class="receipt-barcode mt-3 opacity-70" aria-hidden="true"></div>
                     <p class="mb-0 mt-1.5 text-center text-xs opacity-60">Asante · dukarun</p>

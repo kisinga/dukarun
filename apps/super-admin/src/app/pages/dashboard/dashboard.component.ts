@@ -33,7 +33,7 @@ import { PageHeaderComponent } from '../../shared/ui/page-header.component';
     }
 
     @if (stats(); as s) {
-      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <div class="card bg-base-100">
           <div class="card-body p-4">
             <p class="type-caption">MRR estimate</p>
@@ -81,6 +81,13 @@ import { PageHeaderComponent } from '../../shared/ui/page-header.component';
             </p>
           </div>
         </a>
+        <div class="card bg-base-100">
+          <div class="card-body p-4">
+            <p class="type-caption">Monthly active users</p>
+            <p class="type-hero mt-1 text-primary">{{ s.monthly_active_users }}</p>
+            <p class="mt-0.5 type-caption">of {{ s.users_total }} users · signed in this month</p>
+          </div>
+        </div>
       </div>
 
       <div class="mt-6 grid gap-4 lg:grid-cols-2">
@@ -104,8 +111,8 @@ import { PageHeaderComponent } from '../../shared/ui/page-header.component';
         </section>
       </div>
     } @else {
-      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Loading stats">
-        @for (_ of [1, 2, 3, 4]; track $index) {
+      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5" aria-label="Loading stats">
+        @for (_ of [1, 2, 3, 4, 5]; track $index) {
           <div class="card bg-base-100">
             <div class="card-body gap-3 p-4">
               <div class="skeleton h-3 w-24"></div>

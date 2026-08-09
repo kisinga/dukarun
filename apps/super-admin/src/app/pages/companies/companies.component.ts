@@ -364,6 +364,37 @@ const LEGAL_TYPE: Record<string, BadgeType> = {
             </form>
           </section>
 
+          <section class="border-t border-base-300/60 pt-5">
+            <h3 class="section-title">Customer automation</h3>
+            <p class="type-caption mt-1">
+              Override this company’s own automated-notification preference. Manual document sends
+              are controlled by the platform master switch instead.
+            </p>
+            <div class="mt-3 rounded-box bg-base-200 p-3 text-sm">
+              Company preference:
+              <strong>{{
+                company.automated_customer_notifications_enabled ? 'Enabled' : 'Paused'
+              }}</strong>
+            </div>
+            <div class="mt-3 flex flex-wrap items-end gap-3">
+              <app-form-field label="Superadmin override" class="min-w-56 flex-1">
+                <select class="select select-bordered w-full" [formControl]="automationOverride">
+                  <option value="inherit">Use company setting</option>
+                  <option value="force_enabled">Force enabled</option>
+                  <option value="force_disabled">Force paused</option>
+                </select>
+              </app-form-field>
+              <button
+                class="btn btn-primary min-h-11"
+                type="button"
+                [disabled]="busy()"
+                (click)="saveAutomationOverride(company)"
+              >
+                Save automation
+              </button>
+            </div>
+          </section>
+
           @if (company.status !== 'banned') {
             <section class="border-t border-base-300/60 pt-5">
               <h3 class="section-title">Access controls</h3>
@@ -416,6 +447,9 @@ export class CompaniesComponent implements OnInit {
   protected readonly subExemptUntil = new FormControl('', { nonNullable: true });
   protected readonly subExpiresAt = new FormControl('', { nonNullable: true });
   protected readonly subExemptReason = new FormControl('', { nonNullable: true });
+  protected readonly automationOverride = new FormControl<
+    'inherit' | 'force_enabled' | 'force_disabled'
+  >('inherit', { nonNullable: true });
 
   protected readonly busy = signal(false);
   protected readonly loading = signal(false);
@@ -476,6 +510,13 @@ export class CompaniesComponent implements OnInit {
     this.subExemptUntil.setValue('');
     this.subExpiresAt.setValue('');
     this.subExemptReason.setValue('');
+    this.automationOverride.setValue(
+      company.automated_customer_notifications_override === null
+        ? 'inherit'
+        : company.automated_customer_notifications_override
+          ? 'force_enabled'
+          : 'force_disabled'
+    );
     try {
       this.counts.set(await this.platform.companyCounts(company.id));
     } catch (error) {
@@ -530,6 +571,28 @@ export class CompaniesComponent implements OnInit {
         ...(this.subExpiresAt.value ? { expires_at: this.subExpiresAt.value } : {}),
       });
       this.notice.set(`Subscription updated for ${company.name}`);
+      await this.load();
+    } catch (error) {
+      this.error.set(error instanceof Error ? error.message : 'Update failed');
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected async saveAutomationOverride(company: CompanyRow): Promise<void> {
+    const override =
+      this.automationOverride.value === 'inherit'
+        ? null
+        : this.automationOverride.value === 'force_enabled';
+    this.busy.set(true);
+    this.error.set(null);
+    this.notice.set(null);
+    try {
+      const cancelled = await this.platform.setCompanyAutomationOverride(company.id, override);
+      this.notice.set(
+        `Automation policy updated for ${company.name}` +
+          (cancelled ? `; ${cancelled} pending message(s) cancelled` : '')
+      );
       await this.load();
     } catch (error) {
       this.error.set(error instanceof Error ? error.message : 'Update failed');

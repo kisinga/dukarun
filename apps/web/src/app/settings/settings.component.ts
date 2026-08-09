@@ -607,7 +607,37 @@ type ReminderDraft = {
           @if (perms.has('ManageCommunications')) {
             <div class="card bg-base-100">
               <div class="card-body p-4">
-                <div class="flex items-start justify-between gap-4">
+                <div
+                  class="flex items-start justify-between gap-4 border-b border-base-300/60 pb-4"
+                >
+                  <div>
+                    <h2 class="section-title">Automated customer notifications</h2>
+                    <p class="type-caption mt-1">
+                      Controls scheduled customer messages such as payment reminders. Manually
+                      reviewed receipts, invoices, proformas and purchase orders are separate.
+                    </p>
+                    @if (s.automated_customer_notifications_override !== null) {
+                      <p class="mt-1 text-xs text-warning">
+                        Dukarun has
+                        {{ s.automated_customer_notifications_override ? 'enabled' : 'paused' }}
+                        automation for this company.
+                      </p>
+                    }
+                  </div>
+                  <input
+                    type="checkbox"
+                    class="toggle toggle-primary"
+                    [formControl]="automatedCustomerNotificationsEnabled"
+                    [disabled]="busy() || s.automated_customer_notifications_override !== null"
+                    (change)="saveAutomationPreference()"
+                  />
+                </div>
+                @if (msg('automation'); as m) {
+                  <p class="mt-2 text-sm" [class.text-success]="m.ok" [class.text-error]="!m.ok">
+                    {{ m.text }}
+                  </p>
+                }
+                <div class="mt-4 flex items-start justify-between gap-4">
                   <div>
                     <h2 class="section-title">Payment reminders</h2>
                     <p class="type-caption mt-1">
@@ -873,6 +903,9 @@ export class SettingsComponent implements OnInit {
 
   protected readonly varianceThreshold = new FormControl('', { nonNullable: true });
   protected readonly paymentRemindersEnabled = new FormControl(false, { nonNullable: true });
+  protected readonly automatedCustomerNotificationsEnabled = new FormControl(true, {
+    nonNullable: true,
+  });
   protected readonly reminderChannel = new FormControl<'sms' | 'whatsapp'>('whatsapp', {
     nonNullable: true,
   });
@@ -917,6 +950,10 @@ export class SettingsComponent implements OnInit {
       this.batchExpiry.setValue(settings.batch_expiry_enabled);
       this.varianceThreshold.setValue(formatKesInput(settings.variance_notification_threshold));
       this.paymentRemindersEnabled.setValue(settings.payment_reminders_enabled);
+      this.automatedCustomerNotificationsEnabled.setValue(
+        settings.automated_customer_notifications_override ??
+          settings.automated_customer_notifications_enabled
+      );
       this.reminderChannel.setValue(settings.payment_reminder_channel);
       this.reminderSmsFallback.setValue(settings.payment_reminder_sms_fallback);
       this.reminderDrafts.set(
@@ -1214,6 +1251,32 @@ export class SettingsComponent implements OnInit {
       this.flash('communications', true, 'Reminder settings saved');
     } catch (err) {
       this.flash('communications', false, err instanceof Error ? err.message : 'Save failed');
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected async saveAutomationPreference(): Promise<void> {
+    const current = this.settings();
+    if (!current || current.automated_customer_notifications_override !== null) return;
+    const enabled = this.automatedCustomerNotificationsEnabled.value;
+    this.busy.set(true);
+    try {
+      const cancelled = await this.settingsService.setAutomatedCustomerNotifications(enabled);
+      this.settings.set({ ...current, automated_customer_notifications_enabled: enabled });
+      this.flash(
+        'automation',
+        true,
+        enabled
+          ? 'Automated customer notifications enabled.'
+          : `Automated customer notifications paused${cancelled ? `; ${cancelled} pending message(s) cancelled` : ''}.`
+      );
+    } catch (err) {
+      this.automatedCustomerNotificationsEnabled.setValue(
+        current.automated_customer_notifications_enabled,
+        { emitEvent: false }
+      );
+      this.flash('automation', false, err instanceof Error ? err.message : 'Update failed');
     } finally {
       this.busy.set(false);
     }

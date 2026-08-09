@@ -1187,6 +1187,8 @@ export type Database = {
       companies: {
         Row: {
           address: string | null
+          automated_customer_notifications_enabled: boolean
+          automated_customer_notifications_override: boolean | null
           batch_expiry_enabled: boolean
           billing_cycle: string | null
           cash_control_enabled: boolean
@@ -1240,6 +1242,8 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          automated_customer_notifications_enabled?: boolean
+          automated_customer_notifications_override?: boolean | null
           batch_expiry_enabled?: boolean
           billing_cycle?: string | null
           cash_control_enabled?: boolean
@@ -1293,6 +1297,8 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          automated_customer_notifications_enabled?: boolean
+          automated_customer_notifications_override?: boolean | null
           batch_expiry_enabled?: boolean
           billing_cycle?: string | null
           cash_control_enabled?: boolean
@@ -1858,6 +1864,81 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "outbox"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      external_document_links: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string | null
+          document_type: string
+          expires_at: string
+          id: string
+          party_id: string
+          snapshot: Json
+          subject_id: string
+          token_hash: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          document_type: string
+          expires_at: string
+          id?: string
+          party_id: string
+          snapshot: Json
+          subject_id: string
+          token_hash: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          document_type?: string
+          expires_at?: string
+          id?: string
+          party_id?: string
+          snapshot?: Json
+          subject_id?: string
+          token_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "external_document_links_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "external_document_links_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "external_document_links_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "customer_ar_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "external_document_links_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "external_document_links_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_ap_balances"
+            referencedColumns: ["supplier_id"]
           },
         ]
       }
@@ -2944,7 +3025,11 @@ export type Database = {
           company_id: string
           created_at: string
           customer_id: string | null
+          document_copy_role: string | null
+          document_subject_id: string | null
+          document_type: string | null
           error: string | null
+          external_document_link_id: string | null
           fallback_body: string | null
           fallback_channel: string | null
           fallback_for_outbox_id: string | null
@@ -2970,7 +3055,11 @@ export type Database = {
           company_id: string
           created_at?: string
           customer_id?: string | null
+          document_copy_role?: string | null
+          document_subject_id?: string | null
+          document_type?: string | null
           error?: string | null
+          external_document_link_id?: string | null
           fallback_body?: string | null
           fallback_channel?: string | null
           fallback_for_outbox_id?: string | null
@@ -2996,7 +3085,11 @@ export type Database = {
           company_id?: string
           created_at?: string
           customer_id?: string | null
+          document_copy_role?: string | null
+          document_subject_id?: string | null
+          document_type?: string | null
           error?: string | null
+          external_document_link_id?: string | null
           fallback_body?: string | null
           fallback_channel?: string | null
           fallback_for_outbox_id?: string | null
@@ -3062,6 +3155,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "supplier_ap_balances"
             referencedColumns: ["supplier_id"]
+          },
+          {
+            foreignKeyName: "outbox_external_document_link_id_fkey"
+            columns: ["external_document_link_id"]
+            isOneToOne: false
+            referencedRelation: "external_document_links"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "outbox_fallback_for_outbox_id_fkey"
@@ -3315,6 +3415,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      platform_communication_settings: {
+        Row: {
+          external_messaging_enabled: boolean
+          singleton: boolean
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          external_messaging_enabled?: boolean
+          singleton?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          external_messaging_enabled?: boolean
+          singleton?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
       }
       product_collections: {
         Row: {
@@ -5126,6 +5247,14 @@ export type Database = {
         Returns: Json
       }
       can_approve_request_type: { Args: { p_type: string }; Returns: boolean }
+      cancel_controlled_external_messages: {
+        Args: {
+          p_company_id: string
+          p_include_manual: boolean
+          p_reason: string
+        }
+        Returns: number
+      }
       cancel_purchase_draft: { Args: { p_draft_id: string }; Returns: string }
       cashier_session_required_for_source: {
         Args: { p_source_type: string }
@@ -5431,6 +5560,19 @@ export type Database = {
         Returns: undefined
       }
       expire_proformas: { Args: never; Returns: number }
+      external_document_context: {
+        Args: {
+          p_channel: string
+          p_document_type: string
+          p_include_company_copy?: boolean
+          p_subject_id: string
+        }
+        Returns: Json
+      }
+      external_messaging_allowed: {
+        Args: { p_automated: boolean; p_company_id: string }
+        Returns: boolean
+      }
       feature_enabled: {
         Args: { p_company_id: string; p_feature: string }
         Returns: boolean
@@ -5715,9 +5857,17 @@ export type Database = {
         }
         Returns: Json
       }
+      platform_set_company_automation_override: {
+        Args: { p_company_id: string; p_override?: boolean }
+        Returns: number
+      }
       platform_set_company_status: {
         Args: { p_company_id: string; p_status: string }
         Returns: string
+      }
+      platform_set_external_messaging: {
+        Args: { p_enabled: boolean }
+        Returns: number
       }
       platform_stats: { Args: never; Returns: Json }
       platform_update_billing_config: {
@@ -5916,6 +6066,19 @@ export type Database = {
         }
         Returns: string
       }
+      prepare_controlled_outbox_delivery: {
+        Args: { p_outbox_id: string }
+        Returns: boolean
+      }
+      preview_external_document: {
+        Args: {
+          p_channel: string
+          p_document_type: string
+          p_include_company_copy?: boolean
+          p_subject_id: string
+        }
+        Returns: Json
+      }
       provision_company: {
         Args: {
           p_address?: string
@@ -5953,6 +6116,7 @@ export type Database = {
       }
       public_billing_config: { Args: never; Returns: Json }
       public_customer_statement: { Args: { p_token: string }; Returns: Json }
+      public_external_document: { Args: { p_token: string }; Returns: Json }
       published_legal_document: {
         Args: { p_document_type: string }
         Returns: Json
@@ -6055,6 +6219,10 @@ export type Database = {
         Returns: undefined
       }
       remove_team_member: { Args: { p_membership_id: string }; Returns: string }
+      render_external_document_message: {
+        Args: { p_context: Json; p_copy: boolean; p_url: string }
+        Returns: Json
+      }
       render_message_template: {
         Args: { p_body: string; p_values: Json }
         Returns: string
@@ -6155,7 +6323,20 @@ export type Database = {
         Args: { p_company_id: string }
         Returns: undefined
       }
+      send_external_document: {
+        Args: {
+          p_channel: string
+          p_document_type: string
+          p_include_company_copy?: boolean
+          p_subject_id: string
+        }
+        Returns: Json
+      }
       send_sms_hook: { Args: { event: Json }; Returns: Json }
+      set_automated_customer_notifications: {
+        Args: { p_enabled: boolean }
+        Returns: number
+      }
       set_commissions_enabled: {
         Args: { p_enabled: boolean }
         Returns: boolean

@@ -8,6 +8,8 @@ export type AuditRow = Database['public']['Tables']['audit_log']['Row'];
 export type OutboxRow = Database['public']['Tables']['outbox']['Row'];
 export type CampaignRow = Database['public']['Tables']['message_campaigns']['Row'];
 export type MessageTemplateRow = Database['public']['Tables']['message_templates']['Row'];
+export type PlatformCommunicationSettings =
+  Database['public']['Tables']['platform_communication_settings']['Row'];
 export type FailedOutboxRow = OutboxRow & {
   companies: Pick<Company, 'name' | 'code'> | null;
 };
@@ -19,6 +21,8 @@ export interface PlatformStats {
   subscriptions_active: number;
   subscriptions_trial: number;
   subscriptions_expired: number;
+  users_total: number;
+  monthly_active_users: number;
   orders_today: number;
   revenue_today: number;
   mrr_estimate: number;
@@ -118,6 +122,34 @@ export class PlatformService {
       .is('company_id', null)
       .order('name');
     if (error) throw error;
+    return data;
+  }
+
+  async communicationSettings(): Promise<PlatformCommunicationSettings> {
+    const { data, error } = await this.db
+      .from('platform_communication_settings')
+      .select('*')
+      .single();
+    if (error) throw error;
+    return data;
+  }
+
+  async setExternalMessaging(enabled: boolean): Promise<number> {
+    const { data, error } = await this.db.rpc('platform_set_external_messaging', {
+      p_enabled: enabled,
+    });
+    if (error) throw rpcError(error);
+    return data;
+  }
+
+  async setCompanyAutomationOverride(companyId: string, override: boolean | null): Promise<number> {
+    const { data, error } = await this.db.rpc(
+      'platform_set_company_automation_override',
+      override === null
+        ? { p_company_id: companyId }
+        : { p_company_id: companyId, p_override: override }
+    );
+    if (error) throw rpcError(error);
     return data;
   }
 
