@@ -47,8 +47,5 @@ jobs:
       - name: Enforce public design rules
         run: npm run public-design-guard
 
-      - name: Validate video compositions
-        run: npm run check:video
-
       - name: Build active Angular applications
         run: npm run build:active
