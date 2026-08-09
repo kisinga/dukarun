@@ -54,7 +54,7 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   ManageCustomerCreditLimit: 'Manage customer credit limits',
   ManageCustomers: 'Manage customers',
   ManageCatalog: 'Manage product catalog',
-  ManageCommunications: 'Manage customer communications',
+  ManageCommunications: 'Manage payment reminders and view communications',
   ReverseOrder: 'Reverse sales',
   OverrideCustomerBalance: 'Override customer balances',
   SettleOrder: 'Settle sales',

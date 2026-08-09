@@ -174,7 +174,7 @@ export class DocsComponent {
     },
     {
       title: 'Make your first sale',
-      copy: 'Tap products, take cash or M-Pesa, send the receipt by SMS or WhatsApp. It works even with the internet off.',
+      copy: 'Tap products, take cash or M-Pesa, and print the completed receipt. Sales remain available when the connection drops.',
     },
   ];
 
@@ -187,7 +187,7 @@ export class DocsComponent {
       details: [
         'The sell screen is a grid of your products: tap to add, tap to adjust, charge. It is built for a phone held in one hand, with large targets, the total always visible, and no typing for a normal sale.',
         'Payments are cash, M-Pesa, or a split of both. Change is calculated for you, and every payment method lands in the right place in the books.',
-        'Receipts can be printed or sent straight to the customer by SMS or WhatsApp before they leave the counter.',
+        'Receipts can be printed at the counter before the customer leaves, then reprinted later from the completed sale when needed.',
       ],
     },
     {
@@ -257,13 +257,13 @@ export class DocsComponent {
     },
     {
       id: 'receipts',
-      icon: 'heroChatBubbleLeftRight',
-      title: 'SMS & WhatsApp receipts',
-      summary: 'Receipts and reminders in the channels customers read.',
+      icon: 'heroPrinter',
+      title: 'Receipts & payment reminders',
+      summary: 'Print receipts and send fact-based payment reminders.',
       details: [
-        'After a sale, send the receipt by SMS or WhatsApp with one tap. No paper or printer needed, and the customer cannot lose it.',
-        'The same channel sends credit balance reminders, so customers always know where they stand.',
-        'Messages go from your account; standard carrier charges may apply on your side.',
+        'Print a completed-sale receipt from the counter or order history whenever the customer needs another copy.',
+        'Dukarun can send fixed due-date and overdue-balance reminders by SMS or WhatsApp when the customer has consented.',
+        'Shops cannot compose general broadcasts or change the approved reminder wording.',
       ],
     },
     {

@@ -280,12 +280,13 @@ export const routes: Routes = [
           import('./notifications/notifications.component').then(m => m.NotificationsComponent),
       },
       {
-        path: 'messaging',
-        canActivate: [featureGuard, permissionGuard],
-        data: { feature: 'customerCampaigns', permission: 'ManageCommunications' },
+        path: 'communications',
+        canActivate: [permissionGuard],
+        data: { permission: 'ManageCommunications' },
         loadComponent: () =>
-          import('./messaging/messaging.component').then(m => m.MessagingComponent),
+          import('./messaging/messaging.component').then(m => m.CommunicationsComponent),
       },
+      { path: 'messaging', redirectTo: 'communications' },
       { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
     ],
   },

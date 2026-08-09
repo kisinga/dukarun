@@ -5125,15 +5125,6 @@ export type Database = {
         }
         Returns: Json
       }
-      campaign_preview: {
-        Args: {
-          p_audience?: string
-          p_body: string
-          p_channel: string
-          p_customer_ids?: string[]
-        }
-        Returns: Json
-      }
       can_approve_request_type: { Args: { p_type: string }; Returns: boolean }
       cancel_purchase_draft: { Args: { p_draft_id: string }; Returns: string }
       cashier_session_required_for_source: {
@@ -5315,17 +5306,6 @@ export type Database = {
           p_is_supplier?: boolean
           p_last_name?: string
           p_phone?: string
-        }
-        Returns: string
-      }
-      create_message_campaign: {
-        Args: {
-          p_audience?: string
-          p_body: string
-          p_channel: string
-          p_customer_ids?: string[]
-          p_name: string
-          p_template_id?: string
         }
         Returns: string
       }
@@ -5922,10 +5902,6 @@ export type Database = {
         Args: { p_document_type: string; p_version: string }
         Returns: Json
       }
-      queue_batch_message: {
-        Args: { p_audience?: string; p_body: string; p_channel: string }
-        Returns: number
-      }
       queue_message: {
         Args: {
           p_body: string
@@ -6046,17 +6022,9 @@ export type Database = {
         Args: { p_company_id: string }
         Returns: undefined
       }
-      reset_message_template: {
-        Args: { p_template_key: string }
-        Returns: boolean
-      }
       resolve_business_location: {
         Args: { p_location_id?: string }
         Returns: string
-      }
-      retry_failed_campaign_recipients: {
-        Args: { p_campaign_id: string }
-        Returns: number
       }
       revert_variance: {
         Args: { p_reason?: string; p_recon_account_id: string }
@@ -6124,12 +6092,7 @@ export type Database = {
         Args: { p_company_id: string }
         Returns: undefined
       }
-      send_message_campaign: { Args: { p_campaign_id: string }; Returns: Json }
       send_sms_hook: { Args: { event: Json }; Returns: Json }
-      set_campaign_status: {
-        Args: { p_action: string; p_campaign_id: string }
-        Returns: string
-      }
       set_commissions_enabled: {
         Args: { p_enabled: boolean }
         Returns: boolean
@@ -6290,10 +6253,6 @@ export type Database = {
         Args: { p_after_sequence?: number; p_limit?: number; p_stream: string }
         Returns: Json
       }
-      test_message_template: {
-        Args: { p_channel: string; p_recipient: string; p_template_id: string }
-        Returns: string
-      }
       transfer_stock: {
         Args: {
           p_from_location_id: string
@@ -6441,17 +6400,6 @@ export type Database = {
         Returns: string
       }
       upsert_manufacturer: { Args: { p_name: string }; Returns: string }
-      upsert_message_template: {
-        Args: {
-          p_context: string
-          p_name: string
-          p_sms_body: string
-          p_template_id?: string
-          p_template_key: string
-          p_whatsapp_body: string
-        }
-        Returns: string
-      }
       upsert_role: {
         Args: { p_name: string; p_permissions: string[]; p_role_id?: string }
         Returns: string

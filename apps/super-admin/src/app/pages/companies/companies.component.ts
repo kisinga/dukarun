@@ -489,9 +489,6 @@ export class CompaniesComponent implements OnInit {
     if (!current || !target || current.id === target.id) return [];
     return [
       current.storefront_available && !target.storefront_available ? 'storefront' : null,
-      current.customer_campaigns_available && !target.customer_campaigns_available
-        ? 'customer campaigns'
-        : null,
       current.payment_reminders_available && !target.payment_reminders_available
         ? 'payment reminders'
         : null,

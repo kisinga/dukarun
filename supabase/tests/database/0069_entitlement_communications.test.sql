@@ -1,5 +1,5 @@
 begin;
-select plan(53);
+select plan(55);
 
 select is(
   public.next_monthly_anniversary('2026-01-31 10:00:00+03','2026-02-01 00:00:00+03'),
@@ -14,8 +14,8 @@ select is(
 );
 select is(
   (select customer_campaigns_available from public.subscription_tiers where code='standard'),
-  true,
-  'standard includes customer campaigns'
+  false,
+  'tenant customer campaigns are retired on every tier'
 );
 select is(
   (select payment_reminders_available from public.subscription_tiers where code='standard'),
@@ -70,6 +70,32 @@ select ok(
   'provisioned admin can manage communications'
 );
 
+select testkit.create_user(
+  '69696969-6969-4696-9696-696969696967',
+  'communications-viewer@test.local',
+  '+254700000067'
+);
+select testkit.add_member(
+  (select company_id from communications_fixture),
+  '69696969-6969-4696-9696-696969696967',
+  'Communications Viewer',
+  array['ManageCommunications']
+);
+insert into public.outbox(company_id, channel, recipient, body, status)
+select company_id, 'sms', '+254700000067', 'Approved transactional message', 'sent'
+from communications_fixture;
+select testkit.as_user(
+  (select company_id from communications_fixture),
+  '69696969-6969-4696-9696-696969696967',
+  'Communications Viewer'
+);
+select is(
+  (select count(*)::int from public.outbox where recipient='+254700000067'),
+  1,
+  'ManageCommunications without ViewFinancials can read company delivery history'
+);
+reset role;
+
 insert into public.customers(
   id,company_id,first_name,phone,is_credit_approved,notifications_enabled,
   sms_notifications_enabled,whatsapp_notifications_enabled
@@ -90,57 +116,48 @@ select testkit.as_user(
 );
 
 select is(
-  (public.campaign_preview('sms','Hello {{customer_first_name}}','all')->>'eligible')::int,
-  1,
-  'campaign preview applies master and channel consent'
+  (public.current_entitlements()->'features') ? 'customerCampaigns',
+  false,
+  'tenant entitlement contract omits the retired campaign feature'
 );
 
-create temp table communications_campaign as
-select public.create_message_campaign(
-  'Consent snapshot','sms','Hello {{customer_first_name}} from {{store_name}}','all'
-) campaign_id;
 select is(
-  (public.send_message_campaign((select campaign_id from communications_campaign))->>'queued')::int,
-  1,
-  'campaign queues only eligible recipients'
+  to_regprocedure('public.queue_batch_message(text,text,text)'),
+  null::regprocedure,
+  'legacy tenant batch send API is absent'
 );
 select is(
-  (select rendered_body from public.campaign_recipients
-   where campaign_id=(select campaign_id from communications_campaign) and customer_id='69696969-6969-4696-9696-696969696962'),
-  'Hello Amina from Communications Test Store',
-  'campaign stores the final personalized body'
+  to_regprocedure('public.campaign_preview(text,text,text,uuid[])'),
+  null::regprocedure,
+  'tenant campaign preview API is absent'
 );
 select is(
-  (select skip_reason from public.campaign_recipients
-   where campaign_id=(select campaign_id from communications_campaign) and customer_id='69696969-6969-4696-9696-696969696963'),
-  'opted_out',
-  'campaign snapshot records suppression reasons'
+  to_regprocedure('public.create_message_campaign(text,text,text,text,uuid[],uuid)'),
+  null::regprocedure,
+  'tenant campaign creation API is absent'
 );
 select is(
-  (select quota_state from public.outbox where campaign_id=(select campaign_id from communications_campaign)),
-  'reserved',
-  'queued tenant delivery reserves quota'
+  to_regprocedure('public.upsert_message_template(text,text,text,text,text,uuid)'),
+  null::regprocedure,
+  'tenant template-writing API is absent'
+);
+select is(
+  to_regprocedure('public.test_message_template(uuid,text,text)'),
+  null::regprocedure,
+  'raw-recipient template test API is absent'
+);
+select is(
+  to_regprocedure('public.send_message_campaign(uuid)'),
+  null::regprocedure,
+  'tenant campaign send API is absent'
+);
+select is(
+  to_regprocedure('public.set_campaign_status(uuid,text)'),
+  null::regprocedure,
+  'tenant campaign lifecycle API is absent'
 );
 
 reset role;
-select public.finalize_message_quota(
-  (select id from public.outbox where campaign_id=(select campaign_id from communications_campaign)),
-  true
-);
-select is(
-  (select quota_state from public.outbox where campaign_id=(select campaign_id from communications_campaign)),
-  'used',
-  'provider acceptance converts reserved quota to used'
-);
-select public.finalize_message_quota(
-  (select id from public.outbox where campaign_id=(select campaign_id from communications_campaign)),
-  true
-);
-select is(
-  (select sms_used_this_period from public.companies where id=(select company_id from communications_fixture)),
-  1,
-  'quota finalization is idempotent'
-);
 
 insert into public.subscription_tiers(
   id,code,name,price_monthly,price_yearly,multiple_locations_enabled,
@@ -223,9 +240,9 @@ select testkit.as_user(
   'Admin'
 );
 select throws_ok(
-  $$select public.campaign_preview('sms','Hello {{customer_first_name}}','all')$$,
+  $$select public.update_communication_settings(true,'whatsapp',true,'Ignored text',null)$$,
   'P0001','subscription_expired: renew to continue selling',
-  'expired tenants cannot preview campaigns'
+  'expired tenants cannot enable transactional reminders'
 );
 reset role;
 update public.companies set subscription_grace_period_end=now()+interval '1 day'
@@ -235,10 +252,9 @@ select testkit.as_user(
   '69696969-6969-4696-9696-696969696961',
   'Admin'
 );
-select is(
-  (public.campaign_preview('sms','Hello {{customer_first_name}}','all')->>'eligible')::int,
-  1,
-  'paid subscription grace preserves campaign access'
+select lives_ok(
+  $$select public.update_communication_settings(true,'whatsapp',true,'Ignored text',null)$$,
+  'paid subscription grace preserves transactional reminder controls'
 );
 reset role;
 update public.companies set subscription_grace_period_end=null
@@ -380,23 +396,24 @@ select testkit.as_user(
   '69696969-6969-4696-9696-696969696961',
   'Admin'
 );
-select is(
-  (public.campaign_preview('sms','{{customer_first_name}}123456','all')->>'units')::int,
-  3,
-  'SMS preview sums authoritative segments for every personalized recipient'
+select lives_ok(
+  $$select public.update_communication_settings(
+    false,'sms',false,'Pay this arbitrary destination',
+    '[{"stage_days":3,"enabled":true,"template_key":"tenant-controlled"}]'::jsonb
+  )$$,
+  'tenant may configure a fixed reminder stage without supplying message content'
 );
-create temp table personalized_campaign as
-select public.create_message_campaign('Personalized units','sms','{{customer_first_name}}123456','all') campaign_id;
-select public.send_message_campaign((select campaign_id from personalized_campaign));
 select is(
-  (select sum(quota_units)::int from public.outbox where campaign_id=(select campaign_id from personalized_campaign)),
-  3,
-  'queued campaign quota exactly matches personalized preview units'
+  (select template_key from public.payment_reminder_rules
+   where company_id=(select company_id from communications_fixture) and stage_days=3),
+  'payment-overdue-3',
+  'server derives the approved template key instead of trusting tenant input'
 );
-select throws_ok(
-  format($$select public.set_campaign_status('%s','resume')$$,(select campaign_id from personalized_campaign)),
-  'P0001','invalid_campaign_transition: queued -> queued',
-  'campaign resume is allowed only from paused state'
+select is(
+  (select customer_payment_instructions from public.companies
+   where id=(select company_id from communications_fixture)),
+  null,
+  'free-form payment instructions are ignored and remain cleared'
 );
 
 reset role;

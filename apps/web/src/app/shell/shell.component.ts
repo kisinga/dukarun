@@ -545,7 +545,12 @@ export class ShellComponent implements OnInit {
           visible: () =>
             this.perms.has('ManageCommissions') && this.entitlements.commissionsVisible(),
         },
-        { route: '/messaging', label: 'Messaging', icon: 'heroChatBubbleLeftRight' },
+        {
+          route: '/communications',
+          label: 'Communications',
+          icon: 'heroChatBubbleLeftRight',
+          visible: () => this.perms.has('ManageCommunications'),
+        },
       ],
     },
   ];
