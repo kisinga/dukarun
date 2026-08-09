@@ -159,7 +159,15 @@ export interface SaleDetailSnapshot extends ScopedRecord {
 
 export interface NamedSnapshot extends ScopedRecord {
   key: string;
-  name: 'dashboard' | 'settings' | 'locations' | 'inbox' | 'approvals' | 'team' | 'cashier-display';
+  name:
+    | 'dashboard'
+    | 'settings'
+    | 'locations'
+    | 'inbox'
+    | 'approvals'
+    | 'team'
+    | 'access'
+    | 'cashier-display';
   value: unknown;
   fetched_at: string;
 }

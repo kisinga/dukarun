@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, signal, viewChild } from '@angular/core';
+import { Component, OnInit, computed, effect, inject, signal, viewChild } from '@angular/core';
 import { PageLayoutComponent } from '../shared/ui/page-layout.component';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { normalizeKenyanPhone } from '../core/phone';
@@ -7,8 +7,6 @@ import {
   MembershipWithRole,
   PERMISSION_LABELS,
   Role,
-  MembershipLocation,
-  TeamLocation,
   TeamService,
 } from './team.service';
 import { StatusBadgeComponent } from '../shared/ui/status-badge.component';
@@ -16,9 +14,10 @@ import { DeleteConfirmationModalComponent } from '../shared/ui/delete-confirmati
 import { EntityAvatarComponent } from '../shared/ui/entity-avatar.component';
 import { PaginationComponent } from '../shared/ui/pagination.component';
 import { EntitlementsService } from '../core/entitlements.service';
+import { PermissionsService } from '../core/permissions.service';
 import { SupabaseService } from '../core/supabase.service';
 import { ProfileService } from '../profile/profile.service';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { ButtonComponent } from '../shared/ui/button.component';
 import { IconComponent } from '../shared/ui/icon.component';
 import { DataTableShellComponent } from '../shared/ui/data-table-shell.component';
@@ -588,16 +587,18 @@ export class TeamComponent implements OnInit {
   private readonly team = inject(TeamService);
   private readonly supabase = inject(SupabaseService);
   private readonly profile = inject(ProfileService);
+  private readonly permissions = inject(PermissionsService);
+  private readonly router = inject(Router);
   protected readonly entitlements = inject(EntitlementsService);
 
   protected readonly currentUserId = computed(() => this.supabase.session()?.user.id ?? null);
 
   protected readonly allPermissions = ALL_PERMISSIONS;
   protected readonly permissionLabels = PERMISSION_LABELS;
-  protected readonly members = signal<MembershipWithRole[]>([]);
-  protected readonly roles = signal<Role[]>([]);
-  protected readonly locations = signal<TeamLocation[]>([]);
-  protected readonly membershipLocations = signal<MembershipLocation[]>([]);
+  protected readonly members = this.team.members;
+  protected readonly roles = this.team.roles;
+  protected readonly locations = this.team.locations;
+  protected readonly membershipLocations = this.team.membershipLocations;
   protected readonly locationMember = signal<MembershipWithRole | null>(null);
   protected readonly selectedLocations = signal<Set<string>>(new Set());
   protected readonly primaryLocationId = signal<string | null>(null);
@@ -663,9 +664,21 @@ export class TeamComponent implements OnInit {
   protected readonly rolePermissions = signal<Set<string>>(new Set());
 
   protected readonly busy = signal(false);
-  protected readonly loading = signal(false);
-  protected readonly error = signal<string | null>(null);
+  protected readonly loading = this.team.loading;
+  protected readonly error = this.team.error;
   protected readonly notice = signal<string | null>(null);
+
+  constructor() {
+    effect(() => {
+      const roles = this.roles();
+      if (!this.memberRole.value && roles.length > 0) this.memberRole.setValue(roles[0].id);
+    });
+    effect(() => {
+      if (this.permissions.ready() && !this.permissions.has('ManageTeam')) {
+        void this.router.navigate(['/dashboard']);
+      }
+    });
+  }
 
   protected permissionLabel(permission: string): string {
     return PERMISSION_LABELS[permission as keyof typeof PERMISSION_LABELS] ?? permission;
@@ -690,29 +703,19 @@ export class TeamComponent implements OnInit {
   });
 
   async ngOnInit(): Promise<void> {
-    await this.load();
+    try {
+      await this.team.start();
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Failed to load team');
+    }
   }
 
   protected async load(): Promise<void> {
-    this.loading.set(true);
     try {
-      const [members, roles, locations, membershipLocations] = await Promise.all([
-        this.team.memberships(),
-        this.team.roles(),
-        this.team.locations(),
-        this.team.membershipLocations(),
-      ]);
-      this.members.set(members);
-      this.roles.set(roles);
-      this.locations.set(locations);
-      this.membershipLocations.set(membershipLocations);
-      if (!this.memberRole.value && roles.length > 0) this.memberRole.setValue(roles[0].id);
+      await this.team.refresh(true);
       this.error.set(null);
-      await this.entitlements.refresh();
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Failed to load team');
-    } finally {
-      this.loading.set(false);
     }
   }
 

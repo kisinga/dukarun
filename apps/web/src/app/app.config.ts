@@ -4,7 +4,7 @@ import {
   provideBrowserGlobalErrorListeners,
   provideZonelessChangeDetection,
 } from '@angular/core';
-import { provideRouter, withInMemoryScrolling } from '@angular/router';
+import { provideRouter, withInMemoryScrolling, withPreloading } from '@angular/router';
 import { provideServiceWorker } from '@angular/service-worker';
 import { provideNgIconsConfig, provideIcons } from '@ng-icons/core';
 import {
@@ -72,6 +72,7 @@ import {
 } from '@ng-icons/heroicons/outline';
 
 import { routes } from './app.routes';
+import { SelectivePreloadingStrategy } from './core/selective-preloading.strategy';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -79,6 +80,7 @@ export const appConfig: ApplicationConfig = {
     provideZonelessChangeDetection(),
     provideRouter(
       routes,
+      withPreloading(SelectivePreloadingStrategy),
       withInMemoryScrolling({ scrollPositionRestoration: 'enabled', anchorScrolling: 'enabled' })
     ),
     // Icon registry (design system: Heroicons outline via <app-icon name="hero…">)
