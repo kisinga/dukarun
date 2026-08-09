@@ -86,16 +86,18 @@ export const routes: Routes = [
   {
     path: '',
     canActivate: [authGuard, legalAcceptanceGuard],
-    canActivateChild: [legalAcceptanceGuard, locationGuard],
+    canActivateChild: [locationGuard],
     loadComponent: () => import('./shell/shell.component').then(m => m.ShellComponent),
     children: [
       {
         path: 'dashboard',
+        data: { preload: true },
         loadComponent: () =>
           import('./pages/dashboard/dashboard.component').then(m => m.DashboardComponent),
       },
       {
         path: 'pos/sell',
+        data: { preload: true },
         loadComponent: () => import('./pos/sell/sell.component').then(m => m.SellComponent),
       },
       { path: 'pos/sales', redirectTo: 'sales' },
@@ -174,10 +176,12 @@ export const routes: Routes = [
       },
       {
         path: 'products',
+        data: { preload: true },
         loadComponent: () => import('./products/products.component').then(m => m.ProductsComponent),
       },
       {
         path: 'customers',
+        data: { preload: true },
         loadComponent: () =>
           import('./customers/customers.component').then(m => m.CustomersComponent),
       },
@@ -215,7 +219,7 @@ export const routes: Routes = [
       {
         path: 'team',
         canActivate: [permissionGuard],
-        data: { permission: 'ManageTeam' },
+        data: { permission: 'ManageTeam', preload: true },
         loadComponent: () => import('./team/team.component').then(m => m.TeamComponent),
       },
       {
@@ -244,6 +248,7 @@ export const routes: Routes = [
       },
       {
         path: 'sales',
+        data: { preload: true },
         loadComponent: () => import('./orders/orders.component').then(m => m.OrdersComponent),
       },
       { path: 'orders', redirectTo: 'sales' },

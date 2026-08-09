@@ -2,7 +2,7 @@ import { Injectable, computed, effect, inject, signal } from '@angular/core';
 import { SupabaseService } from './supabase.service';
 import type { AppIdentity } from './supabase.service';
 import type { RealtimeChannel } from '@supabase/supabase-js';
-import { offlineScopeKey } from '../pos/offline/offline-db';
+import { offlineDb, offlineScopeKey, type NamedSnapshot } from '../pos/offline/offline-db';
 import { CacheJournalService, type CacheStreamHandler } from './cache-journal.service';
 
 /** Assignable permissions (role editor checkboxes; mirrored in the DB role templates). */
@@ -192,24 +192,78 @@ export class PermissionsService {
   }
 
   private async load(companyId: string, userId: string, sequence: number): Promise<void> {
+    const identity = { companyId, userId };
+    const cached = await this.cachedAccess(identity);
+    if (sequence !== this.sequence) return;
+    if (cached) {
+      this.commit(cached);
+      this.watchTeam(identity);
+      void this.fetchAccess(identity, sequence, true).catch(() => undefined);
+      return;
+    }
+    await this.fetchAccess(identity, sequence, false);
+  }
+
+  private async fetchAccess(
+    identity: AppIdentity,
+    sequence: number,
+    keepCachedOnError: boolean
+  ): Promise<void> {
     const { data, error } = await this.supabase.client.rpc('current_access_snapshot');
     if (sequence !== this.sequence) return;
     if (error) {
-      this.error.set(error.message);
-      this.state.set('error');
+      if (!keepCachedOnError) {
+        this.error.set(error.message);
+        this.state.set('error');
+      }
       return;
     }
 
     const snapshot = data as unknown as AccessSnapshot;
-    if (snapshot.company_id !== companyId || snapshot.user_id !== userId) {
+    if (snapshot.company_id !== identity.companyId || snapshot.user_id !== identity.userId) {
       this.error.set('Access context changed');
       this.state.set('error');
       return;
     }
+    const permissionsChanged =
+      this.state() === 'ready' && !samePermissions(this.granted(), snapshot.permissions);
+    if (permissionsChanged) await this.journal.purgeSensitive(identity);
+    if (sequence !== this.sequence) return;
+    this.commit(snapshot);
+    await this.persistAccess(identity, snapshot);
+    if (sequence === this.sequence) this.watchTeam(identity);
+  }
+
+  private commit(snapshot: AccessSnapshot): void {
     this.granted.set(new Set(snapshot.permissions));
     this.actions.set(snapshot.actions);
+    this.error.set(null);
     this.state.set('ready');
-    this.watchTeam({ companyId, userId });
+  }
+
+  private async cachedAccess(identity: AppIdentity): Promise<AccessSnapshot | null> {
+    const scope = offlineScopeKey(identity);
+    const cached = await (await offlineDb()).get('snapshots', `${scope}:access`);
+    const snapshot = cached?.value as AccessSnapshot | undefined;
+    return cached &&
+      cached.company_id === identity.companyId &&
+      cached.user_id === identity.userId &&
+      validAccessSnapshot(snapshot, identity)
+      ? snapshot
+      : null;
+  }
+
+  private async persistAccess(identity: AppIdentity, snapshot: AccessSnapshot): Promise<void> {
+    const scope = offlineScopeKey(identity);
+    const cached: NamedSnapshot = {
+      key: `${scope}:access`,
+      name: 'access',
+      company_id: identity.companyId,
+      user_id: identity.userId,
+      value: snapshot,
+      fetched_at: new Date().toISOString(),
+    };
+    await (await offlineDb()).put('snapshots', cached);
   }
 
   private watchTeam(identity: AppIdentity): void {
@@ -220,7 +274,14 @@ export class PermissionsService {
     this.teamScope = scope;
     this.teamIdentity = identity;
     this.teamHandler = {
-      apply: async () => {
+      apply: async changes => {
+        if (
+          !changes.some(change =>
+            ['role', 'membership', 'membership_location'].includes(change.entityType)
+          )
+        ) {
+          return;
+        }
         await this.journal.purgeSensitive(identity);
         await this.loadFor(identity, this.supabase.session()?.access_token ?? null, true);
       },
@@ -240,6 +301,9 @@ export class PermissionsService {
   }
 
   private stopTeamWatch(): void {
+    if (this.teamScope && this.teamHandler) {
+      this.journal.unsubscribe('team', this.teamScope, this.teamHandler, 'permissions');
+    }
     if (this.teamIdentity) void this.journal.purgeSensitive(this.teamIdentity);
     if (this.teamChannel) void this.supabase.client.removeChannel(this.teamChannel);
     this.teamChannel = null;
@@ -247,4 +311,21 @@ export class PermissionsService {
     this.teamScope = null;
     this.teamIdentity = null;
   }
+}
+
+function validAccessSnapshot(
+  snapshot: AccessSnapshot | undefined,
+  identity: AppIdentity
+): snapshot is AccessSnapshot {
+  return (
+    !!snapshot &&
+    snapshot.company_id === identity.companyId &&
+    snapshot.user_id === identity.userId &&
+    Array.isArray(snapshot.permissions) &&
+    !!snapshot.actions
+  );
+}
+
+function samePermissions(current: ReadonlySet<Permission>, next: readonly Permission[]): boolean {
+  return current.size === next.length && next.every(permission => current.has(permission));
 }

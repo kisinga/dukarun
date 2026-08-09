@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, effect, inject, signal } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { Company, SupabaseService } from '../core/supabase.service';
 import { PermissionsService } from '../core/permissions.service';
@@ -450,6 +450,15 @@ export class ShellComponent implements OnInit {
     () => this.sync.queuedCount() + this.sync.failedCount()
   );
   protected readonly signOutWarning = signal(false);
+
+  constructor() {
+    effect(() => {
+      const status = this.legal.status();
+      if (!status?.required || status.accepted || !status.enforcement_started) return;
+      const target = status.can_accept ? '/legal/accept' : '/legal/pending';
+      void this.router.navigate([target], { queryParams: { returnUrl: this.router.url } });
+    });
+  }
 
   protected readonly sections: NavSection[] = [
     {

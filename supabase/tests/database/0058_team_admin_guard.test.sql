@@ -76,6 +76,12 @@ where company_id = (select company_id from g_company)
   and user_id = 'aaaaaaaa-0008-0008-0008-000000000002';
 grant select on pg_temp.g_second to authenticated;
 
+select testkit.as_user(
+  (select company_id from g_company),
+  'aaaaaaaa-0008-0008-0008-000000000002',
+  'Second Admin'
+);
+
 select throws_ok(
   format($$select public.update_team_member('%s', '%s', null)$$,
     (select id from g_second), (select cashier_role from g_roles)),

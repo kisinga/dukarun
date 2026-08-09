@@ -273,7 +273,13 @@ export class CacheJournalService {
   /** Remove snapshots whose visibility can change with role/company context. */
   async purgeSensitive(identity: AppIdentity): Promise<void> {
     const db = await offlineDb();
-    const sensitiveStreams = new Set<CacheStream>(['parties', 'sales', 'settings', 'inbox']);
+    const sensitiveStreams = new Set<CacheStream>([
+      'parties',
+      'sales',
+      'settings',
+      'inbox',
+      'team',
+    ]);
     const stores = [
       'parties',
       'cashier',
@@ -314,7 +320,11 @@ export class CacheJournalService {
     for (const registration of this.handlers.values()) {
       if (
         !registration.scope.startsWith(identityPrefix) ||
-        !sensitiveStreams.has(registration.stream)
+        !sensitiveStreams.has(registration.stream) ||
+        // This method runs inside the permission journal consumer. Re-entering
+        // that same handler would recurse; its current pass persists the new
+        // authoritative access watermark after the purge completes.
+        registration.consumer === 'permissions'
       ) {
         continue;
       }

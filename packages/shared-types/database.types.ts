@@ -6316,6 +6316,7 @@ export type Database = {
         Args: { p_after_sequence?: number; p_limit?: number; p_stream: string }
         Returns: Json
       }
+      team_management_snapshot: { Args: never; Returns: Json }
       transfer_stock: {
         Args: {
           p_from_location_id: string

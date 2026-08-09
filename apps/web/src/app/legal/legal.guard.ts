@@ -6,7 +6,7 @@ export const legalAcceptanceGuard: CanActivateFn = async (_route, state) => {
   const legal = inject(LegalService);
   const router = inject(Router);
   try {
-    const status = await legal.refresh();
+    const status = await legal.ensureVerified();
     if (status.company_status === 'unapproved') {
       return router.createUrlTree(['/company/pending']);
     }
