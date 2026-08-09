@@ -144,7 +144,7 @@ type CreditOrder = {
       </app-list-search-bar>
 
       <!-- List -->
-      @if (!loading() && filtered().length === 0) {
+      @if (!loading() && filtered().length === 0 && !creating() && selectedCustomerId() === null) {
         <app-empty-state
           icon="heroUsers"
           title="No customers found"
