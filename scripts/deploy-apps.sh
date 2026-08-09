@@ -30,6 +30,7 @@ set -euo pipefail
 SSH_HOST="${DEPLOY_SSH_HOST:?missing DEPLOY_SSH_HOST — copy .env.deploy.example to .env.deploy and fill it in}"
 COOLIFY_SERVICE_DIR="${COOLIFY_SERVICE_DIR:?missing COOLIFY_SERVICE_DIR — see .env.deploy.example}"
 SUPABASE_URL="${SUPABASE_URL:-https://supa.dukarun.com}"
+WEB_PUBLIC_URL="${WEB_PUBLIC_URL:-https://dukarun.com}"
 SSH_OPTS=(-o BatchMode=no -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new)
 
 # app -> container name prefix of the v1 container it replaces
@@ -62,6 +63,7 @@ deploy_one() {
     --build-arg "APP=$app" \
     --build-arg "SUPABASE_URL=$SUPABASE_URL" \
     --build-arg "SUPABASE_ANON_KEY=$anon_key" \
+    --build-arg "WEB_PUBLIC_URL=$WEB_PUBLIC_URL" \
     -t "$image" .
 
   echo "▶ [$app] shipping image to $SSH_HOST"

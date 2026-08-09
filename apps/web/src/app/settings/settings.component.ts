@@ -10,7 +10,6 @@ import {
   CompanySettings,
   PaymentMethodRow,
   LocationPaymentMethodRow,
-  ReminderTemplate,
   SettingsService,
   StockLocationRow,
 } from './settings.service';
@@ -28,11 +27,6 @@ type ReminderDraft = {
   stageDays: number;
   enabled: boolean;
   key: string;
-  name: string;
-  smsBody: string;
-  whatsappBody: string;
-  overrideId?: string;
-  dirty: boolean;
 };
 
 @Component({
@@ -652,59 +646,28 @@ type ReminderDraft = {
                       <span class="label-text">Use SMS if WhatsApp permanently fails</span>
                     </label>
                     <div class="sm:col-span-2">
-                      <p class="text-sm font-medium">Reminder stages and templates</p>
-                      <div class="mt-2 space-y-2">
+                      <div class="flex flex-wrap items-baseline justify-between gap-2">
+                        <p class="text-sm font-medium">Reminder stages</p>
+                        <p class="type-caption">Message wording is managed by Dukarun.</p>
+                      </div>
+                      <div class="mt-2 grid gap-2 sm:grid-cols-2">
                         @for (draft of reminderDrafts(); track draft.key) {
-                          <details class="rounded-box border border-base-300 p-3">
-                            <summary class="flex cursor-pointer items-center justify-between gap-3">
-                              <span class="font-medium">{{
-                                reminderStageLabel(draft.stageDays)
-                              }}</span>
-                              <input
-                                type="checkbox"
-                                class="toggle toggle-sm toggle-primary"
-                                [checked]="draft.enabled"
-                                (click)="$event.stopPropagation()"
-                                (change)="setReminderStageEnabled(draft.key, $event)"
-                              />
-                            </summary>
-                            <div class="mt-3 grid gap-3">
-                              <app-form-field label="SMS template">
-                                <textarea
-                                  rows="2"
-                                  class="textarea textarea-bordered w-full"
-                                  [value]="draft.smsBody"
-                                  (input)="setReminderTemplateBody(draft.key, 'sms', $event)"
-                                ></textarea>
-                              </app-form-field>
-                              <app-form-field label="WhatsApp template">
-                                <textarea
-                                  rows="3"
-                                  class="textarea textarea-bordered w-full"
-                                  [value]="draft.whatsappBody"
-                                  (input)="setReminderTemplateBody(draft.key, 'whatsapp', $event)"
-                                ></textarea>
-                              </app-form-field>
-                              <p class="type-caption">
-                                Variables: customer_first_name, outstanding_balance, due_date,
-                                statement_url, store_name, days_overdue.
-                              </p>
-                            </div>
-                          </details>
+                          <label
+                            class="flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-box border border-base-300 px-3 py-2"
+                          >
+                            <span class="font-medium">{{
+                              reminderStageLabel(draft.stageDays)
+                            }}</span>
+                            <input
+                              type="checkbox"
+                              class="toggle toggle-sm toggle-primary"
+                              [checked]="draft.enabled"
+                              (change)="setReminderStageEnabled(draft.key, $event)"
+                            />
+                          </label>
                         }
                       </div>
                     </div>
-                    <app-form-field
-                      class="sm:col-span-2"
-                      label="Customer payment instructions"
-                      hint="Shown on secure statement links. Do not include private account credentials."
-                    >
-                      <textarea
-                        rows="3"
-                        class="textarea textarea-bordered w-full"
-                        [formControl]="paymentInstructions"
-                      ></textarea>
-                    </app-form-field>
                   </div>
                   @if (msg('communications'); as m) {
                     <p class="mt-2 text-sm" [class.text-success]="m.ok" [class.text-error]="!m.ok">
@@ -914,7 +877,6 @@ export class SettingsComponent implements OnInit {
     nonNullable: true,
   });
   protected readonly reminderSmsFallback = new FormControl(true, { nonNullable: true });
-  protected readonly paymentInstructions = new FormControl('', { nonNullable: true });
   protected readonly reminderDrafts = signal<ReminderDraft[]>([]);
   protected readonly locationName = new FormControl('', { nonNullable: true });
   protected readonly locationCode = new FormControl('', { nonNullable: true });
@@ -957,17 +919,10 @@ export class SettingsComponent implements OnInit {
       this.paymentRemindersEnabled.setValue(settings.payment_reminders_enabled);
       this.reminderChannel.setValue(settings.payment_reminder_channel);
       this.reminderSmsFallback.setValue(settings.payment_reminder_sms_fallback);
-      this.paymentInstructions.setValue(settings.customer_payment_instructions ?? '');
       this.reminderDrafts.set(
-        reminderConfiguration.rules.map(rule => {
-          const matching = reminderConfiguration.templates.filter(
-            template => template.template_key === rule.template_key
-          );
-          const template =
-            matching.find(item => item.company_id !== null) ??
-            matching.find(item => item.is_system);
-          return this.reminderDraft(rule.stage_days, rule.enabled, rule.template_key, template);
-        })
+        reminderConfiguration.map(rule =>
+          this.reminderDraft(rule.stage_days, rule.enabled, rule.template_key)
+        )
       );
     } catch (err) {
       this.loadError.set(err instanceof Error ? err.message : 'Failed to load settings');
@@ -1243,32 +1198,17 @@ export class SettingsComponent implements OnInit {
         enabled: this.paymentRemindersEnabled.value,
         channel: this.reminderChannel.value,
         smsFallback: this.reminderSmsFallback.value,
-        paymentInstructions: this.paymentInstructions.value.trim(),
         rules: this.reminderDrafts().map(draft => ({
           stage_days: draft.stageDays,
           enabled: draft.enabled,
           template_key: draft.key,
         })),
       });
-      await Promise.all(
-        this.reminderDrafts()
-          .filter(draft => draft.dirty)
-          .map(draft =>
-            this.settingsService.saveReminderTemplate({
-              id: draft.overrideId,
-              key: draft.key,
-              name: draft.name,
-              smsBody: draft.smsBody,
-              whatsappBody: draft.whatsappBody,
-            })
-          )
-      );
       this.settings.set({
         ...current,
         payment_reminders_enabled: this.paymentRemindersEnabled.value,
         payment_reminder_channel: this.reminderChannel.value,
         payment_reminder_sms_fallback: this.reminderSmsFallback.value,
-        customer_payment_instructions: this.paymentInstructions.value.trim() || null,
       });
       await this.entitlements.refresh();
       this.flash('communications', true, 'Reminder settings saved');
@@ -1279,21 +1219,11 @@ export class SettingsComponent implements OnInit {
     }
   }
 
-  private reminderDraft(
-    stageDays: number,
-    enabled: boolean,
-    key: string,
-    template?: ReminderTemplate
-  ): ReminderDraft {
+  private reminderDraft(stageDays: number, enabled: boolean, key: string): ReminderDraft {
     return {
       stageDays,
       enabled,
       key,
-      name: template?.name ?? this.reminderStageLabel(stageDays),
-      smsBody: template?.sms_body ?? '',
-      whatsappBody: template?.whatsapp_body ?? '',
-      overrideId: template?.company_id ? template.id : undefined,
-      dirty: false,
     };
   }
 
@@ -1305,21 +1235,6 @@ export class SettingsComponent implements OnInit {
     const enabled = (event.target as HTMLInputElement).checked;
     this.reminderDrafts.update(rows =>
       rows.map(row => (row.key === key ? { ...row, enabled } : row))
-    );
-  }
-
-  protected setReminderTemplateBody(key: string, channel: 'sms' | 'whatsapp', event: Event): void {
-    const value = (event.target as HTMLTextAreaElement).value;
-    this.reminderDrafts.update(rows =>
-      rows.map(row =>
-        row.key === key
-          ? {
-              ...row,
-              ...(channel === 'sms' ? { smsBody: value } : { whatsappBody: value }),
-              dirty: true,
-            }
-          : row
-      )
     );
   }
 

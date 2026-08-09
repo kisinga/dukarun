@@ -319,7 +319,6 @@ export class BillingComponent implements OnInit, OnDestroy {
     if (tier.whatsapp_per_period !== null)
       lines.push(`${tier.whatsapp_per_period.toLocaleString('en-KE')} WhatsApp/mo`);
     if (tier.storefront_available) lines.push('Public storefront');
-    if (tier.customer_campaigns_available) lines.push('Customer campaigns');
     if (tier.payment_reminders_available) lines.push('Payment reminders');
     if (tier.multiple_locations_enabled) lines.push('Multiple stock locations');
     if (tier.staff_performance_enabled) lines.push('Staff performance');

@@ -2,12 +2,7 @@ import { Injectable, effect, inject, signal } from '@angular/core';
 import { SupabaseService } from './supabase.service';
 
 export type FeatureKey =
-  | 'multipleLocations'
-  | 'staffPerformance'
-  | 'commissions'
-  | 'storefront'
-  | 'customerCampaigns'
-  | 'paymentReminders';
+  'multipleLocations' | 'staffPerformance' | 'commissions' | 'storefront' | 'paymentReminders';
 export type LimitKey =
   | 'maxTeamMembers'
   | 'maxProducts'

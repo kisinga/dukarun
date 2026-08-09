@@ -141,16 +141,13 @@ select is(
   'same reminder stage is deduped by checkpoint'
 );
 
--- 9. Batch messaging to all customers.
+-- 9. Tenant-authored batch messaging has been retired.
 select testkit.as_user((select company_id from cm_company), '11111111-1111-1111-1111-111111111111', 'Admin');
 
-create temp table batch_result as
-select public.queue_batch_message('whatsapp', 'Shop closed on Madaraka day') as queued;
-
 select is(
-  (select queued from batch_result),
-  1,
-  'batch message expanded to the one customer with a phone'
+  to_regprocedure('public.queue_batch_message(text,text,text)'),
+  null::regprocedure,
+  'tenant-authored batch messaging API is absent'
 );
 
 -- 10. Global invariant still holds after all this.

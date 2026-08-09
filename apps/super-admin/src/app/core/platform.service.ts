@@ -38,6 +38,30 @@ export interface PlatformCampaignPreview {
   eligible: number;
   skipped: number;
 }
+export interface CompanyLegalStatus {
+  company_id: string;
+  company_name: string;
+  terms_version: string | null;
+  legal_status: 'accepted' | 'grace_period' | 'blocked' | 'not_required';
+  accepted_at: string | null;
+  accepted_by: string | null;
+}
+export type LegalDocumentType = 'privacy' | 'terms' | 'dpa' | 'subprocessors';
+export interface LegalDocumentVersion {
+  id: string;
+  document_type: LegalDocumentType;
+  version: string;
+  content_markdown: string | null;
+  content_sha256: string;
+  effective_at: string;
+  enforcement_at: string | null;
+  publication_state: 'draft' | 'published' | 'superseded';
+  requires_company_acceptance: boolean;
+  created_at: string;
+  updated_at: string;
+  published_at: string | null;
+  published_by: string | null;
+}
 
 function rpcError(error: { message: string; code?: string }): Error {
   return new Error(error.message);
@@ -150,6 +174,53 @@ export class PlatformService {
     const { data, error } = await q;
     if (error) throw error;
     return data;
+  }
+
+  async companyLegalStatuses(): Promise<CompanyLegalStatus[]> {
+    const { data, error } = await this.db.rpc('platform_company_legal_status');
+    if (error) throw rpcError(error);
+    return data as unknown as CompanyLegalStatus[];
+  }
+
+  async legalDocuments(): Promise<LegalDocumentVersion[]> {
+    const { data, error } = await this.db.rpc('platform_legal_documents');
+    if (error) throw error;
+    return data as unknown as LegalDocumentVersion[];
+  }
+
+  async saveLegalDraft(input: {
+    id: string | null;
+    type: LegalDocumentType;
+    version: string;
+    markdown: string;
+    effectiveAt: string;
+    enforcementAt: string | null;
+    requiresAcceptance: boolean;
+  }): Promise<string> {
+    const { data, error } = await this.db.rpc('platform_save_legal_draft', {
+      p_id: input.id!,
+      p_document_type: input.type,
+      p_version: input.version,
+      p_content_markdown: input.markdown,
+      p_effective_at: input.effectiveAt,
+      p_enforcement_at: input.enforcementAt!,
+      p_requires_company_acceptance: input.requiresAcceptance,
+    });
+    if (error) throw rpcError(error);
+    return data;
+  }
+
+  async publishLegalDocument(id: string, expectedHash: string): Promise<void> {
+    const { error } = await this.db.rpc('platform_publish_legal_document', {
+      p_id: id,
+      p_expected_sha256: expectedHash,
+    });
+    if (error) throw rpcError(error);
+  }
+
+  async discardLegalDraft(id: string): Promise<void> {
+    const { error } = await this.db.rpc('platform_discard_legal_draft', { p_id: id });
+    if (error) throw rpcError(error);
   }
 
   async companyCounts(companyId: string): Promise<{ members: number; orders: number }> {

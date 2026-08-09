@@ -17,6 +17,7 @@ set -euo pipefail
 source .env.deploy
 SSH_OPTS=(-o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new)
 SUPABASE_URL="${SUPABASE_URL:-https://supa.dukarun.com}"
+WEB_PUBLIC_URL="${WEB_PUBLIC_URL:-https://v2.dukarun.com}"
 
 ssh_app() {
   case "$1" in
@@ -55,6 +56,7 @@ for app in "${APPS[@]}"; do
     --build-arg "APP=$app" \
     --build-arg "SUPABASE_URL=$SUPABASE_URL" \
     --build-arg "SUPABASE_ANON_KEY=$ANON_KEY" \
+    --build-arg "WEB_PUBLIC_URL=$WEB_PUBLIC_URL" \
     -t "$image" . > /dev/null
   echo "▶ [$app] shipping"
   docker save "$image" | gzip | ssh "${SSH_OPTS[@]}" "$DEPLOY_SSH_HOST" 'gunzip | docker load'

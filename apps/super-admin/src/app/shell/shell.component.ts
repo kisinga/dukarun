@@ -99,6 +99,7 @@ export class ShellComponent {
     { route: '/communications', label: 'Communications', icon: 'heroChatBubbleLeftRight' },
     { route: '/operations', label: 'Operations', icon: 'heroServerStack' },
     { route: '/audit', label: 'Audit log', icon: 'heroClipboardDocumentList' },
+    { route: '/legal', label: 'Legal documents', icon: 'heroDocumentText' },
   ];
 
   protected closeDrawer(): void {

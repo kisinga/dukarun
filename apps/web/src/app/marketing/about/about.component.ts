@@ -136,9 +136,9 @@ export class AboutComponent {
       copy: 'Selling on credit is how dukas work. Balances, limits, and payment history are tracked per customer, not in a notebook.',
     },
     {
-      icon: 'heroChatBubbleLeftRight',
-      title: 'Receipts customers actually read',
-      copy: 'Send receipts and balance reminders by SMS or WhatsApp, the channels your customers already use every day.',
+      icon: 'heroPrinter',
+      title: 'Receipts and responsible reminders',
+      copy: 'Print receipts and send approved balance reminders by SMS or WhatsApp, with consent and delivery controls built in.',
     },
     {
       icon: 'heroCreditCard',

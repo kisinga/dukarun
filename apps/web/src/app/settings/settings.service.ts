@@ -8,7 +8,6 @@ export type StockLocationRow = Database['public']['Tables']['stock_locations']['
 export type LocationPaymentMethodRow =
   Database['public']['Tables']['location_payment_methods']['Row'];
 export type ReminderRule = Database['public']['Tables']['payment_reminder_rules']['Row'];
-export type ReminderTemplate = Database['public']['Tables']['message_templates']['Row'];
 
 /**
  * Company settings. The companies table has a COLUMN-LIMITED update grant:
@@ -37,7 +36,6 @@ export interface CompanySettings {
   payment_reminders_enabled: boolean;
   payment_reminder_channel: 'sms' | 'whatsapp';
   payment_reminder_sms_fallback: boolean;
-  customer_payment_instructions: string | null;
 }
 
 const SELECT_COLUMNS = [
@@ -62,7 +60,6 @@ const SELECT_COLUMNS = [
   'payment_reminders_enabled',
   'payment_reminder_channel',
   'payment_reminder_sms_fallback',
-  'customer_payment_instructions',
 ].join(', ');
 
 @Injectable({ providedIn: 'root' })
@@ -185,48 +182,24 @@ export class SettingsService {
     enabled: boolean;
     channel: 'sms' | 'whatsapp';
     smsFallback: boolean;
-    paymentInstructions: string;
     rules: Array<{ stage_days: number; enabled: boolean; template_key: string }>;
   }): Promise<void> {
     const { error } = await this.db.rpc('update_communication_settings', {
       p_reminders_enabled: input.enabled,
       p_channel: input.channel,
       p_sms_fallback: input.smsFallback,
-      p_payment_instructions: input.paymentInstructions,
+      p_payment_instructions: '',
       p_rules: input.rules,
     });
     if (error) throw rpcError(error);
   }
 
-  async reminderConfiguration(): Promise<{
-    rules: ReminderRule[];
-    templates: ReminderTemplate[];
-  }> {
-    const [rules, templates] = await Promise.all([
-      this.db.from('payment_reminder_rules').select('*').order('stage_days'),
-      this.db.from('message_templates').select('*').eq('context', 'reminder').eq('active', true),
-    ]);
-    if (rules.error) throw rules.error;
-    if (templates.error) throw templates.error;
-    return { rules: rules.data, templates: templates.data };
-  }
-
-  async saveReminderTemplate(input: {
-    id?: string;
-    key: string;
-    name: string;
-    smsBody: string;
-    whatsappBody: string;
-  }): Promise<string> {
-    const { data, error } = await this.db.rpc('upsert_message_template', {
-      p_template_key: input.key,
-      p_name: input.name,
-      p_context: 'reminder',
-      p_sms_body: input.smsBody,
-      p_whatsapp_body: input.whatsappBody,
-      ...(input.id ? { p_template_id: input.id } : {}),
-    });
-    if (error) throw rpcError(error);
+  async reminderConfiguration(): Promise<ReminderRule[]> {
+    const { data, error } = await this.db
+      .from('payment_reminder_rules')
+      .select('*')
+      .order('stage_days');
+    if (error) throw error;
     return data;
   }
 

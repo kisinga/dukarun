@@ -76,6 +76,11 @@ import { CustomerStatement, StorefrontService } from './storefront.service';
             </p>
           </section>
         }
+        <p class="mt-6 text-center text-xs text-base-content/50">
+          <a [href]="legalUrl('privacy')" class="link link-hover">Privacy</a>
+          <span aria-hidden="true"> · </span>
+          <a [href]="legalUrl('terms')" class="link link-hover">Terms</a>
+        </p>
       </div>
     </main>
   `,
@@ -106,5 +111,8 @@ export class StatementComponent implements OnInit {
   }
   protected waLink(phone: string, store: string): string {
     return `https://wa.me/${phone.replace(/\D/g, '')}?text=${encodeURIComponent(`Hello ${store}, I have a question about my statement.`)}`;
+  }
+  protected legalUrl(path: 'privacy' | 'terms'): string {
+    return this.storefront.legalUrl(path);
   }
 }

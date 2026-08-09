@@ -1,12 +1,13 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { SupabaseService } from '../../core/supabase.service';
 import { PublicPricingService } from '../../marketing/public-pricing.service';
+import { LegalService, PublishedLegalDocument } from '../../legal/legal.service';
 
 @Component({
   selector: 'app-register',
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, RouterLink],
   template: `
     <main class="dashboard-main flex min-h-screen items-center justify-center bg-base-200 p-4">
       <div class="card w-full max-w-md bg-base-100">
@@ -16,8 +17,8 @@ import { PublicPricingService } from '../../marketing/public-pricing.service';
               {{ hasCompany() ? 'Add another company' : 'Register your business' }}
             </h1>
             <p class="mt-1 text-sm text-base-content/70">
-              This creates your company workspace — ledger, locations, and payment methods are set
-              up automatically.
+              This creates your company workspace. Ledger, locations, and payment methods are set up
+              automatically.
             </p>
             @if (trialDays(); as days) {
               <p class="mt-2 text-sm font-medium text-primary">
@@ -104,10 +105,54 @@ import { PublicPricingService } from '../../marketing/public-pricing.service';
                 </label>
               </fieldset>
 
+              @if (legalReady()) {
+                <label class="flex items-start gap-3 rounded-box border border-base-300 p-4">
+                  <input
+                    type="checkbox"
+                    class="checkbox checkbox-primary mt-0.5"
+                    [formControl]="acceptedTerms"
+                  />
+                  <span class="text-sm">
+                    I am authorized to bind this company and agree to the
+                    <a routerLink="/terms" target="_blank" class="link link-primary"
+                      >Terms of Service</a
+                    >. The
+                    <a routerLink="/privacy" target="_blank" class="link link-primary"
+                      >Privacy Notice</a
+                    >
+                    explains data handling and is not marketing consent.
+                  </span>
+                </label>
+              }
+
+              @if (legalLoadError()) {
+                <div class="alert alert-error flex-wrap text-sm" role="alert">
+                  <span
+                    >The current Terms could not be checked. Reconnect before creating a
+                    company.</span
+                  >
+                  <button
+                    type="button"
+                    class="btn btn-sm"
+                    [disabled]="legalLoading()"
+                    (click)="loadTerms()"
+                  >
+                    {{ legalLoading() ? 'Checking…' : 'Try again' }}
+                  </button>
+                </div>
+              }
+
               <button
                 type="submit"
                 class="btn btn-primary"
-                [disabled]="saving() || companyName.invalid || companyEmail.invalid"
+                [disabled]="
+                  saving() ||
+                  legalLoading() ||
+                  legalLoadError() ||
+                  companyName.invalid ||
+                  companyEmail.invalid ||
+                  (legalReady() && acceptedTerms.invalid)
+                "
               >
                 {{ saving() ? 'Creating workspace…' : 'Create company' }}
               </button>
@@ -126,6 +171,7 @@ export class RegisterComponent implements OnInit {
   private readonly supabase = inject(SupabaseService);
   private readonly route = inject(ActivatedRoute);
   private readonly publicPricing = inject(PublicPricingService);
+  private readonly legal = inject(LegalService);
 
   protected readonly saving = signal(false);
   protected readonly error = signal<string | null>(null);
@@ -133,6 +179,10 @@ export class RegisterComponent implements OnInit {
   /** True when the user already belongs to a company and is adding another. */
   protected readonly hasCompany = signal(false);
   protected readonly trialDays = signal<number | null>(null);
+  protected readonly currentTerms = signal<PublishedLegalDocument | null>(null);
+  protected readonly legalLoading = signal(true);
+  protected readonly legalLoadError = signal(false);
+  protected readonly legalReady = computed(() => this.currentTerms() !== null);
   private readonly requestedPlanCode = this.route.snapshot.queryParamMap.get('plan');
 
   protected readonly ownerName = new FormControl('', { nonNullable: true });
@@ -146,53 +196,76 @@ export class RegisterComponent implements OnInit {
     validators: [Validators.email],
   });
   protected readonly companyAddress = new FormControl('', { nonNullable: true });
+  protected readonly acceptedTerms = new FormControl(false, {
+    nonNullable: true,
+    validators: [Validators.requiredTrue],
+  });
 
   /** Multi-company: existing users may register additional companies from here. */
   async ngOnInit(): Promise<void> {
+    this.hasCompany.set(Boolean(this.supabase.claims()?.company_id));
     await Promise.all([
-      this.supabase
-        .currentCompany()
-        .then(company => this.hasCompany.set(company !== null))
-        .catch(() => undefined),
       this.publicPricing
         .billingConfig()
         .then(config => this.trialDays.set(config?.trialDays ?? null))
         .catch(() => undefined),
+      this.loadTerms(),
     ]);
   }
 
+  protected async loadTerms(): Promise<void> {
+    this.legalLoading.set(true);
+    this.legalLoadError.set(false);
+    try {
+      const terms = await this.legal.publishedDocument('terms');
+      if (!terms) throw new Error('No published Terms are available.');
+      this.currentTerms.set(terms);
+    } catch {
+      this.currentTerms.set(null);
+      this.legalLoadError.set(true);
+    } finally {
+      this.legalLoading.set(false);
+    }
+  }
+
   protected async provision(): Promise<void> {
-    if (this.companyName.invalid || this.companyEmail.invalid) return;
+    if (
+      this.companyName.invalid ||
+      this.companyEmail.invalid ||
+      this.legalLoading() ||
+      this.legalLoadError() ||
+      (this.legalReady() && this.acceptedTerms.invalid)
+    )
+      return;
     this.saving.set(true);
     this.error.set(null);
     try {
-      const { data: companyId, error } = await this.supabase.client.rpc('provision_company', {
-        p_company_name: this.companyName.value.trim(),
-        p_store_name: this.storeName.value.trim() || 'Main location',
-        p_currency: 'KES',
-        p_email: this.companyEmail.value.trim() || undefined,
-        p_address: this.companyAddress.value.trim() || undefined,
-        ...(this.requestedPlanCode ? { p_trial_tier_code: this.requestedPlanCode } : {}),
-      });
+      const terms = this.currentTerms();
+      if (!terms) throw new Error('The current Terms must be loaded before registration.');
+      const { data: companyId, error } = await this.supabase.client.rpc(
+        'provision_company_with_terms',
+        {
+          p_company_name: this.companyName.value.trim(),
+          p_store_name: this.storeName.value.trim() || 'Main location',
+          p_currency: 'KES',
+          p_email: this.companyEmail.value.trim() || undefined,
+          p_address: this.companyAddress.value.trim() || undefined,
+          ...(this.requestedPlanCode ? { p_trial_tier_code: this.requestedPlanCode } : {}),
+          p_terms_version: terms.version,
+          p_terms_content_sha256: terms.content_sha256,
+          p_owner_name: this.ownerName.value.trim() || undefined,
+        }
+      );
       if (error) throw error;
-      // Refresh the session first: the new JWT carries the company claims that
-      // update_my_profile (and everything else) scopes by.
+      // Refresh so an approved company can become active immediately. New
+      // companies remain on the pending screen until platform approval.
       const { error: refreshError } = await this.supabase.client.auth.refreshSession();
       if (refreshError) throw refreshError;
       if (this.supabase.claims()?.company_id !== companyId) {
         this.createdPending.set(true);
         return;
       }
-      // The owner's display name rides on provisioning — optional, best-effort.
-      const name = this.ownerName.value.trim();
-      if (name) {
-        await this.supabase.client
-          .rpc('update_my_profile', { p_display_name: name })
-          .then(({ error: profileError }) => {
-            if (profileError) console.warn('Profile name not saved', profileError);
-          });
-      }
-      // Reload — provision_company made the new company active and every
+      // Reload because provision_company made the new company active and every
       // cached store must restart under the new tenant scope.
       window.location.assign('/dashboard');
     } catch (err) {

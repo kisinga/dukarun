@@ -9,7 +9,7 @@ interface NavLink {
 }
 
 /**
- * Public marketing chrome — sticky navbar + footer for the unauthenticated
+ * Public marketing layout with a sticky navbar and footer for the unauthenticated
  * pages (/, /about, /contact). Deliberately separate from the dashboard shell:
  * no sidebar, no bottom nav, no tenant state.
  */
@@ -96,7 +96,7 @@ interface NavLink {
 
       <!-- Footer -->
       <footer class="border-t border-base-300/60 bg-base-200/50">
-        <div class="mkt-container grid gap-8 py-10 sm:grid-cols-3">
+        <div class="mkt-container grid gap-8 py-10 sm:grid-cols-2 lg:grid-cols-4">
           <div class="flex flex-col gap-2">
             <span class="flex items-center gap-2 font-bold tracking-tight">
               <img src="assets/logo/dukarun-icon-dark.svg" alt="" class="h-6 w-6" />
@@ -133,6 +133,29 @@ interface NavLink {
             >
               Log in
             </a>
+          </nav>
+          <nav class="flex flex-col gap-1" aria-label="Legal">
+            <span class="mkt-eyebrow mb-1">Legal</span>
+            <a
+              routerLink="/privacy"
+              class="flex min-h-8 items-center text-sm text-base-content/70 hover:text-base-content"
+              >Privacy</a
+            >
+            <a
+              routerLink="/terms"
+              class="flex min-h-8 items-center text-sm text-base-content/70 hover:text-base-content"
+              >Terms</a
+            >
+            <a
+              routerLink="/dpa"
+              class="flex min-h-8 items-center text-sm text-base-content/70 hover:text-base-content"
+              >Data Processing Addendum</a
+            >
+            <a
+              routerLink="/subprocessors"
+              class="flex min-h-8 items-center text-sm text-base-content/70 hover:text-base-content"
+              >Subprocessors</a
+            >
           </nav>
         </div>
         <div class="border-t border-base-300/60">

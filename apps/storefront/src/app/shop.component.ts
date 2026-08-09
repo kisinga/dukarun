@@ -15,7 +15,7 @@ function formatKes(amount: number): string {
   })}`;
 }
 
-/** `/:slug` — a shop's public catalog with WhatsApp ordering. */
+/** `/:slug` is a shop's public catalog with WhatsApp ordering. */
 @Component({
   selector: 'app-shop',
   imports: [RouterLink],
@@ -39,7 +39,7 @@ function formatKes(amount: number): string {
             <div class="min-w-0 flex-1">
               <h1 class="truncate text-xl font-bold tracking-tight">{{ s.name }}</h1>
               <p class="text-xs text-base-content/60">
-                Order on WhatsApp — pay on pickup or delivery
+                Order on WhatsApp. Pay on pickup or delivery.
               </p>
             </div>
             @if (s.public_whatsapp_number) {
@@ -81,7 +81,7 @@ function formatKes(amount: number): string {
               <div class="card-body p-6 text-center">
                 <p class="font-semibold">Nothing listed yet</p>
                 <p class="mt-1 text-sm text-base-content/60">
-                  This shop hasn't listed products — check back soon.
+                  This shop has not listed products yet. Check back soon.
                 </p>
               </div>
             </div>
@@ -151,6 +151,11 @@ function formatKes(amount: number): string {
             Order on WhatsApp
           </a>
         }
+        <footer class="mx-auto max-w-2xl px-4 pt-8 text-center text-xs text-base-content/50">
+          <a [href]="legalUrl('privacy')" class="link link-hover">Privacy</a>
+          <span aria-hidden="true"> · </span>
+          <a [href]="legalUrl('terms')" class="link link-hover">Terms</a>
+        </footer>
       } @else if (!error()) {
         <div class="mx-auto max-w-md p-4 py-16 text-center text-sm text-base-content/60">
           Loading…
@@ -217,7 +222,7 @@ export class ShopComponent implements OnInit {
 
   protected label(item: CatalogRow): string {
     if (!item.variant_name || item.variant_name === 'Default') return item.product_name ?? '';
-    return `${item.product_name} — ${item.variant_name}`;
+    return `${item.product_name}: ${item.variant_name}`;
   }
 
   private searchTokens(value: string): string[] {
@@ -233,5 +238,9 @@ export class ShopComponent implements OnInit {
   protected waLink(phone: string, text: string): string {
     const digits = phone.replace(/[^\d]/g, '');
     return `https://wa.me/${digits}?text=${encodeURIComponent(text)}`;
+  }
+
+  protected legalUrl(path: 'privacy' | 'terms'): string {
+    return this.storefront.legalUrl(path);
   }
 }

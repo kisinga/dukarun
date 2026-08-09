@@ -54,11 +54,6 @@ const FEATURE_FIELDS = [
     help: 'Publish a public catalogue with seven-day downgrade grace.',
   },
   {
-    key: 'customer_campaigns_available',
-    label: 'Customer campaigns',
-    help: 'Send permission-controlled customer broadcasts.',
-  },
-  {
     key: 'payment_reminders_available',
     label: 'Payment reminders',
     help: 'Enable due-date reminder automation and secure statements.',
@@ -470,7 +465,6 @@ export class TiersComponent implements OnInit {
       staff_performance_enabled: tier.staff_performance_enabled,
       commissions_available: tier.commissions_available,
       storefront_available: tier.storefront_available,
-      customer_campaigns_available: tier.customer_campaigns_available,
       payment_reminders_available: tier.payment_reminders_available,
     });
     this.openEditor();
@@ -526,7 +520,7 @@ export class TiersComponent implements OnInit {
         sms_per_period: this.limits()['sms_per_period'] ?? null,
         whatsapp_per_period: this.limits()['whatsapp_per_period'] ?? null,
         storefront_available: this.features()['storefront_available'] === true,
-        customer_campaigns_available: this.features()['customer_campaigns_available'] === true,
+        customer_campaigns_available: false,
         payment_reminders_available: this.features()['payment_reminders_available'] === true,
         ...(editing ? { tier_id: editing.id, is_active: this.isActive.value } : {}),
       });

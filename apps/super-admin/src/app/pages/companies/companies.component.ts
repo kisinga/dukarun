@@ -3,7 +3,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { NgIcon } from '@ng-icons/core';
 import { debounceTime, distinctUntilChanged } from 'rxjs';
-import { Company, PlatformService, Tier } from '../../core/platform.service';
+import { Company, CompanyLegalStatus, PlatformService, Tier } from '../../core/platform.service';
 import { DataTableShellComponent } from '../../shared/ui/data-table-shell.component';
 import { DrawerComponent } from '../../shared/ui/drawer.component';
 import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
@@ -27,6 +27,12 @@ const SUB_TYPE: Record<string, BadgeType> = {
   active: 'success',
   expired: 'error',
   cancelled: 'neutral',
+};
+const LEGAL_TYPE: Record<string, BadgeType> = {
+  accepted: 'success',
+  grace_period: 'warning',
+  blocked: 'error',
+  not_required: 'neutral',
 };
 
 @Component({
@@ -95,6 +101,7 @@ const SUB_TYPE: Record<string, BadgeType> = {
                 <th>Company</th>
                 <th>Status</th>
                 <th>Subscription</th>
+                <th>Terms</th>
                 <th>Created</th>
                 <th class="w-12"><span class="sr-only">Open</span></th>
               </tr>
@@ -128,6 +135,13 @@ const SUB_TYPE: Record<string, BadgeType> = {
                       />
                       <span class="type-caption">{{ company.subscription_tiers?.name }}</span>
                     </div>
+                  </td>
+                  <td>
+                    <app-status-badge
+                      [type]="legalType(legalStatus(company.id)?.legal_status)"
+                      [label]="legalLabel(legalStatus(company.id))"
+                      size="sm"
+                    />
                   </td>
                   <td class="type-caption">{{ date(company.created_at) }}</td>
                   <td class="text-right text-base-content/40">
@@ -168,6 +182,11 @@ const SUB_TYPE: Record<string, BadgeType> = {
               @if (company.subscription_tiers?.name) {
                 <span class="type-caption">{{ company.subscription_tiers?.name }}</span>
               }
+              <app-status-badge
+                [type]="legalType(legalStatus(company.id)?.legal_status)"
+                [label]="legalLabel(legalStatus(company.id))"
+                size="sm"
+              />
             </span>
           </button>
         }
@@ -210,6 +229,11 @@ const SUB_TYPE: Record<string, BadgeType> = {
               @if (company.subscription_tiers?.name) {
                 <span class="type-caption">{{ company.subscription_tiers?.name }} tier</span>
               }
+              <app-status-badge
+                [type]="legalType(legalStatus(company.id)?.legal_status)"
+                [label]="legalLabel(legalStatus(company.id))"
+                size="sm"
+              />
             </div>
 
             <div class="mt-4 grid grid-cols-2 gap-3">
@@ -256,7 +280,7 @@ const SUB_TYPE: Record<string, BadgeType> = {
                       date(company.last_payment_date)
                     }}</span>
                   } @else {
-                    —
+                    Not set
                   }
                 </dd>
               </div>
@@ -273,7 +297,7 @@ const SUB_TYPE: Record<string, BadgeType> = {
               <app-form-field label="Tier">
                 <select class="select select-bordered w-full" [formControl]="subTier">
                   @for (tier of tiers(); track tier.id) {
-                    <option [value]="tier.id">{{ tier.code }} — {{ tier.name }}</option>
+                    <option [value]="tier.id">{{ tier.code }}: {{ tier.name }}</option>
                   }
                 </select>
               </app-form-field>
@@ -376,6 +400,8 @@ export class CompaniesComponent implements OnInit {
 
   protected readonly companies = signal<CompanyRow[]>([]);
   protected readonly tiers = signal<Tier[]>([]);
+  protected readonly legalStatuses = signal<Map<string, CompanyLegalStatus>>(new Map());
+  protected readonly legalStatusesAvailable = signal(true);
   protected readonly selected = signal<CompanyRow | null>(null);
   protected readonly drawerOpen = signal(false);
   protected readonly counts = signal<{ members: number; orders: number } | null>(null);
@@ -419,8 +445,17 @@ export class CompaniesComponent implements OnInit {
   protected async load(): Promise<void> {
     this.loading.set(true);
     try {
-      const companies = (await this.platform.companies(this.search.value)) as CompanyRow[];
+      let legalStatusesAvailable = true;
+      const [companies, legalStatuses] = await Promise.all([
+        this.platform.companies(this.search.value) as Promise<CompanyRow[]>,
+        this.platform.companyLegalStatuses().catch(() => {
+          legalStatusesAvailable = false;
+          return [];
+        }),
+      ]);
       this.companies.set(companies);
+      this.legalStatuses.set(new Map(legalStatuses.map(status => [status.company_id, status])));
+      this.legalStatusesAvailable.set(legalStatusesAvailable);
       const selectedId = this.selected()?.id;
       if (selectedId)
         this.selected.set(companies.find(company => company.id === selectedId) ?? null);
@@ -454,9 +489,6 @@ export class CompaniesComponent implements OnInit {
     if (!current || !target || current.id === target.id) return [];
     return [
       current.storefront_available && !target.storefront_available ? 'storefront' : null,
-      current.customer_campaigns_available && !target.customer_campaigns_available
-        ? 'customer campaigns'
-        : null,
       current.payment_reminders_available && !target.payment_reminders_available
         ? 'payment reminders'
         : null,
@@ -514,8 +546,25 @@ export class CompaniesComponent implements OnInit {
     return SUB_TYPE[status ?? ''] ?? 'neutral';
   }
 
+  protected legalStatus(companyId: string): CompanyLegalStatus | undefined {
+    return this.legalStatuses().get(companyId);
+  }
+
+  protected legalType(status?: string): BadgeType {
+    if (!this.legalStatusesAvailable()) return 'neutral';
+    return LEGAL_TYPE[status ?? 'not_required'] ?? 'neutral';
+  }
+
+  protected legalLabel(status?: CompanyLegalStatus): string {
+    if (!this.legalStatusesAvailable()) return 'unavailable';
+    if (!status || status.legal_status === 'not_required') return 'not required';
+    return status.terms_version
+      ? `${status.legal_status.replace('_', ' ')} · ${status.terms_version}`
+      : status.legal_status.replace('_', ' ');
+  }
+
   protected date(iso: string | null): string {
-    if (!iso) return '—';
+    if (!iso) return 'Not set';
     return new Date(iso).toLocaleDateString('en-KE', {
       year: 'numeric',
       month: 'short',

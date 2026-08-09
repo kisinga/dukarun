@@ -471,4 +471,4 @@ select cron.schedule(
 
 -- The browser must use bounded staging; retaining the unbounded entry point
 -- would let older clients bypass chunk limits and set-wise validation.
-drop function public.import_catalog_products(jsonb,text,uuid,uuid);
+drop function if exists public.import_catalog_products(jsonb,text,uuid,uuid);
