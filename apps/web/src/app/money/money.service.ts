@@ -34,6 +34,11 @@ export type CustomerStatementRow = {
   credit: number;
   balance: number;
 };
+export type CustomerStatementCursor = Pick<CustomerStatementRow, 'id' | 'date'>;
+export type CustomerStatementPage = {
+  rows: CustomerStatementRow[];
+  hasMore: boolean;
+};
 
 export type ReconAccountWithParent = ReconAccount & {
   reconciliations: Pick<Reconciliation, 'id' | 'scope' | 'scope_ref_id' | 'created_at'> | null;
@@ -283,85 +288,21 @@ export class MoneyService {
     return data;
   }
 
-  async customerStatement(customerId: string): Promise<CustomerStatementRow[]> {
-    const { data: orders, error: orderError } = await this.db
-      .from('orders')
-      .select('id, code, total, created_at')
-      .eq('customer_id', customerId)
-      .eq('is_credit_sale', true)
-      .in('status', ['completed', 'voided'])
-      .order('created_at');
-    if (orderError) throw orderError;
-    const ids = (orders ?? []).map(order => order.id);
-    const { data: payments, error: paymentError } = ids.length
-      ? await this.db
-          .from('payments')
-          .select('id, order_id, amount, reference, status, created_at')
-          .in('order_id', ids)
-          .order('created_at')
-      : { data: [], error: null };
-    if (paymentError) throw paymentError;
-    const { data: adjustments, error: adjustmentError } = await this.db
-      .from('ledger_journal_lines')
-      .select(
-        'id, debit, credit, meta, ledger_journal_entries!entry_id!inner(posted_at, memo, source_type, source_id), ledger_accounts!inner(code)'
-      )
-      .eq('ledger_journal_entries.source_type', 'BalanceAdjustment')
-      .eq('ledger_accounts.code', 'ACCOUNTS_RECEIVABLE')
-      .contains('meta', { customerId });
-    if (adjustmentError) throw adjustmentError;
-    const entries = [
-      ...(orders ?? []).map(order => ({
-        id: order.id,
-        date: order.created_at,
-        reference: order.code,
-        description: 'Credit sale',
-        debit: order.total,
-        credit: 0,
-      })),
-      ...(payments ?? []).map(payment => ({
-        id: payment.id,
-        date: payment.created_at,
-        reference: payment.reference || 'Payment',
-        description: payment.status === 'reversed' ? 'Reversed payment' : 'Payment received',
-        debit: payment.status === 'reversed' ? payment.amount : 0,
-        credit: payment.status === 'reversed' ? 0 : payment.amount,
-      })),
-      ...(adjustments ?? []).map(line => ({
-        id: line.id,
-        date: line.ledger_journal_entries.posted_at,
-        reference: line.ledger_journal_entries.source_id,
-        description: line.ledger_journal_entries.memo || 'Balance adjustment',
-        debit: line.debit,
-        credit: line.credit,
-      })),
-    ].sort((a, b) => a.date.localeCompare(b.date));
-    let balance = 0;
-    return entries.map(entry => ({ ...entry, balance: (balance += entry.debit - entry.credit) }));
-  }
-
-  async purchasesWithPayments(limit = 500): Promise<(Purchase & { paid: number })[]> {
-    const { data: purchases, error: e1 } = await this.db
-      .from('purchases')
-      .select('*')
-      .eq('stock_location_id', this.locations.requireActiveId())
-      .order('created_at', { ascending: false })
-      .limit(limit);
-    if (e1) throw e1;
-    if (!purchases || purchases.length === 0) return [];
-    const { data: payments, error: e2 } = await this.db
-      .from('purchase_payments')
-      .select('*')
-      .in(
-        'purchase_id',
-        purchases.map(p => p.id)
-      );
-    if (e2) throw e2;
-    const paidBy = new Map<string, number>();
-    for (const p of payments ?? []) {
-      paidBy.set(p.purchase_id, (paidBy.get(p.purchase_id) ?? 0) + p.amount);
-    }
-    return purchases.map(p => ({ ...p, paid: paidBy.get(p.id) ?? 0 }));
+  async customerStatement(
+    customerId: string,
+    before?: CustomerStatementCursor,
+    limit = 25
+  ): Promise<CustomerStatementPage> {
+    const { data, error } = await this.db.rpc('customer_statement', {
+      p_customer_id: customerId,
+      p_limit: Math.min(Math.max(Math.trunc(limit), 1), 100),
+      ...(before ? { p_before_date: before.date, p_before_id: before.id } : {}),
+    });
+    if (error) throw rpcError(error);
+    return {
+      rows: (data ?? []).map(({ has_more: _hasMore, ...row }) => row),
+      hasMore: data?.[0]?.has_more ?? false,
+    };
   }
 
   async purchasesPage(input: {

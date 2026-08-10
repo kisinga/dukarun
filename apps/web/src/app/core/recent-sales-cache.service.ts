@@ -15,6 +15,7 @@ import {
 } from './cache-journal.service';
 import { LocationContextService } from './location-context.service';
 import { SupabaseService } from './supabase.service';
+import { postgrestIdBatches } from './postgrest-batches';
 
 const RECENT_SALES_LIMIT = 100;
 const DETAIL_LIMIT = 20;
@@ -179,13 +180,17 @@ export class RecentSalesCacheService {
       if (!(await this.refresh(scope))) throw new Error('sales_refresh_failed');
       return;
     }
-    const { data, error } = await this.supabase.client
-      .from('orders')
-      .select('*, customers(first_name, last_name)')
-      .in('id', ids)
-      .eq('location_id', locationId);
-    if (error) throw error;
-    const changed = new Map((data ?? []).map(row => [row.id, row]));
+    const changedRows: OrderWithCustomer[] = [];
+    for (const batch of postgrestIdBatches(ids)) {
+      const { data, error } = await this.supabase.client
+        .from('orders')
+        .select('*, customers(first_name, last_name)')
+        .in('id', batch)
+        .eq('location_id', locationId);
+      if (error) throw error;
+      changedRows.push(...(data ?? []));
+    }
+    const changed = new Map(changedRows.map(row => [row.id, row]));
     const idSet = new Set(ids);
     const rows = this.orders().filter(row => !idSet.has(row.id));
     rows.push(...changed.values());

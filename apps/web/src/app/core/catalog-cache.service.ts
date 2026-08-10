@@ -22,6 +22,7 @@ import {
   type CacheChange,
   type CacheStreamHandler,
 } from './cache-journal.service';
+import { postgrestIdBatches } from './postgrest-batches';
 
 // Current offline catalogue contract. Enterprise catalogues beyond 10k need a
 // server-search tier before this bound can safely grow.
@@ -373,13 +374,17 @@ export class CatalogCacheService {
 
     let nextFamilies = this.families().filter(row => !familyIds.has(row.id));
     if (familyIds.size) {
-      const { data: families, error: familyError } = await this.supabase.client
-        .from('products')
-        .select('*')
-        .in('id', [...familyIds])
-        .eq('active', true);
-      if (familyError) throw familyError;
-      nextFamilies.push(...(families ?? []));
+      const changedFamilies: Product[] = [];
+      for (const batch of postgrestIdBatches([...familyIds])) {
+        const { data: families, error: familyError } = await this.supabase.client
+          .from('products')
+          .select('*')
+          .in('id', batch)
+          .eq('active', true);
+        if (familyError) throw familyError;
+        changedFamilies.push(...(families ?? []));
+      }
+      nextFamilies.push(...changedFamilies);
       nextFamilies.sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
     }
 

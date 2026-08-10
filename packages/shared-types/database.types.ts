@@ -5553,6 +5553,24 @@ export type Database = {
         Returns: boolean
       }
       custom_access_token_hook: { Args: { event: Json }; Returns: Json }
+      customer_statement: {
+        Args: {
+          p_before_date?: string
+          p_before_id?: string
+          p_customer_id: string
+          p_limit?: number
+        }
+        Returns: {
+          balance: number
+          credit: number
+          date: string
+          debit: number
+          description: string
+          has_more: boolean
+          id: string
+          reference: string
+        }[]
+      }
       dashboard_location_snapshot: {
         Args: { p_location_id?: string; p_since?: string }
         Returns: Json

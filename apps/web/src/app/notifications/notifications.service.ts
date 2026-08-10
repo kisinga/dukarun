@@ -5,6 +5,7 @@ import { SupabaseService } from '../core/supabase.service';
 import { ConnectivityService } from '../pos/offline/connectivity.service';
 import { offlineDb, offlineScopeKey, type NamedSnapshot } from '../pos/offline/offline-db';
 import { nairobiDayEndExclusive, nairobiDayStart } from '../core/nairobi-date';
+import { postgrestIdBatches } from '../core/postgrest-batches';
 import {
   CacheJournalService,
   type CacheChange,
@@ -134,12 +135,16 @@ export class NotificationsService implements OnDestroy {
       ...new Set(changes.filter(row => row.entityType === 'notification').map(row => row.entityId)),
     ];
     if (!ids.length) return;
-    const { data, error } = await this.db.from('notifications').select('*').in('id', ids);
-    if (error) throw error;
+    const changedNotifications: AppNotification[] = [];
+    for (const batch of postgrestIdBatches(ids)) {
+      const { data, error } = await this.db.from('notifications').select('*').in('id', batch);
+      if (error) throw error;
+      changedNotifications.push(...(data ?? []));
+    }
     if (scope !== this.scope) throw new Error('cache_scope_changed');
     const idSet = new Set(ids);
     const rows = this.notifications().filter(row => !idSet.has(row.id));
-    rows.push(...(data ?? []));
+    rows.push(...changedNotifications);
     rows.sort((a, b) => b.created_at.localeCompare(a.created_at));
     const limited = rows.slice(0, 50);
     await this.persist(limited, scope);

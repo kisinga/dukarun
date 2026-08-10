@@ -15,6 +15,7 @@ import {
   type CacheChange,
   type CacheStreamHandler,
 } from './cache-journal.service';
+import { postgrestIdBatches } from './postgrest-batches';
 
 type Customer = Database['public']['Tables']['customers']['Row'];
 type CustomerBalance = Database['public']['Views']['customer_ar_balances']['Row'];
@@ -376,41 +377,51 @@ export class PartyCacheService {
     const ids = [...new Set(changes.map(change => change.entityId))];
     if (!ids.length) return;
 
-    const [directoryResult, arResult, apResult, arAgingResult, apAgingResult] = await Promise.all([
-      this.supabase.client.from('customers').select('*').in('id', ids),
-      this.supabase.client.from('customer_ar_balances').select('*').in('customer_id', ids),
-      this.supabase.client.from('supplier_ap_balances').select('*').in('supplier_id', ids),
-      this.supabase.client
-        .from('customer_credit_aging')
-        .select('customer_id, days_outstanding, bucket')
-        .in('customer_id', ids),
-      this.supabase.client
-        .from('supplier_ap_aging')
-        .select('supplier_id, days_outstanding, bucket')
-        .in('supplier_id', ids),
-    ]);
-    for (const result of [directoryResult, arResult, apResult, arAgingResult, apAgingResult]) {
-      if (result.error) throw result.error;
+    const directoryRows: Customer[] = [];
+    const arRows: CustomerBalance[] = [];
+    const apRows: SupplierBalance[] = [];
+    const arAgingRows: CustomerAging[] = [];
+    const apAgingRows: SupplierAging[] = [];
+    for (const batch of postgrestIdBatches(ids)) {
+      const [directoryResult, arResult, apResult, arAgingResult, apAgingResult] = await Promise.all(
+        [
+          this.supabase.client.from('customers').select('*').in('id', batch),
+          this.supabase.client.from('customer_ar_balances').select('*').in('customer_id', batch),
+          this.supabase.client.from('supplier_ap_balances').select('*').in('supplier_id', batch),
+          this.supabase.client
+            .from('customer_credit_aging')
+            .select('customer_id, days_outstanding, bucket')
+            .in('customer_id', batch),
+          this.supabase.client
+            .from('supplier_ap_aging')
+            .select('supplier_id, days_outstanding, bucket')
+            .in('supplier_id', batch),
+        ]
+      );
+      for (const result of [directoryResult, arResult, apResult, arAgingResult, apAgingResult]) {
+        if (result.error) throw result.error;
+      }
+      directoryRows.push(...(directoryResult.data ?? []));
+      arRows.push(...(arResult.data ?? []));
+      apRows.push(...(apResult.data ?? []));
+      arAgingRows.push(...(arAgingResult.data ?? []));
+      apAgingRows.push(...(apAgingResult.data ?? []));
     }
 
     const projection: FinancialProjection = {
-      ar: new Map((arResult.data ?? []).map(row => [row.customer_id, row.balance ?? 0])),
-      ap: new Map((apResult.data ?? []).map(row => [row.supplier_id, row.balance ?? 0])),
+      ar: new Map(arRows.map(row => [row.customer_id, row.balance ?? 0])),
+      ap: new Map(apRows.map(row => [row.supplier_id, row.balance ?? 0])),
       arAging: new Map(
-        (arAgingResult.data ?? [])
-          .filter(row => row.customer_id !== null)
-          .map(row => [row.customer_id!, row])
+        arAgingRows.filter(row => row.customer_id !== null).map(row => [row.customer_id!, row])
       ),
       apAging: new Map(
-        (apAgingResult.data ?? [])
-          .filter(row => row.supplier_id !== null)
-          .map(row => [row.supplier_id!, row])
+        apAgingRows.filter(row => row.supplier_id !== null).map(row => [row.supplier_id!, row])
       ),
     };
     const idSet = new Set(ids);
     let customers = this.customers().filter(row => !idSet.has(row.id));
     let suppliers = this.suppliers().filter(row => !idSet.has(row.id));
-    for (const row of directoryResult.data ?? []) {
+    for (const row of directoryRows) {
       if (row.is_supplier) suppliers.push(this.supplierWithFinancials(row, projection));
       else customers.push(this.customerWithFinancials(row, projection));
     }
