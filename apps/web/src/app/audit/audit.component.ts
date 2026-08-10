@@ -13,6 +13,7 @@ import { ListSearchBarComponent } from '../shared/ui/list-search-bar.component';
 import { PageLayoutComponent } from '../shared/ui/page-layout.component';
 import { PaginationComponent } from '../shared/ui/pagination.component';
 import { ButtonComponent } from '../shared/ui/button.component';
+import { FormFieldComponent } from '../shared/ui/form-field.component';
 
 interface ChangeItem {
   field: string;
@@ -86,6 +87,7 @@ const REASON_FIELDS = new Set(['decision_reason', 'void_reason', 'reason', 'note
     PageLayoutComponent,
     PaginationComponent,
     ButtonComponent,
+    FormFieldComponent,
   ],
   template: `
     <app-page
@@ -121,55 +123,59 @@ const REASON_FIELDS = new Set(['decision_reason', 'void_reason', 'reason', 'note
             {{ total() }} {{ total() === 1 ? 'activity' : 'activities' }} found
           }
         </span>
-        <div filters class="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-          <select
-            class="select select-bordered min-h-11 w-full select-sm sm:w-auto"
-            aria-label="Filter by action"
-            [value]="action()"
-            (change)="setFilter(action, $event)"
-          >
-            <option value="">All actions</option>
-            <option value="created">Created</option>
-            <option value="updated">Updated</option>
-            <option value="deleted">Deleted</option>
-            <option value="stock">Stock movement</option>
-          </select>
-          <select
-            class="select select-bordered min-h-11 w-full select-sm sm:w-auto"
-            aria-label="Filter by area"
-            [value]="area()"
-            (change)="setFilter(area, $event)"
-          >
-            <option value="">All areas</option>
-            <option value="sales">Sales</option>
-            <option value="inventory">Inventory</option>
-            <option value="cash">Cash control</option>
-            <option value="people">Customers</option>
-            <option value="team">Team</option>
-            <option value="settings">Settings</option>
-          </select>
-          <select
-            class="select select-bordered min-h-11 w-full select-sm sm:w-auto"
-            aria-label="Filter by person"
-            [value]="actor()"
-            (change)="setFilter(actor, $event)"
-          >
-            <option value="">Everyone</option>
-            @for (person of actors(); track person.user_id) {
-              <option [value]="person.user_id">{{ actorOption(person) }}</option>
-            }
-          </select>
-          <select
-            class="select select-bordered min-h-11 w-full select-sm sm:w-auto"
-            aria-label="Filter by date"
-            [value]="period()"
-            (change)="setFilter(period, $event)"
-          >
-            <option value="">Any time</option>
-            <option value="today">Today</option>
-            <option value="7">Last 7 days</option>
-            <option value="30">Last 30 days</option>
-          </select>
+        <div filters class="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-end">
+          <app-form-field label="Action" class="sm:w-44">
+            <select
+              class="select select-bordered select-sm w-full"
+              [value]="action()"
+              (change)="setFilter(action, $event)"
+            >
+              <option value="">All actions</option>
+              <option value="created">Created</option>
+              <option value="updated">Updated</option>
+              <option value="deleted">Deleted</option>
+              <option value="stock">Stock movement</option>
+            </select>
+          </app-form-field>
+          <app-form-field label="Area" class="sm:w-44">
+            <select
+              class="select select-bordered select-sm w-full"
+              [value]="area()"
+              (change)="setFilter(area, $event)"
+            >
+              <option value="">All areas</option>
+              <option value="sales">Sales</option>
+              <option value="inventory">Inventory</option>
+              <option value="cash">Cash control</option>
+              <option value="people">Customers</option>
+              <option value="team">Team</option>
+              <option value="settings">Settings</option>
+            </select>
+          </app-form-field>
+          <app-form-field label="Person" class="sm:w-52">
+            <select
+              class="select select-bordered select-sm w-full"
+              [value]="actor()"
+              (change)="setFilter(actor, $event)"
+            >
+              <option value="">Everyone</option>
+              @for (person of actors(); track person.user_id) {
+                <option [value]="person.user_id">{{ actorOption(person) }}</option>
+              }
+            </select>
+          </app-form-field>
+          <app-form-field label="Time" class="sm:w-44">
+            <select
+              class="select select-bordered select-sm w-full"
+              [value]="period()"
+              (change)="setFilter(period, $event)"
+            >
+              <option value="">Any time</option>
+              <option value="today">Today</option>
+              <option value="7">Last 7 days</option>
+              <option value="30">Last 30 days</option>
+            </select>
+          </app-form-field>
         </div>
         @if (hasFilters()) {
           <div badges class="flex flex-wrap items-center gap-2">
@@ -399,9 +405,11 @@ const REASON_FIELDS = new Set(['decision_reason', 'void_reason', 'reason', 'note
               [currentPage]="page()"
               [totalPages]="totalPages()"
               [totalItems]="total()"
-              [itemsPerPage]="pageSize"
+              [itemsPerPage]="pageSize()"
+              [showItemsPerPage]="true"
               itemLabel="activities"
               (pageChange)="goToPage($event)"
+              (itemsPerPageChange)="changePageSize($event)"
             />
           </div>
         }
@@ -422,9 +430,9 @@ export class AuditComponent implements OnInit, OnDestroy {
   protected readonly error = signal<string | null>(null);
   protected readonly total = signal(0);
   protected readonly page = signal(1);
-  protected readonly pageSize = 25;
+  protected readonly pageSize = signal(25);
   protected readonly totalPages = computed(() =>
-    Math.max(1, Math.ceil(this.total() / this.pageSize))
+    Math.max(1, Math.ceil(this.total() / this.pageSize()))
   );
   protected readonly selectedEventId = signal<string | null>(null);
   protected readonly selectedEvent = computed(() => {
@@ -464,7 +472,7 @@ export class AuditComponent implements OnInit, OnDestroy {
           from: this.fromDate(),
         },
         this.page(),
-        this.pageSize
+        this.pageSize()
       );
       if (requestId !== this.requestId) return;
       this.events.set(rows);
@@ -502,6 +510,11 @@ export class AuditComponent implements OnInit, OnDestroy {
     this.page.set(page);
     void this.load();
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  protected changePageSize(size: number): void {
+    this.pageSize.set(size);
+    this.reloadFromStart();
   }
 
   protected openEvent(eventId: string): void {

@@ -45,6 +45,8 @@ export interface PartyQueryResult<T> {
 }
 
 const PAGE_SIZE = 500;
+// Separate from the 10k product catalogue: this is a combined customer +
+// supplier retention bound. Enterprise party pickers require server typeahead.
 const PARTY_RETENTION_LIMIT = 5_000;
 const SEARCH_LIMIT = 10;
 

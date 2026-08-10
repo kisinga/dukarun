@@ -499,7 +499,7 @@ type SalesChartPoint = DailySummary & { day: string; revenue: number; heightPerc
                     <h3 class="section-title">Low stock</h3>
                   </div>
                   @if (lowStock().length > 0) {
-                    <span class="badge badge-warning badge-sm">{{ lowStock().length }}</span>
+                    <span class="badge badge-warning badge-sm">{{ lowStockTotal() }}</span>
                   }
                 </div>
 
@@ -626,6 +626,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   protected readonly productSales = signal<DailyProductSales[]>([]);
   protected readonly topVariants = signal<TopVariant[]>([]);
   protected readonly lowStock = signal<LowStockDisplay[]>([]);
+  protected readonly lowStockTotal = signal(0);
   protected readonly expiring = signal<ExpiringDisplay[]>([]);
   protected readonly locationRows = signal<DashboardLocationSummary[]>([]);
   protected readonly comparison = signal<DashboardPeriodComparison>({
@@ -803,13 +804,14 @@ export class DashboardComponent implements OnInit, OnDestroy {
       const since = this.daysAgoIso(6);
       const canView = this.canViewFinancials();
       if (!canView) this.clearFinancials();
-      const [sales, lowStock, expiring] = await Promise.all([
+      const [sales, lowStockResult, expiring] = await Promise.all([
         canView ? this.reports.dashboardSales(since, requestedLocationId) : Promise.resolve(null),
-        this.reports.lowStock(),
+        this.reports.lowStock(requestedLocationId),
         this.preferences.batchExpiryEnabled()
           ? this.reports.expiringBatches()
           : Promise.resolve([]),
       ]);
+      const lowStock = lowStockResult.rows;
       if (requestedLocationId !== this.dashboardLocationId()) {
         this.loadQueued = true;
         return;
@@ -837,6 +839,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
           manufacturer_name: manufacturerByVariant.get(item.variant_id) ?? null,
         }))
       );
+      this.lowStockTotal.set(lowStockResult.total);
       this.expiring.set(
         expiring.map(item => ({
           ...item,
@@ -918,6 +921,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
       productSales: DailyProductSales[];
       topVariants: TopVariant[];
       lowStock: LowStockDisplay[];
+      lowStockTotal?: number;
       expiring: ExpiringDisplay[];
       locationRows: DashboardLocationSummary[];
       comparison: DashboardPeriodComparison;
@@ -926,6 +930,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.productSales.set(value.productSales);
     this.topVariants.set(value.topVariants);
     this.lowStock.set(value.lowStock);
+    this.lowStockTotal.set(value.lowStockTotal ?? value.lowStock.length);
     this.expiring.set(value.expiring);
     this.locationRows.set(value.locationRows);
     this.comparison.set(value.comparison);
@@ -948,6 +953,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
         productSales: this.productSales(),
         topVariants: this.topVariants(),
         lowStock: this.lowStock(),
+        lowStockTotal: this.lowStockTotal(),
         expiring: this.expiring(),
         locationRows: this.locationRows(),
         comparison: this.comparison(),

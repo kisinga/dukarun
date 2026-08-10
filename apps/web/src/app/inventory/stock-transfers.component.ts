@@ -14,6 +14,7 @@ import { FormFieldComponent } from '../shared/ui/form-field.component';
 import { IconComponent } from '../shared/ui/icon.component';
 import { PageLayoutComponent } from '../shared/ui/page-layout.component';
 import { StockTransferListRow, StockTransfersService } from './stock-transfers.service';
+import { PaginationComponent } from '../shared/ui/pagination.component';
 
 interface TransferLine {
   variant: Variant;
@@ -31,6 +32,7 @@ interface TransferLine {
     FormFieldComponent,
     IconComponent,
     PageLayoutComponent,
+    PaginationComponent,
   ],
   template: `
     <app-page
@@ -184,7 +186,61 @@ interface TransferLine {
 
           <section class="card h-fit bg-base-100">
             <div class="card-body p-4">
-              <h2 class="section-title">Recent transfers</h2>
+              <div class="flex items-center justify-between gap-2">
+                <h2 class="section-title">Transfer history</h2>
+                <button
+                  appButton
+                  variant="ghost"
+                  [iconOnly]="true"
+                  type="button"
+                  [loading]="loading()"
+                  title="Refresh transfer history"
+                  aria-label="Refresh transfer history"
+                  (click)="loadHistory()"
+                >
+                  <app-icon name="heroArrowPath" />
+                </button>
+              </div>
+              <div class="mt-3 grid grid-cols-2 gap-2">
+                <app-form-field label="From location">
+                  <select
+                    class="select select-bordered select-sm w-full"
+                    [value]="historyFromLocation()"
+                    (change)="setHistoryLocation('from', $event)"
+                  >
+                    <option value="">Any</option>
+                    @for (location of locations.locations(); track location.id) {
+                      <option [value]="location.id">{{ location.name }}</option>
+                    }
+                  </select>
+                </app-form-field>
+                <app-form-field label="To location">
+                  <select
+                    class="select select-bordered select-sm w-full"
+                    [value]="historyToLocation()"
+                    (change)="setHistoryLocation('to', $event)"
+                  >
+                    <option value="">Any</option>
+                    @for (location of locations.locations(); track location.id) {
+                      <option [value]="location.id">{{ location.name }}</option>
+                    }
+                  </select>
+                </app-form-field>
+                <app-form-field label="From"
+                  ><input
+                    type="date"
+                    class="input input-bordered input-sm w-full"
+                    [value]="historyFrom()"
+                    (change)="setHistoryDate('from', $event)"
+                /></app-form-field>
+                <app-form-field label="To"
+                  ><input
+                    type="date"
+                    class="input input-bordered input-sm w-full"
+                    [value]="historyTo()"
+                    (change)="setHistoryDate('to', $event)"
+                /></app-form-field>
+              </div>
               @if (!loading() && history().length === 0) {
                 <app-empty-state
                   [embedded]="true"
@@ -203,9 +259,30 @@ interface TransferLine {
                         <span>{{ transfer.to_location?.name ?? 'Unknown' }}</span>
                       </div>
                       <p class="type-caption mt-1">{{ transfer.created_at | date: 'medium' }}</p>
+                      <p class="type-caption mt-1">
+                        {{ transfer.stock_transfer_lines.length }} item(s) ·
+                        {{ transferQuantity(transfer) }} units
+                      </p>
+                      @for (
+                        line of transfer.stock_transfer_lines.slice(0, 2);
+                        track line.variant_id
+                      ) {
+                        <p class="mt-1 truncate text-xs">
+                          {{ transferLineLabel(line) }} · {{ quantity(line.quantity) }}
+                        </p>
+                      }
                     </div>
                   }
                 </div>
+                <app-pagination
+                  class="mt-3 block"
+                  [currentPage]="historyPage()"
+                  [totalPages]="historyTotalPages()"
+                  [totalItems]="historyTotal()"
+                  [itemsPerPage]="historyPageSize"
+                  itemLabel="transfers"
+                  (pageChange)="changeHistoryPage($event)"
+                />
               }
             </div>
           </section>
@@ -229,6 +306,16 @@ export class StockTransfersComponent implements OnInit {
   protected readonly searchError = signal<string | null>(null);
   protected readonly lines = signal<TransferLine[]>([]);
   protected readonly history = signal<StockTransferListRow[]>([]);
+  protected readonly historyPage = signal(1);
+  protected readonly historyTotal = signal(0);
+  protected readonly historyPageSize = 10;
+  protected readonly historyFromLocation = signal('');
+  protected readonly historyToLocation = signal('');
+  protected readonly historyFrom = signal(this.daysAgoIso(29));
+  protected readonly historyTo = signal(this.todayIso());
+  protected readonly historyTotalPages = computed(() =>
+    Math.max(1, Math.ceil(this.historyTotal() / this.historyPageSize))
+  );
   protected readonly loading = signal(false);
   protected readonly saving = signal(false);
   protected readonly error = signal<string | null>(null);
@@ -249,6 +336,7 @@ export class StockTransfersComponent implements OnInit {
     this.search.valueChanges.pipe(debounceTime(200), distinctUntilChanged()),
     { initialValue: undefined }
   );
+  private historyLoadSequence = 0;
 
   constructor() {
     effect(() => {
@@ -333,15 +421,70 @@ export class StockTransfersComponent implements OnInit {
     }
   }
 
-  private async loadHistory(): Promise<void> {
+  protected async loadHistory(): Promise<void> {
     if (!this.locations.isMultiLocation()) return;
+    const sequence = ++this.historyLoadSequence;
     this.loading.set(true);
     try {
-      this.history.set(await this.transfers.recent());
+      const result = await this.transfers.page({
+        page: this.historyPage(),
+        pageSize: this.historyPageSize,
+        fromLocationId: this.historyFromLocation() || undefined,
+        toLocationId: this.historyToLocation() || undefined,
+        from: this.historyFrom() || undefined,
+        to: this.historyTo() || undefined,
+      });
+      if (sequence !== this.historyLoadSequence) return;
+      this.history.set(result.rows);
+      this.historyTotal.set(result.count);
     } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Failed to load transfers');
+      if (sequence === this.historyLoadSequence)
+        this.error.set(err instanceof Error ? err.message : 'Failed to load transfers');
     } finally {
-      this.loading.set(false);
+      if (sequence === this.historyLoadSequence) this.loading.set(false);
     }
+  }
+
+  protected changeHistoryPage(page: number): void {
+    this.historyPage.set(page);
+    void this.loadHistory();
+  }
+
+  protected transferQuantity(transfer: StockTransferListRow): string {
+    return this.quantity(
+      transfer.stock_transfer_lines.reduce((sum, line) => sum + Number(line.quantity), 0)
+    );
+  }
+
+  protected transferLineLabel(line: StockTransferListRow['stock_transfer_lines'][number]): string {
+    const variant = line.product_variants;
+    return [variant?.products?.name, variant?.name].filter(Boolean).join(' · ') || 'Product';
+  }
+
+  protected setHistoryLocation(kind: 'from' | 'to', event: Event): void {
+    const value = (event.target as HTMLSelectElement).value;
+    kind === 'from' ? this.historyFromLocation.set(value) : this.historyToLocation.set(value);
+    this.reloadHistory();
+  }
+
+  protected setHistoryDate(kind: 'from' | 'to', event: Event): void {
+    const value = (event.target as HTMLInputElement).value;
+    kind === 'from' ? this.historyFrom.set(value) : this.historyTo.set(value);
+    this.reloadHistory();
+  }
+
+  private reloadHistory(): void {
+    this.historyPage.set(1);
+    void this.loadHistory();
+  }
+
+  private todayIso(): string {
+    return new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Nairobi' });
+  }
+
+  private daysAgoIso(days: number): string {
+    const date = new Date();
+    date.setDate(date.getDate() - days);
+    return date.toLocaleDateString('en-CA', { timeZone: 'Africa/Nairobi' });
   }
 }

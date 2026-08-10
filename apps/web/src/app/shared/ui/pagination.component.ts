@@ -112,7 +112,9 @@ export class PaginationComponent {
   readonly pageChange = output<number>();
   readonly itemsPerPageChange = output<number>();
 
-  protected readonly startItem = computed(() => (this.currentPage() - 1) * this.itemsPerPage() + 1);
+  protected readonly startItem = computed(() =>
+    this.totalItems() === 0 ? 0 : (this.currentPage() - 1) * this.itemsPerPage() + 1
+  );
   protected readonly endItem = computed(() =>
     Math.min(this.currentPage() * this.itemsPerPage(), this.totalItems())
   );

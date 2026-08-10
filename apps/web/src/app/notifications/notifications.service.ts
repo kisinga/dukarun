@@ -4,6 +4,7 @@ import type { Database } from '@dukarun/shared-types';
 import { SupabaseService } from '../core/supabase.service';
 import { ConnectivityService } from '../pos/offline/connectivity.service';
 import { offlineDb, offlineScopeKey, type NamedSnapshot } from '../pos/offline/offline-db';
+import { nairobiDayEndExclusive, nairobiDayStart } from '../core/nairobi-date';
 import {
   CacheJournalService,
   type CacheChange,
@@ -177,6 +178,51 @@ export class NotificationsService implements OnDestroy {
       .limit(limit);
     if (error) throw error;
     return data as OutboxMessageWithParty[];
+  }
+
+  async outboxPage(input: {
+    page: number;
+    pageSize: number;
+    search?: string;
+    matchingCustomerIds?: string[];
+    channel?: string;
+    status?: string;
+    documentType?: string;
+    customerId?: string;
+    from?: string;
+    to?: string;
+    sortBy?: 'created_at' | 'recipient' | 'channel' | 'status';
+    sortDirection?: 'asc' | 'desc';
+  }): Promise<{ rows: OutboxMessageWithParty[]; count: number }> {
+    let query = this.db
+      .from('outbox')
+      .select('*, customers(id, first_name, last_name, is_supplier)', { count: 'exact' });
+    if (input.search?.trim()) {
+      const pattern = `%${input.search.trim().replace(/[%_,()]/g, ' ')}%`;
+      const clauses = [
+        `recipient.ilike.${pattern}`,
+        `body.ilike.${pattern}`,
+        `subject.ilike.${pattern}`,
+      ];
+      if (input.matchingCustomerIds?.length) {
+        clauses.push(`customer_id.in.(${input.matchingCustomerIds.join(',')})`);
+      }
+      query = query.or(clauses.join(','));
+    }
+    if (input.channel) query = query.eq('channel', input.channel);
+    if (input.status) query = query.eq('status', input.status);
+    if (input.documentType) query = query.eq('document_type', input.documentType);
+    if (input.customerId) query = query.eq('customer_id', input.customerId);
+    if (input.from) query = query.gte('created_at', nairobiDayStart(input.from));
+    if (input.to) query = query.lt('created_at', nairobiDayEndExclusive(input.to));
+    const start = (input.page - 1) * input.pageSize;
+    const ascending = input.sortDirection === 'asc';
+    const { data, error, count } = await query
+      .order(input.sortBy ?? 'created_at', { ascending })
+      .order('id', { ascending })
+      .range(start, start + input.pageSize - 1);
+    if (error) throw error;
+    return { rows: (data ?? []) as OutboxMessageWithParty[], count: count ?? 0 };
   }
 
   /** SMS usage + cap for the meter. */

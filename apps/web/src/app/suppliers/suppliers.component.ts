@@ -1,6 +1,7 @@
 import {
   Component,
   ElementRef,
+  OnDestroy,
   OnInit,
   afterRenderEffect,
   computed,
@@ -11,7 +12,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { FormControl, FormsModule, ReactiveFormsModule } from '@angular/forms';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { formatKes, formatKesInput, parseKes } from '../core/money';
 import { PermissionsService } from '../core/permissions.service';
 import { CatalogSearchService } from '../core/catalog-search.service';
@@ -47,21 +48,29 @@ import {
   PurchaseDraft,
   PurchaseLine,
   PurchasePayment,
+  SupplierPurchaseMetric,
   SupplierVariantPerformance,
 } from '../money/money.service';
 import { CashierSessionService } from '../core/cashier-session.service';
 import { SessionRequiredNoticeComponent } from '../shared/ui/session-required-notice.component';
 import { PartyCacheService } from '../core/party-cache.service';
+import {
+  SearchableFilterComponent,
+  type SearchableFilterOption,
+} from '../shared/ui/searchable-filter.component';
 import { DocumentSendComponent } from '../communications/document-send.component';
 
 type SupplierWithAp = MoneyCustomer & { ap_balance: number } & AgingInfo;
 type PurchasePaymentMode = 'paid' | 'partial' | 'later';
+// Avoid oversized PostgREST URLs when a broad query matches many cached suppliers.
+const SUPPLIER_SEARCH_ID_LIMIT = 50;
 type PurchaseRow = {
   id: string;
   supplier_id: string;
   total_cost: number;
   is_credit: boolean;
   reference: string | null;
+  purchase_date: string;
   created_at: string;
   paid: number;
 };
@@ -110,6 +119,7 @@ interface ParsedPurchaseLine {
     SessionRequiredNoticeComponent,
     PaginationComponent,
     DocumentSendComponent,
+    SearchableFilterComponent,
   ],
   template: `
     <app-page
@@ -177,12 +187,49 @@ interface ParsedPurchaseLine {
         <app-list-search-bar
           placeholder="Search supplier name, phone, or email…"
           [searchQuery]="supplierQuery()"
-          (searchQueryChange)="supplierQuery.set($event)"
+          (searchQueryChange)="supplierQuery.set($event); supplierPage.set(1)"
           [sortOptions]="supplierSortOptions()"
-          [(sortKey)]="supplierSort"
-          [(sortDirection)]="supplierSortDirection"
+          [sortKey]="supplierSort()"
+          (sortKeyChange)="supplierSort.set($event); supplierPage.set(1)"
+          [sortDirection]="supplierSortDirection()"
+          (sortDirectionChange)="supplierSortDirection.set($event); supplierPage.set(1)"
         >
           <app-stat-bar summary [stats]="supplierSummary()" />
+          <div filters class="grid gap-2 sm:grid-cols-2 lg:flex lg:items-end">
+            <app-form-field label="Account status" class="lg:w-44">
+              <select
+                class="select select-bordered select-sm w-full"
+                [value]="supplierStatusFilter()"
+                (change)="setSupplierFilter('status', $event)"
+              >
+                <option value="all">All suppliers</option>
+                <option value="active">Active</option>
+                <option value="archived">Archived</option>
+              </select>
+            </app-form-field>
+            <app-form-field label="Balance" class="lg:w-44">
+              <select
+                class="select select-bordered select-sm w-full"
+                [value]="supplierBalanceFilter()"
+                (change)="setSupplierFilter('balance', $event)"
+              >
+                <option value="all">Any balance</option>
+                <option value="owed">We owe</option>
+                <option value="clear">Nothing owed</option>
+              </select>
+            </app-form-field>
+            <app-form-field label="Age" class="lg:w-44">
+              <select
+                class="select select-bordered select-sm w-full"
+                [value]="supplierAgeFilter()"
+                (change)="setSupplierFilter('age', $event)"
+              >
+                <option value="all">Any age</option>
+                <option value="overdue">Over 30 days</option>
+                <option value="current">Current or clear</option>
+              </select>
+            </app-form-field>
+          </div>
         </app-list-search-bar>
 
         @if (!loading() && filteredSuppliers().length === 0) {
@@ -210,7 +257,7 @@ interface ParsedPurchaseLine {
                   </tr>
                 </thead>
                 <tbody>
-                  @for (supplier of filteredSuppliers(); track supplier.id) {
+                  @for (supplier of pagedSuppliers(); track supplier.id) {
                     <tr
                       role="button"
                       tabindex="0"
@@ -1125,7 +1172,7 @@ interface ParsedPurchaseLine {
                   />
                 } @else {
                   <div class="mt-1 flex flex-col divide-y divide-base-200">
-                    @for (s of filteredSuppliers(); track s.id) {
+                    @for (s of pagedSuppliers(); track s.id) {
                       <div
                         class="cursor-pointer py-3"
                         role="button"
@@ -1232,6 +1279,20 @@ interface ParsedPurchaseLine {
           }
         </aside>
       </div>
+
+      @if (!isPurchasePage() && filteredSuppliers().length > 0) {
+        <app-pagination
+          class="mb-4 block"
+          [currentPage]="supplierPage()"
+          [totalPages]="supplierTotalPages()"
+          [totalItems]="filteredSuppliers().length"
+          [itemsPerPage]="supplierPageSize()"
+          itemLabel="suppliers"
+          [showItemsPerPage]="true"
+          (pageChange)="supplierPage.set($event)"
+          (itemsPerPageChange)="supplierPageSize.set($event); supplierPage.set(1)"
+        />
+      }
 
       <!-- Supplier detail/edit drawer (shared shell with the customer drawer) -->
       @if (!isPurchasePage()) {
@@ -1481,7 +1542,11 @@ interface ParsedPurchaseLine {
 
                 <section class="border-t border-base-300/60 pt-3">
                   <h3 class="section-title mb-2">Purchases</h3>
-                  @if (drawerPurchases().length === 0) {
+                  @if (drawerPurchasesLoading()) {
+                    <div class="flex justify-center py-6">
+                      <span class="loading loading-spinner loading-sm"></span>
+                    </div>
+                  } @else if (drawerPurchases().length === 0) {
                     <app-empty-state
                       [compact]="true"
                       icon="heroTruck"
@@ -1499,7 +1564,7 @@ interface ParsedPurchaseLine {
                         [amount]="drawerPaymentSummary().total"
                         [masked]="!perms.has('ViewFinancials')"
                       />
-                      across {{ drawerPurchases().length }} purchase(s) · still to pay
+                      across the latest {{ drawerPurchases().length }} purchase(s) · still to pay
                       <app-money
                         [amount]="drawerPaymentSummary().outstanding"
                         [masked]="!perms.has('ViewFinancials')"
@@ -1514,7 +1579,7 @@ interface ParsedPurchaseLine {
                                 {{ p.reference || 'No reference' }}
                               </p>
                               <p class="type-caption">
-                                {{ time(p.created_at) }} ·
+                                {{ time(p.purchase_date) }} ·
                                 {{ p.is_credit ? 'Pay later' : 'Paid now' }}
                               </p>
                             </div>
@@ -1584,6 +1649,15 @@ interface ParsedPurchaseLine {
                         </li>
                       }
                     </ul>
+                    <a
+                      appButton
+                      variant="ghost"
+                      class="mt-2"
+                      routerLink="/purchases"
+                      [queryParams]="{ supplier: s.id, range: 'all' }"
+                    >
+                      View full purchase history
+                    </a>
                   }
                 </section>
               </div>
@@ -1597,17 +1671,95 @@ interface ParsedPurchaseLine {
           <app-list-search-bar
             placeholder="Search supplier or reference…"
             [searchQuery]="purchaseQuery()"
-            (searchQueryChange)="purchaseQuery.set($event); purchasePage.set(1)"
+            (searchQueryChange)="onPurchaseSearch($event)"
             [sortOptions]="purchaseSortOptions()"
             [sortKey]="purchaseSort()"
-            (sortKeyChange)="purchaseSort.set($event); purchasePage.set(1)"
+            (sortKeyChange)="purchaseSort.set($event); reloadPurchases()"
             [sortDirection]="purchaseSortDirection()"
-            (sortDirectionChange)="purchaseSortDirection.set($event); purchasePage.set(1)"
+            (sortDirectionChange)="purchaseSortDirection.set($event); reloadPurchases()"
           >
             <app-stat-bar summary [stats]="purchaseSummary()" />
+            <div filters class="grid gap-2 sm:grid-cols-2 lg:flex lg:flex-wrap lg:items-end">
+              <app-form-field label="Supplier" class="lg:w-56">
+                <app-searchable-filter
+                  ariaLabel="Filter purchases by supplier"
+                  placeholder="All suppliers"
+                  emptyValue="all"
+                  searchPlaceholder="Search suppliers…"
+                  [options]="purchaseSupplierOptions()"
+                  [value]="purchaseSupplierFilter()"
+                  (valueChange)="setPurchaseSupplierFilter($event)"
+                />
+              </app-form-field>
+              <app-form-field label="Payment" class="lg:w-44">
+                <select
+                  class="select select-bordered select-sm w-full"
+                  [value]="purchasePaymentFilter()"
+                  (change)="setPurchaseFilter('payment', $event)"
+                >
+                  <option value="all">Any status</option>
+                  <option value="paid">Paid</option>
+                  <option value="part_paid">Part-paid</option>
+                  <option value="unpaid">Unpaid</option>
+                </select>
+              </app-form-field>
+              @if (locations().length > 1) {
+                <app-form-field label="Location" class="lg:w-48">
+                  <select
+                    class="select select-bordered select-sm w-full"
+                    [value]="purchaseLocationFilter()"
+                    (change)="setPurchaseFilter('location', $event)"
+                  >
+                    @for (location of locations(); track location.id) {
+                      <option [value]="location.id">{{ location.name }}</option>
+                    }
+                  </select>
+                </app-form-field>
+              }
+              <app-form-field label="From" class="lg:w-40">
+                <input
+                  type="date"
+                  class="input input-bordered input-sm w-full"
+                  [value]="purchaseFrom()"
+                  (change)="setPurchaseDate('from', $event)"
+                />
+              </app-form-field>
+              <app-form-field label="To" class="lg:w-40">
+                <input
+                  type="date"
+                  class="input input-bordered input-sm w-full"
+                  [value]="purchaseTo()"
+                  (change)="setPurchaseDate('to', $event)"
+                />
+              </app-form-field>
+              <div class="flex flex-wrap gap-2 sm:col-span-2">
+                <button
+                  appButton
+                  [variant]="purchaseMonthActive() ? 'soft' : 'ghost'"
+                  type="button"
+                  (click)="setPurchaseMonth()"
+                >
+                  @if (purchaseMonthActive()) {
+                    <app-icon name="heroCheck" size="sm" />
+                  }
+                  This month
+                </button>
+                <button
+                  appButton
+                  [variant]="purchaseAllTimeActive() ? 'soft' : 'ghost'"
+                  type="button"
+                  (click)="setPurchaseAllTime()"
+                >
+                  @if (purchaseAllTimeActive()) {
+                    <app-icon name="heroCheck" size="sm" />
+                  }
+                  All time
+                </button>
+              </div>
+            </div>
           </app-list-search-bar>
 
-          @if (filteredPurchases().length === 0) {
+          @if (purchases().length === 0) {
             <app-empty-state
               icon="heroBanknotes"
               [title]="purchaseQuery() ? 'No matching purchases' : 'No purchases recorded'"
@@ -1620,7 +1772,7 @@ interface ParsedPurchaseLine {
           } @else {
             <app-data-table-shell
               title="Purchase history"
-              [description]="filteredPurchases().length + ' matching purchases'"
+              [description]="purchaseHistoryTotal() + ' matching purchases'"
             >
               <table class="table table-sm">
                 <thead>
@@ -1635,7 +1787,7 @@ interface ParsedPurchaseLine {
                   </tr>
                 </thead>
                 <tbody>
-                  @for (p of pagedPurchases(); track p.id) {
+                  @for (p of purchases(); track p.id) {
                     <tr
                       role="button"
                       tabindex="0"
@@ -1644,7 +1796,7 @@ interface ParsedPurchaseLine {
                       (click)="openPurchaseDrawer(p)"
                       (keydown.enter)="openPurchaseDrawer(p)"
                     >
-                      <td class="whitespace-nowrap text-sm">{{ time(p.created_at) }}</td>
+                      <td class="whitespace-nowrap text-sm">{{ time(p.purchase_date) }}</td>
                       <td class="font-medium">{{ supplierName(p.supplier_id) }}</td>
                       <td class="text-sm">{{ p.is_credit ? 'Pay later' : 'Paid now' }}</td>
                       <td class="type-caption">{{ p.reference || '—' }}</td>
@@ -1704,7 +1856,7 @@ interface ParsedPurchaseLine {
                 [open]="true"
                 (closed)="closePurchaseDrawer()"
                 [title]="p.reference || 'Purchase'"
-                [subtitle]="supplierName(p.supplier_id) + ' · ' + time(p.created_at)"
+                [subtitle]="supplierName(p.supplier_id) + ' · ' + time(p.purchase_date)"
               >
                 @if (printerEnabled()) {
                   <button
@@ -1919,12 +2071,12 @@ interface ParsedPurchaseLine {
               <app-pagination
                 [currentPage]="purchasePage()"
                 [totalPages]="purchaseTotalPages()"
-                [totalItems]="filteredPurchases().length"
+                [totalItems]="purchaseHistoryTotal()"
                 [itemsPerPage]="purchasePageSize()"
                 itemLabel="purchases"
                 [showItemsPerPage]="true"
-                (pageChange)="purchasePage.set($event)"
-                (itemsPerPageChange)="purchasePageSize.set($event); purchasePage.set(1)"
+                (pageChange)="changePurchasePage($event)"
+                (itemsPerPageChange)="changePurchasePageSize($event)"
               />
             </div>
           }
@@ -1933,8 +2085,9 @@ interface ParsedPurchaseLine {
     </app-page>
   `,
 })
-export class SuppliersComponent implements OnInit {
+export class SuppliersComponent implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly money = inject(MoneyService);
   protected readonly partyCache = inject(PartyCacheService);
   private readonly pos = inject(PosService);
@@ -1951,28 +2104,37 @@ export class SuppliersComponent implements OnInit {
   protected readonly duplicatePriceTooltip =
     'Same item on multiple lines — the selling price applies once to the product and stays in sync across those lines.';
   protected readonly suppliers = computed<SupplierWithAp[]>(() => this.partyCache.suppliers());
+  protected readonly purchaseSupplierOptions = computed<readonly SearchableFilterOption[]>(() =>
+    this.suppliers().map(supplier => ({
+      value: supplier.id,
+      label: this.name(supplier),
+      description: supplier.phone || undefined,
+      searchText: supplier.email ?? undefined,
+    }))
+  );
   protected readonly accounts = signal<LedgerAccount[]>([]);
   protected readonly variants = signal<Variant[]>([]);
   protected readonly label = variantLabel;
   protected readonly purchases = signal<PurchaseRow[]>([]);
+  protected readonly purchaseHistoryTotal = signal(0);
   protected readonly purchaseQuery = signal('');
   protected readonly purchaseSort = signal('created');
   protected readonly purchaseSortDirection = signal<ListSortDirection>('desc');
   protected readonly purchaseSortOptions = computed<readonly ListSortOption[]>(() => [
     { value: 'created', label: 'Purchase date' },
-    { value: 'supplier', label: 'Supplier name' },
-    { value: 'status', label: 'Payment status' },
-    ...(this.perms.has('ViewFinancials')
-      ? [
-          { value: 'total', label: 'Purchase value' },
-          { value: 'outstanding', label: 'Outstanding value' },
-        ]
-      : []),
+    ...(this.perms.has('ViewFinancials') ? [{ value: 'total', label: 'Purchase value' }] : []),
   ]);
   protected readonly purchasePage = signal(1);
   protected readonly purchasePageSize = signal(10);
+  protected readonly purchaseSupplierFilter = signal('all');
+  protected readonly purchasePaymentFilter = signal('all');
+  protected readonly purchaseLocationFilter = signal('');
+  protected readonly purchaseFrom = signal(this.monthStartIso());
+  protected readonly purchaseTo = signal(this.todayIso());
+  private purchaseSearchTimer: ReturnType<typeof setTimeout> | null = null;
   protected readonly drafts = signal<PurchaseDraft[]>([]);
   protected readonly performance = signal<SupplierVariantPerformance[]>([]);
+  protected readonly purchaseMetrics = signal<SupplierPurchaseMetric[]>([]);
   protected readonly locations = this.locationContext.locations;
   protected readonly activeDraftId = signal<string | null>(null);
   protected readonly purchaseFormOpen = signal(false);
@@ -1993,6 +2155,11 @@ export class SuppliersComponent implements OnInit {
   protected readonly supplierQuery = signal('');
   protected readonly supplierSort = signal('name');
   protected readonly supplierSortDirection = signal<ListSortDirection>('asc');
+  protected readonly supplierStatusFilter = signal('all');
+  protected readonly supplierBalanceFilter = signal('all');
+  protected readonly supplierAgeFilter = signal('all');
+  protected readonly supplierPage = signal(1);
+  protected readonly supplierPageSize = signal(25);
   protected readonly supplierSortOptions = computed<readonly ListSortOption[]>(() => [
     { value: 'name', label: 'Supplier name' },
     { value: 'aging', label: 'Days outstanding' },
@@ -2061,13 +2228,24 @@ export class SuppliersComponent implements OnInit {
   protected readonly filteredSuppliers = computed(() => {
     const query = this.supplierQuery().trim().toLowerCase();
     const source = this.isPurchasePage() ? this.activeSuppliers() : this.suppliers();
-    const rows = query
+    const searched = query
       ? source.filter(supplier =>
           [this.name(supplier), supplier.phone, supplier.email]
             .filter(Boolean)
             .some(value => value!.toLowerCase().includes(query))
         )
       : source;
+    const rows = searched.filter(supplier => {
+      if (this.supplierStatusFilter() === 'active' && !supplier.supplier_active) return false;
+      if (this.supplierStatusFilter() === 'archived' && supplier.supplier_active) return false;
+      if (this.supplierBalanceFilter() === 'owed' && supplier.ap_balance <= 0) return false;
+      if (this.supplierBalanceFilter() === 'clear' && supplier.ap_balance > 0) return false;
+      if (this.supplierAgeFilter() === 'overdue' && (supplier.days_outstanding ?? 0) <= 30)
+        return false;
+      if (this.supplierAgeFilter() === 'current' && (supplier.days_outstanding ?? 0) > 30)
+        return false;
+      return true;
+    });
     const sortKey = this.supplierSort();
     return sortList(
       rows,
@@ -2086,6 +2264,14 @@ export class SuppliersComponent implements OnInit {
       },
       supplier => this.name(supplier)
     );
+  });
+  protected readonly supplierTotalPages = computed(() =>
+    Math.max(1, Math.ceil(this.filteredSuppliers().length / this.supplierPageSize()))
+  );
+  protected readonly pagedSuppliers = computed(() => {
+    const page = Math.min(this.supplierPage(), this.supplierTotalPages());
+    const start = (page - 1) * this.supplierPageSize();
+    return this.filteredSuppliers().slice(start, start + this.supplierPageSize());
   });
   protected readonly suppliersOwed = computed(() =>
     this.suppliers().filter(supplier => supplier.ap_balance > 0)
@@ -2110,10 +2296,9 @@ export class SuppliersComponent implements OnInit {
     const s = this.drawerSupplier();
     return s ? s.phone || s.email || undefined : undefined;
   });
-  protected readonly drawerPurchases = computed(() => {
-    const id = this.drawerSupplierId();
-    return id ? this.purchases().filter(p => p.supplier_id === id) : [];
-  });
+  protected readonly drawerPurchases = signal<PurchaseRow[]>([]);
+  protected readonly drawerPurchasesLoading = signal(false);
+  private drawerPurchasesSequence = 0;
   protected readonly drawerPaymentSummary = computed(() => {
     const rows = this.drawerPurchases();
     const total = rows.reduce((sum, p) => sum + p.total_cost, 0);
@@ -2129,10 +2314,8 @@ export class SuppliersComponent implements OnInit {
   protected readonly drawerPurchaseLines = signal<PurchaseLine[]>([]);
   protected readonly drawerPurchasePayments = signal<PurchasePayment[]>([]);
   protected readonly purchaseDetailLoading = signal(false);
-  protected readonly openCreditPurchases = computed(
-    () =>
-      this.purchases().filter(purchase => purchase.is_credit && purchase.paid < purchase.total_cost)
-        .length
+  protected readonly openCreditPurchases = computed(() =>
+    this.purchaseMetrics().reduce((sum, metric) => sum + Number(metric.open_purchase_count ?? 0), 0)
   );
   protected readonly supplierSummary = computed(() => [
     { label: 'Active suppliers', value: this.activeSuppliers().length },
@@ -2152,36 +2335,6 @@ export class SuppliersComponent implements OnInit {
       tone: this.openCreditPurchases() > 0 ? ('warning' as const) : ('neutral' as const),
     },
   ]);
-  protected readonly filteredPurchases = computed(() => {
-    const query = this.purchaseQuery().trim().toLowerCase();
-    const rows = query
-      ? this.purchases().filter(purchase =>
-          [this.supplierName(purchase.supplier_id), purchase.reference]
-            .filter(Boolean)
-            .some(value => value!.toLowerCase().includes(query))
-        )
-      : this.purchases();
-    const sortKey = this.purchaseSort();
-    return sortList(
-      rows,
-      this.purchaseSortDirection(),
-      purchase => {
-        switch (sortKey) {
-          case 'supplier':
-            return this.supplierName(purchase.supplier_id);
-          case 'status':
-            return this.purchaseStatusLabel(purchase);
-          case 'total':
-            return purchase.total_cost;
-          case 'outstanding':
-            return Math.max(0, purchase.total_cost - purchase.paid);
-          default:
-            return purchase.created_at;
-        }
-      },
-      purchase => purchase.created_at
-    );
-  });
   protected readonly purchaseSummary = computed(() => {
     const purchases = this.purchases();
     const value = purchases.reduce((sum, purchase) => sum + purchase.total_cost, 0);
@@ -2190,13 +2343,13 @@ export class SuppliersComponent implements OnInit {
       0
     );
     return [
-      { label: 'Purchases', value: purchases.length },
+      { label: 'Matching purchases', value: this.purchaseHistoryTotal() },
       {
-        label: 'Purchase value',
+        label: 'Value on page',
         value: this.perms.has('ViewFinancials') ? this.fmt(value) : 'Hidden',
       },
       {
-        label: 'Still to pay',
+        label: 'Still to pay on page',
         value: this.perms.has('ViewFinancials') ? this.fmt(outstanding) : 'Hidden',
         tone: outstanding > 0 ? ('warning' as const) : ('neutral' as const),
       },
@@ -2208,23 +2361,34 @@ export class SuppliersComponent implements OnInit {
     ];
   });
   protected readonly purchaseTotalPages = computed(() =>
-    Math.max(1, Math.ceil(this.filteredPurchases().length / this.purchasePageSize()))
+    Math.max(1, Math.ceil(this.purchaseHistoryTotal() / this.purchasePageSize()))
   );
-  protected readonly pagedPurchases = computed(() => {
-    const page = Math.min(this.purchasePage(), this.purchaseTotalPages());
-    const start = (page - 1) * this.purchasePageSize();
-    return this.filteredPurchases().slice(start, start + this.purchasePageSize());
-  });
 
   private loadQueued = false;
 
   async ngOnInit(): Promise<void> {
+    this.purchaseLocationFilter.set(this.locationContext.requireActiveId());
+    if (this.isPurchasePage()) {
+      const params = this.route.snapshot.queryParamMap;
+      this.purchaseSupplierFilter.set(params.get('supplier') ?? 'all');
+      this.purchasePaymentFilter.set(params.get('payment') ?? 'all');
+      this.purchaseQuery.set(params.get('q') ?? '');
+      this.purchasePage.set(Math.max(1, Number(params.get('page') ?? 1) || 1));
+      if (params.get('range') === 'all') {
+        this.purchaseFrom.set('');
+        this.purchaseTo.set('');
+      }
+    }
     const [, printerEnabled] = await Promise.all([
       this.preferences.refresh(),
       this.receiptData.printerEnabled(),
     ]);
     this.printerEnabled.set(printerEnabled);
     await this.load();
+  }
+
+  ngOnDestroy(): void {
+    if (this.purchaseSearchTimer) clearTimeout(this.purchaseSearchTimer);
   }
 
   /** Silent reloads (realtime events) refresh data without flashing the header spinner. */
@@ -2235,20 +2399,30 @@ export class SuppliersComponent implements OnInit {
     }
     if (!silent) this.loading.set(true);
     try {
-      const [suppliers, accounts, variants, purchases, drafts, performance] = await Promise.all([
-        this.partyCache.ensureLoaded().then(() => this.partyCache.suppliers()),
-        this.money.transactableAccounts(),
-        this.catalogSearch.activeCatalog(),
-        this.money.purchasesWithPayments(),
-        this.money.purchaseDrafts(),
-        this.money.supplierVariantPerformance(),
-      ]);
+      const purchaseRequest = this.isPurchasePage()
+        ? this.money.purchasesPage(this.purchasePageInput())
+        : Promise.resolve([]);
+      const [suppliers, accounts, variants, purchaseResult, drafts, performance, metrics] =
+        await Promise.all([
+          this.partyCache.ensureLoaded().then(() => this.partyCache.suppliers()),
+          this.money.transactableAccounts(),
+          this.catalogSearch.activeCatalog(),
+          purchaseRequest,
+          this.money.purchaseDrafts(),
+          this.money.supplierVariantPerformance(),
+          this.money.supplierPurchaseMetrics(),
+        ]);
+      const purchases = Array.isArray(purchaseResult) ? purchaseResult : purchaseResult.rows;
       this.accounts.set(accounts);
       // Purchases stock goods only (services are rejected server-side).
       this.variants.set(variants.filter(v => v.kind !== 'service'));
       this.purchases.set(purchases as PurchaseRow[]);
+      this.purchaseHistoryTotal.set(
+        Array.isArray(purchaseResult) ? purchases.length : purchaseResult.count
+      );
       this.drafts.set(drafts);
       this.performance.set(performance);
+      this.purchaseMetrics.set(metrics);
       const activeSuppliers = suppliers.filter(supplier => supplier.supplier_active);
       if (
         activeSuppliers.length > 0 &&
@@ -2289,6 +2463,129 @@ export class SuppliersComponent implements OnInit {
         void this.load();
       }
     }
+  }
+
+  protected onPurchaseSearch(value: string): void {
+    this.purchaseQuery.set(value);
+    if (this.purchaseSearchTimer) clearTimeout(this.purchaseSearchTimer);
+    this.purchaseSearchTimer = setTimeout(() => this.reloadPurchases(), 250);
+  }
+
+  protected setSupplierFilter(kind: 'status' | 'balance' | 'age', event: Event): void {
+    const value = (event.target as HTMLSelectElement).value;
+    if (kind === 'status') this.supplierStatusFilter.set(value);
+    else if (kind === 'balance') this.supplierBalanceFilter.set(value);
+    else this.supplierAgeFilter.set(value);
+    this.supplierPage.set(1);
+  }
+
+  protected setPurchaseFilter(kind: 'location' | 'payment', event: Event): void {
+    const value = (event.target as HTMLSelectElement).value;
+    if (kind === 'location') this.purchaseLocationFilter.set(value);
+    else this.purchasePaymentFilter.set(value);
+    this.reloadPurchases();
+  }
+
+  protected setPurchaseSupplierFilter(value: string): void {
+    this.purchaseSupplierFilter.set(value);
+    this.reloadPurchases();
+  }
+
+  protected setPurchaseDate(kind: 'from' | 'to', event: Event): void {
+    const value = (event.target as HTMLInputElement).value;
+    if (kind === 'from') this.purchaseFrom.set(value);
+    else this.purchaseTo.set(value);
+    this.reloadPurchases();
+  }
+
+  protected setPurchaseMonth(): void {
+    this.purchaseFrom.set(this.monthStartIso());
+    this.purchaseTo.set(this.todayIso());
+    this.reloadPurchases();
+  }
+
+  protected setPurchaseAllTime(): void {
+    this.purchaseFrom.set('');
+    this.purchaseTo.set('');
+    this.reloadPurchases();
+  }
+
+  protected purchaseMonthActive(): boolean {
+    return this.purchaseFrom() === this.monthStartIso() && this.purchaseTo() === this.todayIso();
+  }
+
+  protected purchaseAllTimeActive(): boolean {
+    return !this.purchaseFrom() && !this.purchaseTo();
+  }
+
+  protected reloadPurchases(): void {
+    this.purchasePage.set(1);
+    void this.syncPurchaseUrl();
+    void this.load();
+  }
+
+  protected changePurchasePage(page: number): void {
+    this.purchasePage.set(page);
+    void this.syncPurchaseUrl();
+    void this.load();
+  }
+
+  private syncPurchaseUrl(): Promise<boolean> {
+    if (!this.isPurchasePage()) return Promise.resolve(false);
+    return this.router.navigate([], {
+      relativeTo: this.route,
+      replaceUrl: true,
+      queryParams: {
+        q: this.purchaseQuery().trim() || null,
+        supplier: this.purchaseSupplierFilter() === 'all' ? null : this.purchaseSupplierFilter(),
+        payment: this.purchasePaymentFilter() === 'all' ? null : this.purchasePaymentFilter(),
+        range: this.purchaseAllTimeActive() ? 'all' : null,
+        page: this.purchasePage() > 1 ? this.purchasePage() : null,
+      },
+      queryParamsHandling: 'merge',
+    });
+  }
+
+  protected changePurchasePageSize(size: number): void {
+    this.purchasePageSize.set(size);
+    this.reloadPurchases();
+  }
+
+  private purchasePageInput(): Parameters<MoneyService['purchasesPage']>[0] {
+    const query = this.purchaseQuery().trim().toLowerCase();
+    const matchingSupplierIds = query
+      ? this.suppliers()
+          .filter(supplier => this.name(supplier).toLowerCase().includes(query))
+          .slice(0, SUPPLIER_SEARCH_ID_LIMIT)
+          .map(supplier => supplier.id)
+      : [];
+    const sortBy = this.purchaseSort() === 'total' ? 'total_cost' : 'purchase_date';
+    return {
+      page: this.purchasePage(),
+      pageSize: this.purchasePageSize(),
+      search: query,
+      matchingSupplierIds,
+      supplierId:
+        this.purchaseSupplierFilter() === 'all' ? undefined : this.purchaseSupplierFilter(),
+      paymentStatus:
+        this.purchasePaymentFilter() === 'all'
+          ? undefined
+          : (this.purchasePaymentFilter() as 'paid' | 'part_paid' | 'unpaid'),
+      locationId: this.purchaseLocationFilter() || this.locationContext.requireActiveId(),
+      from: this.purchaseFrom() || undefined,
+      to: this.purchaseTo() || undefined,
+      sortBy,
+      sortDirection: this.purchaseSortDirection(),
+    };
+  }
+
+  private todayIso(): string {
+    return new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Nairobi' });
+  }
+
+  private monthStartIso(): string {
+    const today = this.todayIso();
+    return `${today.slice(0, 8)}01`;
   }
 
   protected setPurchasePaymentMode(mode: PurchasePaymentMode): void {
@@ -2567,7 +2864,7 @@ export class SuppliersComponent implements OnInit {
     averageOrder: number;
     bestPrices: number;
   } {
-    const purchases = this.purchases().filter(purchase => purchase.supplier_id === supplierId);
+    const metric = this.purchaseMetrics().find(row => row.supplier_id === supplierId);
     const rows = this.performance().filter(row => row.supplier_id === supplierId);
     const comparable = rows.filter(row => {
       const peers = this.performance().filter(peer => peer.variant_id === row.variant_id);
@@ -2576,15 +2873,9 @@ export class SuppliersComponent implements OnInit {
       return (row.average_unit_cost ?? Infinity) === best;
     });
     return {
-      purchases: purchases.length,
+      purchases: Number(metric?.purchase_count ?? 0),
       products: rows.length,
-      averageOrder:
-        purchases.length > 0
-          ? Math.round(
-              purchases.reduce((total, purchase) => total + purchase.total_cost, 0) /
-                purchases.length
-            )
-          : 0,
+      averageOrder: Number(metric?.average_order ?? 0),
       bestPrices: comparable.length,
     };
   }
@@ -2825,12 +3116,7 @@ export class SuppliersComponent implements OnInit {
       await this.money.payPurchase(id, amount, this.selectedPayAccount.value);
       this.payPurchaseId.set(null);
       this.notice.set('Purchase payment recorded');
-      await this.load();
-      // Keep an open purchase drawer's payment history in sync.
-      const openId = this.drawerPurchaseId();
-      if (openId) {
-        this.drawerPurchasePayments.set(await this.money.purchasePayments(openId));
-      }
+      await this.refreshPaymentSurfaces();
     } catch (error) {
       this.error.set(error instanceof Error ? error.message : 'Payment failed');
     } finally {
@@ -2892,11 +3178,12 @@ export class SuppliersComponent implements OnInit {
     this.error.set(null);
     this.notice.set(null);
     try {
-      const supplierName = this.supplierName(this.paySupplierId.value);
-      await this.money.paySupplier(this.paySupplierId.value, amount, this.payAccount.value);
+      const supplierId = this.paySupplierId.value;
+      const supplierName = this.supplierName(supplierId);
+      await this.money.paySupplier(supplierId, amount, this.payAccount.value);
       this.payAmount.setValue('');
-      await this.load();
       this.notice.set(`${this.fmt(amount)} payment recorded for ${supplierName}.`);
+      await this.refreshPaymentSurfaces();
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Payment failed');
     } finally {
@@ -2911,10 +3198,64 @@ export class SuppliersComponent implements OnInit {
     this.payAmount.setValue('');
     this.supplierCreditLimit.setValue(formatKesInput(supplier.supplier_credit_limit));
     this.supplierTermsDays.setValue(supplier.supplier_credit_terms_days ?? 0);
+    this.drawerPurchases.set([]);
+    void this.loadDrawerPurchases(supplier.id);
+  }
+
+  private async loadDrawerPurchases(supplierId: string): Promise<void> {
+    const sequence = ++this.drawerPurchasesSequence;
+    this.drawerPurchasesLoading.set(true);
+    await this.money
+      .purchasesPage({
+        page: 1,
+        pageSize: 10,
+        supplierId,
+        allLocations: true,
+        sortBy: 'purchase_date',
+        sortDirection: 'desc',
+      })
+      .then(result => {
+        if (sequence === this.drawerPurchasesSequence && this.drawerSupplierId() === supplierId) {
+          this.drawerPurchases.set(result.rows as PurchaseRow[]);
+        }
+      })
+      .catch(err => {
+        if (sequence === this.drawerPurchasesSequence && this.drawerSupplierId() === supplierId) {
+          this.error.set(err instanceof Error ? err.message : 'Could not load supplier purchases');
+        }
+      })
+      .finally(() => {
+        if (sequence === this.drawerPurchasesSequence && this.drawerSupplierId() === supplierId) {
+          this.drawerPurchasesLoading.set(false);
+        }
+      });
+  }
+
+  /** Refresh failures must never make a committed payment look unsuccessful. */
+  private async refreshPaymentSurfaces(): Promise<void> {
+    await this.load();
+    const openPurchaseId = this.drawerPurchaseId();
+    const openSupplierId = this.drawerSupplierId();
+    const refreshes: Promise<unknown>[] = [];
+    if (openPurchaseId) {
+      refreshes.push(
+        this.money.purchasePayments(openPurchaseId).then(payments => {
+          if (this.drawerPurchaseId() === openPurchaseId) this.drawerPurchasePayments.set(payments);
+        })
+      );
+    }
+    if (openSupplierId) refreshes.push(this.loadDrawerPurchases(openSupplierId));
+    const results = await Promise.allSettled(refreshes);
+    if (results.some(result => result.status === 'rejected')) {
+      this.error.set(
+        'Payment was recorded, but the latest payment details could not be refreshed.'
+      );
+    }
   }
 
   /** Called by the drawer after its close transition finishes. */
   protected closeSupplierDrawer(): void {
+    this.drawerPurchasesSequence++;
     this.drawerSupplierId.set(null);
     this.payPurchaseId.set(null);
     this.supplierCreating.set(false);

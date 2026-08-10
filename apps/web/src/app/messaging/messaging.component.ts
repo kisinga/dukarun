@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { EmptyStateComponent } from '../shared/ui/empty-state.component';
 import { PageLayoutComponent } from '../shared/ui/page-layout.component';
@@ -17,8 +17,12 @@ import {
   type ListSortDirection,
   type ListSortOption,
 } from '../shared/ui/list-search-bar.component';
-import { sortList } from '../shared/ui/list-sort';
 import { StatBarComponent } from '../shared/ui/stat-bar.component';
+import { PartyCacheService } from '../core/party-cache.service';
+import {
+  SearchableFilterComponent,
+  type SearchableFilterOption,
+} from '../shared/ui/searchable-filter.component';
 
 const STATUS_TYPE: Record<string, 'success' | 'warning' | 'error' | 'neutral'> = {
   pending: 'warning',
@@ -29,11 +33,14 @@ const STATUS_TYPE: Record<string, 'success' | 'warning' | 'error' | 'neutral'> =
 
 const MESSAGE_SORT_OPTIONS: readonly ListSortOption[] = [
   { value: 'queued', label: 'Queued date' },
-  { value: 'customer', label: 'Customer name' },
   { value: 'recipient', label: 'Recipient' },
   { value: 'channel', label: 'Channel' },
   { value: 'status', label: 'Delivery status' },
 ];
+
+// Keeps PostgREST URLs bounded for broad party-name searches. Recipient/body
+// matching remains server-side and exhaustive; party-name expansion is best-effort.
+const RELATED_PARTY_SEARCH_ID_LIMIT = 50;
 
 @Component({
   selector: 'app-messaging',
@@ -49,6 +56,7 @@ const MESSAGE_SORT_OPTIONS: readonly ListSortOption[] = [
     ListSearchBarComponent,
     StatBarComponent,
     RouterLink,
+    SearchableFilterComponent,
   ],
   template: `
     <app-page
@@ -106,15 +114,15 @@ const MESSAGE_SORT_OPTIONS: readonly ListSortOption[] = [
       <app-list-search-bar
         placeholder="Search customer, recipient, or message…"
         [searchQuery]="query()"
-        (searchQueryChange)="query.set($event); outboxPage.set(1)"
+        (searchQueryChange)="onSearch($event)"
         [sortOptions]="messageSortOptions"
         [sortKey]="messageSort()"
-        (sortKeyChange)="messageSort.set($event); outboxPage.set(1)"
+        (sortKeyChange)="messageSort.set($event); reloadFromStart()"
         [sortDirection]="messageSortDirection()"
-        (sortDirectionChange)="messageSortDirection.set($event); outboxPage.set(1)"
+        (sortDirectionChange)="messageSortDirection.set($event); reloadFromStart()"
       >
         <app-stat-bar summary [stats]="messageStats()" />
-        <div filters class="grid gap-2 sm:grid-cols-2 lg:flex lg:items-end">
+        <div filters class="grid gap-2 sm:grid-cols-2 lg:flex lg:flex-wrap lg:items-end">
           <app-form-field label="Channel" class="lg:w-44">
             <select
               class="select select-bordered select-sm w-full"
@@ -139,10 +147,74 @@ const MESSAGE_SORT_OPTIONS: readonly ListSortOption[] = [
               <option value="cancelled">Cancelled</option>
             </select>
           </app-form-field>
+          <app-form-field label="Related party" class="lg:w-52">
+            <app-searchable-filter
+              ariaLabel="Filter communications by customer or supplier"
+              placeholder="All customers and suppliers"
+              emptyValue="all"
+              searchPlaceholder="Search people or businesses…"
+              [options]="partyFilterOptions()"
+              [value]="partyFilter()"
+              (valueChange)="setPartyFilter($event)"
+            />
+          </app-form-field>
+          <app-form-field label="Document" class="lg:w-44">
+            <select
+              class="select select-bordered select-sm w-full"
+              [value]="documentFilter()"
+              (change)="setFilter('document', $event)"
+            >
+              <option value="all">All communications</option>
+              <option value="receipt">Receipts</option>
+              <option value="invoice">Invoices</option>
+              <option value="proforma">Proformas</option>
+              <option value="purchase_order">Purchase orders</option>
+            </select>
+          </app-form-field>
+          <app-form-field label="From" class="lg:w-40">
+            <input
+              type="date"
+              class="input input-bordered input-sm w-full"
+              [value]="from()"
+              (change)="setDate('from', $event)"
+            />
+          </app-form-field>
+          <app-form-field label="To" class="lg:w-40">
+            <input
+              type="date"
+              class="input input-bordered input-sm w-full"
+              [value]="to()"
+              (change)="setDate('to', $event)"
+            />
+          </app-form-field>
+          <div class="flex flex-wrap gap-2 sm:col-span-2">
+            <button
+              appButton
+              [variant]="last30Active() ? 'soft' : 'ghost'"
+              type="button"
+              (click)="setLast30()"
+            >
+              @if (last30Active()) {
+                <app-icon name="heroCheck" size="sm" />
+              }
+              30 days
+            </button>
+            <button
+              appButton
+              [variant]="allTimeActive() ? 'soft' : 'ghost'"
+              type="button"
+              (click)="setAllTime()"
+            >
+              @if (allTimeActive()) {
+                <app-icon name="heroCheck" size="sm" />
+              }
+              All time
+            </button>
+          </div>
         </div>
       </app-list-search-bar>
 
-      @if (!loading() && filteredOutbox().length === 0) {
+      @if (!loading() && outbox().length === 0) {
         <app-empty-state
           [compact]="hasOutboxFilters()"
           icon="heroBellSlash"
@@ -157,7 +229,7 @@ const MESSAGE_SORT_OPTIONS: readonly ListSortOption[] = [
         <div class="hidden lg:block">
           <app-data-table-shell
             title="Delivery history"
-            [description]="filteredOutbox().length + ' matching deliveries'"
+            [description]="outboxTotal() + ' matching deliveries'"
           >
             <table class="table table-sm">
               <thead>
@@ -171,7 +243,7 @@ const MESSAGE_SORT_OPTIONS: readonly ListSortOption[] = [
                 </tr>
               </thead>
               <tbody>
-                @for (message of pagedOutbox(); track message.id) {
+                @for (message of outbox(); track message.id) {
                   <tr>
                     <td class="whitespace-nowrap">{{ time(message.created_at) }}</td>
                     <td class="uppercase">{{ message.channel }}</td>
@@ -229,7 +301,7 @@ const MESSAGE_SORT_OPTIONS: readonly ListSortOption[] = [
         </div>
 
         <div class="flex flex-col gap-2 lg:hidden">
-          @for (message of pagedOutbox(); track message.id) {
+          @for (message of outbox(); track message.id) {
             <div class="card bg-base-100">
               <div class="card-body gap-3 p-4">
                 <div class="flex items-start justify-between gap-3">
@@ -288,20 +360,21 @@ const MESSAGE_SORT_OPTIONS: readonly ListSortOption[] = [
           <app-pagination
             [currentPage]="outboxPage()"
             [totalPages]="outboxTotalPages()"
-            [totalItems]="filteredOutbox().length"
+            [totalItems]="outboxTotal()"
             [itemsPerPage]="outboxPageSize()"
             itemLabel="deliveries"
             [showItemsPerPage]="true"
-            (pageChange)="outboxPage.set($event)"
-            (itemsPerPageChange)="outboxPageSize.set($event); outboxPage.set(1)"
+            (pageChange)="changePage($event)"
+            (itemsPerPageChange)="changePageSize($event)"
           />
         </div>
       }
     </app-page>
   `,
 })
-export class CommunicationsComponent implements OnInit {
+export class CommunicationsComponent implements OnInit, OnDestroy {
   private readonly notifications = inject(NotificationsService);
+  private readonly partyCache = inject(PartyCacheService);
 
   protected readonly usage = signal<{
     sms: { used: number; reserved: number; limit: number | null };
@@ -312,105 +385,112 @@ export class CommunicationsComponent implements OnInit {
   protected readonly query = signal('');
   protected readonly channelFilter = signal('all');
   protected readonly statusFilter = signal('all');
+  protected readonly partyFilter = signal('all');
+  protected readonly documentFilter = signal('all');
+  protected readonly from = signal(this.daysAgoIso(29));
+  protected readonly to = signal(this.todayIso());
   protected readonly messageSortOptions = MESSAGE_SORT_OPTIONS;
   protected readonly messageSort = signal('queued');
   protected readonly messageSortDirection = signal<ListSortDirection>('desc');
   protected readonly outboxPage = signal(1);
   protected readonly outboxPageSize = signal(10);
+  protected readonly outboxTotal = signal(0);
   protected readonly error = signal<string | null>(null);
-
-  protected readonly filteredOutbox = computed(() => {
-    const query = this.query().trim().toLowerCase();
-    const rows = this.outbox().filter(message => {
-      if (this.channelFilter() !== 'all' && message.channel !== this.channelFilter()) return false;
-      if (this.statusFilter() !== 'all' && message.status !== this.statusFilter()) return false;
-      if (!query) return true;
-      return [
-        message.recipient,
-        message.body,
-        message.channel,
-        message.status,
-        this.partyName(message),
-      ]
-        .join(' ')
-        .toLowerCase()
-        .includes(query);
-    });
-    const sortKey = this.messageSort();
-    return sortList(
-      rows,
-      this.messageSortDirection(),
-      message => {
-        switch (sortKey) {
-          case 'customer':
-            return this.partyName(message);
-          case 'recipient':
-            return message.recipient;
-          case 'channel':
-            return message.channel;
-          case 'status':
-            return message.status;
-          default:
-            return message.created_at;
-        }
-      },
-      message => message.created_at
-    );
+  private searchTimer: ReturnType<typeof setTimeout> | null = null;
+  private loadSequence = 0;
+  protected readonly partyOptions = computed(() => [
+    ...this.partyCache.customers(),
+    ...this.partyCache.suppliers(),
+  ]);
+  protected readonly partyFilterOptions = computed<readonly SearchableFilterOption[]>(() => {
+    const unique = new Map<string, SearchableFilterOption>();
+    for (const party of this.partyOptions()) {
+      unique.set(party.id, {
+        value: party.id,
+        label: this.partyLabel(party),
+        description: party.phone || undefined,
+        searchText: party.email ?? undefined,
+      });
+    }
+    return [...unique.values()];
   });
   protected readonly hasOutboxFilters = computed(
     () =>
       this.query().trim().length > 0 ||
       this.channelFilter() !== 'all' ||
-      this.statusFilter() !== 'all'
+      this.statusFilter() !== 'all' ||
+      this.partyFilter() !== 'all' ||
+      this.documentFilter() !== 'all' ||
+      !this.last30Active()
   );
   protected readonly messageStats = computed(() => {
     const rows = this.outbox();
     return [
-      { label: 'Recent deliveries', value: rows.length },
+      { label: 'Matching deliveries', value: this.outboxTotal() },
       {
-        label: 'Pending',
+        label: 'Pending on page',
         value: rows.filter(message => message.status === 'pending').length,
         tone: 'warning' as const,
       },
       {
-        label: 'Sent',
+        label: 'Sent on page',
         value: rows.filter(message => message.status === 'sent').length,
         tone: 'success' as const,
       },
       {
-        label: 'Failed',
+        label: 'Failed on page',
         value: rows.filter(message => message.status === 'failed').length,
         tone: 'error' as const,
       },
     ];
   });
   protected readonly outboxTotalPages = computed(() =>
-    Math.max(1, Math.ceil(this.filteredOutbox().length / this.outboxPageSize()))
+    Math.max(1, Math.ceil(this.outboxTotal() / this.outboxPageSize()))
   );
-  protected readonly pagedOutbox = computed(() => {
-    const page = Math.min(this.outboxPage(), this.outboxTotalPages());
-    const start = (page - 1) * this.outboxPageSize();
-    return this.filteredOutbox().slice(start, start + this.outboxPageSize());
-  });
 
   async ngOnInit(): Promise<void> {
+    await this.partyCache.ensureLoaded();
     await this.load();
   }
 
+  ngOnDestroy(): void {
+    if (this.searchTimer) clearTimeout(this.searchTimer);
+  }
+
   protected async load(): Promise<void> {
+    const sequence = ++this.loadSequence;
     this.loading.set(true);
     try {
-      const [usage, outbox] = await Promise.all([
+      const [usage, result] = await Promise.all([
         this.notifications.communicationUsage(),
-        this.notifications.recentOutbox(100),
+        this.notifications.outboxPage({
+          page: this.outboxPage(),
+          pageSize: this.outboxPageSize(),
+          search: this.query(),
+          matchingCustomerIds: this.matchingPartyIds(this.query()),
+          channel: this.channelFilter() === 'all' ? undefined : this.channelFilter(),
+          status: this.statusFilter() === 'all' ? undefined : this.statusFilter(),
+          documentType: this.documentFilter() === 'all' ? undefined : this.documentFilter(),
+          customerId: this.partyFilter() === 'all' ? undefined : this.partyFilter(),
+          from: this.from() || undefined,
+          to: this.to() || undefined,
+          sortBy:
+            this.messageSort() === 'queued'
+              ? 'created_at'
+              : (this.messageSort() as 'recipient' | 'channel' | 'status'),
+          sortDirection: this.messageSortDirection(),
+        }),
       ]);
+      if (sequence !== this.loadSequence) return;
       this.usage.set(usage);
-      this.outbox.set(outbox);
+      this.outbox.set(result.rows);
+      this.outboxTotal.set(result.count);
       this.error.set(null);
     } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Failed to load communications');
+      if (sequence === this.loadSequence)
+        this.error.set(err instanceof Error ? err.message : 'Failed to load communications');
     } finally {
-      this.loading.set(false);
+      if (sequence === this.loadSequence) this.loading.set(false);
     }
   }
 
@@ -450,11 +530,98 @@ export class CommunicationsComponent implements OnInit {
       : null;
   }
 
-  protected setFilter(kind: 'channel' | 'status', event: Event): void {
+  protected setFilter(kind: 'channel' | 'status' | 'document', event: Event): void {
     const value = (event.target as HTMLSelectElement).value;
     if (kind === 'channel') this.channelFilter.set(value);
-    else this.statusFilter.set(value);
+    else if (kind === 'status') this.statusFilter.set(value);
+    else this.documentFilter.set(value);
+    this.reloadFromStart();
+  }
+
+  protected setPartyFilter(value: string): void {
+    this.partyFilter.set(value);
+    this.reloadFromStart();
+  }
+
+  protected onSearch(value: string): void {
+    this.query.set(value);
+    if (this.searchTimer) clearTimeout(this.searchTimer);
+    this.searchTimer = setTimeout(() => this.reloadFromStart(), 250);
+  }
+
+  protected setDate(kind: 'from' | 'to', event: Event): void {
+    const value = (event.target as HTMLInputElement).value;
+    if (kind === 'from') this.from.set(value);
+    else this.to.set(value);
+    this.reloadFromStart();
+  }
+
+  protected setLast30(): void {
+    this.from.set(this.daysAgoIso(29));
+    this.to.set(this.todayIso());
+    this.reloadFromStart();
+  }
+
+  protected setAllTime(): void {
+    this.from.set('');
+    this.to.set('');
+    this.reloadFromStart();
+  }
+
+  protected last30Active(): boolean {
+    return this.from() === this.daysAgoIso(29) && this.to() === this.todayIso();
+  }
+
+  protected allTimeActive(): boolean {
+    return !this.from() && !this.to();
+  }
+
+  protected reloadFromStart(): void {
     this.outboxPage.set(1);
+    void this.load();
+  }
+
+  protected changePage(page: number): void {
+    this.outboxPage.set(page);
+    void this.load();
+  }
+
+  protected changePageSize(size: number): void {
+    this.outboxPageSize.set(size);
+    this.reloadFromStart();
+  }
+
+  protected partyLabel(party: {
+    first_name: string;
+    last_name: string | null;
+    is_supplier: boolean;
+  }): string {
+    return `${[party.first_name, party.last_name].filter(Boolean).join(' ')}${party.is_supplier ? ' · Supplier' : ''}`;
+  }
+
+  private matchingPartyIds(query: string): string[] {
+    const normalized = query.trim().toLowerCase();
+    if (!normalized) return [];
+    return this.partyOptions()
+      .filter(party =>
+        [party.first_name, party.last_name, party.phone]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase()
+          .includes(normalized)
+      )
+      .slice(0, RELATED_PARTY_SEARCH_ID_LIMIT)
+      .map(party => party.id);
+  }
+
+  private todayIso(): string {
+    return new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Nairobi' });
+  }
+
+  private daysAgoIso(days: number): string {
+    const date = new Date();
+    date.setDate(date.getDate() - days);
+    return date.toLocaleDateString('en-CA', { timeZone: 'Africa/Nairobi' });
   }
 
   protected time(iso: string): string {

@@ -106,14 +106,18 @@ export class ReportsService {
     return data;
   }
 
-  async lowStock(): Promise<LowStockVariant[]> {
-    const { data, error } = await this.db
-      .from('low_stock_variants')
-      .select('*')
-      .order('stock')
-      .limit(20);
+  async lowStock(locationId?: string | null): Promise<{ rows: LowStockVariant[]; total: number }> {
+    const request = locationId
+      ? this.db
+          .from('low_stock_variants_by_location')
+          .select('*', { count: 'exact' })
+          .eq('location_id', locationId)
+          .order('stock')
+          .limit(20)
+      : this.db.from('low_stock_variants').select('*', { count: 'exact' }).order('stock').limit(20);
+    const { data, error, count } = await request;
     if (error) throw error;
-    return data;
+    return { rows: data as LowStockVariant[], total: count ?? data.length };
   }
 
   async expiringBatches(): Promise<ExpiringBatch[]> {

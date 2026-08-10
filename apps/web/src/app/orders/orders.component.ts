@@ -39,6 +39,10 @@ import { Approval, ApprovalsService } from '../approvals/approvals.service';
 import { RecentSalesCacheService } from '../core/recent-sales-cache.service';
 import { DocumentSendComponent } from '../communications/document-send.component';
 import { PartyCacheService } from '../core/party-cache.service';
+import {
+  SearchableFilterComponent,
+  type SearchableFilterOption,
+} from '../shared/ui/searchable-filter.component';
 
 const ALL_STATUSES = ['completed', 'voided', 'draft', 'expired', 'pending_payment'];
 
@@ -73,6 +77,7 @@ const SALE_SORT_OPTIONS: readonly ListSortOption[] = [
     StatBarComponent,
     MoneyComponent,
     DocumentSendComponent,
+    SearchableFilterComponent,
   ],
   template: `
     <app-page
@@ -136,16 +141,14 @@ const SALE_SORT_OPTIONS: readonly ListSortOption[] = [
             </select>
           </app-form-field>
           <app-form-field label="Customer" class="sm:col-span-2 lg:w-56">
-            <select
-              class="select select-bordered select-sm w-full"
+            <app-searchable-filter
+              ariaLabel="Filter sales by customer"
+              placeholder="All customers"
+              searchPlaceholder="Search customers…"
+              [options]="customerFilterOptions()"
               [value]="customerId() ?? ''"
-              (change)="setCustomerFilter($event)"
-            >
-              <option value="">All customers</option>
-              @for (customer of customerOptions(); track customer.id) {
-                <option [value]="customer.id">{{ customerNameFromParty(customer) }}</option>
-              }
-            </select>
+              (valueChange)="setCustomerFilter($event)"
+            />
           </app-form-field>
           <app-form-field label="From" class="lg:w-40">
             <input
@@ -940,6 +943,14 @@ export class OrdersComponent implements OnInit, OnDestroy {
   protected readonly customerOptions = computed(() =>
     this.partyCache.customers().filter(customer => customer.deleted_at === null)
   );
+  protected readonly customerFilterOptions = computed<readonly SearchableFilterOption[]>(() =>
+    this.customerOptions().map(customer => ({
+      value: customer.id,
+      label: this.customerNameFromParty(customer),
+      description: customer.phone || undefined,
+      searchText: customer.email ?? undefined,
+    }))
+  );
   protected readonly selectedCustomerName = computed(() => {
     const customer = this.customerOptions().find(row => row.id === this.customerId());
     return customer ? this.customerNameFromParty(customer) : 'Selected customer';
@@ -1095,8 +1106,8 @@ export class OrdersComponent implements OnInit, OnDestroy {
     await this.apply();
   }
 
-  protected async setCustomerFilter(event: Event): Promise<void> {
-    const value = (event.target as HTMLSelectElement).value || null;
+  protected async setCustomerFilter(selected: string): Promise<void> {
+    const value = selected || null;
     this.customerId.set(value);
     if (value) this.allTime.set(true);
     await this.syncHistoryFilters();

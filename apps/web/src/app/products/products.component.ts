@@ -42,6 +42,10 @@ import { ProductTransferService, type CatalogImportResult } from './product-tran
 import { BarcodeScannerComponent } from '../shared/ui/barcode-scanner.component';
 import { BarcodeLabelDialogComponent } from './barcode-label-dialog.component';
 import { BARCODE_MAX_LENGTH, generateDukarunBarcode } from './barcode-labels';
+import {
+  SearchableFilterComponent,
+  type SearchableFilterOption,
+} from '../shared/ui/searchable-filter.component';
 
 type StockInfo = { stock: number; stock_value: number };
 type ProductStatusFilter = 'all' | 'active' | 'inactive';
@@ -106,6 +110,7 @@ interface ProductEditorRow {
     ProductImportDialogComponent,
     BarcodeScannerComponent,
     BarcodeLabelDialogComponent,
+    SearchableFilterComponent,
   ],
   template: `
     <app-page
@@ -385,19 +390,64 @@ interface ProductEditorRow {
                     </app-form-field>
                     <app-form-field
                       label="Shared barcode"
-                      hint="Only suitable for products with one variant."
+                      hint="Scan the package barcode or enter it manually. Only suitable for products with one variant."
                     >
-                      <input
-                        type="text"
-                        class="input input-bordered w-full"
-                        autocomplete="off"
-                        placeholder="Optional"
-                        [maxLength]="barcodeMaxLength"
-                        [formControl]="familyBarcode"
-                        (keydown.enter)="$event.preventDefault()"
-                      />
+                      <div class="flex gap-1.5">
+                        <input
+                          type="text"
+                          class="input input-bordered min-w-0 flex-1 font-mono"
+                          autocomplete="off"
+                          placeholder="Scan or enter barcode"
+                          [maxLength]="barcodeMaxLength"
+                          [formControl]="familyBarcode"
+                          (keydown.enter)="$event.preventDefault()"
+                        />
+                        <button
+                          appButton
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          title="Scan barcode with camera"
+                          aria-label="Scan shared product barcode"
+                          (click)="scanFamilyBarcode()"
+                        >
+                          <app-icon name="heroCamera" />
+                          Scan
+                        </button>
+                      </div>
                     </app-form-field>
                   </section>
+
+                  @if (pendingFamilyBarcode(); as replacement) {
+                    <div class="mt-4 rounded-field border border-warning/50 bg-warning/5 p-3">
+                      <p class="text-sm font-medium">Replace the shared barcode?</p>
+                      <p class="mt-1 break-all text-xs">
+                        <span class="font-mono">{{ familyBarcode.value.trim() }}</span>
+                        <span class="mx-1.5">→</span>
+                        <span class="font-mono">{{ replacement }}</span>
+                      </p>
+                      <div class="mt-2 flex gap-2">
+                        <button
+                          appButton
+                          type="button"
+                          variant="primary"
+                          size="sm"
+                          (click)="confirmFamilyBarcode()"
+                        >
+                          Replace
+                        </button>
+                        <button
+                          appButton
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          (click)="cancelFamilyBarcode()"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  }
 
                   @if (familyBarcode.value.trim() && editorRows.length > 1) {
                     <div class="alert alert-warning mt-4 text-sm">
@@ -889,19 +939,16 @@ interface ProductEditorRow {
             <option value="out_of_stock">Out of stock</option>
             <option value="not_tracked">Not tracked</option>
           </select>
-          <select
-            class="select select-bordered min-h-10 w-full select-sm sm:w-56"
-            aria-label="Manufacturer"
-            title="Manufacturer"
+          <app-searchable-filter
+            class="w-full sm:w-56"
+            ariaLabel="Filter products by manufacturer"
+            placeholder="All manufacturers"
+            emptyValue="all"
+            searchPlaceholder="Search manufacturers…"
+            [options]="manufacturerFilterOptions()"
             [value]="manufacturerFilter()"
-            (change)="setManufacturerFilter($event)"
-          >
-            <option value="all">All manufacturers</option>
-            <option value="unassigned">Not specified</option>
-            @for (manufacturer of manufacturers(); track manufacturer.id) {
-              <option [value]="manufacturer.id">{{ manufacturer.name }}</option>
-            }
-          </select>
+            (valueChange)="setManufacturerFilter($event)"
+          />
           @if (hasProductFilters()) {
             <button
               appButton
@@ -1309,10 +1356,10 @@ interface ProductEditorRow {
         [(open)]="importOpen"
         (imported)="productImportCompleted($event)"
       />
-      @if (editorScannerIndex() !== null) {
+      @if (editorScannerTarget() !== null) {
         <app-barcode-scanner
           (scanned)="editorBarcodeScanned($event)"
-          (close)="editorScannerIndex.set(null)"
+          (close)="editorScannerTarget.set(null)"
         />
       }
       @defer (when labelDialogMode() !== null) {
@@ -1383,7 +1430,8 @@ export class ProductsComponent implements OnInit {
   protected readonly editorLoading = signal(false);
   private editorRowSequence = 0;
   protected editorRows: ProductEditorRow[] = [];
-  protected readonly editorScannerIndex = signal<number | null>(null);
+  protected readonly editorScannerTarget = signal<'family' | number | null>(null);
+  protected readonly pendingFamilyBarcode = signal<string | null>(null);
   protected readonly labelDialogMode = signal<'catalogue' | 'single' | null>(null);
   protected readonly labelVariantId = signal<string | null>(null);
 
@@ -1411,6 +1459,13 @@ export class ProductsComponent implements OnInit {
   protected readonly collectionsOpen = signal(false);
   protected readonly collections = this.catalogCache.collections;
   protected readonly manufacturers = this.catalogCache.manufacturers;
+  protected readonly manufacturerFilterOptions = computed<readonly SearchableFilterOption[]>(() => [
+    { value: 'unassigned', label: 'Not specified' },
+    ...this.manufacturers().map(manufacturer => ({
+      value: manufacturer.id,
+      label: manufacturer.name,
+    })),
+  ]);
   protected readonly stockLocations = this.locationContext.locations;
   protected readonly collectionForm = signal<{ editing: CollectionWithCount | null } | null>(null);
   protected readonly collectionName = new FormControl('', { nonNullable: true });
@@ -1606,8 +1661,8 @@ export class ProductsComponent implements OnInit {
     this.stockStatusFilter.set((event.target as HTMLSelectElement).value as StockStatusFilter);
   }
 
-  protected setManufacturerFilter(event: Event): void {
-    this.manufacturerFilter.set((event.target as HTMLSelectElement).value);
+  protected setManufacturerFilter(value: string): void {
+    this.manufacturerFilter.set(value);
   }
 
   protected clearProductFilters(): void {
@@ -1949,6 +2004,7 @@ export class ProductsComponent implements OnInit {
     this.familyName.setValue('');
     this.familyManufacturer.setValue('');
     this.familyBarcode.setValue('');
+    this.pendingFamilyBarcode.set(null);
     this.familyActive.setValue(true);
     this.familyCollections.set(new Set());
     this.editorRows = [this.emptyEditorRow()];
@@ -1963,6 +2019,7 @@ export class ProductsComponent implements OnInit {
     this.familyName.setValue(family.name);
     this.familyManufacturer.setValue(this.manufacturerName(family.manufacturer_id) ?? '');
     this.familyBarcode.setValue(family.barcode ?? '');
+    this.pendingFamilyBarcode.set(null);
     this.familyActive.setValue(family.active);
     this.familyCollections.set(new Set());
     this.editorRows = [];
@@ -1996,7 +2053,8 @@ export class ProductsComponent implements OnInit {
     this.editorLoading.set(false);
     this.editorMode.set(null);
     this.editingFamily.set(null);
-    this.editorScannerIndex.set(null);
+    this.editorScannerTarget.set(null);
+    this.pendingFamilyBarcode.set(null);
     this.error.set(null);
   }
 
@@ -2033,14 +2091,54 @@ export class ProductsComponent implements OnInit {
 
   protected scanEditorBarcode(index: number): void {
     this.error.set(null);
-    this.editorScannerIndex.set(index);
+    this.editorScannerTarget.set(index);
+  }
+
+  protected scanFamilyBarcode(): void {
+    this.error.set(null);
+    this.editorScannerTarget.set('family');
   }
 
   protected editorBarcodeScanned(value: string): void {
-    const index = this.editorScannerIndex();
-    this.editorScannerIndex.set(null);
-    if (index === null) return;
-    this.proposeEditorBarcode(index, value);
+    const target = this.editorScannerTarget();
+    this.editorScannerTarget.set(null);
+    if (target === null) return;
+    if (target === 'family') {
+      this.proposeFamilyBarcode(value);
+      return;
+    }
+    this.proposeEditorBarcode(target, value);
+  }
+
+  protected confirmFamilyBarcode(): void {
+    const barcode = this.pendingFamilyBarcode();
+    if (!barcode) return;
+    this.familyBarcode.setValue(barcode);
+    this.pendingFamilyBarcode.set(null);
+  }
+
+  protected cancelFamilyBarcode(): void {
+    this.pendingFamilyBarcode.set(null);
+  }
+
+  private proposeFamilyBarcode(scannedValue: string): void {
+    const barcode = scannedValue.trim();
+    if (!barcode) return;
+    if (barcode.length > BARCODE_MAX_LENGTH) {
+      this.error.set(`Barcodes can be at most ${BARCODE_MAX_LENGTH} characters.`);
+      return;
+    }
+    const current = this.familyBarcode.value.trim();
+    if (barcode === current) {
+      this.pendingFamilyBarcode.set(null);
+      return;
+    }
+    if (current) {
+      this.pendingFamilyBarcode.set(barcode);
+      return;
+    }
+    this.familyBarcode.setValue(barcode);
+    this.pendingFamilyBarcode.set(null);
   }
 
   protected generateEditorBarcode(index: number): void {

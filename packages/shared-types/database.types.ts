@@ -4630,6 +4630,18 @@ export type Database = {
           },
         ]
       }
+      low_stock_variants_by_location: {
+        Row: {
+          company_id: string | null
+          location_id: string | null
+          low_stock_threshold: number | null
+          product_name: string | null
+          stock: number | null
+          variant_id: string | null
+          variant_name: string | null
+        }
+        Relationships: []
+      }
       mv_daily_customer_stats: {
         Row: {
           ar_delta: number | null
@@ -4807,6 +4819,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      purchase_history: {
+        Row: {
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          id: string | null
+          is_credit: boolean | null
+          notes: string | null
+          paid: number | null
+          payment_status: string | null
+          purchase_date: string | null
+          reference: string | null
+          stock_location_id: string | null
+          supplier_id: string | null
+          total_cost: number | null
+        }
+        Relationships: []
       }
       public_storefronts: {
         Row: {
@@ -5037,6 +5067,17 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      supplier_purchase_metrics: {
+        Row: {
+          average_order: number | null
+          company_id: string | null
+          open_purchase_count: number | null
+          outstanding: number | null
+          purchase_count: number | null
+          supplier_id: string | null
+        }
+        Relationships: []
       }
       supplier_variant_performance: {
         Row: {

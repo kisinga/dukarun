@@ -436,9 +436,11 @@ type StockAdjustmentHistoryDisplay = StockAdjustmentHistoryRow & {
                 [currentPage]="historyPage()"
                 [totalPages]="historyTotalPages()"
                 [totalItems]="historyTotal()"
-                [itemsPerPage]="historyPageSize"
+                [itemsPerPage]="historyPageSize()"
                 itemLabel="adjustments"
+                [showItemsPerPage]="true"
                 (pageChange)="changeHistoryPage($event)"
+                (itemsPerPageChange)="changeHistoryPageSize($event)"
               />
             }
           </div>
@@ -480,9 +482,9 @@ export class StockAdjustmentsComponent implements OnInit {
   protected readonly historyVariantId = signal<string | null>(null);
   protected readonly historyLoading = signal(false);
   protected readonly historyError = signal<string | null>(null);
-  protected readonly historyPageSize = 20;
+  protected readonly historyPageSize = signal(20);
   protected readonly historyTotalPages = computed(() =>
-    Math.max(1, Math.ceil(this.historyTotal() / this.historyPageSize))
+    Math.max(1, Math.ceil(this.historyTotal() / this.historyPageSize()))
   );
   protected readonly label = variantLabel;
   private readonly debouncedSearch = toSignal(
@@ -731,7 +733,7 @@ export class StockAdjustmentsComponent implements OnInit {
         variantId: this.historyVariantId(),
         search: this.historySearch.value,
         page: this.historyPage(),
-        pageSize: this.historyPageSize,
+        pageSize: this.historyPageSize(),
       });
       const variants = await this.pos.variantsByIds(result.rows.map(row => row.variant_id));
       const manufacturerByVariant = new Map(
@@ -759,6 +761,12 @@ export class StockAdjustmentsComponent implements OnInit {
 
   protected changeHistoryPage(page: number): void {
     this.historyPage.set(page);
+    void this.loadHistory();
+  }
+
+  protected changeHistoryPageSize(size: number): void {
+    this.historyPageSize.set(size);
+    this.historyPage.set(1);
     void this.loadHistory();
   }
 

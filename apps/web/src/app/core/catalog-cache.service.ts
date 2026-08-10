@@ -23,6 +23,8 @@ import {
   type CacheStreamHandler,
 } from './cache-journal.service';
 
+// Current offline catalogue contract. Enterprise catalogues beyond 10k need a
+// server-search tier before this bound can safely grow.
 const CATALOG_LIMIT = 10_000;
 const CATALOG_PAGE_SIZE = 1_000;
 
