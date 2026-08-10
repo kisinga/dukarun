@@ -6,6 +6,7 @@ import { CatalogRow, StorefrontInfo, StorefrontService } from './storefront.serv
 import { StorefrontBrandComponent } from './storefront-brand.component';
 import { StorefrontSeoService } from './storefront-seo.service';
 import { environment } from '../environments/environment';
+import { PoweredByDukarunComponent } from './powered-by-dukarun.component';
 
 function formatKes(amount: number): string {
   return `KES ${Math.round(amount).toLocaleString('en-KE')}`;
@@ -13,7 +14,7 @@ function formatKes(amount: number): string {
 
 @Component({
   selector: 'app-product-detail',
-  imports: [RouterLink, StorefrontBrandComponent],
+  imports: [RouterLink, StorefrontBrandComponent, PoweredByDukarunComponent],
   template: `
     <main class="min-h-screen bg-base-200 pb-24">
       @if (shop(); as s) {
@@ -189,7 +190,7 @@ function formatKes(amount: number): string {
           }
         </div>
         <footer class="mx-auto max-w-6xl px-5 pb-10 text-center text-xs text-base-content/45">
-          Powered by Dukarun
+          <app-powered-by-dukarun />
         </footer>
       } @else if (!loading()) {
         <div class="mx-auto max-w-lg px-5 py-24 text-center">

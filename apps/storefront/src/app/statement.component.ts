@@ -2,9 +2,11 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { CustomerStatement, StorefrontService } from './storefront.service';
 import { StorefrontSeoService } from './storefront-seo.service';
+import { PoweredByDukarunComponent } from './powered-by-dukarun.component';
 
 @Component({
   selector: 'app-statement',
+  imports: [PoweredByDukarunComponent],
   template: `
     <main class="min-h-screen bg-base-200 p-4 py-10">
       <div class="mx-auto max-w-xl">
@@ -78,6 +80,8 @@ import { StorefrontSeoService } from './storefront-seo.service';
           </section>
         }
         <p class="mt-6 text-center text-xs text-base-content/50">
+          <app-powered-by-dukarun />
+          <span aria-hidden="true"> · </span>
           <a [href]="legalUrl('privacy')" class="link link-hover">Privacy</a>
           <span aria-hidden="true"> · </span>
           <a [href]="legalUrl('terms')" class="link link-hover">Terms</a>

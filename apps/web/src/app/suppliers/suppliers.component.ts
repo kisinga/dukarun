@@ -52,10 +52,7 @@ import {
 import { CashierSessionService } from '../core/cashier-session.service';
 import { SessionRequiredNoticeComponent } from '../shared/ui/session-required-notice.component';
 import { PartyCacheService } from '../core/party-cache.service';
-import {
-  ExternalDocumentChannel,
-  ExternalDocumentsService,
-} from '../communications/external-documents.service';
+import { DocumentSendComponent } from '../communications/document-send.component';
 
 type SupplierWithAp = MoneyCustomer & { ap_balance: number } & AgingInfo;
 type PurchasePaymentMode = 'paid' | 'partial' | 'later';
@@ -112,6 +109,7 @@ interface ParsedPurchaseLine {
     PageLayoutComponent,
     SessionRequiredNoticeComponent,
     PaginationComponent,
+    DocumentSendComponent,
   ],
   template: `
     <app-page
@@ -1737,28 +1735,16 @@ interface ParsedPurchaseLine {
                 </div>
 
                 @if (perms.has('ManageCommunications') && perms.has('ViewFinancials')) {
-                  <section class="mt-3 rounded-box border border-base-300 p-3">
-                    <p class="text-sm font-medium">Send purchase order</p>
-                    <p class="type-caption">
-                      Fixed wording · supplier and costs come from this purchase.
-                    </p>
-                    <div class="mt-2 flex flex-wrap gap-2">
-                      <button
-                        class="btn btn-outline btn-sm"
-                        [disabled]="documentBusy()"
-                        (click)="sendPurchaseOrder(p.id, 'sms')"
-                      >
-                        Send SMS
-                      </button>
-                      <button
-                        class="btn btn-outline btn-sm"
-                        [disabled]="documentBusy()"
-                        (click)="sendPurchaseOrder(p.id, 'whatsapp')"
-                      >
-                        Send WhatsApp
-                      </button>
-                    </div>
-                  </section>
+                  <app-document-send
+                    class="mt-3 block"
+                    documentType="purchase_order"
+                    [subjectId]="p.id"
+                    title="Send purchase order"
+                    description="Supplier and costs come from this purchase."
+                    [allowCompanyCopy]="true"
+                    (sent)="notice.set($event)"
+                    (failed)="error.set($event)"
+                  />
                 }
 
                 <div class="mt-3 grid grid-cols-2 gap-2">
@@ -1956,7 +1942,6 @@ export class SuppliersComponent implements OnInit {
   private readonly locationContext = inject(LocationContextService);
   private readonly receiptData = inject(ReceiptDataService);
   private readonly print = inject(PrintService);
-  private readonly documents = inject(ExternalDocumentsService);
   protected readonly perms = inject(PermissionsService);
   protected readonly cashierSession = inject(CashierSessionService);
   protected readonly preferences = inject(CompanyPreferencesService);
@@ -2062,7 +2047,6 @@ export class SuppliersComponent implements OnInit {
   protected readonly selectedPayAccount = new FormControl('', { nonNullable: true });
 
   protected readonly busy = signal(false);
-  protected readonly documentBusy = signal(false);
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
@@ -3106,49 +3090,6 @@ export class SuppliersComponent implements OnInit {
       );
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Print failed');
-    }
-  }
-
-  protected async sendPurchaseOrder(
-    purchaseId: string,
-    channel: ExternalDocumentChannel
-  ): Promise<void> {
-    const includeCompanyCopy = window.confirm(
-      'Also send a company copy to the configured company WhatsApp number?'
-    );
-    this.documentBusy.set(true);
-    this.error.set(null);
-    this.notice.set(null);
-    try {
-      const preview = await this.documents.preview(
-        'purchase_order',
-        purchaseId,
-        channel,
-        includeCompanyCopy
-      );
-      const copy = preview.company_copy_body
-        ? `\n\nCompany copy:\n${preview.company_copy_body}`
-        : '';
-      if (
-        !window.confirm(
-          `Send to ${preview.party_name} (${preview.recipient})?\n\n${preview.body}${copy}`
-        )
-      )
-        return;
-      const result = await this.documents.send(
-        'purchase_order',
-        purchaseId,
-        channel,
-        includeCompanyCopy
-      );
-      this.notice.set(
-        `Purchase order queued for ${result.recipient}` +
-          (result.company_copy_error ? `; company copy failed: ${result.company_copy_error}` : '')
-      );
-    } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Purchase order could not be sent');
-    } finally {
-      this.documentBusy.set(false);
     }
   }
 

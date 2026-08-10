@@ -12,6 +12,12 @@ import {
 
 export type AppNotification = Database['public']['Tables']['notifications']['Row'];
 export type OutboxMessage = Database['public']['Tables']['outbox']['Row'];
+export type OutboxMessageWithParty = OutboxMessage & {
+  customers: Pick<
+    Database['public']['Tables']['customers']['Row'],
+    'id' | 'first_name' | 'last_name' | 'is_supplier'
+  > | null;
+};
 
 /** Notifications inbox + live unread count (table is realtime-published). */
 @Injectable({ providedIn: 'root' })
@@ -163,14 +169,14 @@ export class NotificationsService implements OnDestroy {
     await db.put('snapshots', snapshot);
   }
 
-  async recentOutbox(limit = 20): Promise<OutboxMessage[]> {
+  async recentOutbox(limit = 20): Promise<OutboxMessageWithParty[]> {
     const { data, error } = await this.db
       .from('outbox')
-      .select('*')
+      .select('*, customers(id, first_name, last_name, is_supplier)')
       .order('created_at', { ascending: false })
       .limit(limit);
     if (error) throw error;
-    return data;
+    return data as OutboxMessageWithParty[];
   }
 
   /** SMS usage + cap for the meter. */

@@ -1,5 +1,5 @@
 begin;
-select plan(10);
+select plan(12);
 
 select is(
   (select count(*)::int from public.message_templates
@@ -75,13 +75,29 @@ select testkit.as_user(
 
 create temp table docs_hardening_send as
 select public.send_external_document(
-  'receipt','78888888-8888-4888-8888-888888888883','whatsapp',false
+  'receipt','78888888-8888-4888-8888-888888888883','whatsapp',false,true
 ) result;
 grant select on pg_temp.docs_hardening_send to authenticated;
 
 select ok(
   ((select result from docs_hardening_send)->>'queued')::boolean,
   'hardened document send queues successfully'
+);
+select is(
+  (select scheduled_after from public.outbox
+   where id=((select result from docs_hardening_send)->>'outbox_id')::uuid),
+  (select created_at from public.outbox
+   where id=((select result from docs_hardening_send)->>'outbox_id')::uuid),
+  'merchant-triggered document bypasses WhatsApp quiet hours'
+);
+select ok(
+  position(
+    'queue_manual_document_message' in
+    pg_catalog.pg_get_functiondef(
+      'public.send_external_document(text,uuid,text,boolean,boolean)'::regprocedure
+    )
+  ) > 0,
+  'document sends use the immediate transactional queue path'
 );
 select ok(
   position(E'\n' in ((select result from docs_hardening_send)->>'body')) > 0,
@@ -107,7 +123,7 @@ select ok(
   position(
     'pg_advisory_xact_lock' in
     pg_catalog.pg_get_functiondef(
-      'public.send_external_document(text,uuid,text,boolean)'::regprocedure
+      'public.send_external_document(text,uuid,text,boolean,boolean)'::regprocedure
     )
   ) > 0,
   'document send serializes the cooldown check'

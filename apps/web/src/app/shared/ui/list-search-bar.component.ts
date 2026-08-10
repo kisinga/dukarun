@@ -28,7 +28,7 @@ export type ListSortDirection = 'asc' | 'desc';
           <input
             type="search"
             [placeholder]="placeholder()"
-            class="input input-bordered min-h-11 w-full pr-9 pl-9"
+            class="search-with-custom-clear input input-bordered min-h-11 w-full pr-9 pl-9"
             [value]="searchQuery()"
             (input)="onSearchInput($event)"
           />

@@ -508,6 +508,8 @@ export class PosService {
     since?: string;
     until?: string;
     search?: string;
+    customerId?: string;
+    allLocations?: boolean;
     page: number;
     pageSize: number;
     sortBy?: 'created_at' | 'cashier_pending_at' | 'code' | 'total' | 'status';
@@ -528,8 +530,9 @@ export class PosService {
     let query = this.client
       .from('orders')
       .select('*, customers(first_name, last_name)', { count: 'exact' })
-      .eq('location_id', this.locations.requireActiveId())
       .in('status', input.statuses);
+    if (!input.allLocations) query = query.eq('location_id', this.locations.requireActiveId());
+    if (input.customerId) query = query.eq('customer_id', input.customerId);
     if (input.since) query = query.gte('created_at', input.since);
     if (input.until) query = query.lt('created_at', input.until);
     if (input.cashierQueueOnly) query = query.not('cashier_pending_at', 'is', null);

@@ -217,6 +217,10 @@ Every list page is the same four blocks, top to bottom — no improvisation:
    its contents with table-shell headers and cells while guaranteeing the same gap before every
    data surface. Pages must not wrap it just to recreate that spacing. No detached stat-card
    grids, custom search rows, or bare `input-bordered`.
+   The primitive owns its single clear button and applies `search-with-custom-clear` to suppress
+   the browser's native cancel control. Any other search that supplies a custom clear action must
+   use the same class; searches without a custom action keep native clearing. Two clear controls
+   are always a design-language defect.
 3. **Data surface** — desktop: `<app-data-table-shell>` containing a semantic table with
    row-click navigation to the detail view (no "View" buttons); mobile: a per-domain card
    component. Empty state = `<app-empty-state>`.

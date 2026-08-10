@@ -265,7 +265,7 @@ interface DraftFlag {
                   </span>
                   <input
                     type="search"
-                    class="input input-bordered min-h-11 w-full pr-12 pl-11"
+                    class="search-with-custom-clear input input-bordered min-h-11 w-full pr-12 pl-11"
                     placeholder="Search or scan barcode…"
                     autocomplete="off"
                     aria-label="Search products or scan barcode"

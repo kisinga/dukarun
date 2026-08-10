@@ -14,7 +14,7 @@
     "dev:site": "npm start -w @dukarun/site",
     "build:site": "npm run build -w @dukarun/site",
     "dev:web": "npm start -w @dukarun/web",
-    "build:web": "npm run build -w @dukarun/web",
+    "build:web": "npm run build --prod -w @dukarun/web",
     "dev:video": "npm run studio -w @dukarun/video",
     "video:approve-script": "npm run approve-script -w @dukarun/video --",
     "video:voice": "npm run voice -w @dukarun/video --",

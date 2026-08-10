@@ -52,13 +52,15 @@ export class ExternalDocumentsService {
     type: ExternalDocumentType,
     subjectId: string,
     channel: ExternalDocumentChannel,
-    includeCompanyCopy = false
+    includeCompanyCopy = false,
+    bypassQuietHours = false
   ): Promise<ExternalDocumentSendResult> {
     const { data, error } = await this.db.rpc('send_external_document', {
       p_document_type: type,
       p_subject_id: subjectId,
       p_channel: channel,
       p_include_company_copy: includeCompanyCopy,
+      p_bypass_quiet_hours: bypassQuietHours,
     });
     if (error) throw rpcError(error);
     return data as unknown as ExternalDocumentSendResult;

@@ -748,6 +748,16 @@ type CreditOrder = {
                                   [amount]="o.total"
                                   [masked]="!perms.has('ViewFinancials')"
                               /></span>
+                              <button
+                                appButton
+                                variant="ghost"
+                                size="sm"
+                                type="button"
+                                title="View order details"
+                                (click)="viewSale(c.id, o.id)"
+                              >
+                                View
+                              </button>
                               @if (perms.has('SettleOrder')) {
                                 <button
                                   appButton
@@ -816,7 +826,16 @@ type CreditOrder = {
                   </section>
 
                   <section class="border-t border-base-300/60 pt-3">
-                    <h3 class="section-title mb-2">Sales history</h3>
+                    <div class="mb-2 flex items-center justify-between gap-2">
+                      <h3 class="section-title">Recent sales</h3>
+                      <button
+                        class="btn btn-ghost btn-xs"
+                        type="button"
+                        (click)="viewAllSales(c.id)"
+                      >
+                        View all sales <app-icon name="heroArrowRight" size="sm" />
+                      </button>
+                    </div>
                     @if (orders().length === 0) {
                       <app-empty-state
                         [compact]="true"
@@ -826,7 +845,13 @@ type CreditOrder = {
                     } @else {
                       <ul class="max-h-80 divide-y divide-base-200 overflow-y-auto">
                         @for (o of orders(); track o.id) {
-                          <li class="flex items-center gap-2 py-2">
+                          <li
+                            class="flex cursor-pointer items-center gap-2 rounded-field py-2 hover:bg-base-200/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                            role="button"
+                            tabindex="0"
+                            (click)="viewSale(c.id, o.id)"
+                            (keydown.enter)="viewSale(c.id, o.id)"
+                          >
                             <div class="min-w-0 flex-1">
                               <p class="font-mono text-sm font-medium">{{ o.code }}</p>
                               <p class="type-caption">{{ date(o.created_at) }}</p>
@@ -845,6 +870,11 @@ type CreditOrder = {
                                 [masked]="!perms.has('ViewFinancials')"
                               />
                             </span>
+                            <app-icon
+                              name="heroChevronRight"
+                              size="sm"
+                              class="text-base-content/40"
+                            />
                           </li>
                         }
                       </ul>
@@ -1365,6 +1395,18 @@ export class CustomersComponent implements OnInit {
     } else {
       this.drawerEditing.set(false);
     }
+  }
+
+  protected viewAllSales(customerId: string): void {
+    void this.router.navigate(['/orders'], {
+      queryParams: { customer: customerId, range: 'all' },
+    });
+  }
+
+  protected viewSale(customerId: string, orderId: string): void {
+    void this.router.navigate(['/orders'], {
+      queryParams: { customer: customerId, range: 'all', order: orderId },
+    });
   }
 
   protected async save(): Promise<void> {

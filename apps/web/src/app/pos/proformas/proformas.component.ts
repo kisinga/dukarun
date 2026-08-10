@@ -43,10 +43,7 @@ import { DrawerComponent } from '../../shared/ui/drawer.component';
 import { StatCardComponent } from '../../shared/ui/stat-card.component';
 import { MoneyComponent } from '../../shared/ui/money.component';
 import { Approval, ApprovalsService } from '../../approvals/approvals.service';
-import {
-  ExternalDocumentChannel,
-  ExternalDocumentsService,
-} from '../../communications/external-documents.service';
+import { DocumentSendComponent } from '../../communications/document-send.component';
 
 const PROFORMA_STATUSES = ['draft', 'expired'];
 
@@ -78,6 +75,7 @@ const PROFORMA_SORT_OPTIONS: readonly ListSortOption[] = [
     DrawerComponent,
     StatCardComponent,
     MoneyComponent,
+    DocumentSendComponent,
   ],
   template: `
     <app-page
@@ -489,26 +487,15 @@ const PROFORMA_SORT_OPTIONS: readonly ListSortOption[] = [
           </div>
 
           @if (draft.status === 'draft' && draft.customer_id && canSendDocuments()) {
-            <section class="mt-3 rounded-box border border-base-300 p-3">
-              <p class="text-sm font-medium">Send proforma</p>
-              <p class="type-caption">A read-only snapshot is shared through a secure link.</p>
-              <div class="mt-2 flex flex-wrap gap-2">
-                <button
-                  class="btn btn-outline btn-sm"
-                  [disabled]="documentBusy()"
-                  (click)="sendProforma(draft.id, 'sms')"
-                >
-                  Send SMS
-                </button>
-                <button
-                  class="btn btn-outline btn-sm"
-                  [disabled]="documentBusy()"
-                  (click)="sendProforma(draft.id, 'whatsapp')"
-                >
-                  Send WhatsApp
-                </button>
-              </div>
-            </section>
+            <app-document-send
+              class="mt-3 block"
+              documentType="proforma"
+              [subjectId]="draft.id"
+              title="Send proforma"
+              description="A read-only snapshot is shared through a secure link."
+              (sent)="notice.set($event)"
+              (failed)="error.set($event)"
+            />
           }
 
           @if (previewLoading()) {
@@ -649,7 +636,6 @@ export class ProformasComponent implements OnInit, OnDestroy {
   private readonly receiptData = inject(ReceiptDataService);
   private readonly print = inject(PrintService);
   private readonly perms = inject(PermissionsService);
-  private readonly documents = inject(ExternalDocumentsService);
   protected readonly cashierSession = inject(CashierSessionService);
   protected readonly orderQueueCounts = inject(OrderQueueCountsService);
 
@@ -676,7 +662,6 @@ export class ProformasComponent implements OnInit, OnDestroy {
   protected readonly methods = signal<PaymentMethodOption[]>([]);
   protected readonly busy = signal(false);
   protected readonly printing = signal(false);
-  protected readonly documentBusy = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
   protected readonly completedSale = signal<{ id: string; code: string } | null>(null);
@@ -860,25 +845,6 @@ export class ProformasComponent implements OnInit, OnDestroy {
       this.error.set(err instanceof Error ? err.message : 'Print failed');
     } finally {
       this.printing.set(false);
-    }
-  }
-
-  protected async sendProforma(orderId: string, channel: ExternalDocumentChannel): Promise<void> {
-    this.documentBusy.set(true);
-    this.error.set(null);
-    this.notice.set(null);
-    try {
-      const preview = await this.documents.preview('proforma', orderId, channel);
-      if (
-        !window.confirm(`Send to ${preview.party_name} (${preview.recipient})?\n\n${preview.body}`)
-      )
-        return;
-      const result = await this.documents.send('proforma', orderId, channel);
-      this.notice.set(`Proforma queued for ${result.recipient}`);
-    } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Proforma could not be sent');
-    } finally {
-      this.documentBusy.set(false);
     }
   }
 

@@ -6357,6 +6357,7 @@ export type Database = {
       }
       send_external_document: {
         Args: {
+          p_bypass_quiet_hours?: boolean
           p_channel: string
           p_document_type: string
           p_include_company_copy?: boolean
@@ -6884,4 +6885,3 @@ export const Constants = {
     Enums: {},
   },
 } as const
-

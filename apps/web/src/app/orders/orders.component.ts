@@ -37,11 +37,8 @@ import { MoneyComponent } from '../shared/ui/money.component';
 import { PermissionsService } from '../core/permissions.service';
 import { Approval, ApprovalsService } from '../approvals/approvals.service';
 import { RecentSalesCacheService } from '../core/recent-sales-cache.service';
-import {
-  ExternalDocumentChannel,
-  ExternalDocumentType,
-  ExternalDocumentsService,
-} from '../communications/external-documents.service';
+import { DocumentSendComponent } from '../communications/document-send.component';
+import { PartyCacheService } from '../core/party-cache.service';
 
 const ALL_STATUSES = ['completed', 'voided', 'draft', 'expired', 'pending_payment'];
 
@@ -75,6 +72,7 @@ const SALE_SORT_OPTIONS: readonly ListSortOption[] = [
     IconComponent,
     StatBarComponent,
     MoneyComponent,
+    DocumentSendComponent,
   ],
   template: `
     <app-page
@@ -143,27 +141,81 @@ const SALE_SORT_OPTIONS: readonly ListSortOption[] = [
               <option value="pending_payment">Cashier queue</option>
             </select>
           </app-form-field>
+          <app-form-field label="Customer" class="sm:col-span-2 lg:w-56">
+            <select
+              class="select select-bordered select-sm w-full"
+              [value]="customerId() ?? ''"
+              (change)="setCustomerFilter($event)"
+            >
+              <option value="">All customers</option>
+              @for (customer of customerOptions(); track customer.id) {
+                <option [value]="customer.id">{{ customerNameFromParty(customer) }}</option>
+              }
+            </select>
+          </app-form-field>
           <app-form-field label="From" class="lg:w-40">
-            <input type="date" class="input input-bordered input-sm w-full" [formControl]="from" />
+            <input
+              type="date"
+              class="input input-bordered input-sm w-full"
+              [formControl]="from"
+              [disabled]="allTime()"
+            />
           </app-form-field>
           <app-form-field label="To" class="lg:w-40">
-            <input type="date" class="input input-bordered input-sm w-full" [formControl]="to" />
+            <input
+              type="date"
+              class="input input-bordered input-sm w-full"
+              [formControl]="to"
+              [disabled]="allTime()"
+            />
           </app-form-field>
           <div class="flex flex-wrap items-center gap-2 sm:col-span-2">
             <button appButton type="button" (click)="apply()">Apply filters</button>
             <button appButton variant="ghost" type="button" (click)="setToday()">Today</button>
             <button appButton variant="ghost" type="button" (click)="setWeek()">7 days</button>
+            <button appButton variant="ghost" type="button" (click)="setAllTime()">All time</button>
           </div>
         </div>
       </app-list-search-bar>
+
+      @if (customerId() || allTime()) {
+        <div
+          class="mb-3 flex flex-wrap items-center gap-2 rounded-box border border-info/20 bg-info/10 px-3 py-2 text-sm"
+        >
+          <app-icon name="heroUsers" size="sm" />
+          <span>
+            @if (customerId()) {
+              Showing <strong>{{ selectedCustomerName() }}</strong>
+              @if (allTime()) {
+                across all time and locations
+              }
+            } @else {
+              Showing all time for the current location
+            }
+          </span>
+          @if (customerId()) {
+            <button
+              class="btn btn-ghost btn-xs ml-auto"
+              type="button"
+              (click)="clearCustomerFilter()"
+            >
+              Clear customer
+            </button>
+          }
+        </div>
+      }
 
       @if (!loading() && orders().length === 0) {
         <div class="mt-3">
           <app-empty-state
             [compact]="true"
             icon="heroClipboardDocumentList"
-            title="No sales in this range"
-            description="— widen the dates or clear the status filter."
+            [title]="allTime() ? 'No matching sales' : 'No sales in this range'"
+            [description]="
+              allTime()
+                ? 'Clear the customer, search, or status filter.'
+                : 'Widen the dates or clear the status filter.'
+            "
           />
         </div>
       } @else {
@@ -438,44 +490,29 @@ const SALE_SORT_OPTIONS: readonly ListSortOption[] = [
               order.customer_id &&
               permissions.has('ManageCommunications')
             ) {
-              <section class="mt-3 rounded-box border border-base-300 p-3">
-                <p class="text-sm font-medium">Send document</p>
-                <p class="type-caption">Fixed wording · customer and totals come from this sale.</p>
-                <div class="mt-2 flex flex-wrap gap-2">
-                  @if (canSendReceipt(order)) {
-                    <button
-                      class="btn btn-outline btn-sm"
-                      [disabled]="documentBusy()"
-                      (click)="sendDocument('receipt', order.id, 'sms')"
-                    >
-                      Receipt · SMS
-                    </button>
-                    <button
-                      class="btn btn-outline btn-sm"
-                      [disabled]="documentBusy()"
-                      (click)="sendDocument('receipt', order.id, 'whatsapp')"
-                    >
-                      Receipt · WhatsApp
-                    </button>
-                  }
-                  @if (order.is_credit_sale) {
-                    <button
-                      class="btn btn-outline btn-sm"
-                      [disabled]="documentBusy()"
-                      (click)="sendDocument('invoice', order.id, 'sms')"
-                    >
-                      Invoice · SMS
-                    </button>
-                    <button
-                      class="btn btn-outline btn-sm"
-                      [disabled]="documentBusy()"
-                      (click)="sendDocument('invoice', order.id, 'whatsapp')"
-                    >
-                      Invoice · WhatsApp
-                    </button>
-                  }
-                </div>
-              </section>
+              <div class="mt-3 space-y-2">
+                @if (canSendReceipt(order)) {
+                  <app-document-send
+                    documentType="receipt"
+                    [subjectId]="order.id"
+                    title="Send receipt"
+                    description="Customer and totals come from this completed sale."
+                    (sent)="notice.set($event)"
+                    (failed)="error.set($event)"
+                  />
+                }
+                @if (order.is_credit_sale) {
+                  <app-document-send
+                    documentType="invoice"
+                    [subjectId]="order.id"
+                    title="Send invoice"
+                    description="Customer, total, and balance come from this credit sale."
+                    [allowCompanyCopy]="true"
+                    (sent)="notice.set($event)"
+                    (failed)="error.set($event)"
+                  />
+                }
+              </div>
             }
 
             @if (detailLoading()) {
@@ -837,7 +874,7 @@ export class OrdersComponent implements OnInit, OnDestroy {
   protected readonly permissions = inject(PermissionsService);
   private readonly approvals = inject(ApprovalsService);
   private readonly recentSales = inject(RecentSalesCacheService);
-  private readonly documents = inject(ExternalDocumentsService);
+  private readonly partyCache = inject(PartyCacheService);
   protected readonly fmtKes = formatKes;
 
   protected readonly pageSize = signal(20);
@@ -868,10 +905,18 @@ export class OrdersComponent implements OnInit, OnDestroy {
   protected readonly error = signal<string | null>(null);
   protected readonly warning = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
-  protected readonly documentBusy = signal(false);
   protected readonly printerEnabled = signal(false);
   protected readonly page = signal(1);
   protected readonly query = signal('');
+  protected readonly customerId = signal<string | null>(null);
+  protected readonly allTime = signal(false);
+  protected readonly customerOptions = computed(() =>
+    this.partyCache.customers().filter(customer => customer.deleted_at === null)
+  );
+  protected readonly selectedCustomerName = computed(() => {
+    const customer = this.customerOptions().find(row => row.id === this.customerId());
+    return customer ? this.customerNameFromParty(customer) : 'Selected customer';
+  });
   protected readonly saleSortOptions = SALE_SORT_OPTIONS;
   protected readonly saleSort = signal('created_at');
   protected readonly saleSortDirection = signal<ListSortDirection>('desc');
@@ -913,6 +958,16 @@ export class OrdersComponent implements OnInit, OnDestroy {
       if (!this.routeReady()) return;
       untracked(() => {
         const orderId = params.get('order');
+        const routedCustomerId = params.get('customer');
+        const routedAllTime = params.get('range') === 'all' || routedCustomerId !== null;
+        const historyFiltersChanged =
+          routedCustomerId !== this.customerId() || routedAllTime !== this.allTime();
+        if (historyFiltersChanged) {
+          this.customerId.set(routedCustomerId);
+          this.allTime.set(routedAllTime);
+          this.page.set(1);
+          void this.load();
+        }
         this.highlightedApprovalId.set(params.get('approval'));
         if (orderId && this.selectedOrderId() !== orderId) void this.openOrder(orderId, false);
         if (!orderId && this.selectedOrderId()) this.closeOrderDrawer(false);
@@ -922,7 +977,7 @@ export class OrdersComponent implements OnInit, OnDestroy {
 
   /** Live when the range covers today (the old Today's Sales behaviour). */
   protected readonly isLive = computed(
-    () => this.from.value <= this.todayIso() && this.to.value >= this.todayIso()
+    () => !this.allTime() && this.from.value <= this.todayIso() && this.to.value >= this.todayIso()
   );
 
   protected readonly totalPages = computed(() =>
@@ -942,39 +997,6 @@ export class OrdersComponent implements OnInit, OnDestroy {
     return paid >= order.total;
   }
 
-  protected async sendDocument(
-    type: Extract<ExternalDocumentType, 'receipt' | 'invoice'>,
-    subjectId: string,
-    channel: ExternalDocumentChannel
-  ): Promise<void> {
-    const includeCompanyCopy =
-      type === 'invoice' &&
-      window.confirm('Also send a company copy to the configured company WhatsApp number?');
-    this.documentBusy.set(true);
-    this.error.set(null);
-    this.notice.set(null);
-    try {
-      const preview = await this.documents.preview(type, subjectId, channel, includeCompanyCopy);
-      const copy = preview.company_copy_body
-        ? `\n\nCompany copy:\n${preview.company_copy_body}`
-        : '';
-      if (
-        !window.confirm(
-          `Send to ${preview.party_name} (${preview.recipient})?\n\n${preview.body}${copy}`
-        )
-      )
-        return;
-      const result = await this.documents.send(type, subjectId, channel, includeCompanyCopy);
-      this.notice.set(
-        `${type === 'invoice' ? 'Invoice' : 'Receipt'} queued for ${result.recipient}` +
-          (result.company_copy_error ? `; company copy failed: ${result.company_copy_error}` : '')
-      );
-    } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Document could not be sent');
-    } finally {
-      this.documentBusy.set(false);
-    }
-  }
   protected readonly salesStats = computed(() => {
     const rows = this.orders();
     const completed = rows.filter(order => order.status === 'completed');
@@ -991,8 +1013,12 @@ export class OrdersComponent implements OnInit, OnDestroy {
   });
 
   async ngOnInit(): Promise<void> {
+    const initialParams = this.route.snapshot.queryParamMap;
+    const initialCustomer = initialParams.get('customer');
+    this.customerId.set(initialCustomer);
+    this.allTime.set(initialParams.get('range') === 'all' || initialCustomer !== null);
     this.printerEnabled.set(await this.receiptData.printerEnabled());
-    await this.recentSales.ensureLoaded();
+    await Promise.all([this.recentSales.ensureLoaded(), this.partyCache.ensureLoaded()]);
     this.applyRecentCache();
     await this.load();
     this.routeReady.set(true);
@@ -1015,14 +1041,38 @@ export class OrdersComponent implements OnInit, OnDestroy {
   }
 
   protected async setToday(): Promise<void> {
+    this.allTime.set(false);
     this.from.setValue(this.todayIso());
     this.to.setValue(this.todayIso());
+    await this.syncHistoryFilters();
     await this.apply();
   }
 
   protected async setWeek(): Promise<void> {
+    this.allTime.set(false);
     this.from.setValue(this.daysAgoIso(6));
     this.to.setValue(this.todayIso());
+    await this.syncHistoryFilters();
+    await this.apply();
+  }
+
+  protected async setAllTime(): Promise<void> {
+    this.allTime.set(true);
+    await this.syncHistoryFilters();
+    await this.apply();
+  }
+
+  protected async setCustomerFilter(event: Event): Promise<void> {
+    const value = (event.target as HTMLSelectElement).value || null;
+    this.customerId.set(value);
+    if (value) this.allTime.set(true);
+    await this.syncHistoryFilters();
+    await this.apply();
+  }
+
+  protected async clearCustomerFilter(): Promise<void> {
+    this.customerId.set(null);
+    await this.syncHistoryFilters();
     await this.apply();
   }
 
@@ -1032,14 +1082,18 @@ export class OrdersComponent implements OnInit, OnDestroy {
     try {
       await this.pos.expireProformas();
       const statuses = this.status.value === 'all' ? ALL_STATUSES : [this.status.value];
-      const since = new Date(`${this.from.value}T00:00:00`).toISOString();
+      const since = this.allTime()
+        ? undefined
+        : new Date(`${this.from.value}T00:00:00`).toISOString();
       const untilDate = new Date(`${this.to.value}T00:00:00`);
       untilDate.setDate(untilDate.getDate() + 1); // "to" inclusive
       const result = await this.pos.ordersPage({
         statuses,
         since,
-        until: untilDate.toISOString(),
+        until: this.allTime() ? undefined : untilDate.toISOString(),
         search: this.query(),
+        customerId: this.customerId() ?? undefined,
+        allLocations: this.customerId() !== null,
         page: this.page(),
         pageSize: this.pageSize(),
         sortBy: this.saleSort() as 'created_at' | 'code' | 'total' | 'status',
@@ -1152,7 +1206,14 @@ export class OrdersComponent implements OnInit, OnDestroy {
   }
 
   private applyRecentCache(): void {
-    if (!this.recentSales.loaded() || this.page() !== 1 || this.query().trim()) return;
+    if (
+      !this.recentSales.loaded() ||
+      this.page() !== 1 ||
+      this.query().trim() ||
+      this.customerId() ||
+      this.allTime()
+    )
+      return;
     if (this.saleSort() !== 'created_at' || this.saleSortDirection() !== 'desc') return;
     const today = this.todayIso();
     // The 100-row cache is only authoritative enough for the first page of the
@@ -1483,6 +1544,25 @@ export class OrdersComponent implements OnInit, OnDestroy {
   protected customerName(order: OrderWithCustomer): string {
     if (!order.customers) return 'Walk-in';
     return [order.customers.first_name, order.customers.last_name].filter(Boolean).join(' ');
+  }
+
+  protected customerNameFromParty(customer: {
+    first_name: string;
+    last_name: string | null;
+  }): string {
+    return [customer.first_name, customer.last_name].filter(Boolean).join(' ');
+  }
+
+  private async syncHistoryFilters(): Promise<void> {
+    await this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: {
+        customer: this.customerId(),
+        range: this.allTime() ? 'all' : null,
+      },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
   }
 
   protected time(iso: string): string {

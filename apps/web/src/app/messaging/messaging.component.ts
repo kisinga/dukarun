@@ -1,9 +1,13 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { EmptyStateComponent } from '../shared/ui/empty-state.component';
 import { PageLayoutComponent } from '../shared/ui/page-layout.component';
 import { StatusBadgeComponent } from '../shared/ui/status-badge.component';
 import { PaginationComponent } from '../shared/ui/pagination.component';
-import { NotificationsService, OutboxMessage } from '../notifications/notifications.service';
+import {
+  NotificationsService,
+  OutboxMessageWithParty,
+} from '../notifications/notifications.service';
 import { ButtonComponent } from '../shared/ui/button.component';
 import { DataTableShellComponent } from '../shared/ui/data-table-shell.component';
 import { FormFieldComponent } from '../shared/ui/form-field.component';
@@ -25,6 +29,7 @@ const STATUS_TYPE: Record<string, 'success' | 'warning' | 'error' | 'neutral'> =
 
 const MESSAGE_SORT_OPTIONS: readonly ListSortOption[] = [
   { value: 'queued', label: 'Queued date' },
+  { value: 'customer', label: 'Customer name' },
   { value: 'recipient', label: 'Recipient' },
   { value: 'channel', label: 'Channel' },
   { value: 'status', label: 'Delivery status' },
@@ -43,6 +48,7 @@ const MESSAGE_SORT_OPTIONS: readonly ListSortOption[] = [
     IconComponent,
     ListSearchBarComponent,
     StatBarComponent,
+    RouterLink,
   ],
   template: `
     <app-page
@@ -98,7 +104,7 @@ const MESSAGE_SORT_OPTIONS: readonly ListSortOption[] = [
       }
 
       <app-list-search-bar
-        placeholder="Search recipient or message…"
+        placeholder="Search customer, recipient, or message…"
         [searchQuery]="query()"
         (searchQueryChange)="query.set($event); outboxPage.set(1)"
         [sortOptions]="messageSortOptions"
@@ -158,6 +164,7 @@ const MESSAGE_SORT_OPTIONS: readonly ListSortOption[] = [
                 <tr>
                   <th>Queued</th>
                   <th>Channel</th>
+                  <th>Customer</th>
                   <th>Recipient</th>
                   <th>Message</th>
                   <th>Status</th>
@@ -168,9 +175,41 @@ const MESSAGE_SORT_OPTIONS: readonly ListSortOption[] = [
                   <tr>
                     <td class="whitespace-nowrap">{{ time(message.created_at) }}</td>
                     <td class="uppercase">{{ message.channel }}</td>
+                    <td>
+                      @if (message.customers; as party) {
+                        <a
+                          class="link link-hover font-medium"
+                          [routerLink]="party.is_supplier ? '/suppliers' : '/customers'"
+                          [queryParams]="party.is_supplier ? {} : { customer: party.id }"
+                        >
+                          {{ partyName(message) }}
+                        </a>
+                        <p class="table-secondary">
+                          {{ party.is_supplier ? 'Supplier' : 'Customer' }}
+                          @if (message.document_copy_role === 'company') {
+                            · company copy
+                          }
+                        </p>
+                      } @else {
+                        <span class="text-base-content/40">Unlinked</span>
+                      }
+                    </td>
                     <td class="font-mono text-xs">{{ message.recipient }}</td>
                     <td class="max-w-lg">
                       <p class="line-clamp-2 text-sm">{{ message.body }}</p>
+                      @if (documentOrderId(message); as orderId) {
+                        <a
+                          class="mt-1 inline-flex text-xs font-medium link link-hover"
+                          routerLink="/orders"
+                          [queryParams]="{
+                            order: orderId,
+                            customer: message.customer_id,
+                            range: 'all',
+                          }"
+                        >
+                          Open source document
+                        </a>
+                      }
                     </td>
                     <td>
                       <app-status-badge
@@ -206,10 +245,37 @@ const MESSAGE_SORT_OPTIONS: readonly ListSortOption[] = [
                     <p class="mt-1 font-mono text-xs text-base-content/60">
                       {{ message.recipient }}
                     </p>
+                    @if (message.customers) {
+                      <a
+                        class="mt-1 inline-flex text-sm font-medium link link-hover"
+                        [routerLink]="message.customers.is_supplier ? '/suppliers' : '/customers'"
+                        [queryParams]="
+                          message.customers.is_supplier ? {} : { customer: message.customers.id }
+                        "
+                      >
+                        {{ partyName(message) }}
+                        @if (message.document_copy_role === 'company') {
+                          · company copy
+                        }
+                      </a>
+                    }
                   </div>
                   <span class="type-caption shrink-0">{{ time(message.created_at) }}</span>
                 </div>
                 <p class="border-t border-base-300/60 pt-3 text-sm">{{ message.body }}</p>
+                @if (documentOrderId(message); as orderId) {
+                  <a
+                    class="inline-flex text-sm font-medium link link-hover"
+                    routerLink="/orders"
+                    [queryParams]="{
+                      order: orderId,
+                      customer: message.customer_id,
+                      range: 'all',
+                    }"
+                  >
+                    Open source document
+                  </a>
+                }
                 @if (message.status === 'failed' && message.error) {
                   <p class="text-xs text-error">{{ message.error }}</p>
                 }
@@ -241,7 +307,7 @@ export class CommunicationsComponent implements OnInit {
     sms: { used: number; reserved: number; limit: number | null };
     whatsapp: { used: number; reserved: number; limit: number | null };
   } | null>(null);
-  protected readonly outbox = signal<OutboxMessage[]>([]);
+  protected readonly outbox = signal<OutboxMessageWithParty[]>([]);
   protected readonly loading = signal(false);
   protected readonly query = signal('');
   protected readonly channelFilter = signal('all');
@@ -259,7 +325,13 @@ export class CommunicationsComponent implements OnInit {
       if (this.channelFilter() !== 'all' && message.channel !== this.channelFilter()) return false;
       if (this.statusFilter() !== 'all' && message.status !== this.statusFilter()) return false;
       if (!query) return true;
-      return [message.recipient, message.body, message.channel, message.status]
+      return [
+        message.recipient,
+        message.body,
+        message.channel,
+        message.status,
+        this.partyName(message),
+      ]
         .join(' ')
         .toLowerCase()
         .includes(query);
@@ -270,6 +342,8 @@ export class CommunicationsComponent implements OnInit {
       this.messageSortDirection(),
       message => {
         switch (sortKey) {
+          case 'customer':
+            return this.partyName(message);
           case 'recipient':
             return message.recipient;
           case 'channel':
@@ -362,6 +436,18 @@ export class CommunicationsComponent implements OnInit {
 
   protected statusType(status: string): 'success' | 'warning' | 'error' | 'neutral' {
     return STATUS_TYPE[status] ?? 'neutral';
+  }
+
+  protected partyName(message: OutboxMessageWithParty): string {
+    if (!message.customers) return '';
+    return [message.customers.first_name, message.customers.last_name].filter(Boolean).join(' ');
+  }
+
+  protected documentOrderId(message: OutboxMessageWithParty): string | null {
+    if (!message.document_subject_id) return null;
+    return ['receipt', 'invoice', 'proforma'].includes(message.document_type ?? '')
+      ? message.document_subject_id
+      : null;
   }
 
   protected setFilter(kind: 'channel' | 'status', event: Event): void {

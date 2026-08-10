@@ -6,6 +6,7 @@ import { ShopCollection, StorefrontInfo, StorefrontService } from './storefront.
 import { StorefrontBrandComponent } from './storefront-brand.component';
 import { StorefrontSeoService } from './storefront-seo.service';
 import { environment } from '../environments/environment';
+import { PoweredByDukarunComponent } from './powered-by-dukarun.component';
 
 const PAGE_SIZE = 12;
 
@@ -15,7 +16,7 @@ function formatKes(amount: number): string {
 
 @Component({
   selector: 'app-shop',
-  imports: [RouterLink, StorefrontBrandComponent],
+  imports: [RouterLink, StorefrontBrandComponent, PoweredByDukarunComponent],
   template: `
     <main class="min-h-screen bg-base-200 pb-24">
       @if (notFound()) {
@@ -104,7 +105,7 @@ function formatKes(amount: number): string {
                 <input
                   id="catalog-search"
                   type="search"
-                  class="input min-h-13 w-full border-base-300 bg-base-100 pr-24 text-base shadow-none focus:border-primary"
+                  class="search-with-custom-clear input min-h-13 w-full border-base-300 bg-base-100 pr-24 text-base shadow-none focus:border-primary"
                   placeholder="Search products, brands or SKUs"
                   [value]="query()"
                   (input)="setQuery($any($event.target).value)"
@@ -314,7 +315,7 @@ function formatKes(amount: number): string {
           >
         }
         <footer class="mx-auto max-w-6xl px-5 pb-10 text-center text-xs text-base-content/45">
-          <span>Powered by Dukarun</span><span aria-hidden="true"> · </span
+          <app-powered-by-dukarun /><span aria-hidden="true"> · </span
           ><a [href]="legalUrl('privacy')" class="link link-hover">Privacy</a
           ><span aria-hidden="true"> · </span
           ><a [href]="legalUrl('terms')" class="link link-hover">Terms</a>
