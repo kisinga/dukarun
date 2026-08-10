@@ -165,7 +165,7 @@ export class LegalService {
       }
       return status;
     } catch (error) {
-      if (context.companyId && context.userId && !navigator.onLine) {
+      if (context.companyId && context.userId && this.connectivity.offline()) {
         const cached = this.cachedStatus(context.companyId, context.userId);
         if (cached) {
           const offlineStatus = { ...cached, can_accept: false, offlineConfirmed: true };

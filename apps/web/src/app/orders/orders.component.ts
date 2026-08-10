@@ -80,12 +80,6 @@ const SALE_SORT_OPTIONS: readonly ListSortOption[] = [
       subtitle="Review completed sales, cashier handoffs, proformas, refunds, and voids."
       [wide]="true"
     >
-      @if (isLive()) {
-        <span actions class="badge badge-success gap-1">
-          <app-icon name="heroSignal" size="sm" class="animate-pulse" />
-          Live
-        </span>
-      }
       <button
         actions
         appButton
@@ -171,9 +165,42 @@ const SALE_SORT_OPTIONS: readonly ListSortOption[] = [
           </app-form-field>
           <div class="flex flex-wrap items-center gap-2 sm:col-span-2">
             <button appButton type="button" (click)="apply()">Apply filters</button>
-            <button appButton variant="ghost" type="button" (click)="setToday()">Today</button>
-            <button appButton variant="ghost" type="button" (click)="setWeek()">7 days</button>
-            <button appButton variant="ghost" type="button" (click)="setAllTime()">All time</button>
+            <button
+              appButton
+              [variant]="todayActive() ? 'soft' : 'ghost'"
+              type="button"
+              [attr.aria-pressed]="todayActive()"
+              (click)="setToday()"
+            >
+              @if (todayActive()) {
+                <app-icon name="heroCheck" size="sm" />
+              }
+              Today
+            </button>
+            <button
+              appButton
+              [variant]="weekActive() ? 'soft' : 'ghost'"
+              type="button"
+              [attr.aria-pressed]="weekActive()"
+              (click)="setWeek()"
+            >
+              @if (weekActive()) {
+                <app-icon name="heroCheck" size="sm" />
+              }
+              7 days
+            </button>
+            <button
+              appButton
+              [variant]="allTime() ? 'soft' : 'ghost'"
+              type="button"
+              [attr.aria-pressed]="allTime()"
+              (click)="setAllTime()"
+            >
+              @if (allTime()) {
+                <app-icon name="heroCheck" size="sm" />
+              }
+              All time
+            </button>
           </div>
         </div>
       </app-list-search-bar>
@@ -975,10 +1002,16 @@ export class OrdersComponent implements OnInit, OnDestroy {
     });
   }
 
-  /** Live when the range covers today (the old Today's Sales behaviour). */
-  protected readonly isLive = computed(
-    () => !this.allTime() && this.from.value <= this.todayIso() && this.to.value >= this.todayIso()
-  );
+  protected todayActive(): boolean {
+    const today = this.todayIso();
+    return !this.allTime() && this.from.value === today && this.to.value === today;
+  }
+
+  protected weekActive(): boolean {
+    return (
+      !this.allTime() && this.from.value === this.daysAgoIso(6) && this.to.value === this.todayIso()
+    );
+  }
 
   protected readonly totalPages = computed(() =>
     Math.max(1, Math.ceil(this.totalItems() / this.pageSize()))

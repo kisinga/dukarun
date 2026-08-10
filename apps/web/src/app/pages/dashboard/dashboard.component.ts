@@ -65,19 +65,6 @@ type SalesChartPoint = DailySummary & { day: string; revenue: number; heightPerc
   ],
   template: `
     <app-page title="Dashboard" [subtitle]="dashboardSubtitle()" [wide]="true">
-      <span
-        actions
-        class="badge gap-1.5"
-        [class.badge-success]="liveConnected()"
-        [class.badge-warning]="!liveConnected()"
-      >
-        <app-icon
-          [name]="liveConnected() ? 'heroSignal' : 'heroSignalSlash'"
-          size="sm"
-          [class.animate-pulse]="!liveConnected()"
-        />
-        {{ liveConnected() ? 'Live' : 'Connecting' }}
-      </span>
       <button
         actions
         appButton

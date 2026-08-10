@@ -70,12 +70,6 @@ const QUEUE_SORT_OPTIONS: readonly ListSortOption[] = [
       [badge]="orderQueueCounts.cashierQueue()"
       [wide]="true"
     >
-      @if (live()) {
-        <span actions class="badge badge-success gap-1">
-          <app-icon name="heroSignal" size="sm" class="animate-pulse" />
-          Live
-        </span>
-      }
       <button
         actions
         appButton
@@ -466,7 +460,6 @@ export class CashierQueueComponent implements OnInit, OnDestroy {
   protected readonly queueSortOptions = QUEUE_SORT_OPTIONS;
   protected readonly queueSort = signal('cashier_pending_at');
   protected readonly queueSortDirection = signal<ListSortDirection>('asc');
-  protected readonly live = signal(false);
   protected readonly expandedFor = signal<string | null>(null);
   protected readonly loadingLinesFor = signal<string | null>(null);
   protected readonly lines = signal<OrderLineWithProduct[]>([]);
@@ -533,7 +526,6 @@ export class CashierQueueComponent implements OnInit, OnDestroy {
       const online = this.connectivity.online();
       const loaded = this.recentSales.loaded();
       untracked(() => {
-        this.live.set(online && loaded);
         this.applyCachedQueue();
         void this.load(true);
       });

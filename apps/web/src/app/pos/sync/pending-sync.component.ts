@@ -28,9 +28,6 @@ import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
       [badge]="sync.entries().length"
       subtitle="Posted when you're back online. Until then they're only on this device — not in Today's Sales, not in the books."
     >
-      @if (!connectivity.online()) {
-        <span actions class="badge badge-warning">Offline</span>
-      }
       <button
         actions
         class="btn btn-primary btn-sm ml-auto"

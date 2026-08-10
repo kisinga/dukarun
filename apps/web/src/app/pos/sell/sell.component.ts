@@ -74,9 +74,6 @@ interface DraftFlag {
       @if (cart.draftId()) {
         <span actions class="badge badge-info">Editing proforma</span>
       }
-      @if (!connectivity.online()) {
-        <span actions class="badge badge-warning">Offline — sales will queue</span>
-      }
       @if (sync.usingCachedCatalog()) {
         <span actions class="badge badge-warning">{{ sync.catalogStatusLabel() }}</span>
       }

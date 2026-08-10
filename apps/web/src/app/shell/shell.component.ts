@@ -20,6 +20,7 @@ import { ProfileService } from '../profile/profile.service';
 import { EntityAvatarComponent } from '../shared/ui/entity-avatar.component';
 import { LegalService } from '../legal/legal.service';
 import { siteUrl } from '../core/public-url';
+import { ConnectivityService } from '../pos/offline/connectivity.service';
 
 interface NavItem {
   route: string;
@@ -87,6 +88,17 @@ interface NavSection {
           }
 
           <div class="flex flex-none items-center gap-1.5">
+            @if (connectivity.offline()) {
+              <span
+                class="badge badge-warning h-8 gap-1.5 whitespace-nowrap px-2.5"
+                title="No network connection. Supported work will sync automatically when you reconnect."
+                aria-label="Offline"
+              >
+                <app-icon name="heroSignalSlash" size="sm" />
+                Offline
+              </span>
+            }
+
             @if (pendingSyncCount() > 0 || sync.syncing()) {
               <a
                 routerLink="/pos/sync"
@@ -216,6 +228,23 @@ interface NavSection {
             </div>
           </div>
         </div>
+
+        @if (connectivity.offline()) {
+          <div
+            class="border-b border-warning/25 bg-warning/10 px-4 py-2 text-sm"
+            role="status"
+            aria-live="polite"
+          >
+            <div class="mx-auto flex max-w-6xl items-center gap-2 text-base-content/75">
+              <app-icon name="heroSignalSlash" size="sm" class="text-warning" />
+              <span>
+                <strong class="font-semibold text-base-content">You're offline.</strong>
+                Keep working where available; saved changes will sync automatically after you
+                reconnect.
+              </span>
+            </div>
+          </div>
+        }
 
         <!-- Page content -->
         <main class="flex-1 overflow-auto bg-base-200/40 pb-20 lg:pb-0">
@@ -456,6 +485,7 @@ export class ShellComponent implements OnInit {
   protected readonly companies = inject(CompanyContextService);
   protected readonly profile = inject(ProfileService);
   protected readonly legal = inject(LegalService);
+  protected readonly connectivity = inject(ConnectivityService);
 
   protected readonly myName = computed(() => this.profile.me()?.display_name ?? 'Account');
   protected readonly myAvatarUrl = computed(() =>

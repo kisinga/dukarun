@@ -4,6 +4,7 @@ import { CompanyContextService } from '../core/company-context.service';
 import { SupabaseService } from '../core/supabase.service';
 import { LegalService } from './legal.service';
 import { siteUrl } from '../core/public-url';
+import { ConnectivityService } from '../pos/offline/connectivity.service';
 
 @Component({
   selector: 'app-legal-pending',
@@ -80,10 +81,11 @@ export class LegalPendingComponent implements OnInit {
   private readonly supabase = inject(SupabaseService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+  private readonly connectivity = inject(ConnectivityService);
   protected readonly companies = inject(CompanyContextService);
   protected readonly checking = signal(false);
   protected readonly error = signal<string | null>(null);
-  protected readonly offline = signal(this.route.snapshot.queryParamMap.has('offline'));
+  protected readonly offline = this.connectivity.offline;
   protected readonly approvalPending = signal(false);
 
   ngOnInit(): void {
@@ -111,7 +113,6 @@ export class LegalPendingComponent implements OnInit {
         this.error.set('Acceptance is still pending.');
       }
     } catch {
-      this.offline.set(!navigator.onLine);
       this.error.set('Legal status could not be verified.');
     } finally {
       this.checking.set(false);
