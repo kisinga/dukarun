@@ -41,6 +41,30 @@ export interface PlatformCampaignPreview {
   total: number;
   eligible: number;
   skipped: number;
+  missing_admin: number;
+  missing_phone: number;
+  sample: {
+    merchant_name: string;
+    tier: string;
+    subscription_state: string;
+    subscription_end_date: string;
+  } | null;
+}
+export interface PlatformCampaignMetrics {
+  targeted: number;
+  skipped: number;
+  queued: number;
+  provider_accepted: number;
+  failed: number;
+  read: number;
+  clicked: number;
+}
+export interface PlatformExternalMetrics {
+  provider_accepted: number;
+  failed: number;
+  pending: number;
+  documents_opened: number;
+  link_opens: number;
 }
 export interface CompanyLegalStatus {
   company_id: string;
@@ -179,16 +203,6 @@ export class PlatformService {
       .eq('status', 'unapproved')
       .order('created_at');
     if (error) throw error;
-    return data;
-  }
-
-  async broadcast(title: string, body: string, link?: string): Promise<number> {
-    const { data, error } = await this.db.rpc('platform_broadcast', {
-      p_title: title,
-      p_body: body,
-      ...(link ? { p_link: link } : {}),
-    });
-    if (error) throw rpcError(error);
     return data;
   }
 
@@ -390,7 +404,16 @@ export class PlatformService {
     return data as unknown as PlatformCampaignPreview;
   }
 
-  async sendCampaign(input: {
+  async reviewCampaign(id: string): Promise<PlatformCampaignPreview> {
+    const { data, error } = await this.db.rpc('platform_review_campaign', {
+      p_campaign_id: id,
+    });
+    if (error) throw rpcError(error);
+    return data as unknown as PlatformCampaignPreview;
+  }
+
+  async saveCampaignDraft(input: {
+    id?: string;
     name: string;
     title: string;
     body: string;
@@ -399,19 +422,70 @@ export class PlatformService {
     tierId?: string;
     subscriptionStatus?: string;
     companyIds?: string[];
-  }): Promise<{ queued: number; skipped: number }> {
-    const { data, error } = await this.db.rpc('platform_send_campaign', {
+    ctaLabel?: string;
+    ctaLink?: string;
+  }): Promise<string> {
+    const { data, error } = await this.db.rpc('platform_save_campaign_draft', {
       p_name: input.name,
       p_title: input.title,
       p_body: input.body,
       p_channel: input.channel,
       p_audience: input.audience,
-      ...(input.tierId ? { p_tier_id: input.tierId } : {}),
-      ...(input.subscriptionStatus ? { p_subscription_status: input.subscriptionStatus } : {}),
-      ...(input.companyIds?.length ? { p_company_ids: input.companyIds } : {}),
+      p_tier_id: input.tierId,
+      p_subscription_status: input.subscriptionStatus,
+      p_company_ids: input.companyIds,
+      p_cta_label: input.ctaLabel,
+      p_cta_link: input.ctaLink,
+      p_campaign_id: input.id,
     });
     if (error) throw rpcError(error);
-    return data as unknown as { queued: number; skipped: number };
+    return data;
+  }
+
+  async launchCampaign(id: string, scheduledFor?: string): Promise<Record<string, unknown>> {
+    const { data, error } = await this.db.rpc('platform_launch_campaign', {
+      p_campaign_id: id,
+      p_scheduled_for: scheduledFor,
+    });
+    if (error) throw rpcError(error);
+    return data as Record<string, unknown>;
+  }
+
+  async cancelCampaign(id: string): Promise<boolean> {
+    const { data, error } = await this.db.rpc('platform_cancel_campaign', { p_campaign_id: id });
+    if (error) throw rpcError(error);
+    return data;
+  }
+
+  async duplicateCampaign(id: string): Promise<string> {
+    const { data, error } = await this.db.rpc('platform_duplicate_campaign', {
+      p_campaign_id: id,
+    });
+    if (error) throw rpcError(error);
+    return data;
+  }
+
+  async campaignMetrics(id: string): Promise<PlatformCampaignMetrics> {
+    const { data, error } = await this.db.rpc('platform_campaign_metrics', {
+      p_campaign_id: id,
+    });
+    if (error) throw rpcError(error);
+    return data as unknown as PlatformCampaignMetrics;
+  }
+
+  async externalCommunicationMetrics(): Promise<PlatformExternalMetrics> {
+    const { data, error } = await this.db.rpc('platform_external_communication_metrics');
+    if (error) throw rpcError(error);
+    return data as unknown as PlatformExternalMetrics;
+  }
+
+  async testExternalMessage(input: {
+    channel: 'sms' | 'whatsapp';
+    recipient: string;
+    body: string;
+  }): Promise<void> {
+    const { error } = await this.db.functions.invoke('platform-message-test', { body: input });
+    if (error) throw error;
   }
 
   async auditLog(filters: {

@@ -1,10 +1,12 @@
 import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
 import { LegalService } from './legal.service';
+import { ConnectivityService } from '../pos/offline/connectivity.service';
 
 export const legalAcceptanceGuard: CanActivateFn = async (_route, state) => {
   const legal = inject(LegalService);
   const router = inject(Router);
+  const connectivity = inject(ConnectivityService);
   try {
     const status = await legal.ensureVerified();
     if (status.company_status === 'unapproved') {
@@ -15,7 +17,7 @@ export const legalAcceptanceGuard: CanActivateFn = async (_route, state) => {
     return router.createUrlTree([path], { queryParams: { returnUrl: state.url } });
   } catch {
     return router.createUrlTree(['/legal/pending'], {
-      queryParams: { returnUrl: state.url, offline: !navigator.onLine || undefined },
+      queryParams: { returnUrl: state.url, offline: connectivity.offline() || undefined },
     });
   }
 };

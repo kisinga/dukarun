@@ -74,9 +74,6 @@ interface DraftFlag {
       @if (cart.draftId()) {
         <span actions class="badge badge-info">Editing proforma</span>
       }
-      @if (!connectivity.online()) {
-        <span actions class="badge badge-warning">Offline — sales will queue</span>
-      }
       @if (sync.usingCachedCatalog()) {
         <span actions class="badge badge-warning">{{ sync.catalogStatusLabel() }}</span>
       }
@@ -265,7 +262,7 @@ interface DraftFlag {
                   </span>
                   <input
                     type="search"
-                    class="input input-bordered min-h-11 w-full pr-12 pl-11"
+                    class="search-with-custom-clear input input-bordered min-h-11 w-full pr-12 pl-11"
                     placeholder="Search or scan barcode…"
                     autocomplete="off"
                     aria-label="Search products or scan barcode"

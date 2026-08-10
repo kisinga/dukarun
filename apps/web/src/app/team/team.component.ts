@@ -222,6 +222,9 @@ const MEMBER_SORT_OPTIONS: readonly ListSortOption[] = [
                             @if (isSelf(m)) {
                               <span class="badge badge-xs badge-outline ml-1">You</span>
                             }
+                            @if (isPrimaryContact(m)) {
+                              <span class="badge badge-xs badge-primary ml-1">Primary contact</span>
+                            }
                           </p>
                           <p class="table-secondary font-mono">User …{{ shortId(m.user_id) }}</p>
                         </div>
@@ -277,6 +280,17 @@ const MEMBER_SORT_OPTIONS: readonly ListSortOption[] = [
                       >
                         Rename
                       </button>
+                      @if (canBePrimaryContact(m) && !isPrimaryContact(m)) {
+                        <button
+                          appButton
+                          variant="ghost"
+                          size="sm"
+                          [disabled]="busy()"
+                          (click)="makePrimaryContact(m)"
+                        >
+                          Make primary
+                        </button>
+                      }
                       @if (!isSelf(m)) {
                         @if (m.authorization_status === 'disabled') {
                           <button
@@ -334,6 +348,9 @@ const MEMBER_SORT_OPTIONS: readonly ListSortOption[] = [
                       @if (isSelf(m)) {
                         <span class="badge badge-xs badge-outline ml-1">You</span>
                       }
+                      @if (isPrimaryContact(m)) {
+                        <span class="badge badge-xs badge-primary ml-1">Primary contact</span>
+                      }
                     </p>
                     <p class="type-caption mt-0.5">User …{{ shortId(m.user_id) }}</p>
                     <select
@@ -383,6 +400,17 @@ const MEMBER_SORT_OPTIONS: readonly ListSortOption[] = [
                   >
                     Rename
                   </button>
+                  @if (canBePrimaryContact(m) && !isPrimaryContact(m)) {
+                    <button
+                      appButton
+                      variant="ghost"
+                      size="sm"
+                      [disabled]="busy()"
+                      (click)="makePrimaryContact(m)"
+                    >
+                      Make primary
+                    </button>
+                  }
                   @if (!isSelf(m)) {
                     @if (m.authorization_status === 'disabled') {
                       <button
@@ -778,6 +806,30 @@ export class TeamComponent implements OnInit {
       // The change didn't apply — snap the select back to the member's role.
       select.value = m.role_id ?? '';
       this.error.set(err instanceof Error ? err.message : 'Role change failed');
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected isPrimaryContact(member: MembershipWithRole): boolean {
+    return this.team.primaryContactUserId() === member.user_id;
+  }
+
+  protected canBePrimaryContact(member: MembershipWithRole): boolean {
+    return (
+      member.authorization_status === 'approved' &&
+      (member.roles?.permissions.includes('ManageTeam') ?? false)
+    );
+  }
+
+  protected async makePrimaryContact(member: MembershipWithRole): Promise<void> {
+    this.busy.set(true);
+    this.error.set(null);
+    try {
+      await this.team.setPrimaryContact(member.user_id);
+      this.notice.set(`${this.memberNameFor(member)} is now the primary contact`);
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Primary contact update failed');
     } finally {
       this.busy.set(false);
     }

@@ -5,6 +5,17 @@
 
 @use 'tailwindcss';
 
+/* Hide the browser clear only where the UI supplies its own clear action. */
+input.search-with-custom-clear::-webkit-search-cancel-button,
+input.search-with-custom-clear::-webkit-search-decoration {
+  appearance: none;
+  display: none;
+}
+
+input.search-with-custom-clear::-ms-clear {
+  display: none;
+}
+
 @theme {
   --font-sans: 'Outfit', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-mono: ui-monospace, 'Cascadia Code', 'Consolas', monospace;

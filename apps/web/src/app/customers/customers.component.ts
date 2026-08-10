@@ -60,6 +60,9 @@ type CreditOrder = {
   created_at: string;
 };
 
+const CUSTOMER_STATEMENT_PAGE_SIZE = 25;
+const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
+
 @Component({
   selector: 'app-customers',
   imports: [
@@ -748,6 +751,16 @@ type CreditOrder = {
                                   [amount]="o.total"
                                   [masked]="!perms.has('ViewFinancials')"
                               /></span>
+                              <button
+                                appButton
+                                variant="ghost"
+                                size="sm"
+                                type="button"
+                                title="View order details"
+                                (click)="viewSale(c.id, o.id)"
+                              >
+                                View
+                              </button>
                               @if (perms.has('SettleOrder')) {
                                 <button
                                   appButton
@@ -816,7 +829,16 @@ type CreditOrder = {
                   </section>
 
                   <section class="border-t border-base-300/60 pt-3">
-                    <h3 class="section-title mb-2">Sales history</h3>
+                    <div class="mb-2 flex items-center justify-between gap-2">
+                      <h3 class="section-title">Recent sales</h3>
+                      <button
+                        class="btn btn-ghost btn-xs"
+                        type="button"
+                        (click)="viewAllSales(c.id)"
+                      >
+                        View all sales <app-icon name="heroArrowRight" size="sm" />
+                      </button>
+                    </div>
                     @if (orders().length === 0) {
                       <app-empty-state
                         [compact]="true"
@@ -826,7 +848,13 @@ type CreditOrder = {
                     } @else {
                       <ul class="max-h-80 divide-y divide-base-200 overflow-y-auto">
                         @for (o of orders(); track o.id) {
-                          <li class="flex items-center gap-2 py-2">
+                          <li
+                            class="flex cursor-pointer items-center gap-2 rounded-field py-2 hover:bg-base-200/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                            role="button"
+                            tabindex="0"
+                            (click)="viewSale(c.id, o.id)"
+                            (keydown.enter)="viewSale(c.id, o.id)"
+                          >
                             <div class="min-w-0 flex-1">
                               <p class="font-mono text-sm font-medium">{{ o.code }}</p>
                               <p class="type-caption">{{ date(o.created_at) }}</p>
@@ -845,101 +873,131 @@ type CreditOrder = {
                                 [masked]="!perms.has('ViewFinancials')"
                               />
                             </span>
+                            <app-icon
+                              name="heroChevronRight"
+                              size="sm"
+                              class="text-base-content/40"
+                            />
                           </li>
                         }
                       </ul>
                     }
                   </section>
 
-                  <section class="border-t border-base-300/60 pt-3 print:mt-0 print:border-0">
-                    @if (companyInfo(); as company) {
-                      <div class="mb-3 hidden text-center print:block">
-                        @if (company.logoUrl) {
-                          <img
-                            [src]="company.logoUrl"
-                            alt="Company logo"
-                            class="mx-auto mb-1 max-h-16 object-contain"
-                          />
-                        }
-                        <p class="font-bold">{{ company.name }}</p>
-                        @if (company.address) {
-                          <p class="text-sm">{{ company.address }}</p>
-                        }
-                      </div>
-                    }
-                    <div class="mb-2 flex items-center justify-between gap-2">
-                      <div>
-                        <h3 class="section-title">Customer statement</h3>
-                        <p class="type-caption">Sales, repayments and running balance.</p>
-                      </div>
-                      <button appButton variant="ghost" size="sm" (click)="printStatement()">
-                        <app-icon name="heroPrinter" /> Print
-                      </button>
-                    </div>
-                    @if (statement().length === 0) {
-                      <app-empty-state
-                        [compact]="true"
-                        icon="heroDocumentText"
-                        title="No statement activity"
-                      />
-                    } @else {
-                      <ul
-                        class="max-h-80 divide-y divide-base-200 overflow-y-auto print:max-h-none print:overflow-visible"
-                      >
-                        @for (row of statement(); track row.id) {
-                          <li class="flex items-center gap-3 py-2">
-                            <div class="min-w-0 flex-1">
-                              <p class="truncate text-sm">{{ row.description }}</p>
-                              <p class="type-caption">
-                                {{ date(row.date) }} ·
-                                <span class="font-mono">{{ row.reference }}</span>
-                              </p>
-                            </div>
-                            <div class="shrink-0 text-right">
-                              <p class="text-sm font-semibold tabular-nums">
-                                <app-money [amount]="row.balance" />
-                              </p>
-                              <p class="type-caption">
-                                @if (row.debit > 0) {
-                                  charged <app-money [amount]="row.debit" direction="out" />
-                                }
-                                @if (row.credit > 0) {
-                                  paid <app-money [amount]="row.credit" direction="in" />
-                                }
-                              </p>
-                            </div>
-                          </li>
-                        }
-                      </ul>
-                    }
-                    @if (perms.has('OverrideCustomerBalance')) {
-                      <form
-                        (submit)="$event.preventDefault(); adjustBalance(c.id)"
-                        class="mt-3 flex flex-wrap items-end gap-2 print:hidden"
-                      >
-                        <app-form-field label="Balance adjustment (KES)"
-                          ><input
-                            class="input input-bordered input-sm w-32"
-                            placeholder="Use - to reduce"
-                            [formControl]="adjustmentAmount"
-                        /></app-form-field>
-                        <app-form-field label="Reason"
-                          ><input
-                            class="input input-bordered input-sm"
-                            [formControl]="adjustmentReason"
-                        /></app-form-field>
+                  @if (perms.has('ViewFinancials')) {
+                    <section class="border-t border-base-300/60 pt-3 print:mt-0 print:border-0">
+                      @if (companyInfo(); as company) {
+                        <div class="mb-3 hidden text-center print:block">
+                          @if (company.logoUrl) {
+                            <img
+                              [src]="company.logoUrl"
+                              alt="Company logo"
+                              class="mx-auto mb-1 max-h-16 object-contain"
+                            />
+                          }
+                          <p class="font-bold">{{ company.name }}</p>
+                          @if (company.address) {
+                            <p class="text-sm">{{ company.address }}</p>
+                          }
+                        </div>
+                      }
+                      <div class="mb-2 flex items-center justify-between gap-2">
+                        <div>
+                          <h3 class="section-title">Customer statement</h3>
+                          <p class="type-caption">Sales, repayments and running balance.</p>
+                        </div>
                         <button
                           appButton
-                          variant="outline"
+                          variant="ghost"
                           size="sm"
-                          type="submit"
-                          [disabled]="busy()"
+                          type="button"
+                          class="print:hidden"
+                          [disabled]="statementBusy() || statement().length === 0"
+                          (click)="printStatement()"
                         >
-                          Post adjustment
+                          <app-icon name="heroPrinter" />
+                          {{ statementBusy() ? 'Preparing…' : 'Print' }}
                         </button>
-                      </form>
-                    }
-                  </section>
+                      </div>
+                      @if (statement().length === 0) {
+                        <app-empty-state
+                          [compact]="true"
+                          icon="heroDocumentText"
+                          title="No statement activity"
+                        />
+                      } @else {
+                        <ul
+                          class="max-h-80 divide-y divide-base-200 overflow-y-auto print:max-h-none print:overflow-visible"
+                        >
+                          @for (row of statement(); track row.id) {
+                            <li class="flex items-center gap-3 py-2">
+                              <div class="min-w-0 flex-1">
+                                <p class="truncate text-sm">{{ row.description }}</p>
+                                <p class="type-caption">
+                                  {{ date(row.date) }} ·
+                                  <span class="font-mono">{{ row.reference }}</span>
+                                </p>
+                              </div>
+                              <div class="shrink-0 text-right">
+                                <p class="text-sm font-semibold tabular-nums">
+                                  <app-money [amount]="row.balance" />
+                                </p>
+                                <p class="type-caption">
+                                  @if (row.debit > 0) {
+                                    charged <app-money [amount]="row.debit" direction="out" />
+                                  }
+                                  @if (row.credit > 0) {
+                                    paid <app-money [amount]="row.credit" direction="in" />
+                                  }
+                                </p>
+                              </div>
+                            </li>
+                          }
+                        </ul>
+                        @if (statementHasMore()) {
+                          <div class="mt-2 flex justify-center print:hidden">
+                            <button
+                              appButton
+                              variant="ghost"
+                              size="sm"
+                              type="button"
+                              [disabled]="statementBusy()"
+                              (click)="loadOlderStatement()"
+                            >
+                              Load older activity
+                            </button>
+                          </div>
+                        }
+                      }
+                      @if (perms.has('OverrideCustomerBalance')) {
+                        <form
+                          (submit)="$event.preventDefault(); adjustBalance(c.id)"
+                          class="mt-3 flex flex-wrap items-end gap-2 print:hidden"
+                        >
+                          <app-form-field label="Balance adjustment (KES)"
+                            ><input
+                              class="input input-bordered input-sm w-32"
+                              placeholder="Use - to reduce"
+                              [formControl]="adjustmentAmount"
+                          /></app-form-field>
+                          <app-form-field label="Reason"
+                            ><input
+                              class="input input-bordered input-sm"
+                              [formControl]="adjustmentReason"
+                          /></app-form-field>
+                          <button
+                            appButton
+                            variant="outline"
+                            size="sm"
+                            type="submit"
+                            [disabled]="busy()"
+                          >
+                            Post adjustment
+                          </button>
+                        </form>
+                      }
+                    </section>
+                  }
                 </div>
               }
             }
@@ -993,9 +1051,13 @@ export class CustomersComponent implements OnInit {
   protected readonly orders = signal<OrderWithCustomer[]>([]);
   protected readonly creditOrders = signal<CreditOrder[]>([]);
   protected readonly statement = signal<CustomerStatementRow[]>([]);
+  protected readonly statementHasMore = signal(false);
+  protected readonly statementBusy = signal(false);
+  private statementSequence = 0;
   protected readonly companyInfo = signal<CompanyPrintInfo | null>(null);
   protected readonly customerApprovals = signal<Approval[]>([]);
   protected readonly pageCustomerApprovals = signal<Map<string, Approval>>(new Map());
+  private pageApprovalSequence = 0;
   protected readonly customerApprovalPeople = signal<Map<string, string>>(new Map());
   protected readonly highlightedApprovalId = signal<string | null>(null);
   protected readonly methods = signal<string[]>([]);
@@ -1068,6 +1130,11 @@ export class CustomersComponent implements OnInit {
           void this.openCustomer(customerId, false);
         }
       });
+    });
+    effect(() => {
+      if (!this.partyCache.loaded()) return;
+      const ids = this.pagedCustomers().map(customer => customer.id);
+      untracked(() => void this.loadPageCustomerApprovals(ids));
     });
   }
 
@@ -1181,18 +1248,9 @@ export class CustomersComponent implements OnInit {
 
   protected async load(): Promise<void> {
     this.loading.set(true);
+    this.error.set(null);
     try {
       await this.partyCache.ensureLoaded();
-      const approvals = await this.approvals.forCustomers(
-        this.customers().map(customer => customer.id)
-      );
-      const latest = new Map<string, Approval>();
-      for (const approval of approvals) {
-        if (approval.subject_id && !latest.has(approval.subject_id))
-          latest.set(approval.subject_id, approval);
-      }
-      this.pageCustomerApprovals.set(latest);
-      this.error.set(null);
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Failed to load customers');
     } finally {
@@ -1200,12 +1258,37 @@ export class CustomersComponent implements OnInit {
     }
   }
 
+  private async loadPageCustomerApprovals(customerIds: string[]): Promise<void> {
+    const sequence = ++this.pageApprovalSequence;
+    if (customerIds.length === 0) {
+      this.pageCustomerApprovals.set(new Map());
+      return;
+    }
+    try {
+      const approvals = await this.approvals.forCustomers(customerIds);
+      if (sequence !== this.pageApprovalSequence) return;
+      const latest = new Map<string, Approval>();
+      for (const approval of approvals) {
+        if (approval.subject_id && !latest.has(approval.subject_id))
+          latest.set(approval.subject_id, approval);
+      }
+      this.pageCustomerApprovals.set(latest);
+    } catch (err) {
+      if (sequence === this.pageApprovalSequence) {
+        this.error.set(err instanceof Error ? err.message : 'Failed to load customer approvals');
+      }
+    }
+  }
+
   protected async openCustomer(customerId: string, updateUrl = true): Promise<void> {
+    const statementSequence = ++this.statementSequence;
     this.selectedCustomerId.set(customerId);
     this.repayFor.set(null);
     this.orders.set([]);
     this.creditOrders.set([]);
     this.statement.set([]);
+    this.statementHasMore.set(false);
+    this.statementBusy.set(false);
     this.customerApprovals.set([]);
     this.detailLoading.set(true);
     const customer =
@@ -1218,18 +1301,23 @@ export class CustomersComponent implements OnInit {
       this.creditReason.setValue('');
     }
     try {
-      const [orders, creditOrders, statement, company, approvals] = await Promise.all([
+      const statementRequest = this.perms.has('ViewFinancials')
+        ? this.money.customerStatement(customerId, undefined, CUSTOMER_STATEMENT_PAGE_SIZE)
+        : Promise.resolve({ rows: [], hasMore: false });
+      const [orders, creditOrders, statementPage, company, approvals] = await Promise.all([
         this.pos.customerOrders(customerId),
         this.money.creditOrders(customerId),
-        this.money.customerStatement(customerId),
+        statementRequest,
         this.receiptData.companyPrintInfo().catch(() => null),
         this.approvals.forCustomer(customerId),
       ]);
       // Ignore stale results when the drawer was closed (or reopened) meanwhile.
-      if (this.selectedCustomerId() !== customerId) return;
+      if (this.selectedCustomerId() !== customerId || statementSequence !== this.statementSequence)
+        return;
       this.orders.set(orders);
       this.creditOrders.set(creditOrders);
-      this.statement.set(statement);
+      this.statement.set(statementPage.rows);
+      this.statementHasMore.set(statementPage.hasMore);
       this.companyInfo.set(company);
       this.customerApprovals.set(approvals);
       this.customerApprovalPeople.set(
@@ -1254,6 +1342,7 @@ export class CustomersComponent implements OnInit {
 
   /** Called by the drawer after its close transition finishes. */
   protected closeCustomerDrawer(): void {
+    this.statementSequence++;
     this.selectedCustomerId.set(null);
     this.repayFor.set(null);
     this.detailLoading.set(false);
@@ -1263,6 +1352,8 @@ export class CustomersComponent implements OnInit {
     this.orders.set([]);
     this.creditOrders.set([]);
     this.statement.set([]);
+    this.statementHasMore.set(false);
+    this.statementBusy.set(false);
     this.customerApprovals.set([]);
     this.customerApprovalPeople.set(new Map());
     this.highlightedApprovalId.set(null);
@@ -1367,6 +1458,18 @@ export class CustomersComponent implements OnInit {
     }
   }
 
+  protected viewAllSales(customerId: string): void {
+    void this.router.navigate(['/orders'], {
+      queryParams: { customer: customerId, range: 'all' },
+    });
+  }
+
+  protected viewSale(customerId: string, orderId: string): void {
+    void this.router.navigate(['/orders'], {
+      queryParams: { customer: customerId, range: 'all', order: orderId },
+    });
+  }
+
   protected async save(): Promise<void> {
     if (this.firstName.value.trim().length === 0) return;
     this.busy.set(true);
@@ -1460,7 +1563,7 @@ export class CustomersComponent implements OnInit {
       if (current) {
         this.creditOrders.set(await this.money.creditOrders(current.id));
         this.orders.set(await this.pos.customerOrders(current.id));
-        this.statement.set(await this.money.customerStatement(current.id));
+        await this.refreshCustomerStatement(current.id);
       }
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Repayment failed');
@@ -1496,7 +1599,7 @@ export class CustomersComponent implements OnInit {
       this.notice.set('Payment allocated to the oldest outstanding credit sales');
       await this.load();
       this.creditOrders.set(await this.money.creditOrders(customerId));
-      this.statement.set(await this.money.customerStatement(customerId));
+      await this.refreshCustomerStatement(customerId);
     } catch (error) {
       this.error.set(error instanceof Error ? error.message : 'Payment failed');
     } finally {
@@ -1524,7 +1627,7 @@ export class CustomersComponent implements OnInit {
       this.adjustmentReason.setValue('');
       this.notice.set('Amount owed to us adjusted');
       await this.load();
-      this.statement.set(await this.money.customerStatement(customerId));
+      await this.refreshCustomerStatement(customerId);
     } catch (error) {
       this.error.set(error instanceof Error ? error.message : 'Adjustment failed');
     } finally {
@@ -1532,8 +1635,89 @@ export class CustomersComponent implements OnInit {
     }
   }
 
-  protected printStatement(): void {
-    window.print();
+  private async refreshCustomerStatement(customerId: string): Promise<void> {
+    const sequence = ++this.statementSequence;
+    if (!this.perms.has('ViewFinancials')) {
+      this.statement.set([]);
+      this.statementHasMore.set(false);
+      this.statementBusy.set(false);
+      return;
+    }
+    this.statementBusy.set(true);
+    try {
+      const page = await this.money.customerStatement(
+        customerId,
+        undefined,
+        CUSTOMER_STATEMENT_PAGE_SIZE
+      );
+      if (this.selectedCustomerId() !== customerId || sequence !== this.statementSequence) return;
+      this.statement.set(page.rows);
+      this.statementHasMore.set(page.hasMore);
+    } finally {
+      if (this.selectedCustomerId() === customerId && sequence === this.statementSequence) {
+        this.statementBusy.set(false);
+      }
+    }
+  }
+
+  protected async loadOlderStatement(): Promise<void> {
+    const customerId = this.selectedCustomerId();
+    const cursor = this.statement()[this.statement().length - 1];
+    if (!customerId || !cursor || !this.statementHasMore() || this.statementBusy()) return;
+    const sequence = ++this.statementSequence;
+    this.statementBusy.set(true);
+    this.error.set(null);
+    try {
+      const page = await this.money.customerStatement(
+        customerId,
+        { id: cursor.id, date: cursor.date },
+        CUSTOMER_STATEMENT_PAGE_SIZE
+      );
+      if (this.selectedCustomerId() !== customerId || sequence !== this.statementSequence) return;
+      this.statement.update(rows => [...rows, ...page.rows]);
+      this.statementHasMore.set(page.hasMore);
+    } catch (error) {
+      this.error.set(error instanceof Error ? error.message : 'Failed to load older activity');
+    } finally {
+      if (this.selectedCustomerId() === customerId && sequence === this.statementSequence) {
+        this.statementBusy.set(false);
+      }
+    }
+  }
+
+  protected async printStatement(): Promise<void> {
+    const customerId = this.selectedCustomerId();
+    if (!customerId || !this.perms.has('ViewFinancials') || this.statementBusy()) return;
+    const sequence = ++this.statementSequence;
+    this.statementBusy.set(true);
+    this.error.set(null);
+    try {
+      const rows = [...this.statement()];
+      let hasMore = this.statementHasMore();
+      while (hasMore) {
+        const cursor = rows[rows.length - 1];
+        if (!cursor) break;
+        const page = await this.money.customerStatement(
+          customerId,
+          { id: cursor.id, date: cursor.date },
+          CUSTOMER_STATEMENT_PRINT_PAGE_SIZE
+        );
+        if (this.selectedCustomerId() !== customerId || sequence !== this.statementSequence) return;
+        if (page.rows.length === 0) break;
+        rows.push(...page.rows);
+        hasMore = page.hasMore;
+      }
+      this.statement.set(rows);
+      this.statementHasMore.set(false);
+      await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+      window.print();
+    } catch (error) {
+      this.error.set(error instanceof Error ? error.message : 'Failed to prepare statement');
+    } finally {
+      if (this.selectedCustomerId() === customerId && sequence === this.statementSequence) {
+        this.statementBusy.set(false);
+      }
+    }
   }
 
   protected async saveCredit(c: CustomerWithAr): Promise<void> {

@@ -11,6 +11,12 @@
 //      EMAIL_API_URL / EMAIL_API_KEY / EMAIL_FROM
 
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import {
+  DeliveryError,
+  requestProvider,
+  sendSms,
+  sendWhatsapp,
+} from '../_shared/message-providers.ts';
 
 const BATCH = 50;
 const DEFAULT_MAX_ATTEMPTS = 5;
@@ -30,96 +36,6 @@ function authorized(req: Request): boolean {
   let diff = 0;
   for (let i = 0; i < expected.length; i++) diff |= actual.charCodeAt(i) ^ expected.charCodeAt(i);
   return diff === 0;
-}
-
-function kePhone(raw: string): string {
-  const digits = raw.replace(/[^\d]/g, '');
-  return digits.startsWith('0') ? '254' + digits.slice(1) : digits.replace(/^\+/, '');
-}
-
-class DeliveryError extends Error {
-  constructor(
-    message: string,
-    readonly permanent: boolean,
-    readonly accepted: boolean
-  ) {
-    super(message);
-  }
-}
-
-async function requestProvider(url: string, init: RequestInit, label: string): Promise<Response> {
-  try {
-    const res = await fetch(url, init);
-    if (!res.ok) {
-      const permanent = res.status >= 400 && res.status < 500 && ![408, 429].includes(res.status);
-      throw new DeliveryError(`${label} http ${res.status}`, permanent, false);
-    }
-    return res;
-  } catch (error) {
-    if (error instanceof DeliveryError) throw error;
-    // Request may have reached provider before connection failed. Preserve the
-    // quota reservation as used because delivery/cost is uncertain.
-    throw new DeliveryError(
-      error instanceof Error ? error.message : `${label} network error`,
-      false,
-      true
-    );
-  }
-}
-
-async function sendSms(recipient: string, body: string): Promise<void> {
-  const apiKey = Deno.env.get('TEXTSMS_API_KEY');
-  const partnerID = Deno.env.get('TEXTSMS_PARTNER_ID');
-  const shortcode = Deno.env.get('TEXTSMS_SHORTCODE');
-  if (!apiKey || !partnerID || !shortcode) {
-    throw new DeliveryError('provider_not_configured: textsms', true, false);
-  }
-
-  const res = await requestProvider(
-    'https://sms.textsms.co.ke/api/services/sendsms/',
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({
-        apikey: apiKey,
-        partnerID,
-        message: body,
-        shortcode,
-        mobile: kePhone(recipient),
-      }),
-    },
-    'textsms'
-  );
-
-  const result = await res.json().catch(() => null);
-  const code =
-    result?.responses?.[0]?.['respose-code'] ?? result?.responses?.[0]?.['response-code'];
-  if (code !== undefined && code !== 200) {
-    throw new DeliveryError(
-      `textsms code ${code}: ${result?.responses?.[0]?.['response-description'] ?? ''}`,
-      true,
-      false
-    );
-  }
-}
-
-async function sendWhatsapp(recipient: string, body: string): Promise<void> {
-  const baseUrl = Deno.env.get('OPENWA_BASE_URL');
-  const apiKey = Deno.env.get('OPENWA_API_KEY');
-  const session = Deno.env.get('OPENWA_SESSION') ?? 'default';
-  if (!baseUrl || !apiKey) {
-    throw new DeliveryError('provider_not_configured: openwa', true, false);
-  }
-
-  await requestProvider(
-    `${baseUrl}/api/sessions/${session}/messages/send-text`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
-      body: JSON.stringify({ chatId: `${kePhone(recipient)}@s.whatsapp.net`, text: body }),
-    },
-    'openwa'
-  );
 }
 
 async function sendEmail(recipient: string, subject: string | null, body: string): Promise<void> {
@@ -145,34 +61,18 @@ async function sendEmail(recipient: string, subject: string | null, body: string
   );
 }
 
-async function finalizeCampaignRecipient(
+async function tryFinalizeCampaignRecipient(
   row: { campaign_id?: string | null; campaign_recipient_id?: string | null },
   status: 'sent' | 'failed'
 ): Promise<void> {
   if (!row.campaign_id || !row.campaign_recipient_id) return;
-  await db.from('campaign_recipients').update({ status }).eq('id', row.campaign_recipient_id);
-  const { data: recipients } = await db
-    .from('campaign_recipients')
-    .select('status')
-    .eq('campaign_id', row.campaign_id);
-  const rows = recipients ?? [];
-  const sentCount = rows.filter(item => item.status === 'sent').length;
-  const failedCount = rows.filter(item => item.status === 'failed').length;
-  const pending = rows.some(item => item.status === 'queued' || item.status === 'eligible');
-  await db
-    .from('message_campaigns')
-    .update({
-      sent_count: sentCount,
-      failed_count: failedCount,
-      status: pending
-        ? 'sending'
-        : failedCount === 0
-          ? 'completed'
-          : sentCount > 0
-            ? 'partial'
-            : 'failed',
-    })
-    .eq('id', row.campaign_id);
+  const { error } = await db.rpc('finalize_campaign_recipient', {
+    p_recipient_id: row.campaign_recipient_id,
+    p_status: status,
+  });
+  if (error) {
+    console.error('campaign recipient finalization failed', row.campaign_recipient_id, error);
+  }
 }
 
 async function queueFallback(row: {
@@ -318,7 +218,7 @@ Deno.serve(async req => {
         .select('id');
       if (updated?.length) {
         failed++;
-        await finalizeCampaignRecipient(row, 'failed');
+        await tryFinalizeCampaignRecipient(row, 'failed');
         await queueFallback(row);
       }
       continue;
@@ -347,7 +247,7 @@ Deno.serve(async req => {
 
       if (updated?.length) {
         sent++;
-        await finalizeCampaignRecipient(row, 'sent');
+        await tryFinalizeCampaignRecipient(row, 'sent');
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'send failed';
@@ -381,7 +281,7 @@ Deno.serve(async req => {
         .select('id');
       if (updated?.length) failed++;
       if (terminal && updated?.length) {
-        await finalizeCampaignRecipient(row, 'failed');
+        await tryFinalizeCampaignRecipient(row, 'failed');
         await queueFallback(row);
       }
     }

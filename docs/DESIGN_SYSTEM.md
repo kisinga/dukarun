@@ -76,6 +76,18 @@ The orange is a spice, not a sauce.
 - Desktop adds density and width via `lg:` enhancements (tables, accounting, reports) —
   same tokens, same components, no separate desktop design.
 
+### Connectivity is app state, not page decoration
+
+- `ConnectivityService` is the single source of truth for online/offline state. Data services and
+  screens consume it; pages must not infer connectivity from dates, loaded rows, or a realtime
+  subscription alone.
+- The authenticated shell owns connectivity communication: while offline, show the compact header
+  badge and quiet persistent strip. Healthy connectivity is the default and needs no global badge.
+- Page-level status remains domain-specific (`Cached catalog`, `3 sales waiting to sync`). Do not
+  repeat a generic `Offline` badge or use `Live` to mean a current date range.
+- Offline copy should preserve confidence: say what remains available and that supported saved work
+  will sync automatically. Do not imply every server-only action works offline.
+
 ---
 
 ## Type scale — 5 roles (dashboard)
@@ -217,6 +229,10 @@ Every list page is the same four blocks, top to bottom — no improvisation:
    its contents with table-shell headers and cells while guaranteeing the same gap before every
    data surface. Pages must not wrap it just to recreate that spacing. No detached stat-card
    grids, custom search rows, or bare `input-bordered`.
+   The primitive owns its single clear button and applies `search-with-custom-clear` to suppress
+   the browser's native cancel control. Any other search that supplies a custom clear action must
+   use the same class; searches without a custom action keep native clearing. Two clear controls
+   are always a design-language defect.
 3. **Data surface** — desktop: `<app-data-table-shell>` containing a semantic table with
    row-click navigation to the detail view (no "View" buttons); mobile: a per-domain card
    component. Empty state = `<app-empty-state>`.

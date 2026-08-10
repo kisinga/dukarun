@@ -1,5 +1,5 @@
 begin;
-select plan(32);
+select plan(33);
 
 select testkit.create_user('77777777-7777-4777-8777-777777777771','docs-admin@test.local','+254700000771');
 select testkit.create_user('77777777-7777-4777-8777-777777777779','docs-root@test.local','+254700000779');
@@ -96,10 +96,10 @@ select is(public.platform_set_external_messaging(true),0,'superadmin can restore
 reset role;
 
 select ok(position('p_body' in pg_get_function_arguments(
-  'public.send_external_document(text,uuid,text,boolean)'::regprocedure))=0,
+  'public.send_external_document(text,uuid,text,boolean,boolean)'::regprocedure))=0,
   'document send API accepts no message body');
 select ok(position('recipient' in pg_get_function_arguments(
-  'public.send_external_document(text,uuid,text,boolean)'::regprocedure))=0,
+  'public.send_external_document(text,uuid,text,boolean,boolean)'::regprocedure))=0,
   'document send API accepts no recipient');
 
 select vault.create_secret('https://storefront.test','STOREFRONT_PUBLIC_URL');
@@ -124,6 +124,21 @@ select ok((public.send_external_document('invoice','77777777-7777-4777-8777-7777
 select is((select count(*)::int from public.outbox where document_type='invoice'
   and document_subject_id='77777777-7777-4777-8777-777777777776'),2,
   'invoice primary and company copy are separately auditable');
+select is(
+  (select scheduled_after from public.outbox where document_type='invoice'
+    and document_subject_id='77777777-7777-4777-8777-777777777776'
+    and document_copy_role='primary'),
+  case
+    when extract(hour from now() at time zone 'Africa/Nairobi')::int >= 19 then
+      (((now() at time zone 'Africa/Nairobi')::date + interval '1 day 8 hours')
+        at time zone 'Africa/Nairobi')
+    when extract(hour from now() at time zone 'Africa/Nairobi')::int < 8 then
+      (((now() at time zone 'Africa/Nairobi')::date + interval '8 hours')
+        at time zone 'Africa/Nairobi')
+    else now()
+  end,
+  'manual WhatsApp documents respect quiet hours by default'
+);
 select throws_ok(
   $$select public.send_external_document('receipt','77777777-7777-4777-8777-777777777774','sms',false)$$,
   'P0001','document_send_cooldown','rapid duplicate sends are blocked');

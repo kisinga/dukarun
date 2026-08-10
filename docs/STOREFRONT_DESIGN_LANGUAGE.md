@@ -35,6 +35,9 @@ obvious without behaving like a full ecommerce checkout.
 - **Shop masthead:** logo (or initial fallback), merchant name, a one-line promise, and a subdued
   WhatsApp action. It stays compact and never resembles an admin navbar.
 - **Search:** a full-width, labelled catalogue search with a visible reset state.
+- **Search clearing:** a search has exactly one clear affordance. When a designed Clear action is
+  present, add `search-with-custom-clear` so the browser-provided cancel control is suppressed;
+  otherwise retain the native control. Never show both.
 - **Collection filter:** scrollable pills on phones. “All products” is always first.
 - **Product card:** square image, manufacturer eyebrow, two-line product name, price/range, and
   availability. The whole card opens the detail page.
@@ -44,6 +47,11 @@ obvious without behaving like a full ecommerce checkout.
   reset after search or collection changes.
 - **Empty/error states:** short, specific, and actionable. Missing imagery uses a calm branded
   placeholder rather than collapsing the layout.
+- **Dukarun attribution:** use `<app-powered-by-dukarun>`—never hand-build the wordmark or link.
+  It pairs the 12px Dukarun mark with caption-sized text, stays below merchant content at muted
+  contrast, and links to `SITE_PUBLIC_URL`. It is required on shop catalogues, product details,
+  secure business documents, and customer statements. Attribution must remain visible but must
+  never compete with the merchant identity or the page's primary action.
 
 ## URL model
 

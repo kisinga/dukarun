@@ -18,6 +18,8 @@
 #   DB_PORT         local forward port  (default: 5433)
 #   DB_NAME         target database     (default: postgres)
 #   PG_PASSWORD     postgres password   (fetched from host; prompted as fallback)
+#   STOREFRONT_PUBLIC_URL canonical URL synchronized into Database Vault
+#                         (default: https://store.dukarun.com)
 #   FUNCTIONS_VOLUME edge-runtime functions dir on the host
 #                   (default: $COOLIFY_SERVICE_DIR/volumes/functions)
 
@@ -33,8 +35,16 @@ DB_PORT="${DB_PORT:-5433}"
 while nc -z 127.0.0.1 "$DB_PORT" 2>/dev/null; do DB_PORT=$((DB_PORT + 1)); done
 DB_NAME="${DB_NAME:-postgres}"
 PG_PASSWORD="${PG_PASSWORD:-}"
+STOREFRONT_PUBLIC_URL="${STOREFRONT_PUBLIC_URL:-https://store.dukarun.com}"
 FUNCTIONS_VOLUME="${FUNCTIONS_VOLUME:-$COOLIFY_SERVICE_DIR/volumes/functions}"
 SYNC_FUNCTIONS=0
+
+case "$STOREFRONT_PUBLIC_URL" in
+  http://*|https://*) ;;
+  *) echo "STOREFRONT_PUBLIC_URL must be an http(s) URL" >&2; exit 2 ;;
+esac
+# Receipt links are joined with /document/<token>; keep one canonical origin.
+STOREFRONT_PUBLIC_URL="${STOREFRONT_PUBLIC_URL%/}"
 
 for arg in "$@"; do
   case "$arg" in
@@ -98,9 +108,25 @@ done
 echo "→ applying migrations"
 npx supabase db push --db-url "postgresql://postgres:${PG_PASSWORD}@127.0.0.1:${DB_PORT}/${DB_NAME}?sslmode=disable"
 
+echo "→ syncing STOREFRONT_PUBLIC_URL into Database Vault"
+# Compose build args configure the static frontends only. Receipt messages are
+# created by Postgres, so the same canonical origin must also live in Vault.
+ssh "${SSH_OPTS[@]}" "$SSH_HOST" \
+  docker exec -i "$DB_CONTAINER" psql -U postgres -d "$DB_NAME" \
+    -v ON_ERROR_STOP=1 -v "secret_value=$STOREFRONT_PUBLIC_URL" <<'SQL'
+select vault.create_secret(:'secret_value', 'STOREFRONT_PUBLIC_URL')
+where not exists (
+  select 1 from vault.secrets where name = 'STOREFRONT_PUBLIC_URL'
+);
+
+select vault.update_secret(id, :'secret_value')
+from vault.secrets
+where name = 'STOREFRONT_PUBLIC_URL';
+SQL
+
 if [ "$SYNC_FUNCTIONS" = "1" ]; then
   echo "→ syncing edge functions to ${SSH_HOST}:${FUNCTIONS_VOLUME}"
-  for fn in paystack-charge paystack-webhook notification-flush; do
+  for fn in _shared paystack-charge paystack-webhook notification-flush platform-message-test; do
     rsync -az --delete -e "ssh ${SSH_OPTS[*]}" \
       "supabase/functions/${fn}/" "${SSH_HOST}:${FUNCTIONS_VOLUME}/${fn}/"
   done

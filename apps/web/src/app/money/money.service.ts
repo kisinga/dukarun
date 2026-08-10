@@ -5,6 +5,7 @@ import { rpcError } from '../pos/pos.service';
 import { LocationContextService } from '../core/location-context.service';
 import { PartyCacheService } from '../core/party-cache.service';
 import { ActionExecutorService, type ActionOutcome } from '../core/action-executor.service';
+import { nairobiDayEndExclusive, nairobiDayStart } from '../core/nairobi-date';
 
 export type LedgerAccount = Database['public']['Tables']['ledger_accounts']['Row'];
 export type JournalEntry = Database['public']['Tables']['ledger_journal_entries']['Row'];
@@ -19,6 +20,8 @@ export type PurchaseDraft = Database['public']['Tables']['purchase_drafts']['Row
 export type PurchaseLine = Database['public']['Tables']['purchase_lines']['Row'];
 export type SupplierVariantPerformance =
   Database['public']['Views']['supplier_variant_performance']['Row'];
+export type SupplierPurchaseMetric =
+  Database['public']['Views']['supplier_purchase_metrics']['Row'];
 export type MoneyCustomer = Database['public']['Tables']['customers']['Row'];
 export type ReconAccount = Database['public']['Tables']['reconciliation_accounts']['Row'];
 export type Reconciliation = Database['public']['Tables']['reconciliations']['Row'];
@@ -30,6 +33,11 @@ export type CustomerStatementRow = {
   debit: number;
   credit: number;
   balance: number;
+};
+export type CustomerStatementCursor = Pick<CustomerStatementRow, 'id' | 'date'>;
+export type CustomerStatementPage = {
+  rows: CustomerStatementRow[];
+  hasMore: boolean;
 };
 
 export type ReconAccountWithParent = ReconAccount & {
@@ -151,22 +159,22 @@ export class MoneyService {
     sortBy?: 'posted_at' | 'source_type' | 'memo';
     sortDirection?: 'asc' | 'desc';
   }): Promise<{ rows: JournalEntryWithLines[]; count: number }> {
-    // Account filter needs inner joins so only entries touching that account
-    // match (and their embedded lines are that account's lines).
-    const select = input.accountCode
-      ? '*, ledger_journal_lines!entry_id!inner(*, ledger_accounts!inner(code, name))'
+    // Filter through a separate relation alias so matching an account never
+    // removes the journal entry's other side from the rendered transaction.
+    const select: string = input.accountCode
+      ? '*, account_filter:ledger_journal_lines!inner(ledger_accounts!inner(code)), ledger_journal_lines(*, ledger_accounts(code, name))'
       : '*, ledger_journal_lines!entry_id(*, ledger_accounts(code, name))';
     let query = this.db.from('ledger_journal_entries').select(select, { count: 'exact' });
     if (input.accountCode) {
-      query = query.eq('ledger_journal_lines.ledger_accounts.code', input.accountCode);
+      query = query.eq('account_filter.ledger_accounts.code', input.accountCode);
     }
     if (input.search?.trim()) {
       const pattern = `%${input.search.trim().replace(/[%_,()]/g, ' ')}%`;
       query = query.or(`memo.ilike.${pattern},source_id.ilike.${pattern}`);
     }
     if (input.sourceType) query = query.eq('source_type', input.sourceType);
-    if (input.from) query = query.gte('posted_at', `${input.from}T00:00:00`);
-    if (input.to) query = query.lt('posted_at', `${input.to}T23:59:59.999`);
+    if (input.from) query = query.gte('posted_at', nairobiDayStart(input.from));
+    if (input.to) query = query.lt('posted_at', nairobiDayEndExclusive(input.to));
     const start = (input.page - 1) * input.pageSize;
     const ascending = input.sortDirection === 'asc';
     const { data, error, count } = await query
@@ -174,7 +182,7 @@ export class MoneyService {
       .order('id', { ascending })
       .range(start, start + input.pageSize - 1);
     if (error) throw error;
-    return { rows: data ?? [], count: count ?? 0 };
+    return { rows: (data ?? []) as unknown as JournalEntryWithLines[], count: count ?? 0 };
   }
 
   async openSession(): Promise<CashierSession | null> {
@@ -280,85 +288,63 @@ export class MoneyService {
     return data;
   }
 
-  async customerStatement(customerId: string): Promise<CustomerStatementRow[]> {
-    const { data: orders, error: orderError } = await this.db
-      .from('orders')
-      .select('id, code, total, created_at')
-      .eq('customer_id', customerId)
-      .eq('is_credit_sale', true)
-      .in('status', ['completed', 'voided'])
-      .order('created_at');
-    if (orderError) throw orderError;
-    const ids = (orders ?? []).map(order => order.id);
-    const { data: payments, error: paymentError } = ids.length
-      ? await this.db
-          .from('payments')
-          .select('id, order_id, amount, reference, status, created_at')
-          .in('order_id', ids)
-          .order('created_at')
-      : { data: [], error: null };
-    if (paymentError) throw paymentError;
-    const { data: adjustments, error: adjustmentError } = await this.db
-      .from('ledger_journal_lines')
-      .select(
-        'id, debit, credit, meta, ledger_journal_entries!entry_id!inner(posted_at, memo, source_type, source_id), ledger_accounts!inner(code)'
-      )
-      .eq('ledger_journal_entries.source_type', 'BalanceAdjustment')
-      .eq('ledger_accounts.code', 'ACCOUNTS_RECEIVABLE')
-      .contains('meta', { customerId });
-    if (adjustmentError) throw adjustmentError;
-    const entries = [
-      ...(orders ?? []).map(order => ({
-        id: order.id,
-        date: order.created_at,
-        reference: order.code,
-        description: 'Credit sale',
-        debit: order.total,
-        credit: 0,
-      })),
-      ...(payments ?? []).map(payment => ({
-        id: payment.id,
-        date: payment.created_at,
-        reference: payment.reference || 'Payment',
-        description: payment.status === 'reversed' ? 'Reversed payment' : 'Payment received',
-        debit: payment.status === 'reversed' ? payment.amount : 0,
-        credit: payment.status === 'reversed' ? 0 : payment.amount,
-      })),
-      ...(adjustments ?? []).map(line => ({
-        id: line.id,
-        date: line.ledger_journal_entries.posted_at,
-        reference: line.ledger_journal_entries.source_id,
-        description: line.ledger_journal_entries.memo || 'Balance adjustment',
-        debit: line.debit,
-        credit: line.credit,
-      })),
-    ].sort((a, b) => a.date.localeCompare(b.date));
-    let balance = 0;
-    return entries.map(entry => ({ ...entry, balance: (balance += entry.debit - entry.credit) }));
+  async customerStatement(
+    customerId: string,
+    before?: CustomerStatementCursor,
+    limit = 25
+  ): Promise<CustomerStatementPage> {
+    const { data, error } = await this.db.rpc('customer_statement', {
+      p_customer_id: customerId,
+      p_limit: Math.min(Math.max(Math.trunc(limit), 1), 100),
+      ...(before ? { p_before_date: before.date, p_before_id: before.id } : {}),
+    });
+    if (error) throw rpcError(error);
+    return {
+      rows: (data ?? []).map(({ has_more: _hasMore, ...row }) => row),
+      hasMore: data?.[0]?.has_more ?? false,
+    };
   }
 
-  async purchasesWithPayments(limit = 500): Promise<(Purchase & { paid: number })[]> {
-    const { data: purchases, error: e1 } = await this.db
-      .from('purchases')
-      .select('*')
-      .eq('stock_location_id', this.locations.requireActiveId())
-      .order('created_at', { ascending: false })
-      .limit(limit);
-    if (e1) throw e1;
-    if (!purchases || purchases.length === 0) return [];
-    const { data: payments, error: e2 } = await this.db
-      .from('purchase_payments')
-      .select('*')
-      .in(
-        'purchase_id',
-        purchases.map(p => p.id)
-      );
-    if (e2) throw e2;
-    const paidBy = new Map<string, number>();
-    for (const p of payments ?? []) {
-      paidBy.set(p.purchase_id, (paidBy.get(p.purchase_id) ?? 0) + p.amount);
+  async purchasesPage(input: {
+    page: number;
+    pageSize: number;
+    search?: string;
+    supplierId?: string;
+    paymentStatus?: 'paid' | 'part_paid' | 'unpaid';
+    matchingSupplierIds?: string[];
+    locationId?: string;
+    allLocations?: boolean;
+    from?: string;
+    to?: string;
+    sortBy?: 'created_at' | 'purchase_date' | 'total_cost' | 'reference';
+    sortDirection?: 'asc' | 'desc';
+  }): Promise<{ rows: (Purchase & { paid: number })[]; count: number }> {
+    let query = this.db.from('purchase_history').select('*', { count: 'exact' });
+    if (!input.allLocations) {
+      query = query.eq('stock_location_id', input.locationId ?? this.locations.requireActiveId());
     }
-    return purchases.map(p => ({ ...p, paid: paidBy.get(p.id) ?? 0 }));
+    if (input.supplierId) query = query.eq('supplier_id', input.supplierId);
+    if (input.paymentStatus) query = query.eq('payment_status', input.paymentStatus);
+    if (input.search?.trim()) {
+      const search = input.search.trim().replace(/[%_,()]/g, ' ');
+      const supplierIds = input.matchingSupplierIds ?? [];
+      const clauses = [`reference.ilike.%${search}%`];
+      if (supplierIds.length > 0) clauses.push(`supplier_id.in.(${supplierIds.join(',')})`);
+      query = query.or(clauses.join(','));
+    }
+    if (input.from) query = query.gte('purchase_date', input.from);
+    if (input.to) query = query.lte('purchase_date', input.to);
+    const start = (input.page - 1) * input.pageSize;
+    const ascending = input.sortDirection === 'asc';
+    const { data, error, count } = await query
+      .order(input.sortBy ?? 'created_at', { ascending })
+      .order('id', { ascending })
+      .range(start, start + input.pageSize - 1);
+    if (error) throw error;
+    return {
+      rows: (data ?? []).map(purchase => purchase as Purchase & { paid: number }),
+      count: count ?? 0,
+    };
   }
 
   async purchaseDrafts(): Promise<PurchaseDraft[]> {
@@ -397,6 +383,12 @@ export class MoneyService {
       .from('supplier_variant_performance')
       .select('*')
       .order('last_purchase_date', { ascending: false });
+    if (error) throw error;
+    return data;
+  }
+
+  async supplierPurchaseMetrics(): Promise<SupplierPurchaseMetric[]> {
+    const { data, error } = await this.db.from('supplier_purchase_metrics').select('*');
     if (error) throw error;
     return data;
   }

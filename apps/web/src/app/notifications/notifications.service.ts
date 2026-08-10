@@ -4,6 +4,8 @@ import type { Database } from '@dukarun/shared-types';
 import { SupabaseService } from '../core/supabase.service';
 import { ConnectivityService } from '../pos/offline/connectivity.service';
 import { offlineDb, offlineScopeKey, type NamedSnapshot } from '../pos/offline/offline-db';
+import { nairobiDayEndExclusive, nairobiDayStart } from '../core/nairobi-date';
+import { postgrestIdBatches } from '../core/postgrest-batches';
 import {
   CacheJournalService,
   type CacheChange,
@@ -12,6 +14,20 @@ import {
 
 export type AppNotification = Database['public']['Tables']['notifications']['Row'];
 export type OutboxMessage = Database['public']['Tables']['outbox']['Row'];
+export type OutboxMessageWithParty = OutboxMessage & {
+  customers: Pick<
+    Database['public']['Tables']['customers']['Row'],
+    'id' | 'first_name' | 'last_name' | 'is_supplier'
+  > | null;
+  external_document_links: Pick<
+    Database['public']['Tables']['external_document_links']['Row'],
+    'open_count' | 'first_opened_at' | 'last_opened_at'
+  > | null;
+  customer_statement_links: Pick<
+    Database['public']['Tables']['customer_statement_links']['Row'],
+    'open_count' | 'first_opened_at' | 'last_opened_at'
+  > | null;
+};
 
 /** Notifications inbox + live unread count (table is realtime-published). */
 @Injectable({ providedIn: 'root' })
@@ -105,6 +121,27 @@ export class NotificationsService implements OnDestroy {
     await this.persist(this.notifications(), scope);
   }
 
+  async recordClick(id: string): Promise<void> {
+    const scope = this.scope;
+    if (!scope) return;
+    const { data, error } = await this.db.rpc('record_notification_click', {
+      p_notification_id: id,
+    });
+    if (error) throw new Error(error.message);
+    if (!data) throw new Error('Notification action is unavailable');
+    if (scope !== this.scope) return;
+    const clickedAt = new Date().toISOString();
+    this.notifications.update(rows =>
+      rows.map(row =>
+        row.id === id
+          ? { ...row, clicked_at: row.clicked_at ?? clickedAt, read_at: row.read_at ?? clickedAt }
+          : row
+      )
+    );
+    this.unreadCount.set(this.notifications().filter(row => row.read_at === null).length);
+    await this.persist(this.notifications(), scope);
+  }
+
   private async start(companyId: string, scope: string): Promise<void> {
     const cached = await (await offlineDb()).get('snapshots', `${scope}:inbox`);
     if (scope !== this.scope) return;
@@ -127,12 +164,16 @@ export class NotificationsService implements OnDestroy {
       ...new Set(changes.filter(row => row.entityType === 'notification').map(row => row.entityId)),
     ];
     if (!ids.length) return;
-    const { data, error } = await this.db.from('notifications').select('*').in('id', ids);
-    if (error) throw error;
+    const changedNotifications: AppNotification[] = [];
+    for (const batch of postgrestIdBatches(ids)) {
+      const { data, error } = await this.db.from('notifications').select('*').in('id', batch);
+      if (error) throw error;
+      changedNotifications.push(...(data ?? []));
+    }
     if (scope !== this.scope) throw new Error('cache_scope_changed');
     const idSet = new Set(ids);
     const rows = this.notifications().filter(row => !idSet.has(row.id));
-    rows.push(...(data ?? []));
+    rows.push(...changedNotifications);
     rows.sort((a, b) => b.created_at.localeCompare(a.created_at));
     const limited = rows.slice(0, 50);
     await this.persist(limited, scope);
@@ -163,14 +204,64 @@ export class NotificationsService implements OnDestroy {
     await db.put('snapshots', snapshot);
   }
 
-  async recentOutbox(limit = 20): Promise<OutboxMessage[]> {
+  async recentOutbox(limit = 20): Promise<OutboxMessageWithParty[]> {
     const { data, error } = await this.db
       .from('outbox')
-      .select('*')
+      .select(
+        '*, customers(id, first_name, last_name, is_supplier), external_document_links(open_count, first_opened_at, last_opened_at), customer_statement_links(open_count, first_opened_at, last_opened_at)'
+      )
       .order('created_at', { ascending: false })
       .limit(limit);
     if (error) throw error;
-    return data;
+    return data as OutboxMessageWithParty[];
+  }
+
+  async outboxPage(input: {
+    page: number;
+    pageSize: number;
+    search?: string;
+    matchingCustomerIds?: string[];
+    channel?: string;
+    status?: string;
+    documentType?: string;
+    customerId?: string;
+    from?: string;
+    to?: string;
+    sortBy?: 'created_at' | 'recipient' | 'channel' | 'status';
+    sortDirection?: 'asc' | 'desc';
+  }): Promise<{ rows: OutboxMessageWithParty[]; count: number }> {
+    let query = this.db
+      .from('outbox')
+      .select(
+        '*, customers(id, first_name, last_name, is_supplier), external_document_links(open_count, first_opened_at, last_opened_at), customer_statement_links(open_count, first_opened_at, last_opened_at)',
+        { count: 'exact' }
+      );
+    if (input.search?.trim()) {
+      const pattern = `%${input.search.trim().replace(/[%_,()]/g, ' ')}%`;
+      const clauses = [
+        `recipient.ilike.${pattern}`,
+        `body.ilike.${pattern}`,
+        `subject.ilike.${pattern}`,
+      ];
+      if (input.matchingCustomerIds?.length) {
+        clauses.push(`customer_id.in.(${input.matchingCustomerIds.join(',')})`);
+      }
+      query = query.or(clauses.join(','));
+    }
+    if (input.channel) query = query.eq('channel', input.channel);
+    if (input.status) query = query.eq('status', input.status);
+    if (input.documentType) query = query.eq('document_type', input.documentType);
+    if (input.customerId) query = query.eq('customer_id', input.customerId);
+    if (input.from) query = query.gte('created_at', nairobiDayStart(input.from));
+    if (input.to) query = query.lt('created_at', nairobiDayEndExclusive(input.to));
+    const start = (input.page - 1) * input.pageSize;
+    const ascending = input.sortDirection === 'asc';
+    const { data, error, count } = await query
+      .order(input.sortBy ?? 'created_at', { ascending })
+      .order('id', { ascending })
+      .range(start, start + input.pageSize - 1);
+    if (error) throw error;
+    return { rows: (data ?? []) as OutboxMessageWithParty[], count: count ?? 0 };
   }
 
   /** SMS usage + cap for the meter. */

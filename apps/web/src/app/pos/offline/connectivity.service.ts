@@ -1,5 +1,7 @@
 import { Injectable, computed, signal } from '@angular/core';
 
+export type ConnectivityState = 'online' | 'offline';
+
 /**
  * Single seam for the online/offline decision: navigator.onLine + browser
  * online/offline events, plus a manual override for testing. Everything
@@ -16,6 +18,9 @@ export class ConnectivityService {
   readonly resumeTick = signal(0);
 
   readonly online = computed(() => this.manualOverride() ?? this.browserOnline());
+  /** Canonical application-level connection state for UI and data services. */
+  readonly state = computed<ConnectivityState>(() => (this.online() ? 'online' : 'offline'));
+  readonly offline = computed(() => this.state() === 'offline');
 
   constructor() {
     if (typeof window !== 'undefined') {

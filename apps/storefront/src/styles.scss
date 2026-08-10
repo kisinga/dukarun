@@ -5,6 +5,17 @@
 
 @use 'tailwindcss';
 
+/* Search fields with an explicit Clear action must not show the native cancel too. */
+input.search-with-custom-clear::-webkit-search-cancel-button,
+input.search-with-custom-clear::-webkit-search-decoration {
+  appearance: none;
+  display: none;
+}
+
+input.search-with-custom-clear::-ms-clear {
+  display: none;
+}
+
 @theme {
   --font-sans: 'Outfit', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
