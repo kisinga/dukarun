@@ -474,8 +474,12 @@ select is(
 set local role authenticated;
 set local request.jwt.claims =
   '{"sub":"99999999-9999-9999-9999-999999999999","role":"authenticated","is_platform_admin":true}';
-select public.platform_send_campaign('Admin only','in_app','Notice','Hello {{merchant_name}}','selected',
-  null,null,array[(select company_id from communications_fixture)]);
+create temp table reviewed_admin_campaign as select public.platform_save_campaign_draft(
+  'Admin only','in_app','Notice','Hello {{merchant_name}}','selected',null,null,
+  array[(select company_id from communications_fixture)],null,null,null
+) id;
+select public.platform_review_campaign((select id from reviewed_admin_campaign));
+select public.platform_launch_campaign((select id from reviewed_admin_campaign),null);
 reset role;
 select is(
   (select user_id from public.notifications where company_id=(select company_id from communications_fixture)

@@ -10,6 +10,7 @@ Current system documentation:
 | Dashboard design language      | [`DESIGN_SYSTEM.md`](DESIGN_SYSTEM.md)                                |
 | Detail-surface rollout scope   | [`DETAIL_SURFACES_ROLLOUT.md`](DETAIL_SURFACES_ROLLOUT.md)            |
 | Transaction workflows          | [`TRANSACTION_WORKFLOWS.md`](TRANSACTION_WORKFLOWS.md)                |
+| Metrics decisions              | [`METRICS_DECISIONS.md`](METRICS_DECISIONS.md)                        |
 | Vendure → Supabase cutover     | `V1_V2_MIGRATION.md` — internal, gitignored (references real tenants) |
 | Troubleshooting                | [`GENERAL_TROUBLESHOOTING.md`](GENERAL_TROUBLESHOOTING.md)            |
 

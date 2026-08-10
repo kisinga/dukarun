@@ -30,6 +30,7 @@ export type MembershipWithRole = Membership & {
 
 interface TeamManagementSnapshot {
   company_id: string;
+  primary_contact_user_id: string | null;
   members: MembershipWithRole[];
   roles: Role[];
   locations: TeamLocation[];
@@ -57,6 +58,7 @@ export class TeamService {
   readonly roles = signal<Role[]>([]);
   readonly locations = signal<TeamLocation[]>([]);
   readonly membershipLocations = signal<MembershipLocation[]>([]);
+  readonly primaryContactUserId = signal<string | null>(null);
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
 
@@ -226,6 +228,7 @@ export class TeamService {
     this.roles.set(snapshot.roles);
     this.locations.set(snapshot.locations);
     this.membershipLocations.set(snapshot.membership_locations);
+    this.primaryContactUserId.set(snapshot.primary_contact_user_id);
   }
 
   private applySettingsChanges(changes: readonly CacheChange[]): Promise<void> {
@@ -269,6 +272,7 @@ export class TeamService {
     this.roles.set([]);
     this.locations.set([]);
     this.membershipLocations.set([]);
+    this.primaryContactUserId.set(null);
     this.loading.set(false);
   }
 
@@ -351,6 +355,12 @@ export class TeamService {
     return data;
   }
 
+  async setPrimaryContact(userId: string): Promise<void> {
+    const { error } = await this.db.rpc('set_company_primary_contact', { p_user_id: userId });
+    if (error) throw rpcError(error);
+    this.primaryContactUserId.set(userId);
+  }
+
   async removeTeamMember(membershipId: string): Promise<string> {
     const { data, error } = await this.db.rpc('remove_team_member', {
       p_membership_id: membershipId,
@@ -371,6 +381,8 @@ function validSnapshot(
   return (
     !!snapshot &&
     snapshot.company_id === companyId &&
+    (snapshot.primary_contact_user_id === null ||
+      typeof snapshot.primary_contact_user_id === 'string') &&
     Array.isArray(snapshot.members) &&
     Array.isArray(snapshot.roles) &&
     Array.isArray(snapshot.locations) &&

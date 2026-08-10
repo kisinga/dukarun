@@ -55,9 +55,10 @@ permissioned RPCs with journal provenance.
 ## Platform operations
 
 The super-admin Operations page exposes pending registrations, outbound delivery failures,
-membership totals and the invariant count for unbalanced journals. `platform_broadcast` creates
-one company-wide in-app notification for every approved company. Both operations RPCs require a
-platform-admin JWT claim.
+membership totals and the invariant count for unbalanced journals. Platform communications use
+the Communications draft, review and launch flow; Operations links there instead of exposing a
+review-bypassing broadcast action. Operations and communications RPCs require a platform-admin
+JWT claim.
 
 ## Feature entitlements
 

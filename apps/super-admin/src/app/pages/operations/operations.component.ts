@@ -1,5 +1,5 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
-import { FormControl, ReactiveFormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { NgIcon } from '@ng-icons/core';
 import {
   Company,
@@ -10,18 +10,10 @@ import {
 import { PageHeaderComponent } from '../../shared/ui/page-header.component';
 import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
 import { DataTableShellComponent } from '../../shared/ui/data-table-shell.component';
-import { FormFieldComponent } from '../../shared/ui/form-field.component';
 
 @Component({
   selector: 'app-operations',
-  imports: [
-    ReactiveFormsModule,
-    NgIcon,
-    PageHeaderComponent,
-    EmptyStateComponent,
-    DataTableShellComponent,
-    FormFieldComponent,
-  ],
+  imports: [RouterLink, NgIcon, PageHeaderComponent, EmptyStateComponent, DataTableShellComponent],
   template: `
     <app-page-header title="Operations" subtitle="Registration, accounting and delivery health">
       <button
@@ -94,32 +86,15 @@ import { FormFieldComponent } from '../../shared/ui/form-field.component';
         </div>
       </section>
       <section class="card bg-base-100">
-        <form class="card-body p-4" (submit)="$event.preventDefault(); sendBroadcast()">
+        <div class="card-body p-4">
           <h2 class="type-heading">Platform broadcast</h2>
-          <p class="type-caption">Send an in-app notice to every approved company.</p>
-          <app-form-field label="Title" [required]="true">
-            <input class="input input-bordered w-full" [formControl]="title" />
-          </app-form-field>
-          <app-form-field label="Message" [required]="true">
-            <textarea class="textarea textarea-bordered w-full" [formControl]="body"></textarea>
-          </app-form-field>
-          <app-form-field label="App link" hint="Relative link inside the tenant app">
-            <input
-              class="input input-bordered w-full"
-              placeholder="/notifications"
-              [formControl]="link"
-            />
-          </app-form-field>
-          <button
-            class="btn btn-primary btn-sm min-h-11 self-start"
-            [disabled]="busy() || !title.value.trim() || !body.value.trim()"
+          <p class="type-caption">
+            Draft, review, schedule, and measure merchant-admin campaigns in one place.
+          </p>
+          <a routerLink="/communications" class="btn btn-primary btn-sm min-h-11 self-start"
+            >Open communications</a
           >
-            @if (busy()) {
-              <span class="loading loading-spinner loading-sm"></span>
-            }
-            Send to approved companies
-          </button>
-        </form>
+        </div>
       </section>
       <section class="xl:col-span-2">
         <div class="hidden md:block">
@@ -194,12 +169,8 @@ export class OperationsComponent implements OnInit {
   protected readonly failures = signal<FailedOutboxRow[]>([]);
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
-  protected readonly busy = signal(false);
   protected readonly loading = signal(false);
   protected readonly approvingId = signal<string | null>(null);
-  protected readonly title = new FormControl('', { nonNullable: true });
-  protected readonly body = new FormControl('', { nonNullable: true });
-  protected readonly link = new FormControl('/notifications', { nonNullable: true });
   async ngOnInit(): Promise<void> {
     await this.load();
   }
@@ -240,24 +211,6 @@ export class OperationsComponent implements OnInit {
       this.error.set(error instanceof Error ? error.message : 'Approval failed');
     } finally {
       this.approvingId.set(null);
-    }
-  }
-  protected async sendBroadcast(): Promise<void> {
-    this.busy.set(true);
-    this.error.set(null);
-    try {
-      const count = await this.platform.broadcast(
-        this.title.value.trim(),
-        this.body.value.trim(),
-        this.link.value.trim() || undefined
-      );
-      this.notice.set(`Broadcast sent to ${count} companies`);
-      this.title.setValue('');
-      this.body.setValue('');
-    } catch (error) {
-      this.error.set(error instanceof Error ? error.message : 'Broadcast failed');
-    } finally {
-      this.busy.set(false);
     }
   }
   protected date(value: string): string {

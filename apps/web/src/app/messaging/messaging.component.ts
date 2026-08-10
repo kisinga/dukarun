@@ -240,6 +240,7 @@ const RELATED_PARTY_SEARCH_ID_LIMIT = 50;
                   <th>Recipient</th>
                   <th>Message</th>
                   <th>Status</th>
+                  <th>Opens</th>
                 </tr>
               </thead>
               <tbody>
@@ -291,6 +292,17 @@ const RELATED_PARTY_SEARCH_ID_LIMIT = 50;
                       />
                       @if (message.status === 'failed' && message.error) {
                         <p class="table-secondary max-w-xs text-error">{{ message.error }}</p>
+                      }
+                    </td>
+                    <td class="whitespace-nowrap">
+                      {{ openLabel(message) }}
+                      @if (lastOpenedAt(message); as openedAt) {
+                        <p
+                          class="table-secondary"
+                          [title]="'A valid secure-link load; refreshes count again.'"
+                        >
+                          Last {{ time(openedAt) }}
+                        </p>
                       }
                     </td>
                   </tr>
@@ -350,6 +362,9 @@ const RELATED_PARTY_SEARCH_ID_LIMIT = 50;
                 }
                 @if (message.status === 'failed' && message.error) {
                   <p class="text-xs text-error">{{ message.error }}</p>
+                }
+                @if (message.external_document_links || message.customer_statement_links) {
+                  <p class="text-xs text-base-content/60">{{ openLabel(message) }}</p>
                 }
               </div>
             </div>
@@ -528,6 +543,27 @@ export class CommunicationsComponent implements OnInit, OnDestroy {
     return ['receipt', 'invoice', 'proforma'].includes(message.document_type ?? '')
       ? message.document_subject_id
       : null;
+  }
+
+  protected openLabel(message: OutboxMessageWithParty): string {
+    const documentLink = message.external_document_links;
+    const link = documentLink ?? message.customer_statement_links;
+    if (!link) return '—';
+    const opens =
+      link.open_count === 0
+        ? 'Not opened'
+        : link.open_count === 1
+          ? 'Opened once'
+          : `Opened ${link.open_count} times`;
+    return message.document_copy_role === 'company' ? `Company copy · ${opens}` : opens;
+  }
+
+  protected lastOpenedAt(message: OutboxMessageWithParty): string | null {
+    return (
+      message.external_document_links?.last_opened_at ??
+      message.customer_statement_links?.last_opened_at ??
+      null
+    );
   }
 
   protected setFilter(kind: 'channel' | 'status' | 'document', event: Event): void {

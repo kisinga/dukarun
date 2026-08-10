@@ -37,6 +37,7 @@
     "sb:stop": "supabase stop",
     "sb:reset": "supabase db reset",
     "sb:test": "supabase test db",
+    "sb:test:communications-concurrency": "node scripts/test-communications-concurrency.mjs",
     "sb:test:fresh": "supabase db reset && supabase test db",
     "sb:lint": "supabase db lint",
     "sb:types": "supabase gen types typescript --local > packages/shared-types/database.types.ts",

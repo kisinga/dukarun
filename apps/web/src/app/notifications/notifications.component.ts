@@ -77,7 +77,7 @@ const TYPE_ICON: Record<string, string> = {
                     <span
                       class="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-primary"
                     >
-                      View details
+                      {{ n.action_label || 'View details' }}
                       <app-icon name="heroChevronRight" size="sm" />
                     </span>
                   }
@@ -112,8 +112,12 @@ export class NotificationsComponent {
   /** Tap = mark read; navigate when the notification carries a link. */
   protected async open(n: AppNotification): Promise<void> {
     try {
-      if (n.read_at === null) await this.notifications.markRead(n.id);
-      if (n.link) await this.router.navigateByUrl(n.link);
+      if (n.link) {
+        await this.notifications.recordClick(n.id);
+        await this.router.navigateByUrl(n.link);
+      } else if (n.read_at === null) {
+        await this.notifications.markRead(n.id);
+      }
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Failed');
     }
