@@ -335,6 +335,7 @@ export class ProductTransferService {
       this.allProducts(),
       this.allVariants(),
     ]);
+    this.addBarcodeErrors(products, currentProducts, currentVariants, errors);
     const productIds = new Set(
       products.flatMap(product => (product.product_id ? [product.product_id] : []))
     );
@@ -367,6 +368,42 @@ export class ProductTransferService {
       ).length,
       errors,
     };
+  }
+
+  private addBarcodeErrors(
+    products: CatalogImportProduct[],
+    currentProducts: ProductRow[],
+    currentVariants: VariantRow[],
+    errors: string[]
+  ): void {
+    const incomingVariantIds = new Set(
+      products.flatMap(product =>
+        product.variants.flatMap(variant => (variant.variant_id ? [variant.variant_id] : []))
+      )
+    );
+    const currentProductById = new Map(currentProducts.map(product => [product.id, product]));
+    const claimed = new Set<string>();
+    for (const variant of currentVariants) {
+      const product = currentProductById.get(variant.product_id);
+      const barcode = variant.barcode?.trim() || product?.barcode?.trim();
+      if (barcode && variant.active && product?.active && !incomingVariantIds.has(variant.id)) {
+        claimed.add(barcode);
+      }
+    }
+
+    for (const product of products) {
+      if (!product.active) continue;
+      for (const variant of product.variants) {
+        if (!variant.active) continue;
+        const barcode = variant.barcode?.trim() || product.barcode?.trim();
+        if (!barcode) continue;
+        if (claimed.has(barcode)) {
+          errors.push(`${product.product_key}: duplicate barcode ${barcode}`);
+        } else {
+          claimed.add(barcode);
+        }
+      }
+    }
   }
 
   async apply(

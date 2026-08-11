@@ -1,8 +1,9 @@
 import { Injectable, inject } from '@angular/core';
 import type { Variant } from '../pos/pos.service';
 import { PrintService } from '../shared/print/print.service';
+import { barcodeLabelPageStyles, type BarcodeLabelLayout } from './barcode-label-presets';
 
-export type BarcodeLabelLayout = 'a4-grid' | 'compact-roll';
+export type { BarcodeLabelLayout } from './barcode-label-presets';
 
 export interface BarcodeLabelRenderFailure {
   variant: Variant;
@@ -64,6 +65,36 @@ export class BarcodeLabelPrintService {
     );
   }
 
+  async printTestLabel(layout: BarcodeLabelLayout): Promise<void> {
+    await this.printLabels(
+      [
+        {
+          variant_id: 'test-label',
+          company_id: '',
+          product_id: '',
+          product_name: 'DukaRun test label',
+          variant_name: 'Printer setup',
+          kind: 'good',
+          sku: 'TEST-001',
+          barcode: 'DRTEST123456',
+          price: 0,
+          wholesale_price: null,
+          allow_fractional: false,
+          track_inventory: false,
+          variant_active: true,
+          product_active: true,
+          image_path: null,
+          stock: 0,
+          manufacturer_id: null,
+          manufacturer_name: null,
+        },
+      ],
+      layout,
+      1,
+      1
+    );
+  }
+
   private labelHtml(variant: Variant, barcode: string, svg: string): string {
     const variantName =
       variant.variant_name && variant.variant_name !== 'Default'
@@ -94,19 +125,7 @@ export class BarcodeLabelPrintService {
       .barcode-value { margin-top: .5mm; text-align: center; font: 7.5pt/1.1 monospace;
         white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     `;
-    if (layout === 'compact-roll') {
-      return `${common}
-        @page { size: 50mm 30mm; margin: 0; }
-        .label-sheet { width: 50mm; }
-        .barcode-label { width: 50mm; height: 30mm; padding: 2mm 3mm; page-break-after: always; }
-        .barcode-label:last-child { page-break-after: auto; }
-      `;
-    }
-    return `${common}
-      @page { size: A4 portrait; margin: 8mm; }
-      .label-sheet { display: grid; grid-template-columns: repeat(3, 1fr); width: 194mm; }
-      .barcode-label { height: 39.9mm; padding: 3mm 4mm; border: .2mm solid #ddd; }
-    `;
+    return common + barcodeLabelPageStyles(layout);
   }
 
   private escape(value: string): string {
