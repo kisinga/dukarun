@@ -261,7 +261,8 @@ export class ReceiptDataService {
     const { data: payments } = await this.db
       .from('purchase_payments')
       .select('amount')
-      .eq('purchase_id', purchaseId);
+      .eq('purchase_id', purchaseId)
+      .eq('status', 'settled');
     const paid = (payments ?? []).reduce((sum, p) => sum + p.amount, 0);
     const paymentStatus =
       !purchase.is_credit || paid >= purchase.total_cost

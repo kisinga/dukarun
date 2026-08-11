@@ -280,16 +280,18 @@ const MEMBER_SORT_OPTIONS: readonly ListSortOption[] = [
                       >
                         Rename
                       </button>
-                      @if (canBePrimaryContact(m) && !isPrimaryContact(m)) {
-                        <button
-                          appButton
-                          variant="ghost"
-                          size="sm"
-                          [disabled]="busy()"
-                          (click)="makePrimaryContact(m)"
-                        >
-                          Make primary
-                        </button>
+                      @if (canBePrimaryContact(m)) {
+                        <label class="flex cursor-pointer items-center gap-2 text-xs">
+                          <span>Primary contact</span>
+                          <input
+                            type="checkbox"
+                            class="toggle toggle-primary toggle-sm"
+                            [checked]="isPrimaryContact(m)"
+                            [disabled]="busy() || isPrimaryContact(m)"
+                            [attr.aria-label]="'Make ' + memberNameFor(m) + ' primary contact'"
+                            (change)="makePrimaryContact(m)"
+                          />
+                        </label>
                       }
                       @if (!isSelf(m)) {
                         @if (m.authorization_status === 'disabled') {
@@ -400,16 +402,18 @@ const MEMBER_SORT_OPTIONS: readonly ListSortOption[] = [
                   >
                     Rename
                   </button>
-                  @if (canBePrimaryContact(m) && !isPrimaryContact(m)) {
-                    <button
-                      appButton
-                      variant="ghost"
-                      size="sm"
-                      [disabled]="busy()"
-                      (click)="makePrimaryContact(m)"
-                    >
-                      Make primary
-                    </button>
+                  @if (canBePrimaryContact(m)) {
+                    <label class="flex cursor-pointer items-center gap-2 text-xs">
+                      <span>Primary contact</span>
+                      <input
+                        type="checkbox"
+                        class="toggle toggle-primary toggle-sm"
+                        [checked]="isPrimaryContact(m)"
+                        [disabled]="busy() || isPrimaryContact(m)"
+                        [attr.aria-label]="'Make ' + memberNameFor(m) + ' primary contact'"
+                        (change)="makePrimaryContact(m)"
+                      />
+                    </label>
                   }
                   @if (!isSelf(m)) {
                     @if (m.authorization_status === 'disabled') {

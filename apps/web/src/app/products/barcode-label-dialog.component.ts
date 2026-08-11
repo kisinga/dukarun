@@ -10,6 +10,7 @@ import {
   BarcodeLabelRenderError,
   type BarcodeLabelLayout,
 } from './barcode-label-print.service';
+import { BARCODE_LABEL_PRESETS } from './barcode-label-presets';
 import { batchLabels, classifyBarcodeLabels, generateDukarunBarcode } from './barcode-labels';
 
 const LABEL_LAYOUT_KEY = 'dukarun-barcode-label-layout';
@@ -131,9 +132,11 @@ const LABEL_LAYOUT_KEY = 'dukarun-barcode-label-layout';
               [ngModel]="layout()"
               (ngModelChange)="setLayout($event)"
             >
-              <option value="a4-grid">A4 grid — 3 × 7</option>
-              <option value="compact-roll">Compact roll — 50 × 30 mm</option>
+              @for (preset of labelPresets; track preset.id) {
+                <option [value]="preset.id">{{ preset.label }}</option>
+              }
             </select>
+            <p class="type-caption mt-1">Choose the same paper size in the system print dialog.</p>
           </label>
           @if (mode() === 'single') {
             <label>
@@ -163,6 +166,16 @@ const LABEL_LAYOUT_KEY = 'dukarun-barcode-label-layout';
         }
 
         <footer class="modal-action">
+          <button
+            appButton
+            type="button"
+            variant="outline"
+            [loading]="testPrinting()"
+            [disabled]="printing() || testPrinting()"
+            (click)="printTestLabel()"
+          >
+            Print test label
+          </button>
           <button appButton type="button" variant="ghost" (click)="closed.emit()">Close</button>
           <button
             appButton
@@ -202,9 +215,11 @@ export class BarcodeLabelDialogComponent {
   readonly closed = output<void>();
 
   protected readonly layout = signal<BarcodeLabelLayout>(this.loadLayout());
+  protected readonly labelPresets = BARCODE_LABEL_PRESETS;
   protected readonly copies = signal(1);
   protected readonly busy = signal(false);
   protected readonly printing = signal(false);
+  protected readonly testPrinting = signal(false);
   protected readonly confirmGenerate = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly renderFailures = signal<string[]>([]);
@@ -267,6 +282,19 @@ export class BarcodeLabelDialogComponent {
       localStorage.setItem(LABEL_LAYOUT_KEY, layout);
     } catch {
       // Private mode: keep the choice for this session only.
+    }
+  }
+
+  protected async printTestLabel(): Promise<void> {
+    if (this.testPrinting()) return;
+    this.testPrinting.set(true);
+    this.error.set(null);
+    try {
+      await this.labels.printTestLabel(this.layout());
+    } catch (error) {
+      this.error.set(this.friendlyError(error));
+    } finally {
+      this.testPrinting.set(false);
     }
   }
 

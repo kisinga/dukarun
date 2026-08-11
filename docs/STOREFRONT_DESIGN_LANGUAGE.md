@@ -39,6 +39,10 @@ obvious without behaving like a full ecommerce checkout.
   present, add `search-with-custom-clear` so the browser-provided cancel control is suppressed;
   otherwise retain the native control. Never show both.
 - **Category filter:** scrollable pills on phones. “All products” is always first.
+- **Catalogue views:** an accessible segmented control switches between the default image-led grid,
+  a compact product list, and a category browser. Grid/list changes are presentation-only and make
+  no network request. Category cards use the category name and optional description without product
+  counts; choosing one returns to the shopper's last product view and loads the filtered first page.
 - **Product card:** square image, manufacturer eyebrow, two-line product name, price/range, and
   availability. The whole card opens the detail page.
 - **Product detail:** breadcrumb, large image, manufacturer/name, selectable variants, availability,

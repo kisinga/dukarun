@@ -1,5 +1,5 @@
 begin;
-select plan(18);
+select plan(17);
 
 select testkit.create_user('78787878-7878-4787-8787-787878787871', 'barcode-admin@local.test');
 select testkit.create_user('78787878-7878-4787-8787-787878787872', 'barcode-cashier@local.test');
@@ -39,12 +39,6 @@ select public.create_catalog_product('Delivery', '[{
 
 create temp table barcode_missing as
 select public.create_catalog_product('Unlabelled', '[{"price": 75}]') product_id;
-
-create temp table barcode_ambiguous as
-select public.create_catalog_product('Shared Family', '[
-  {"name":"Small","price":100},
-  {"name":"Large","price":200}
-]', 'SHARED-CODE') product_id;
 
 select is(
   (select product_name from public.resolve_catalog_barcode(E'\t001234567890\r\n')),
@@ -100,12 +94,6 @@ select public.update_catalog_product(
     'barcode', 'SERVICE-DELIVERY',
     'active', true
   ))
-);
-
-select throws_ok(
-  $$select * from public.resolve_catalog_barcode('SHARED-CODE')$$,
-  'P0001', 'barcode_ambiguous: SHARED-CODE',
-  'shared family barcode never resolves an arbitrary variant'
 );
 
 create temp table assigned as

@@ -6,6 +6,8 @@ import {
   FailedOutboxRow,
   OperationsSnapshot,
   PlatformService,
+  RegistrationAlert,
+  RegistrationConfig,
 } from '../../core/platform.service';
 import { PageHeaderComponent } from '../../shared/ui/page-header.component';
 import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
@@ -50,6 +52,99 @@ import { DataTableShellComponent } from '../../shared/ui/data-table-shell.compon
           </div>
         }
       </div>
+    }
+    @if (registration(); as config) {
+      <section class="card mb-4 border border-warning/30 bg-base-100">
+        <div class="card-body gap-4 p-4">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <div class="flex items-center gap-2">
+                <h2 class="type-heading">Automatic registration approval</h2>
+                <span
+                  class="badge"
+                  [class.badge-success]="config.automatic_company_approval_enabled"
+                  [class.badge-ghost]="!config.automatic_company_approval_enabled"
+                >
+                  {{ config.automatic_company_approval_enabled ? 'On' : 'Manual' }}
+                </span>
+              </div>
+              <p class="type-caption mt-1 max-w-2xl">
+                When enabled, every newly created company starts its trial immediately. Existing
+                pending registrations stay in review.
+              </p>
+            </div>
+            <input
+              type="checkbox"
+              class="toggle toggle-success"
+              [checked]="config.automatic_company_approval_enabled"
+              [disabled]="registrationSaving()"
+              (change)="toggleAutomatic($any($event.target).checked)"
+              aria-label="Automatic registration approval"
+            />
+          </div>
+          <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <label class="form-control">
+              <span class="label-text text-xs">Hourly warning</span>
+              <input
+                type="number"
+                min="1"
+                class="input input-bordered input-sm"
+                [value]="config.hourly_alert_threshold"
+                (change)="setRegistrationThreshold('hourly', $any($event.target).value)"
+              />
+            </label>
+            <label class="form-control">
+              <span class="label-text text-xs">Daily warning</span>
+              <input
+                type="number"
+                min="1"
+                class="input input-bordered input-sm"
+                [value]="config.daily_alert_threshold"
+                (change)="setRegistrationThreshold('daily', $any($event.target).value)"
+              />
+            </label>
+            <div class="rounded-field bg-base-200 p-3">
+              <p class="type-caption">Automatic · last hour</p>
+              <strong class="text-xl">{{ config.automatic_last_hour }}</strong>
+            </div>
+            <div class="rounded-field bg-base-200 p-3">
+              <p class="type-caption">Automatic · last 24 hours</p>
+              <strong class="text-xl">{{ config.automatic_last_day }}</strong>
+            </div>
+          </div>
+          @if (
+            config.automatic_last_hour >= config.hourly_alert_threshold ||
+            config.automatic_last_day >= config.daily_alert_threshold
+          ) {
+            <div class="alert alert-warning py-2 text-sm">
+              Registration volume is above its configured warning threshold.
+            </div>
+          }
+        </div>
+      </section>
+    }
+    @if (unacknowledgedAlerts().length) {
+      <section class="card mb-4 border border-warning bg-warning/10">
+        <div class="card-body gap-3 p-4">
+          <h2 class="type-heading">Registration volume alerts</h2>
+          @for (alert of unacknowledgedAlerts(); track alert.id) {
+            <div
+              class="flex flex-wrap items-center justify-between gap-3 rounded-field bg-base-100 p-3"
+            >
+              <div>
+                <strong>{{ alert.approval_count }} automatic approvals</strong>
+                <p class="type-caption">
+                  {{ alert.alert_window }} window · threshold {{ alert.threshold }} ·
+                  {{ date(alert.window_started_at) }}
+                </p>
+              </div>
+              <button class="btn btn-ghost btn-sm" (click)="acknowledgeAlert(alert)">
+                Acknowledge
+              </button>
+            </div>
+          }
+        </div>
+      </section>
     }
     <div class="grid gap-4 xl:grid-cols-2">
       <section class="card bg-base-100">
@@ -171,20 +266,29 @@ export class OperationsComponent implements OnInit {
   protected readonly notice = signal<string | null>(null);
   protected readonly loading = signal(false);
   protected readonly approvingId = signal<string | null>(null);
+  protected readonly registration = signal<RegistrationConfig | null>(null);
+  protected readonly registrationAlerts = signal<RegistrationAlert[]>([]);
+  protected readonly unacknowledgedAlerts = () =>
+    this.registrationAlerts().filter(alert => !alert.acknowledged_at);
+  protected readonly registrationSaving = signal(false);
   async ngOnInit(): Promise<void> {
     await this.load();
   }
   protected async load(): Promise<void> {
     this.loading.set(true);
     try {
-      const [snapshot, pending, failures] = await Promise.all([
+      const [snapshot, pending, failures, registration, alerts] = await Promise.all([
         this.platform.operationsSnapshot(),
         this.platform.pendingCompanies(),
         this.platform.failedOutbox(),
+        this.platform.registrationConfig(),
+        this.platform.registrationAlerts(),
       ]);
       this.snapshot.set(snapshot);
       this.pending.set(pending);
       this.failures.set(failures);
+      this.registration.set(registration);
+      this.registrationAlerts.set(alerts);
       this.error.set(null);
     } catch (error) {
       this.error.set(error instanceof Error ? error.message : 'Load failed');
@@ -211,6 +315,71 @@ export class OperationsComponent implements OnInit {
       this.error.set(error instanceof Error ? error.message : 'Approval failed');
     } finally {
       this.approvingId.set(null);
+    }
+  }
+  protected async toggleAutomatic(enabled: boolean): Promise<void> {
+    const current = this.registration();
+    if (!current) return;
+    if (
+      enabled &&
+      !confirm(
+        'Enable immediate approval for every future company registration? Existing pending registrations will not change.'
+      )
+    ) {
+      this.registration.set({ ...current });
+      return;
+    }
+    await this.saveRegistration(
+      enabled,
+      current.hourly_alert_threshold,
+      current.daily_alert_threshold
+    );
+  }
+  protected async setRegistrationThreshold(kind: 'hourly' | 'daily', raw: string): Promise<void> {
+    const current = this.registration();
+    const value = Math.max(1, Math.trunc(Number(raw)));
+    if (!current || !Number.isFinite(value)) return;
+    await this.saveRegistration(
+      current.automatic_company_approval_enabled,
+      kind === 'hourly' ? value : current.hourly_alert_threshold,
+      kind === 'daily' ? value : current.daily_alert_threshold
+    );
+  }
+  protected async acknowledgeAlert(alert: RegistrationAlert): Promise<void> {
+    try {
+      await this.platform.acknowledgeRegistrationAlert(alert.id);
+      this.registrationAlerts.update(alerts =>
+        alerts.map(item =>
+          item.id === alert.id ? { ...item, acknowledged_at: new Date().toISOString() } : item
+        )
+      );
+    } catch (error) {
+      this.error.set(error instanceof Error ? error.message : 'Alert could not be acknowledged');
+    }
+  }
+  private async saveRegistration(
+    automatic: boolean,
+    hourlyThreshold: number,
+    dailyThreshold: number
+  ): Promise<void> {
+    this.registrationSaving.set(true);
+    this.error.set(null);
+    try {
+      this.registration.set(
+        await this.platform.updateRegistrationConfig({ automatic, hourlyThreshold, dailyThreshold })
+      );
+      this.notice.set(
+        automatic
+          ? 'Automatic registration approval enabled'
+          : 'Registrations now require manual approval'
+      );
+    } catch (error) {
+      this.error.set(
+        error instanceof Error ? error.message : 'Registration settings could not be saved'
+      );
+      await this.load();
+    } finally {
+      this.registrationSaving.set(false);
     }
   }
   protected date(value: string): string {

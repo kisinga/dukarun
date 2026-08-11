@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import type { Database } from '@dukarun/shared-types';
+import type { Database, Json } from '@dukarun/shared-types';
 import { SupabaseService } from '../core/supabase.service';
 import { environment } from '../../environments/environment';
 import { LocationContextService } from '../core/location-context.service';
@@ -67,6 +67,13 @@ export interface PaymentInput {
   amount: number;
   reference?: string;
   mpesa_receipt?: string;
+}
+
+/** Explicit checkout allocation. Payment rows remain real money tenders. */
+export interface SaleSettlementInput {
+  payments: PaymentInput[];
+  depositAmount: number;
+  creditAmount: number;
 }
 
 export type OrderWithCustomer = Order & {
@@ -652,7 +659,7 @@ export class PosService {
       .from('payments')
       .select('order_id, amount, status')
       .in('order_id', orderIds)
-      .neq('status', 'reversed');
+      .eq('status', 'settled');
     if (error) throw error;
     for (const row of data ?? []) {
       totals.set(row.order_id, (totals.get(row.order_id) ?? 0) + row.amount);
@@ -740,6 +747,38 @@ export class PosService {
       status: result.status === 'parked' ? 'parked' : 'completed',
       orderId: result.order_id,
     };
+  }
+
+  async customerDepositAvailable(customerId: string): Promise<number> {
+    const { data, error } = await this.client.rpc('customer_deposit_available', {
+      p_customer_id: customerId,
+    });
+    if (error) throw rpcError(error);
+    return Number(data ?? 0);
+  }
+
+  async postSaleWithPrepayment(
+    customerId: string,
+    lines: SaleLineInput[],
+    settlement: SaleSettlementInput,
+    clientRef: string,
+    draftId?: string
+  ): Promise<PostSaleResult> {
+    const { data, error } = await this.client.rpc('post_sale_with_prepayment_at_location', {
+      p_location_id: this.locations.requireActiveId(),
+      p_customer_id: customerId,
+      p_lines: lines as unknown as Json,
+      p_payments: settlement.payments as unknown as Json,
+      p_deposit_amount: settlement.depositAmount,
+      p_credit_amount: settlement.creditAmount,
+      p_client_ref: clientRef,
+      ...(draftId ? { p_draft_id: draftId } : {}),
+    });
+    if (error) throw rpcError(error);
+    const result = data as unknown as { status: string; order_id: string; approval_id?: string };
+    return result.status === 'approval_required'
+      ? { status: 'approval_required', orderId: result.order_id, approvalId: result.approval_id! }
+      : { status: 'completed', orderId: result.order_id };
   }
 
   private async withLocationStock(rows: Variant[]): Promise<Variant[]> {

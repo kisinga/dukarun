@@ -9,6 +9,9 @@ export interface RenderedLegalMarkdown {
   sections: LegalMarkdownSection[];
 }
 
+export type SafeMarkdownSection = LegalMarkdownSection;
+export type RenderedSafeMarkdown = RenderedLegalMarkdown;
+
 function escapeHtml(value: string): string {
   return value
     .replaceAll('&', '&amp;')
@@ -117,3 +120,6 @@ export function renderLegalMarkdown(
   closeList();
   return { html: html.join('\n'), title, sections };
 }
+
+/** Shared escaped Markdown renderer for public and privileged authored content. */
+export const renderSafeMarkdown = renderLegalMarkdown;

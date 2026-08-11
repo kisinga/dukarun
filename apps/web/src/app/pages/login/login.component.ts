@@ -98,6 +98,7 @@ export class LoginComponent {
 
   private cooldownTimer: ReturnType<typeof setInterval> | null = null;
   private readonly requestedPlanCode = this.route.snapshot.queryParamMap.get('plan');
+  private readonly requestedBlogRef = this.route.snapshot.queryParamMap.get('blog_ref');
 
   constructor() {
     this.destroyRef.onDestroy(() => this.clearCooldownTimer());
@@ -155,7 +156,12 @@ export class LoginComponent {
       }
       await this.router.navigate([target], {
         queryParams:
-          target === '/register' ? { plan: this.requestedPlanCode ?? undefined } : undefined,
+          target === '/register'
+            ? {
+                plan: this.requestedPlanCode ?? undefined,
+                blog_ref: this.requestedBlogRef ?? undefined,
+              }
+            : undefined,
       });
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Verification failed');

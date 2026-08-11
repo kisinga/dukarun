@@ -10,12 +10,18 @@ export const authGuard: CanActivateFn = async route => {
     return session
       ? true
       : router.createUrlTree(['/login'], {
-          queryParams: { plan: route.queryParamMap.get('plan') ?? undefined },
+          queryParams: {
+            plan: route.queryParamMap.get('plan') ?? undefined,
+            blog_ref: route.queryParamMap.get('blog_ref') ?? undefined,
+          },
         });
   } catch {
     // A stale or unreachable persisted session must not freeze navigation.
     return router.createUrlTree(['/login'], {
-      queryParams: { plan: route.queryParamMap.get('plan') ?? undefined },
+      queryParams: {
+        plan: route.queryParamMap.get('plan') ?? undefined,
+        blog_ref: route.queryParamMap.get('blog_ref') ?? undefined,
+      },
     });
   }
 };

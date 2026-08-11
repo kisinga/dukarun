@@ -20,6 +20,7 @@
 #   PG_PASSWORD     postgres password   (fetched from host; prompted as fallback)
 #   STOREFRONT_PUBLIC_URL canonical URL synchronized into Database Vault
 #                         (default: https://store.dukarun.com)
+#   SITE_DEPLOY_URL public site-deploy Edge Function URL (optional)
 #   FUNCTIONS_VOLUME edge-runtime functions dir on the host
 #                   (default: $COOLIFY_SERVICE_DIR/volumes/functions)
 
@@ -36,6 +37,7 @@ while nc -z 127.0.0.1 "$DB_PORT" 2>/dev/null; do DB_PORT=$((DB_PORT + 1)); done
 DB_NAME="${DB_NAME:-postgres}"
 PG_PASSWORD="${PG_PASSWORD:-}"
 STOREFRONT_PUBLIC_URL="${STOREFRONT_PUBLIC_URL:-https://store.dukarun.com}"
+SITE_DEPLOY_URL="${SITE_DEPLOY_URL:-}"
 FUNCTIONS_VOLUME="${FUNCTIONS_VOLUME:-$COOLIFY_SERVICE_DIR/volumes/functions}"
 SYNC_FUNCTIONS=0
 
@@ -45,6 +47,12 @@ case "$STOREFRONT_PUBLIC_URL" in
 esac
 # Receipt links are joined with /document/<token>; keep one canonical origin.
 STOREFRONT_PUBLIC_URL="${STOREFRONT_PUBLIC_URL%/}"
+if [ -n "$SITE_DEPLOY_URL" ]; then
+  case "$SITE_DEPLOY_URL" in
+    https://*) ;;
+    *) echo "SITE_DEPLOY_URL must be an https URL" >&2; exit 2 ;;
+  esac
+fi
 
 for arg in "$@"; do
   case "$arg" in
@@ -124,9 +132,21 @@ from vault.secrets
 where name = 'STOREFRONT_PUBLIC_URL';
 SQL
 
+if [ -n "$SITE_DEPLOY_URL" ]; then
+  echo "→ syncing SITE_DEPLOY_URL into Database Vault"
+  ssh "${SSH_OPTS[@]}" "$SSH_HOST" \
+    docker exec -i "$DB_CONTAINER" psql -U postgres -d "$DB_NAME" \
+      -v ON_ERROR_STOP=1 -v "secret_value=$SITE_DEPLOY_URL" <<'SQL'
+select vault.create_secret(:'secret_value', 'SITE_DEPLOY_URL')
+where not exists (select 1 from vault.secrets where name = 'SITE_DEPLOY_URL');
+select vault.update_secret(id, :'secret_value')
+from vault.secrets where name = 'SITE_DEPLOY_URL';
+SQL
+fi
+
 if [ "$SYNC_FUNCTIONS" = "1" ]; then
   echo "→ syncing edge functions to ${SSH_HOST}:${FUNCTIONS_VOLUME}"
-  for fn in _shared paystack-charge paystack-webhook notification-flush platform-message-test; do
+  for fn in _shared paystack-charge paystack-webhook notification-flush platform-message-test site-deploy; do
     rsync -az --delete -e "ssh ${SSH_OPTS[*]}" \
       "supabase/functions/${fn}/" "${SSH_HOST}:${FUNCTIONS_VOLUME}/${fn}/"
   done

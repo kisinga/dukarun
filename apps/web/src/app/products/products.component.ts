@@ -2424,14 +2424,32 @@ export class ProductsComponent implements OnInit {
   }
 
   protected effectiveBarcodeConflict(): boolean {
+    return this.editorBarcodeConflictValue() !== null;
+  }
+
+  private editorBarcodeConflictValue(): string | null {
+    if (!this.familyActive.value) return null;
     const seen = new Set<string>();
+    const editingProductId = this.editingFamily()?.id ?? null;
+    const existing = new Set(
+      this.catalog()
+        .filter(
+          variant =>
+            variant.product_id !== editingProductId &&
+            variant.variant_active &&
+            variant.product_active &&
+            !!variant.barcode?.trim()
+        )
+        .map(variant => variant.barcode!.trim())
+    );
     for (const row of this.editorRows) {
+      if (!row.active) continue;
       const barcode = this.effectiveEditorBarcode(row);
       if (!barcode) continue;
-      if (seen.has(barcode)) return true;
+      if (seen.has(barcode) || existing.has(barcode)) return barcode;
       seen.add(barcode);
     }
-    return false;
+    return null;
   }
 
   protected effectiveEditorBarcode(row: ProductEditorRow): string {
@@ -2553,8 +2571,11 @@ export class ProductsComponent implements OnInit {
     const name = this.familyName.value.trim();
     if (!mode || !name || this.editorLoading() || this.duplicateLabels()) return;
     if (this.effectiveBarcodeConflict()) {
+      const barcode = this.editorBarcodeConflictValue();
       this.error.set(
-        'Each variant needs a unique barcode. Clear the shared barcode or assign individual variant barcodes.'
+        barcode
+          ? `Barcode “${barcode}” is already assigned to another active variant.`
+          : 'Each active variant needs a unique barcode.'
       );
       return;
     }
@@ -2607,7 +2628,9 @@ export class ProductsComponent implements OnInit {
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Save failed';
       this.error.set(
-        message.toLowerCase().includes('duplicate') && message.toLowerCase().includes('barcode')
+        (message.toLowerCase().includes('duplicate') &&
+          message.toLowerCase().includes('barcode')) ||
+          message.toLowerCase().includes('barcode_conflict')
           ? 'That barcode is already assigned to another variant.'
           : message
       );

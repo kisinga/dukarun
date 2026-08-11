@@ -1,5 +1,7 @@
 # Documentation
 
+- [`BARCODE_HARDWARE.md`](BARCODE_HARDWARE.md) — USB scanner and fixed-size label printer setup.
+
 Current system documentation:
 
 | Topic                          | Document                                                              |

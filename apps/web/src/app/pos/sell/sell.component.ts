@@ -1,4 +1,15 @@
-import { Component, OnInit, computed, effect, inject, signal, untracked } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  HostListener,
+  OnInit,
+  computed,
+  effect,
+  inject,
+  signal,
+  untracked,
+  viewChild,
+} from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { debounceTime, distinctUntilChanged } from 'rxjs';
@@ -26,12 +37,14 @@ import { MyPendingSalesComponent } from './my-pending-sales.component';
 import { SessionRequiredNoticeComponent } from '../../shared/ui/session-required-notice.component';
 import { BarcodeScannerComponent } from '../../shared/ui/barcode-scanner.component';
 import { ScanFeedbackService } from '../../shared/ui/scan-feedback.service';
+import { isRapidScannerBurst, isTextEntryTarget } from '../keyboard-wedge';
 import { CatalogCacheService } from '../../core/catalog-cache.service';
 import { SupabaseService } from '../../core/supabase.service';
 import {
   Customer,
   CustomerWithCredit,
   PaymentInput,
+  SaleSettlementInput,
   PosRpcError,
   PosService,
   Variant,
@@ -265,13 +278,14 @@ type CatalogView = 'grid' | 'list' | 'categories';
                     <app-icon name="heroMagnifyingGlass" size="lg" />
                   </span>
                   <input
+                    #productSearch
                     type="search"
                     class="search-with-custom-clear input input-bordered min-h-11 w-full pr-12 pl-11"
                     placeholder="Search or scan barcode…"
                     autocomplete="off"
                     aria-label="Search products or scan barcode"
                     [formControl]="search"
-                    (keydown.enter)="$event.preventDefault(); scanTypedBarcode()"
+                    (keydown)="onSearchKeydown($event)"
                   />
                   @if (search.value) {
                     <button
@@ -937,10 +951,13 @@ type CatalogView = 'grid' | 'list' | 'categories';
           [total]="cart.total()"
           [methods]="panelMethods()"
           [canUseDirectAccounts]="canUseDirectAccounts()"
+          [customerDepositAvailable]="customerDepositBalance()"
+          [allowCredit]="mixedCreditAllowed()"
           [busy]="busy()"
           heading="Take payment"
           (confirmed)="completeSale($event)"
           (approvalRequested)="completeSale($event)"
+          (settlementConfirmed)="completeSaleWithSettlement($event)"
           (cancelled)="checkoutOpen.set(false)"
         />
       }
@@ -1083,6 +1100,7 @@ export class SellComponent implements OnInit {
   private readonly supabase = inject(SupabaseService);
 
   protected readonly search = new FormControl('', { nonNullable: true });
+  private readonly productSearch = viewChild<ElementRef<HTMLInputElement>>('productSearch');
   protected readonly searchQuery = signal('');
   protected readonly scannerOpen = signal(false);
   protected readonly results = signal<Variant[]>([]);
@@ -1197,6 +1215,7 @@ export class SellComponent implements OnInit {
   } | null>(null);
 
   protected readonly checkoutOpen = signal(false);
+  protected readonly customerDepositBalance = signal(0);
   protected readonly clearCartArmed = signal(false);
   protected readonly creditConfirmOpen = signal(false);
   protected readonly creditApprovalReason = new FormControl('', { nonNullable: true });
@@ -1243,10 +1262,15 @@ export class SellComponent implements OnInit {
     return this.cart.customerId() ? methods : methods.filter(m => m.isCashierControlled);
   });
   protected readonly canUseDirectAccounts = computed(() => this.perms.has('ViewFinancials'));
+  protected readonly mixedCreditAllowed = computed(
+    () => !!this.selectedCustomer()?.is_credit_approved
+  );
   protected readonly approvalSent = signal(false);
   private approvalSentTimer: ReturnType<typeof setTimeout> | null = null;
+  private saleAttempt: { fingerprint: string; clientRef: string } | null = null;
   private searchSeq = 0;
   private barcodeQueue: Promise<void> = Promise.resolve();
+  private searchKeystrokes: number[] = [];
   private customerSearchSeq = 0;
   private priceFloorTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly debouncedSearch = toSignal(
@@ -1288,10 +1312,35 @@ export class SellComponent implements OnInit {
     if (customerId) {
       try {
         this.selectedCustomer.set(await this.pos.customerWithCredit(customerId));
+        await this.refreshCustomerDeposit(customerId);
       } catch {
         this.selectedCustomer.set(null);
+        this.customerDepositBalance.set(0);
       }
     }
+  }
+
+  /** USB scanners normally behave like fast keyboards. Type-to-search also helps physical tills. */
+  @HostListener('window:keydown', ['$event'])
+  protected captureWedgeInput(event: KeyboardEvent): void {
+    if (
+      event.defaultPrevented ||
+      event.isComposing ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.altKey ||
+      isTextEntryTarget(event.target) ||
+      event.key.length !== 1 ||
+      this.checkoutOpen() ||
+      this.creditConfirmOpen() ||
+      this.scannerOpen()
+    ) {
+      return;
+    }
+    event.preventDefault();
+    this.search.setValue(this.search.value + event.key);
+    this.productSearch()?.nativeElement.focus({ preventScroll: true });
+    this.recordSearchKeystroke(event.timeStamp);
   }
 
   protected async refreshCatalog(): Promise<void> {
@@ -1411,6 +1460,29 @@ export class SellComponent implements OnInit {
     this.enqueueBarcode(value);
   }
 
+  protected onSearchKeydown(event: KeyboardEvent): void {
+    if (event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      this.recordSearchKeystroke(event.timeStamp);
+      return;
+    }
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      this.scanTypedBarcode();
+      return;
+    }
+    if (event.key === 'Tab' && isRapidScannerBurst(this.searchKeystrokes)) {
+      event.preventDefault();
+      this.scanTypedBarcode();
+    }
+  }
+
+  private recordSearchKeystroke(time: number): void {
+    const previous = this.searchKeystrokes.at(-1);
+    if (previous === undefined || time - previous <= 80) this.searchKeystrokes.push(time);
+    else this.searchKeystrokes = [time];
+    if (this.searchKeystrokes.length > 64) this.searchKeystrokes.shift();
+  }
+
   protected scanTypedBarcode(): void {
     const barcode = this.search.value.trim();
     if (!barcode) return;
@@ -1458,6 +1530,9 @@ export class SellComponent implements OnInit {
       this.scanFeedback.playSuccess();
     } catch (error) {
       this.error.set(error instanceof Error ? error.message : 'Barcode lookup failed.');
+    } finally {
+      this.searchKeystrokes = [];
+      queueMicrotask(() => this.productSearch()?.nativeElement.focus({ preventScroll: true }));
     }
   }
 
@@ -1644,6 +1719,8 @@ export class SellComponent implements OnInit {
     this.customerDropdownOpen.set(false);
     this.customerSearch.setValue('', { emitEvent: false });
     this.customerResults.set([]);
+    if (customer) void this.refreshCustomerDeposit(customer.id);
+    else this.customerDepositBalance.set(0);
   }
 
   protected customerCreditAvailable(customer: CustomerWithCredit): number {
@@ -1659,13 +1736,23 @@ export class SellComponent implements OnInit {
     this.error.set(null);
     try {
       await this.cashierSession.assertOpen('taking payment');
+      const customerId = this.cart.customerId();
+      if (customerId) await this.refreshCustomerDeposit(customerId);
       this.checkoutOpen.set(true);
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Open a cashier session first');
     }
   }
 
-  protected async completeSale(payments: PaymentInput[], approvalReason?: string): Promise<void> {
+  protected completeSaleWithSettlement(settlement: SaleSettlementInput): void {
+    void this.completeSale(settlement.payments, undefined, settlement);
+  }
+
+  protected async completeSale(
+    payments: PaymentInput[],
+    approvalReason?: string,
+    settlement?: SaleSettlementInput
+  ): Promise<void> {
     this.error.set(null);
     this.notice.set(null);
     this.success.set(null);
@@ -1679,12 +1766,23 @@ export class SellComponent implements OnInit {
     this.busy.set(true);
     const customerId = this.cart.customerId();
     const lines = this.cart.toSaleLines();
-    // Use the same reference for the first request and every possible replay.
-    // This closes the ambiguous "server committed, response was lost" window.
-    const clientRef = crypto.randomUUID();
+    // Retain one key across ambiguous retries, but rotate it when the sale
+    // payload changes so an edited cart cannot replay an earlier completion.
+    const fingerprint = JSON.stringify({ customerId, lines, payments, settlement });
+    if (this.saleAttempt?.fingerprint !== fingerprint) {
+      this.saleAttempt = { fingerprint, clientRef: crypto.randomUUID() };
+    }
+    const clientRef = this.saleAttempt.clientRef;
     if (!this.connectivity.online()) {
+      if (settlement) {
+        this.error.set('Customer deposits and mixed credit require an online connection.');
+        this.checkoutOpen.set(false);
+        this.busy.set(false);
+        return;
+      }
       try {
         await this.queueSale(customerId, lines, payments, clientRef);
+        this.saleAttempt = null;
       } catch (err) {
         this.error.set(err instanceof Error ? err.message : 'Could not safely queue the sale');
       } finally {
@@ -1700,16 +1798,24 @@ export class SellComponent implements OnInit {
       const completedDraftId = this.cart.draftId() ?? undefined;
       let result;
       try {
-        result = await this.pos.postSale(
-          customerId,
-          lines,
-          payments,
-          false,
-          clientRef,
-          undefined,
-          completedDraftId,
-          approvalReason
-        );
+        result = settlement
+          ? await this.pos.postSaleWithPrepayment(
+              customerId!,
+              lines,
+              settlement,
+              clientRef,
+              completedDraftId
+            )
+          : await this.pos.postSale(
+              customerId,
+              lines,
+              payments,
+              false,
+              clientRef,
+              undefined,
+              completedDraftId,
+              approvalReason
+            );
       } catch (err) {
         // The loaded proforma expired or was retired on another device: drop
         // the link and retry once as a plain sale. The same client_ref keeps
@@ -1722,40 +1828,57 @@ export class SellComponent implements OnInit {
           throw err;
         }
         this.cart.draftId.set(null);
-        result = await this.pos.postSale(
-          customerId,
-          lines,
-          payments,
-          false,
-          clientRef,
-          undefined,
-          undefined,
-          approvalReason
-        );
+        result = settlement
+          ? await this.pos.postSaleWithPrepayment(customerId!, lines, settlement, clientRef)
+          : await this.pos.postSale(
+              customerId,
+              lines,
+              payments,
+              false,
+              clientRef,
+              undefined,
+              undefined,
+              approvalReason
+            );
       }
       this.checkoutOpen.set(false);
       this.cart.clear();
+      this.saleAttempt = null;
       this.selectedCustomer.set(null);
+      this.customerDepositBalance.set(0);
       if (result.status === 'approval_required') {
         this.showApprovalSent();
       } else {
         this.success.set({ text: 'Sale completed', tone: 'success', orderId: result.orderId });
       }
     } catch (err) {
-      if (!(err instanceof PosRpcError)) {
+      if (!(err instanceof PosRpcError) && !settlement) {
         try {
           await this.queueSale(customerId, lines, payments, clientRef);
+          this.saleAttempt = null;
         } catch (queueError) {
           this.error.set(
             queueError instanceof Error ? queueError.message : 'Could not safely queue the sale'
           );
         }
       } else {
-        this.error.set(err.message);
+        this.error.set(err instanceof Error ? err.message : 'Sale could not be completed');
         this.checkoutOpen.set(false);
       }
     } finally {
       this.busy.set(false);
+    }
+  }
+
+  private async refreshCustomerDeposit(customerId: string): Promise<void> {
+    if (!this.connectivity.online()) {
+      this.customerDepositBalance.set(0);
+      return;
+    }
+    try {
+      this.customerDepositBalance.set(await this.pos.customerDepositAvailable(customerId));
+    } catch {
+      this.customerDepositBalance.set(0);
     }
   }
 

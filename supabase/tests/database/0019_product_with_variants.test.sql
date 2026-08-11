@@ -37,9 +37,9 @@ select ok(
 -- 4-5. Multi-variant product with labels (sizes) + price check.
 create temp table cpv_multi as
 select public.create_product_with_variants('T-Shirt', '[
-  {"name": "S", "price": 80000},
-  {"name": "M", "price": 85000},
-  {"name": "L", "price": 90000, "wholesale_price": 80000}
+  {"name": "S", "price": 80000, "barcode": "TS-S"},
+  {"name": "M", "price": 85000, "barcode": "TS-M"},
+  {"name": "L", "price": 90000, "barcode": "TS-L", "wholesale_price": 80000}
 ]', '6001112223334') as product_id;
 
 select is(

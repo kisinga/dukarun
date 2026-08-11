@@ -74,6 +74,19 @@ export const routes: Routes = [
         loadComponent: () => import('./marketing/docs/docs.component').then(m => m.DocsComponent),
       },
       {
+        path: 'blog',
+        title: 'Business guides | Dukarun',
+        data: { description: 'Practical guides for running sales, stock, cash flow, and books.' },
+        loadComponent: () => import('./blog/blog-list.component').then(m => m.BlogListComponent),
+      },
+      {
+        path: 'blog/:slug',
+        title: 'Dukarun journal',
+        data: { description: 'A practical business guide from Dukarun.' },
+        loadComponent: () =>
+          import('./blog/blog-article.component').then(m => m.BlogArticleComponent),
+      },
+      {
         path: 'privacy',
         title: 'Privacy Notice | Dukarun',
         data: { documentType: 'privacy', description: 'Current Dukarun Privacy Notice.' },

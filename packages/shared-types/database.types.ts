@@ -217,6 +217,192 @@ export type Database = {
         }
         Relationships: []
       }
+      blog_daily_metrics: {
+        Row: {
+          cta_clicks: number
+          engaged_readers: number
+          metric_day: string
+          post_id: string
+          registrations: number
+          scroll_50: number
+          scroll_90: number
+          share_clicks: number
+          unique_readers: number
+          views: number
+        }
+        Insert: {
+          cta_clicks?: number
+          engaged_readers?: number
+          metric_day: string
+          post_id: string
+          registrations?: number
+          scroll_50?: number
+          scroll_90?: number
+          share_clicks?: number
+          unique_readers?: number
+          views?: number
+        }
+        Update: {
+          cta_clicks?: number
+          engaged_readers?: number
+          metric_day?: string
+          post_id?: string
+          registrations?: number
+          scroll_50?: number
+          scroll_90?: number
+          share_clicks?: number
+          unique_readers?: number
+          views?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "blog_daily_metrics_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "blog_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      blog_events: {
+        Row: {
+          event_day: string
+          event_type: string
+          id: string
+          metadata: Json
+          occurred_at: string
+          post_id: string
+          visitor_id: string
+        }
+        Insert: {
+          event_day: string
+          event_type: string
+          id: string
+          metadata?: Json
+          occurred_at?: string
+          post_id: string
+          visitor_id: string
+        }
+        Update: {
+          event_day?: string
+          event_type?: string
+          id?: string
+          metadata?: Json
+          occurred_at?: string
+          post_id?: string
+          visitor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "blog_events_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "blog_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      blog_post_versions: {
+        Row: {
+          author_name: string
+          content_markdown: string
+          cover_image_alt: string | null
+          cover_image_path: string | null
+          created_at: string
+          created_by: string
+          excerpt: string
+          id: string
+          post_id: string
+          publication_state: string
+          published_at: string | null
+          published_by: string | null
+          scheduled_for: string | null
+          seo_description: string | null
+          seo_title: string | null
+          tags: string[]
+          title: string
+          updated_at: string
+          version_number: number
+        }
+        Insert: {
+          author_name: string
+          content_markdown: string
+          cover_image_alt?: string | null
+          cover_image_path?: string | null
+          created_at?: string
+          created_by: string
+          excerpt: string
+          id?: string
+          post_id: string
+          publication_state?: string
+          published_at?: string | null
+          published_by?: string | null
+          scheduled_for?: string | null
+          seo_description?: string | null
+          seo_title?: string | null
+          tags?: string[]
+          title: string
+          updated_at?: string
+          version_number: number
+        }
+        Update: {
+          author_name?: string
+          content_markdown?: string
+          cover_image_alt?: string | null
+          cover_image_path?: string | null
+          created_at?: string
+          created_by?: string
+          excerpt?: string
+          id?: string
+          post_id?: string
+          publication_state?: string
+          published_at?: string | null
+          published_by?: string | null
+          scheduled_for?: string | null
+          seo_description?: string | null
+          seo_title?: string | null
+          tags?: string[]
+          title?: string
+          updated_at?: string
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "blog_post_versions_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "blog_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      blog_posts: {
+        Row: {
+          archived_at: string | null
+          created_at: string
+          created_by: string
+          id: string
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          archived_at?: string | null
+          created_at?: string
+          created_by: string
+          id?: string
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          archived_at?: string | null
+          created_at?: string
+          created_by?: string
+          id?: string
+          slug?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       cache_change_log: {
         Row: {
           changed_at: string
@@ -376,8 +562,22 @@ export type Database = {
             foreignKeyName: "campaign_recipients_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
+            referencedRelation: "customer_deposit_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "campaign_recipients_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
             referencedRelation: "customers"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_recipients_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_advance_balances"
+            referencedColumns: ["supplier_id"]
           },
           {
             foreignKeyName: "campaign_recipients_customer_id_fkey"
@@ -1380,6 +1580,45 @@ export type Database = {
           },
         ]
       }
+      company_approval_events: {
+        Row: {
+          approval_mode: string
+          approved_at: string
+          approved_by: string | null
+          company_id: string
+          id: string
+        }
+        Insert: {
+          approval_mode: string
+          approved_at?: string
+          approved_by?: string | null
+          company_id: string
+          id?: string
+        }
+        Update: {
+          approval_mode?: string
+          approved_at?: string
+          approved_by?: string | null
+          company_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_approval_events_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_approval_events_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       company_legal_acceptances: {
         Row: {
           accepted_at: string
@@ -1544,6 +1783,56 @@ export type Database = {
           },
         ]
       }
+      company_registration_attributions: {
+        Row: {
+          attributed_at: string
+          click_event_id: string | null
+          company_id: string
+          post_id: string
+        }
+        Insert: {
+          attributed_at?: string
+          click_event_id?: string | null
+          company_id: string
+          post_id: string
+        }
+        Update: {
+          attributed_at?: string
+          click_event_id?: string | null
+          company_id?: string
+          post_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_registration_attributions_click_event_id_fkey"
+            columns: ["click_event_id"]
+            isOneToOne: true
+            referencedRelation: "blog_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_registration_attributions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_registration_attributions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_registration_attributions_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "blog_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       company_staff_profiles: {
         Row: {
           avatar_path: string | null
@@ -1676,6 +1965,13 @@ export type Database = {
             foreignKeyName: "credit_notification_checkpoints_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
+            referencedRelation: "customer_deposit_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "credit_notification_checkpoints_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
             referencedRelation: "customers"
             referencedColumns: ["id"]
           },
@@ -1683,8 +1979,487 @@ export type Database = {
             foreignKeyName: "credit_notification_checkpoints_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
+            referencedRelation: "supplier_advance_balances"
+            referencedColumns: ["supplier_id"]
+          },
+          {
+            foreignKeyName: "credit_notification_checkpoints_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
             referencedRelation: "supplier_ap_balances"
             referencedColumns: ["supplier_id"]
+          },
+        ]
+      }
+      customer_deposit_allocations: {
+        Row: {
+          amount: number
+          application_id: string
+          company_id: string
+          created_at: string
+          deposit_id: string
+          id: string
+        }
+        Insert: {
+          amount: number
+          application_id: string
+          company_id: string
+          created_at?: string
+          deposit_id: string
+          id?: string
+        }
+        Update: {
+          amount?: number
+          application_id?: string
+          company_id?: string
+          created_at?: string
+          deposit_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_deposit_allocations_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "customer_deposit_applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_deposit_allocations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_deposit_allocations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_deposit_allocations_deposit_id_fkey"
+            columns: ["deposit_id"]
+            isOneToOne: false
+            referencedRelation: "customer_deposit_source_balances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_deposit_allocations_deposit_id_fkey"
+            columns: ["deposit_id"]
+            isOneToOne: false
+            referencedRelation: "customer_deposits"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customer_deposit_applications: {
+        Row: {
+          amount: number
+          client_ref: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          customer_id: string
+          id: string
+          order_id: string
+          reversal_reason: string | null
+          reversed_at: string | null
+          reversed_by: string | null
+          status: string
+        }
+        Insert: {
+          amount: number
+          client_ref?: string | null
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          customer_id: string
+          id?: string
+          order_id: string
+          reversal_reason?: string | null
+          reversed_at?: string | null
+          reversed_by?: string | null
+          status?: string
+        }
+        Update: {
+          amount?: number
+          client_ref?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string
+          id?: string
+          order_id?: string
+          reversal_reason?: string | null
+          reversed_at?: string | null
+          reversed_by?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_deposit_applications_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_deposit_applications_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_deposit_applications_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_ar_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "customer_deposit_applications_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_deposit_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "customer_deposit_applications_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_deposit_applications_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_advance_balances"
+            referencedColumns: ["supplier_id"]
+          },
+          {
+            foreignKeyName: "customer_deposit_applications_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_ap_balances"
+            referencedColumns: ["supplier_id"]
+          },
+          {
+            foreignKeyName: "customer_deposit_applications_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customer_deposit_refund_allocations: {
+        Row: {
+          amount: number
+          company_id: string
+          created_at: string
+          deposit_id: string
+          id: string
+          refund_id: string
+        }
+        Insert: {
+          amount: number
+          company_id: string
+          created_at?: string
+          deposit_id: string
+          id?: string
+          refund_id: string
+        }
+        Update: {
+          amount?: number
+          company_id?: string
+          created_at?: string
+          deposit_id?: string
+          id?: string
+          refund_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_deposit_refund_allocations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_deposit_refund_allocations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_deposit_refund_allocations_deposit_id_fkey"
+            columns: ["deposit_id"]
+            isOneToOne: false
+            referencedRelation: "customer_deposit_source_balances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_deposit_refund_allocations_deposit_id_fkey"
+            columns: ["deposit_id"]
+            isOneToOne: false
+            referencedRelation: "customer_deposits"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_deposit_refund_allocations_refund_id_fkey"
+            columns: ["refund_id"]
+            isOneToOne: false
+            referencedRelation: "customer_deposit_refunds"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customer_deposit_refunds: {
+        Row: {
+          amount: number
+          cashier_session_id: string | null
+          client_ref: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          customer_id: string
+          id: string
+          location_id: string
+          method_code: string
+          reason: string
+          reference: string | null
+          status: string
+        }
+        Insert: {
+          amount: number
+          cashier_session_id?: string | null
+          client_ref?: string | null
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          customer_id: string
+          id?: string
+          location_id: string
+          method_code: string
+          reason: string
+          reference?: string | null
+          status?: string
+        }
+        Update: {
+          amount?: number
+          cashier_session_id?: string | null
+          client_ref?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string
+          id?: string
+          location_id?: string
+          method_code?: string
+          reason?: string
+          reference?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_deposit_refunds_cashier_session_id_fkey"
+            columns: ["cashier_session_id"]
+            isOneToOne: false
+            referencedRelation: "cashier_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_deposit_refunds_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_deposit_refunds_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_deposit_refunds_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_ar_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "customer_deposit_refunds_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_deposit_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "customer_deposit_refunds_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_deposit_refunds_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_advance_balances"
+            referencedColumns: ["supplier_id"]
+          },
+          {
+            foreignKeyName: "customer_deposit_refunds_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_ap_balances"
+            referencedColumns: ["supplier_id"]
+          },
+          {
+            foreignKeyName: "customer_deposit_refunds_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "low_stock_variants_by_location"
+            referencedColumns: ["location_id"]
+          },
+          {
+            foreignKeyName: "customer_deposit_refunds_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "stock_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customer_deposits: {
+        Row: {
+          amount: number
+          cashier_session_id: string | null
+          client_ref: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          customer_id: string
+          id: string
+          location_id: string
+          method_code: string
+          reference: string | null
+          reversal_reason: string | null
+          reversed_at: string | null
+          reversed_by: string | null
+          status: string
+        }
+        Insert: {
+          amount: number
+          cashier_session_id?: string | null
+          client_ref?: string | null
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          customer_id: string
+          id?: string
+          location_id: string
+          method_code: string
+          reference?: string | null
+          reversal_reason?: string | null
+          reversed_at?: string | null
+          reversed_by?: string | null
+          status?: string
+        }
+        Update: {
+          amount?: number
+          cashier_session_id?: string | null
+          client_ref?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string
+          id?: string
+          location_id?: string
+          method_code?: string
+          reference?: string | null
+          reversal_reason?: string | null
+          reversed_at?: string | null
+          reversed_by?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_deposits_cashier_session_id_fkey"
+            columns: ["cashier_session_id"]
+            isOneToOne: false
+            referencedRelation: "cashier_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_deposits_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_deposits_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_deposits_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_ar_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "customer_deposits_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_deposit_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "customer_deposits_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_deposits_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_advance_balances"
+            referencedColumns: ["supplier_id"]
+          },
+          {
+            foreignKeyName: "customer_deposits_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_ap_balances"
+            referencedColumns: ["supplier_id"]
+          },
+          {
+            foreignKeyName: "customer_deposits_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "low_stock_variants_by_location"
+            referencedColumns: ["location_id"]
+          },
+          {
+            foreignKeyName: "customer_deposits_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "stock_locations"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1751,8 +2526,22 @@ export type Database = {
             foreignKeyName: "customer_statement_links_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
+            referencedRelation: "customer_deposit_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "customer_statement_links_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
             referencedRelation: "customers"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_statement_links_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_advance_balances"
+            referencedColumns: ["supplier_id"]
           },
           {
             foreignKeyName: "customer_statement_links_customer_id_fkey"
@@ -1981,8 +2770,22 @@ export type Database = {
             foreignKeyName: "external_document_links_party_id_fkey"
             columns: ["party_id"]
             isOneToOne: false
+            referencedRelation: "customer_deposit_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "external_document_links_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
             referencedRelation: "customers"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "external_document_links_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_advance_balances"
+            referencedColumns: ["supplier_id"]
           },
           {
             foreignKeyName: "external_document_links_party_id_fkey"
@@ -2082,8 +2885,22 @@ export type Database = {
             foreignKeyName: "inventory_batches_supplier_id_fkey"
             columns: ["supplier_id"]
             isOneToOne: false
+            referencedRelation: "customer_deposit_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "inventory_batches_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
             referencedRelation: "customers"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_batches_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_advance_balances"
+            referencedColumns: ["supplier_id"]
           },
           {
             foreignKeyName: "inventory_batches_supplier_id_fkey"
@@ -2332,6 +3149,7 @@ export type Database = {
           entry_date: string
           id: string
           memo: string | null
+          payload_hash: string | null
           posted_at: string
           reversal_of: string | null
           source_id: string
@@ -2343,6 +3161,7 @@ export type Database = {
           entry_date: string
           id?: string
           memo?: string | null
+          payload_hash?: string | null
           posted_at?: string
           reversal_of?: string | null
           source_id: string
@@ -2354,6 +3173,7 @@ export type Database = {
           entry_date?: string
           id?: string
           memo?: string | null
+          payload_hash?: string | null
           posted_at?: string
           reversal_of?: string | null
           source_id?: string
@@ -2391,6 +3211,7 @@ export type Database = {
           debit: number
           entry_id: string
           id: string
+          location_id: string | null
           meta: Json
           order_id: string | null
         }
@@ -2401,6 +3222,7 @@ export type Database = {
           debit?: number
           entry_id: string
           id?: string
+          location_id?: string | null
           meta?: Json
           order_id?: string | null
         }
@@ -2411,6 +3233,7 @@ export type Database = {
           debit?: number
           entry_id?: string
           id?: string
+          location_id?: string | null
           meta?: Json
           order_id?: string | null
         }
@@ -2448,6 +3271,20 @@ export type Database = {
             columns: ["entry_id"]
             isOneToOne: false
             referencedRelation: "ledger_journal_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ledger_journal_lines_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "low_stock_variants_by_location"
+            referencedColumns: ["location_id"]
+          },
+          {
+            foreignKeyName: "ledger_journal_lines_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "stock_locations"
             referencedColumns: ["id"]
           },
           {
@@ -3143,8 +3980,22 @@ export type Database = {
             foreignKeyName: "orders_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
+            referencedRelation: "customer_deposit_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
             referencedRelation: "customers"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_advance_balances"
+            referencedColumns: ["supplier_id"]
           },
           {
             foreignKeyName: "orders_customer_id_fkey"
@@ -3175,6 +4026,8 @@ export type Database = {
           body: string
           campaign_id: string | null
           campaign_recipient_id: string | null
+          cashier_session_event: string | null
+          cashier_session_id: string | null
           channel: string
           company_id: string
           created_at: string
@@ -3206,6 +4059,8 @@ export type Database = {
           body: string
           campaign_id?: string | null
           campaign_recipient_id?: string | null
+          cashier_session_event?: string | null
+          cashier_session_id?: string | null
           channel: string
           company_id: string
           created_at?: string
@@ -3237,6 +4092,8 @@ export type Database = {
           body?: string
           campaign_id?: string | null
           campaign_recipient_id?: string | null
+          cashier_session_event?: string | null
+          cashier_session_id?: string | null
           channel?: string
           company_id?: string
           created_at?: string
@@ -3279,6 +4136,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "outbox_cashier_session_id_fkey"
+            columns: ["cashier_session_id"]
+            isOneToOne: false
+            referencedRelation: "cashier_sessions"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "outbox_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
@@ -3303,8 +4167,22 @@ export type Database = {
             foreignKeyName: "outbox_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
+            referencedRelation: "customer_deposit_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "outbox_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
             referencedRelation: "customers"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "outbox_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_advance_balances"
+            referencedColumns: ["supplier_id"]
           },
           {
             foreignKeyName: "outbox_customer_id_fkey"
@@ -3440,36 +4318,42 @@ export type Database = {
           amount: number
           company_id: string
           created_at: string
+          customer_deposit_application_id: string | null
           id: string
           location_id: string
           method_code: string
           mpesa_receipt: string | null
           order_id: string
           reference: string | null
+          settlement_kind: string
           status: string
         }
         Insert: {
           amount: number
           company_id: string
           created_at?: string
+          customer_deposit_application_id?: string | null
           id?: string
           location_id: string
           method_code: string
           mpesa_receipt?: string | null
           order_id: string
           reference?: string | null
+          settlement_kind?: string
           status?: string
         }
         Update: {
           amount?: number
           company_id?: string
           created_at?: string
+          customer_deposit_application_id?: string | null
           id?: string
           location_id?: string
           method_code?: string
           mpesa_receipt?: string | null
           order_id?: string
           reference?: string | null
+          settlement_kind?: string
           status?: string
         }
         Relationships: [
@@ -3485,6 +4369,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_customer_deposit_application_fk"
+            columns: ["customer_deposit_application_id"]
+            isOneToOne: false
+            referencedRelation: "customer_deposit_applications"
             referencedColumns: ["id"]
           },
           {
@@ -3602,6 +4493,66 @@ export type Database = {
         }
         Update: {
           external_messaging_enabled?: boolean
+          singleton?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      platform_registration_alerts: {
+        Row: {
+          acknowledged_at: string | null
+          acknowledged_by: string | null
+          alert_window: string
+          approval_count: number
+          created_at: string
+          id: string
+          threshold: number
+          window_started_at: string
+        }
+        Insert: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          alert_window: string
+          approval_count: number
+          created_at?: string
+          id?: string
+          threshold: number
+          window_started_at: string
+        }
+        Update: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          alert_window?: string
+          approval_count?: number
+          created_at?: string
+          id?: string
+          threshold?: number
+          window_started_at?: string
+        }
+        Relationships: []
+      }
+      platform_registration_settings: {
+        Row: {
+          automatic_company_approval_enabled: boolean
+          daily_alert_threshold: number
+          hourly_alert_threshold: number
+          singleton: boolean
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          automatic_company_approval_enabled?: boolean
+          daily_alert_threshold?: number
+          hourly_alert_threshold?: number
+          singleton?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          automatic_company_approval_enabled?: boolean
+          daily_alert_threshold?: number
+          hourly_alert_threshold?: number
           singleton?: boolean
           updated_at?: string
           updated_by?: string | null
@@ -3803,9 +4754,110 @@ export type Database = {
           },
         ]
       }
+      public_site_deploy_requests: {
+        Row: {
+          attempt_count: number
+          completed_at: string | null
+          created_at: string
+          deployment_id: string | null
+          id: string
+          next_attempt_at: string
+          reason: string
+          requested_by: string | null
+          resource_id: string | null
+          resource_type: string
+          revision_id: string | null
+          status: string
+        }
+        Insert: {
+          attempt_count?: number
+          completed_at?: string | null
+          created_at?: string
+          deployment_id?: string | null
+          id?: string
+          next_attempt_at?: string
+          reason: string
+          requested_by?: string | null
+          resource_id?: string | null
+          resource_type: string
+          revision_id?: string | null
+          status?: string
+        }
+        Update: {
+          attempt_count?: number
+          completed_at?: string | null
+          created_at?: string
+          deployment_id?: string | null
+          id?: string
+          next_attempt_at?: string
+          reason?: string
+          requested_by?: string | null
+          resource_id?: string | null
+          resource_type?: string
+          revision_id?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "public_site_deploy_requests_deployment_id_fkey"
+            columns: ["deployment_id"]
+            isOneToOne: false
+            referencedRelation: "public_site_deployments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "public_site_deploy_requests_revision_id_fkey"
+            columns: ["revision_id"]
+            isOneToOne: false
+            referencedRelation: "blog_post_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      public_site_deployments: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          error_summary: string | null
+          id: string
+          provider: string
+          provider_deployment_id: string | null
+          requested_by: string | null
+          started_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          error_summary?: string | null
+          id?: string
+          provider?: string
+          provider_deployment_id?: string | null
+          requested_by?: string | null
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          error_summary?: string | null
+          id?: string
+          provider?: string
+          provider_deployment_id?: string | null
+          requested_by?: string | null
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       purchase_drafts: {
         Row: {
           account_code: string | null
+          advance_amount: number
+          client_ref: string | null
           company_id: string
           created_at: string
           created_by: string | null
@@ -3826,6 +4878,8 @@ export type Database = {
         }
         Insert: {
           account_code?: string | null
+          advance_amount?: number
+          client_ref?: string | null
           company_id: string
           created_at?: string
           created_by?: string | null
@@ -3846,6 +4900,8 @@ export type Database = {
         }
         Update: {
           account_code?: string | null
+          advance_amount?: number
+          client_ref?: string | null
           company_id?: string
           created_at?: string
           created_by?: string | null
@@ -3918,8 +4974,22 @@ export type Database = {
             foreignKeyName: "purchase_drafts_supplier_id_fkey"
             columns: ["supplier_id"]
             isOneToOne: false
+            referencedRelation: "customer_deposit_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "purchase_drafts_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
             referencedRelation: "customers"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_drafts_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_advance_balances"
+            referencedColumns: ["supplier_id"]
           },
           {
             foreignKeyName: "purchase_drafts_supplier_id_fkey"
@@ -4133,6 +5203,9 @@ export type Database = {
           created_by: string | null
           id: string
           purchase_id: string
+          settlement_kind: string
+          status: string
+          supplier_advance_application_id: string | null
         }
         Insert: {
           account_code: string
@@ -4142,6 +5215,9 @@ export type Database = {
           created_by?: string | null
           id?: string
           purchase_id: string
+          settlement_kind?: string
+          status?: string
+          supplier_advance_application_id?: string | null
         }
         Update: {
           account_code?: string
@@ -4151,6 +5227,9 @@ export type Database = {
           created_by?: string | null
           id?: string
           purchase_id?: string
+          settlement_kind?: string
+          status?: string
+          supplier_advance_application_id?: string | null
         }
         Relationships: [
           {
@@ -4181,10 +5260,18 @@ export type Database = {
             referencedRelation: "purchases"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "purchase_payments_supplier_advance_application_fk"
+            columns: ["supplier_advance_application_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_advance_applications"
+            referencedColumns: ["id"]
+          },
         ]
       }
       purchases: {
         Row: {
+          client_ref: string | null
           company_id: string
           created_at: string
           created_by: string | null
@@ -4199,6 +5286,7 @@ export type Database = {
           total_cost: number
         }
         Insert: {
+          client_ref?: string | null
           company_id: string
           created_at?: string
           created_by?: string | null
@@ -4213,6 +5301,7 @@ export type Database = {
           total_cost: number
         }
         Update: {
+          client_ref?: string | null
           company_id?: string
           created_at?: string
           created_by?: string | null
@@ -4266,8 +5355,22 @@ export type Database = {
             foreignKeyName: "purchases_supplier_id_fkey"
             columns: ["supplier_id"]
             isOneToOne: false
+            referencedRelation: "customer_deposit_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "purchases_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
             referencedRelation: "customers"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchases_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_advance_balances"
+            referencedColumns: ["supplier_id"]
           },
           {
             foreignKeyName: "purchases_supplier_id_fkey"
@@ -4815,6 +5918,485 @@ export type Database = {
         }
         Relationships: []
       }
+      supplier_advance_allocations: {
+        Row: {
+          advance_id: string
+          amount: number
+          application_id: string
+          company_id: string
+          created_at: string
+          id: string
+        }
+        Insert: {
+          advance_id: string
+          amount: number
+          application_id: string
+          company_id: string
+          created_at?: string
+          id?: string
+        }
+        Update: {
+          advance_id?: string
+          amount?: number
+          application_id?: string
+          company_id?: string
+          created_at?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_advance_allocations_advance_id_fkey"
+            columns: ["advance_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_advance_source_balances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_advance_allocations_advance_id_fkey"
+            columns: ["advance_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_advances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_advance_allocations_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_advance_applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_advance_allocations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_advance_allocations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supplier_advance_applications: {
+        Row: {
+          amount: number
+          client_ref: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          purchase_id: string
+          reversal_reason: string | null
+          reversed_at: string | null
+          reversed_by: string | null
+          status: string
+          supplier_id: string
+        }
+        Insert: {
+          amount: number
+          client_ref?: string | null
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          purchase_id: string
+          reversal_reason?: string | null
+          reversed_at?: string | null
+          reversed_by?: string | null
+          status?: string
+          supplier_id: string
+        }
+        Update: {
+          amount?: number
+          client_ref?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          purchase_id?: string
+          reversal_reason?: string | null
+          reversed_at?: string | null
+          reversed_by?: string | null
+          status?: string
+          supplier_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_advance_applications_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_advance_applications_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_advance_applications_purchase_id_fkey"
+            columns: ["purchase_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_history"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_advance_applications_purchase_id_fkey"
+            columns: ["purchase_id"]
+            isOneToOne: false
+            referencedRelation: "purchases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_advance_applications_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "customer_ar_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "supplier_advance_applications_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "customer_deposit_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "supplier_advance_applications_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_advance_applications_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_advance_balances"
+            referencedColumns: ["supplier_id"]
+          },
+          {
+            foreignKeyName: "supplier_advance_applications_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_ap_balances"
+            referencedColumns: ["supplier_id"]
+          },
+        ]
+      }
+      supplier_advance_return_allocations: {
+        Row: {
+          advance_id: string
+          amount: number
+          company_id: string
+          created_at: string
+          id: string
+          return_id: string
+        }
+        Insert: {
+          advance_id: string
+          amount: number
+          company_id: string
+          created_at?: string
+          id?: string
+          return_id: string
+        }
+        Update: {
+          advance_id?: string
+          amount?: number
+          company_id?: string
+          created_at?: string
+          id?: string
+          return_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_advance_return_allocations_advance_id_fkey"
+            columns: ["advance_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_advance_source_balances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_advance_return_allocations_advance_id_fkey"
+            columns: ["advance_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_advances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_advance_return_allocations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_advance_return_allocations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_advance_return_allocations_return_id_fkey"
+            columns: ["return_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_advance_returns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supplier_advance_returns: {
+        Row: {
+          account_code: string
+          amount: number
+          cashier_session_id: string | null
+          client_ref: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          location_id: string
+          reason: string
+          reference: string | null
+          status: string
+          supplier_id: string
+        }
+        Insert: {
+          account_code: string
+          amount: number
+          cashier_session_id?: string | null
+          client_ref?: string | null
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          location_id: string
+          reason: string
+          reference?: string | null
+          status?: string
+          supplier_id: string
+        }
+        Update: {
+          account_code?: string
+          amount?: number
+          cashier_session_id?: string | null
+          client_ref?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          location_id?: string
+          reason?: string
+          reference?: string | null
+          status?: string
+          supplier_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_advance_returns_cashier_session_id_fkey"
+            columns: ["cashier_session_id"]
+            isOneToOne: false
+            referencedRelation: "cashier_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_advance_returns_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_advance_returns_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_advance_returns_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "low_stock_variants_by_location"
+            referencedColumns: ["location_id"]
+          },
+          {
+            foreignKeyName: "supplier_advance_returns_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "stock_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_advance_returns_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "customer_ar_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "supplier_advance_returns_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "customer_deposit_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "supplier_advance_returns_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_advance_returns_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_advance_balances"
+            referencedColumns: ["supplier_id"]
+          },
+          {
+            foreignKeyName: "supplier_advance_returns_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_ap_balances"
+            referencedColumns: ["supplier_id"]
+          },
+        ]
+      }
+      supplier_advances: {
+        Row: {
+          account_code: string
+          amount: number
+          cashier_session_id: string | null
+          client_ref: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          location_id: string
+          reference: string | null
+          reversal_reason: string | null
+          reversed_at: string | null
+          reversed_by: string | null
+          status: string
+          supplier_id: string
+        }
+        Insert: {
+          account_code: string
+          amount: number
+          cashier_session_id?: string | null
+          client_ref?: string | null
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          location_id: string
+          reference?: string | null
+          reversal_reason?: string | null
+          reversed_at?: string | null
+          reversed_by?: string | null
+          status?: string
+          supplier_id: string
+        }
+        Update: {
+          account_code?: string
+          amount?: number
+          cashier_session_id?: string | null
+          client_ref?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          location_id?: string
+          reference?: string | null
+          reversal_reason?: string | null
+          reversed_at?: string | null
+          reversed_by?: string | null
+          status?: string
+          supplier_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_advances_cashier_session_id_fkey"
+            columns: ["cashier_session_id"]
+            isOneToOne: false
+            referencedRelation: "cashier_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_advances_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_advances_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_advances_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "low_stock_variants_by_location"
+            referencedColumns: ["location_id"]
+          },
+          {
+            foreignKeyName: "supplier_advances_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "stock_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_advances_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "customer_ar_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "supplier_advances_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "customer_deposit_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "supplier_advances_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_advances_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_advance_balances"
+            referencedColumns: ["supplier_id"]
+          },
+          {
+            foreignKeyName: "supplier_advances_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_ap_balances"
+            referencedColumns: ["supplier_id"]
+          },
+        ]
+      }
       user_preferences: {
         Row: {
           active_company_id: string | null
@@ -4896,6 +6478,112 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "public_storefronts"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      customer_deposit_balances: {
+        Row: {
+          balance: number | null
+          company_id: string | null
+          customer_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customers_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customers_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customer_deposit_source_balances: {
+        Row: {
+          amount: number | null
+          available: number | null
+          company_id: string | null
+          created_at: string | null
+          customer_id: string | null
+          id: string | null
+          method_code: string | null
+          reference: string | null
+        }
+        Insert: {
+          amount?: number | null
+          available?: never
+          company_id?: string | null
+          created_at?: string | null
+          customer_id?: string | null
+          id?: string | null
+          method_code?: string | null
+          reference?: string | null
+        }
+        Update: {
+          amount?: number | null
+          available?: never
+          company_id?: string | null
+          created_at?: string | null
+          customer_id?: string | null
+          id?: string | null
+          method_code?: string | null
+          reference?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_deposits_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_deposits_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_deposits_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_ar_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "customer_deposits_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_deposit_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "customer_deposits_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_deposits_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_advance_balances"
+            referencedColumns: ["supplier_id"]
+          },
+          {
+            foreignKeyName: "customer_deposits_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_ap_balances"
+            referencedColumns: ["supplier_id"]
           },
         ]
       }
@@ -5049,8 +6737,22 @@ export type Database = {
             foreignKeyName: "orders_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
+            referencedRelation: "customer_deposit_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
             referencedRelation: "customers"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_advance_balances"
+            referencedColumns: ["supplier_id"]
           },
           {
             foreignKeyName: "orders_customer_id_fkey"
@@ -5229,6 +6931,7 @@ export type Database = {
       purchase_history: {
         Row: {
           all_in_total: number | null
+          client_ref: string | null
           company_id: string | null
           created_at: string | null
           created_by: string | null
@@ -5286,8 +6989,22 @@ export type Database = {
             foreignKeyName: "purchases_supplier_id_fkey"
             columns: ["supplier_id"]
             isOneToOne: false
+            referencedRelation: "customer_deposit_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "purchases_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
             referencedRelation: "customers"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchases_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_advance_balances"
+            referencedColumns: ["supplier_id"]
           },
           {
             foreignKeyName: "purchases_supplier_id_fkey"
@@ -5333,8 +7050,22 @@ export type Database = {
             foreignKeyName: "orders_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
+            referencedRelation: "customer_deposit_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
             referencedRelation: "customers"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_advance_balances"
+            referencedColumns: ["supplier_id"]
           },
           {
             foreignKeyName: "orders_customer_id_fkey"
@@ -5459,6 +7190,112 @@ export type Database = {
           },
         ]
       }
+      supplier_advance_balances: {
+        Row: {
+          balance: number | null
+          company_id: string | null
+          supplier_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customers_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customers_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supplier_advance_source_balances: {
+        Row: {
+          account_code: string | null
+          amount: number | null
+          available: number | null
+          company_id: string | null
+          created_at: string | null
+          id: string | null
+          reference: string | null
+          supplier_id: string | null
+        }
+        Insert: {
+          account_code?: string | null
+          amount?: number | null
+          available?: never
+          company_id?: string | null
+          created_at?: string | null
+          id?: string | null
+          reference?: string | null
+          supplier_id?: string | null
+        }
+        Update: {
+          account_code?: string | null
+          amount?: number | null
+          available?: never
+          company_id?: string | null
+          created_at?: string | null
+          id?: string | null
+          reference?: string | null
+          supplier_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_advances_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_advances_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_advances_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "customer_ar_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "supplier_advances_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "customer_deposit_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "supplier_advances_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_advances_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_advance_balances"
+            referencedColumns: ["supplier_id"]
+          },
+          {
+            foreignKeyName: "supplier_advances_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_ap_balances"
+            referencedColumns: ["supplier_id"]
+          },
+        ]
+      }
       supplier_ap_aging: {
         Row: {
           balance: number | null
@@ -5543,8 +7380,22 @@ export type Database = {
             foreignKeyName: "purchases_supplier_id_fkey"
             columns: ["supplier_id"]
             isOneToOne: false
+            referencedRelation: "customer_deposit_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "purchases_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
             referencedRelation: "customers"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchases_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_advance_balances"
+            referencedColumns: ["supplier_id"]
           },
           {
             foreignKeyName: "purchases_supplier_id_fkey"
@@ -5630,8 +7481,22 @@ export type Database = {
             foreignKeyName: "purchases_supplier_id_fkey"
             columns: ["supplier_id"]
             isOneToOne: false
+            referencedRelation: "customer_deposit_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "purchases_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
             referencedRelation: "customers"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchases_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_advance_balances"
+            referencedColumns: ["supplier_id"]
           },
           {
             foreignKeyName: "purchases_supplier_id_fkey"
@@ -5727,13 +7592,33 @@ export type Database = {
         Args: { p_chunk_index: number; p_import_id: string; p_products: Json }
         Returns: Json
       }
+      apply_customer_deposit: {
+        Args: { p_amount: number; p_client_ref?: string; p_order_id: string }
+        Returns: string
+      }
       apply_role_template: { Args: { p_template_id: string }; Returns: string }
+      apply_supplier_advance: {
+        Args: { p_amount: number; p_client_ref?: string; p_purchase_id: string }
+        Returns: string
+      }
+      approve_company_transition: {
+        Args: { p_company_id: string; p_mode: string }
+        Returns: string
+      }
       approve_request: {
         Args: { p_approval_id: string; p_reason?: string }
         Returns: string
       }
       assert_approval_authority: {
         Args: { p_type: string }
+        Returns: undefined
+      }
+      assert_effective_barcode_available: {
+        Args: {
+          p_barcode: string
+          p_company_id: string
+          p_exclude_variant_id: string
+        }
         Returns: undefined
       }
       assert_entitled: {
@@ -5788,6 +7673,7 @@ export type Database = {
         Returns: number
       }
       cancel_purchase_draft: { Args: { p_draft_id: string }; Returns: string }
+      cashier_kes: { Args: { p_amount: number }; Returns: string }
       cashier_session_required_for_source: {
         Args: { p_source_type: string }
         Returns: boolean
@@ -5864,6 +7750,7 @@ export type Database = {
         }
         Returns: Json
       }
+      claim_public_site_deployment: { Args: never; Returns: Json }
       cleanup_abandoned_catalog_imports: { Args: never; Returns: number }
       close_accounting_period: { Args: { p_end_date: string }; Returns: string }
       close_cashier_session: {
@@ -5908,6 +7795,16 @@ export type Database = {
         Args: { p_actor: string; p_order_id: string; p_payments: Json }
         Returns: string
       }
+      complete_order_with_prepayment: {
+        Args: {
+          p_client_ref?: string
+          p_credit_amount: number
+          p_deposit_amount: number
+          p_order_id: string
+          p_payments: Json
+        }
+        Returns: string
+      }
       confirm_purchase_draft: {
         Args: {
           p_account_code?: string
@@ -5918,6 +7815,10 @@ export type Database = {
         Returns: string
       }
       confirm_purchase_draft_complete: {
+        Args: { p_draft_id: string }
+        Returns: string
+      }
+      confirm_purchase_draft_with_advance: {
         Args: { p_draft_id: string }
         Returns: string
       }
@@ -6041,6 +7942,14 @@ export type Database = {
         Returns: boolean
       }
       custom_access_token_hook: { Args: { event: Json }; Returns: Json }
+      customer_deposit_activity: {
+        Args: { p_customer_id: string; p_limit?: number }
+        Returns: Json
+      }
+      customer_deposit_available: {
+        Args: { p_customer_id: string }
+        Returns: number
+      }
       customer_statement: {
         Args: {
           p_before_date?: string
@@ -6146,6 +8055,14 @@ export type Database = {
         Args: { p_accepted: boolean; p_outbox_id: string }
         Returns: undefined
       }
+      finalize_public_site_deployment: {
+        Args: {
+          p_deployment_id: string
+          p_error_summary?: string
+          p_status: string
+        }
+        Returns: boolean
+      }
       flush_outbox_trigger: { Args: never; Returns: undefined }
       generate_commission_period: {
         Args: { p_end_date: string; p_start_date: string }
@@ -6166,6 +8083,10 @@ export type Database = {
       }
       issue_customer_statement_link: {
         Args: { p_company_id: string; p_customer_id: string }
+        Returns: string
+      }
+      journal_payload_hash: {
+        Args: { p_entry_date: string; p_lines: Json; p_memo: string }
         Returns: string
       }
       jsonb_uuid_array_contains: {
@@ -6247,6 +8168,10 @@ export type Database = {
           status: string
         }[]
       }
+      location_account_balance: {
+        Args: { p_code: string; p_company_id: string; p_location_id: string }
+        Returns: number
+      }
       location_stock_for_variants: {
         Args: { p_location_id: string; p_variant_ids: string[] }
         Returns: {
@@ -6327,6 +8252,20 @@ export type Database = {
         }
         Returns: string
       }
+      platform_acknowledge_registration_alert: {
+        Args: { p_alert_id: string }
+        Returns: boolean
+      }
+      platform_archive_blog_post: {
+        Args: { p_post_id: string }
+        Returns: boolean
+      }
+      platform_blog_metrics: {
+        Args: { p_post_id?: string; p_since?: string }
+        Returns: Json
+      }
+      platform_blog_post: { Args: { p_post_id: string }; Returns: Json }
+      platform_blog_posts: { Args: never; Returns: Json }
       platform_campaign_metrics: {
         Args: { p_campaign_id: string }
         Returns: Json
@@ -6343,6 +8282,10 @@ export type Database = {
       }
       platform_cancel_campaign: {
         Args: { p_campaign_id: string }
+        Returns: boolean
+      }
+      platform_cancel_scheduled_blog_post: {
+        Args: { p_post_id: string }
         Returns: boolean
       }
       platform_company_legal_status: {
@@ -6398,12 +8341,34 @@ export type Database = {
         }
       }
       platform_operations_snapshot: { Args: never; Returns: Json }
+      platform_publish_blog_post: { Args: { p_post_id: string }; Returns: Json }
       platform_publish_legal_document: {
         Args: { p_expected_sha256: string; p_id: string }
         Returns: Json
       }
+      platform_registration_alerts: {
+        Args: { p_limit?: number }
+        Returns: Json
+      }
+      platform_registration_config: { Args: never; Returns: Json }
       platform_review_campaign: {
         Args: { p_campaign_id: string }
+        Returns: Json
+      }
+      platform_save_blog_draft: {
+        Args: {
+          p_author_name: string
+          p_content_markdown: string
+          p_cover_image_alt?: string
+          p_cover_image_path?: string
+          p_excerpt: string
+          p_post_id: string
+          p_seo_description?: string
+          p_seo_title?: string
+          p_slug: string
+          p_tags?: string[]
+          p_title: string
+        }
         Returns: Json
       }
       platform_save_campaign_draft: {
@@ -6457,6 +8422,10 @@ export type Database = {
         }
         Returns: string
       }
+      platform_schedule_blog_post: {
+        Args: { p_post_id: string; p_scheduled_for: string }
+        Returns: Json
+      }
       platform_set_company_automation_override: {
         Args: { p_company_id: string; p_override?: boolean }
         Returns: number
@@ -6469,9 +8438,18 @@ export type Database = {
         Args: { p_enabled: boolean }
         Returns: number
       }
+      platform_site_deployments: { Args: never; Returns: Json }
       platform_stats: { Args: never; Returns: Json }
       platform_update_billing_config: {
         Args: { p_default_trial_tier_id: string; p_trial_duration_days: number }
+        Returns: Json
+      }
+      platform_update_registration_config: {
+        Args: {
+          p_automatic_company_approval_enabled: boolean
+          p_daily_alert_threshold: number
+          p_hourly_alert_threshold: number
+        }
         Returns: Json
       }
       platform_update_subscription: {
@@ -6529,6 +8507,18 @@ export type Database = {
         Args: { p_amount: number; p_customer_id: string; p_reason: string }
         Returns: string
       }
+      post_customer_deposit_refund: {
+        Args: {
+          p_amount: number
+          p_client_ref?: string
+          p_customer_id: string
+          p_location_id?: string
+          p_method_code?: string
+          p_reason: string
+          p_reference?: string
+        }
+        Returns: Json
+      }
       post_customer_payment: {
         Args: {
           p_amount: number
@@ -6559,6 +8549,18 @@ export type Database = {
           p_memo: string
           p_source_id: string
           p_source_type: string
+        }
+        Returns: string
+      }
+      post_location_variance_adjustment: {
+        Args: {
+          p_account_code: string
+          p_company_id: string
+          p_count_id: string
+          p_declared: number
+          p_location_id: string
+          p_reason?: string
+          p_session_id: string
         }
         Returns: string
       }
@@ -6619,6 +8621,19 @@ export type Database = {
         }
         Returns: Json
       }
+      post_sale_with_prepayment_at_location: {
+        Args: {
+          p_client_ref?: string
+          p_credit_amount: number
+          p_customer_id: string
+          p_deposit_amount: number
+          p_draft_id?: string
+          p_lines: Json
+          p_location_id: string
+          p_payments: Json
+        }
+        Returns: Json
+      }
       post_stock_adjustment: {
         Args: {
           p_expected_quantity: number
@@ -6670,6 +8685,22 @@ export type Database = {
         Args: { p_outbox_id: string }
         Returns: boolean
       }
+      prepayment_money_account: {
+        Args: {
+          p_account_code: string
+          p_location_id: string
+          p_reference?: string
+        }
+        Returns: string
+      }
+      prepayment_tender_account: {
+        Args: {
+          p_location_id: string
+          p_method_code: string
+          p_reference?: string
+        }
+        Returns: string
+      }
       preview_external_document: {
         Args: {
           p_channel: string
@@ -6700,6 +8731,36 @@ export type Database = {
         }
         Returns: string
       }
+      provision_company_registration: {
+        Args: {
+          p_address?: string
+          p_blog_ref?: string
+          p_company_name: string
+          p_currency?: string
+          p_email?: string
+          p_owner_name?: string
+          p_store_name?: string
+          p_terms_content_sha256?: string
+          p_terms_version?: string
+          p_trial_tier_code?: string
+        }
+        Returns: Json
+      }
+      provision_company_registration_core: {
+        Args: {
+          p_address: string
+          p_blog_ref: string
+          p_company_name: string
+          p_currency: string
+          p_email: string
+          p_owner_name: string
+          p_store_name: string
+          p_terms_content_sha256: string
+          p_terms_version: string
+          p_trial_tier_code: string
+        }
+        Returns: Json
+      }
       provision_company_with_terms: {
         Args: {
           p_address?: string
@@ -6715,8 +8776,20 @@ export type Database = {
         Returns: string
       }
       public_billing_config: { Args: never; Returns: Json }
+      public_blog_post: { Args: { p_slug: string }; Returns: Json }
+      public_blog_posts: {
+        Args: {
+          p_before?: string
+          p_before_id?: string
+          p_limit?: number
+          p_tag?: string
+        }
+        Returns: Json
+      }
+      public_blog_sitemap: { Args: never; Returns: Json }
       public_customer_statement: { Args: { p_token: string }; Returns: Json }
       public_external_document: { Args: { p_token: string }; Returns: Json }
+      publish_due_blog_posts: { Args: never; Returns: number }
       published_legal_document: {
         Args: { p_document_type: string }
         Returns: Json
@@ -6728,6 +8801,10 @@ export type Database = {
       published_legal_document_version: {
         Args: { p_document_type: string; p_version: string }
         Returns: Json
+      }
+      queue_cashier_session_notification: {
+        Args: { p_event: string; p_session_id: string }
+        Returns: string
       }
       queue_manual_document_message: {
         Args: {
@@ -6767,6 +8844,27 @@ export type Database = {
           p_whatsapp_status: string
         }
         Returns: undefined
+      }
+      record_blog_event: {
+        Args: {
+          p_event_id: string
+          p_event_type: string
+          p_metadata?: Json
+          p_post_id: string
+          p_visitor_id: string
+        }
+        Returns: boolean
+      }
+      record_customer_deposit: {
+        Args: {
+          p_amount: number
+          p_client_ref?: string
+          p_customer_id: string
+          p_location_id?: string
+          p_method_code: string
+          p_reference?: string
+        }
+        Returns: string
       }
       record_manual_reconciliation: {
         Args: { p_declarations: Json }
@@ -6812,6 +8910,23 @@ export type Database = {
         }
         Returns: string
       }
+      record_purchase_with_advance: {
+        Args: {
+          p_account_code?: string
+          p_advance_amount?: number
+          p_client_ref?: string
+          p_credit_amount?: number
+          p_expenses?: Json
+          p_lines: Json
+          p_notes?: string
+          p_payment_amount?: number
+          p_purchase_date?: string
+          p_reference?: string
+          p_stock_location_id?: string
+          p_supplier_id: string
+        }
+        Returns: string
+      }
       record_purchase_with_payment: {
         Args: {
           p_account_code?: string
@@ -6838,8 +8953,32 @@ export type Database = {
         }
         Returns: string
       }
+      record_supplier_advance: {
+        Args: {
+          p_account_code: string
+          p_amount: number
+          p_client_ref?: string
+          p_location_id?: string
+          p_reference?: string
+          p_supplier_id: string
+        }
+        Returns: string
+      }
+      record_supplier_advance_return: {
+        Args: {
+          p_account_code: string
+          p_amount: number
+          p_client_ref?: string
+          p_location_id?: string
+          p_reason: string
+          p_reference?: string
+          p_supplier_id: string
+        }
+        Returns: string
+      }
       refresh_analytics: { Args: never; Returns: undefined }
       refresh_auth_otp_delivery_status: { Args: never; Returns: number }
+      refresh_blog_daily_metrics: { Args: never; Returns: number }
       refresh_catalog_search_product: {
         Args: { p_product_id: string }
         Returns: undefined
@@ -6847,6 +8986,18 @@ export type Database = {
       refresh_catalog_search_variant: {
         Args: { p_variant_id: string }
         Returns: undefined
+      }
+      refund_customer_deposit: {
+        Args: {
+          p_amount: number
+          p_client_ref?: string
+          p_customer_id: string
+          p_location_id?: string
+          p_method_code?: string
+          p_reason: string
+          p_reference?: string
+        }
+        Returns: string
       }
       remove_team_member: { Args: { p_membership_id: string }; Returns: string }
       render_external_document_message: {
@@ -6914,6 +9065,14 @@ export type Database = {
         Args: { p_company_id: string }
         Returns: Json
       }
+      reverse_customer_deposit_application: {
+        Args: { p_application_id: string; p_reason: string }
+        Returns: string
+      }
+      reverse_supplier_advance_application: {
+        Args: { p_application_id: string; p_reason: string }
+        Returns: string
+      }
       revert_variance: {
         Args: { p_reason?: string; p_recon_account_id: string }
         Returns: string
@@ -6969,6 +9128,24 @@ export type Database = {
         }
         Returns: string
       }
+      save_purchase_draft_with_advance: {
+        Args: {
+          p_account_code?: string
+          p_advance_amount?: number
+          p_client_ref?: string
+          p_draft_id?: string
+          p_expenses?: Json
+          p_lines: Json
+          p_notes?: string
+          p_payment_amount?: number
+          p_purchase_date?: string
+          p_reference?: string
+          p_stock_location_id?: string
+          p_supplier_id: string
+        }
+        Returns: string
+      }
+      scan_registration_volume_alerts: { Args: never; Returns: number }
       search_catalog_variants: {
         Args: { p_limit?: number; p_location_id?: string; p_query: string }
         Returns: {
@@ -7182,6 +9359,14 @@ export type Database = {
         }[]
       }
       subscription_expiry_scan: { Args: never; Returns: number }
+      supplier_advance_activity: {
+        Args: { p_limit?: number; p_supplier_id: string }
+        Returns: Json
+      }
+      supplier_advance_available: {
+        Args: { p_supplier_id: string }
+        Returns: number
+      }
       sync_cache_stream: {
         Args: { p_after_sequence?: number; p_limit?: number; p_stream: string }
         Returns: Json
@@ -7196,6 +9381,7 @@ export type Database = {
         }
         Returns: string
       }
+      trigger_public_site_deploy: { Args: never; Returns: undefined }
       update_catalog_product: {
         Args: {
           p_active?: boolean
@@ -7357,6 +9543,29 @@ export type Database = {
       user_has_company_permission_unchecked: {
         Args: { p_company_id: string; p_permission: string }
         Returns: boolean
+      }
+      validate_blog_fields: {
+        Args: {
+          p_author_name: string
+          p_content_markdown: string
+          p_cover_image_alt: string
+          p_cover_image_path: string
+          p_excerpt: string
+          p_seo_description: string
+          p_seo_title: string
+          p_slug: string
+          p_tags: string[]
+          p_title: string
+        }
+        Returns: undefined
+      }
+      validate_cashier_declarations: {
+        Args: {
+          p_company_id: string
+          p_declarations: Json
+          p_location_id: string
+        }
+        Returns: undefined
       }
       validate_platform_campaign: {
         Args: {

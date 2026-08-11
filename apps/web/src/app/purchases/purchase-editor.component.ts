@@ -154,7 +154,7 @@ interface ExpenseForm {
                         controlSize="md"
                         [options]="supplierOptions()"
                         [value]="supplier.value"
-                        (valueChange)="supplier.setValue($event); markDirty()"
+                        (valueChange)="onSupplierChange($event)"
                       />
                     </app-form-field>
                     <app-form-field label="Receive into" [required]="true">
@@ -579,6 +579,39 @@ interface ExpenseForm {
                     </button>
                   }
                 </div>
+                @if (supplierAdvanceAvailable() > 0 && perms.has('ManageSupplierCreditPurchases')) {
+                  <div class="rounded-field border border-info/30 bg-info/5 p-3">
+                    <div class="flex items-center justify-between gap-2">
+                      <div>
+                        <p class="type-heading">Advance with supplier</p>
+                        <p class="type-caption">Explicitly choose how much to apply.</p>
+                      </div>
+                      <app-money [amount]="supplierAdvanceAvailable()" />
+                    </div>
+                    <app-form-field
+                      class="mt-2 block"
+                      label="Use advance (KES)"
+                      [error]="advanceAmountError()"
+                    >
+                      <input
+                        class="input input-bordered w-full text-right"
+                        inputmode="numeric"
+                        [formControl]="advanceAmount"
+                        (input)="markDirty()"
+                      />
+                    </app-form-field>
+                    <button
+                      appButton
+                      variant="ghost"
+                      size="sm"
+                      type="button"
+                      class="mt-2"
+                      (click)="useSuggestedAdvance()"
+                    >
+                      Use suggested <app-money [amount]="suggestedAdvance()" />
+                    </button>
+                  </div>
+                }
                 @if (paymentMode.value === 'partial') {
                   <app-form-field label="Amount paid now" [error]="partialPaymentError()">
                     <input
@@ -642,6 +675,9 @@ interface ExpenseForm {
                 </div>
                 <div class="flex justify-between text-sm">
                   <span>Initial supplier payment</span><app-money [amount]="initialPayment()" />
+                </div>
+                <div class="flex justify-between text-sm">
+                  <span>Advance applied</span><app-money [amount]="advanceUsed()" />
                 </div>
                 <div class="flex justify-between text-sm">
                   <span>Cash leaving now</span
@@ -758,9 +794,13 @@ export class PurchaseEditorComponent implements OnInit {
   protected readonly purchaseDate = new FormControl(this.today(), { nonNullable: true });
   protected readonly paymentMode = new FormControl<PaymentMode>('paid', { nonNullable: true });
   protected readonly partialAmount = new FormControl('', { nonNullable: true });
+  protected readonly advanceAmount = new FormControl('0', { nonNullable: true });
+  protected readonly supplierAdvanceAvailable = signal(0);
   protected readonly account = new FormControl('', { nonNullable: true });
   private nextKey = 1;
   private searchRequest = 0;
+  private purchaseClientRef: string = crypto.randomUUID();
+  private advanceAwareDraft = false;
   private exitAllowed = false;
 
   protected readonly goodsSubtotal = computed(() =>
@@ -780,6 +820,9 @@ export class PurchaseEditorComponent implements OnInit {
   );
   protected readonly invoiceTotal = computed(
     () => this.goodsSubtotal() + this.supplierExpenseTotal()
+  );
+  protected readonly suggestedAdvance = computed(() =>
+    Math.min(this.supplierAdvanceAvailable(), this.invoiceTotal())
   );
 
   async ngOnInit(): Promise<void> {
@@ -1069,13 +1112,39 @@ export class PurchaseEditorComponent implements OnInit {
     if (mode !== 'partial') this.partialAmount.setValue('');
     this.markDirty();
   }
+  protected onSupplierChange(supplierId: string): void {
+    this.supplier.setValue(supplierId);
+    this.advanceAmount.setValue('0');
+    this.supplierAdvanceAvailable.set(0);
+    this.markDirty();
+    if (supplierId) {
+      void this.money.supplierAdvanceAvailable(supplierId).then(balance => {
+        if (this.supplier.value === supplierId) this.supplierAdvanceAvailable.set(balance);
+      });
+    }
+  }
+  protected advanceUsed(): number {
+    return parseKes(this.advanceAmount.value) ?? 0;
+  }
+  protected advanceAmountError(): string | null {
+    const amount = parseKes(this.advanceAmount.value);
+    if (amount === null || amount < 0) return 'Enter zero or a positive amount';
+    if (amount > this.supplierAdvanceAvailable()) return 'Amount exceeds the available advance';
+    if (amount > this.invoiceTotal()) return 'Amount exceeds the supplier invoice';
+    return null;
+  }
+  protected useSuggestedAdvance(): void {
+    this.advanceAmount.setValue(formatKesInput(this.suggestedAdvance()));
+    this.markDirty();
+  }
   protected initialPayment(): number {
-    if (this.paymentMode.value === 'paid') return this.invoiceTotal();
+    if (this.paymentMode.value === 'paid')
+      return Math.max(0, this.invoiceTotal() - this.advanceUsed());
     if (this.paymentMode.value === 'later') return 0;
     return parseKes(this.partialAmount.value) ?? 0;
   }
   protected balanceDue(): number {
-    return Math.max(0, this.invoiceTotal() - this.initialPayment());
+    return Math.max(0, this.invoiceTotal() - this.initialPayment() - this.advanceUsed());
   }
   protected cashLeavingNow(): number {
     return this.initialPayment() + this.separateExpenseTotal();
@@ -1087,7 +1156,8 @@ export class PurchaseEditorComponent implements OnInit {
     const amount = parseKes(this.partialAmount.value);
     if (this.paymentMode.value !== 'partial') return null;
     if (amount === null || amount <= 0) return 'Enter an amount greater than zero';
-    if (amount >= this.invoiceTotal()) return 'Use Paid now for the full invoice';
+    if (amount + this.advanceUsed() >= this.invoiceTotal())
+      return 'Use Paid now when the invoice is fully settled';
     return null;
   }
   protected creditExceeded(): boolean {
@@ -1101,6 +1171,7 @@ export class PurchaseEditorComponent implements OnInit {
   protected canConfirm(): boolean {
     return (
       !this.busy() &&
+      !this.advanceAmountError() &&
       !this.partialPaymentError() &&
       !this.creditExceeded() &&
       (!this.requiresSession() || this.cashierSession.canTakePayment())
@@ -1112,7 +1183,7 @@ export class PurchaseEditorComponent implements OnInit {
     this.savingDraft.set(true);
     this.error.set(null);
     try {
-      const id = await this.money.savePurchaseDraftComplete({
+      const common = {
         draftId: this.draftId() ?? undefined,
         supplierId: this.supplier.value,
         lines: this.parsedLines(),
@@ -1121,10 +1192,21 @@ export class PurchaseEditorComponent implements OnInit {
         notes: this.notes.value.trim() || undefined,
         purchaseDate: this.purchaseDate.value,
         stockLocationId: this.location.value,
-        paymentMode: this.paymentMode.value,
         paymentAmount: this.initialPayment(),
         accountCode: this.account.value || undefined,
-      });
+      };
+      const useAdvanceDraftRpc = this.advanceUsed() > 0 || this.advanceAwareDraft;
+      const id = useAdvanceDraftRpc
+        ? await this.money.savePurchaseDraftWithAdvance({
+            ...common,
+            advanceAmount: this.advanceUsed(),
+            clientRef: this.purchaseClientRef,
+          })
+        : await this.money.savePurchaseDraftComplete({
+            ...common,
+            paymentMode: this.paymentMode.value,
+          });
+      if (useAdvanceDraftRpc) this.advanceAwareDraft = true;
       this.draftId.set(id);
       this.dirty.set(false);
       this.notice.set('Purchase draft saved');
@@ -1144,7 +1226,7 @@ export class PurchaseEditorComponent implements OnInit {
       if (this.requiresSession()) await this.cashierSession.assertOpen('recording this purchase');
       let purchaseId: string;
       if (this.draftId()) {
-        await this.money.savePurchaseDraftComplete({
+        const common = {
           draftId: this.draftId()!,
           supplierId: this.supplier.value,
           lines: this.parsedLines(),
@@ -1153,13 +1235,26 @@ export class PurchaseEditorComponent implements OnInit {
           notes: this.notes.value.trim() || undefined,
           purchaseDate: this.purchaseDate.value,
           stockLocationId: this.location.value,
-          paymentMode: this.paymentMode.value,
           paymentAmount: this.initialPayment(),
           accountCode: this.account.value || undefined,
-        });
-        purchaseId = await this.money.confirmPurchaseDraftComplete(this.draftId()!);
+        };
+        if (this.advanceUsed() > 0 || this.advanceAwareDraft) {
+          await this.money.savePurchaseDraftWithAdvance({
+            ...common,
+            advanceAmount: this.advanceUsed(),
+            clientRef: this.purchaseClientRef,
+          });
+          this.advanceAwareDraft = true;
+          purchaseId = await this.money.confirmPurchaseDraftWithAdvance(this.draftId()!);
+        } else {
+          await this.money.savePurchaseDraftComplete({
+            ...common,
+            paymentMode: this.paymentMode.value,
+          });
+          purchaseId = await this.money.confirmPurchaseDraftComplete(this.draftId()!);
+        }
       } else {
-        purchaseId = await this.money.recordPurchaseComplete({
+        const common = {
           supplierId: this.supplier.value,
           lines: this.parsedLines(),
           expenses: this.parsedExpenses(),
@@ -1169,7 +1264,16 @@ export class PurchaseEditorComponent implements OnInit {
           notes: this.notes.value.trim() || undefined,
           purchaseDate: this.purchaseDate.value,
           stockLocationId: this.location.value,
-        });
+        };
+        purchaseId =
+          this.advanceUsed() > 0
+            ? await this.money.recordPurchaseWithAdvance({
+                ...common,
+                advanceAmount: this.advanceUsed(),
+                creditAmount: this.balanceDue(),
+                clientRef: this.purchaseClientRef,
+              })
+            : await this.money.recordPurchaseComplete(common);
       }
       this.exitAllowed = true;
       this.dirty.set(false);
@@ -1291,7 +1395,17 @@ export class PurchaseEditorComponent implements OnInit {
       return;
     }
     this.draftId.set(draft.id);
+    this.purchaseClientRef =
+      (draft as unknown as { client_ref?: string | null }).client_ref ?? crypto.randomUUID();
     this.supplier.setValue(draft.supplier_id);
+    const restoredAdvance = Number(
+      (draft as unknown as { advance_amount?: number }).advance_amount ?? 0
+    );
+    this.advanceAwareDraft = restoredAdvance > 0 || !!draft.client_ref;
+    this.advanceAmount.setValue(formatKesInput(restoredAdvance));
+    void this.money.supplierAdvanceAvailable(draft.supplier_id).then(balance => {
+      if (this.supplier.value === draft.supplier_id) this.supplierAdvanceAvailable.set(balance);
+    });
     this.reference.setValue(draft.reference ?? '');
     this.notes.setValue(draft.notes ?? '');
     this.purchaseDate.setValue(draft.purchase_date);

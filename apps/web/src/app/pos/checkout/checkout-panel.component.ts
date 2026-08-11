@@ -6,7 +6,7 @@ import { ButtonComponent } from '../../shared/ui/button.component';
 import { FormFieldComponent } from '../../shared/ui/form-field.component';
 import { IconComponent } from '../../shared/ui/icon.component';
 import { MoneyComponent } from '../../shared/ui/money.component';
-import type { PaymentInput } from '../pos.service';
+import type { PaymentInput, SaleSettlementInput } from '../pos.service';
 
 /** An enabled tender method as shown in the checkout panel. */
 export interface PaymentMethodOption {
@@ -67,6 +67,65 @@ interface Tender {
         </header>
 
         <div class="flex-1 overflow-y-auto p-3 md:p-6">
+          @if (customerDepositAvailable() > 0 || allowCredit()) {
+            <section class="mb-4 rounded-box border border-base-300/60 bg-base-200/50 p-3">
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <p class="type-heading">Use existing balance</p>
+                  <p class="type-caption mt-1">Nothing is applied until you confirm this sale.</p>
+                </div>
+                @if (customerDepositAvailable() > 0) {
+                  <span class="badge badge-info badge-sm">
+                    Held: <app-money [amount]="customerDepositAvailable()" />
+                  </span>
+                }
+              </div>
+              <div class="mt-3 grid gap-3 sm:grid-cols-2">
+                @if (customerDepositAvailable() > 0) {
+                  <app-form-field
+                    label="Use customer deposit (KES)"
+                    hint="Money held for customer"
+                    [error]="depositInputInvalid() ? 'Enter a valid amount' : null"
+                  >
+                    <input
+                      class="input input-bordered min-h-11 w-full"
+                      type="text"
+                      inputmode="numeric"
+                      [ngModel]="depositText()"
+                      (ngModelChange)="setDepositText($event)"
+                    />
+                  </app-form-field>
+                }
+                @if (allowCredit()) {
+                  <app-form-field
+                    label="Customer owes us (KES)"
+                    hint="Residual sale credit"
+                    [error]="creditInputInvalid() ? 'Enter a valid amount' : null"
+                  >
+                    <input
+                      class="input input-bordered min-h-11 w-full"
+                      type="text"
+                      inputmode="numeric"
+                      [ngModel]="creditText()"
+                      (ngModelChange)="setCreditText($event)"
+                    />
+                  </app-form-field>
+                }
+              </div>
+              @if (customerDepositAvailable() > 0) {
+                <button
+                  appButton
+                  variant="ghost"
+                  size="sm"
+                  type="button"
+                  class="mt-2"
+                  (click)="useSuggestedDeposit()"
+                >
+                  Use suggested <app-money [amount]="suggestedDeposit()" />
+                </button>
+              }
+            </section>
+          }
           <section aria-labelledby="payment-method-heading">
             <p id="payment-method-heading" class="type-heading mb-2">Payment method</p>
             <div class="rounded-box bg-base-200 p-1">
@@ -122,7 +181,7 @@ interface Tender {
                   type="range"
                   class="range range-primary range-sm w-full"
                   min="0"
-                  [max]="total()"
+                  [max]="tenderDue()"
                   step="1"
                   [ngModel]="splitFirstAmount()"
                   (ngModelChange)="setSplitFirstAmount($event)"
@@ -175,7 +234,7 @@ interface Tender {
                       [attr.aria-pressed]="paidAmount() === amount"
                       (click)="useCashAmount(amount)"
                     >
-                      @if (amount === total()) {
+                      @if (amount === tenderDue()) {
                         Exact
                       } @else {
                         <app-money [amount]="amount" />
@@ -276,11 +335,11 @@ interface Tender {
                   <strong
                     class="tabular-nums"
                     [class.text-error]="
-                      paidAmount() < total() || (isSplit() && paidAmount() > total())
+                      paidAmount() < tenderDue() || (isSplit() && paidAmount() > tenderDue())
                     "
                     [class.text-success]="
-                      (paidAmount() === total() && !hasInvalidTender()) ||
-                      (!isSplit() && paidAmount() > total())
+                      (paidAmount() === tenderDue() && !hasInvalidTender()) ||
+                      (!isSplit() && paidAmount() > tenderDue())
                     "
                   >
                     <app-money [amount]="paidAmount()" />
@@ -314,7 +373,7 @@ interface Tender {
                 <progress
                   class="progress progress-primary mt-2 w-full"
                   [value]="allocatedProgressAmount()"
-                  [max]="total()"
+                  [max]="tenderDue()"
                   aria-label="Payment allocation progress"
                 ></progress>
               }
@@ -398,10 +457,15 @@ export class CheckoutPanelComponent {
   readonly methods = input.required<PaymentMethodOption[]>();
   /** Whether the user may confirm tenders paid to direct (non-till) accounts. */
   readonly canUseDirectAccounts = input(false);
+  /** Unapplied subledger balance; zero hides deposit controls. */
+  readonly customerDepositAvailable = input(0);
+  /** Identified, approved customer may leave an explicit residual in AR. */
+  readonly allowCredit = input(false);
   readonly heading = input('Checkout');
   readonly busy = input(false);
 
   readonly confirmed = output<PaymentInput[]>();
+  readonly settlementConfirmed = output<SaleSettlementInput>();
   /** Emitted instead of `confirmed` when a direct-account tender needs approval. */
   readonly approvalRequested = output<PaymentInput[]>();
   readonly cancelled = output<void>();
@@ -412,6 +476,21 @@ export class CheckoutPanelComponent {
   protected readonly armed = signal(false);
   /** Reference fields the cashier has focused and left — drives bank validation text. */
   protected readonly referenceTouched = signal<Set<number>>(new Set());
+  protected readonly depositText = signal('0');
+  protected readonly creditText = signal('0');
+  protected readonly depositAmount = computed(() => parseKes(this.depositText()) ?? 0);
+  protected readonly creditAmount = computed(() => parseKes(this.creditText()) ?? 0);
+  protected readonly depositInputInvalid = computed(() => parseKes(this.depositText()) === null);
+  protected readonly creditInputInvalid = computed(() => parseKes(this.creditText()) === null);
+  protected readonly usesHeldFunds = computed(
+    () => this.depositAmount() > 0 || this.creditAmount() > 0
+  );
+  protected readonly tenderDue = computed(() =>
+    Math.max(this.total() - this.depositAmount() - this.creditAmount(), 0)
+  );
+  protected readonly suggestedDeposit = computed(() =>
+    Math.min(this.customerDepositAvailable(), this.total())
+  );
   protected readonly isSplit = computed(() => this.tenders().length > 1);
   protected readonly singleMethod = computed(() =>
     this.isSplit() ? null : (this.tenders()[0]?.method ?? null)
@@ -454,10 +533,12 @@ export class CheckoutPanelComponent {
 
   private reset(): void {
     this.initialized = true;
+    this.depositText.set('0');
+    this.creditText.set('0');
     this.tenders.set([
       {
         method: this.defaultMethodCode(),
-        amountText: this.amountText(this.total()),
+        amountText: this.amountText(this.tenderDue()),
         reference: '',
       },
     ]);
@@ -499,7 +580,7 @@ export class CheckoutPanelComponent {
     this.tenders.set([
       {
         method: code,
-        amountText: this.amountText(this.total()),
+        amountText: this.amountText(this.tenderDue()),
         reference: '',
       },
     ]);
@@ -515,7 +596,7 @@ export class CheckoutPanelComponent {
     const amount = parseKes(amountText);
     const ts = this.tenders();
 
-    if (ts.length !== 2 || amount === null || amount < 0 || amount > this.total()) {
+    if (ts.length !== 2 || amount === null || amount < 0 || amount > this.tenderDue()) {
       this.patchTender(index, { amountText });
       return;
     }
@@ -523,7 +604,7 @@ export class CheckoutPanelComponent {
     this.tenders.set(
       ts.map((tender, tenderIndex) => ({
         ...tender,
-        amountText: tenderIndex === index ? amountText : this.amountText(this.total() - amount),
+        amountText: tenderIndex === index ? amountText : this.amountText(this.tenderDue() - amount),
       }))
     );
   }
@@ -537,12 +618,12 @@ export class CheckoutPanelComponent {
       codes.find(code => code !== first);
     if (!first || !second) return;
 
-    const half = Math.floor(this.total() / 2);
+    const half = Math.floor(this.tenderDue() / 2);
     this.armed.set(false);
     this.tenders.set([
       {
         method: first,
-        amountText: this.amountText(this.total() - half),
+        amountText: this.amountText(this.tenderDue() - half),
         reference: '',
       },
       { method: second, amountText: this.amountText(half), reference: '' },
@@ -561,12 +642,12 @@ export class CheckoutPanelComponent {
   protected setSplitFirstAmount(value: number | string): void {
     const amount = Number(value);
     if (!Number.isFinite(amount)) return;
-    const clamped = Math.min(Math.max(Math.round(amount), 0), this.total());
+    const clamped = Math.min(Math.max(Math.round(amount), 0), this.tenderDue());
     this.setTwoWaySplit(clamped);
   }
 
   protected setSplitRatio(firstShare: number): void {
-    this.setTwoWaySplit(Math.round(this.total() * firstShare));
+    this.setTwoWaySplit(Math.round(this.tenderDue() * firstShare));
   }
 
   protected methodUsedElsewhere(code: string, index: number): boolean {
@@ -579,18 +660,21 @@ export class CheckoutPanelComponent {
     this.tenders().reduce((sum, t) => sum + (parseKes(t.amountText) ?? 0), 0)
   );
   protected readonly remainingAmount = computed(() =>
-    Math.max(this.total() - this.paidAmount(), 0)
+    Math.max(this.tenderDue() - this.paidAmount(), 0)
   );
-  protected readonly overpaidAmount = computed(() => Math.max(this.paidAmount() - this.total(), 0));
+  protected readonly overpaidAmount = computed(() =>
+    Math.max(this.paidAmount() - this.tenderDue(), 0)
+  );
   protected readonly allocatedProgressAmount = computed(() =>
-    Math.min(this.paidAmount(), this.total())
+    Math.min(this.paidAmount(), this.tenderDue())
   );
-  protected readonly hasInvalidTender = computed(() =>
-    this.tenders().some(tender => (parseKes(tender.amountText) ?? 0) <= 0)
+  protected readonly hasInvalidTender = computed(
+    () =>
+      this.tenderDue() > 0 && this.tenders().some(tender => (parseKes(tender.amountText) ?? 0) <= 0)
   );
 
   protected readonly cashSuggestions = computed(() => {
-    const total = this.total();
+    const total = this.tenderDue();
     const roundUp = (unit: number) => Math.ceil(total / unit) * unit;
     const kenyanNotes = [50, 100, 200, 500, 1_000];
 
@@ -622,12 +706,18 @@ export class CheckoutPanelComponent {
     const ts = this.tenders();
     if (ts.length !== 1 || ts[0].method !== 'cash') return 0;
     const tendered = parseKes(ts[0].amountText);
-    if (tendered === null || tendered <= this.total()) return 0;
-    return tendered - this.total();
+    if (tendered === null || tendered <= this.tenderDue()) return 0;
+    return tendered - this.tenderDue();
   });
 
   protected canConfirm = computed(() => {
     const ts = this.tenders();
+    if (this.depositInputInvalid() || this.creditInputInvalid()) return false;
+    if (this.depositAmount() < 0 || this.depositAmount() > this.customerDepositAvailable())
+      return false;
+    if (this.creditAmount() < 0 || (!this.allowCredit() && this.creditAmount() > 0)) return false;
+    if (this.depositAmount() + this.creditAmount() > this.total()) return false;
+    if (this.tenderDue() === 0) return true;
     if (ts.length === 0) return false;
     if (this.hasInvalidTender()) return false;
     // Statement-matched (bank) tenders need their transaction ID before confirming.
@@ -635,8 +725,8 @@ export class CheckoutPanelComponent {
       return false;
     // A single cash tender may exceed the total (change given); anything else
     // must sum to the total exactly (the backend enforces payment_mismatch).
-    if (ts.length === 1 && ts[0].method === 'cash') return this.paidAmount() >= this.total();
-    return this.paidAmount() === this.total();
+    if (ts.length === 1 && ts[0].method === 'cash') return this.paidAmount() >= this.tenderDue();
+    return this.paidAmount() === this.tenderDue();
   });
 
   protected methodLabel(code: string): string {
@@ -657,24 +747,25 @@ export class CheckoutPanelComponent {
     this.armed.set(false);
     this.tenders.set([
       { ...ts[0], amountText: this.amountText(firstAmount) },
-      { ...ts[1], amountText: this.amountText(this.total() - firstAmount) },
+      { ...ts[1], amountText: this.amountText(this.tenderDue() - firstAmount) },
     ]);
   }
 
   private useSingleTender(tender: Tender): void {
     this.armed.set(false);
     this.tenders.set([
-      { ...tender, amountText: this.amountText(this.total()), reference: tender.reference },
+      { ...tender, amountText: this.amountText(this.tenderDue()), reference: tender.reference },
     ]);
   }
 
   /** Build the PaymentInput payload, or null (with `error` set) when invalid. */
   private buildPayments(): PaymentInput[] | null {
     const ts = this.tenders();
+    if (this.tenderDue() === 0) return [];
     // Single cash tender with overpayment: send the exact total; change is
     // handed back physically and is not part of the payment record.
-    if (ts.length === 1 && ts[0].method === 'cash' && this.paidAmount() > this.total()) {
-      return [{ method: 'cash', amount: this.total() }];
+    if (ts.length === 1 && ts[0].method === 'cash' && this.paidAmount() > this.tenderDue()) {
+      return [{ method: 'cash', amount: this.tenderDue() }];
     }
     const payments: PaymentInput[] = [];
     for (const t of ts) {
@@ -698,10 +789,23 @@ export class CheckoutPanelComponent {
 
   protected confirm(): void {
     this.error.set(null);
+    if (this.depositInputInvalid() || this.creditInputInvalid()) {
+      this.error.set('Enter valid deposit and credit amounts');
+      return;
+    }
     if (this.directMethod() !== null) {
       if (this.needsApproval()) {
         const payments = this.buildPayments();
-        if (payments) this.approvalRequested.emit(payments);
+        if (!payments) return;
+        if (this.usesHeldFunds()) {
+          this.settlementConfirmed.emit({
+            payments,
+            depositAmount: this.depositAmount(),
+            creditAmount: this.creditAmount(),
+          });
+        } else {
+          this.approvalRequested.emit(payments);
+        }
         return;
       }
       if (!this.armed()) {
@@ -710,6 +814,41 @@ export class CheckoutPanelComponent {
       }
     }
     const payments = this.buildPayments();
-    if (payments) this.confirmed.emit(payments);
+    if (!payments) return;
+    if (this.usesHeldFunds()) {
+      this.settlementConfirmed.emit({
+        payments,
+        depositAmount: this.depositAmount(),
+        creditAmount: this.creditAmount(),
+      });
+    } else {
+      this.confirmed.emit(payments);
+    }
+  }
+
+  protected setDepositText(value: string): void {
+    this.depositText.set(value);
+    this.resetTenderForSettlement();
+  }
+
+  protected setCreditText(value: string): void {
+    this.creditText.set(value);
+    this.resetTenderForSettlement();
+  }
+
+  protected useSuggestedDeposit(): void {
+    this.depositText.set(String(this.suggestedDeposit()));
+    this.resetTenderForSettlement();
+  }
+
+  private resetTenderForSettlement(): void {
+    const due = this.tenderDue();
+    this.armed.set(false);
+    this.error.set(null);
+    this.tenders.set(
+      due === 0
+        ? []
+        : [{ method: this.defaultMethodCode(), amountText: this.amountText(due), reference: '' }]
+    );
   }
 }

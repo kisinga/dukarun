@@ -10,9 +10,9 @@ select testkit.as_user((select company_id from edit_company),
 
 create temp table edited_product as
 select public.create_catalog_product('Tea', '[
-  {"name":"250g","price":12000,"sku":"TEA-250",
+  {"name":"250g","price":12000,"sku":"TEA-250","barcode":"616000000002",
    "opening_quantity":1,"opening_unit_cost":5000},
-  {"name":"500g","price":22000,"sku":"TEA-500"}
+  {"name":"500g","price":22000,"sku":"TEA-500","barcode":"616000000003"}
 ]', '616000000001') product_id;
 
 create temp table edited_variants as
@@ -25,19 +25,19 @@ select public.update_catalog_product(
   jsonb_build_array(
     jsonb_build_object(
       'variant_id', (select id from edited_variants where name = '250g'),
-      'name', '250 g', 'price', 13000, 'sku', 'TEA-250-NEW', 'barcode', null,
+      'name', '250 g', 'price', 13000, 'sku', 'TEA-250-NEW', 'barcode', '616000000002',
       'wholesale_price', 11000, 'kind', 'good', 'track_inventory', true,
       'allow_fractional', false, 'active', true
     ),
     jsonb_build_object(
       'variant_id', (select id from edited_variants where name = '500g'),
-      'name', '500g', 'price', 22000, 'sku', 'TEA-500', 'barcode', null,
+      'name', '500g', 'price', 22000, 'sku', 'TEA-500', 'barcode', '616000000003',
       'wholesale_price', null, 'kind', 'good', 'track_inventory', true,
       'allow_fractional', false, 'active', false
     ),
     jsonb_build_object(
       'name', '1 kg', 'price', 40000, 'kind', 'good', 'track_inventory', true,
-      'allow_fractional', false, 'active', true, 'opening_quantity', 3,
+      'allow_fractional', false, 'active', true, 'barcode', '616000000004', 'opening_quantity', 3,
       'opening_unit_cost', 30000, 'batch_number', 'OPEN-TEA'
     )
   ),
