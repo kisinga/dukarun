@@ -5,12 +5,11 @@ active root workspace, default development flow, CI, or production deployment.
 
 | Area | Contents |
 |---|---|
-| [`vendure/`](vendure/) | Vendure-era Angular dashboard, infrastructure, architecture, deployment, and coverage artifacts |
-| [`v1-migration/`](v1-migration/) | PocketBase/Alpine v1 preservation and requirements extraction |
-| [`docs/2026-07-10/`](docs/2026-07-10/) | Dated Vendure implementation notes and decisions |
-| [`research/`](research/) | Product-recognition spikes, datasets, model samples, and unused images |
-| `01_Initial_Idea_and_Revisions.md` | Earliest product notes |
-| `02_Frappe_Evaluation/` | Framework evaluation history |
+| [`REFERENCE.md`](REFERENCE.md) | Short system history, durable lessons, and archive journal |
+| [`vendure/`](vendure/) | Retained v1 Vendure backend, primary dashboard, infrastructure, and recovery documentation |
+
+The pre-v1 implementation, abandoned research, dated working notes, and replaced v1 applications
+were removed after the v2 transition. Their useful lessons are condensed in `REFERENCE.md`.
 
 Archived documents are frozen context. Paths and commands inside them may describe their
 original layout. Use the root `README.md`, `ARCHITECTURE.md`, and `docs/` for current work.

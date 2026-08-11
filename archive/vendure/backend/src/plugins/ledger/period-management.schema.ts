@@ -1,6 +1,6 @@
 import { gql } from 'graphql-tag';
 
-/** Session and other UUID-bearing ids use String! not ID! so Vendure's integer ID strategy does not decode them to -1. See archive/docs/2026-07-10/GRAPHQL_IDS_AND_UUIDS.md. */
+/** UUID-bearing ids use String! so Vendure's integer ID strategy does not decode them to -1. */
 
 export const PERIOD_MANAGEMENT_SCHEMA = gql`
   type AccountingPeriod {

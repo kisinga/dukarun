@@ -23,7 +23,7 @@ import { WorkerContextService } from '../../infrastructure/utils/worker-context.
  *   3. During 14-day grace period: "grace_period_ending" reminders at 7/3/1 days.
  *   4. After grace period: emit "hard_expired".
  *
- * Behavior is documented in archive/docs/2026-07-10/SUBSCRIPTION_EXPIRY_NOTIFICATIONS.md.
+ * Historical subscription behavior; see the implementation below and archive/REFERENCE.md.
  */
 @Injectable()
 export class SubscriptionExpirySubscriber extends WorkerBackgroundTaskBase {

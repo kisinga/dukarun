@@ -439,21 +439,11 @@ coverageReporter: {
 
 ### GitHub Integration
 
-#### Coverage Badges
-
-```markdown
-[![Tests](https://github.com/kisinga/Dukarun/actions/workflows/test.yml/badge.svg)](https://github.com/kisinga/Dukarun/actions/workflows/test.yml)
-![Backend Coverage](./badges/backend-coverage.svg)
-![Frontend Coverage](./badges/frontend-coverage.svg)
-![Coverage](./badges/coverage.svg)
-```
-
 #### CI/CD Pipeline
 
 - **Separate Jobs**: Backend and frontend tests run independently
 - **Artifact Upload**: Coverage files stored as downloadable GitHub Actions artifacts
-- **Coverage Summary**: Combined LCOV results are written to the GitHub Actions job summary
-- **Repository Badges**: Successful pushes to `main` open or update a PR with refreshed backend, frontend, and combined coverage badges
+- **Coverage Summary**: Combined LCOV results were written to the GitHub Actions job summary
 
 ### Local Development
 
@@ -466,15 +456,12 @@ npm run test:coverage -w @dukarun/backend
 # Frontend coverage
 npm run test:coverage -w @dukarun/frontend
 
-# Combined summary and badge
-npm run coverage:summary
 ```
 
 #### Coverage Reports
 
 - **Backend**: `backend/coverage/index.html`
 - **Frontend**: `frontend/coverage/lcov-report/index.html`
-- **Combined**: GitHub Actions job summary and the SVG badges under `badges/`
 
 ### Best Practices
 
@@ -535,23 +522,24 @@ Dukarun uses platform-agnostic container images for flexible deployment.
 
 **See [INFRASTRUCTURE.md](./docs/INFRASTRUCTURE.md) for complete deployment guide and environment variables.**
 
-## Migration from V1
+## Migration from the pre-Vendure system
 
-### V1 (PocketBase)
+### PocketBase predecessor
 
 - **Backend**: Go + SQLite
 - **Frontend**: Alpine.js + Vanilla JS
 - **Auth**: Cookie-based
 - **DB**: SQLite (single file)
 
-### V2 (Vendure)
+### Vendure v1
 
 - **Backend**: TypeScript + PostgreSQL
 - **Frontend**: Angular + RxJS
 - **Auth**: JWT tokens
 - **DB**: PostgreSQL (scalable)
 
-**Complete migration documentation: [archive/v1-migration/MIGRATION_SUMMARY.md](./archive/v1-migration/MIGRATION_SUMMARY.md)**
+The extracted PocketBase source and migration bundle were removed after the Vendure migration
+ceased to be operationally relevant. They remain recoverable from repository history.
 
 ## Performance Considerations
 

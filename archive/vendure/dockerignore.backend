@@ -25,4 +25,3 @@ docs/
 # Backend build: exclude other apps (keep workspace package.json for npm)
 frontend/*
 !frontend/package.json
-super-admin/
