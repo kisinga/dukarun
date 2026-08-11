@@ -1,0 +1,1362 @@
+import { Component, HostListener, OnInit, computed, inject, signal } from '@angular/core';
+import { FormControl, FormsModule, ReactiveFormsModule } from '@angular/forms';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { CatalogSearchService } from '../core/catalog-search.service';
+import { CashierSessionService } from '../core/cashier-session.service';
+import { CompanyPreferencesService } from '../core/company-preferences.service';
+import { formatKes, formatKesInput, parseKes } from '../core/money';
+import { PartyCacheService } from '../core/party-cache.service';
+import { PermissionsService } from '../core/permissions.service';
+import { LocationContextService } from '../core/location-context.service';
+import {
+  LedgerAccount,
+  MoneyService,
+  PurchaseDraft,
+  PurchaseExpenseInput,
+  PurchaseLineInput,
+  SupplierVariantPerformance,
+} from '../money/money.service';
+import { Variant, variantLabel } from '../pos/pos.service';
+import { ButtonComponent } from '../shared/ui/button.component';
+import { FormFieldComponent } from '../shared/ui/form-field.component';
+import { IconComponent } from '../shared/ui/icon.component';
+import { MoneyComponent } from '../shared/ui/money.component';
+import { PageLayoutComponent } from '../shared/ui/page-layout.component';
+import { SessionRequiredNoticeComponent } from '../shared/ui/session-required-notice.component';
+import {
+  SearchableFilterComponent,
+  type SearchableFilterOption,
+} from '../shared/ui/searchable-filter.component';
+import {
+  PurchaseLineRowComponent,
+  type PurchaseLineDetailField,
+  type PurchaseLineForm,
+  type PurchaseLinePriceContext,
+} from './purchase-line-row.component';
+
+type PaymentMode = 'paid' | 'partial' | 'later';
+type ExpenseSettlement = '' | 'supplier_bill' | 'separate';
+
+interface ExpenseForm {
+  key: number;
+  category: string;
+  customCategory: string;
+  memo: string;
+  amount: string;
+  settlement: ExpenseSettlement;
+  accountCode: string;
+  error: string | null;
+}
+
+@Component({
+  selector: 'app-purchase-editor',
+  imports: [
+    FormsModule,
+    ReactiveFormsModule,
+    RouterLink,
+    PageLayoutComponent,
+    ButtonComponent,
+    FormFieldComponent,
+    IconComponent,
+    MoneyComponent,
+    SessionRequiredNoticeComponent,
+    SearchableFilterComponent,
+    PurchaseLineRowComponent,
+  ],
+  template: `
+    <app-page
+      [title]="draftId() ? 'Continue purchase' : 'Record purchase'"
+      subtitle="Receive stock, match the supplier invoice, and post the books in one transaction."
+      backLink="/purchases"
+      [wide]="true"
+    >
+      @if (loading()) {
+        <div class="flex min-h-64 items-center justify-center">
+          <span class="loading loading-spinner loading-lg"></span>
+        </div>
+      } @else {
+        @if (error()) {
+          <div class="alert alert-error mb-4 text-sm" role="alert">
+            <app-icon name="heroExclamationTriangle" />
+            <span>{{ error() }}</span>
+          </div>
+        }
+        @if (notice()) {
+          <div class="alert alert-success mb-4 text-sm" role="status">
+            <app-icon name="heroCheckCircle" />
+            <span>{{ notice() }}</span>
+          </div>
+        }
+
+        <nav class="mb-6 max-w-lg" aria-label="Purchase progress">
+          <ol class="flex items-center">
+            <li class="flex shrink-0 items-center gap-2">
+              <span
+                class="flex size-6 items-center justify-center rounded-full border text-xs font-semibold"
+                [class.border-primary]="stage() === 'build'"
+                [class.bg-primary]="stage() === 'build'"
+                [class.text-primary-content]="stage() === 'build'"
+                [class.border-base-content/30]="stage() === 'review'"
+                [class.bg-base-content/10]="stage() === 'review'"
+              >
+                @if (stage() === 'review') {
+                  <app-icon name="heroCheck" size="sm" />
+                } @else {
+                  1
+                }
+              </span>
+              <span
+                class="text-sm"
+                [class.font-semibold]="stage() === 'build'"
+                [class.text-base-content/60]="stage() === 'review'"
+                >Build purchase</span
+              >
+            </li>
+            <li
+              class="mx-3 h-px min-w-8 flex-1 bg-base-300"
+              [class.bg-base-content/30]="stage() === 'review'"
+              aria-hidden="true"
+            ></li>
+            <li class="flex shrink-0 items-center gap-2">
+              <span
+                class="flex size-6 items-center justify-center rounded-full border text-xs font-semibold"
+                [class.border-primary]="stage() === 'review'"
+                [class.bg-primary]="stage() === 'review'"
+                [class.text-primary-content]="stage() === 'review'"
+                [class.border-base-300]="stage() === 'build'"
+                [class.text-base-content/60]="stage() === 'build'"
+                >2</span
+              >
+              <span
+                class="text-sm"
+                [class.font-semibold]="stage() === 'review'"
+                [class.text-base-content/60]="stage() === 'build'"
+                >Review and pay</span
+              >
+            </li>
+          </ol>
+        </nav>
+
+        @if (stage() === 'build') {
+          <div class="grid items-start gap-6 lg:grid-cols-12">
+            <div class="min-w-0 space-y-6 lg:col-span-9">
+              <section class="card bg-base-100">
+                <div class="card-body gap-4 p-4">
+                  <div
+                    class="grid gap-3 md:grid-cols-2 md:items-end xl:grid-cols-[minmax(14rem,1fr)_minmax(12rem,.9fr)_minmax(13rem,.9fr)_minmax(10rem,.55fr)]"
+                  >
+                    <app-form-field label="Supplier" [required]="true">
+                      <app-searchable-filter
+                        data-supplier-picker
+                        ariaLabel="Choose supplier"
+                        placeholder="Choose supplier"
+                        searchPlaceholder="Search suppliers by name, phone, or email…"
+                        controlSize="md"
+                        [options]="supplierOptions()"
+                        [value]="supplier.value"
+                        (valueChange)="supplier.setValue($event); markDirty()"
+                      />
+                    </app-form-field>
+                    <app-form-field label="Receive into" [required]="true">
+                      <select
+                        data-location-picker
+                        class="select select-bordered h-12 w-full"
+                        [formControl]="location"
+                        (change)="markDirty()"
+                      >
+                        @for (item of locations(); track item.id) {
+                          <option [value]="item.id">{{ item.name }}</option>
+                        }
+                      </select>
+                    </app-form-field>
+                    <app-form-field label="Invoice / reference">
+                      <input
+                        class="input input-bordered h-12 w-full"
+                        placeholder="Optional"
+                        [formControl]="reference"
+                        (input)="markDirty()"
+                      />
+                    </app-form-field>
+                    <app-form-field label="Purchase info">
+                      <button
+                        type="button"
+                        class="flex h-12 w-full items-center gap-2 rounded-field border border-base-300 bg-base-200/30 px-3 text-left transition-colors hover:bg-base-200/60 focus-visible:outline-2 focus-visible:outline-primary"
+                        title="Change the purchase date or add delivery notes"
+                        [attr.aria-expanded]="invoiceDetailsExpanded()"
+                        aria-controls="purchase-invoice-details"
+                        (click)="invoiceDetailsExpanded.update(value => !value)"
+                      >
+                        <span class="type-caption min-w-0 flex-1 truncate text-base-content/70">
+                          {{ purchaseInfoSummary() }}
+                        </span>
+                        <app-icon
+                          [name]="invoiceDetailsExpanded() ? 'heroChevronUp' : 'heroChevronDown'"
+                          class="shrink-0 text-base-content/50"
+                        />
+                      </button>
+                    </app-form-field>
+                  </div>
+                  @if (invoiceDetailsExpanded()) {
+                    <div
+                      id="purchase-invoice-details"
+                      class="grid gap-3 border-t border-base-300 pt-3 md:grid-cols-2"
+                    >
+                      <app-form-field label="Purchase date">
+                        <input
+                          type="date"
+                          class="input input-bordered h-11 w-full md:h-10"
+                          [formControl]="purchaseDate"
+                          (change)="markDirty()"
+                        />
+                      </app-form-field>
+                      <app-form-field label="Notes">
+                        <input
+                          class="input input-bordered h-11 w-full md:h-10"
+                          placeholder="Delivery notes…"
+                          [formControl]="notes"
+                          (input)="markDirty()"
+                        />
+                      </app-form-field>
+                    </div>
+                  }
+                </div>
+              </section>
+
+              <section class="card overflow-visible bg-base-100">
+                <div class="card-body gap-4 p-4">
+                  <div>
+                    <h2 class="section-title">Items</h2>
+                    <p class="type-caption mt-1">
+                      Search or scan once to add an item. Unit cost and line total are both
+                      editable.
+                    </p>
+                  </div>
+                  <div class="sticky top-16 z-30 bg-base-100 py-1">
+                    <div class="relative">
+                      <span
+                        class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-base-content/50"
+                      >
+                        <app-icon name="heroMagnifyingGlass" />
+                      </span>
+                      <input
+                        type="search"
+                        class="input input-bordered h-12 w-full pl-9"
+                        placeholder="Scan barcode or search product, manufacturer, or SKU…"
+                        [value]="productQuery()"
+                        (input)="searchProducts($any($event.target).value)"
+                        (keydown.enter)="$event.preventDefault(); addFirstSearchResult()"
+                      />
+                      @if (productQuery().trim()) {
+                        <div
+                          class="absolute inset-x-0 top-full z-50 mt-1 max-h-72 overflow-y-auto rounded-box border border-base-300 bg-base-100 p-1 shadow-overlay"
+                        >
+                          @for (variant of searchResults(); track variant.variant_id) {
+                            <button
+                              type="button"
+                              class="flex min-h-12 w-full items-center justify-between gap-3 rounded-field px-3 py-2 text-left hover:bg-base-200"
+                              (click)="addVariant(variant)"
+                            >
+                              <span class="min-w-0">
+                                <span class="block truncate text-sm font-medium">{{
+                                  label(variant)
+                                }}</span>
+                                <span class="type-caption block truncate"
+                                  >{{ variant.manufacturer_name || 'Manufacturer not set' }} ·
+                                  {{ variant.sku
+                                  }}{{ variant.barcode ? ' · ' + variant.barcode : '' }}</span
+                                >
+                              </span>
+                              <span class="type-caption shrink-0"
+                                >{{ variant.stock ?? 0 }} in stock</span
+                              >
+                            </button>
+                          } @empty {
+                            <p class="p-3 text-sm text-base-content/60">
+                              No matching stock products.
+                            </p>
+                          }
+                        </div>
+                      }
+                    </div>
+                  </div>
+
+                  @if (lines().length === 0) {
+                    <div class="rounded-box border border-dashed border-base-300 p-6 text-center">
+                      <p class="text-sm font-medium">No items added</p>
+                      <p class="type-caption mt-1">
+                        Use the search above to begin matching the supplier invoice.
+                      </p>
+                    </div>
+                  }
+
+                  @if (lines().length > 0) {
+                    <div class="divide-y divide-base-300 border-y border-base-300">
+                      <div
+                        class="hidden grid-cols-[minmax(14rem,1fr)_7rem_10rem_10rem_3rem] items-center gap-3 border-b border-base-300 bg-base-200/30 px-3 py-2 xl:grid"
+                        aria-hidden="true"
+                      >
+                        <span class="type-caption">Item</span>
+                        <span class="type-caption text-right">Quantity</span>
+                        <span class="type-caption text-right">Unit cost</span>
+                        <span class="type-caption text-right">Line total</span>
+                        <span class="sr-only">Actions</span>
+                      </div>
+                      @for (line of lines(); track line.key; let index = $index) {
+                        <app-purchase-line-row
+                          [line]="line"
+                          [variant]="lineVariant(line)"
+                          [label]="lineLabel(line)"
+                          [priceContext]="linePriceContext(line)"
+                          [canEditPrices]="perms.has('ManageStockAdjustments')"
+                          [trackExpiry]="preferences.batchExpiryEnabled()"
+                          (quantityChange)="quantityChanged(line, $event)"
+                          (unitCostChange)="unitCostChanged(line, $event)"
+                          (lineTotalChange)="lineTotalChanged(line, $event)"
+                          (detailChange)="updateLineDetail(line, $event.field, $event.value)"
+                          (expandedChange)="setLineExpanded(line, $event)"
+                          (remove)="removeLine(index)"
+                        />
+                      }
+                    </div>
+                  }
+                </div>
+              </section>
+
+              <section class="card bg-base-100">
+                <div class="card-body gap-4 p-4">
+                  <div class="flex items-start justify-between gap-3">
+                    <div>
+                      <h2 class="section-title">Additional expenses</h2>
+                      <p class="type-caption mt-1">
+                        Transport, loading, packaging, duty, or another cost associated with this
+                        purchase.
+                      </p>
+                    </div>
+                    <button
+                      appButton
+                      variant="outline"
+                      size="sm"
+                      type="button"
+                      (click)="addExpense()"
+                    >
+                      <app-icon name="heroPlus" /> Add expense
+                    </button>
+                  </div>
+                  @if (expenses().length > 0) {
+                    <div class="divide-y divide-base-300 border-y border-base-300">
+                      @for (expense of expenses(); track expense.key; let index = $index) {
+                        <article
+                          class="overflow-visible bg-base-100"
+                          [attr.data-expense-key]="expense.key"
+                        >
+                          <div
+                            class="flex items-center justify-between gap-3 bg-base-200/30 px-3 py-2"
+                          >
+                            <div class="min-w-0">
+                              <h3 class="truncate text-sm font-semibold">
+                                Expense {{ index + 1 }}
+                              </h3>
+                              <p class="type-caption truncate">
+                                {{ expenseCategoryLabel(expense) }}
+                              </p>
+                            </div>
+                            <button
+                              appButton
+                              variant="ghost"
+                              size="sm"
+                              [iconOnly]="true"
+                              type="button"
+                              title="Remove expense"
+                              [attr.aria-label]="'Remove expense ' + (index + 1)"
+                              (click)="removeExpense(index)"
+                            >
+                              <app-icon name="heroXMark" />
+                            </button>
+                          </div>
+
+                          <div
+                            class="grid gap-x-4 gap-y-3 border-t border-base-300 p-3 md:grid-cols-2 xl:grid-cols-4"
+                          >
+                            <app-form-field label="Category">
+                              <select
+                                class="select select-bordered h-11 w-full md:h-10"
+                                [(ngModel)]="expense.category"
+                                [ngModelOptions]="{ standalone: true }"
+                                (change)="markDirty()"
+                              >
+                                <option value="transport">Transport</option>
+                                <option value="loading">Loading</option>
+                                <option value="packaging">Packaging</option>
+                                <option value="duty">Duty</option>
+                                <option value="other">Other</option>
+                              </select>
+                            </app-form-field>
+                            @if (expense.category === 'other') {
+                              <app-form-field label="Expense name" [required]="true">
+                                <input
+                                  class="input input-bordered h-11 w-full md:h-10"
+                                  placeholder="e.g. Port handling"
+                                  [(ngModel)]="expense.customCategory"
+                                  [ngModelOptions]="{ standalone: true }"
+                                  (input)="markDirty()"
+                                />
+                              </app-form-field>
+                            }
+                            <app-form-field label="Amount (KES)" [required]="true">
+                              <input
+                                class="input input-bordered h-11 w-full text-right md:h-10"
+                                inputmode="numeric"
+                                placeholder="0"
+                                [(ngModel)]="expense.amount"
+                                [ngModelOptions]="{ standalone: true }"
+                                (input)="markDirty()"
+                              />
+                            </app-form-field>
+                            <app-form-field
+                              label="Settlement"
+                              [required]="true"
+                              [hint]="expenseSettlementHint(expense.settlement)"
+                            >
+                              <select
+                                class="select select-bordered h-11 w-full md:h-10"
+                                [(ngModel)]="expense.settlement"
+                                [ngModelOptions]="{ standalone: true }"
+                                (change)="markDirty()"
+                              >
+                                <option value="" disabled>Choose settlement</option>
+                                <option value="supplier_bill">Included in supplier bill</option>
+                                @if (perms.has('CreateInterAccountTransfer')) {
+                                  <option value="separate">Paid separately</option>
+                                }
+                              </select>
+                            </app-form-field>
+                            @if (expense.settlement === 'separate') {
+                              <app-form-field
+                                label="Paid from"
+                                [required]="true"
+                                class="xl:col-span-2"
+                                [error]="
+                                  accountOptions().length === 0
+                                    ? 'No cash, bank, or M-Pesa account is available.'
+                                    : null
+                                "
+                              >
+                                <app-searchable-filter
+                                  data-expense-account-picker
+                                  ariaLabel="Choose account used for this expense"
+                                  placeholder="Choose cash, bank, or M-Pesa account"
+                                  searchPlaceholder="Search accounts by name or code…"
+                                  controlSize="md"
+                                  [options]="accountOptions()"
+                                  [value]="expense.accountCode"
+                                  (valueChange)="expense.accountCode = $event; markDirty()"
+                                />
+                              </app-form-field>
+                              <app-form-field label="Memo" class="xl:col-span-2">
+                                <input
+                                  class="input input-bordered h-11 w-full md:h-10"
+                                  placeholder="Optional note about this charge"
+                                  [(ngModel)]="expense.memo"
+                                  [ngModelOptions]="{ standalone: true }"
+                                  (input)="markDirty()"
+                                />
+                              </app-form-field>
+                            } @else {
+                              <app-form-field label="Memo" class="md:col-span-2 xl:col-span-4">
+                                <input
+                                  class="input input-bordered h-11 w-full md:h-10"
+                                  placeholder="Optional note about this charge"
+                                  [(ngModel)]="expense.memo"
+                                  [ngModelOptions]="{ standalone: true }"
+                                  (input)="markDirty()"
+                                />
+                              </app-form-field>
+                            }
+                            @if (expense.error) {
+                              <p
+                                class="text-sm text-error md:col-span-2 xl:col-span-4"
+                                role="alert"
+                              >
+                                {{ expense.error }}
+                              </p>
+                            }
+                          </div>
+                        </article>
+                      }
+                    </div>
+                  }
+                </div>
+              </section>
+            </div>
+
+            <aside class="card bg-base-100 lg:sticky lg:top-20 lg:col-span-3">
+              <div class="card-body gap-3 p-4">
+                <h2 class="section-title">Purchase summary</h2>
+                <div class="flex justify-between text-sm">
+                  <span>Items</span><strong>{{ lines().length }}</strong>
+                </div>
+                <div class="flex justify-between text-sm">
+                  <span>Goods</span><app-money [amount]="goodsSubtotal()" />
+                </div>
+                <div class="flex justify-between text-sm">
+                  <span>Supplier expenses</span><app-money [amount]="supplierExpenseTotal()" />
+                </div>
+                <div class="flex justify-between border-t border-base-300 pt-3">
+                  <strong>Invoice total</strong
+                  ><strong><app-money [amount]="invoiceTotal()" /></strong>
+                </div>
+                @if (separateExpenseTotal() > 0) {
+                  <div class="flex justify-between text-sm">
+                    <span>Paid separately</span><app-money [amount]="separateExpenseTotal()" />
+                  </div>
+                }
+                <button
+                  appButton
+                  type="button"
+                  class="mt-2 w-full"
+                  (click)="goToReview()"
+                  [disabled]="lines().length === 0"
+                >
+                  Review purchase
+                </button>
+                <button
+                  appButton
+                  variant="outline"
+                  type="button"
+                  class="w-full"
+                  [loading]="savingDraft()"
+                  (click)="saveDraft()"
+                >
+                  Save draft
+                </button>
+                <a appButton variant="ghost" routerLink="/purchases" (click)="allowExit()"
+                  >Cancel</a
+                >
+              </div>
+            </aside>
+          </div>
+        } @else {
+          <div class="grid items-start gap-6 lg:grid-cols-12">
+            <section class="card bg-base-100 lg:col-span-9">
+              <div class="card-body gap-5 p-4 md:p-5">
+                <div class="flex items-center justify-between gap-3">
+                  <div>
+                    <h2 class="section-title">Payment</h2>
+                    <p class="type-caption mt-1">How is the supplier invoice being settled?</p>
+                  </div>
+                  <button appButton variant="ghost" type="button" (click)="stage.set('build')">
+                    Edit purchase
+                  </button>
+                </div>
+                <div class="grid gap-2 sm:grid-cols-3">
+                  <button
+                    type="button"
+                    class="min-h-14 rounded-field border px-3 text-left"
+                    [class.border-primary]="paymentMode.value === 'paid'"
+                    (click)="setPaymentMode('paid')"
+                  >
+                    <strong class="block text-sm">Paid now</strong
+                    ><span class="type-caption">Full supplier invoice</span>
+                  </button>
+                  @if (perms.has('ManageSupplierCreditPurchases')) {
+                    <button
+                      type="button"
+                      class="min-h-14 rounded-field border px-3 text-left"
+                      [class.border-primary]="paymentMode.value === 'partial'"
+                      (click)="setPaymentMode('partial')"
+                    >
+                      <strong class="block text-sm">Part-paid</strong
+                      ><span class="type-caption">Pay some, owe the rest</span>
+                    </button>
+                    <button
+                      type="button"
+                      class="min-h-14 rounded-field border px-3 text-left"
+                      [class.border-warning]="paymentMode.value === 'later'"
+                      (click)="setPaymentMode('later')"
+                    >
+                      <strong class="block text-sm">Pay later</strong
+                      ><span class="type-caption">Supplier credit</span>
+                    </button>
+                  }
+                </div>
+                @if (paymentMode.value === 'partial') {
+                  <app-form-field label="Amount paid now" [error]="partialPaymentError()">
+                    <input
+                      class="input input-bordered w-full text-right"
+                      inputmode="numeric"
+                      [formControl]="partialAmount"
+                      (input)="markDirty()"
+                    />
+                  </app-form-field>
+                }
+                @if (paymentMode.value !== 'later') {
+                  <app-form-field
+                    label="Paid from"
+                    [required]="true"
+                    [error]="
+                      accountOptions().length === 0
+                        ? 'No cash, bank, or M-Pesa account is available.'
+                        : null
+                    "
+                  >
+                    <app-searchable-filter
+                      data-purchase-account-picker
+                      ariaLabel="Choose account used to pay the supplier"
+                      placeholder="Choose cash, bank, or M-Pesa account"
+                      searchPlaceholder="Search accounts by name or code…"
+                      controlSize="md"
+                      [options]="accountOptions()"
+                      [value]="account.value"
+                      (valueChange)="account.setValue($event); markDirty()"
+                    />
+                  </app-form-field>
+                }
+                @if (requiresSession() && !cashierSession.canTakePayment()) {
+                  <app-session-required-notice action="recording this purchase" />
+                }
+                @if (creditExceeded()) {
+                  <div class="alert alert-error text-sm">
+                    <app-icon name="heroExclamationTriangle" /><span
+                      >This purchase would exceed the supplier's available credit.</span
+                    >
+                  </div>
+                }
+              </div>
+            </section>
+            <aside class="card bg-base-100 lg:sticky lg:top-20 lg:col-span-3">
+              <div class="card-body gap-3 p-4">
+                <h2 class="section-title">Review</h2>
+                <div class="flex justify-between text-sm">
+                  <span>Merchandise</span><app-money [amount]="goodsSubtotal()" />
+                </div>
+                <div class="flex justify-between text-sm">
+                  <span>Supplier-bill expenses</span><app-money [amount]="supplierExpenseTotal()" />
+                </div>
+                <div class="flex justify-between border-t border-base-300 pt-3">
+                  <strong>Supplier invoice</strong
+                  ><strong><app-money [amount]="invoiceTotal()" /></strong>
+                </div>
+                <div class="flex justify-between text-sm">
+                  <span>Separately paid expenses</span
+                  ><app-money [amount]="separateExpenseTotal()" />
+                </div>
+                <div class="flex justify-between text-sm">
+                  <span>Initial supplier payment</span><app-money [amount]="initialPayment()" />
+                </div>
+                <div class="flex justify-between text-sm">
+                  <span>Cash leaving now</span
+                  ><strong><app-money [amount]="cashLeavingNow()" /></strong>
+                </div>
+                <div class="flex justify-between text-sm">
+                  <span>Remaining supplier balance</span
+                  ><strong><app-money [amount]="balanceDue()" /></strong>
+                </div>
+                <button
+                  appButton
+                  type="button"
+                  class="mt-2 w-full"
+                  [loading]="busy()"
+                  [disabled]="!canConfirm()"
+                  (click)="confirmPurchase()"
+                >
+                  {{ draftId() ? 'Confirm draft purchase' : 'Confirm purchase' }}
+                </button>
+                <button
+                  appButton
+                  variant="outline"
+                  type="button"
+                  class="w-full"
+                  [loading]="savingDraft()"
+                  (click)="saveDraft()"
+                >
+                  Save draft
+                </button>
+              </div>
+            </aside>
+          </div>
+        }
+
+        @if (stage() === 'build') {
+          <div
+            class="fixed inset-x-0 bottom-0 z-30 border-t border-base-300 bg-base-100 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:hidden"
+          >
+            <div class="mx-auto flex max-w-lg items-center gap-3">
+              <div class="min-w-0 flex-1">
+                <p class="type-caption">{{ lines().length }} item(s)</p>
+                <p class="font-semibold"><app-money [amount]="invoiceTotal()" /></p>
+              </div>
+              <button
+                appButton
+                type="button"
+                (click)="goToReview()"
+                [disabled]="lines().length === 0"
+              >
+                Review
+              </button>
+            </div>
+          </div>
+        }
+      }
+    </app-page>
+  `,
+})
+export class PurchaseEditorComponent implements OnInit {
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
+  private readonly money = inject(MoneyService);
+  private readonly catalog = inject(CatalogSearchService);
+  private readonly parties = inject(PartyCacheService);
+  private readonly locationContext = inject(LocationContextService);
+  protected readonly perms = inject(PermissionsService);
+  protected readonly cashierSession = inject(CashierSessionService);
+  protected readonly preferences = inject(CompanyPreferencesService);
+
+  protected readonly suppliers = computed(() =>
+    this.parties.suppliers().filter(item => item.supplier_active)
+  );
+  protected readonly supplierOptions = computed<readonly SearchableFilterOption[]>(() =>
+    this.suppliers().map(item => {
+      const contact = [item.phone, item.email].filter(Boolean).join(' · ');
+      return {
+        value: item.id,
+        label: this.supplierName(item),
+        ...(contact ? { description: contact } : {}),
+      };
+    })
+  );
+  protected readonly locations = this.locationContext.locations;
+  protected readonly accounts = signal<LedgerAccount[]>([]);
+  protected readonly accountOptions = computed<readonly SearchableFilterOption[]>(() =>
+    this.accounts().map(item => ({
+      value: item.code,
+      label: item.name,
+      description: item.code,
+      searchText: `${item.code} ${item.name}`,
+    }))
+  );
+  protected readonly variants = signal<Variant[]>([]);
+  protected readonly performance = signal<SupplierVariantPerformance[]>([]);
+  protected readonly lines = signal<PurchaseLineForm[]>([]);
+  protected readonly expenses = signal<ExpenseForm[]>([]);
+  protected readonly searchResults = signal<Variant[]>([]);
+  protected readonly productQuery = signal('');
+  protected readonly stage = signal<'build' | 'review'>('build');
+  protected readonly invoiceDetailsExpanded = signal(false);
+  protected readonly loading = signal(true);
+  protected readonly busy = signal(false);
+  protected readonly savingDraft = signal(false);
+  protected readonly dirty = signal(false);
+  protected readonly error = signal<string | null>(null);
+  protected readonly notice = signal<string | null>(null);
+  protected readonly draftId = signal<string | null>(null);
+  protected readonly label = variantLabel;
+
+  protected readonly supplier = new FormControl('', { nonNullable: true });
+  protected readonly location = new FormControl('', { nonNullable: true });
+  protected readonly reference = new FormControl('', { nonNullable: true });
+  protected readonly notes = new FormControl('', { nonNullable: true });
+  protected readonly purchaseDate = new FormControl(this.today(), { nonNullable: true });
+  protected readonly paymentMode = new FormControl<PaymentMode>('paid', { nonNullable: true });
+  protected readonly partialAmount = new FormControl('', { nonNullable: true });
+  protected readonly account = new FormControl('', { nonNullable: true });
+  private nextKey = 1;
+  private searchRequest = 0;
+  private exitAllowed = false;
+
+  protected readonly goodsSubtotal = computed(() =>
+    this.lines().reduce((sum, line) => sum + this.lineAmount(line), 0)
+  );
+  protected readonly supplierExpenseTotal = computed(() =>
+    this.expenses().reduce(
+      (sum, item) => sum + (item.settlement === 'supplier_bill' ? (parseKes(item.amount) ?? 0) : 0),
+      0
+    )
+  );
+  protected readonly separateExpenseTotal = computed(() =>
+    this.expenses().reduce(
+      (sum, item) => sum + (item.settlement === 'separate' ? (parseKes(item.amount) ?? 0) : 0),
+      0
+    )
+  );
+  protected readonly invoiceTotal = computed(
+    () => this.goodsSubtotal() + this.supplierExpenseTotal()
+  );
+
+  async ngOnInit(): Promise<void> {
+    try {
+      await this.parties.ensureLoaded();
+      const [accounts, variants, drafts, performance] = await Promise.all([
+        this.money.transactableAccounts(),
+        this.catalog.activeCatalog(),
+        this.money.purchaseDrafts(),
+        this.money.supplierVariantPerformance(),
+      ]);
+      this.accounts.set(accounts);
+      this.variants.set(variants.filter(item => item.kind !== 'service'));
+      this.performance.set(performance);
+      this.account.setValue(accounts[0]?.code ?? '');
+      this.location.setValue(this.locationContext.activeId() ?? this.locations()[0]?.id ?? '');
+      const requestedDraft = this.route.snapshot.paramMap.get('id');
+      if (requestedDraft) this.restoreDraft(drafts.find(item => item.id === requestedDraft));
+      this.dirty.set(false);
+    } catch (error) {
+      this.error.set(error instanceof Error ? error.message : 'Could not prepare purchase entry');
+    } finally {
+      this.loading.set(false);
+    }
+  }
+
+  canDeactivate(): boolean {
+    return this.exitAllowed || !this.dirty() || window.confirm('Discard unsaved purchase changes?');
+  }
+  @HostListener('window:beforeunload', ['$event']) beforeUnload(event: BeforeUnloadEvent): void {
+    if (this.dirty() && !this.exitAllowed) event.preventDefault();
+  }
+  protected allowExit(): void {
+    this.exitAllowed = true;
+  }
+  protected markDirty(): void {
+    this.dirty.set(true);
+    this.notice.set(null);
+  }
+  protected expenseSettlementHint(settlement: ExpenseSettlement): string {
+    if (settlement === 'supplier_bill') {
+      return 'Follows the supplier payment and affects the supplier balance.';
+    }
+    if (settlement === 'separate') {
+      return 'Paid now from the selected account; does not affect the supplier balance.';
+    }
+    return 'Choose who is being paid before continuing.';
+  }
+  protected expenseCategoryLabel(expense: ExpenseForm): string {
+    if (expense.category === 'other') {
+      return expense.customCategory.trim() || 'Other purchase cost';
+    }
+    return expense.category.charAt(0).toUpperCase() + expense.category.slice(1);
+  }
+  protected purchaseInfoSummary(): string {
+    const [year, month, day] = this.purchaseDate.value.split('-').map(Number);
+    const date =
+      year && month && day
+        ? new Intl.DateTimeFormat('en-KE', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric',
+          }).format(new Date(year, month - 1, day))
+        : this.purchaseDate.value;
+    const note = this.notes.value.trim();
+    return `${date}${note ? ` · ${note}` : ' · No notes'}`;
+  }
+  protected supplierName(item: { first_name: string; last_name: string | null }): string {
+    return [item.first_name, item.last_name].filter(Boolean).join(' ');
+  }
+  protected lineVariant(line: PurchaseLineForm): Variant | undefined {
+    return this.variants().find(item => item.variant_id === line.variantId);
+  }
+  protected lineLabel(line: PurchaseLineForm): string {
+    const variant = this.lineVariant(line);
+    return variant ? this.label(variant) : 'Unknown item';
+  }
+  protected linePriceContext(line: PurchaseLineForm): PurchaseLinePriceContext {
+    const variant = this.lineVariant(line);
+    const currentCost = parseKes(line.unitCost);
+    const supplierInsight = this.performance().find(
+      item => item.variant_id === line.variantId && item.supplier_id === this.supplier.value
+    );
+    const supplierCost = supplierInsight?.last_unit_cost ?? null;
+    const peers = this.performance().filter(
+      item => item.variant_id === line.variantId && (item.average_unit_cost ?? 0) > 0
+    );
+    const best = peers.length
+      ? peers.reduce((lowest, item) =>
+          (item.average_unit_cost ?? Infinity) < (lowest.average_unit_cost ?? Infinity)
+            ? item
+            : lowest
+        )
+      : null;
+    const wholesale = parseKes(line.wholesalePrice) ?? variant?.wholesale_price ?? 0;
+    const retail = parseKes(line.retailPrice) ?? variant?.price ?? 0;
+    return {
+      supplierCost,
+      supplierComparison: this.supplierPriceComparison(currentCost, supplierCost),
+      purchaseCount: Number(supplierInsight?.purchase_count ?? 0),
+      wholesaleMargin: this.marginContext(currentCost, wholesale),
+      retailMargin: this.marginContext(currentCost, retail),
+      bestRecordedCost: best?.average_unit_cost ?? null,
+      bestRecordedSupplier: best?.supplier_id
+        ? this.supplierName(
+            this.suppliers().find(item => item.id === best.supplier_id) ?? {
+              first_name: 'Unknown supplier',
+              last_name: null,
+            }
+          )
+        : null,
+      warning: this.linePriceWarning(currentCost, wholesale, retail, supplierCost),
+      catalogPriceChanged:
+        !!variant &&
+        (wholesale !== (variant.wholesale_price ?? 0) || retail !== (variant.price ?? 0)),
+    };
+  }
+
+  private supplierPriceComparison(current: number | null, previous: number | null): string {
+    if (previous === null || current === null || current <= 0) return 'Last recorded cost';
+    const difference = current - previous;
+    if (difference === 0) return 'Same as last price';
+    return `${formatKes(Math.abs(difference))} ${difference > 0 ? 'higher' : 'lower'} than last`;
+  }
+
+  private marginContext(
+    cost: number | null,
+    sellingPrice: number
+  ): PurchaseLinePriceContext['retailMargin'] {
+    if (cost === null || cost <= 0 || sellingPrice <= 0)
+      return { label: 'No price', type: 'neutral' };
+    const margin = ((sellingPrice - cost) / sellingPrice) * 100;
+    return {
+      label: `${margin >= 0 ? '+' : ''}${margin.toFixed(1)}% margin`,
+      type: margin < 0 ? 'error' : margin < 15 ? 'warning' : 'success',
+    };
+  }
+
+  private linePriceWarning(
+    cost: number | null,
+    wholesale: number,
+    retail: number,
+    previous: number | null
+  ): string | null {
+    if (cost === null || cost <= 0) return null;
+    if (retail > 0 && cost > retail)
+      return `Unit cost is ${formatKes(cost - retail)} above the current retail price.`;
+    if (wholesale > 0 && cost > wholesale)
+      return `Unit cost is ${formatKes(cost - wholesale)} above the current wholesale price.`;
+    if (previous && cost > previous)
+      return `This supplier's unit cost is ${formatKes(cost - previous)} above their last price.`;
+    return null;
+  }
+
+  protected async searchProducts(value: string): Promise<void> {
+    this.productQuery.set(value);
+    const request = ++this.searchRequest;
+    if (!value.trim()) {
+      this.searchResults.set([]);
+      return;
+    }
+    const result = await this.catalog.search(value, 20);
+    if (request === this.searchRequest)
+      this.searchResults.set(result.variants.filter(item => item.kind !== 'service'));
+  }
+  protected addFirstSearchResult(): void {
+    const first = this.searchResults()[0];
+    if (first) this.addVariant(first);
+  }
+  protected addVariant(variant: Variant): void {
+    const supplierCost = this.performance().find(
+      item => item.variant_id === variant.variant_id && item.supplier_id === this.supplier.value
+    )?.last_unit_cost;
+    const cost = supplierCost ?? variant.wholesale_price ?? 0;
+    const key = this.nextKey++;
+    this.lines.update(items => [
+      ...items,
+      {
+        key,
+        variantId: variant.variant_id!,
+        quantity: 1,
+        unitCost: cost > 0 ? formatKesInput(cost) : '',
+        lineTotal: cost > 0 ? formatKesInput(cost) : '',
+        valueSource: 'unit',
+        batchNumber: '',
+        expiryDate: '',
+        wholesalePrice: formatKesInput(variant.wholesale_price ?? 0),
+        retailPrice: formatKesInput(variant.price ?? 0),
+        expanded: false,
+        error: null,
+      },
+    ]);
+    this.productQuery.set('');
+    this.searchResults.set([]);
+    this.markDirty();
+    setTimeout(() => {
+      const quantity = document.querySelector<HTMLInputElement>(
+        `[data-line-key="${key}"] [data-quantity]`
+      );
+      quantity?.scrollIntoView({ block: 'center' });
+      quantity?.focus({ preventScroll: true });
+    });
+  }
+  protected removeLine(index: number): void {
+    this.lines.update(items => items.filter((_, itemIndex) => itemIndex !== index));
+    this.markDirty();
+  }
+  protected setLineExpanded(line: PurchaseLineForm, expanded: boolean): void {
+    line.expanded = expanded;
+    this.lines.update(items => [...items]);
+  }
+  protected updateLineDetail(
+    line: PurchaseLineForm,
+    field: PurchaseLineDetailField,
+    value: string
+  ): void {
+    line[field] = value;
+    this.lines.update(items => [...items]);
+    this.markDirty();
+  }
+  protected quantityChanged(line: PurchaseLineForm, value: number | string): void {
+    line.quantity = Math.max(0, Number(value) || 0);
+    if (line.valueSource === 'unit') this.syncTotal(line);
+    else this.syncUnit(line);
+    this.lines.update(items => [...items]);
+    this.markDirty();
+  }
+  protected unitCostChanged(line: PurchaseLineForm, value: string): void {
+    line.unitCost = value;
+    line.valueSource = 'unit';
+    this.syncTotal(line);
+    this.lines.update(items => [...items]);
+    this.markDirty();
+  }
+  protected lineTotalChanged(line: PurchaseLineForm, value: string): void {
+    line.lineTotal = value;
+    line.valueSource = 'total';
+    this.syncUnit(line);
+    this.lines.update(items => [...items]);
+    this.markDirty();
+  }
+  private syncTotal(line: PurchaseLineForm): void {
+    const unit = parseKes(line.unitCost);
+    line.lineTotal = unit === null ? '' : formatKesInput(line.quantity * unit);
+  }
+  private syncUnit(line: PurchaseLineForm): void {
+    const total = parseKes(line.lineTotal);
+    line.unitCost =
+      total === null || line.quantity <= 0 ? '' : formatKesInput(total / line.quantity);
+  }
+  private lineAmount(line: PurchaseLineForm): number {
+    return line.valueSource === 'total'
+      ? (parseKes(line.lineTotal) ?? 0)
+      : Math.round(line.quantity * (parseKes(line.unitCost) ?? 0));
+  }
+
+  protected addExpense(): void {
+    this.expenses.update(items => [
+      ...items,
+      {
+        key: this.nextKey++,
+        category: 'transport',
+        customCategory: '',
+        memo: '',
+        amount: '',
+        settlement: '',
+        accountCode: this.account.value || this.accounts()[0]?.code || '',
+        error: null,
+      },
+    ]);
+    this.markDirty();
+  }
+  protected removeExpense(index: number): void {
+    this.expenses.update(items => items.filter((_, itemIndex) => itemIndex !== index));
+    this.markDirty();
+  }
+
+  protected goToReview(): void {
+    if (this.validateBuild()) {
+      this.error.set(null);
+      this.stage.set('review');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }
+  protected setPaymentMode(mode: PaymentMode): void {
+    this.paymentMode.setValue(mode);
+    if (mode !== 'partial') this.partialAmount.setValue('');
+    this.markDirty();
+  }
+  protected initialPayment(): number {
+    if (this.paymentMode.value === 'paid') return this.invoiceTotal();
+    if (this.paymentMode.value === 'later') return 0;
+    return parseKes(this.partialAmount.value) ?? 0;
+  }
+  protected balanceDue(): number {
+    return Math.max(0, this.invoiceTotal() - this.initialPayment());
+  }
+  protected cashLeavingNow(): number {
+    return this.initialPayment() + this.separateExpenseTotal();
+  }
+  protected requiresSession(): boolean {
+    return this.cashLeavingNow() > 0;
+  }
+  protected partialPaymentError(): string | null {
+    const amount = parseKes(this.partialAmount.value);
+    if (this.paymentMode.value !== 'partial') return null;
+    if (amount === null || amount <= 0) return 'Enter an amount greater than zero';
+    if (amount >= this.invoiceTotal()) return 'Use Paid now for the full invoice';
+    return null;
+  }
+  protected creditExceeded(): boolean {
+    const item = this.suppliers().find(value => value.id === this.supplier.value);
+    return (
+      !!item &&
+      item.supplier_credit_limit > 0 &&
+      item.ap_balance + this.balanceDue() > item.supplier_credit_limit
+    );
+  }
+  protected canConfirm(): boolean {
+    return (
+      !this.busy() &&
+      !this.partialPaymentError() &&
+      !this.creditExceeded() &&
+      (!this.requiresSession() || this.cashierSession.canTakePayment())
+    );
+  }
+
+  protected async saveDraft(): Promise<void> {
+    if (!this.validateBuild()) return;
+    this.savingDraft.set(true);
+    this.error.set(null);
+    try {
+      const id = await this.money.savePurchaseDraftComplete({
+        draftId: this.draftId() ?? undefined,
+        supplierId: this.supplier.value,
+        lines: this.parsedLines(),
+        expenses: this.parsedExpenses(),
+        reference: this.reference.value.trim() || undefined,
+        notes: this.notes.value.trim() || undefined,
+        purchaseDate: this.purchaseDate.value,
+        stockLocationId: this.location.value,
+        paymentMode: this.paymentMode.value,
+        paymentAmount: this.initialPayment(),
+        accountCode: this.account.value || undefined,
+      });
+      this.draftId.set(id);
+      this.dirty.set(false);
+      this.notice.set('Purchase draft saved');
+      await this.router.navigate(['/purchases/drafts', id], { replaceUrl: true });
+    } catch (error) {
+      this.error.set(error instanceof Error ? error.message : 'Draft save failed');
+    } finally {
+      this.savingDraft.set(false);
+    }
+  }
+
+  protected async confirmPurchase(): Promise<void> {
+    if (!this.validateBuild() || !this.canConfirm()) return;
+    this.busy.set(true);
+    this.error.set(null);
+    try {
+      if (this.requiresSession()) await this.cashierSession.assertOpen('recording this purchase');
+      let purchaseId: string;
+      if (this.draftId()) {
+        await this.money.savePurchaseDraftComplete({
+          draftId: this.draftId()!,
+          supplierId: this.supplier.value,
+          lines: this.parsedLines(),
+          expenses: this.parsedExpenses(),
+          reference: this.reference.value.trim() || undefined,
+          notes: this.notes.value.trim() || undefined,
+          purchaseDate: this.purchaseDate.value,
+          stockLocationId: this.location.value,
+          paymentMode: this.paymentMode.value,
+          paymentAmount: this.initialPayment(),
+          accountCode: this.account.value || undefined,
+        });
+        purchaseId = await this.money.confirmPurchaseDraftComplete(this.draftId()!);
+      } else {
+        purchaseId = await this.money.recordPurchaseComplete({
+          supplierId: this.supplier.value,
+          lines: this.parsedLines(),
+          expenses: this.parsedExpenses(),
+          paymentAmount: this.initialPayment(),
+          reference: this.reference.value.trim() || undefined,
+          accountCode: this.account.value || undefined,
+          notes: this.notes.value.trim() || undefined,
+          purchaseDate: this.purchaseDate.value,
+          stockLocationId: this.location.value,
+        });
+      }
+      this.exitAllowed = true;
+      this.dirty.set(false);
+      await this.router.navigate(['/purchases'], { state: { purchaseRecorded: true, purchaseId } });
+    } catch (error) {
+      this.error.set(error instanceof Error ? error.message : 'Purchase could not be recorded');
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  private validateBuild(): boolean {
+    this.error.set(null);
+    let valid = true;
+    if (!this.supplier.value) {
+      this.error.set('Choose a supplier');
+      this.focusControl('[data-supplier-picker] button');
+      return false;
+    }
+    if (!this.location.value) {
+      this.error.set('Choose a receiving location');
+      this.focusControl('[data-location-picker]');
+      return false;
+    }
+    if (this.lines().length === 0) {
+      this.error.set('Add at least one item');
+      return false;
+    }
+    for (const line of this.lines()) {
+      line.error = null;
+      const unit = parseKes(line.unitCost);
+      const total = parseKes(line.lineTotal);
+      if (line.quantity <= 0 || unit === null || unit <= 0 || total === null || total <= 0) {
+        line.error = 'Enter a valid quantity, unit cost, and line total';
+        valid = false;
+      }
+      const wholesale = parseKes(line.wholesalePrice);
+      const retail = parseKes(line.retailPrice);
+      if (wholesale === null || retail === null || retail < wholesale) {
+        line.error = 'Retail price must not be lower than wholesale';
+        valid = false;
+      }
+    }
+    for (const expense of this.expenses()) {
+      expense.error = null;
+      const amount = parseKes(expense.amount);
+      if (amount === null || amount <= 0) {
+        expense.error = 'Enter an amount greater than zero';
+        valid = false;
+      } else if (!expense.settlement) {
+        expense.error = 'Choose how this expense was paid';
+        valid = false;
+      } else if (expense.category === 'other' && !expense.customCategory.trim()) {
+        expense.error = 'Name this expense';
+        valid = false;
+      } else if (expense.settlement === 'separate' && !expense.accountCode) {
+        expense.error = 'Choose the account used';
+        valid = false;
+      }
+    }
+    this.lines.update(items => [...items]);
+    this.expenses.update(items => [...items]);
+    if (!valid) {
+      this.error.set('Review the highlighted purchase details');
+      setTimeout(() => {
+        const message = document.querySelector<HTMLElement>(
+          '[data-line-key] .text-error, [data-expense-key] .text-error'
+        );
+        const row = message?.closest<HTMLElement>('[data-line-key], [data-expense-key]');
+        row?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        row?.querySelector<HTMLElement>('input, select, button')?.focus();
+      });
+    }
+    return valid;
+  }
+
+  private focusControl(selector: string): void {
+    setTimeout(() => document.querySelector<HTMLElement>(selector)?.focus());
+  }
+
+  private parsedLines(): PurchaseLineInput[] {
+    return this.lines().map(line => {
+      const variant = this.lineVariant(line)!;
+      const wholesale = parseKes(line.wholesalePrice) ?? 0;
+      const retail = parseKes(line.retailPrice) ?? 0;
+      return {
+        variant_id: line.variantId,
+        quantity: line.quantity,
+        unit_cost: parseKes(line.unitCost)!,
+        line_total: parseKes(line.lineTotal)!,
+        value_source: line.valueSource,
+        ...(this.preferences.batchExpiryEnabled() && line.expiryDate
+          ? { expiry_date: line.expiryDate }
+          : {}),
+        ...(line.batchNumber.trim() ? { batch_number: line.batchNumber.trim() } : {}),
+        ...(this.perms.has('ManageStockAdjustments') && wholesale !== (variant.wholesale_price ?? 0)
+          ? { new_wholesale_price: wholesale }
+          : {}),
+        ...(this.perms.has('ManageStockAdjustments') && retail !== (variant.price ?? 0)
+          ? { new_retail_price: retail }
+          : {}),
+      };
+    });
+  }
+  private parsedExpenses(): PurchaseExpenseInput[] {
+    return this.expenses().map(item => ({
+      category: item.category as PurchaseExpenseInput['category'],
+      ...(item.category === 'other' ? { custom_label: item.customCategory.trim() } : {}),
+      ...(item.memo.trim() ? { memo: item.memo.trim() } : {}),
+      amount: parseKes(item.amount)!,
+      settlement: item.settlement as Exclude<ExpenseSettlement, ''>,
+      ...(item.settlement === 'separate' ? { account_code: item.accountCode } : {}),
+    }));
+  }
+
+  private restoreDraft(draft: PurchaseDraft | undefined): void {
+    if (!draft) {
+      this.error.set('Purchase draft was not found');
+      return;
+    }
+    this.draftId.set(draft.id);
+    this.supplier.setValue(draft.supplier_id);
+    this.reference.setValue(draft.reference ?? '');
+    this.notes.setValue(draft.notes ?? '');
+    this.purchaseDate.setValue(draft.purchase_date);
+    this.location.setValue(draft.stock_location_id ?? this.location.value);
+    this.paymentMode.setValue((draft.payment_mode as PaymentMode | null) ?? 'paid');
+    this.partialAmount.setValue(
+      draft.payment_mode === 'partial' ? formatKesInput(draft.payment_amount ?? 0) : ''
+    );
+    this.account.setValue(draft.account_code ?? this.account.value);
+    const rawLines = Array.isArray(draft.lines)
+      ? (draft.lines as unknown as Record<string, unknown>[])
+      : [];
+    this.lines.set(
+      rawLines.map(item => ({
+        key: this.nextKey++,
+        variantId: String(item['variant_id'] ?? ''),
+        quantity: Number(item['quantity'] ?? 1),
+        unitCost: formatKesInput(Number(item['unit_cost'] ?? 0)),
+        lineTotal: formatKesInput(
+          Number(
+            item['line_total'] ?? Number(item['quantity'] ?? 1) * Number(item['unit_cost'] ?? 0)
+          )
+        ),
+        valueSource: item['value_source'] === 'total' ? 'total' : 'unit',
+        batchNumber: String(item['batch_number'] ?? ''),
+        expiryDate: String(item['expiry_date'] ?? ''),
+        wholesalePrice: formatKesInput(
+          Number(
+            item['new_wholesale_price'] ??
+              this.variants().find(v => v.variant_id === item['variant_id'])?.wholesale_price ??
+              0
+          )
+        ),
+        retailPrice: formatKesInput(
+          Number(
+            item['new_retail_price'] ??
+              this.variants().find(v => v.variant_id === item['variant_id'])?.price ??
+              0
+          )
+        ),
+        expanded: false,
+        error: null,
+      }))
+    );
+    const rawExpenses = Array.isArray(draft.expenses)
+      ? (draft.expenses as unknown as Record<string, unknown>[])
+      : [];
+    this.expenses.set(
+      rawExpenses.map(item => {
+        const category = String(item['category'] ?? 'other');
+        const preset = ['transport', 'loading', 'packaging', 'duty'].includes(category);
+        return {
+          key: this.nextKey++,
+          category: preset ? category : 'other',
+          customCategory: String(item['custom_label'] ?? (preset ? '' : category)),
+          memo: String(item['memo'] ?? ''),
+          amount: formatKesInput(Number(item['amount'] ?? 0)),
+          settlement: String(item['settlement'] ?? '') as ExpenseSettlement,
+          accountCode: String(item['account_code'] ?? this.account.value),
+          error: null,
+        };
+      })
+    );
+  }
+  private today(): string {
+    return new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Nairobi' });
+  }
+}

@@ -2000,9 +2000,11 @@ export type Database = {
           created_at: string
           expiry_date: string | null
           id: string
+          original_cost: number
           purchased_at: string
           quantity: number
           remaining: number
+          remaining_cost: number
           stock_location_id: string
           supplier_id: string | null
           unit_cost: number
@@ -2014,9 +2016,11 @@ export type Database = {
           created_at?: string
           expiry_date?: string | null
           id?: string
+          original_cost: number
           purchased_at?: string
           quantity: number
           remaining: number
+          remaining_cost: number
           stock_location_id: string
           supplier_id?: string | null
           unit_cost: number
@@ -2028,9 +2032,11 @@ export type Database = {
           created_at?: string
           expiry_date?: string | null
           id?: string
+          original_cost?: number
           purchased_at?: string
           quantity?: number
           remaining?: number
+          remaining_cost?: number
           stock_location_id?: string
           supplier_id?: string | null
           unit_cost?: number
@@ -3799,46 +3805,61 @@ export type Database = {
       }
       purchase_drafts: {
         Row: {
+          account_code: string | null
           company_id: string
           created_at: string
           created_by: string | null
+          expenses: Json
           id: string
           lines: Json
           notes: string | null
+          payment_amount: number | null
+          payment_mode: string | null
           posted_purchase_id: string | null
           purchase_date: string
           reference: string | null
           status: string
+          stock_location_id: string | null
           supplier_id: string
           total_cost: number
           updated_at: string
         }
         Insert: {
+          account_code?: string | null
           company_id: string
           created_at?: string
           created_by?: string | null
+          expenses?: Json
           id?: string
           lines: Json
           notes?: string | null
+          payment_amount?: number | null
+          payment_mode?: string | null
           posted_purchase_id?: string | null
           purchase_date?: string
           reference?: string | null
           status?: string
+          stock_location_id?: string | null
           supplier_id: string
           total_cost: number
           updated_at?: string
         }
         Update: {
+          account_code?: string | null
           company_id?: string
           created_at?: string
           created_by?: string | null
+          expenses?: Json
           id?: string
           lines?: Json
           notes?: string | null
+          payment_amount?: number | null
+          payment_mode?: string | null
           posted_purchase_id?: string | null
           purchase_date?: string
           reference?: string | null
           status?: string
+          stock_location_id?: string | null
           supplier_id?: string
           total_cost?: number
           updated_at?: string
@@ -3873,6 +3894,20 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "purchase_drafts_stock_location_id_fkey"
+            columns: ["stock_location_id"]
+            isOneToOne: false
+            referencedRelation: "low_stock_variants_by_location"
+            referencedColumns: ["location_id"]
+          },
+          {
+            foreignKeyName: "purchase_drafts_stock_location_id_fkey"
+            columns: ["stock_location_id"]
+            isOneToOne: false
+            referencedRelation: "stock_locations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "purchase_drafts_supplier_id_fkey"
             columns: ["supplier_id"]
             isOneToOne: false
@@ -3895,6 +3930,77 @@ export type Database = {
           },
         ]
       }
+      purchase_expenses: {
+        Row: {
+          account_code: string | null
+          amount: number
+          category: string
+          company_id: string
+          created_at: string
+          created_by: string | null
+          custom_label: string | null
+          id: string
+          memo: string | null
+          purchase_id: string
+          settlement: string
+        }
+        Insert: {
+          account_code?: string | null
+          amount: number
+          category: string
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          custom_label?: string | null
+          id?: string
+          memo?: string | null
+          purchase_id: string
+          settlement: string
+        }
+        Update: {
+          account_code?: string | null
+          amount?: number
+          category?: string
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          custom_label?: string | null
+          id?: string
+          memo?: string | null
+          purchase_id?: string
+          settlement?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_expenses_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_expenses_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_expenses_purchase_id_fkey"
+            columns: ["purchase_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_history"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_expenses_purchase_id_fkey"
+            columns: ["purchase_id"]
+            isOneToOne: false
+            referencedRelation: "purchases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       purchase_lines: {
         Row: {
           batch_number: string | null
@@ -3907,6 +4013,7 @@ export type Database = {
           purchase_id: string
           quantity: number
           unit_cost: number
+          value_source: string
           variant_id: string
         }
         Insert: {
@@ -3920,6 +4027,7 @@ export type Database = {
           purchase_id: string
           quantity: number
           unit_cost: number
+          value_source?: string
           variant_id: string
         }
         Update: {
@@ -3933,6 +4041,7 @@ export type Database = {
           purchase_id?: string
           quantity?: number
           unit_cost?: number
+          value_source?: string
           variant_id?: string
         }
         Relationships: [
@@ -4079,6 +4188,7 @@ export type Database = {
           company_id: string
           created_at: string
           created_by: string | null
+          goods_subtotal: number
           id: string
           is_credit: boolean
           notes: string | null
@@ -4092,6 +4202,7 @@ export type Database = {
           company_id: string
           created_at?: string
           created_by?: string | null
+          goods_subtotal?: number
           id?: string
           is_credit?: boolean
           notes?: string | null
@@ -4105,6 +4216,7 @@ export type Database = {
           company_id?: string
           created_at?: string
           created_by?: string | null
+          goods_subtotal?: number
           id?: string
           is_credit?: boolean
           notes?: string | null
@@ -4442,6 +4554,7 @@ export type Database = {
           id: string
           quantity: number
           source_batch_id: string
+          total_cost: number
           transfer_id: string
           unit_cost: number
           variant_id: string
@@ -4453,6 +4566,7 @@ export type Database = {
           id?: string
           quantity: number
           source_batch_id: string
+          total_cost: number
           transfer_id: string
           unit_cost: number
           variant_id: string
@@ -4464,6 +4578,7 @@ export type Database = {
           id?: string
           quantity?: number
           source_batch_id?: string
+          total_cost?: number
           transfer_id?: string
           unit_cost?: number
           variant_id?: string
@@ -5113,9 +5228,12 @@ export type Database = {
       }
       purchase_history: {
         Row: {
+          all_in_total: number | null
           company_id: string | null
           created_at: string | null
           created_by: string | null
+          expense_total: number | null
+          goods_subtotal: number | null
           id: string | null
           is_credit: boolean | null
           notes: string | null
@@ -5123,6 +5241,7 @@ export type Database = {
           payment_status: string | null
           purchase_date: string | null
           reference: string | null
+          separate_expense_total: number | null
           stock_location_id: string | null
           supplier_id: string | null
           total_cost: number | null
@@ -5795,6 +5914,10 @@ export type Database = {
           p_is_credit: boolean
           p_stock_location_id?: string
         }
+        Returns: string
+      }
+      confirm_purchase_draft_complete: {
+        Args: { p_draft_id: string }
         Returns: string
       }
       confirm_purchase_draft_with_payment: {
@@ -6666,6 +6789,20 @@ export type Database = {
         }
         Returns: string
       }
+      record_purchase_complete: {
+        Args: {
+          p_account_code?: string
+          p_expenses?: Json
+          p_lines: Json
+          p_notes?: string
+          p_payment_amount?: number
+          p_purchase_date?: string
+          p_reference?: string
+          p_stock_location_id?: string
+          p_supplier_id: string
+        }
+        Returns: string
+      }
       record_purchase_with_payment: {
         Args: {
           p_account_code?: string
@@ -6803,6 +6940,22 @@ export type Database = {
           p_notes?: string
           p_purchase_date?: string
           p_reference?: string
+          p_supplier_id: string
+        }
+        Returns: string
+      }
+      save_purchase_draft_complete: {
+        Args: {
+          p_account_code?: string
+          p_draft_id?: string
+          p_expenses?: Json
+          p_lines: Json
+          p_notes?: string
+          p_payment_amount?: number
+          p_payment_mode?: string
+          p_purchase_date?: string
+          p_reference?: string
+          p_stock_location_id?: string
           p_supplier_id: string
         }
         Returns: string

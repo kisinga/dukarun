@@ -89,6 +89,13 @@ const RULES = [
       'Pages must pass title/subtitle/actions through <app-page>, not render PageHeaderComponent directly.',
   },
   {
+    id: 'unbounded-entity-select',
+    exts: ['.html', '.ts'],
+    re: /<select\b(?:(?!<\/select>)[\s\S])*@for\s*\([^)]*\bof\s+(?:suppliers|manufacturers|customers|products)\s*\(\)(?:(?!<\/select>)[\s\S])*<\/select>/g,
+    message:
+      'Potentially unbounded party/catalog lists must use <app-searchable-filter> or server typeahead; native selects are only for small bounded enumerations.',
+  },
+  {
     id: 'page-width-override',
     exts: ['.ts'],
     re: /class="mx-auto max-w-(?:sm|md|lg|xl|2xl|3xl|4xl|5xl|6xl|7xl)\b/g,

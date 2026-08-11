@@ -46,6 +46,8 @@ import {
   MoneyCustomer,
   MoneyService,
   PurchaseDraft,
+  PurchaseExpense,
+  PurchaseHistoryRow,
   PurchaseLine,
   PurchasePayment,
   SupplierPurchaseMetric,
@@ -64,16 +66,7 @@ type SupplierWithAp = MoneyCustomer & { ap_balance: number } & AgingInfo;
 type PurchasePaymentMode = 'paid' | 'partial' | 'later';
 // Avoid oversized PostgREST URLs when a broad query matches many cached suppliers.
 const SUPPLIER_SEARCH_ID_LIMIT = 50;
-type PurchaseRow = {
-  id: string;
-  supplier_id: string;
-  total_cost: number;
-  is_credit: boolean;
-  reference: string | null;
-  purchase_date: string;
-  created_at: string;
-  paid: number;
-};
+type PurchaseRow = PurchaseHistoryRow;
 
 interface PurchaseLineForm {
   variantId: string;
@@ -154,12 +147,12 @@ interface ParsedPurchaseLine {
         </a>
       }
       @if (isPurchasePage()) {
-        <button actions appButton type="button" (click)="startPurchase()">
+        <a actions appButton routerLink="/purchases/new">
           <app-icon name="heroPlus" /> Record purchase
-        </button>
+        </a>
       }
       @if (!isPurchasePage()) {
-        <a actions appButton variant="secondary" routerLink="/purchases">
+        <a actions appButton variant="secondary" routerLink="/purchases/new">
           <app-icon name="heroShoppingCart" /> New purchase
         </a>
       }
@@ -1149,7 +1142,8 @@ interface ParsedPurchaseLine {
                           {{ draft.reference || 'No reference' }} · {{ fmt(draft.total_cost) }}
                         </p>
                       </div>
-                      <button appButton variant="ghost" (click)="openDraft(draft)">Open</button
+                      <a appButton variant="ghost" [routerLink]="['/purchases/drafts', draft.id]"
+                        >Open</a
                       ><button appButton variant="ghost" (click)="cancelDraft(draft.id)">
                         Cancel
                       </button>
@@ -1905,8 +1899,16 @@ interface ParsedPurchaseLine {
 
                 <div class="mt-3 grid grid-cols-2 gap-2">
                   <app-stat-card
-                    label="Total"
+                    label="Supplier invoice"
                     [value]="perms.has('ViewFinancials') ? fmt(p.total_cost) : 'Hidden'"
+                    [sub]="
+                      perms.has('ViewFinancials')
+                        ? 'Merchandise ' +
+                          fmt(p.goods_subtotal) +
+                          ' · expenses ' +
+                          fmt(p.expense_total - p.separate_expense_total)
+                        : undefined
+                    "
                   />
                   <app-stat-card
                     label="Paid"
@@ -1918,6 +1920,19 @@ interface ParsedPurchaseLine {
                         : undefined
                     "
                   />
+                  @if (p.separate_expense_total > 0) {
+                    <app-stat-card
+                      label="Paid separately"
+                      [value]="
+                        perms.has('ViewFinancials') ? fmt(p.separate_expense_total) : 'Hidden'
+                      "
+                      sub="Internal expense; not supplier AP"
+                    />
+                    <app-stat-card
+                      label="All-in outlay"
+                      [value]="perms.has('ViewFinancials') ? fmt(p.all_in_total) : 'Hidden'"
+                    />
+                  }
                 </div>
 
                 @if (purchaseDetailLoading()) {
@@ -1973,6 +1988,38 @@ interface ParsedPurchaseLine {
                         </ul>
                       }
                     </section>
+
+                    @if (drawerPurchaseExpenses().length > 0) {
+                      <section class="border-t border-base-300/60 pt-3">
+                        <h3 class="section-title mb-2">Additional expenses</h3>
+                        <ul class="divide-y divide-base-200">
+                          @for (expense of drawerPurchaseExpenses(); track expense.id) {
+                            <li class="flex items-center gap-3 py-2">
+                              <div class="min-w-0 flex-1">
+                                <p class="text-sm font-medium capitalize">
+                                  {{ expense.custom_label || expense.category }}
+                                </p>
+                                <p class="type-caption">
+                                  {{
+                                    expense.settlement === 'supplier_bill'
+                                      ? 'Included in supplier bill'
+                                      : 'Paid separately from ' + expense.account_code
+                                  }}
+                                  @if (expense.memo) {
+                                    · {{ expense.memo }}
+                                  }
+                                </p>
+                              </div>
+                              <strong class="text-sm"
+                                ><app-money
+                                  [amount]="expense.amount"
+                                  [masked]="!perms.has('ViewFinancials')"
+                              /></strong>
+                            </li>
+                          }
+                        </ul>
+                      </section>
+                    }
 
                     <section class="border-t border-base-300/60 pt-3">
                       <h3 class="section-title mb-2">Payments</h3>
@@ -2316,6 +2363,7 @@ export class SuppliersComponent implements OnInit, OnDestroy {
     return id ? (this.purchases().find(p => p.id === id) ?? null) : null;
   });
   protected readonly drawerPurchaseLines = signal<PurchaseLine[]>([]);
+  protected readonly drawerPurchaseExpenses = signal<PurchaseExpense[]>([]);
   protected readonly drawerPurchasePayments = signal<PurchasePayment[]>([]);
   protected readonly purchaseDetailLoading = signal(false);
   protected readonly openCreditPurchases = computed(() =>
@@ -2373,6 +2421,9 @@ export class SuppliersComponent implements OnInit, OnDestroy {
   async ngOnInit(): Promise<void> {
     this.purchaseLocationFilter.set(this.locationContext.requireActiveId());
     if (this.isPurchasePage()) {
+      if (window.history.state?.purchaseRecorded) {
+        this.notice.set('Purchase recorded successfully. Stock and accounting are up to date.');
+      }
       const params = this.route.snapshot.queryParamMap;
       this.purchaseSupplierFilter.set(params.get('supplier') ?? 'all');
       this.purchasePaymentFilter.set(params.get('payment') ?? 'all');
@@ -3064,16 +3115,19 @@ export class SuppliersComponent implements OnInit, OnDestroy {
     this.drawerPurchaseId.set(purchase.id);
     this.payPurchaseId.set(null);
     this.drawerPurchaseLines.set([]);
+    this.drawerPurchaseExpenses.set([]);
     this.drawerPurchasePayments.set([]);
     this.purchaseDetailLoading.set(true);
     try {
-      const [lines, payments] = await Promise.all([
+      const [lines, expenses, payments] = await Promise.all([
         this.money.purchaseLines(purchase.id),
+        this.money.purchaseExpenses(purchase.id),
         this.money.purchasePayments(purchase.id),
       ]);
       // Ignore stale results when the drawer was closed (or reopened) meanwhile.
       if (this.drawerPurchaseId() !== purchase.id) return;
       this.drawerPurchaseLines.set(lines);
+      this.drawerPurchaseExpenses.set(expenses);
       this.drawerPurchasePayments.set(payments);
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Failed to load purchase details');
@@ -3088,6 +3142,7 @@ export class SuppliersComponent implements OnInit, OnDestroy {
     this.payPurchaseId.set(null);
     this.purchaseDetailLoading.set(false);
     this.drawerPurchaseLines.set([]);
+    this.drawerPurchaseExpenses.set([]);
     this.drawerPurchasePayments.set([]);
   }
 

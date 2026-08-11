@@ -342,7 +342,7 @@ type ReminderDraft = {
                   </div>
                   <label class="flex cursor-pointer items-center justify-between gap-4 py-3">
                     <span>
-                      <span class="block text-sm font-medium">Track batch expiry</span>
+                      <span class="block text-sm font-medium">Track expiry dates</span>
                       <span class="block text-xs text-base-content/60">
                         Show expiry fields on stock intake and warn about batches nearing expiry.
                       </span>

@@ -263,16 +263,29 @@ export class ReceiptDataService {
       .select('amount')
       .eq('purchase_id', purchaseId);
     const paid = (payments ?? []).reduce((sum, p) => sum + p.amount, 0);
-    const paymentStatus = paid >= purchase.total_cost ? 'paid' : paid > 0 ? 'partial' : 'pending';
+    const paymentStatus =
+      !purchase.is_credit || paid >= purchase.total_cost
+        ? 'paid'
+        : paid > 0
+          ? 'partial'
+          : 'pending';
+    const { data: expenses, error: expenseError } = await this.db
+      .from('purchase_expenses')
+      .select('id, category, custom_label, memo, amount')
+      .eq('purchase_id', purchaseId)
+      .eq('settlement', 'supplier_bill')
+      .order('created_at');
+    if (expenseError) throw expenseError;
 
     return {
       id: purchase.id,
       supplierId: purchase.supplier_id,
-      purchaseDate: purchase.created_at,
+      purchaseDate: purchase.purchase_date,
       referenceNumber: purchase.reference,
       totalCost: purchase.total_cost,
       paymentStatus,
       status: 'confirmed',
+      notes: purchase.notes,
       supplier: purchase.customers
         ? {
             id: purchase.supplier_id,
@@ -305,6 +318,7 @@ export class ReceiptDataService {
             : undefined,
         };
       }),
+      expenses: expenses ?? [],
     };
   }
 }
