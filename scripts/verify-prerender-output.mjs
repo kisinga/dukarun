@@ -20,7 +20,17 @@ function requireMatchingSocialTitle(html, label) {
   }
 }
 
-for (const route of ['', 'about', 'contact', 'docs', 'privacy', 'terms', 'dpa', 'subprocessors']) {
+for (const route of [
+  '',
+  'about',
+  'contact',
+  'docs',
+  'blog',
+  'privacy',
+  'terms',
+  'dpa',
+  'subprocessors',
+]) {
   const html = requireFile(resolve(site, route, 'index.html'));
   for (const marker of [
     '<html lang="en-KE"',
@@ -42,6 +52,24 @@ for (const route of ['', 'about', 'contact', 'docs', 'privacy', 'terms', 'dpa', 
 const siteIndex = requireFile(resolve(site, 'index.html'));
 const siteSitemap = requireFile(resolve(site, 'sitemap.xml'));
 const siteRobots = requireFile(resolve(site, 'robots.txt'));
+const fixtureMode =
+  process.env.PUBLIC_DATA_MODE === 'fixture' ||
+  !process.env.SUPABASE_URL ||
+  !process.env.SUPABASE_ANON_KEY;
+if (fixtureMode) {
+  const fixtureBlog = requireFile(resolve(site, 'blog/keep-stock-and-cash-in-step/index.html'));
+  for (const marker of [
+    'Keep stock and cash in step',
+    '"@type":"BlogPosting"',
+    'property="og:type" content="article"',
+  ]) {
+    if (!fixtureBlog.includes(marker))
+      throw new Error(`Prerendered fixture blog is missing: ${marker}`);
+  }
+  if (!siteSitemap.includes('/blog/keep-stock-and-cash-in-step')) {
+    throw new Error('Site sitemap is missing the fixture blog post.');
+  }
+}
 const canonicalMatch = siteIndex.match(/<link rel="canonical" href="([^"]+)">/);
 if (!canonicalMatch) throw new Error('Site root is missing its canonical URL.');
 const siteOrigin = new URL(canonicalMatch[1]).origin;
@@ -64,10 +92,6 @@ if (!siteIndex.includes('"@type":"FAQPage"')) {
 }
 
 const privacy = requireFile(resolve(site, 'privacy/index.html'));
-const fixtureMode =
-  process.env.PUBLIC_DATA_MODE === 'fixture' ||
-  !process.env.SUPABASE_URL ||
-  !process.env.SUPABASE_ANON_KEY;
 if (fixtureMode) {
   for (const marker of [
     'Version 2026-01-01',

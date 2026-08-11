@@ -4,6 +4,7 @@ import { Meta, Title } from '@angular/platform-browser';
 import { ActivatedRoute, NavigationEnd, Router } from '@angular/router';
 import { filter, startWith } from 'rxjs';
 import { environment } from '../../environments/environment';
+import type { PublishedBlogPost } from '../blog/blog.service';
 
 const SOCIAL_IMAGE_PATH = '/media/video/product-overview/product-overview-full-wide.png';
 
@@ -103,21 +104,62 @@ export class SiteSeoService {
     this.meta.updateTag({ name: 'twitter:description', content: description });
     this.meta.updateTag({ name: 'twitter:image', content: image });
 
+    this.setCanonical(url.toString());
+    this.setStructuredData(url.pathname === '/');
+  }
+
+  applyBlogPost(post: PublishedBlogPost, coverUrl: string | null): void {
+    const baseTitle = post.seo_title || post.title;
+    const title = /\|\s*dukarun$/i.test(baseTitle) ? baseTitle : `${baseTitle} | Dukarun`;
+    const description = post.seo_description || post.excerpt;
+    const url = new URL(`/blog/${post.slug}`, environment.sitePublicUrl);
+    const image = coverUrl || new URL(SOCIAL_IMAGE_PATH, environment.sitePublicUrl).toString();
+    this.title.setTitle(title);
+    this.meta.updateTag({ name: 'description', content: description });
+    this.meta.updateTag({ name: 'robots', content: 'index, follow' });
+    this.updateProperty('og:title', title);
+    this.updateProperty('og:description', description);
+    this.updateProperty('og:url', url.toString());
+    this.updateProperty('og:type', 'article');
+    this.updateProperty('og:image', image);
+    this.meta.updateTag({ name: 'twitter:title', content: title });
+    this.meta.updateTag({ name: 'twitter:description', content: description });
+    this.meta.updateTag({ name: 'twitter:image', content: image });
+    this.setCanonical(url.toString());
+    const siteUrl = new URL('/', environment.sitePublicUrl).toString();
+    this.setStructuredData(false, {
+      '@type': 'BlogPosting',
+      headline: post.title,
+      description,
+      image: [image],
+      datePublished: post.published_at,
+      dateModified: post.updated_at,
+      author: { '@type': 'Person', name: post.author_name },
+      mainEntityOfPage: url.toString(),
+      publisher: { '@id': `${siteUrl}#organization` },
+    });
+  }
+
+  applyNotFound(): void {
+    this.title.setTitle('Article not found | Dukarun');
+    this.meta.updateTag({ name: 'robots', content: 'noindex, nofollow' });
+  }
+
+  private setCanonical(value: string): void {
     let canonical = this.document.head.querySelector<HTMLLinkElement>('link[rel="canonical"]');
     if (!canonical) {
       canonical = this.document.createElement('link');
       canonical.rel = 'canonical';
       this.document.head.appendChild(canonical);
     }
-    canonical.href = url.toString();
-    this.setStructuredData(url.pathname === '/');
+    canonical.href = value;
   }
 
   private updateProperty(property: string, content: string): void {
     this.meta.updateTag({ property, content }, `property="${property}"`);
   }
 
-  private setStructuredData(includeFaq: boolean): void {
+  private setStructuredData(includeFaq: boolean, pageEntity?: object): void {
     const siteUrl = new URL('/', environment.sitePublicUrl).toString();
     const organizationId = `${siteUrl}#organization`;
     const graph: object[] = [
@@ -148,6 +190,7 @@ export class SiteSeoService {
       },
     ];
     if (includeFaq) graph.push({ '@type': 'FAQPage', mainEntity: FAQ_ENTITIES });
+    if (pageEntity) graph.push(pageEntity);
 
     this.document.getElementById('site-structured-data')?.remove();
     const script = this.document.createElement('script');

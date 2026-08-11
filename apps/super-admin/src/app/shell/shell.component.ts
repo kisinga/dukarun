@@ -100,6 +100,7 @@ export class ShellComponent {
     { route: '/operations', label: 'Operations', icon: 'heroServerStack' },
     { route: '/audit', label: 'Audit log', icon: 'heroClipboardDocumentList' },
     { route: '/legal', label: 'Legal documents', icon: 'heroDocumentText' },
+    { route: '/blog', label: 'Blog', icon: 'heroDocumentText' },
   ];
 
   protected closeDrawer(): void {

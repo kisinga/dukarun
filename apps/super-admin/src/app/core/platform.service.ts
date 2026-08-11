@@ -74,6 +74,71 @@ export interface CompanyLegalStatus {
   accepted_at: string | null;
   accepted_by: string | null;
 }
+export interface RegistrationConfig {
+  automatic_company_approval_enabled: boolean;
+  hourly_alert_threshold: number;
+  daily_alert_threshold: number;
+  automatic_last_hour: number;
+  automatic_last_day: number;
+  updated_at: string | null;
+}
+export interface RegistrationAlert {
+  id: string;
+  alert_window: 'hourly' | 'daily';
+  window_started_at: string;
+  approval_count: number;
+  threshold: number;
+  created_at: string;
+  acknowledged_at: string | null;
+  acknowledged_by: string | null;
+}
+export interface PlatformBlogPost {
+  post_id: string;
+  revision_id: string | null;
+  version_number: number | null;
+  slug: string;
+  publication_state: 'draft' | 'scheduled' | 'published' | 'superseded' | 'archived' | 'empty';
+  title: string | null;
+  excerpt: string | null;
+  content_markdown?: string | null;
+  author_name: string | null;
+  cover_image_path: string | null;
+  cover_image_alt: string | null;
+  tags: string[];
+  seo_title: string | null;
+  seo_description: string | null;
+  scheduled_for: string | null;
+  published_at: string | null;
+  archived_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+export interface PlatformBlogMetrics {
+  views: number;
+  unique_readers: number;
+  engaged_readers: number;
+  scroll_90: number;
+  cta_clicks: number;
+  share_clicks: number;
+  registrations: number;
+  posts: Array<{
+    post_id: string;
+    slug: string;
+    title: string;
+    views: number;
+    unique_readers: number;
+    cta_clicks: number;
+    registrations: number;
+  }>;
+}
+export interface SiteDeployment {
+  id: string;
+  provider_deployment_id: string | null;
+  status: 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled' | 'timed_out';
+  error_summary: string | null;
+  created_at: string;
+  completed_at: string | null;
+}
 export type LegalDocumentType = 'privacy' | 'terms' | 'dpa' | 'subprocessors';
 export interface LegalDocumentVersion {
   id: string;
@@ -114,6 +179,136 @@ export class PlatformService {
     const { data, error } = await this.db.rpc('platform_operations_snapshot');
     if (error) throw rpcError(error);
     return data as unknown as OperationsSnapshot;
+  }
+
+  async registrationConfig(): Promise<RegistrationConfig> {
+    const { data, error } = await this.db.rpc('platform_registration_config');
+    if (error) throw rpcError(error);
+    return data as unknown as RegistrationConfig;
+  }
+
+  async updateRegistrationConfig(input: {
+    automatic: boolean;
+    hourlyThreshold: number;
+    dailyThreshold: number;
+  }): Promise<RegistrationConfig> {
+    const { data, error } = await this.db.rpc('platform_update_registration_config', {
+      p_automatic_company_approval_enabled: input.automatic,
+      p_hourly_alert_threshold: input.hourlyThreshold,
+      p_daily_alert_threshold: input.dailyThreshold,
+    });
+    if (error) throw rpcError(error);
+    return data as unknown as RegistrationConfig;
+  }
+
+  async registrationAlerts(): Promise<RegistrationAlert[]> {
+    const { data, error } = await this.db.rpc('platform_registration_alerts', { p_limit: 20 });
+    if (error) throw rpcError(error);
+    return (data ?? []) as unknown as RegistrationAlert[];
+  }
+
+  async acknowledgeRegistrationAlert(alertId: string): Promise<void> {
+    const { error } = await this.db.rpc('platform_acknowledge_registration_alert', {
+      p_alert_id: alertId,
+    });
+    if (error) throw rpcError(error);
+  }
+
+  async blogPosts(): Promise<PlatformBlogPost[]> {
+    const { data, error } = await this.db.rpc('platform_blog_posts');
+    if (error) throw rpcError(error);
+    return (data ?? []) as unknown as PlatformBlogPost[];
+  }
+
+  async blogPost(postId: string): Promise<PlatformBlogPost> {
+    const { data, error } = await this.db.rpc('platform_blog_post', { p_post_id: postId });
+    if (error) throw rpcError(error);
+    if (!data) throw new Error('Blog article not found');
+    return data as unknown as PlatformBlogPost;
+  }
+
+  async blogMetrics(postId?: string): Promise<PlatformBlogMetrics> {
+    const { data, error } = await this.db.rpc('platform_blog_metrics', {
+      ...(postId ? { p_post_id: postId } : {}),
+    });
+    if (error) throw rpcError(error);
+    return data as unknown as PlatformBlogMetrics;
+  }
+
+  async saveBlogDraft(input: {
+    postId: string | null;
+    slug: string;
+    title: string;
+    excerpt: string;
+    markdown: string;
+    authorName: string;
+    coverImagePath: string | null;
+    coverImageAlt: string | null;
+    tags: string[];
+    seoTitle: string | null;
+    seoDescription: string | null;
+  }): Promise<{ post_id: string; revision_id: string }> {
+    const { data, error } = await this.db.rpc('platform_save_blog_draft', {
+      p_post_id: input.postId!,
+      p_slug: input.slug,
+      p_title: input.title,
+      p_excerpt: input.excerpt,
+      p_content_markdown: input.markdown,
+      p_author_name: input.authorName,
+      p_cover_image_path: input.coverImagePath!,
+      p_cover_image_alt: input.coverImageAlt!,
+      p_tags: input.tags,
+      p_seo_title: input.seoTitle!,
+      p_seo_description: input.seoDescription!,
+    });
+    if (error) throw rpcError(error);
+    return data as unknown as { post_id: string; revision_id: string };
+  }
+
+  async publishBlogPost(postId: string): Promise<void> {
+    const { error } = await this.db.rpc('platform_publish_blog_post', { p_post_id: postId });
+    if (error) throw rpcError(error);
+  }
+
+  async scheduleBlogPost(postId: string, scheduledFor: string): Promise<void> {
+    const { error } = await this.db.rpc('platform_schedule_blog_post', {
+      p_post_id: postId,
+      p_scheduled_for: scheduledFor,
+    });
+    if (error) throw rpcError(error);
+  }
+
+  async cancelScheduledBlogPost(postId: string): Promise<void> {
+    const { error } = await this.db.rpc('platform_cancel_scheduled_blog_post', {
+      p_post_id: postId,
+    });
+    if (error) throw rpcError(error);
+  }
+
+  async archiveBlogPost(postId: string): Promise<void> {
+    const { error } = await this.db.rpc('platform_archive_blog_post', { p_post_id: postId });
+    if (error) throw rpcError(error);
+  }
+
+  async uploadBlogCover(postId: string, file: File): Promise<string> {
+    const extension = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+    const path = `${postId}/${crypto.randomUUID()}.${extension}`;
+    const { error } = await this.db.storage.from('blog-media').upload(path, file, {
+      contentType: file.type,
+      upsert: false,
+    });
+    if (error) throw error;
+    return path;
+  }
+
+  blogCoverUrl(path: string | null): string | null {
+    return path ? this.db.storage.from('blog-media').getPublicUrl(path).data.publicUrl : null;
+  }
+
+  async siteDeployments(): Promise<SiteDeployment[]> {
+    const { data, error } = await this.db.rpc('platform_site_deployments');
+    if (error) throw rpcError(error);
+    return (data ?? []) as unknown as SiteDeployment[];
   }
 
   async failedOutbox(): Promise<FailedOutboxRow[]> {

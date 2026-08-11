@@ -23,8 +23,9 @@ nothing sensitive is stored in the repo.
 - [x] GoTrue hooks + SMS provider env (send_sms → TextSMS via vault, custom_access_token)
 - [x] SMS login OTP validity set to five minutes (`GOTRUE_SMS_OTP_EXP=300`)
 - [x] Vault secrets: `TEXTSMS_API_KEY`, `TEXTSMS_PARTNER_ID`, `TEXTSMS_SHORTCODE`,
-      `SUPABASE_SERVICE_ROLE_KEY`, `NOTIFY_FLUSH_URL`
-- [x] Edge functions deployed: paystack-charge, paystack-webhook, notification-flush, _shared
+      `SUPABASE_SERVICE_ROLE_KEY`, `NOTIFY_FLUSH_URL`, `SITE_DEPLOY_URL`
+- [x] Edge functions deployed: paystack-charge, paystack-webhook, notification-flush,
+      platform-message-test, site-deploy, _shared
 - [x] Edge-runtime env: `PAYSTACK_SECRET_KEY`, `TEXTSMS_*`, `OPENWA_*`, `EMAIL_API_*`
 - [x] Env managed in Coolify UI (survives redeploys)
 - [x] Commissioning hardening migration `0023` applied (2026-08-06)
@@ -66,8 +67,13 @@ deploys site last.
 Storefront publish, unpublish, slug, name, and branding changes must trigger a storefront
 rebuild. Until automation is connected, run the storefront deployment manually.
 
-Publishing or changing public legal documents or pricing must trigger a site rebuild. Until
-automation is connected, run the site deployment manually.
+Blog publication and archive operations enqueue a site rebuild automatically. The database cron
+coalesces pending requests, invokes `site-deploy`, and the function starts and reconciles a forced
+Coolify build. Publishing is not rolled back if the build fails. Failed builds retry three times
+with bounded backoff and remain visible in Superadmin → Blog → SEO deployments.
+
+Public legal-document and pricing changes still require a manual site deployment until those
+existing publishing RPCs are connected to the same generic queue.
 
 Rollback each frontend with `scripts/deploy-apps.sh rollback <app>`. The deploy script refuses
 to create a second container for an already-routed
@@ -81,6 +87,41 @@ runners. Database migrations and Edge Functions are intentionally deployed with
 manage the separate Supabase service.
 `.github/workflows/test.yml`: design guards + fixture-backed builds for all four apps.
 Merging to `main` triggers Coolify's normal Git-connected application rebuild.
+
+## Blog publishing and automatic SEO deployment
+
+Production setup:
+
+1. Create a Coolify API token and identify the public-site application UUID.
+2. Add `COOLIFY_API_URL`, `COOLIFY_API_TOKEN`, and `COOLIFY_SITE_UUID` to the Supabase Edge
+   Runtime environment. `COOLIFY_API_URL` is the Coolify origin without `/api/v1`.
+3. Set `SITE_DEPLOY_URL=https://supa.dukarun.com/functions/v1/site-deploy` in `.env.deploy`.
+4. Run `npm run deploy:functions`. The deploy script syncs the function and upserts the dispatcher
+   URL into Database Vault. `SUPABASE_SERVICE_ROLE_KEY` must already exist there.
+5. Publish a test article in Superadmin. It is public immediately through Supabase; within one
+   minute a Coolify build should appear and then be marked `succeeded` in Superadmin.
+6. Verify the article URL is prerendered and appears in `https://dukarun.com/sitemap.xml`, then
+   resubmit or inspect that sitemap in the existing Google Search Console property.
+
+The dispatcher follows Coolify's documented `POST /api/v1/deploy` contract and reconciles with
+`GET /api/v1/deployments/{deployment_uuid}`. Do not place the Coolify token in Angular variables,
+Database Vault, Cloudflare, or browser storage.
+
+## Cloudflare front door
+
+Cloudflare can remain the DNS/CDN/WAF layer in front of the Coolify applications; Cloudflare Pages
+is not required. Use proxied DNS records for the public app hostnames, TLS mode **Full (strict)**,
+and an origin certificate or publicly trusted certificate on Coolify. Keep the default cache
+behavior for HTML so a newly deployed prerendered article is observed promptly; do not add a
+“Cache Everything” rule for document responses. Hashed JS/CSS assets already carry one-year
+immutable origin caching. Preserve `no-store`/`no-cache` responses for application shells and
+private token routes.
+
+For `supa.dukarun.com`, bypass caching for `/auth/*`, `/rest/*`, `/realtime/*`, and `/functions/*`.
+Rate-limit abusive anonymous traffic at Cloudflare, but allow the public blog read RPC and
+`record_blog_event`; the database additionally de-duplicates engagement signals and caps a visitor
+at 100 events per hour. Google Search Console remains the indexing/diagnostics tool while
+Cloudflare remains delivery and security infrastructure—they are complementary.
 
 ## Lint findings (accepted, by design)
 

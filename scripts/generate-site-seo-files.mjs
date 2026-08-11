@@ -4,7 +4,26 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const baseUrl = new URL(process.env.SITE_PUBLIC_URL || 'http://localhost:4202');
-const routes = ['', 'about', 'contact', 'docs', 'privacy', 'terms', 'dpa', 'subprocessors'];
+const routes = ['', 'about', 'contact', 'docs', 'blog', 'privacy', 'terms', 'dpa', 'subprocessors'];
+if (
+  process.env.PUBLIC_DATA_MODE === 'live' &&
+  process.env.SUPABASE_URL &&
+  process.env.SUPABASE_ANON_KEY
+) {
+  const response = await fetch(
+    `${process.env.SUPABASE_URL.replace(/\/+$/, '')}/rest/v1/rpc/public_blog_sitemap`,
+    {
+      method: 'POST',
+      headers: { apikey: process.env.SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+      body: '{}',
+    }
+  );
+  if (!response.ok) throw new Error(`Blog sitemap query failed: ${response.status}`);
+  const posts = await response.json();
+  routes.push(...posts.map(post => `blog/${post.slug}`));
+} else {
+  routes.push('blog/keep-stock-and-cash-in-step');
+}
 const urls = routes.map(route =>
   new URL(route, `${baseUrl.toString().replace(/\/+$/, '')}/`).toString()
 );

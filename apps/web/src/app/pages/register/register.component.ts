@@ -34,7 +34,21 @@ import { LegalService, PublishedLegalDocument } from '../../legal/legal.service'
             </div>
           }
 
-          @if (!createdPending()) {
+          @if (createdApproved()) {
+            <div class="alert alert-success flex-col items-start" role="status">
+              <span>Your workspace is approved and ready.</span>
+              <button
+                type="button"
+                class="btn btn-primary btn-sm"
+                [disabled]="saving()"
+                (click)="continueToWorkspace()"
+              >
+                {{ saving() ? 'Opening…' : 'Continue to dashboard' }}
+              </button>
+            </div>
+          }
+
+          @if (!createdPending() && !createdApproved()) {
             <form (submit)="$event.preventDefault(); provision()" class="flex flex-col gap-5">
               <fieldset class="flex flex-col gap-3">
                 <legend class="text-xs font-semibold uppercase tracking-wider text-base-content/45">
@@ -178,6 +192,8 @@ export class RegisterComponent implements OnInit {
   protected readonly siteUrl = siteUrl;
   protected readonly error = signal<string | null>(null);
   protected readonly createdPending = signal(false);
+  protected readonly createdApproved = signal(false);
+  private readonly createdCompanyId = signal<string | null>(null);
   /** True when the user already belongs to a company and is adding another. */
   protected readonly hasCompany = signal(false);
   protected readonly trialDays = signal<number | null>(null);
@@ -186,6 +202,9 @@ export class RegisterComponent implements OnInit {
   protected readonly legalLoadError = signal(false);
   protected readonly legalReady = computed(() => this.currentTerms() !== null);
   private readonly requestedPlanCode = this.route.snapshot.queryParamMap.get('plan');
+  private readonly requestedBlogRef = this.validUuid(
+    this.route.snapshot.queryParamMap.get('blog_ref')
+  );
 
   protected readonly ownerName = new FormControl('', { nonNullable: true });
   protected readonly companyName = new FormControl('', {
@@ -244,36 +263,63 @@ export class RegisterComponent implements OnInit {
     try {
       const terms = this.currentTerms();
       if (!terms) throw new Error('The current Terms must be loaded before registration.');
-      const { data: companyId, error } = await this.supabase.client.rpc(
-        'provision_company_with_terms',
-        {
-          p_company_name: this.companyName.value.trim(),
-          p_store_name: this.storeName.value.trim() || 'Main location',
-          p_currency: 'KES',
-          p_email: this.companyEmail.value.trim() || undefined,
-          p_address: this.companyAddress.value.trim() || undefined,
-          ...(this.requestedPlanCode ? { p_trial_tier_code: this.requestedPlanCode } : {}),
-          p_terms_version: terms.version,
-          p_terms_content_sha256: terms.content_sha256,
-          p_owner_name: this.ownerName.value.trim() || undefined,
-        }
-      );
+      const { data, error } = await this.supabase.client.rpc('provision_company_registration', {
+        p_company_name: this.companyName.value.trim(),
+        p_store_name: this.storeName.value.trim() || 'Main location',
+        p_currency: 'KES',
+        p_email: this.companyEmail.value.trim() || undefined,
+        p_address: this.companyAddress.value.trim() || undefined,
+        ...(this.requestedPlanCode ? { p_trial_tier_code: this.requestedPlanCode } : {}),
+        p_terms_version: terms.version,
+        p_terms_content_sha256: terms.content_sha256,
+        p_owner_name: this.ownerName.value.trim() || undefined,
+        ...(this.requestedBlogRef ? { p_blog_ref: this.requestedBlogRef } : {}),
+      });
       if (error) throw error;
-      // Refresh so an approved company can become active immediately. New
-      // companies remain on the pending screen until platform approval.
-      const { error: refreshError } = await this.supabase.client.auth.refreshSession();
-      if (refreshError) throw refreshError;
-      if (this.supabase.claims()?.company_id !== companyId) {
+      const result = data as unknown as {
+        company_id: string;
+        company_status: 'approved' | 'unapproved';
+      };
+      this.createdCompanyId.set(result.company_id);
+      if (result.company_status !== 'approved') {
         this.createdPending.set(true);
         return;
       }
-      // Reload because provision_company made the new company active and every
-      // cached store must restart under the new tenant scope.
-      window.location.assign('/dashboard');
+      this.createdApproved.set(true);
+      await this.continueToWorkspace();
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Provisioning failed');
     } finally {
       this.saving.set(false);
     }
+  }
+
+  protected async continueToWorkspace(): Promise<void> {
+    const companyId = this.createdCompanyId();
+    if (!companyId) return;
+    this.saving.set(true);
+    this.error.set(null);
+    try {
+      const { error } = await this.supabase.client.auth.refreshSession();
+      if (error) throw error;
+      if (this.supabase.claims()?.company_id !== companyId) {
+        throw new Error('Your workspace is ready. Select Continue again to refresh access.');
+      }
+      // Reload all tenant-scoped stores under the newly selected company.
+      window.location.assign('/dashboard');
+    } catch (err) {
+      this.error.set(
+        err instanceof Error ? err.message : 'Workspace access could not be refreshed'
+      );
+    } finally {
+      this.saving.set(false);
+    }
+  }
+
+  private validUuid(value: string | null): string | null {
+    return value &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+      ? value
+      : null;
   }
 }

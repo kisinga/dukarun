@@ -188,6 +188,7 @@ export class MarketingLayoutComponent {
     { label: 'Home', path: '/' },
     { label: 'Pricing', path: '/', fragment: 'pricing' },
     { label: 'Guide', path: '/docs' },
+    { label: 'Blog', path: '/blog' },
     { label: 'About', path: '/about' },
     { label: 'Contact', path: '/contact' },
   ];

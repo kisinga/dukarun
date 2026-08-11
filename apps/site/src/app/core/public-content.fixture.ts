@@ -3,6 +3,7 @@ import type {
   PublicBillingConfig,
   PublicSubscriptionPlan,
 } from '../marketing/public-pricing.service';
+import type { PublishedBlogPost } from '../blog/blog.service';
 
 const document = (type: LegalDocumentType, title: string): PublishedLegalDocument => ({
   id: `fixture-${type}`,
@@ -49,3 +50,25 @@ export const FIXTURE_BILLING_CONFIG: PublicBillingConfig = {
   trialDays: 14,
   defaultTrialTierCode: 'standard',
 };
+
+export const FIXTURE_BLOG_POSTS: PublishedBlogPost[] = [
+  {
+    post_id: '00000000-0000-4000-8000-000000000075',
+    revision_id: '00000000-0000-4000-8000-000000000076',
+    slug: 'keep-stock-and-cash-in-step',
+    title: 'Keep stock and cash in step',
+    excerpt: 'A practical guide to connecting what leaves the shelf with what lands in the till.',
+    content_markdown:
+      '# Keep stock and cash in step\n\n## Count what matters\n\nA reliable stock count makes every purchasing and cash decision easier.\n\n## Close the loop\n\nRecord each sale when it happens, review exceptions, and close the day against the money received.',
+    author_name: 'Dukarun team',
+    cover_image_path: null,
+    cover_image_alt: null,
+    tags: ['stock', 'cash-flow'],
+    seo_title: 'Keep stock and cash in step',
+    seo_description:
+      'Connect stock movement with daily cash control using a simple operating rhythm.',
+    published_at: '2026-08-01T06:00:00.000Z',
+    updated_at: '2026-08-01T06:00:00.000Z',
+    reading_minutes: 3,
+  },
+];
