@@ -78,6 +78,10 @@ type PurchaseRow = {
 interface PurchaseLineForm {
   variantId: string;
   quantity: number;
+  // Purchase-entry invariant: keep both values editable. Supplier invoices may quote either a
+  // unit price or a flat line amount; for odd/fractional quantities the exact unit price may be
+  // impossible to represent in whole KES. `valueSource` identifies the authoritative input. When
+  // it is `total`, posting must preserve that exact line total and treat unit cost as derived.
   unitCost: string; // KES text
   lineTotal: string; // KES text; linked bidirectionally with unitCost
   valueSource: 'unit' | 'total';

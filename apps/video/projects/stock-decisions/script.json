@@ -1,0 +1,83 @@
+{
+  "projectId": "stock-decisions",
+  "title": "Act on numbers you can trust",
+  "language": "en-KE",
+  "fps": 30,
+  "durationInFrames": 656,
+  "promptVersion": "stock-decisions-v1",
+  "model": "human-authored",
+  "callToAction": "Get started",
+  "narration": [
+    {
+      "id": "overview",
+      "text": "See revenue, margin and stock across every location.",
+      "source": "script",
+      "audioFile": null,
+      "startFrame": 0,
+      "endFrame": 138
+    },
+    {
+      "id": "attention",
+      "text": "Know what is selling, what needs restocking and where stock is available.",
+      "source": "script",
+      "audioFile": null,
+      "startFrame": 138,
+      "endFrame": 315
+    },
+    {
+      "id": "movements",
+      "text": "Record purchases, adjustments and transfers as they happen.",
+      "source": "script",
+      "audioFile": null,
+      "startFrame": 315,
+      "endFrame": 453
+    },
+    {
+      "id": "decisions",
+      "text": "Use a current view of the business to make better decisions.",
+      "source": "script",
+      "audioFile": null,
+      "startFrame": 453,
+      "endFrame": 566
+    }
+  ],
+  "scenes": [
+    {
+      "id": "overview",
+      "template": "remote-dashboard",
+      "startFrame": 0,
+      "durationInFrames": 315,
+      "headline": "Know your margin and stock.",
+      "body": "See every location from one view.",
+      "claimIds": ["owner-dashboard", "multi-location-dashboard", "business-reporting"],
+      "narrationSegmentIds": ["overview", "attention"],
+      "data": {
+        "revenue": 18450,
+        "margin": 4260,
+        "sales": 27
+      }
+    },
+    {
+      "id": "movements",
+      "template": "stock-operations",
+      "startFrame": 315,
+      "durationInFrames": 251,
+      "headline": "Keep stock movements clear.",
+      "body": "Purchases. Adjustments. Location transfers.",
+      "claimIds": ["supplier-purchases", "stock-adjustments", "stock-transfers"],
+      "narrationSegmentIds": ["movements", "decisions"],
+      "data": {}
+    },
+    {
+      "id": "close",
+      "template": "cta",
+      "startFrame": 566,
+      "durationInFrames": 90,
+      "headline": "Act on numbers you can trust.",
+      "body": "Run your business with Dukarun.",
+      "claimIds": [],
+      "narrationSegmentIds": [],
+      "data": {}
+    }
+  ]
+}

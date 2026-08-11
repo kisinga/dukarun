@@ -1,0 +1,227 @@
+{
+  "projectId": "product-overview",
+  "title": "Run your business with Dukarun",
+  "language": "en-KE",
+  "fps": 30,
+  "durationInFrames": 2645,
+  "promptVersion": "product-overview-v2",
+  "model": "human-authored",
+  "callToAction": "Get started",
+  "narration": [
+    {
+      "id": "business-day",
+      "text": "Running a business means keeping track of sales, stock, cash, suppliers, staff, customer credit, and more.",
+      "source": "script",
+      "audioFile": null,
+      "startFrame": 0,
+      "endFrame": 251
+    },
+    {
+      "id": "breakdown",
+      "text": "When any of these parts breaks down, the business suffers. Uncollected credit, stockouts, and uncertain margins cost money.",
+      "source": "script",
+      "audioFile": null,
+      "startFrame": 251,
+      "endFrame": 521
+    },
+    {
+      "id": "transition",
+      "text": "Dukarun keeps sales, stock, credit, and costs in one place.",
+      "source": "script",
+      "audioFile": null,
+      "startFrame": 521,
+      "endFrame": 711
+    },
+    {
+      "id": "sell",
+      "text": "Record each sale in seconds. Find the item, take cash or M-Pesa, and the record is complete.",
+      "source": "script",
+      "audioFile": null,
+      "startFrame": 711,
+      "endFrame": 931
+    },
+    {
+      "id": "flow",
+      "text": "Each sale updates stock and the books. If the connection drops, the record is saved and syncs when the internet returns.",
+      "source": "script",
+      "audioFile": null,
+      "startFrame": 931,
+      "endFrame": 1163
+    },
+    {
+      "id": "owner",
+      "text": "See your margin, what is selling, and what needs restocking before shelves run empty. Compare every location and act on numbers you can trust.",
+      "source": "script",
+      "audioFile": null,
+      "startFrame": 1163,
+      "endFrame": 1488
+    },
+    {
+      "id": "credit",
+      "text": "See what customers owe you and what you owe suppliers. Keep payments against the right balance, and send customer receipts and reminders through SMS or WhatsApp.",
+      "source": "script",
+      "audioFile": null,
+      "startFrame": 1488,
+      "endFrame": 1848
+    },
+    {
+      "id": "team",
+      "text": "See sales and collections by team member, then prepare commissions from the same records.",
+      "source": "script",
+      "audioFile": null,
+      "startFrame": 1848,
+      "endFrame": 2037
+    },
+    {
+      "id": "operations",
+      "text": "Approvals and permissions protect sensitive actions. The audit trail shows who did what. Purchases, expenses, stock movements, and reports stay connected.",
+      "source": "script",
+      "audioFile": null,
+      "startFrame": 2037,
+      "endFrame": 2387
+    },
+    {
+      "id": "close",
+      "text": "Clear balances. Fewer stock surprises. Numbers you can trust. Run your business with Dukarun.",
+      "source": "script",
+      "audioFile": null,
+      "startFrame": 2387,
+      "endFrame": 2645
+    }
+  ],
+  "scenes": [
+    {
+      "id": "business-day",
+      "template": "business-operations",
+      "startFrame": 0,
+      "durationInFrames": 251,
+      "headline": "Many moving parts.",
+      "body": "Sales. Stock. Money. People.",
+      "claimIds": [],
+      "narrationSegmentIds": ["business-day"],
+      "data": {}
+    },
+    {
+      "id": "breakdown",
+      "template": "records-breakdown",
+      "startFrame": 251,
+      "durationInFrames": 270,
+      "headline": "Gaps in the records cost money.",
+      "body": "Uncollected credit. Stockouts. Uncertain margin.",
+      "claimIds": [],
+      "narrationSegmentIds": ["breakdown"],
+      "data": {}
+    },
+    {
+      "id": "transition",
+      "template": "dukarun-transition",
+      "startFrame": 521,
+      "durationInFrames": 190,
+      "headline": "Meet Dukarun.",
+      "body": "Sales, stock, credit and costs in one place.",
+      "claimIds": [],
+      "narrationSegmentIds": ["transition"],
+      "data": {}
+    },
+    {
+      "id": "sell",
+      "template": "barcode-sale",
+      "startFrame": 711,
+      "durationInFrames": 220,
+      "headline": "Record every sale.",
+      "body": "Find the item. Take payment. Keep the record.",
+      "claimIds": ["product-selection", "cash-mpesa"],
+      "narrationSegmentIds": ["sell"],
+      "data": {
+        "total": 185
+      }
+    },
+    {
+      "id": "flow",
+      "template": "transaction-flow",
+      "startFrame": 931,
+      "durationInFrames": 232,
+      "headline": "One sale. Every record updated.",
+      "body": "Sales, stock and books stay in sync.",
+      "claimIds": ["offline-selling", "inventory-updates", "ledger-posting"],
+      "narrationSegmentIds": ["flow"],
+      "data": {}
+    },
+    {
+      "id": "owner",
+      "template": "remote-dashboard",
+      "startFrame": 1163,
+      "durationInFrames": 325,
+      "headline": "Know your margin and stock.",
+      "body": "See what is selling and restock before shelves run empty.",
+      "claimIds": ["owner-dashboard", "multi-location-dashboard"],
+      "narrationSegmentIds": ["owner"],
+      "data": {
+        "revenue": 18450,
+        "margin": 4260,
+        "sales": 27
+      }
+    },
+    {
+      "id": "credit",
+      "template": "customer-comms",
+      "startFrame": 1488,
+      "durationInFrames": 360,
+      "headline": "Know what is owed.",
+      "body": "Customer balances. Supplier balances. Follow-up.",
+      "claimIds": ["customer-credit", "supplier-purchases", "automated-customer-comms"],
+      "narrationSegmentIds": ["credit"],
+      "data": {
+        "balance": 2450,
+        "customerBalance": 6200,
+        "supplierBalance": 18400
+      }
+    },
+    {
+      "id": "team",
+      "template": "staff-performance",
+      "startFrame": 1848,
+      "durationInFrames": 189,
+      "headline": "See how your team performs.",
+      "body": "Sales. Collections. Commissions.",
+      "claimIds": ["staff-performance", "sales-commissions"],
+      "narrationSegmentIds": ["team"],
+      "data": {
+        "commission": 2780
+      }
+    },
+    {
+      "id": "operations",
+      "template": "operations-snapshot",
+      "startFrame": 2037,
+      "durationInFrames": 350,
+      "headline": "Stay in control.",
+      "body": "Approvals. Audit history. Reports.",
+      "claimIds": [
+        "approval-controls",
+        "role-permissions",
+        "audit-history",
+        "supplier-purchases",
+        "stock-adjustments",
+        "stock-transfers",
+        "expense-management",
+        "money-transfers",
+        "business-reporting",
+        "proformas"
+      ],
+      "narrationSegmentIds": ["operations"],
+      "data": {}
+    },
+    {
+      "id": "close",
+      "template": "cta",
+      "startFrame": 2387,
+      "durationInFrames": 258,
+      "headline": "Run your business with Dukarun.",
+      "body": "Clear balances. Fewer stock surprises. Numbers you can trust.",
+      "claimIds": [],
+      "narrationSegmentIds": ["close"],
+      "data": {}
+    }
+  ]
+}

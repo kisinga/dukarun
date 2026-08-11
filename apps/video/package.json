@@ -12,6 +12,8 @@
     "render-review": "tsx scripts/video-cli.ts render-review",
     "approve-final": "tsx scripts/video-cli.ts approve-final",
     "render-final": "tsx scripts/video-cli.ts render-final",
+    "validate:overview": "tsx scripts/validate-overview.ts",
+    "validate:showcases": "tsx scripts/validate-showcases.ts",
     "validate:cta": "tsx scripts/validate-cta.ts",
     "check": "npm run typecheck && npm run test && npm run compositions",
     "typecheck": "tsc --noEmit",

@@ -32,6 +32,9 @@ SUPABASE_URL="${SUPABASE_URL:-https://supa.dukarun.com}"
 SITE_PUBLIC_URL="${SITE_PUBLIC_URL:-https://dukarun.com}"
 APP_PUBLIC_URL="${APP_PUBLIC_URL:-https://app.dukarun.com}"
 STOREFRONT_PUBLIC_URL="${STOREFRONT_PUBLIC_URL:-https://store.dukarun.com}"
+MARKETING_VIDEO_BASE_URL="${SITE_PUBLIC_URL%/}/media/video/product-overview"
+MARKETING_MEDIA_HOST_DIR="/var/lib/dukarun/marketing-media"
+MARKETING_MEDIA_LOCAL_DIR="apps/video/output/final/product-overview"
 SSH_OPTS=(-o BatchMode=no -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new)
 
 # app -> container name prefix of the v1 container it replaces
@@ -62,10 +65,45 @@ fetch_anon_key() {
   ssh_cmd "grep '^SERVICE_SUPABASEANON_KEY=' '$COOLIFY_SERVICE_DIR/.env' | cut -d= -f2-"
 }
 
+sync_site_media() {
+  local remote_dir="$MARKETING_MEDIA_HOST_DIR/video/product-overview"
+  local files=(
+    product-overview-full-wide.mp4
+    product-overview-full-wide.png
+    product-overview-full-square.mp4
+    product-overview-full-square.png
+    product-overview.en-KE.vtt
+  )
+  local file has_local_assets=true
+
+  for file in "${files[@]}"; do
+    if [ ! -f "$MARKETING_MEDIA_LOCAL_DIR/$file" ]; then
+      has_local_assets=false
+      break
+    fi
+  done
+
+  if [ "$has_local_assets" = true ]; then
+    echo "▶ [site] uploading same-origin marketing video"
+    ssh_cmd "mkdir -p '$remote_dir'"
+    tar --no-xattrs -C "$MARKETING_MEDIA_LOCAL_DIR" -czf - "${files[@]}" \
+      | ssh "${SSH_OPTS[@]}" "$SSH_HOST" "tar -xzf - -C '$remote_dir'"
+    return
+  fi
+
+  echo "▶ [site] no local render; checking persistent media on host"
+  ssh_cmd "test -f '$remote_dir/${files[0]}' -a -f '$remote_dir/${files[1]}' -a -f '$remote_dir/${files[2]}' -a -f '$remote_dir/${files[3]}' -a -f '$remote_dir/${files[4]}'" || {
+    echo "✗ site media is missing locally and on the host; render product-overview first" >&2
+    exit 1
+  }
+}
+
 deploy_one() {
   local app="$1" image="dukarun-$1:deploy"
   local prefix; prefix=$(container_prefix "$app")
   local domain; domain=$(app_domain "$app")
+
+  [ "$app" != site ] || sync_site_media
 
   echo "▶ [$app] fetching prod anon key"
   local anon_key; anon_key=$(fetch_anon_key)
@@ -79,6 +117,7 @@ deploy_one() {
     --build-arg "SITE_PUBLIC_URL=$SITE_PUBLIC_URL" \
     --build-arg "APP_PUBLIC_URL=$APP_PUBLIC_URL" \
     --build-arg "STOREFRONT_PUBLIC_URL=$STOREFRONT_PUBLIC_URL" \
+    --build-arg "MARKETING_VIDEO_BASE_URL=$MARKETING_VIDEO_BASE_URL" \
     --build-arg "PUBLIC_DATA_MODE=live" \
     -t "$image" .
 
@@ -87,9 +126,16 @@ deploy_one() {
 
   echo "▶ [$app] swapping container (prefix $prefix)"
   # shellcheck disable=SC2087
-  ssh "${SSH_OPTS[@]}" "$SSH_HOST" bash -s -- "$prefix" "$image" "$domain" <<'REMOTE'
+  ssh "${SSH_OPTS[@]}" "$SSH_HOST" bash -s -- \
+    "$prefix" "$image" "$domain" "$app" "$MARKETING_MEDIA_HOST_DIR" <<'REMOTE'
 set -euo pipefail
-PREFIX="$1"; IMAGE="$2"; DOMAIN="$3"
+PREFIX="$1"; IMAGE="$2"; DOMAIN="$3"; APP="$4"; MEDIA_DIR="$5"
+
+MEDIA_ARGS=()
+if [ "$APP" = site ]; then
+  mkdir -p "$MEDIA_DIR"
+  MEDIA_ARGS=(--mount "type=bind,source=$MEDIA_DIR,target=/usr/share/nginx/html/media,readonly")
+fi
 
 wait_healthy() {
   local name="$1" status health attempt
@@ -114,7 +160,8 @@ if [ -z "$OLD" ]; then
   }
   NAME="${PREFIX}primary"
   docker run -d --name "$NAME" --restart unless-stopped --network coolify \
-    --label "caddy=://$DOMAIN" --label 'caddy.reverse_proxy={{upstreams 80}}' "$IMAGE" >/dev/null
+    --label "caddy=://$DOMAIN" --label 'caddy.reverse_proxy={{upstreams 80}}' \
+    "${MEDIA_ARGS[@]}" "$IMAGE" >/dev/null
   if ! wait_healthy "$NAME"; then
     echo "✗ $NAME did not become healthy" >&2
     docker logs --tail 50 "$NAME" >&2 || true
@@ -142,7 +189,8 @@ docker stop "$BACKUP" >/dev/null
 # Run the new container with the old identity. Restore immediately if Docker
 # rejects the launch; do not leave production without its serving container.
 if ! docker run -d --name "$OLD" --restart unless-stopped \
-  --label-file "$LABEL_FILE" --network "$PRIMARY_NETWORK" "$IMAGE"; then
+  --label-file "$LABEL_FILE" --network "$PRIMARY_NETWORK" \
+  "${MEDIA_ARGS[@]}" "$IMAGE"; then
   rm -f "$LABEL_FILE"
   docker rename "$BACKUP" "$OLD"
   docker start "$OLD" >/dev/null

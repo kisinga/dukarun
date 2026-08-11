@@ -3,19 +3,67 @@ import '@fontsource/outfit/500.css';
 import '@fontsource/outfit/600.css';
 import '@fontsource/outfit/700.css';
 import { Composition } from 'remotion';
-import scriptJson from '../projects/offline-pos/script.json';
+import creditScriptJson from '../projects/credit-communications/script.json';
+import creditVoiceJson from '../projects/credit-communications/voice.json';
+import overviewScriptJson from '../projects/product-overview/script.json';
+import overviewVoiceJson from '../projects/product-overview/voice.json';
+import saleRecordsScriptJson from '../projects/sale-records/script.json';
+import saleRecordsVoiceJson from '../projects/sale-records/voice.json';
+import stockDecisionsScriptJson from '../projects/stock-decisions/script.json';
+import stockDecisionsVoiceJson from '../projects/stock-decisions/voice.json';
 import { FORMAT_CONFIG } from './brand';
 import { PilotVideo } from './pilot-video';
-import { CompositionPropsSchema, ScriptManifestSchema, type RenderTarget } from './schema';
-import type { Cutdown } from './timeline';
+import { CompositionPropsSchema, ScriptManifestSchema, VoiceRuntimeSchema, type RenderTarget } from './schema';
 import './styles.css';
 
-const manifest = ScriptManifestSchema.parse(scriptJson);
-const cutdowns: Cutdown[] = ['full', 'offline', 'ledger', 'dashboard'];
+const voices = new Map(
+  [overviewVoiceJson, saleRecordsVoiceJson, creditVoiceJson, stockDecisionsVoiceJson].map(
+    voice => {
+      const parsed = VoiceRuntimeSchema.parse(voice);
+      return [parsed.projectId, parsed];
+    }
+  )
+);
+
+const manifests = [
+  overviewScriptJson,
+  saleRecordsScriptJson,
+  creditScriptJson,
+  stockDecisionsScriptJson,
+].map(manifest => ScriptManifestSchema.parse(manifest));
 const targets: RenderTarget[] = ['wide', 'vertical', 'square'];
 
-export function compositionId(cutdown: Cutdown, target: RenderTarget): string { return `offline-pos-${cutdown}-${target}`; }
+export function compositionId(projectId: string, target: RenderTarget): string {
+  return `${projectId}-full-${target}`;
+}
 
 export function VideoRoot() {
-  return <>{cutdowns.flatMap(cutdown => targets.map(target => { const dimensions = FORMAT_CONFIG[target]; return <Composition key={compositionId(cutdown, target)} id={compositionId(cutdown, target)} component={PilotVideo} width={dimensions.width} height={dimensions.height} fps={30} durationInFrames={cutdown === 'full' ? manifest.durationInFrames : 450} schema={CompositionPropsSchema} defaultProps={{ manifest, target, cutdown, review: false, voice: null }} />; }))}</>;
+  return (
+    <>
+      {manifests.flatMap(manifest =>
+        targets.map(target => {
+          const dimensions = FORMAT_CONFIG[target];
+          const id = compositionId(manifest.projectId, target);
+          return (
+            <Composition
+              key={id}
+              id={id}
+              component={PilotVideo}
+              width={dimensions.width}
+              height={dimensions.height}
+              fps={manifest.fps}
+              durationInFrames={manifest.durationInFrames}
+              schema={CompositionPropsSchema}
+              defaultProps={{
+                manifest,
+                target,
+                review: false,
+                voice: voices.get(manifest.projectId) ?? null,
+              }}
+            />
+          );
+        })
+      )}
+    </>
+  );
 }

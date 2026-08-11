@@ -9,6 +9,7 @@
 #   SITE_PUBLIC_URL    canonical public site URL
 #   APP_PUBLIC_URL     authenticated merchant app URL
 #   STOREFRONT_PUBLIC_URL public storefront URL
+#   MARKETING_VIDEO_BASE_URL public base URL for optional marketing video assets
 # SUPABASE_* are baked into the bundle by scripts/generate-environment.mjs (prebuild).
 # ========================================
 
@@ -42,12 +43,14 @@ ARG SUPABASE_ANON_KEY
 ARG SITE_PUBLIC_URL
 ARG APP_PUBLIC_URL
 ARG STOREFRONT_PUBLIC_URL
+ARG MARKETING_VIDEO_BASE_URL=""
 ARG PUBLIC_DATA_MODE=live
 ENV SUPABASE_URL=$SUPABASE_URL \
     SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY \
     SITE_PUBLIC_URL=$SITE_PUBLIC_URL \
     APP_PUBLIC_URL=$APP_PUBLIC_URL \
     STOREFRONT_PUBLIC_URL=$STOREFRONT_PUBLIC_URL \
+    MARKETING_VIDEO_BASE_URL=$MARKETING_VIDEO_BASE_URL \
     PUBLIC_DATA_MODE=$PUBLIC_DATA_MODE
 
 RUN cd apps/$APP && npm run build

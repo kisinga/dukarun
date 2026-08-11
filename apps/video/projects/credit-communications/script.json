@@ -1,0 +1,76 @@
+{
+  "projectId": "credit-communications",
+  "title": "Keep every balance clear",
+  "language": "en-KE",
+  "fps": 30,
+  "durationInFrames": 584,
+  "promptVersion": "credit-communications-v1",
+  "model": "human-authored",
+  "callToAction": "Get started",
+  "narration": [
+    {
+      "id": "balances",
+      "text": "See what each customer owes and what you owe each supplier.",
+      "source": "script",
+      "audioFile": null,
+      "startFrame": 0,
+      "endFrame": 133
+    },
+    {
+      "id": "payment-history",
+      "text": "Record payments against the right balance, with the full history in one place.",
+      "source": "script",
+      "audioFile": null,
+      "startFrame": 133,
+      "endFrame": 297
+    },
+    {
+      "id": "reminders",
+      "text": "Send receipts and scheduled reminders through SMS or WhatsApp, with the right amount and timing.",
+      "source": "script",
+      "audioFile": null,
+      "startFrame": 297,
+      "endFrame": 494
+    }
+  ],
+  "scenes": [
+    {
+      "id": "accounts",
+      "template": "credit-accounts",
+      "startFrame": 0,
+      "durationInFrames": 297,
+      "headline": "Keep credit clear.",
+      "body": "Customer and supplier balances in one place.",
+      "claimIds": ["customer-credit", "supplier-purchases"],
+      "narrationSegmentIds": ["balances", "payment-history"],
+      "data": {
+        "customerBalance": 6200,
+        "supplierBalance": 18400
+      }
+    },
+    {
+      "id": "reminders",
+      "template": "customer-reminders",
+      "startFrame": 297,
+      "durationInFrames": 197,
+      "headline": "Follow up on time.",
+      "body": "Receipts and reminders through SMS or WhatsApp.",
+      "claimIds": ["automated-customer-comms"],
+      "narrationSegmentIds": ["reminders"],
+      "data": {
+        "balance": 2450
+      }
+    },
+    {
+      "id": "close",
+      "template": "cta",
+      "startFrame": 494,
+      "durationInFrames": 90,
+      "headline": "Keep every balance clear.",
+      "body": "Run your business with Dukarun.",
+      "claimIds": [],
+      "narrationSegmentIds": [],
+      "data": {}
+    }
+  ]
+}

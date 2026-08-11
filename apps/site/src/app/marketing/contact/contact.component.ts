@@ -12,7 +12,7 @@ interface Channel {
 }
 
 /**
- * Public contact page. All details are the product's own address only —
+ * Public contact page. All details are the product's own address only.
  * no real phone numbers or personal contacts.
  */
 @Component({

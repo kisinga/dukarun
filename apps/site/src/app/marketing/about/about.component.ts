@@ -4,7 +4,7 @@ import { IconComponent } from '../../shared/ui/icon.component';
 import { appUrl } from '../../core/public-url';
 
 /**
- * Public about page — why Dukarun exists and what it believes.
+ * Public about page. Why Dukarun exists and what it believes.
  */
 @Component({
   selector: 'app-marketing-about',

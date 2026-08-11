@@ -6,14 +6,8 @@ import { videoRoot } from '../src/node-utils';
 import type { RenderTarget } from '../src/schema';
 
 const targets: RenderTarget[] = ['wide', 'vertical', 'square'];
-const endings: Array<{ projectId: string; frame: number }> = [
-  { projectId: 'product-overview', frame: 2400 },
-  { projectId: 'sale-records', frame: 570 },
-  { projectId: 'credit-communications', frame: 570 },
-  { projectId: 'stock-decisions', frame: 570 },
-];
-
-const outputDirectory = path.join(videoRoot, '.cache', 'cta-validation');
+const frames = [105, 386, 600, 790, 1016, 1295, 1637, 1912, 2181, 2485];
+const outputDirectory = path.join(videoRoot, '.cache', 'overview-validation');
 await mkdir(outputDirectory, { recursive: true });
 
 const serveUrl = await bundle({
@@ -21,15 +15,15 @@ const serveUrl = await bundle({
   publicDir: path.join(videoRoot, 'public'),
 });
 
-for (const ending of endings) {
-  for (const target of targets) {
-    const id = `${ending.projectId}-full-${target}`;
-    const composition = await selectComposition({ serveUrl, id });
-    const output = path.join(outputDirectory, `${id}.png`);
+for (const target of targets) {
+  const id = `product-overview-full-${target}`;
+  const composition = await selectComposition({ serveUrl, id });
+  for (const frame of frames) {
+    const output = path.join(outputDirectory, `${id}-${frame}.png`);
     await renderStill({
       serveUrl,
       composition,
-      frame: ending.frame,
+      frame,
       imageFormat: 'png',
       output,
       overwrite: true,
