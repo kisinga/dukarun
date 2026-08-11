@@ -41,7 +41,7 @@ export interface PlatformCampaignPreview {
   total: number;
   eligible: number;
   skipped: number;
-  missing_admin: number;
+  missing_primary: number;
   missing_phone: number;
   sample: {
     merchant_name: string;

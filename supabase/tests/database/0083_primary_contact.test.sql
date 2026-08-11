@@ -52,10 +52,10 @@ create temp table no_admin_campaign as select public.platform_save_campaign_draf
   'No admin target','in_app','No admin','Hello','selected',null,null,
   array[(select company_id from primary_fixture)],null,null,null
 ) id;
-select is((public.platform_review_campaign((select id from no_admin_campaign))->>'eligible')::integer,0,'preview skips companies without an approved admin');
+select is((public.platform_review_campaign((select id from no_admin_campaign))->>'eligible')::integer,0,'preview skips companies without a selected primary contact');
 select public.platform_launch_campaign((select id from no_admin_campaign),null);
 reset role;
-select is((select skip_reason from public.campaign_recipients where campaign_id=(select id from no_admin_campaign)),'missing_admin','dispatch never falls back to non-admin staff');
+select is((select skip_reason from public.campaign_recipients where campaign_id=(select id from no_admin_campaign)),'missing_primary','dispatch never falls back when primary contact is missing');
 
 select * from finish();
 rollback;

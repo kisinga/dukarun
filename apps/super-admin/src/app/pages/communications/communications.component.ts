@@ -328,8 +328,8 @@ import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
               ><strong class="text-xl">{{ p.skipped }}</strong>
             </div>
             <div class="stat rounded-box bg-base-200 p-3">
-              <span class="type-caption">No admin</span
-              ><strong class="text-xl">{{ p.missing_admin }}</strong>
+              <span class="type-caption">No primary contact</span
+              ><strong class="text-xl">{{ p.missing_primary }}</strong>
             </div>
             <div class="stat rounded-box bg-base-200 p-3">
               <span class="type-caption">No phone</span
@@ -337,7 +337,7 @@ import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
             </div>
           </div>
           <p class="type-caption mt-3">
-            One primary administrator per company. Scheduled audience resolves at dispatch.
+            One selected primary contact per company. Scheduled audience resolves at dispatch.
           </p>
           <div class="mt-4 rounded-box border border-base-300 p-4">
             <p class="type-caption">

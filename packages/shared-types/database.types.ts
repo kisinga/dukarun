@@ -3173,6 +3173,8 @@ export type Database = {
         Row: {
           attempts: number
           body: string
+          cashier_session_event: string | null
+          cashier_session_id: string | null
           campaign_id: string | null
           campaign_recipient_id: string | null
           channel: string
@@ -3204,6 +3206,8 @@ export type Database = {
         Insert: {
           attempts?: number
           body: string
+          cashier_session_event?: string | null
+          cashier_session_id?: string | null
           campaign_id?: string | null
           campaign_recipient_id?: string | null
           channel: string
@@ -3235,6 +3239,8 @@ export type Database = {
         Update: {
           attempts?: number
           body?: string
+          cashier_session_event?: string | null
+          cashier_session_id?: string | null
           campaign_id?: string | null
           campaign_recipient_id?: string | null
           channel?: string
@@ -3264,6 +3270,13 @@ export type Database = {
           template_version?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "outbox_cashier_session_id_fkey"
+            columns: ["cashier_session_id"]
+            isOneToOne: false
+            referencedRelation: "cashier_sessions"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "outbox_campaign_id_fkey"
             columns: ["campaign_id"]
