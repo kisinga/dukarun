@@ -26,6 +26,8 @@ import { MyPendingSalesComponent } from './my-pending-sales.component';
 import { SessionRequiredNoticeComponent } from '../../shared/ui/session-required-notice.component';
 import { BarcodeScannerComponent } from '../../shared/ui/barcode-scanner.component';
 import { ScanFeedbackService } from '../../shared/ui/scan-feedback.service';
+import { CatalogCacheService } from '../../core/catalog-cache.service';
+import { SupabaseService } from '../../core/supabase.service';
 import {
   Customer,
   CustomerWithCredit,
@@ -48,6 +50,8 @@ interface DraftFlag {
   needed: number;
   count: number;
 }
+
+type CatalogView = 'grid' | 'list' | 'categories';
 
 @Component({
   selector: 'app-sell',
@@ -296,90 +300,279 @@ interface DraftFlag {
                 </button>
               </div>
 
-              <div class="mt-4 flex items-center justify-between gap-2">
-                <p class="type-caption">
-                  {{ searchMode() ? 'Search results' : 'Quick add' }}
-                </p>
-                @if (!searchMode()) {
-                  <p class="text-xs text-base-content/50 sm:hidden">Swipe for more</p>
-                }
+              <div class="mt-4 flex flex-wrap items-center justify-between gap-2">
+                <div class="min-w-0">
+                  <p class="type-caption">
+                    {{ catalogSectionLabel() }}
+                  </p>
+                  @if (selectedCategory(); as category) {
+                    @if (!searchMode()) {
+                      <p class="truncate text-sm font-semibold">{{ category.name }}</p>
+                    }
+                  }
+                </div>
+                <div class="join shrink-0" role="group" aria-label="Product catalogue view">
+                  <button
+                    appButton
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    class="join-item"
+                    aria-label="Grid view"
+                    title="Grid view"
+                    [attr.aria-pressed]="catalogView() === 'grid'"
+                    [class.btn-active]="catalogView() === 'grid'"
+                    (click)="setCatalogView('grid')"
+                  >
+                    <app-icon name="heroSquares2x2" />
+                    <span class="hidden sm:inline">Grid</span>
+                  </button>
+                  <button
+                    appButton
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    class="join-item"
+                    aria-label="List view"
+                    title="List view"
+                    [attr.aria-pressed]="catalogView() === 'list'"
+                    [class.btn-active]="catalogView() === 'list'"
+                    (click)="setCatalogView('list')"
+                  >
+                    <app-icon name="heroBars3" />
+                    <span class="hidden sm:inline">List</span>
+                  </button>
+                  <button
+                    appButton
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    class="join-item"
+                    aria-label="Categories view"
+                    title="Categories view"
+                    [attr.aria-pressed]="catalogView() === 'categories'"
+                    [class.btn-active]="catalogView() === 'categories'"
+                    (click)="setCatalogView('categories')"
+                  >
+                    <app-icon name="heroQueueList" />
+                    <span class="hidden sm:inline">Categories</span>
+                  </button>
+                </div>
               </div>
 
-              <div
-                class="mt-2 snap-x gap-2 overflow-x-auto pb-2 sm:grid sm:grid-cols-3 sm:overflow-visible sm:pb-0 xl:grid-cols-4"
-                [class.flex]="!searchMode()"
-                [class.grid]="searchMode()"
-                [class.grid-cols-2]="searchMode()"
-              >
-                @for (v of gridItems(); track v.variant_id) {
-                  <button
-                    type="button"
-                    class="group relative flex h-32 min-h-32 shrink-0 snap-start flex-col items-start gap-1 overflow-hidden rounded-box border border-base-300/70 bg-base-100 p-3 text-left transition-colors hover:border-primary/50 hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-45 sm:w-auto"
-                    [class.w-36]="!searchMode()"
-                    [class.w-full]="searchMode()"
-                    [disabled]="unavailable(v)"
-                    (click)="addVariant(v)"
-                  >
-                    <div class="flex w-full items-start justify-between gap-2">
-                      @if (imageUrl(v.image_path); as thumb) {
-                        @if (!brokenImages().has(v.image_path!)) {
-                          <img
-                            [src]="thumb"
-                            alt=""
-                            class="h-10 w-10 rounded-field object-cover"
-                            (error)="markBroken(v.image_path!)"
-                          />
+              @if (catalogView() === 'categories' && !searchMode()) {
+                @if (!catalogCache.categoryMembershipsComplete()) {
+                  <div role="status" class="alert alert-warning mt-3 text-sm">
+                    <app-icon name="heroSignalSlash" />
+                    <span>
+                      {{
+                        connectivity.online()
+                          ? 'Refreshing category browsing…'
+                          : 'Reconnect to load category browsing for this catalogue.'
+                      }}
+                    </span>
+                  </div>
+                } @else if (selectedCategory(); as category) {
+                  <div class="mt-3 flex items-center justify-between gap-2">
+                    <button
+                      appButton
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      (click)="leaveCategory()"
+                    >
+                      <app-icon name="heroChevronLeft" /> All categories
+                    </button>
+                    <span class="type-caption">{{ categoryItems().length }} options</span>
+                  </div>
+                } @else {
+                  <label class="input input-bordered input-sm mt-3 flex items-center gap-2">
+                    <app-icon name="heroMagnifyingGlass" class="text-base-content/50" />
+                    <input
+                      type="search"
+                      class="min-w-0 grow"
+                      placeholder="Search categories…"
+                      [value]="categorySearch()"
+                      (input)="categorySearch.set($any($event.target).value)"
+                    />
+                  </label>
+                  <div class="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
+                    @for (category of categoryDirectory(); track category.id) {
+                      <button
+                        type="button"
+                        class="min-h-24 rounded-box border border-base-300/70 bg-base-100 p-3 text-left transition-colors hover:border-primary/50 hover:bg-primary/5"
+                        (click)="openCategory(category.id)"
+                      >
+                        <span class="line-clamp-2 text-sm font-semibold">{{ category.name }}</span>
+                        <span class="type-caption mt-3 block">
+                          {{ category.productCount }}
+                          {{ category.productCount === 1 ? 'product' : 'products' }} ·
+                          {{ category.optionCount }} options
+                        </span>
+                      </button>
+                    } @empty {
+                      <div class="col-span-full py-6 text-center">
+                        <p class="text-sm font-medium">No categories found</p>
+                        <p class="mt-1 text-sm text-base-content/60">
+                          {{
+                            categorySearch().trim()
+                              ? 'Try another category name.'
+                              : 'Active categories with products appear here.'
+                          }}
+                        </p>
+                      </div>
+                    }
+                  </div>
+                }
+              }
+
+              @if (showProductResults()) {
+                @if (resultPresentation() === 'list') {
+                  <div class="mt-2 overflow-hidden rounded-box border border-base-300/70">
+                    @for (v of visibleCatalogItems(); track v.variant_id) {
+                      <button
+                        type="button"
+                        class="flex min-h-16 w-full items-center gap-3 border-b border-base-200 px-3 py-2 text-left transition-colors last:border-0 hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-45"
+                        [disabled]="unavailable(v)"
+                        (click)="addVariant(v)"
+                      >
+                        @if (imageUrl(v.image_path); as thumb) {
+                          @if (!brokenImages().has(v.image_path!)) {
+                            <img
+                              [src]="thumb"
+                              alt=""
+                              class="h-11 w-11 shrink-0 rounded-field object-cover"
+                              (error)="markBroken(v.image_path!)"
+                            />
+                          } @else {
+                            <span
+                              class="flex h-11 w-11 shrink-0 items-center justify-center rounded-field bg-base-200"
+                              ><app-icon name="heroCube" size="lg"
+                            /></span>
+                          }
                         } @else {
                           <span
-                            class="flex h-10 w-10 items-center justify-center rounded-field bg-base-200"
-                          >
-                            <app-icon name="heroCube" size="lg" />
-                          </span>
+                            class="flex h-11 w-11 shrink-0 items-center justify-center rounded-field bg-base-200"
+                            ><app-icon name="heroCube" size="lg"
+                          /></span>
                         }
-                      } @else {
-                        <span
-                          class="flex h-10 w-10 items-center justify-center rounded-field bg-base-200"
-                        >
-                          <app-icon name="heroCube" size="lg" />
+                        <span class="min-w-0 flex-1">
+                          <span class="block truncate text-xs text-base-content/55">{{
+                            v.manufacturer_name || 'Manufacturer not set'
+                          }}</span>
+                          <span class="line-clamp-2 text-sm font-semibold">{{ label(v) }}</span>
                         </span>
-                      }
-                      @if (quantityInCart(v.variant_id) > 0) {
-                        <span class="badge badge-primary badge-sm">
-                          {{ quantityInCart(v.variant_id) }}
+                        <span class="shrink-0 text-right">
+                          @if (quantityInCart(v.variant_id) > 0) {
+                            <span class="badge badge-primary badge-sm mb-1">{{
+                              quantityInCart(v.variant_id)
+                            }}</span>
+                          } @else if (unavailable(v)) {
+                            <span class="badge badge-error badge-sm mb-1">Out</span>
+                          }
+                          <span class="block text-sm font-bold"
+                            ><app-money [amount]="v.price ?? 0"
+                          /></span>
+                          <span class="block text-xs text-base-content/50">{{
+                            stockLabel(v)
+                          }}</span>
                         </span>
-                      } @else if (unavailable(v)) {
-                        <span class="badge badge-error badge-sm whitespace-nowrap">Out</span>
-                      }
-                    </div>
-                    <span class="line-clamp-2 text-sm leading-tight font-semibold">
-                      {{ label(v) }}
-                    </span>
-                    <span class="type-caption w-full truncate">
-                      {{ v.manufacturer_name || 'Manufacturer not set' }}
-                    </span>
-                    <span class="mt-auto flex w-full items-end justify-between gap-1">
-                      <span class="text-sm font-bold whitespace-nowrap">
-                        <app-money [amount]="v.price ?? 0" />
-                      </span>
-                      <span
-                        class="text-right text-xs whitespace-nowrap"
-                        [class.text-error]="unavailable(v)"
-                        [class.text-base-content/50]="!unavailable(v)"
+                      </button>
+                    }
+                  </div>
+                } @else {
+                  <div
+                    class="mt-2 snap-x gap-2 overflow-x-auto pb-2 sm:grid sm:grid-cols-3 sm:overflow-visible sm:pb-0 xl:grid-cols-4"
+                    [class.flex]="quickAddMode()"
+                    [class.grid]="!quickAddMode()"
+                    [class.grid-cols-2]="!quickAddMode()"
+                  >
+                    @for (v of visibleCatalogItems(); track v.variant_id) {
+                      <button
+                        type="button"
+                        class="group relative flex h-32 min-h-32 shrink-0 snap-start flex-col items-start gap-1 overflow-hidden rounded-box border border-base-300/70 bg-base-100 p-3 text-left transition-colors hover:border-primary/50 hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-45 sm:w-auto"
+                        [class.w-36]="quickAddMode()"
+                        [class.w-full]="!quickAddMode()"
+                        [disabled]="unavailable(v)"
+                        (click)="addVariant(v)"
                       >
-                        {{ stockLabel(v) }}
-                      </span>
-                    </span>
-                  </button>
+                        <div class="flex w-full min-w-0 items-start gap-2">
+                          @if (imageUrl(v.image_path); as thumb) {
+                            @if (!brokenImages().has(v.image_path!)) {
+                              <img
+                                [src]="thumb"
+                                alt=""
+                                class="h-10 w-10 shrink-0 rounded-field object-cover"
+                                (error)="markBroken(v.image_path!)"
+                              />
+                            } @else {
+                              <span
+                                class="flex h-10 w-10 shrink-0 items-center justify-center rounded-field bg-base-200"
+                                ><app-icon name="heroCube" size="lg"
+                              /></span>
+                            }
+                          } @else {
+                            <span
+                              class="flex h-10 w-10 shrink-0 items-center justify-center rounded-field bg-base-200"
+                              ><app-icon name="heroCube" size="lg"
+                            /></span>
+                          }
+                          <span
+                            class="min-w-0 flex-1 truncate pt-0.5 text-xs text-base-content/55"
+                            >{{ v.manufacturer_name || 'Manufacturer not set' }}</span
+                          >
+                          @if (quantityInCart(v.variant_id) > 0) {
+                            <span class="badge badge-primary badge-sm shrink-0">{{
+                              quantityInCart(v.variant_id)
+                            }}</span>
+                          } @else if (unavailable(v)) {
+                            <span class="badge badge-error badge-sm shrink-0">Out</span>
+                          }
+                        </div>
+                        <span class="line-clamp-2 text-sm leading-tight font-semibold">{{
+                          label(v)
+                        }}</span>
+                        <span class="mt-auto flex w-full items-end justify-between gap-1">
+                          <span class="text-sm font-bold whitespace-nowrap"
+                            ><app-money [amount]="v.price ?? 0"
+                          /></span>
+                          <span
+                            class="text-right text-xs whitespace-nowrap"
+                            [class.text-error]="unavailable(v)"
+                            [class.text-base-content/50]="!unavailable(v)"
+                            >{{ stockLabel(v) }}</span
+                          >
+                        </span>
+                      </button>
+                    }
+                  </div>
                 }
-              </div>
 
-              @if (gridItems().length === 0) {
-                <div class="py-6 text-center">
-                  <p class="text-sm font-medium">No matching products</p>
-                  <p class="mt-1 text-sm text-base-content/60">
-                    Check the spelling or scan the item's barcode.
-                  </p>
-                </div>
+                @if (visibleCatalogItems().length === 0) {
+                  <div class="py-6 text-center">
+                    <p class="text-sm font-medium">No matching products</p>
+                    <p class="mt-1 text-sm text-base-content/60">
+                      {{
+                        searchMode()
+                          ? "Check the spelling or scan the item's barcode."
+                          : 'This category has no sellable options.'
+                      }}
+                    </p>
+                  </div>
+                }
+                @if (canShowMoreCategoryItems()) {
+                  <div class="mt-3 flex justify-center">
+                    <button
+                      appButton
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      (click)="showMoreCategoryItems()"
+                    >
+                      Show more
+                    </button>
+                  </div>
+                }
               }
             </div>
           </section>
@@ -886,6 +1079,8 @@ export class SellComponent implements OnInit {
   private readonly pos = inject(PosService);
   private readonly route = inject(ActivatedRoute);
   private readonly scanFeedback = inject(ScanFeedbackService);
+  protected readonly catalogCache = inject(CatalogCacheService);
+  private readonly supabase = inject(SupabaseService);
 
   protected readonly search = new FormControl('', { nonNullable: true });
   protected readonly searchQuery = signal('');
@@ -893,8 +1088,85 @@ export class SellComponent implements OnInit {
   protected readonly results = signal<Variant[]>([]);
   protected readonly topVariants = signal<Variant[]>([]);
   protected readonly searchMode = computed(() => this.searchQuery().trim().length >= 2);
-  protected readonly gridItems = computed(() =>
-    this.searchMode() ? this.results() : this.topVariants()
+  protected readonly catalogView = signal<CatalogView>('grid');
+  protected readonly selectedCategoryId = signal<string | null>(null);
+  protected readonly categorySearch = signal('');
+  protected readonly categoryVisibleLimit = signal(24);
+  protected readonly selectedCategory = computed(() => {
+    const id = this.selectedCategoryId();
+    return id
+      ? (this.catalogCache.categories().find(category => category.id === id && category.active) ??
+          null)
+      : null;
+  });
+  private readonly activeCatalog = computed(() =>
+    this.catalogCache
+      .catalog()
+      .filter(variant => variant.variant_active && variant.product_active && variant.product_id)
+  );
+  protected readonly categoryDirectory = computed(() => {
+    const query = this.categorySearch().trim().toLocaleLowerCase();
+    const productIdsByCategory = new Map<string, Set<string>>();
+    for (const link of this.catalogCache.productCategories()) {
+      const productIds = productIdsByCategory.get(link.category_id) ?? new Set<string>();
+      productIds.add(link.product_id);
+      productIdsByCategory.set(link.category_id, productIds);
+    }
+    const activeProductIds = new Set(this.activeCatalog().map(variant => variant.product_id!));
+    return this.catalogCache
+      .categories()
+      .filter(
+        category => category.active && (!query || category.name.toLocaleLowerCase().includes(query))
+      )
+      .map(category => {
+        const linked = productIdsByCategory.get(category.id) ?? new Set<string>();
+        const productIds = new Set(
+          [...linked].filter(productId => activeProductIds.has(productId))
+        );
+        return {
+          ...category,
+          productCount: productIds.size,
+          optionCount: this.activeCatalog().filter(variant => productIds.has(variant.product_id!))
+            .length,
+        };
+      })
+      .filter(category => category.productCount > 0);
+  });
+  protected readonly categoryItems = computed(() => {
+    const categoryId = this.selectedCategoryId();
+    if (!categoryId) return [];
+    const productIds = new Set(
+      this.catalogCache
+        .productCategories()
+        .filter(link => link.category_id === categoryId)
+        .map(link => link.product_id)
+    );
+    return this.activeCatalog().filter(variant => productIds.has(variant.product_id!));
+  });
+  protected readonly visibleCatalogItems = computed(() => {
+    if (this.searchMode()) return this.results();
+    if (this.catalogView() === 'categories') {
+      return this.categoryItems().slice(0, this.categoryVisibleLimit());
+    }
+    return this.topVariants();
+  });
+  protected readonly showProductResults = computed(
+    () =>
+      this.searchMode() ||
+      this.catalogView() !== 'categories' ||
+      (this.catalogCache.categoryMembershipsComplete() && this.selectedCategory() !== null)
+  );
+  protected readonly resultPresentation = computed<'grid' | 'list'>(() =>
+    this.catalogView() === 'list' ? 'list' : 'grid'
+  );
+  protected readonly quickAddMode = computed(
+    () => !this.searchMode() && this.catalogView() === 'grid'
+  );
+  protected readonly canShowMoreCategoryItems = computed(
+    () =>
+      !this.searchMode() &&
+      this.catalogView() === 'categories' &&
+      this.categoryVisibleLimit() < this.categoryItems().length
   );
   protected readonly cartItemCount = computed(() =>
     this.cart.lines().reduce((total, line) => total + line.quantity, 0)
@@ -997,6 +1269,7 @@ export class SellComponent implements OnInit {
   }
 
   async ngOnInit(): Promise<void> {
+    this.restoreCatalogView();
     void this.sync.paymentMethods().then(methods => this.methods.set(methods));
     void this.receiptData.printerEnabled().then(enabled => this.printerEnabled.set(enabled));
     void this.sync
@@ -1025,6 +1298,61 @@ export class SellComponent implements OnInit {
       if (!refreshed) this.error.set('Could not refresh the catalog; using the last saved copy.');
     } finally {
       this.catalogRefreshing.set(false);
+    }
+  }
+
+  protected setCatalogView(view: CatalogView): void {
+    this.catalogView.set(view);
+    this.persistCatalogView(view);
+  }
+
+  protected openCategory(categoryId: string): void {
+    this.selectedCategoryId.set(categoryId);
+    this.categoryVisibleLimit.set(24);
+  }
+
+  protected leaveCategory(): void {
+    this.selectedCategoryId.set(null);
+    this.categoryVisibleLimit.set(24);
+  }
+
+  protected showMoreCategoryItems(): void {
+    this.categoryVisibleLimit.update(limit => limit + 24);
+  }
+
+  protected catalogSectionLabel(): string {
+    if (this.searchMode()) return 'Search results';
+    if (this.catalogView() === 'categories') {
+      return this.selectedCategory() ? 'Category' : 'Browse categories';
+    }
+    return 'Quick add';
+  }
+
+  private catalogViewStorageKey(): string | null {
+    const identity = this.supabase.offlineIdentity();
+    return identity ? `dukarun:catalog-view:${identity.companyId}:${identity.userId}` : null;
+  }
+
+  private restoreCatalogView(): void {
+    const key = this.catalogViewStorageKey();
+    if (!key || typeof localStorage === 'undefined') return;
+    try {
+      const stored = localStorage.getItem(key);
+      if (stored === 'grid' || stored === 'list' || stored === 'categories') {
+        this.catalogView.set(stored);
+      }
+    } catch {
+      // Restricted storage must not prevent the POS from starting.
+    }
+  }
+
+  private persistCatalogView(view: CatalogView): void {
+    const key = this.catalogViewStorageKey();
+    if (!key || typeof localStorage === 'undefined') return;
+    try {
+      localStorage.setItem(key, view);
+    } catch {
+      // Keep the in-memory selection when storage is unavailable or full.
     }
   }
 

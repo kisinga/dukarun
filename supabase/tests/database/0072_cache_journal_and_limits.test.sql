@@ -165,7 +165,7 @@ select is(
 );
 select is(
   (jsonb_path_query_first(
-    public.catalog_management_page('all','all','all',null,'name','asc',1,100,null),
+    public.catalog_management_page('all','all','all','all',null,'name','asc',1,100,null),
     '$.groups[*].variants[*] ? (@.sku == "QUOTA-1").stock_value'
   ) #>> '{}')::bigint,
   10::bigint,

@@ -99,6 +99,7 @@ for (const marker of [
   'property="og:description"',
   'property="og:image"',
   'name="twitter:card"',
+  'rel="icon"',
 ]) {
   if (!directory.includes(marker)) throw new Error(`Storefront directory is missing ${marker}`);
 }
@@ -131,6 +132,7 @@ for (const slug of shopPaths) {
     'property="og:image"',
     'name="twitter:card"',
     'application/ld+json',
+    'rel="icon"',
     `storefront:catalog:${slug}:12:0`,
   ]) {
     if (!html.includes(marker)) throw new Error(`Storefront /${slug} is missing ${marker}`);

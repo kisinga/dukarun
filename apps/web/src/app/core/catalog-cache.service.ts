@@ -13,8 +13,9 @@ import {
 } from '../pos/offline/offline-db';
 import {
   PosService,
-  type CollectionWithCount,
+  type CategoryWithCount,
   type Product,
+  type ProductCategoryLink,
   type Variant,
 } from '../pos/pos.service';
 import {
@@ -52,7 +53,9 @@ export class CatalogCacheService {
   readonly catalog = signal<Variant[]>([]);
   readonly families = signal<Product[]>([]);
   readonly manufacturers = signal<CachedManufacturer[]>([]);
-  readonly collections = signal<CollectionWithCount[]>([]);
+  readonly categories = signal<CategoryWithCount[]>([]);
+  readonly productCategories = signal<ProductCategoryLink[]>([]);
+  readonly categoryMembershipsComplete = signal(false);
   readonly stock = signal<Map<string, { stock: number; stock_value: number }>>(new Map());
   readonly fetchedAt = signal<string | null>(null);
   /** Defensive compatibility flag for snapshots created before the 10k ceiling. */
@@ -119,7 +122,12 @@ export class CatalogCacheService {
     }
     // A missing snapshot needs a bootstrap; warm snapshots are reconciled by
     // the durable journal without paying for an unconditional full download.
-    if (this.connectivity.online() && !snapshot) void this.refresh();
+    if (
+      this.connectivity.online() &&
+      (!snapshot || snapshot.category_memberships_complete !== true)
+    ) {
+      void this.refresh();
+    }
     return !!snapshot?.families && !!snapshot.location_stock;
   }
 
@@ -177,12 +185,13 @@ export class CatalogCacheService {
     const scope = offlineScopeKey(identity, locationId);
     if (scope !== expectedScope || scope !== this.scope) return false;
     try {
-      const [catalogResult, familyRows, manufacturers, collections] = await Promise.all([
+      const [catalogResult, familyRows, manufacturers, productCategories] = await Promise.all([
         this.fetchCatalogRows(),
         this.fetchFamilyRows(),
         this.pos.listManufacturers(),
-        this.pos.listCollections(),
+        this.pos.listProductCategoryLinks(),
       ]);
+      const categories = await this.pos.listCategories(productCategories);
       const catalogRows = catalogResult.rows;
       const locationStock = await this.fetchLocationStock(
         locationId,
@@ -205,7 +214,9 @@ export class CatalogCacheService {
         families: familyRows,
         location_stock: locationStock,
         manufacturers: manufacturerOptions,
-        collections,
+        categories,
+        product_categories: productCategories,
+        category_memberships_complete: true,
         truncated: catalogResult.truncated,
         catalog_complete: true,
         fetched_at: new Date().toISOString(),
@@ -302,7 +313,9 @@ export class CatalogCacheService {
     const metadataVariantIds = new Set<string>();
     const productIds = new Set<string>();
     const familyIds = new Set<string>();
-    let referencesChanged = false;
+    let manufacturerReferencesChanged = false;
+    const changedCategoryIds = new Set<string>();
+    const categoryMembershipProductIds = new Set<string>();
     for (const change of relevant) {
       if (change.entityType === 'variant') {
         variantIds.add(change.entityId);
@@ -313,13 +326,12 @@ export class CatalogCacheService {
         productIds.add(change.entityId);
         familyIds.add(change.entityId);
       }
-      if (change.entityType === 'product_collection') {
+      if (change.entityType === 'product_category') {
         familyIds.add(change.entityId);
-        referencesChanged = true;
+        categoryMembershipProductIds.add(change.entityId);
       }
-      if (change.entityType === 'manufacturer' || change.entityType === 'collection') {
-        referencesChanged = true;
-      }
+      if (change.entityType === 'manufacturer') manufacturerReferencesChanged = true;
+      if (change.entityType === 'category') changedCategoryIds.add(change.entityId);
     }
 
     // A deleted/deactivated variant no longer tells us its family on the server.
@@ -389,12 +401,10 @@ export class CatalogCacheService {
     }
 
     let manufacturers = this.manufacturers();
-    let collections = this.collections();
-    if (referencesChanged) {
-      [manufacturers, collections] = await Promise.all([
-        this.pos.listManufacturers(),
-        this.pos.listCollections(),
-      ]);
+    let categories = this.categories();
+    let productCategories = this.productCategories();
+    if (manufacturerReferencesChanged) {
+      manufacturers = await this.pos.listManufacturers();
       const manufacturerNames = new Map(manufacturers.map(item => [item.id, item.name]));
       nextCatalog = nextCatalog.map(row => ({
         ...row,
@@ -402,6 +412,43 @@ export class CatalogCacheService {
           ? (manufacturerNames.get(row.manufacturer_id) ?? null)
           : null,
       }));
+    }
+    if (categoryMembershipProductIds.size) {
+      const changedLinks: ProductCategoryLink[] = [];
+      for (const batch of postgrestIdBatches([...categoryMembershipProductIds])) {
+        const { data: links, error: linkError } = await this.supabase.client
+          .from('product_categories')
+          .select('product_id,category_id')
+          .in('product_id', batch);
+        if (linkError) throw linkError;
+        changedLinks.push(...(links ?? []));
+      }
+      productCategories = productCategories
+        .filter(link => !categoryMembershipProductIds.has(link.product_id))
+        .concat(changedLinks);
+    }
+    if (changedCategoryIds.size) {
+      const changedCategories: CategoryWithCount[] = [];
+      for (const batch of postgrestIdBatches([...changedCategoryIds])) {
+        const { data: rows, error: categoryError } = await this.supabase.client
+          .from('categories')
+          .select('*')
+          .in('id', batch);
+        if (categoryError) throw categoryError;
+        changedCategories.push(...(rows ?? []).map(row => ({ ...row, product_count: 0 })));
+      }
+      categories = categories
+        .filter(category => !changedCategoryIds.has(category.id))
+        .concat(changedCategories);
+    }
+    if (categoryMembershipProductIds.size || changedCategoryIds.size) {
+      const counts = new Map<string, number>();
+      for (const link of productCategories) {
+        counts.set(link.category_id, (counts.get(link.category_id) ?? 0) + 1);
+      }
+      categories = categories
+        .map(category => ({ ...category, product_count: counts.get(category.id) ?? 0 }))
+        .sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
     }
 
     const nextStock = new Map(this.stock());
@@ -418,12 +465,23 @@ export class CatalogCacheService {
       families: nextFamilies,
       location_stock: [...nextStock].map(([variant_id, value]) => ({ variant_id, ...value })),
       manufacturers: this.mergeManufacturers(manufacturers, nextCatalog),
-      collections,
+      categories,
+      product_categories: productCategories,
+      // Incremental journal patches cannot turn a legacy/partial membership
+      // snapshot into a complete one. Only fetchSnapshot() downloads every link.
+      category_memberships_complete: this.categoryMembershipsComplete(),
       truncated: this.catalogTruncated(),
       catalog_complete: this.catalogCompletenessKnown(),
       fetched_at: new Date().toISOString(),
     };
-    await this.persistPatch(snapshot, affectedVariants, familyIds.size > 0 || referencesChanged);
+    await this.persistPatch(
+      snapshot,
+      affectedVariants,
+      familyIds.size > 0 ||
+        manufacturerReferencesChanged ||
+        changedCategoryIds.size > 0 ||
+        categoryMembershipProductIds.size > 0
+    );
     if (scope !== this.scope) throw new Error('cache_scope_changed');
     this.applySnapshot(snapshot);
   }
@@ -434,7 +492,9 @@ export class CatalogCacheService {
     this.manufacturers.set(
       this.mergeManufacturers(snapshot.manufacturers ?? [], snapshot.products)
     );
-    this.collections.set(snapshot.collections ?? []);
+    this.categories.set(snapshot.categories ?? []);
+    this.productCategories.set(snapshot.product_categories ?? []);
+    this.categoryMembershipsComplete.set(snapshot.category_memberships_complete === true);
     this.stock.set(
       new Map(
         (snapshot.location_stock ?? []).map(row => [
@@ -483,7 +543,9 @@ export class CatalogCacheService {
     this.catalog.set([]);
     this.families.set([]);
     this.manufacturers.set([]);
-    this.collections.set([]);
+    this.categories.set([]);
+    this.productCategories.set([]);
+    this.categoryMembershipsComplete.set(false);
     this.stock.set(new Map());
     this.fetchedAt.set(null);
     this.catalogTruncated.set(false);
@@ -544,7 +606,9 @@ export class CatalogCacheService {
           stock_value: entry.stock_value,
         })),
         manufacturers: metadata.manufacturers,
-        collections: metadata.collections,
+        categories: metadata.categories,
+        product_categories: metadata.product_categories,
+        category_memberships_complete: metadata.category_memberships_complete,
         truncated: metadata.truncated,
         catalog_complete: metadata.catalog_complete,
         fetched_at: metadata.fetched_at,
@@ -600,7 +664,9 @@ export class CatalogCacheService {
       location_id: snapshot.location_id,
       families: snapshot.families ?? [],
       manufacturers: snapshot.manufacturers ?? [],
-      collections: snapshot.collections ?? [],
+      categories: snapshot.categories ?? [],
+      product_categories: snapshot.product_categories ?? [],
+      category_memberships_complete: snapshot.category_memberships_complete,
       truncated: snapshot.truncated ?? false,
       catalog_complete: snapshot.catalog_complete,
       fetched_at: snapshot.fetched_at,
@@ -645,7 +711,9 @@ export class CatalogCacheService {
         ...currentMetadata,
         families: snapshot.families ?? [],
         manufacturers: snapshot.manufacturers ?? [],
-        collections: snapshot.collections ?? [],
+        categories: snapshot.categories ?? [],
+        product_categories: snapshot.product_categories ?? [],
+        category_memberships_complete: snapshot.category_memberships_complete,
         truncated: snapshot.truncated ?? false,
         catalog_complete: snapshot.catalog_complete,
         fetched_at: snapshot.fetched_at,

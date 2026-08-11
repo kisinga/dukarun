@@ -7,7 +7,7 @@ import { formatKes, formatKesInput, parseKes } from '../core/money';
 import { SupabaseService } from '../core/supabase.service';
 import {
   CatalogVariantInput,
-  CollectionWithCount,
+  CategoryWithCount,
   InventoryBatch,
   PosService,
   Product,
@@ -37,10 +37,12 @@ import { CompanyPreferencesService } from '../core/company-preferences.service';
 import { PermissionsService } from '../core/permissions.service';
 import { CatalogCacheService } from '../core/catalog-cache.service';
 import { LocationContextService } from '../core/location-context.service';
+import { ConnectivityService } from '../pos/offline/connectivity.service';
 import { ProductImportDialogComponent } from './product-import-dialog.component';
 import { ProductTransferService, type CatalogImportResult } from './product-transfer.service';
 import { BarcodeScannerComponent } from '../shared/ui/barcode-scanner.component';
 import { BarcodeLabelDialogComponent } from './barcode-label-dialog.component';
+import { BatchProductCategoriesDialogComponent } from './batch-product-categories-dialog.component';
 import { BARCODE_MAX_LENGTH, generateDukarunBarcode } from './barcode-labels';
 import {
   SearchableFilterComponent,
@@ -65,7 +67,7 @@ const PRODUCT_SORT_OPTIONS: readonly ListSortOption[] = [
 ];
 
 /** One variant in the coupled create/edit product editor. */
-type DeactivateTarget = { kind: 'collection'; collection: CollectionWithCount };
+type DeactivateTarget = { kind: 'category'; category: CategoryWithCount };
 
 interface ProductEditorRow {
   key: string;
@@ -111,6 +113,7 @@ interface ProductEditorRow {
     BarcodeScannerComponent,
     BarcodeLabelDialogComponent,
     SearchableFilterComponent,
+    BatchProductCategoriesDialogComponent,
   ],
   template: `
     <app-page
@@ -151,13 +154,8 @@ interface ProductEditorRow {
           <app-icon name="heroArrowUpTray" /> Import
         </button>
       }
-      <button
-        actions
-        appButton
-        variant="secondary"
-        (click)="collectionsOpen.set(!collectionsOpen())"
-      >
-        <app-icon name="heroQueueList" /> Collections
+      <button actions appButton variant="secondary" (click)="categoriesOpen.set(!categoriesOpen())">
+        <app-icon name="heroQueueList" /> Categories
       </button>
       @if (perms.has('ManageStockAdjustments')) {
         <button actions appButton variant="primary" (click)="startFamilyCreate()">
@@ -187,20 +185,28 @@ interface ProductEditorRow {
         </div>
       }
 
-      <!-- Collections panel -->
-      @if (collectionsOpen()) {
+      <!-- Categories panel -->
+      @if (categoriesOpen()) {
         <div class="card mb-4 bg-base-100">
           <div class="card-body p-4">
             <div class="flex items-center justify-between">
-              <h2 class="card-title text-lg">Collections</h2>
-              <button class="btn btn-ghost btn-sm" (click)="startCollectionCreate()">
-                + New collection
-              </button>
+              <h2 class="card-title text-lg">Categories</h2>
+              @if (perms.has('ManageCatalog')) {
+                <button
+                  appButton
+                  variant="ghost"
+                  size="sm"
+                  [disabled]="!connectivity.online() || !categoryMembershipsComplete()"
+                  (click)="startCategoryCreate()"
+                >
+                  <app-icon name="heroPlus" /> New category
+                </button>
+              }
             </div>
 
-            @if (collectionForm(); as cf) {
+            @if (categoryForm(); as cf) {
               <form
-                (submit)="$event.preventDefault(); saveCollection()"
+                (submit)="$event.preventDefault(); saveCategory()"
                 class="mt-2 flex flex-wrap items-end gap-3 rounded-field bg-base-200 p-2"
               >
                 <label class="form-control">
@@ -208,7 +214,7 @@ interface ProductEditorRow {
                   <input
                     type="text"
                     class="input input-bordered input-sm"
-                    [formControl]="collectionName"
+                    [formControl]="categoryName"
                   />
                 </label>
                 <label class="form-control">
@@ -217,7 +223,7 @@ interface ProductEditorRow {
                     type="text"
                     class="input input-bordered input-sm"
                     placeholder="auto"
-                    [formControl]="collectionSlug"
+                    [formControl]="categorySlug"
                   />
                 </label>
                 <label class="form-control flex-1">
@@ -225,29 +231,35 @@ interface ProductEditorRow {
                   <input
                     type="text"
                     class="input input-bordered input-sm"
-                    [formControl]="collectionDescription"
+                    [formControl]="categoryDescription"
                   />
                 </label>
                 <button
                   type="submit"
                   class="btn btn-primary btn-sm"
-                  [disabled]="busy() || collectionName.value.trim().length === 0"
+                  [disabled]="
+                    busy() ||
+                    !connectivity.online() ||
+                    !categoryMembershipsComplete() ||
+                    categoryName.value.trim().length === 0
+                  "
                 >
                   {{ busy() ? 'Saving…' : cf.editing ? 'Save' : 'Create' }}
                 </button>
-                <button
-                  type="button"
-                  class="btn btn-ghost btn-sm"
-                  (click)="collectionForm.set(null)"
-                >
+                <button type="button" class="btn btn-ghost btn-sm" (click)="categoryForm.set(null)">
                   Cancel
                 </button>
               </form>
             }
 
-            @if (collections().length === 0) {
+            @if (!categoryMembershipsComplete()) {
+              <div role="status" class="alert alert-warning mt-3 text-sm">
+                <app-icon name="heroSignalSlash" />
+                <span>{{ categoryDataStatusLabel() }}</span>
+              </div>
+            } @else if (categories().length === 0) {
               <p class="mt-2 text-sm text-base-content/60">
-                No collections yet — group products for the storefront or reports.
+                No categories yet — group products for the storefront or reports.
               </p>
             } @else {
               <table class="table table-sm mt-2">
@@ -261,7 +273,7 @@ interface ProductEditorRow {
                   </tr>
                 </thead>
                 <tbody>
-                  @for (c of collections(); track c.id) {
+                  @for (c of categories(); track c.id) {
                     <tr>
                       <td class="text-sm font-medium">{{ c.name }}</td>
                       <td class="font-mono text-xs">{{ c.slug }}</td>
@@ -272,25 +284,37 @@ interface ProductEditorRow {
                         }
                       </td>
                       <td class="whitespace-nowrap text-right">
-                        <button class="btn btn-ghost btn-xs" (click)="startCollectionEdit(c)">
-                          Edit
-                        </button>
-                        @if (c.active) {
+                        @if (perms.has('ManageCatalog')) {
                           <button
-                            class="btn btn-error btn-outline btn-xs"
-                            [disabled]="busy()"
-                            (click)="confirmDeactivate({ kind: 'collection', collection: c })"
+                            appButton
+                            variant="ghost"
+                            size="sm"
+                            [disabled]="!connectivity.online()"
+                            (click)="startCategoryEdit(c)"
                           >
-                            Deactivate
+                            Edit
                           </button>
-                        } @else {
-                          <button
-                            class="btn btn-success btn-outline btn-xs"
-                            [disabled]="busy()"
-                            (click)="setCollectionActive(c, true)"
-                          >
-                            Reactivate
-                          </button>
+                          @if (c.active) {
+                            <button
+                              appButton
+                              variant="error"
+                              size="sm"
+                              [disabled]="busy() || !connectivity.online()"
+                              (click)="confirmDeactivate({ kind: 'category', category: c })"
+                            >
+                              Deactivate
+                            </button>
+                          } @else {
+                            <button
+                              appButton
+                              variant="outline"
+                              size="sm"
+                              [disabled]="busy() || !connectivity.online()"
+                              (click)="setCategoryActive(c, true)"
+                            >
+                              Reactivate
+                            </button>
+                          }
                         }
                       </td>
                     </tr>
@@ -516,24 +540,63 @@ interface ProductEditorRow {
                     </section>
 
                     <section class="mt-6 border-t border-base-300 pt-4">
-                      <h3 class="section-title">Collections</h3>
-                      <div class="mt-3 flex flex-wrap gap-4">
-                        @for (c of collections(); track c.id) {
-                          @if (c.active) {
-                            <label class="flex min-h-11 cursor-pointer items-center gap-2">
+                      <h3 class="section-title">Categories</h3>
+                      @if (
+                        perms.has('ManageCatalog') &&
+                        connectivity.online() &&
+                        categoryMembershipsComplete()
+                      ) {
+                        <label class="input input-bordered input-sm mt-3 flex items-center gap-2">
+                          <app-icon name="heroMagnifyingGlass" class="text-base-content/50" />
+                          <input
+                            type="search"
+                            class="min-w-0 grow"
+                            placeholder="Search categories…"
+                            [value]="familyCategoryQuery()"
+                            (input)="familyCategoryQuery.set($any($event.target).value)"
+                          />
+                        </label>
+                        <div
+                          class="mt-2 max-h-56 overflow-y-auto rounded-box border border-base-300"
+                        >
+                          @for (c of visibleFamilyCategories(); track c.id) {
+                            <label
+                              class="flex min-h-11 cursor-pointer items-center gap-3 border-b border-base-200 px-3 last:border-0 hover:bg-base-200"
+                            >
                               <input
                                 type="checkbox"
                                 class="checkbox checkbox-sm"
-                                [checked]="familyCollections().has(c.id)"
-                                (change)="toggleFamilyCollection(c.id)"
+                                [checked]="familyCategories().has(c.id)"
+                                (change)="toggleFamilyCategory(c.id)"
                               />
-                              <span class="text-sm">{{ c.name }}</span>
+                              <span class="min-w-0 flex-1 truncate text-sm">{{ c.name }}</span>
                             </label>
+                          } @empty {
+                            <p class="p-4 text-center text-sm text-base-content/60">
+                              No categories match.
+                            </p>
                           }
-                        } @empty {
-                          <p class="type-caption">No collections yet.</p>
+                        </div>
+                        @if (matchingFamilyCategories().length > visibleFamilyCategories().length) {
+                          <p class="type-caption mt-2">
+                            Keep typing to narrow
+                            {{ matchingFamilyCategories().length }} categories.
+                          </p>
                         }
-                      </div>
+                      } @else if (categoryMembershipsComplete()) {
+                        <div class="mt-2 flex flex-wrap gap-1.5">
+                          @for (name of productCategoryNames(editingFamily()!.id); track name) {
+                            <span class="badge badge-ghost">{{ name }}</span>
+                          } @empty {
+                            <p class="type-caption">Uncategorized</p>
+                          }
+                        </div>
+                        @if (perms.has('ManageCatalog') && !connectivity.online()) {
+                          <p class="type-caption mt-2">Reconnect to change categories.</p>
+                        }
+                      } @else {
+                        <p class="type-caption mt-2">{{ categoryDataStatusLabel() }}</p>
+                      }
                     </section>
                   }
                 } @else {
@@ -949,6 +1012,18 @@ interface ProductEditorRow {
             [value]="manufacturerFilter()"
             (valueChange)="setManufacturerFilter($event)"
           />
+          @if (categoryMembershipsComplete()) {
+            <app-searchable-filter
+              class="w-full sm:w-56"
+              ariaLabel="Filter products by category"
+              placeholder="All categories"
+              emptyValue="all"
+              searchPlaceholder="Search categories…"
+              [options]="categoryFilterOptions()"
+              [value]="categoryFilter()"
+              (valueChange)="setCategoryFilter($event)"
+            />
+          }
           @if (hasProductFilters()) {
             <button
               appButton
@@ -962,6 +1037,26 @@ interface ProductEditorRow {
           }
         </div>
       </app-list-search-bar>
+
+      @if (selectedProductIds().size > 0 && categoryMembershipsComplete()) {
+        <div class="card mb-3 flex-row items-center gap-3 bg-base-100 p-3">
+          <p class="min-w-0 flex-1 text-sm font-semibold">
+            {{ selectedProductIds().size }} products selected
+          </p>
+          <button appButton variant="ghost" size="sm" type="button" (click)="clearSelection()">
+            Clear
+          </button>
+          <button
+            appButton
+            variant="soft"
+            size="sm"
+            type="button"
+            (click)="batchCategoriesOpen.set(true)"
+          >
+            <app-icon name="heroQueueList" /> Categorize
+          </button>
+        </div>
+      }
 
       <!-- Grouped list -->
       @if (!loading() && grouped().length === 0) {
@@ -987,6 +1082,16 @@ interface ProductEditorRow {
             >
               <div class="card-body p-4">
                 <div class="flex items-start gap-3">
+                  @if (perms.has('ManageCatalog') && categoryMembershipsComplete()) {
+                    <input
+                      type="checkbox"
+                      class="checkbox checkbox-sm mt-1 shrink-0"
+                      [checked]="selectedProductIds().has(group.family.id)"
+                      [attr.aria-label]="'Select ' + group.family.name"
+                      (click)="$event.stopPropagation()"
+                      (change)="toggleProductSelection(group.family.id)"
+                    />
+                  }
                   @if (imageUrl(group.family.image_path); as thumb) {
                     @if (!brokenImages().has(group.family.image_path!)) {
                       <img
@@ -1009,6 +1114,20 @@ interface ProductEditorRow {
                         · <span class="font-mono">{{ group.family.barcode }}</span>
                       }
                     </span>
+                    @if (productCategoryNames(group.family.id); as categoryNames) {
+                      @if (categoryNames.length > 0) {
+                        <div class="mt-1 flex flex-wrap gap-1">
+                          @for (name of categoryNames.slice(0, 2); track name) {
+                            <span class="badge badge-ghost badge-sm">{{ name }}</span>
+                          }
+                          @if (categoryNames.length > 2) {
+                            <span class="badge badge-ghost badge-sm"
+                              >+{{ categoryNames.length - 2 }}</span
+                            >
+                          }
+                        </div>
+                      }
+                    }
                   </div>
                   @if (!group.family.active) {
                     <app-status-badge type="warning" label="inactive" />
@@ -1039,8 +1158,21 @@ interface ProductEditorRow {
             <table class="table table-sm">
               <thead>
                 <tr>
+                  @if (perms.has('ManageCatalog') && categoryMembershipsComplete()) {
+                    <th class="w-10">
+                      <input
+                        type="checkbox"
+                        class="checkbox checkbox-sm"
+                        aria-label="Select products on this page"
+                        [checked]="allPageProductsSelected()"
+                        [indeterminate]="somePageProductsSelected()"
+                        (change)="togglePageSelection()"
+                      />
+                    </th>
+                  }
                   <th>Product</th>
                   <th>Manufacturer</th>
+                  <th>Categories</th>
                   <th class="text-right">Variants</th>
                   <th class="text-right">Inventory</th>
                   <th>Status</th>
@@ -1057,6 +1189,17 @@ interface ProductEditorRow {
                     (click)="openProduct(group.family.id)"
                     (keydown.enter)="openProduct(group.family.id)"
                   >
+                    @if (perms.has('ManageCatalog') && categoryMembershipsComplete()) {
+                      <td (click)="$event.stopPropagation()">
+                        <input
+                          type="checkbox"
+                          class="checkbox checkbox-sm"
+                          [checked]="selectedProductIds().has(group.family.id)"
+                          [attr.aria-label]="'Select ' + group.family.name"
+                          (change)="toggleProductSelection(group.family.id)"
+                        />
+                      </td>
+                    }
                     <td>
                       <span class="font-semibold">{{ group.family.name }}</span>
                       <p class="type-caption mt-0.5 font-mono">
@@ -1068,6 +1211,26 @@ interface ProductEditorRow {
                         <span class="badge badge-ghost badge-sm">{{ manufacturer }}</span>
                       } @else {
                         <span class="type-caption">—</span>
+                      }
+                    </td>
+                    <td>
+                      @if (!categoryMembershipsComplete()) {
+                        <span class="type-caption">{{ categoryDataStatusLabel() }}</span>
+                      } @else if (productCategoryNames(group.family.id); as categoryNames) {
+                        @if (categoryNames.length === 0) {
+                          <span class="type-caption">Uncategorized</span>
+                        } @else {
+                          <div class="flex max-w-56 flex-wrap gap-1">
+                            @for (name of categoryNames.slice(0, 2); track name) {
+                              <span class="badge badge-ghost badge-sm">{{ name }}</span>
+                            }
+                            @if (categoryNames.length > 2) {
+                              <span class="badge badge-ghost badge-sm"
+                                >+{{ categoryNames.length - 2 }}</span
+                              >
+                            }
+                          </div>
+                        }
                       }
                     </td>
                     <td class="text-right font-medium">
@@ -1184,6 +1347,23 @@ interface ProductEditorRow {
               "
             />
           </div>
+
+          <section class="mt-4 border-t border-base-300/60 pt-4">
+            <h3 class="section-title">Categories</h3>
+            @if (!categoryMembershipsComplete()) {
+              <p class="type-caption mt-2">{{ categoryDataStatusLabel() }}</p>
+            } @else if (productCategoryNames(group.family.id); as categoryNames) {
+              @if (categoryNames.length > 0) {
+                <div class="mt-2 flex flex-wrap gap-1.5">
+                  @for (name of categoryNames; track name) {
+                    <span class="badge badge-ghost">{{ name }}</span>
+                  }
+                </div>
+              } @else {
+                <p class="type-caption mt-2">Uncategorized</p>
+              }
+            }
+          </section>
 
           @if (familyBarcodeAmbiguous(group)) {
             <div class="alert alert-warning mt-4 text-sm">
@@ -1352,6 +1532,15 @@ interface ProductEditorRow {
         confirmButtonText="Deactivate"
         (confirm)="executeDeactivate()"
       />
+      @if (batchCategoriesOpen() && categoryMembershipsComplete()) {
+        <app-batch-product-categories-dialog
+          [productIds]="selectedProductIdList()"
+          [categories]="categories()"
+          [links]="productCategories()"
+          (closed)="batchCategoriesOpen.set(false)"
+          (applied)="batchCategoriesApplied($event)"
+        />
+      }
       <app-product-import-dialog
         [(open)]="importOpen"
         (imported)="productImportCompleted($event)"
@@ -1393,6 +1582,7 @@ export class ProductsComponent implements OnInit {
   private readonly supabase = inject(SupabaseService);
   private readonly catalogCache = inject(CatalogCacheService);
   private readonly locationContext = inject(LocationContextService);
+  protected readonly connectivity = inject(ConnectivityService);
   private readonly productTransfer = inject(ProductTransferService);
   protected readonly preferences = inject(CompanyPreferencesService);
   protected readonly perms = inject(PermissionsService);
@@ -1414,6 +1604,7 @@ export class ProductsComponent implements OnInit {
   );
   protected readonly stockStatusFilter = signal<StockStatusFilter>('all');
   protected readonly manufacturerFilter = signal<string>('all');
+  protected readonly categoryFilter = signal<string>('all');
   protected readonly productSortOptions = PRODUCT_SORT_OPTIONS;
   protected readonly productSort = signal('name');
   protected readonly productSortDirection = signal<ListSortDirection>('asc');
@@ -1455,9 +1646,11 @@ export class ProductsComponent implements OnInit {
   protected readonly imageBusy = signal(false);
   protected readonly brokenImages = signal<Set<string>>(new Set());
 
-  /** Collections panel + per-family checkbox editor. */
-  protected readonly collectionsOpen = signal(false);
-  protected readonly collections = this.catalogCache.collections;
+  /** Categories panel + per-family checkbox editor. */
+  protected readonly categoriesOpen = signal(false);
+  protected readonly categories = this.catalogCache.categories;
+  protected readonly productCategories = this.catalogCache.productCategories;
+  protected readonly categoryMembershipsComplete = this.catalogCache.categoryMembershipsComplete;
   protected readonly manufacturers = this.catalogCache.manufacturers;
   protected readonly manufacturerFilterOptions = computed<readonly SearchableFilterOption[]>(() => [
     { value: 'unassigned', label: 'Not specified' },
@@ -1466,12 +1659,57 @@ export class ProductsComponent implements OnInit {
       label: manufacturer.name,
     })),
   ]);
+  protected readonly categoryFilterOptions = computed<readonly SearchableFilterOption[]>(() => {
+    if (!this.categoryMembershipsComplete()) return [];
+    return [
+      { value: 'uncategorized', label: 'Uncategorized' },
+      ...this.categories()
+        .filter(category => category.active)
+        .map(category => ({
+          value: category.id,
+          label: category.name,
+          description: `${category.product_count} products`,
+        })),
+    ];
+  });
+  private readonly categoryIdsByProduct = computed(() => {
+    const result = new Map<string, Set<string>>();
+    for (const link of this.productCategories()) {
+      const categoryIds = result.get(link.product_id) ?? new Set<string>();
+      categoryIds.add(link.category_id);
+      result.set(link.product_id, categoryIds);
+    }
+    return result;
+  });
   protected readonly stockLocations = this.locationContext.locations;
-  protected readonly collectionForm = signal<{ editing: CollectionWithCount | null } | null>(null);
-  protected readonly collectionName = new FormControl('', { nonNullable: true });
-  protected readonly collectionSlug = new FormControl('', { nonNullable: true });
-  protected readonly collectionDescription = new FormControl('', { nonNullable: true });
-  protected readonly familyCollections = signal<Set<string>>(new Set());
+  protected readonly categoryForm = signal<{ editing: CategoryWithCount | null } | null>(null);
+  protected readonly categoryName = new FormControl('', { nonNullable: true });
+  protected readonly categorySlug = new FormControl('', { nonNullable: true });
+  protected readonly categoryDescription = new FormControl('', { nonNullable: true });
+  protected readonly familyCategories = signal<Set<string>>(new Set());
+  protected readonly familyCategoryQuery = signal('');
+  protected readonly matchingFamilyCategories = computed(() => {
+    const query = this.familyCategoryQuery().trim().toLocaleLowerCase();
+    return this.categories().filter(
+      category => category.active && (!query || category.name.toLocaleLowerCase().includes(query))
+    );
+  });
+  protected readonly visibleFamilyCategories = computed(() =>
+    this.matchingFamilyCategories().slice(0, 50)
+  );
+  protected readonly selectedProductIds = signal<Set<string>>(new Set());
+  protected readonly batchCategoriesOpen = signal(false);
+  protected readonly selectedProductIdList = computed(() => [...this.selectedProductIds()]);
+  protected readonly allPageProductsSelected = computed(() => {
+    const pageIds = this.pagedGroups().map(group => group.family.id);
+    return pageIds.length > 0 && pageIds.every(id => this.selectedProductIds().has(id));
+  });
+  protected readonly somePageProductsSelected = computed(() => {
+    const selected = this.pagedGroups().filter(group =>
+      this.selectedProductIds().has(group.family.id)
+    ).length;
+    return selected > 0 && selected < this.pagedGroups().length;
+  });
 
   /** Deactivate confirmation (family or variant). */
   protected readonly deactivateTarget = signal<DeactivateTarget | null>(null);
@@ -1483,6 +1721,8 @@ export class ProductsComponent implements OnInit {
     const productStatus = this.productStatusFilter();
     const stockStatus = this.stockStatusFilter();
     const manufacturer = this.manufacturerFilter();
+    const category = this.categoryMembershipsComplete() ? this.categoryFilter() : 'all';
+    const categoryIdsByProduct = this.categoryIdsByProduct();
     const sortKey = this.productSort();
     const sortDirection = this.productSortDirection();
     if (productStatus !== 'active') return this.serverGroups();
@@ -1506,6 +1746,11 @@ export class ProductsComponent implements OnInit {
         if (manufacturer === 'unassigned' && g.family.manufacturer_id !== null) return false;
         if (manufacturer !== 'all' && manufacturer !== 'unassigned') {
           if (g.family.manufacturer_id !== manufacturer) return false;
+        }
+        const categoryIds = categoryIdsByProduct.get(g.family.id) ?? new Set<string>();
+        if (category === 'uncategorized' && categoryIds.size > 0) return false;
+        if (category !== 'all' && category !== 'uncategorized' && !categoryIds.has(category)) {
+          return false;
         }
         if (stockStatus === 'all') return true;
         const tracked = g.variants.filter(
@@ -1562,7 +1807,8 @@ export class ProductsComponent implements OnInit {
       this.query().trim().length > 0 ||
       this.productStatusFilter() !== DEFAULT_PRODUCT_STATUS_FILTER ||
       this.stockStatusFilter() !== 'all' ||
-      this.manufacturerFilter() !== 'all'
+      this.manufacturerFilter() !== 'all' ||
+      (this.categoryMembershipsComplete() && this.categoryFilter() !== 'all')
   );
   protected readonly productStats = computed(() => {
     const groups = this.grouped();
@@ -1620,11 +1866,11 @@ export class ProductsComponent implements OnInit {
     // typing only resets pagination. Skip the effect's initial run.
     let firstRun = true;
     effect(() => {
-      this.catalogCache.revision();
       this.query();
       this.productStatusFilter();
       this.stockStatusFilter();
       this.manufacturerFilter();
+      this.categoryFilter();
       this.productSort();
       this.productSortDirection();
       if (firstRun) {
@@ -1639,16 +1885,36 @@ export class ProductsComponent implements OnInit {
         this.serverTotal.set(0);
         this.serverLoaded.set(false);
       }
+      this.clearSelection();
+    });
+    effect(() => {
+      const complete = this.categoryMembershipsComplete();
+      const selectedCategory = this.categoryFilter();
+      if (!complete) {
+        this.categoryFilter.set('all');
+        this.categoryForm.set(null);
+        this.clearSelection();
+        return;
+      }
+      if (
+        selectedCategory !== 'all' &&
+        selectedCategory !== 'uncategorized' &&
+        !this.categories().some(category => category.id === selectedCategory && category.active)
+      ) {
+        this.categoryFilter.set('all');
+      }
     });
   }
 
   protected changePageSize(size: number): void {
+    this.clearSelection();
     this.pageSize.set(size);
     this.page.set(1);
     if (this.serverMode()) void this.loadManagementPage();
   }
 
   protected changePage(page: number): void {
+    this.clearSelection();
     this.page.set(page);
     if (this.serverMode()) void this.loadManagementPage();
   }
@@ -1665,11 +1931,61 @@ export class ProductsComponent implements OnInit {
     this.manufacturerFilter.set(value);
   }
 
+  protected setCategoryFilter(value: string): void {
+    if (!this.categoryMembershipsComplete()) return;
+    this.categoryFilter.set(value);
+  }
+
+  protected toggleProductSelection(productId: string): void {
+    if (!this.categoryMembershipsComplete()) return;
+    this.selectedProductIds.update(selected => {
+      const next = new Set(selected);
+      if (next.has(productId)) next.delete(productId);
+      else next.add(productId);
+      return next;
+    });
+  }
+
+  protected togglePageSelection(): void {
+    if (!this.categoryMembershipsComplete()) return;
+    const pageIds = this.pagedGroups().map(group => group.family.id);
+    this.selectedProductIds.update(selected => {
+      const next = new Set(selected);
+      const remove = pageIds.length > 0 && pageIds.every(id => next.has(id));
+      for (const id of pageIds) remove ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  protected clearSelection(): void {
+    this.selectedProductIds.set(new Set());
+    this.batchCategoriesOpen.set(false);
+  }
+
+  protected productCategoryNames(productId: string): string[] {
+    const ids = this.categoryIdsByProduct().get(productId) ?? new Set<string>();
+    return this.categories()
+      .filter(category => ids.has(category.id))
+      .map(category => category.name);
+  }
+
+  protected categoryDataStatusLabel(): string {
+    return this.connectivity.online()
+      ? 'Refreshing category data…'
+      : 'Reconnect to load category data.';
+  }
+
+  protected batchCategoriesApplied(message: string): void {
+    this.notice.set(message);
+    this.clearSelection();
+  }
+
   protected clearProductFilters(): void {
     this.query.set('');
     this.productStatusFilter.set(DEFAULT_PRODUCT_STATUS_FILTER);
     this.stockStatusFilter.set('all');
     this.manufacturerFilter.set('all');
+    this.categoryFilter.set('all');
   }
 
   protected manufacturerName(id: string | null): string | null {
@@ -1707,6 +2023,7 @@ export class ProductsComponent implements OnInit {
         p_status: this.productStatusFilter(),
         p_stock_status: this.stockStatusFilter(),
         p_manufacturer: this.manufacturerFilter(),
+        p_category: this.categoryMembershipsComplete() ? this.categoryFilter() : 'all',
         p_search: this.query().trim() || undefined,
         p_sort: this.productSort(),
         p_direction: this.productSortDirection(),
@@ -1841,37 +2158,55 @@ export class ProductsComponent implements OnInit {
     }
   }
 
-  // --- Collections ---
+  // --- Categories ---
 
-  protected startCollectionCreate(): void {
-    this.collectionForm.set({ editing: null });
-    this.collectionName.setValue('');
-    this.collectionSlug.setValue('');
-    this.collectionDescription.setValue('');
+  protected startCategoryCreate(): void {
+    if (
+      !this.perms.has('ManageCatalog') ||
+      !this.connectivity.online() ||
+      !this.categoryMembershipsComplete()
+    )
+      return;
+    this.categoryForm.set({ editing: null });
+    this.categoryName.setValue('');
+    this.categorySlug.setValue('');
+    this.categoryDescription.setValue('');
   }
 
-  protected startCollectionEdit(c: CollectionWithCount): void {
-    this.collectionForm.set({ editing: c });
-    this.collectionName.setValue(c.name);
-    this.collectionSlug.setValue(c.slug);
-    this.collectionDescription.setValue(c.description ?? '');
+  protected startCategoryEdit(c: CategoryWithCount): void {
+    if (
+      !this.perms.has('ManageCatalog') ||
+      !this.connectivity.online() ||
+      !this.categoryMembershipsComplete()
+    )
+      return;
+    this.categoryForm.set({ editing: c });
+    this.categoryName.setValue(c.name);
+    this.categorySlug.setValue(c.slug);
+    this.categoryDescription.setValue(c.description ?? '');
   }
 
-  protected async saveCollection(): Promise<void> {
-    if (this.collectionName.value.trim().length === 0) return;
-    const cf = this.collectionForm();
+  protected async saveCategory(): Promise<void> {
+    if (
+      !this.perms.has('ManageCatalog') ||
+      !this.connectivity.online() ||
+      !this.categoryMembershipsComplete() ||
+      this.categoryName.value.trim().length === 0
+    )
+      return;
+    const cf = this.categoryForm();
     this.busy.set(true);
     this.error.set(null);
     this.notice.set(null);
     try {
-      await this.pos.upsertCollection({
-        name: this.collectionName.value.trim(),
-        slug: this.collectionSlug.value.trim() || undefined,
-        description: this.collectionDescription.value.trim() || undefined,
-        ...(cf?.editing ? { collection_id: cf.editing.id } : {}),
+      await this.pos.upsertCategory({
+        name: this.categoryName.value.trim(),
+        slug: this.categorySlug.value.trim() || undefined,
+        description: this.categoryDescription.value.trim() || undefined,
+        ...(cf?.editing ? { category_id: cf.editing.id } : {}),
       });
-      this.notice.set(cf?.editing ? 'Collection updated' : 'Collection created');
-      this.collectionForm.set(null);
+      this.notice.set(cf?.editing ? 'Category updated' : 'Category created');
+      this.categoryForm.set(null);
       await this.load();
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Save failed');
@@ -1880,14 +2215,20 @@ export class ProductsComponent implements OnInit {
     }
   }
 
-  protected async setCollectionActive(c: CollectionWithCount, active: boolean): Promise<void> {
+  protected async setCategoryActive(c: CategoryWithCount, active: boolean): Promise<void> {
+    if (
+      !this.perms.has('ManageCatalog') ||
+      !this.connectivity.online() ||
+      !this.categoryMembershipsComplete()
+    )
+      return;
     this.busy.set(true);
     this.error.set(null);
     try {
-      await this.pos.upsertCollection({
+      await this.pos.upsertCategory({
         name: c.name,
         slug: c.slug,
-        collection_id: c.id,
+        category_id: c.id,
         active,
       });
       this.notice.set(`${c.name} ${active ? 'reactivated' : 'deactivated'}`);
@@ -1899,11 +2240,17 @@ export class ProductsComponent implements OnInit {
     }
   }
 
-  protected toggleFamilyCollection(collectionId: string): void {
-    this.familyCollections.update(set => {
+  protected toggleFamilyCategory(categoryId: string): void {
+    if (
+      !this.perms.has('ManageCatalog') ||
+      !this.connectivity.online() ||
+      !this.categoryMembershipsComplete()
+    )
+      return;
+    this.familyCategories.update(set => {
       const next = new Set(set);
-      if (next.has(collectionId)) next.delete(collectionId);
-      else next.add(collectionId);
+      if (next.has(categoryId)) next.delete(categoryId);
+      else next.add(categoryId);
       return next;
     });
   }
@@ -2006,7 +2353,8 @@ export class ProductsComponent implements OnInit {
     this.familyBarcode.setValue('');
     this.pendingFamilyBarcode.set(null);
     this.familyActive.setValue(true);
-    this.familyCollections.set(new Set());
+    this.familyCategories.set(new Set());
+    this.familyCategoryQuery.set('');
     this.editorRows = [this.emptyEditorRow()];
     this.editorStep.set(1);
     this.editorMode.set('create');
@@ -2021,7 +2369,8 @@ export class ProductsComponent implements OnInit {
     this.familyBarcode.setValue(family.barcode ?? '');
     this.pendingFamilyBarcode.set(null);
     this.familyActive.setValue(family.active);
-    this.familyCollections.set(new Set());
+    this.familyCategories.set(new Set());
+    this.familyCategoryQuery.set('');
     this.editorRows = [];
     this.editorStep.set(step);
     this.editorLoading.set(true);
@@ -2029,15 +2378,15 @@ export class ProductsComponent implements OnInit {
 
     void Promise.all([
       this.pos.variantsForProduct(family.id),
-      this.pos.productCollectionIds(family.id),
+      this.pos.productCategoryIds(family.id),
     ])
-      .then(([variants, collectionIds]) => {
+      .then(([variants, categoryIds]) => {
         if (this.editingFamily()?.id !== family.id || this.editorMode() !== 'edit') return;
         this.editorRows = variants.map(variant =>
           this.editorRowFromVariant(variant, variants.length)
         );
         if (this.editorRows.length === 0) this.addEditorRow();
-        this.familyCollections.set(new Set(collectionIds));
+        this.familyCategories.set(new Set(categoryIds));
       })
       .catch(err => {
         if (this.editingFamily()?.id !== family.id || this.editorMode() !== 'edit') return;
@@ -2245,7 +2594,9 @@ export class ProductsComponent implements OnInit {
           manufacturer_id: manufacturerId,
           variants,
         });
-        await this.pos.setProductCollections(editing.id, [...this.familyCollections()]);
+        if (this.perms.has('ManageCatalog') && this.connectivity.online()) {
+          await this.pos.setProductCategories(editing.id, [...this.familyCategories()]);
+        }
         this.notice.set(
           `Updated ${name} and ${variants.length} variant${variants.length === 1 ? '' : 's'}`
         );
@@ -2387,10 +2738,10 @@ export class ProductsComponent implements OnInit {
     const t = this.deactivateTarget();
     if (!t) return { entityName: '' };
     return {
-      entityName: t.collection.name,
-      relatedCount: t.collection.product_count,
+      entityName: t.category.name,
+      relatedCount: t.category.product_count,
       relatedLabel: 'product',
-      warningDetails: ['Products stay; only the collection grouping is deactivated.'],
+      warningDetails: ['Products stay; only the category grouping is deactivated.'],
     };
   }
 
@@ -2398,7 +2749,7 @@ export class ProductsComponent implements OnInit {
     const t = this.deactivateTarget();
     if (!t) return;
     this.deleteModal()?.hide();
-    await this.setCollectionActive(t.collection, false);
+    await this.setCategoryActive(t.category, false);
     this.deactivateTarget.set(null);
   }
 
