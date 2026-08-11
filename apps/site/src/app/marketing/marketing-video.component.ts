@@ -6,9 +6,11 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
+import { IconComponent } from '../shared/ui/icon.component';
 
 @Component({
   selector: 'app-marketing-video',
+  imports: [IconComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <figure class="mx-auto mb-0 max-w-6xl">
@@ -68,16 +70,11 @@ import {
               [attr.aria-label]="ended() ? 'Replay ' + title() : 'Play ' + title()"
               (click)="play()"
             >
-              <svg
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-                class="ml-1 h-7 w-7 transition-transform group-hover/play:scale-110 sm:h-9 sm:w-9"
-                fill="currentColor"
-              >
-                <path
-                  d="M8 5.7v12.6c0 .8.9 1.3 1.6.8l9-6.3a1 1 0 0 0 0-1.6l-9-6.3A1 1 0 0 0 8 5.7Z"
-                />
-              </svg>
+              <app-icon
+                name="heroPlaySolid"
+                size="xl"
+                class="ml-1 transition-transform group-hover/play:scale-110"
+              />
             </button>
 
             <div
