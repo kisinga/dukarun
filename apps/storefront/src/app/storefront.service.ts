@@ -14,8 +14,8 @@ import { environment } from '../environments/environment';
 export type StorefrontInfo = Database['public']['Views']['public_storefronts']['Row'];
 export type CatalogRow =
   Database['public']['Functions']['storefront_catalog_page']['Returns'][number];
-export type ShopCollection =
-  Database['public']['Functions']['storefront_collections']['Returns'][number];
+export type ShopCategory =
+  Database['public']['Functions']['storefront_categories']['Returns'][number];
 export interface CatalogPage {
   rows: CatalogRow[];
   total: number;
@@ -67,8 +67,8 @@ const DIRECTORY_KEY = makeStateKey<StorefrontInfo[]>('storefront:directory');
 const shopKey = (slug: string) => makeStateKey<StorefrontInfo | null>(`storefront:shop:${slug}`);
 const catalogPageKey = (slug: string, limit: number, offset: number) =>
   makeStateKey<CatalogPage>(`storefront:catalog:${slug}:${limit}:${offset}`);
-const collectionsKey = (slug: string) =>
-  makeStateKey<ShopCollection[]>(`storefront:collections:${slug}`);
+const categoriesKey = (slug: string) =>
+  makeStateKey<ShopCategory[]>(`storefront:categories:${slug}`);
 
 /**
  * Anonymous read-only access to the public storefront surface.
@@ -129,8 +129,8 @@ export class StorefrontService {
       : null;
   }
 
-  transferredCollections(slug: string): ShopCollection[] | null {
-    const key = collectionsKey(slug);
+  transferredCategories(slug: string): ShopCategory[] | null {
+    const key = categoriesKey(slug);
     return this.transferState.hasKey(key) ? this.transferState.get(key, []) : null;
   }
 
@@ -185,7 +185,7 @@ export class StorefrontService {
     slug: string,
     options: {
       search?: string;
-      collectionId?: string | null;
+      categoryId?: string | null;
       limit?: number;
       offset?: number;
       force?: boolean;
@@ -194,7 +194,7 @@ export class StorefrontService {
     const limit = options.limit ?? 12;
     const requestedOffset = options.offset ?? 0;
     const key = catalogPageKey(slug, limit, requestedOffset);
-    const cacheable = !options.search?.trim() && !options.collectionId;
+    const cacheable = !options.search?.trim() && !options.categoryId;
     if (!options.force && cacheable && this.transferState.hasKey(key)) {
       return this.transferState.get(key, { rows: [], total: 0, offset: requestedOffset });
     }
@@ -212,14 +212,14 @@ export class StorefrontService {
           }
         : await this.track(async () => {
             const search = options.search?.trim();
-            const collectionId = options.collectionId;
+            const categoryId = options.categoryId;
             const fetchPage = async (offset: number): Promise<CatalogPage> => {
               const { data, error } = await this.client.rpc('storefront_catalog_page', {
                 p_slug: slug,
                 p_limit: limit,
                 p_offset: offset,
                 ...(search ? { p_search: search } : {}),
-                ...(collectionId ? { p_collection_id: collectionId } : {}),
+                ...(categoryId ? { p_category_id: categoryId } : {}),
               });
               if (error) throw error;
               return { rows: data, total: Number(data[0]?.total_count ?? 0), offset };
@@ -254,22 +254,22 @@ export class StorefrontService {
     });
   }
 
-  /** Active collections for the shop. */
-  async collections(slug: string, force = false): Promise<ShopCollection[]> {
-    const key = collectionsKey(slug);
+  /** Active categories for the shop. */
+  async categories(slug: string, force = false): Promise<ShopCategory[]> {
+    const key = categoriesKey(slug);
     if (!force && this.transferState.hasKey(key)) return this.transferState.get(key, []);
-    const collections =
+    const categories =
       environment.publicDataMode === 'fixture'
         ? []
         : await this.track(async () => {
-            const { data, error } = await this.client.rpc('storefront_collections', {
+            const { data, error } = await this.client.rpc('storefront_categories', {
               p_slug: slug,
             });
             if (error) throw error;
             return data;
           });
-    if (isPlatformServer(this.platformId)) this.transferState.set(key, collections);
-    return collections;
+    if (isPlatformServer(this.platformId)) this.transferState.set(key, categories);
+    return categories;
   }
 
   /** Public product-image URL from a storage path. */

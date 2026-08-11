@@ -2,7 +2,7 @@ import { Component, OnDestroy, OnInit, PLATFORM_ID, computed, inject, signal } f
 import { isPlatformBrowser } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { CatalogProduct, groupCatalog } from './catalog.models';
-import { ShopCollection, StorefrontInfo, StorefrontService } from './storefront.service';
+import { ShopCategory, StorefrontInfo, StorefrontService } from './storefront.service';
 import { StorefrontBrandComponent } from './storefront-brand.component';
 import { StorefrontSeoService } from './storefront-seo.service';
 import { environment } from '../environments/environment';
@@ -121,29 +121,29 @@ function formatKes(amount: number): string {
                 }
               </div>
 
-              @if (collections().length) {
+              @if (categories().length) {
                 <div
                   class="-mx-4 mt-4 flex gap-2 overflow-x-auto px-4 pb-2 sm:mx-0 sm:px-0"
-                  aria-label="Product collections"
+                  aria-label="Product categories"
                 >
                   <button
                     type="button"
                     class="btn btn-sm shrink-0 rounded-full px-5"
-                    [class.btn-primary]="selectedCollection() === null"
-                    [class.btn-ghost]="selectedCollection() !== null"
-                    (click)="selectCollection(null)"
+                    [class.btn-primary]="selectedCategory() === null"
+                    [class.btn-ghost]="selectedCategory() !== null"
+                    (click)="selectCategory(null)"
                   >
                     All products
                   </button>
-                  @for (collection of collections(); track collection.id) {
+                  @for (category of categories(); track category.id) {
                     <button
                       type="button"
                       class="btn btn-sm shrink-0 rounded-full px-5"
-                      [class.btn-primary]="selectedCollection() === collection.id"
-                      [class.btn-ghost]="selectedCollection() !== collection.id"
-                      (click)="selectCollection(collection.id)"
+                      [class.btn-primary]="selectedCategory() === category.id"
+                      [class.btn-ghost]="selectedCategory() !== category.id"
+                      (click)="selectCategory(category.id)"
                     >
-                      {{ collection.name }}
+                      {{ category.name }}
                     </button>
                   }
                 </div>
@@ -179,7 +179,7 @@ function formatKes(amount: number): string {
                   <p class="text-xs font-semibold tracking-[0.14em] text-base-content/45 uppercase">
                     Catalogue
                   </p>
-                  <h2 class="mt-1 text-2xl font-bold">{{ activeCollectionName() }}</h2>
+                  <h2 class="mt-1 text-2xl font-bold">{{ activeCategoryName() }}</h2>
                 </div>
                 <p class="text-sm text-base-content/55">
                   {{ resultCount() }} {{ resultCount() === 1 ? 'product' : 'products' }}
@@ -290,7 +290,7 @@ function formatKes(amount: number): string {
                   <p class="mt-1 text-sm text-base-content/55">
                     Try another search or browse all products.
                   </p>
-                  @if (query() || selectedCollection()) {
+                  @if (query() || selectedCategory()) {
                     <button
                       type="button"
                       class="btn btn-outline mt-5 min-h-11"
@@ -345,16 +345,16 @@ export class ShopComponent implements OnInit, OnDestroy {
   private readonly initialCatalog = this.slug
     ? this.storefront.transferredCatalogPage(this.slug, PAGE_SIZE)
     : null;
-  private readonly initialCollections = this.slug
-    ? this.storefront.transferredCollections(this.slug)
+  private readonly initialCategories = this.slug
+    ? this.storefront.transferredCategories(this.slug)
     : null;
 
   protected readonly shop = signal<StorefrontInfo | null>(this.initialShop ?? null);
   protected readonly products = signal<CatalogProduct[]>(
     groupCatalog(this.initialCatalog?.rows ?? [])
   );
-  protected readonly collections = signal<ShopCollection[]>(this.initialCollections ?? []);
-  protected readonly selectedCollection = signal<string | null>(null);
+  protected readonly categories = signal<ShopCategory[]>(this.initialCategories ?? []);
+  protected readonly selectedCategory = signal<string | null>(null);
   protected readonly catalogLoading = signal(this.initialCatalog === null);
   protected readonly catalogError = signal(false);
   protected readonly notFound = signal(false);
@@ -378,9 +378,9 @@ export class ShopComponent implements OnInit, OnDestroy {
   protected readonly lastResult = computed(() =>
     Math.min(this.page() * PAGE_SIZE, this.resultCount())
   );
-  protected readonly activeCollectionName = computed(
+  protected readonly activeCategoryName = computed(
     () =>
-      this.collections().find(collection => collection.id === this.selectedCollection())?.name ??
+      this.categories().find(category => category.id === this.selectedCategory())?.name ??
       'All products'
   );
   protected readonly visiblePages = computed(() => {
@@ -420,11 +420,11 @@ export class ShopComponent implements OnInit, OnDestroy {
       if (shop.catalogue_visible) {
         const refreshTransferredData =
           isPlatformBrowser(this.platformId) && this.initialCatalog !== null;
-        const [, collections] = await Promise.all([
+        const [, categories] = await Promise.all([
           this.loadCatalog(refreshTransferredData, refreshTransferredData),
-          this.storefront.collections(this.slug, refreshTransferredData),
+          this.storefront.categories(this.slug, refreshTransferredData),
         ]);
-        this.collections.set(collections);
+        this.categories.set(categories);
       } else {
         this.catalogLoading.set(false);
       }
@@ -457,7 +457,7 @@ export class ShopComponent implements OnInit, OnDestroy {
     try {
       const result = await this.storefront.catalogPage(this.slug, {
         search: this.query(),
-        collectionId: this.selectedCollection(),
+        categoryId: this.selectedCategory(),
         limit: PAGE_SIZE,
         offset: (nextPage - 1) * PAGE_SIZE,
         force,
@@ -477,10 +477,10 @@ export class ShopComponent implements OnInit, OnDestroy {
     }
   }
 
-  protected async selectCollection(id: string | null): Promise<void> {
-    if (id === this.selectedCollection()) return;
+  protected async selectCategory(id: string | null): Promise<void> {
+    if (id === this.selectedCategory()) return;
     if (this.searchTimer) clearTimeout(this.searchTimer);
-    this.selectedCollection.set(id);
+    this.selectedCategory.set(id);
     await this.loadPage(1);
   }
 
@@ -493,7 +493,7 @@ export class ShopComponent implements OnInit, OnDestroy {
   protected resetFilters(): void {
     if (this.searchTimer) clearTimeout(this.searchTimer);
     this.query.set('');
-    this.selectedCollection.set(null);
+    this.selectedCategory.set(null);
     void this.loadPage(1);
   }
   protected goToPage(page: number): void {

@@ -3,10 +3,11 @@ import type { Database } from '@dukarun/shared-types';
 import type { AppIdentity } from '../../core/supabase.service';
 import type { CartLine } from '../cart.service';
 import type {
-  CollectionWithCount,
+  CategoryWithCount,
   Manufacturer,
   PaymentInput,
   Product,
+  ProductCategoryLink,
   OrderWithCustomer,
   SaleLineInput,
   Variant,
@@ -65,7 +66,9 @@ export interface ProductSnapshot {
   location_stock?: Array<{ variant_id: string; stock: number; stock_value: number }>;
   /** Catalog reference data, hydrated with products to avoid staggered labels and filters. */
   manufacturers?: CachedManufacturer[];
-  collections?: CollectionWithCount[];
+  categories?: CategoryWithCount[];
+  product_categories?: ProductCategoryLink[];
+  category_memberships_complete?: boolean;
   truncated?: boolean;
   /** True when the cache writer probed beyond its row ceiling. */
   catalog_complete?: boolean;
@@ -88,7 +91,9 @@ export interface CatalogMetadata extends ScopedRecord {
   location_id: string;
   families: Product[];
   manufacturers: CachedManufacturer[];
-  collections: CollectionWithCount[];
+  categories: CategoryWithCount[];
+  product_categories?: ProductCategoryLink[];
+  category_memberships_complete?: boolean;
   truncated: boolean;
   catalog_complete?: boolean;
   fetched_at: string;

@@ -8,8 +8,12 @@ import { ActionExecutorService, type ActionOutcome } from '../core/action-execut
 
 export type Product = Database['public']['Tables']['products']['Row'];
 export type Manufacturer = Database['public']['Tables']['manufacturers']['Row'];
-export type Collection = Database['public']['Tables']['collections']['Row'];
-export type CollectionWithCount = Collection & { product_count: number };
+export type Category = Database['public']['Tables']['categories']['Row'];
+export type CategoryWithCount = Category & { product_count: number };
+export type ProductCategoryLink = Pick<
+  Database['public']['Tables']['product_categories']['Row'],
+  'product_id' | 'category_id'
+>;
 export type Variant = Database['public']['Views']['variant_catalog']['Row'];
 export type ProductVariant = Database['public']['Tables']['product_variants']['Row'];
 export type Customer = Database['public']['Tables']['customers']['Row'];
@@ -407,56 +411,89 @@ export class PosService {
     if (error) throw new Error(error.message);
   }
 
-  // --- Collections ---
+  // --- Categories ---
 
-  async listCollections(): Promise<CollectionWithCount[]> {
-    const [{ data: collections, error: e1 }, { data: links, error: e2 }] = await Promise.all([
-      this.client.from('collections').select('*').order('name'),
-      this.client.from('product_collections').select('collection_id'),
+  async listCategories(
+    productCategoryLinks?: readonly ProductCategoryLink[]
+  ): Promise<CategoryWithCount[]> {
+    const [{ data: categories, error }, links] = await Promise.all([
+      this.client.from('categories').select('*').order('name'),
+      productCategoryLinks ?? this.listProductCategoryLinks(),
     ]);
-    if (e1) throw e1;
-    if (e2) throw e2;
+    if (error) throw error;
     const counts = new Map<string, number>();
-    for (const l of links ?? [])
-      counts.set(l.collection_id, (counts.get(l.collection_id) ?? 0) + 1);
-    return (collections ?? []).map(c => ({ ...c, product_count: counts.get(c.id) ?? 0 }));
+    for (const link of links) {
+      counts.set(link.category_id, (counts.get(link.category_id) ?? 0) + 1);
+    }
+    return (categories ?? []).map(c => ({ ...c, product_count: counts.get(c.id) ?? 0 }));
   }
 
-  async upsertCollection(input: {
+  /** Full tenant category membership, paged past PostgREST's default row ceiling. */
+  async listProductCategoryLinks(): Promise<ProductCategoryLink[]> {
+    const pageSize = 1_000;
+    const links: ProductCategoryLink[] = [];
+    for (let from = 0; ; from += pageSize) {
+      const { data, error } = await this.client
+        .from('product_categories')
+        .select('product_id,category_id')
+        .order('product_id')
+        .order('category_id')
+        .range(from, from + pageSize - 1);
+      if (error) throw error;
+      links.push(...data);
+      if (data.length < pageSize) return links;
+    }
+  }
+
+  async upsertCategory(input: {
     name: string;
     slug?: string;
     description?: string;
-    collection_id?: string;
+    category_id?: string;
     active?: boolean;
   }): Promise<string> {
-    const { data, error } = await this.client.rpc('upsert_collection', {
+    const { data, error } = await this.client.rpc('upsert_category', {
       p_name: input.name,
       ...(input.slug ? { p_slug: input.slug } : {}),
       ...(input.description ? { p_description: input.description } : {}),
-      ...(input.collection_id ? { p_collection_id: input.collection_id } : {}),
+      ...(input.category_id ? { p_category_id: input.category_id } : {}),
       ...(input.active !== undefined ? { p_active: input.active } : {}),
     });
     if (error) throw rpcError(error);
     return data;
   }
 
-  /** Replace a family's collection set with exactly `collectionIds`. */
-  async setProductCollections(productId: string, collectionIds: string[]): Promise<string> {
-    const { data, error } = await this.client.rpc('set_product_collections', {
+  /** Replace a family's category set with exactly `categoryIds`. */
+  async setProductCategories(productId: string, categoryIds: string[]): Promise<string> {
+    const { data, error } = await this.client.rpc('set_product_categories', {
       p_product_id: productId,
-      p_collection_ids: collectionIds,
+      p_category_ids: categoryIds,
     });
     if (error) throw rpcError(error);
     return data;
   }
 
-  async productCollectionIds(productId: string): Promise<string[]> {
+  async productCategoryIds(productId: string): Promise<string[]> {
     const { data, error } = await this.client
-      .from('product_collections')
-      .select('collection_id')
+      .from('product_categories')
+      .select('category_id')
       .eq('product_id', productId);
     if (error) throw error;
-    return (data ?? []).map(r => r.collection_id);
+    return (data ?? []).map(r => r.category_id);
+  }
+
+  async patchProductCategories(
+    productIds: string[],
+    addCategoryIds: string[],
+    removeCategoryIds: string[]
+  ): Promise<{ product_count: number; added_count: number; removed_count: number }> {
+    const { data, error } = await this.client.rpc('patch_product_categories', {
+      p_product_ids: productIds,
+      p_add_category_ids: addCategoryIds,
+      p_remove_category_ids: removeCategoryIds,
+    });
+    if (error) throw rpcError(error);
+    return data as { product_count: number; added_count: number; removed_count: number };
   }
 
   async searchCustomers(query: string): Promise<PartyQueryResult<CustomerWithCredit>> {

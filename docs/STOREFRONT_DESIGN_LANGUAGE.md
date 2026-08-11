@@ -16,7 +16,7 @@ obvious without behaving like a full ecommerce checkout.
    charcoal type keeps it legible. Decoration never competes with products.
 4. **One clear action.** Product discovery leads to a detail page, and the detail page leads to a
    pre-filled WhatsApp enquiry. Avoid competing primary buttons.
-5. **Small-screen native.** Two-column product grids, 44px minimum targets, horizontal collection
+5. **Small-screen native.** Two-column product grids, 44px minimum targets, horizontal category
    rails, and sticky mobile actions are the default. Larger layouts expand rather than redesign.
 
 ## Foundations
@@ -38,13 +38,13 @@ obvious without behaving like a full ecommerce checkout.
 - **Search clearing:** a search has exactly one clear affordance. When a designed Clear action is
   present, add `search-with-custom-clear` so the browser-provided cancel control is suppressed;
   otherwise retain the native control. Never show both.
-- **Collection filter:** scrollable pills on phones. “All products” is always first.
+- **Category filter:** scrollable pills on phones. “All products” is always first.
 - **Product card:** square image, manufacturer eyebrow, two-line product name, price/range, and
   availability. The whole card opens the detail page.
 - **Product detail:** breadcrumb, large image, manufacturer/name, selectable variants, availability,
   price, and one WhatsApp action whose message includes the chosen option and page URL.
 - **Pagination:** numbered pages with previous/next actions, a visible result range, and an automatic
-  reset after search or collection changes.
+  reset after search or category changes.
 - **Empty/error states:** short, specific, and actionable. Missing imagery uses a calm branded
   placeholder rather than collapsing the layout.
 - **Dukarun attribution:** use `<app-powered-by-dukarun>`—never hand-build the wordmark or link.

@@ -885,7 +885,7 @@ export type Database = {
           },
         ]
       }
-      collections: {
+      categories: {
         Row: {
           active: boolean
           company_id: string
@@ -918,14 +918,14 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "collections_company_id_fkey"
+            foreignKeyName: "categories_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "collections_company_id_fkey"
+            foreignKeyName: "categories_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "public_storefronts"
@@ -3608,56 +3608,56 @@ export type Database = {
         }
         Relationships: []
       }
-      product_collections: {
+      product_categories: {
         Row: {
-          collection_id: string
+          category_id: string
           company_id: string
           created_at: string
           product_id: string
         }
         Insert: {
-          collection_id: string
+          category_id: string
           company_id: string
           created_at?: string
           product_id: string
         }
         Update: {
-          collection_id?: string
+          category_id?: string
           company_id?: string
           created_at?: string
           product_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "product_collections_collection_id_fkey"
-            columns: ["collection_id"]
+            foreignKeyName: "product_categories_category_id_fkey"
+            columns: ["category_id"]
             isOneToOne: false
-            referencedRelation: "collections"
+            referencedRelation: "categories"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "product_collections_company_id_fkey"
+            foreignKeyName: "product_categories_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "product_collections_company_id_fkey"
+            foreignKeyName: "product_categories_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "public_storefronts"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "product_collections_product_id_fkey"
+            foreignKeyName: "product_categories_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "product_collections_product_id_fkey"
+            foreignKeyName: "product_categories_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "variant_catalog"
@@ -5841,6 +5841,7 @@ export type Database = {
       }
       catalog_management_page: {
         Args: {
+          p_category?: string
           p_direction?: string
           p_location_id?: string
           p_manufacturer?: string
@@ -6301,6 +6302,14 @@ export type Database = {
       open_cashier_session_at_location: {
         Args: { p_declarations: Json; p_location_id: string }
         Returns: string
+      }
+      patch_product_categories: {
+        Args: {
+          p_add_category_ids?: string[]
+          p_product_ids: string[]
+          p_remove_category_ids?: string[]
+        }
+        Returns: Json
       }
       pay_purchase: {
         Args: {
@@ -7030,8 +7039,8 @@ export type Database = {
         }
         Returns: string
       }
-      set_product_collections: {
-        Args: { p_collection_ids: string[]; p_product_id: string }
+      set_product_categories: {
+        Args: { p_category_ids: string[]; p_product_id: string }
         Returns: string
       }
       set_supplier_active: {
@@ -7109,38 +7118,9 @@ export type Database = {
           variant_name: string
         }[]
       }
-      storefront_catalog: {
-        Args: { p_collection_id?: string; p_slug: string }
-        Returns: {
-          allow_fractional: boolean | null
-          barcode: string | null
-          company_id: string | null
-          image_path: string | null
-          kind: string | null
-          manufacturer_id: string | null
-          manufacturer_name: string | null
-          price: number | null
-          product_active: boolean | null
-          product_id: string | null
-          product_name: string | null
-          sku: string | null
-          stock: number | null
-          track_inventory: boolean | null
-          variant_active: boolean | null
-          variant_id: string | null
-          variant_name: string | null
-          wholesale_price: number | null
-        }[]
-        SetofOptions: {
-          from: "*"
-          to: "variant_catalog"
-          isOneToOne: false
-          isSetofReturn: true
-        }
-      }
       storefront_catalog_page: {
         Args: {
-          p_collection_id?: string
+          p_category_id?: string
           p_limit?: number
           p_offset?: number
           p_search?: string
@@ -7165,7 +7145,7 @@ export type Database = {
         Args: { c: Database["public"]["Tables"]["companies"]["Row"] }
         Returns: boolean
       }
-      storefront_collections: {
+      storefront_categories: {
         Args: { p_slug: string }
         Returns: {
           active: boolean
@@ -7179,7 +7159,7 @@ export type Database = {
         }[]
         SetofOptions: {
           from: "*"
-          to: "collections"
+          to: "categories"
           isOneToOne: false
           isSetofReturn: true
         }
@@ -7332,10 +7312,10 @@ export type Database = {
         }
         Returns: string
       }
-      upsert_collection: {
+      upsert_category: {
         Args: {
           p_active?: boolean
-          p_collection_id?: string
+          p_category_id?: string
           p_description?: string
           p_name: string
           p_slug?: string

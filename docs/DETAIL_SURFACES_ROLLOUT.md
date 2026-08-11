@@ -65,7 +65,7 @@ stock, batch/expiry drill-down (the `expandedFamily`/`batchesFor` content restac
 drawer patterns; `expandedFamily` and both expansion variants removed). The two-step
 product-editor **modal stays a modal** — the drawer's Edit action closes the drawer and
 opens it. The drawer reads from the loaded `families`/`catalog`/`stock` signals, so list
-reloads stay live while open. Collections panel untouched.
+reloads stay live while open. Categories panel untouched.
 
 ## ✅ Phase 7 — Audit event drawer (`/settings/audit-trail`) (done)
 
