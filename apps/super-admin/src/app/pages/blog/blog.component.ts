@@ -2,7 +2,9 @@ import { DatePipe } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
+  ElementRef,
   OnInit,
+  ViewChild,
   computed,
   inject,
   signal,
@@ -23,35 +25,452 @@ import { PageHeaderComponent } from '../../shared/ui/page-header.component';
   imports: [ReactiveFormsModule, DatePipe, PageHeaderComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <app-page-header title="Blog" subtitle="Draft, publish, schedule, and measure public articles">
-      <button actions class="btn btn-primary btn-sm min-h-11" (click)="newPost()">
-        New article
-      </button>
+    <app-page-header title="Editorial" subtitle="Write and publish stories for the Dukarun journal">
+      <button actions class="btn btn-primary min-h-11" (click)="newPost()">New article</button>
     </app-page-header>
 
     @if (error()) {
-      <div class="alert alert-error mb-4" role="alert">{{ error() }}</div>
+      <div class="alert alert-error mb-5" role="alert">{{ error() }}</div>
     }
     @if (notice()) {
-      <div class="alert alert-success mb-4" role="status">{{ notice() }}</div>
+      <div class="alert alert-success mb-5" role="status">{{ notice() }}</div>
     }
 
-    @if (metrics(); as m) {
-      <div class="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        @for (card of metricCards(m); track card.label) {
-          <div class="card bg-base-100">
-            <div class="card-body p-4">
-              <p class="type-caption">{{ card.label }}</p>
-              <strong class="type-hero">{{ card.value }}</strong>
+    <div
+      class="editor-shell grid items-start gap-5 lg:grid-cols-[15rem_minmax(0,1fr)] 2xl:grid-cols-[15rem_minmax(0,1fr)_18rem]"
+    >
+      <aside
+        class="order-3 rounded-box border border-base-300/70 bg-base-100 lg:order-none lg:col-start-1 lg:row-start-1 2xl:sticky 2xl:top-5"
+      >
+        <div class="border-b border-base-200 p-4">
+          <div class="flex items-center justify-between gap-3">
+            <div>
+              <p class="text-xs font-semibold uppercase tracking-[0.16em] text-base-content/45">
+                Journal
+              </p>
+              <h2 class="mt-1 font-semibold">All articles</h2>
             </div>
+            <span class="badge badge-neutral badge-sm">{{ posts().length }}</span>
           </div>
-        }
-      </div>
-      @if (m.posts.length) {
-        <section class="card mb-4 bg-base-100">
-          <div class="card-body p-4">
-            <h2 class="type-heading">Article performance</h2>
-            <div class="overflow-x-auto">
+          <input
+            type="search"
+            class="input input-bordered input-sm mt-4 w-full bg-base-200/45"
+            placeholder="Search titles…"
+            [value]="searchQuery()"
+            (input)="searchQuery.set($any($event.target).value)"
+          />
+        </div>
+        <div class="max-h-72 space-y-1 overflow-y-auto p-2 lg:max-h-[46vh] 2xl:max-h-[68vh]">
+          @for (post of filteredPosts(); track post.post_id) {
+            <button
+              type="button"
+              class="group w-full rounded-lg border border-transparent px-3 py-3 text-left transition-colors hover:bg-base-200/70"
+              [class.border-primary]="selected()?.post_id === post.post_id"
+              [class.bg-primary/10]="selected()?.post_id === post.post_id"
+              (click)="selectPost(post)"
+            >
+              <div class="flex items-start gap-2.5">
+                <span
+                  class="mt-1.5 size-2 shrink-0 rounded-full"
+                  [class.bg-success]="post.publication_state === 'published'"
+                  [class.bg-warning]="post.publication_state === 'scheduled'"
+                  [class.bg-primary]="post.publication_state === 'draft'"
+                  [class.bg-base-300]="
+                    post.publication_state !== 'published' &&
+                    post.publication_state !== 'scheduled' &&
+                    post.publication_state !== 'draft'
+                  "
+                ></span>
+                <span class="min-w-0 flex-1">
+                  <strong class="line-clamp-2 text-sm font-medium leading-snug">{{
+                    post.title || 'Untitled article'
+                  }}</strong>
+                  <span class="mt-1 block truncate text-xs text-base-content/45"
+                    >/{{ post.slug }}</span
+                  >
+                </span>
+              </div>
+            </button>
+          } @empty {
+            <div class="px-4 py-12 text-center">
+              <p class="text-sm font-medium">No articles found</p>
+              <p class="mt-1 text-xs text-base-content/50">Start with a fresh draft.</p>
+            </div>
+          }
+        </div>
+      </aside>
+
+      <form class="contents" (submit)="$event.preventDefault(); save()">
+        <main
+          class="order-1 min-w-0 overflow-hidden rounded-box border border-base-300/70 bg-base-100 shadow-sm lg:col-start-2 lg:row-span-2 lg:row-start-1 2xl:col-start-auto 2xl:row-span-1"
+        >
+          <header
+            class="flex min-h-16 flex-wrap items-center justify-between gap-3 border-b border-base-200 px-5 py-3"
+          >
+            <div class="flex items-center gap-2">
+              <span
+                class="size-2 rounded-full"
+                [class.bg-primary]="!selected() || selected()?.publication_state === 'draft'"
+                [class.bg-success]="selected()?.publication_state === 'published'"
+                [class.bg-warning]="selected()?.publication_state === 'scheduled'"
+                [class.bg-base-300]="selected()?.publication_state === 'archived'"
+              ></span>
+              <span class="text-sm font-medium capitalize">{{
+                selected()?.publication_state || 'New draft'
+              }}</span>
+              @if (editorDirty()) {
+                <span class="text-xs text-base-content/45">Unsaved changes</span>
+              } @else if (selected()) {
+                <span class="text-xs text-base-content/45">Saved</span>
+              }
+            </div>
+            <div class="flex items-center gap-2">
+              @if (selected()?.publication_state === 'draft') {
+                <button
+                  type="button"
+                  class="btn btn-ghost btn-sm min-h-10 text-success"
+                  [disabled]="busy() || editorDirty()"
+                  (click)="publish()"
+                >
+                  Publish
+                </button>
+              }
+              <button
+                type="submit"
+                class="btn btn-primary btn-sm min-h-10 px-5"
+                [disabled]="busy() || invalid()"
+              >
+                {{ busy() ? 'Saving…' : selected() ? 'Save draft' : 'Create draft' }}
+              </button>
+            </div>
+          </header>
+
+          <div class="mx-auto max-w-4xl px-5 py-8 sm:px-10 sm:py-12">
+            <input
+              class="editor-title w-full bg-transparent text-3xl font-bold leading-tight tracking-tight outline-none placeholder:text-base-content/25 sm:text-5xl"
+              maxlength="120"
+              placeholder="Article title"
+              aria-label="Article title"
+              [formControl]="title"
+              (input)="titleChanged()"
+            />
+            <div class="mt-4 flex min-w-0 items-center gap-1 text-sm text-base-content/45">
+              <span class="shrink-0">dukarun.com/blog/</span>
+              <input
+                class="min-w-0 flex-1 bg-transparent font-mono text-xs outline-none placeholder:text-base-content/25"
+                maxlength="100"
+                placeholder="article-slug"
+                aria-label="Article URL slug"
+                [formControl]="slug"
+                (input)="slugEdited.set(true)"
+              />
+            </div>
+            <textarea
+              class="mt-7 w-full resize-none bg-transparent text-lg leading-relaxed text-base-content/65 outline-none placeholder:text-base-content/25"
+              rows="3"
+              maxlength="320"
+              placeholder="A short summary that gives readers a reason to continue…"
+              aria-label="Article excerpt"
+              [formControl]="excerpt"
+            ></textarea>
+
+            <div class="mt-5 flex items-center justify-between border-b border-base-200">
+              <div class="flex gap-1" role="tablist" aria-label="Editor view">
+                <button
+                  type="button"
+                  class="editor-tab"
+                  [class.editor-tab-active]="editorMode() === 'write'"
+                  (click)="editorMode.set('write')"
+                >
+                  Write
+                </button>
+                <button
+                  type="button"
+                  class="editor-tab"
+                  [class.editor-tab-active]="editorMode() === 'preview'"
+                  (click)="editorMode.set('preview')"
+                >
+                  Preview
+                </button>
+              </div>
+              <span class="pb-3 text-xs text-base-content/40"
+                >{{ markdown.value.length }} characters</span
+              >
+            </div>
+            @if (editorMode() === 'write') {
+              <div class="flex flex-wrap items-center gap-1 border-b border-base-200 py-2">
+                <button
+                  type="button"
+                  class="format-button font-bold"
+                  title="Bold"
+                  aria-label="Bold selected text"
+                  (click)="formatMarkdown('bold')"
+                >
+                  B
+                </button>
+                <button
+                  type="button"
+                  class="format-button italic"
+                  title="Italic"
+                  aria-label="Italicize selected text"
+                  (click)="formatMarkdown('italic')"
+                >
+                  I
+                </button>
+                <button
+                  type="button"
+                  class="format-button"
+                  title="Heading"
+                  aria-label="Add heading"
+                  (click)="formatMarkdown('heading')"
+                >
+                  H2
+                </button>
+                <span class="mx-1 h-5 w-px bg-base-200"></span>
+                <button
+                  type="button"
+                  class="format-button"
+                  aria-label="Add bulleted list"
+                  (click)="formatMarkdown('list')"
+                >
+                  • List
+                </button>
+                <button
+                  type="button"
+                  class="format-button"
+                  aria-label="Add link"
+                  (click)="formatMarkdown('link')"
+                >
+                  Link
+                </button>
+                <button
+                  type="button"
+                  class="format-button"
+                  aria-label="Add quote"
+                  (click)="formatMarkdown('quote')"
+                >
+                  Quote
+                </button>
+              </div>
+              <textarea
+                #markdownEditor
+                class="editor-body mt-6 min-h-[38rem] w-full resize-y bg-transparent font-mono text-[0.925rem] leading-7 outline-none placeholder:text-base-content/25"
+                [formControl]="markdown"
+                (input)="updatePreview()"
+                placeholder="Start writing in Markdown…"
+                aria-label="Article content in Markdown"
+              ></textarea>
+            } @else {
+              <article
+                class="blog-preview mt-6 min-h-[38rem] text-base-content/85"
+                [innerHTML]="preview()"
+              ></article>
+            }
+          </div>
+        </main>
+
+        <aside
+          class="order-2 space-y-4 lg:order-none lg:col-start-1 lg:row-start-2 2xl:col-start-3 2xl:row-start-1 2xl:sticky 2xl:top-5"
+        >
+          <section class="rounded-box border border-base-300/70 bg-base-100 shadow-sm">
+            <div class="border-b border-base-200 px-4 py-3">
+              <h2 class="text-sm font-semibold">Publish</h2>
+            </div>
+            <div class="space-y-4 p-4">
+              <div class="flex items-center justify-between text-sm">
+                <span class="text-base-content/55">Status</span>
+                <span class="badge badge-ghost badge-sm capitalize">{{
+                  selected()?.publication_state || 'Unsaved'
+                }}</span>
+              </div>
+              <label class="form-control gap-1.5">
+                <span class="text-xs font-medium text-base-content/60">Schedule in Nairobi</span>
+                <input
+                  type="datetime-local"
+                  class="input input-bordered input-sm w-full"
+                  [formControl]="scheduledFor"
+                />
+              </label>
+              <div class="grid gap-2">
+                @if (selected()?.publication_state === 'draft') {
+                  <button
+                    type="button"
+                    class="btn btn-success min-h-11 w-full"
+                    [disabled]="busy() || editorDirty()"
+                    (click)="publish()"
+                  >
+                    Publish now
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-outline min-h-11 w-full"
+                    [disabled]="busy() || !scheduledFor.value || editorDirty()"
+                    (click)="schedule()"
+                  >
+                    Schedule article
+                  </button>
+                } @else if (!selected()) {
+                  <p
+                    class="rounded-lg bg-base-200/60 p-3 text-xs leading-relaxed text-base-content/55"
+                  >
+                    Create the draft first, then add a cover and publish it.
+                  </p>
+                }
+                @if (editorDirty() && selected()) {
+                  <p class="text-xs leading-relaxed text-warning">
+                    Save your changes before publishing or scheduling.
+                  </p>
+                }
+                @if (selected()?.publication_state === 'scheduled') {
+                  <button
+                    type="button"
+                    class="btn btn-ghost btn-sm w-full"
+                    [disabled]="busy()"
+                    (click)="cancelSchedule()"
+                  >
+                    Cancel schedule
+                  </button>
+                }
+                @if (selected()?.publication_state === 'published') {
+                  <button
+                    type="button"
+                    class="btn btn-ghost btn-sm text-error"
+                    [disabled]="busy()"
+                    (click)="archive()"
+                  >
+                    Archive article
+                  </button>
+                }
+              </div>
+            </div>
+          </section>
+
+          <section class="rounded-box border border-base-300/70 bg-base-100">
+            <div class="border-b border-base-200 px-4 py-3">
+              <h2 class="text-sm font-semibold">Story details</h2>
+            </div>
+            <div class="space-y-4 p-4">
+              <div>
+                <span class="mb-2 block text-xs font-medium text-base-content/60">Cover image</span>
+                @if (coverUrl(); as image) {
+                  <div class="relative overflow-hidden rounded-lg bg-base-200">
+                    <img
+                      [src]="image"
+                      [alt]="coverAlt.value"
+                      class="aspect-video w-full object-cover"
+                    />
+                  </div>
+                }
+                <label
+                  class="mt-2 flex min-h-16 cursor-pointer items-center justify-center rounded-lg border border-dashed border-base-300 bg-base-200/35 px-3 text-center text-xs text-base-content/55 transition-colors hover:border-primary/40 hover:bg-primary/5"
+                  [class.pointer-events-none]="!selected() || busy()"
+                  [class.opacity-50]="!selected() || busy()"
+                >
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    class="sr-only"
+                    [disabled]="!selected() || busy()"
+                    (change)="uploadCover($event)"
+                  />
+                  {{
+                    selected()
+                      ? coverUrl()
+                        ? 'Replace image'
+                        : 'Choose image'
+                      : 'Save draft to upload'
+                  }}
+                </label>
+              </div>
+              <label class="form-control gap-1.5">
+                <span class="text-xs font-medium text-base-content/60">Image description</span>
+                <input
+                  class="input input-bordered input-sm w-full"
+                  maxlength="200"
+                  placeholder="Describe the image"
+                  [formControl]="coverAlt"
+                />
+              </label>
+              <label class="form-control gap-1.5">
+                <span class="text-xs font-medium text-base-content/60">Author</span>
+                <input
+                  class="input input-bordered input-sm w-full"
+                  maxlength="120"
+                  [formControl]="author"
+                />
+              </label>
+              <label class="form-control gap-1.5">
+                <span class="text-xs font-medium text-base-content/60">Tags</span>
+                <input
+                  class="input input-bordered input-sm w-full"
+                  placeholder="stock, cash-flow"
+                  [formControl]="tags"
+                />
+                <span class="text-[0.68rem] text-base-content/40">Separate tags with commas</span>
+              </label>
+            </div>
+          </section>
+
+          <details
+            class="collapse collapse-arrow rounded-box border border-base-300/70 bg-base-100"
+          >
+            <summary class="collapse-title min-h-12 py-3 text-sm font-semibold">
+              Search preview
+            </summary>
+            <div class="collapse-content space-y-3">
+              <div class="rounded-lg border border-base-200 bg-base-200/30 p-3">
+                <p class="truncate text-xs text-success">dukarun.com › blog › {{ slug.value }}</p>
+                <p class="mt-1 line-clamp-1 text-base font-medium text-primary">
+                  {{ seoTitle.value || title.value || 'Article title' }}
+                </p>
+                <p class="mt-1 line-clamp-2 text-xs leading-relaxed text-base-content/55">
+                  {{ seoDescription.value || excerpt.value || 'Article description' }}
+                </p>
+              </div>
+              <label class="form-control gap-1">
+                <span class="text-xs text-base-content/55">SEO title</span>
+                <input
+                  class="input input-bordered input-sm w-full"
+                  maxlength="70"
+                  [formControl]="seoTitle"
+                />
+              </label>
+              <label class="form-control gap-1">
+                <span class="text-xs text-base-content/55">SEO description</span>
+                <textarea
+                  class="textarea textarea-bordered textarea-sm w-full"
+                  rows="3"
+                  maxlength="180"
+                  [formControl]="seoDescription"
+                ></textarea>
+              </label>
+            </div>
+          </details>
+        </aside>
+      </form>
+    </div>
+
+    @if (metrics(); as m) {
+      <details
+        class="collapse collapse-arrow mt-6 rounded-box border border-base-300/70 bg-base-100"
+      >
+        <summary class="collapse-title min-h-16 py-4">
+          <span class="font-semibold">Performance</span>
+          <span class="ml-2 text-sm font-normal text-base-content/45">Last 30 days</span>
+        </summary>
+        <div class="collapse-content">
+          <div
+            class="grid gap-px overflow-hidden rounded-lg border border-base-200 bg-base-200 sm:grid-cols-5"
+          >
+            @for (card of metricCards(m); track card.label) {
+              <div class="bg-base-100 p-4">
+                <p class="text-xs text-base-content/45">{{ card.label }}</p>
+                <strong class="mt-1 block text-2xl font-semibold">{{ card.value }}</strong>
+              </div>
+            }
+          </div>
+          @if (m.posts.length) {
+            <div class="mt-5 overflow-x-auto">
               <table class="table table-sm">
                 <thead>
                   <tr>
@@ -66,8 +485,8 @@ import { PageHeaderComponent } from '../../shared/ui/page-header.component';
                   @for (row of m.posts; track row.post_id) {
                     <tr>
                       <td>
-                        <strong>{{ row.title }}</strong
-                        ><span class="type-caption ml-2">/{{ row.slug }}</span>
+                        <strong>{{ row.title }}</strong>
+                        <span class="ml-2 text-xs text-base-content/40">/{{ row.slug }}</span>
                       </td>
                       <td class="text-right">{{ row.views }}</td>
                       <td class="text-right">{{ row.unique_readers }}</td>
@@ -78,226 +497,28 @@ import { PageHeaderComponent } from '../../shared/ui/page-header.component';
                 </tbody>
               </table>
             </div>
-          </div>
-        </section>
-      }
+          }
+        </div>
+      </details>
     }
 
-    <div class="grid gap-4 xl:grid-cols-[22rem_minmax(0,1fr)]">
-      <aside class="card h-fit bg-base-100">
-        <div class="card-body gap-3 p-4">
-          <div class="flex items-center justify-between">
-            <h2 class="type-heading">Articles</h2>
-            <span class="badge badge-ghost">{{ posts().length }}</span>
-          </div>
-          <input
-            type="search"
-            class="input input-bordered input-sm"
-            placeholder="Search articles"
-            [value]="searchQuery()"
-            (input)="searchQuery.set($any($event.target).value)"
-          />
-          <div class="max-h-[65vh] space-y-2 overflow-y-auto">
-            @for (post of filteredPosts(); track post.post_id) {
-              <button
-                type="button"
-                class="w-full rounded-field border p-3 text-left hover:border-primary/50"
-                [class.border-primary]="selected()?.post_id === post.post_id"
-                [class.bg-primary/5]="selected()?.post_id === post.post_id"
-                (click)="selectPost(post)"
-              >
-                <div class="flex items-start justify-between gap-2">
-                  <strong class="line-clamp-2 text-sm">{{
-                    post.title || 'Untitled article'
-                  }}</strong>
-                  <span
-                    class="badge badge-sm"
-                    [class.badge-success]="post.publication_state === 'published'"
-                    [class.badge-warning]="post.publication_state === 'scheduled'"
-                    >{{ post.publication_state }}</span
-                  >
-                </div>
-                <p class="type-caption mt-1 truncate">/{{ post.slug }}</p>
-              </button>
-            } @empty {
-              <p class="py-8 text-center type-caption">No articles yet.</p>
-            }
-          </div>
-        </div>
-      </aside>
-
-      <section class="card bg-base-100">
-        <form class="card-body gap-5 p-4 sm:p-6" (submit)="$event.preventDefault(); save()">
-          <div class="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h2 class="type-heading">{{ selected() ? 'Edit article' : 'New article' }}</h2>
-              <p class="type-caption">
-                Published revisions remain immutable; saving creates or updates the next draft.
-              </p>
-            </div>
-            <div class="flex flex-wrap gap-2">
-              @if (selected()?.publication_state === 'scheduled') {
-                <button
-                  type="button"
-                  class="btn btn-ghost btn-sm"
-                  [disabled]="busy()"
-                  (click)="cancelSchedule()"
-                >
-                  Cancel schedule
-                </button>
-              }
-              @if (selected()?.publication_state === 'published') {
-                <button
-                  type="button"
-                  class="btn btn-outline btn-error btn-sm"
-                  [disabled]="busy()"
-                  (click)="archive()"
-                >
-                  Archive
-                </button>
-              }
-              <button type="submit" class="btn btn-primary btn-sm" [disabled]="busy() || invalid()">
-                {{ busy() ? 'Saving…' : 'Save draft' }}
-              </button>
-            </div>
-          </div>
-
-          <div class="grid gap-4 md:grid-cols-2">
-            <label class="form-control md:col-span-2"
-              ><span class="label-text">Title</span
-              ><input
-                class="input input-bordered"
-                maxlength="120"
-                [formControl]="title"
-                (input)="titleChanged()"
-            /></label>
-            <label class="form-control"
-              ><span class="label-text">Slug</span
-              ><input
-                class="input input-bordered"
-                maxlength="100"
-                [formControl]="slug"
-                (input)="slugEdited.set(true)"
-            /></label>
-            <label class="form-control"
-              ><span class="label-text">Author</span
-              ><input class="input input-bordered" maxlength="120" [formControl]="author"
-            /></label>
-            <label class="form-control md:col-span-2"
-              ><span class="label-text">Excerpt</span
-              ><textarea
-                class="textarea textarea-bordered"
-                rows="2"
-                maxlength="320"
-                [formControl]="excerpt"
-              ></textarea>
-            </label>
-            <label class="form-control"
-              ><span class="label-text">Tags</span
-              ><input
-                class="input input-bordered"
-                placeholder="stock, cash-flow"
-                [formControl]="tags"
-            /></label>
-            <label class="form-control"
-              ><span class="label-text">Schedule (Nairobi time)</span
-              ><input
-                type="datetime-local"
-                class="input input-bordered"
-                [formControl]="scheduledFor"
-            /></label>
-            <label class="form-control"
-              ><span class="label-text">SEO title</span
-              ><input class="input input-bordered" maxlength="70" [formControl]="seoTitle"
-            /></label>
-            <label class="form-control"
-              ><span class="label-text">SEO description</span
-              ><input class="input input-bordered" maxlength="180" [formControl]="seoDescription"
-            /></label>
-            <label class="form-control md:col-span-2"
-              ><span class="label-text">Cover image alt text</span
-              ><input class="input input-bordered" maxlength="200" [formControl]="coverAlt"
-            /></label>
-            <div class="md:col-span-2 flex flex-wrap items-center gap-3">
-              <input
-                #coverInput
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                class="file-input file-input-bordered file-input-sm"
-                [disabled]="!selected() || busy()"
-                (change)="uploadCover($event)"
-              />
-              @if (!selected()) {
-                <span class="type-caption">Save once before uploading a cover.</span>
-              }
-              @if (coverUrl(); as image) {
-                <img [src]="image" [alt]="coverAlt.value" class="h-16 w-28 rounded object-cover" />
-              }
-            </div>
-          </div>
-
-          <div class="grid gap-4 lg:grid-cols-2">
-            <label class="form-control"
-              ><span class="label-text">Markdown</span
-              ><textarea
-                class="textarea textarea-bordered min-h-[28rem] font-mono text-sm"
-                [formControl]="markdown"
-                (input)="updatePreview()"
-              ></textarea>
-            </label>
-            <div>
-              <span class="label-text">Preview</span>
-              <article
-                class="blog-preview min-h-[28rem] rounded-box border border-base-300 p-5"
-                [innerHTML]="preview()"
-              ></article>
-            </div>
-          </div>
-
-          @if (selected()) {
-            <div class="flex flex-wrap items-end gap-3 border-t border-base-300 pt-4">
-              <button
-                type="button"
-                class="btn btn-success"
-                [disabled]="busy() || selected()?.publication_state !== 'draft' || editorDirty()"
-                (click)="publish()"
-              >
-                Publish draft now
-              </button>
-              <button
-                type="button"
-                class="btn btn-outline"
-                [disabled]="
-                  busy() ||
-                  selected()?.publication_state !== 'draft' ||
-                  !scheduledFor.value ||
-                  editorDirty()
-                "
-                (click)="schedule()"
-              >
-                Schedule draft
-              </button>
-              @if (editorDirty()) {
-                <span class="type-caption text-warning"
-                  >Save the latest edits before publishing or scheduling.</span
-                >
-              }
-            </div>
-          }
-        </form>
-      </section>
-    </div>
-
     @if (deployments().length) {
-      <section class="card mt-4 bg-base-100">
-        <div class="card-body p-4">
-          <h2 class="type-heading">SEO deployments</h2>
-          <div class="mt-2 divide-y divide-base-200">
+      <details
+        class="collapse collapse-arrow mt-4 rounded-box border border-base-300/70 bg-base-100"
+      >
+        <summary class="collapse-title min-h-14 py-4 text-sm font-semibold">
+          Site deployments
+          <span class="ml-2 font-normal text-base-content/45"
+            >{{ deployments().length }} recent</span
+          >
+        </summary>
+        <div class="collapse-content">
+          <div class="divide-y divide-base-200">
             @for (deployment of deployments(); track deployment.id) {
-              <div class="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
-                <span>{{ deployment.created_at | date: 'd MMM y, HH:mm' }}</span
-                ><span
-                  class="badge"
+              <div class="flex flex-wrap items-center justify-between gap-2 py-3 text-sm">
+                <span>{{ deployment.created_at | date: 'd MMM y, HH:mm' }}</span>
+                <span
+                  class="badge badge-sm"
                   [class.badge-success]="deployment.status === 'succeeded'"
                   [class.badge-error]="
                     deployment.status === 'failed' || deployment.status === 'timed_out'
@@ -311,10 +532,46 @@ import { PageHeaderComponent } from '../../shared/ui/page-header.component';
             }
           </div>
         </div>
-      </section>
+      </details>
     }
   `,
   styles: `
+    .editor-tab {
+      border-bottom: 2px solid transparent;
+      padding: 0.75rem 0.9rem;
+      color: color-mix(in oklab, var(--color-base-content) 52%, transparent);
+      font-size: 0.8125rem;
+      font-weight: 600;
+      transition:
+        color 150ms ease,
+        border-color 150ms ease;
+    }
+    .editor-tab:hover {
+      color: var(--color-base-content);
+    }
+    .editor-tab-active {
+      border-color: var(--color-primary);
+      color: var(--color-primary);
+    }
+    .editor-title,
+    .editor-body {
+      caret-color: var(--color-primary);
+    }
+    .format-button {
+      min-height: 2rem;
+      border-radius: 0.45rem;
+      padding: 0.25rem 0.55rem;
+      color: color-mix(in oklab, var(--color-base-content) 62%, transparent);
+      font-size: 0.75rem;
+      font-weight: 600;
+      transition:
+        color 150ms ease,
+        background 150ms ease;
+    }
+    .format-button:hover {
+      background: var(--color-base-200);
+      color: var(--color-base-content);
+    }
     :host ::ng-deep .blog-preview h1,
     :host ::ng-deep .blog-preview h2,
     :host ::ng-deep .blog-preview h3 {
@@ -322,13 +579,16 @@ import { PageHeaderComponent } from '../../shared/ui/page-header.component';
       font-weight: 750;
     }
     :host ::ng-deep .blog-preview h1 {
-      font-size: 1.75rem;
+      font-size: 2.25rem;
+      line-height: 1.15;
     }
     :host ::ng-deep .blog-preview h2 {
-      font-size: 1.35rem;
+      font-size: 1.5rem;
+      line-height: 1.25;
     }
     :host ::ng-deep .blog-preview p {
-      margin-bottom: 0.9rem;
+      margin-bottom: 1.15rem;
+      line-height: 1.75;
     }
     :host ::ng-deep .blog-preview ul {
       margin: 0 0 1rem 1.25rem;
@@ -342,9 +602,23 @@ import { PageHeaderComponent } from '../../shared/ui/page-header.component';
       color: var(--color-primary);
       text-decoration: underline;
     }
+    :host ::ng-deep .blog-preview blockquote {
+      margin: 1.5rem 0;
+      border-left: 3px solid var(--color-primary);
+      padding-left: 1rem;
+      color: color-mix(in oklab, var(--color-base-content) 68%, transparent);
+    }
+    :host ::ng-deep .blog-preview pre {
+      margin: 1.5rem 0;
+      overflow-x: auto;
+      border-radius: 0.75rem;
+      background: var(--color-base-200);
+      padding: 1rem;
+    }
   `,
 })
 export class BlogComponent implements OnInit {
+  @ViewChild('markdownEditor') private markdownEditor?: ElementRef<HTMLTextAreaElement>;
   private readonly platform = inject(PlatformService);
   private readonly sanitizer = inject(DomSanitizer);
   protected readonly posts = signal<PlatformBlogPost[]>([]);
@@ -360,6 +634,7 @@ export class BlogComponent implements OnInit {
   protected readonly coverChanged = signal(false);
   protected readonly searchQuery = signal('');
   protected readonly slugEdited = signal(false);
+  protected readonly editorMode = signal<'write' | 'preview'>('write');
   protected readonly title = new FormControl('', {
     nonNullable: true,
     validators: [Validators.required],
@@ -448,6 +723,7 @@ export class BlogComponent implements OnInit {
     this.coverPath.set(null);
     this.coverUrl.set(null);
     this.slugEdited.set(false);
+    this.editorMode.set('write');
     this.updatePreview();
     this.markEditorPristine();
   }
@@ -494,6 +770,36 @@ export class BlogComponent implements OnInit {
     this.preview.set(
       this.sanitizer.bypassSecurityTrustHtml(renderSafeMarkdown(this.markdown.value).html)
     );
+  }
+
+  protected formatMarkdown(kind: 'bold' | 'italic' | 'heading' | 'list' | 'link' | 'quote'): void {
+    const editor = this.markdownEditor?.nativeElement;
+    if (!editor) return;
+    const start = editor.selectionStart;
+    const end = editor.selectionEnd;
+    const value = this.markdown.value;
+    const selected = value.slice(start, end);
+    const formats = {
+      bold: { prefix: '**', suffix: '**', fallback: 'bold text' },
+      italic: { prefix: '_', suffix: '_', fallback: 'italic text' },
+      heading: { prefix: '## ', suffix: '', fallback: 'Heading' },
+      list: { prefix: '- ', suffix: '', fallback: 'List item' },
+      link: { prefix: '[', suffix: '](https://)', fallback: 'link text' },
+      quote: { prefix: '> ', suffix: '', fallback: 'Quote' },
+    } as const;
+    const format = formats[kind];
+    const content = selected || format.fallback;
+    const replacement = `${format.prefix}${content}${format.suffix}`;
+    this.markdown.setValue(value.slice(0, start) + replacement + value.slice(end));
+    this.markdown.markAsDirty();
+    this.updatePreview();
+    requestAnimationFrame(() => {
+      editor.focus();
+      editor.setSelectionRange(
+        start + format.prefix.length,
+        start + format.prefix.length + content.length
+      );
+    });
   }
 
   protected async save(): Promise<void> {

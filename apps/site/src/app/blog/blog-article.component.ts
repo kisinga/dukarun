@@ -13,53 +13,141 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { renderSafeMarkdown } from '@dukarun/legal-markdown';
 import { appUrl } from '../core/public-url';
 import { SiteSeoService } from '../core/site-seo.service';
+import { IconComponent } from '../shared/ui/icon.component';
 import { BlogService, PublishedBlogPost } from './blog.service';
 
 @Component({
   selector: 'app-blog-article',
-  imports: [RouterLink, DatePipe],
+  imports: [RouterLink, DatePipe, IconComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (post(); as article) {
+      <div
+        class="fixed left-0 top-16 z-30 h-0.5 bg-primary transition-[width] duration-150"
+        [style.width.%]="readingProgress()"
+        aria-hidden="true"
+      ></div>
       <article>
-        <header class="border-b border-base-300/60 bg-base-200/35">
-          <div class="mkt-container max-w-4xl py-12 sm:py-16">
-            <a routerLink="/blog" class="text-sm font-medium text-primary">← All articles</a>
-            <div class="mt-5 flex flex-wrap gap-2">
-              @for (tag of article.tags; track tag) {
-                <span class="badge badge-ghost">{{ tag }}</span>
-              }
+        <header class="article-masthead border-b border-base-300/60">
+          <div class="mkt-container max-w-5xl py-12 sm:py-20">
+            <a
+              routerLink="/blog"
+              class="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-base-content/55 transition-colors hover:text-primary"
+            >
+              <span aria-hidden="true">←</span>
+              The journal
+            </a>
+            <div
+              class="mt-7 flex flex-wrap items-center gap-3 text-xs font-semibold uppercase tracking-[0.13em]"
+            >
+              <span class="text-primary">{{ article.tags[0] || 'Field notes' }}</span>
+              <span class="h-1 w-1 rounded-full bg-base-content/20"></span>
+              <span class="text-base-content/45">{{ article.reading_minutes }} minute read</span>
             </div>
-            <h1 class="mkt-display mt-4">{{ article.title }}</h1>
-            <p class="mt-4 text-lg text-base-content/70">{{ article.excerpt }}</p>
-            <p class="mt-5 text-sm text-base-content/55">
-              {{ article.author_name }} · {{ article.published_at | date: 'd MMMM y' }} ·
-              {{ article.reading_minutes }} min read
+            <h1
+              class="mt-5 max-w-4xl text-4xl font-bold leading-[1.04] tracking-[-0.035em] sm:text-6xl"
+            >
+              {{ article.title }}
+            </h1>
+            <p class="mt-6 max-w-3xl text-lg leading-relaxed text-base-content/65 sm:text-xl">
+              {{ article.excerpt }}
             </p>
+            <div class="mt-8 flex items-center gap-3">
+              <span
+                class="flex size-10 items-center justify-center rounded-full bg-neutral text-sm font-bold text-neutral-content"
+                aria-hidden="true"
+                >D</span
+              >
+              <p class="text-sm leading-snug">
+                <strong class="block font-semibold">{{ article.author_name }}</strong>
+                <span class="text-base-content/45"
+                  >Published {{ article.published_at | date: 'd MMMM y' }}</span
+                >
+              </p>
+            </div>
           </div>
         </header>
 
-        <div class="mkt-container max-w-4xl py-10 sm:py-14">
-          @if (coverUrl(); as image) {
+        @if (coverUrl(); as image) {
+          <div class="mkt-container max-w-6xl pt-8 sm:pt-12">
             <img
               [src]="image"
               [alt]="article.cover_image_alt || ''"
-              class="mb-10 aspect-[16/9] w-full rounded-box object-cover"
+              class="aspect-[16/8.5] w-full rounded-[1.25rem] object-cover shadow-sm"
             />
-          }
-          <div class="blog-prose" [innerHTML]="html()"></div>
-          <aside class="mt-12 rounded-box bg-primary p-6 text-primary-content sm:p-8">
-            <h2 class="text-2xl font-bold">Put the idea into practice with Dukarun.</h2>
-            <p class="mt-2 max-w-2xl text-primary-content/80">
-              Sell, manage stock, and keep balanced books from one practical workspace.
-            </p>
-            <a
-              [href]="registrationUrl()"
-              class="btn mt-5 border-0 bg-white text-primary hover:bg-white/90"
-              (click)="trackCta($event)"
-              >Start your free trial</a
-            >
+          </div>
+        }
+
+        <div
+          class="mkt-container grid max-w-5xl items-start gap-8 py-10 sm:py-16 lg:grid-cols-[9rem_minmax(0,43rem)] lg:justify-center lg:gap-14"
+        >
+          <aside class="border-y border-base-300/60 py-4 lg:sticky lg:top-28 lg:border-y-0 lg:py-0">
+            <div class="flex items-center justify-between gap-4 lg:block">
+              <div class="text-xs text-base-content/45">
+                <span class="block font-semibold uppercase tracking-wider text-base-content/65"
+                  >Reading</span
+                >
+                <span class="mt-1 block">{{ article.reading_minutes }} minutes</span>
+              </div>
+              <button
+                type="button"
+                class="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-base-content/60 transition-colors hover:text-primary lg:mt-5"
+                (click)="shareArticle()"
+              >
+                <app-icon name="heroShare" size="sm" />
+                {{ shareNotice() || 'Share' }}
+              </button>
+            </div>
           </aside>
+
+          <div class="min-w-0">
+            <div class="blog-prose" [innerHTML]="html()"></div>
+
+            <aside
+              class="article-cta relative mt-14 overflow-hidden rounded-[1.25rem] bg-neutral p-7 text-neutral-content sm:p-10"
+            >
+              <div class="relative z-10 max-w-xl">
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
+                  From insight to action
+                </p>
+                <h2 class="mt-3 text-2xl font-bold leading-tight tracking-tight sm:text-3xl">
+                  Run the business with the same clarity.
+                </h2>
+                <p class="mt-4 max-w-lg leading-relaxed text-neutral-content/65">
+                  Sell, manage stock, follow cash, and keep balanced books from one practical
+                  workspace.
+                </p>
+                <a
+                  [href]="registrationUrl()"
+                  class="btn btn-primary mt-7 min-h-12 px-6"
+                  (click)="trackCta($event)"
+                >
+                  Start your free trial
+                  <app-icon name="heroArrowRight" size="sm" />
+                </a>
+              </div>
+            </aside>
+
+            <footer
+              class="mt-12 flex flex-wrap items-center justify-between gap-4 border-t border-base-300/70 pt-7"
+            >
+              <a
+                routerLink="/blog"
+                class="inline-flex min-h-11 items-center gap-2 font-semibold text-primary"
+              >
+                <span aria-hidden="true">←</span>
+                More from the journal
+              </a>
+              <button
+                type="button"
+                class="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-base-content/55 hover:text-primary"
+                (click)="shareArticle()"
+              >
+                <app-icon name="heroShare" size="sm" />
+                Share article
+              </button>
+            </footer>
+          </div>
         </div>
       </article>
     } @else if (notFound()) {
@@ -73,21 +161,48 @@ import { BlogService, PublishedBlogPost } from './blog.service';
     }
   `,
   styles: `
+    .article-masthead {
+      background:
+        radial-gradient(
+          circle at 85% 12%,
+          color-mix(in oklab, var(--color-primary) 12%, transparent),
+          transparent 26rem
+        ),
+        linear-gradient(
+          180deg,
+          var(--color-base-100),
+          color-mix(in oklab, var(--color-base-200) 42%, var(--color-base-100))
+        );
+    }
+    .article-cta::after {
+      position: absolute;
+      right: -4rem;
+      bottom: -5rem;
+      width: 15rem;
+      height: 15rem;
+      border-radius: 999px;
+      background: color-mix(in oklab, var(--color-primary) 28%, transparent);
+      content: '';
+      filter: blur(1px);
+    }
     :host ::ng-deep .blog-prose {
-      font-size: 1.05rem;
-      line-height: 1.8;
+      font-size: 1.075rem;
+      line-height: 1.85;
       color: color-mix(in oklab, currentColor 84%, transparent);
+    }
+    :host ::ng-deep .blog-prose > h1:first-child {
+      display: none;
     }
     :host ::ng-deep .blog-prose h1,
     :host ::ng-deep .blog-prose h2,
     :host ::ng-deep .blog-prose h3 {
-      margin: 2rem 0 0.75rem;
+      margin: 3rem 0 1rem;
       color: var(--color-base-content);
       font-weight: 750;
       line-height: 1.25;
     }
     :host ::ng-deep .blog-prose h1 {
-      font-size: 2rem;
+      font-size: 2.25rem;
     }
     :host ::ng-deep .blog-prose h2 {
       font-size: 1.5rem;
@@ -96,7 +211,12 @@ import { BlogService, PublishedBlogPost } from './blog.service';
       font-size: 1.2rem;
     }
     :host ::ng-deep .blog-prose p {
-      margin: 0 0 1.25rem;
+      margin: 0 0 1.4rem;
+    }
+    :host ::ng-deep .blog-prose > p:first-of-type {
+      font-size: 1.2rem;
+      line-height: 1.75;
+      color: var(--color-base-content);
     }
     :host ::ng-deep .blog-prose ul,
     :host ::ng-deep .blog-prose ol {
@@ -109,14 +229,62 @@ import { BlogService, PublishedBlogPost } from './blog.service';
       list-style: decimal;
     }
     :host ::ng-deep .blog-prose blockquote {
-      margin: 1.5rem 0;
-      border-left: 4px solid var(--color-primary);
-      padding-left: 1rem;
-      font-style: italic;
+      margin: 2rem 0;
+      border-left: 3px solid var(--color-primary);
+      padding: 0.25rem 0 0.25rem 1.25rem;
+      color: color-mix(in oklab, var(--color-base-content) 72%, transparent);
+      font-size: 1.15rem;
     }
     :host ::ng-deep .blog-prose a {
       color: var(--color-primary);
+      font-weight: 600;
       text-decoration: underline;
+      text-underline-offset: 0.2em;
+    }
+    :host ::ng-deep .blog-prose hr {
+      margin: 3rem 0;
+      border-color: color-mix(in oklab, var(--color-base-300) 70%, transparent);
+    }
+    :host ::ng-deep .blog-prose pre {
+      margin: 2rem 0;
+      overflow-x: auto;
+      border-radius: 0.75rem;
+      background: var(--color-neutral);
+      padding: 1.25rem;
+      color: var(--color-neutral-content);
+      font-size: 0.9rem;
+      line-height: 1.65;
+    }
+    :host ::ng-deep .blog-prose img {
+      margin: 2rem 0;
+      width: 100%;
+      border-radius: 0.75rem;
+    }
+    :host ::ng-deep .blog-prose table {
+      display: block;
+      margin: 2rem 0;
+      max-width: 100%;
+      overflow-x: auto;
+      border-collapse: collapse;
+      font-size: 0.95rem;
+    }
+    :host ::ng-deep .blog-prose th,
+    :host ::ng-deep .blog-prose td {
+      border-bottom: 1px solid var(--color-base-300);
+      padding: 0.65rem 0.9rem;
+      text-align: left;
+      white-space: nowrap;
+    }
+    :host ::ng-deep .blog-prose :not(pre) > code {
+      border-radius: 0.3rem;
+      background: var(--color-base-200);
+      padding: 0.12em 0.35em;
+      font-size: 0.9em;
+    }
+    @media (min-width: 40rem) {
+      :host ::ng-deep .blog-prose {
+        font-size: 1.125rem;
+      }
     }
   `,
 })
@@ -130,6 +298,7 @@ export class BlogArticleComponent implements OnInit {
   private readonly slug = this.route.snapshot.paramMap.get('slug') ?? '';
   private readonly ctaEventId = this.blog.newEventId();
   private engagementTimer: ReturnType<typeof setTimeout> | null = null;
+  private scrollFrame: number | null = null;
   private sent50 = false;
   private sent90 = false;
 
@@ -137,6 +306,8 @@ export class BlogArticleComponent implements OnInit {
   protected readonly html = signal<SafeHtml>('');
   protected readonly coverUrl = signal<string | null>(null);
   protected readonly notFound = signal(false);
+  protected readonly readingProgress = signal(0);
+  protected readonly shareNotice = signal<string | null>(null);
 
   async ngOnInit(): Promise<void> {
     const article = await this.blog.post(this.slug).catch(() => null);
@@ -157,6 +328,7 @@ export class BlogArticleComponent implements OnInit {
       window.addEventListener('scroll', this.onScroll, { passive: true });
       this.destroyRef.onDestroy(() => {
         if (this.engagementTimer) clearTimeout(this.engagementTimer);
+        if (this.scrollFrame !== null) cancelAnimationFrame(this.scrollFrame);
         window.removeEventListener('scroll', this.onScroll);
       });
       void this.blog
@@ -197,6 +369,25 @@ export class BlogArticleComponent implements OnInit {
     window.location.assign(this.registrationUrl());
   }
 
+  protected async shareArticle(): Promise<void> {
+    const article = this.post();
+    if (!article || !isPlatformBrowser(this.platformId)) return;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: article.title, text: article.excerpt, url: location.href });
+      } else {
+        await navigator.clipboard.writeText(location.href);
+        this.shareNotice.set('Link copied');
+        setTimeout(() => this.shareNotice.set(null), 2_000);
+      }
+      await this.blog.recordEvent(article.post_id, 'share_click').catch(() => undefined);
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+      this.shareNotice.set('Could not share');
+      setTimeout(() => this.shareNotice.set(null), 2_000);
+    }
+  }
+
   private apply(article: PublishedBlogPost): void {
     this.post.set(article);
     this.html.set(
@@ -207,11 +398,20 @@ export class BlogArticleComponent implements OnInit {
   }
 
   private readonly onScroll = (): void => {
+    if (this.scrollFrame !== null) return;
+    this.scrollFrame = requestAnimationFrame(() => {
+      this.scrollFrame = null;
+      this.updateScrollProgress();
+    });
+  };
+
+  private updateScrollProgress(): void {
     const article = this.post();
     if (!article) return;
     const available = document.documentElement.scrollHeight - window.innerHeight;
     if (available <= 0) return;
     const progress = window.scrollY / available;
+    this.readingProgress.set(Math.min(100, Math.max(0, progress * 100)));
     if (progress >= 0.5 && !this.sent50) {
       this.sent50 = true;
       void this.blog.recordEvent(article.post_id, 'scroll_50').catch(() => undefined);
@@ -220,7 +420,7 @@ export class BlogArticleComponent implements OnInit {
       this.sent90 = true;
       void this.blog.recordEvent(article.post_id, 'scroll_90').catch(() => undefined);
     }
-  };
+  }
 
   private sourceMetadata(): Record<string, string> {
     const referrer = document.referrer ? new URL(document.referrer).hostname : '';
