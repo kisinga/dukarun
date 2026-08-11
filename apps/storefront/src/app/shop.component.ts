@@ -342,18 +342,28 @@ export class ShopComponent implements OnInit, OnDestroy {
   private readonly initialShop = this.slug
     ? this.storefront.transferredStorefront(this.slug)
     : undefined;
+  private readonly initialCatalog = this.slug
+    ? this.storefront.transferredCatalogPage(this.slug, PAGE_SIZE)
+    : null;
+  private readonly initialCollections = this.slug
+    ? this.storefront.transferredCollections(this.slug)
+    : null;
 
   protected readonly shop = signal<StorefrontInfo | null>(this.initialShop ?? null);
-  protected readonly products = signal<CatalogProduct[]>([]);
-  protected readonly collections = signal<ShopCollection[]>([]);
+  protected readonly products = signal<CatalogProduct[]>(
+    groupCatalog(this.initialCatalog?.rows ?? [])
+  );
+  protected readonly collections = signal<ShopCollection[]>(this.initialCollections ?? []);
   protected readonly selectedCollection = signal<string | null>(null);
-  protected readonly catalogLoading = signal(true);
+  protected readonly catalogLoading = signal(this.initialCatalog === null);
   protected readonly catalogError = signal(false);
   protected readonly notFound = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly query = signal('');
-  protected readonly page = signal(1);
-  protected readonly resultCount = signal(0);
+  protected readonly page = signal(
+    this.initialCatalog ? Math.floor(this.initialCatalog.offset / PAGE_SIZE) + 1 : 1
+  );
+  protected readonly resultCount = signal(this.initialCatalog?.total ?? 0);
   protected readonly skeletons = Array.from({ length: 8 });
   private searchTimer: ReturnType<typeof setTimeout> | undefined;
   private requestSequence = 0;
@@ -382,6 +392,7 @@ export class ShopComponent implements OnInit, OnDestroy {
 
   async ngOnInit(): Promise<void> {
     if (!this.slug) {
+      this.seo.set('Shop not found', 'This shop could not be found.', '/', true);
       this.notFound.set(true);
       this.catalogLoading.set(false);
       return;
@@ -392,6 +403,7 @@ export class ShopComponent implements OnInit, OnDestroy {
         isPlatformBrowser(this.platformId) && this.initialShop !== undefined
       );
       if (!shop) {
+        this.seo.set('Shop not found', 'This shop could not be found.', `/${this.slug}`, true);
         this.notFound.set(true);
         this.catalogLoading.set(false);
         return;
@@ -400,13 +412,17 @@ export class ShopComponent implements OnInit, OnDestroy {
       this.seo.set(
         `${shop.name} | Dukarun shops`,
         `Browse ${shop.name} and order directly on WhatsApp.`,
-        `/${this.slug}`
+        `/${this.slug}`,
+        !shop.catalogue_visible,
+        this.companyLogoUrl(shop.logo_path)
       );
       this.seo.setStructuredData(this.shopStructuredData(shop));
-      if (shop.catalogue_visible && isPlatformBrowser(this.platformId)) {
+      if (shop.catalogue_visible) {
+        const refreshTransferredData =
+          isPlatformBrowser(this.platformId) && this.initialCatalog !== null;
         const [, collections] = await Promise.all([
-          this.loadCatalog(),
-          this.storefront.collections(this.slug),
+          this.loadCatalog(refreshTransferredData, refreshTransferredData),
+          this.storefront.collections(this.slug, refreshTransferredData),
         ]);
         this.collections.set(collections);
       } else {
@@ -423,30 +439,41 @@ export class ShopComponent implements OnInit, OnDestroy {
     if (this.searchTimer) clearTimeout(this.searchTimer);
   }
 
-  protected async loadCatalog(): Promise<void> {
-    await this.loadPage(this.page());
+  protected async loadCatalog(force = false, preserveRenderedContent = false): Promise<void> {
+    await this.loadPage(this.page(), force, preserveRenderedContent);
   }
 
-  private async loadPage(requestedPage: number): Promise<void> {
+  private async loadPage(
+    requestedPage: number,
+    force = false,
+    preserveRenderedContent = false
+  ): Promise<void> {
     const nextPage = Math.max(1, requestedPage);
     const request = ++this.requestSequence;
-    this.catalogLoading.set(true);
-    this.catalogError.set(false);
+    if (!preserveRenderedContent) {
+      this.catalogLoading.set(true);
+      this.catalogError.set(false);
+    }
     try {
       const result = await this.storefront.catalogPage(this.slug, {
         search: this.query(),
         collectionId: this.selectedCollection(),
         limit: PAGE_SIZE,
         offset: (nextPage - 1) * PAGE_SIZE,
+        force,
       });
       if (request !== this.requestSequence) return;
       this.page.set(Math.floor(result.offset / PAGE_SIZE) + 1);
       this.resultCount.set(result.total);
       this.products.set(groupCatalog(result.rows));
     } catch {
-      if (request === this.requestSequence) this.catalogError.set(true);
+      if (request === this.requestSequence && !preserveRenderedContent) {
+        this.catalogError.set(true);
+      }
     } finally {
-      if (request === this.requestSequence) this.catalogLoading.set(false);
+      if (request === this.requestSequence && !preserveRenderedContent) {
+        this.catalogLoading.set(false);
+      }
     }
   }
 

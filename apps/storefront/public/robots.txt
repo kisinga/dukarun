@@ -1,2 +1,3 @@
 User-agent: *
 Allow: /
+Sitemap: https://store.dukarun.com/sitemap.xml
