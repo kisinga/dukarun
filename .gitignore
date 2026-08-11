@@ -35,6 +35,9 @@ yarn-error.log
 apps/*/src/environments/environment.generated.ts
 apps/storefront/public/sitemap.xml
 
+# Locally generated blog cover drafts. Published covers live in Supabase Storage.
+assets/blog/
+
 # Local ETL reports and dry-run captures.
 scripts/etl/out/
 
