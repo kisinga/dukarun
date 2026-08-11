@@ -16,6 +16,25 @@ input.search-with-custom-clear::-ms-clear {
   display: none;
 }
 
+.catalog-view-option:not(.catalog-view-active):hover {
+  background: #f7f4ef;
+}
+
+.catalog-view-option:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.catalog-view-active {
+  background: #f7ded3;
+  color: #78301d;
+}
+
+.catalog-category-active {
+  border-color: #df5b32;
+  background: #f7ded3;
+}
+
 @theme {
   --font-sans: 'Outfit', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }

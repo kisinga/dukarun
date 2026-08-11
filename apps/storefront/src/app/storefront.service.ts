@@ -104,11 +104,66 @@ export class StorefrontService {
       product_id: '00000000-0000-0000-0000-000000000003',
       product_name: 'Fixture Sugar 1kg',
       sku: 'FIX-SUGAR-1KG',
-      total_count: 1,
+      total_count: 3,
       variant_id: '00000000-0000-0000-0000-000000000004',
       variant_name: 'Default',
     },
+    {
+      available: true,
+      image_path: '',
+      kind: 'stock',
+      manufacturer_id: '00000000-0000-0000-0000-000000000002',
+      manufacturer_name: 'Fixture Foods',
+      price: 320,
+      product_id: '00000000-0000-0000-0000-000000000005',
+      product_name: 'Fixture Tea 100 bags',
+      sku: 'FIX-TEA-100',
+      total_count: 3,
+      variant_id: '00000000-0000-0000-0000-000000000006',
+      variant_name: 'Default',
+    },
+    {
+      available: false,
+      image_path: '',
+      kind: 'stock',
+      manufacturer_id: '00000000-0000-0000-0000-000000000007',
+      manufacturer_name: 'Fixture Home',
+      price: 120,
+      product_id: '00000000-0000-0000-0000-000000000008',
+      product_name: 'Fixture Bar Soap',
+      sku: 'FIX-SOAP-BAR',
+      total_count: 3,
+      variant_id: '00000000-0000-0000-0000-000000000009',
+      variant_name: 'Default',
+    },
   ];
+  private readonly fixtureCategories: ShopCategory[] = [
+    {
+      active: true,
+      company_id: '00000000-0000-0000-0000-000000000001',
+      created_at: '2026-01-01T00:00:00.000Z',
+      description: 'Everyday food and pantry essentials.',
+      id: '00000000-0000-0000-0000-000000000010',
+      name: 'Groceries',
+      slug: 'groceries',
+      updated_at: '2026-01-01T00:00:00.000Z',
+    },
+    {
+      active: true,
+      company_id: '00000000-0000-0000-0000-000000000001',
+      created_at: '2026-01-01T00:00:00.000Z',
+      description: 'Useful products for the home.',
+      id: '00000000-0000-0000-0000-000000000011',
+      name: 'Household',
+      slug: 'household',
+      updated_at: '2026-01-01T00:00:00.000Z',
+    },
+  ];
+  private readonly fixtureCategoryIdsByProduct = new Map<string, readonly string[]>([
+    ['00000000-0000-0000-0000-000000000003', ['00000000-0000-0000-0000-000000000010']],
+    ['00000000-0000-0000-0000-000000000005', ['00000000-0000-0000-0000-000000000010']],
+    ['00000000-0000-0000-0000-000000000008', ['00000000-0000-0000-0000-000000000011']],
+  ]);
 
   /** All public storefronts (the directory at `/`). */
   transferredDirectory(): StorefrontInfo[] | null {
@@ -198,11 +253,18 @@ export class StorefrontService {
     if (!options.force && cacheable && this.transferState.hasKey(key)) {
       return this.transferState.get(key, { rows: [], total: 0, offset: requestedOffset });
     }
-    const fixtureRows = options.search?.trim()
-      ? this.fixtureCatalog.filter(row =>
-          row.product_name.toLowerCase().includes(options.search!.trim().toLowerCase())
-        )
-      : this.fixtureCatalog;
+    const fixtureSearch = options.search?.trim().toLowerCase();
+    const fixtureRows = this.fixtureCatalog.filter(row => {
+      const matchesSearch =
+        !fixtureSearch ||
+        [row.product_name, row.manufacturer_name, row.sku].some(value =>
+          value?.toLowerCase().includes(fixtureSearch)
+        );
+      const matchesCategory =
+        !options.categoryId ||
+        this.fixtureCategoryIdsByProduct.get(row.product_id)?.includes(options.categoryId);
+      return matchesSearch && matchesCategory;
+    });
     const page =
       environment.publicDataMode === 'fixture'
         ? {
@@ -260,7 +322,7 @@ export class StorefrontService {
     if (!force && this.transferState.hasKey(key)) return this.transferState.get(key, []);
     const categories =
       environment.publicDataMode === 'fixture'
-        ? []
+        ? this.fixtureCategories
         : await this.track(async () => {
             const { data, error } = await this.client.rpc('storefront_categories', {
               p_slug: slug,

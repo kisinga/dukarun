@@ -1,6 +1,16 @@
-import { Component, OnDestroy, OnInit, PLATFORM_ID, computed, inject, signal } from '@angular/core';
+import {
+  Component,
+  OnDestroy,
+  OnInit,
+  PLATFORM_ID,
+  afterNextRender,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
+import { NgIcon } from '@ng-icons/core';
 import { CatalogProduct, groupCatalog } from './catalog.models';
 import { ShopCategory, StorefrontInfo, StorefrontService } from './storefront.service';
 import { StorefrontBrandComponent } from './storefront-brand.component';
@@ -9,6 +19,10 @@ import { environment } from '../environments/environment';
 import { PoweredByDukarunComponent } from './powered-by-dukarun.component';
 
 const PAGE_SIZE = 12;
+const CATALOG_VIEW_KEY = 'dukarun.storefront.catalog-view';
+
+type ProductView = 'grid' | 'list';
+type CatalogView = ProductView | 'categories';
 
 function formatKes(amount: number): string {
   return `KES ${Math.round(amount).toLocaleString('en-KE')}`;
@@ -16,7 +30,7 @@ function formatKes(amount: number): string {
 
 @Component({
   selector: 'app-shop',
-  imports: [RouterLink, StorefrontBrandComponent, PoweredByDukarunComponent],
+  imports: [RouterLink, NgIcon, StorefrontBrandComponent, PoweredByDukarunComponent],
   template: `
     <main class="min-h-screen bg-base-200 pb-24">
       @if (notFound()) {
@@ -121,7 +135,64 @@ function formatKes(amount: number): string {
                 }
               </div>
 
-              @if (categories().length) {
+              <div
+                class="mt-4 grid w-full overflow-hidden rounded-2xl border border-base-300 bg-base-100 sm:max-w-xl"
+                [class.grid-cols-3]="sortedCategories().length > 0 || categoriesLoading()"
+                [class.grid-cols-2]="sortedCategories().length === 0 && !categoriesLoading()"
+                role="group"
+                aria-label="Catalogue view"
+              >
+                <button
+                  type="button"
+                  class="catalog-view-option flex min-h-13 min-w-0 items-center justify-center gap-1.5 border-r border-base-300 px-2 text-sm font-semibold transition sm:gap-2 sm:px-3 sm:text-base"
+                  [class.catalog-view-active]="view() === 'grid'"
+                  [attr.aria-pressed]="view() === 'grid'"
+                  (click)="setView('grid')"
+                >
+                  <ng-icon name="heroSquares2x2" size="1.25rem" aria-hidden="true" />
+                  Grid
+                </button>
+                <button
+                  type="button"
+                  class="catalog-view-option flex min-h-13 min-w-0 items-center justify-center gap-1.5 px-2 text-sm font-semibold transition sm:gap-2 sm:px-3 sm:text-base"
+                  [class.border-r]="sortedCategories().length > 0 || categoriesLoading()"
+                  [class.border-base-300]="sortedCategories().length > 0 || categoriesLoading()"
+                  [class.catalog-view-active]="view() === 'list'"
+                  [attr.aria-pressed]="view() === 'list'"
+                  (click)="setView('list')"
+                >
+                  <ng-icon name="heroListBullet" size="1.25rem" aria-hidden="true" />
+                  List
+                </button>
+                @if (sortedCategories().length || categoriesLoading()) {
+                  <button
+                    type="button"
+                    class="catalog-view-option flex min-h-13 min-w-0 items-center justify-center gap-1.5 px-1 text-sm font-semibold transition sm:gap-2 sm:px-3 sm:text-base"
+                    [class.catalog-view-active]="view() === 'categories'"
+                    [attr.aria-pressed]="view() === 'categories'"
+                    [disabled]="!sortedCategories().length"
+                    (click)="setView('categories')"
+                  >
+                    <ng-icon name="heroQueueList" size="1.25rem" aria-hidden="true" />
+                    Categories
+                  </button>
+                }
+              </div>
+
+              @if (categoriesError()) {
+                <div class="mt-3 flex items-center gap-3 text-sm text-error">
+                  <span>Categories aren't available right now.</span>
+                  <button
+                    type="button"
+                    class="btn btn-ghost btn-sm text-current"
+                    (click)="loadCategories(true)"
+                  >
+                    Try again
+                  </button>
+                </div>
+              }
+
+              @if (view() !== 'categories' && sortedCategories().length) {
                 <div
                   class="-mx-4 mt-4 flex gap-2 overflow-x-auto px-4 pb-2 sm:mx-0 sm:px-0"
                   aria-label="Product categories"
@@ -131,16 +202,18 @@ function formatKes(amount: number): string {
                     class="btn btn-sm shrink-0 rounded-full px-5"
                     [class.btn-primary]="selectedCategory() === null"
                     [class.btn-ghost]="selectedCategory() !== null"
+                    [attr.aria-pressed]="selectedCategory() === null"
                     (click)="selectCategory(null)"
                   >
                     All products
                   </button>
-                  @for (category of categories(); track category.id) {
+                  @for (category of sortedCategories(); track category.id) {
                     <button
                       type="button"
                       class="btn btn-sm shrink-0 rounded-full px-5"
                       [class.btn-primary]="selectedCategory() === category.id"
                       [class.btn-ghost]="selectedCategory() !== category.id"
+                      [attr.aria-pressed]="selectedCategory() === category.id"
                       (click)="selectCategory(category.id)"
                     >
                       {{ category.name }}
@@ -150,19 +223,88 @@ function formatKes(amount: number): string {
               }
             </section>
 
-            @if (catalogLoading()) {
-              <div class="grid grid-cols-2 gap-3 pt-8 sm:grid-cols-3 lg:grid-cols-4">
-                @for (item of skeletons; track $index) {
-                  <div class="overflow-hidden rounded-2xl border border-base-300 bg-base-100">
-                    <div class="skeleton aspect-square rounded-none"></div>
-                    <div class="space-y-2 p-4">
-                      <div class="skeleton h-3 w-1/2"></div>
-                      <div class="skeleton h-5 w-full"></div>
-                      <div class="skeleton h-5 w-2/3"></div>
-                    </div>
-                  </div>
+            @if (view() === 'categories') {
+              <div class="mt-8">
+                <p class="text-xs font-semibold tracking-[0.14em] text-base-content/45 uppercase">
+                  Browse
+                </p>
+                <h2 class="mt-1 text-2xl font-bold">Categories</h2>
+              </div>
+
+              <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <button
+                  type="button"
+                  class="group flex min-h-32 items-start justify-between gap-4 rounded-2xl border border-base-300 bg-base-100 p-5 text-left transition hover:-translate-y-0.5 hover:border-primary hover:shadow-md"
+                  [class.catalog-category-active]="selectedCategory() === null"
+                  [attr.aria-pressed]="selectedCategory() === null"
+                  (click)="selectCategory(null)"
+                >
+                  <span>
+                    <span class="block text-lg font-semibold">All products</span>
+                    <span class="mt-1 block text-sm leading-5 text-base-content/55">
+                      Browse the full catalogue.
+                    </span>
+                  </span>
+                  <ng-icon
+                    name="heroChevronRight"
+                    size="1.25rem"
+                    class="mt-1 text-base-content/35 transition group-hover:translate-x-0.5 group-hover:text-primary"
+                    aria-hidden="true"
+                  />
+                </button>
+                @for (category of sortedCategories(); track category.id) {
+                  <button
+                    type="button"
+                    class="group flex min-h-32 items-start justify-between gap-4 rounded-2xl border border-base-300 bg-base-100 p-5 text-left transition hover:-translate-y-0.5 hover:border-primary hover:shadow-md"
+                    [class.catalog-category-active]="selectedCategory() === category.id"
+                    [attr.aria-pressed]="selectedCategory() === category.id"
+                    (click)="selectCategory(category.id)"
+                  >
+                    <span>
+                      <span class="block text-lg font-semibold">{{ category.name }}</span>
+                      <span class="mt-1 block text-sm leading-5 text-base-content/55">
+                        {{ category.description || 'Browse this category.' }}
+                      </span>
+                    </span>
+                    <ng-icon
+                      name="heroChevronRight"
+                      size="1.25rem"
+                      class="mt-1 text-base-content/35 transition group-hover:translate-x-0.5 group-hover:text-primary"
+                      aria-hidden="true"
+                    />
+                  </button>
                 }
               </div>
+            } @else if (catalogLoading()) {
+              @if (view() === 'list') {
+                <div class="flex flex-col gap-3 pt-8">
+                  @for (item of skeletons; track $index) {
+                    <div
+                      class="grid grid-cols-[5.5rem_minmax(0,1fr)] overflow-hidden rounded-2xl border border-base-300 bg-base-100 sm:grid-cols-[7rem_minmax(0,1fr)]"
+                    >
+                      <div class="skeleton aspect-square rounded-none"></div>
+                      <div class="flex flex-col justify-center gap-2 p-4">
+                        <div class="skeleton h-3 w-1/3"></div>
+                        <div class="skeleton h-5 w-3/4"></div>
+                        <div class="skeleton h-4 w-1/2"></div>
+                      </div>
+                    </div>
+                  }
+                </div>
+              } @else {
+                <div class="grid grid-cols-2 gap-3 pt-8 sm:grid-cols-3 lg:grid-cols-4">
+                  @for (item of skeletons; track $index) {
+                    <div class="overflow-hidden rounded-2xl border border-base-300 bg-base-100">
+                      <div class="skeleton aspect-square rounded-none"></div>
+                      <div class="space-y-2 p-4">
+                        <div class="skeleton h-3 w-1/2"></div>
+                        <div class="skeleton h-5 w-full"></div>
+                        <div class="skeleton h-5 w-2/3"></div>
+                      </div>
+                    </div>
+                  }
+                </div>
+              }
             } @else if (catalogError()) {
               <div class="mt-8 rounded-2xl border border-error/25 bg-base-100 p-8 text-center">
                 <p class="font-semibold">The catalogue couldn't load</p>
@@ -187,61 +329,122 @@ function formatKes(amount: number): string {
               </div>
 
               @if (pagedProducts().length) {
-                <div class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-5 lg:grid-cols-4">
-                  @for (product of pagedProducts(); track product.id) {
-                    <a
-                      [routerLink]="['/', slug, 'products', product.id]"
-                      class="group flex min-w-0 flex-col overflow-hidden rounded-2xl border border-base-300 bg-base-100 transition duration-200 hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-md"
-                    >
-                      <div class="relative aspect-square overflow-hidden bg-[#eee8df]">
-                        @if (imageUrl(product.imagePath); as image) {
-                          <img
-                            [src]="image"
-                            [alt]="product.name"
-                            class="h-full w-full object-cover transition duration-300 group-hover:scale-[1.025]"
-                            loading="lazy"
-                          />
-                        } @else {
-                          <div
-                            class="grid h-full place-content-center bg-gradient-to-br from-[#f3eee7] to-[#e8dfd3] text-center text-base-content/30"
-                          >
-                            <span
-                              class="rounded-full border border-current/20 bg-white/25 px-3 py-1 text-[0.65rem] font-semibold tracking-widest uppercase"
-                              >Photo coming soon</span
+                @if (view() === 'grid') {
+                  <div class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-5 lg:grid-cols-4">
+                    @for (product of pagedProducts(); track product.id) {
+                      <a
+                        [routerLink]="['/', slug, 'products', product.id]"
+                        class="group flex min-w-0 flex-col overflow-hidden rounded-2xl border border-base-300 bg-base-100 transition duration-200 hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-md"
+                      >
+                        <div class="relative aspect-square overflow-hidden bg-[#eee8df]">
+                          @if (imageUrl(product.imagePath); as image) {
+                            <img
+                              [src]="image"
+                              [alt]="product.name"
+                              class="h-full w-full object-cover transition duration-300 group-hover:scale-[1.025]"
+                              loading="lazy"
+                            />
+                          } @else {
+                            <div
+                              class="grid h-full place-content-center bg-gradient-to-br from-[#f3eee7] to-[#e8dfd3] text-center text-base-content/30"
                             >
-                          </div>
-                        }
-                        @if (!product.available) {
-                          <span class="badge badge-neutral absolute right-3 bottom-3"
-                            >Unavailable</span
+                              <span
+                                class="rounded-full border border-current/20 bg-white/25 px-3 py-1 text-[0.65rem] font-semibold tracking-widest uppercase"
+                                >Photo coming soon</span
+                              >
+                            </div>
+                          }
+                          @if (!product.available) {
+                            <span class="badge badge-neutral absolute right-3 bottom-3"
+                              >Unavailable</span
+                            >
+                          }
+                        </div>
+                        <div class="flex flex-1 flex-col p-3.5 sm:p-4">
+                          @if (product.manufacturer) {
+                            <p
+                              class="truncate text-[0.68rem] font-semibold tracking-[0.12em] text-base-content/45 uppercase"
+                            >
+                              {{ product.manufacturer }}
+                            </p>
+                          }
+                          <h3
+                            class="mt-1 line-clamp-2 text-sm leading-snug font-semibold group-hover:text-primary sm:text-base"
                           >
-                        }
-                      </div>
-                      <div class="flex flex-1 flex-col p-3.5 sm:p-4">
-                        @if (product.manufacturer) {
-                          <p
-                            class="truncate text-[0.68rem] font-semibold tracking-[0.12em] text-base-content/45 uppercase"
-                          >
-                            {{ product.manufacturer }}
+                            {{ product.name }}
+                          </h3>
+                          @if (product.variants.length > 1) {
+                            <p class="mt-1 text-xs text-base-content/45">
+                              {{ product.variants.length }} options
+                            </p>
+                          }
+                          <p class="mt-auto pt-3 text-base font-bold tabular-nums text-primary">
+                            {{ productPrice(product) }}
                           </p>
-                        }
-                        <h3
-                          class="mt-1 line-clamp-2 text-sm leading-snug font-semibold group-hover:text-primary sm:text-base"
+                        </div>
+                      </a>
+                    }
+                  </div>
+                } @else {
+                  <div class="mt-4 flex flex-col gap-3">
+                    @for (product of pagedProducts(); track product.id) {
+                      <a
+                        [routerLink]="['/', slug, 'products', product.id]"
+                        class="group grid min-w-0 grid-cols-[5.5rem_minmax(0,1fr)] overflow-hidden rounded-2xl border border-base-300 bg-base-100 transition duration-200 hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-md sm:grid-cols-[7rem_minmax(0,1fr)]"
+                      >
+                        <div class="relative aspect-square overflow-hidden bg-[#eee8df]">
+                          @if (imageUrl(product.imagePath); as image) {
+                            <img
+                              [src]="image"
+                              [alt]="product.name"
+                              class="h-full w-full object-cover transition duration-300 group-hover:scale-[1.025]"
+                              loading="lazy"
+                            />
+                          } @else {
+                            <div
+                              class="grid h-full place-content-center bg-gradient-to-br from-[#f3eee7] to-[#e8dfd3] text-center text-[0.65rem] font-semibold tracking-wider text-base-content/30 uppercase"
+                            >
+                              No photo
+                            </div>
+                          }
+                          @if (!product.available) {
+                            <span class="badge badge-neutral badge-xs absolute right-2 bottom-2"
+                              >Unavailable</span
+                            >
+                          }
+                        </div>
+                        <div
+                          class="flex min-w-0 flex-col justify-center p-3.5 sm:flex-row sm:items-center sm:gap-5 sm:p-5"
                         >
-                          {{ product.name }}
-                        </h3>
-                        @if (product.variants.length > 1) {
-                          <p class="mt-1 text-xs text-base-content/45">
-                            {{ product.variants.length }} options
+                          <div class="min-w-0 flex-1">
+                            @if (product.manufacturer) {
+                              <p
+                                class="truncate text-[0.68rem] font-semibold tracking-[0.12em] text-base-content/45 uppercase"
+                              >
+                                {{ product.manufacturer }}
+                              </p>
+                            }
+                            <h3
+                              class="mt-1 line-clamp-2 text-sm leading-snug font-semibold group-hover:text-primary sm:text-base"
+                            >
+                              {{ product.name }}
+                            </h3>
+                            @if (product.variants.length > 1) {
+                              <p class="mt-1 text-xs text-base-content/45">
+                                {{ product.variants.length }} options
+                              </p>
+                            }
+                          </div>
+                          <p
+                            class="mt-2 shrink-0 text-base font-bold tabular-nums text-primary sm:mt-0"
+                          >
+                            {{ productPrice(product) }}
                           </p>
-                        }
-                        <p class="mt-auto pt-3 text-base font-bold tabular-nums text-primary">
-                          {{ productPrice(product) }}
-                        </p>
-                      </div>
-                    </a>
-                  }
-                </div>
+                        </div>
+                      </a>
+                    }
+                  </div>
+                }
 
                 @if (pageCount() > 1) {
                   <nav
@@ -355,8 +558,12 @@ export class ShopComponent implements OnInit, OnDestroy {
   );
   protected readonly categories = signal<ShopCategory[]>(this.initialCategories ?? []);
   protected readonly selectedCategory = signal<string | null>(null);
+  protected readonly view = signal<CatalogView>('grid');
+  private readonly lastProductView = signal<ProductView>('grid');
   protected readonly catalogLoading = signal(this.initialCatalog === null);
   protected readonly catalogError = signal(false);
+  protected readonly categoriesLoading = signal(this.initialCategories === null);
+  protected readonly categoriesError = signal(false);
   protected readonly notFound = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly query = signal('');
@@ -368,10 +575,19 @@ export class ShopComponent implements OnInit, OnDestroy {
   private searchTimer: ReturnType<typeof setTimeout> | undefined;
   private requestSequence = 0;
 
+  constructor() {
+    afterNextRender(() => this.restoreProductView());
+  }
+
   protected readonly pageCount = computed(() =>
     Math.max(1, Math.ceil(this.resultCount() / PAGE_SIZE))
   );
   protected readonly pagedProducts = this.products;
+  protected readonly sortedCategories = computed(() =>
+    [...this.categories()].sort(
+      (left, right) => left.name.localeCompare(right.name) || left.id.localeCompare(right.id)
+    )
+  );
   protected readonly firstResult = computed(() =>
     this.resultCount() ? (this.page() - 1) * PAGE_SIZE + 1 : 0
   );
@@ -420,13 +636,13 @@ export class ShopComponent implements OnInit, OnDestroy {
       if (shop.catalogue_visible) {
         const refreshTransferredData =
           isPlatformBrowser(this.platformId) && this.initialCatalog !== null;
-        const [, categories] = await Promise.all([
+        await Promise.all([
           this.loadCatalog(refreshTransferredData, refreshTransferredData),
-          this.storefront.categories(this.slug, refreshTransferredData),
+          this.loadCategories(refreshTransferredData),
         ]);
-        this.categories.set(categories);
       } else {
         this.catalogLoading.set(false);
+        this.categoriesLoading.set(false);
       }
     } catch (err) {
       this.catalogLoading.set(false);
@@ -441,6 +657,21 @@ export class ShopComponent implements OnInit, OnDestroy {
 
   protected async loadCatalog(force = false, preserveRenderedContent = false): Promise<void> {
     await this.loadPage(this.page(), force, preserveRenderedContent);
+  }
+
+  protected async loadCategories(force = false): Promise<void> {
+    if (!this.categories().length) this.categoriesLoading.set(true);
+    this.categoriesError.set(false);
+    try {
+      this.categories.set(await this.storefront.categories(this.slug, force));
+    } catch {
+      this.categoriesError.set(!this.categories().length);
+      if (this.view() === 'categories' && !this.categories().length) {
+        this.activateProductView();
+      }
+    } finally {
+      this.categoriesLoading.set(false);
+    }
   }
 
   private async loadPage(
@@ -478,6 +709,7 @@ export class ShopComponent implements OnInit, OnDestroy {
   }
 
   protected async selectCategory(id: string | null): Promise<void> {
+    if (this.view() === 'categories') this.activateProductView();
     if (id === this.selectedCategory()) return;
     if (this.searchTimer) clearTimeout(this.searchTimer);
     this.selectedCategory.set(id);
@@ -485,6 +717,7 @@ export class ShopComponent implements OnInit, OnDestroy {
   }
 
   protected setQuery(value: string): void {
+    if (this.view() === 'categories') this.activateProductView();
     this.query.set(value);
     this.page.set(1);
     if (this.searchTimer) clearTimeout(this.searchTimer);
@@ -500,6 +733,21 @@ export class ShopComponent implements OnInit, OnDestroy {
     const nextPage = Math.max(1, Math.min(page, this.pageCount()));
     void this.loadPage(nextPage);
     if (isPlatformBrowser(this.platformId)) window.scrollTo({ top: 420, behavior: 'smooth' });
+  }
+  protected setView(view: CatalogView): void {
+    if (view === 'categories') {
+      if (this.sortedCategories().length) this.view.set(view);
+      return;
+    }
+    this.lastProductView.set(view);
+    this.view.set(view);
+    if (isPlatformBrowser(this.platformId)) {
+      try {
+        window.localStorage.setItem(CATALOG_VIEW_KEY, view);
+      } catch {
+        // A blocked preference store should never block catalogue browsing.
+      }
+    }
   }
   protected productPrice(product: CatalogProduct): string {
     return product.minPrice === product.maxPrice
@@ -517,6 +765,21 @@ export class ShopComponent implements OnInit, OnDestroy {
   }
   protected legalUrl(path: 'privacy' | 'terms'): string {
     return this.storefront.legalUrl(path);
+  }
+  private activateProductView(): void {
+    this.view.set(this.lastProductView());
+  }
+  private restoreProductView(): void {
+    if (!isPlatformBrowser(this.platformId)) return;
+    try {
+      const stored = window.localStorage.getItem(CATALOG_VIEW_KEY);
+      if (stored === 'grid' || stored === 'list') {
+        this.lastProductView.set(stored);
+        this.view.set(stored);
+      }
+    } catch {
+      // Use the grid default when browser storage is unavailable.
+    }
   }
   private shopStructuredData(shop: StorefrontInfo): object {
     return {
