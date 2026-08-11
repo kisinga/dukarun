@@ -6,12 +6,16 @@ workspace.
 
 ## Contents
 
+- `backend/` — former Vendure service, migrations, tests, and recovery logic.
 - `frontend/` — former `@dukarun/frontend` Angular/Apollo dashboard.
-- `backend/`, `storefront/`, and `super-admin/` — Vendure services and companion apps.
 - `ARCHITECTURE.md` and `DEPLOYMENT.md` — former root system documents.
 - `docker-compose*.yml`, `dockerignore.*`, `.env.example` — former Vendure stack operations.
-- `badges/` and `coverage-summary.mjs` — final legacy coverage presentation tooling.
-- `FEATURE_CATALOG.md` and `GENERAL_TROUBLESHOOTING.md` — former product/operations references.
+- `GENERAL_TROUBLESHOOTING.md` — short recovery notes.
+- `../REFERENCE.md` — system history, retired decisions, and durable lessons.
+
+The separate Vendure storefront and platform-admin applications, presentation artifacts, and
+obsolete development tooling were removed during archive cleanup. Their v2 replacements live in
+the active root workspace.
 
 Generated `.angular`, `dist`, `coverage`, and `node_modules` directories were intentionally
 removed during archival. They are reproducible and are not source artifacts.

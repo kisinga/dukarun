@@ -18,6 +18,15 @@ export type Purchase = Database['public']['Tables']['purchases']['Row'];
 export type PurchasePayment = Database['public']['Tables']['purchase_payments']['Row'];
 export type PurchaseDraft = Database['public']['Tables']['purchase_drafts']['Row'];
 export type PurchaseLine = Database['public']['Tables']['purchase_lines']['Row'];
+export type PurchaseExpense = Database['public']['Tables']['purchase_expenses']['Row'];
+export type PurchaseHistoryRow = Purchase & {
+  goods_subtotal: number;
+  expense_total: number;
+  separate_expense_total: number;
+  all_in_total: number;
+  paid: number;
+  payment_status: string;
+};
 export type SupplierVariantPerformance =
   Database['public']['Views']['supplier_variant_performance']['Row'];
 export type SupplierPurchaseMetric =
@@ -71,6 +80,27 @@ export interface CashierAccount {
   label: string;
 }
 
+export interface PurchaseLineInput {
+  variant_id: string;
+  quantity: number;
+  unit_cost: number;
+  line_total: number;
+  value_source: 'unit' | 'total';
+  expiry_date?: string;
+  batch_number?: string;
+  new_wholesale_price?: number;
+  new_retail_price?: number;
+}
+
+export interface PurchaseExpenseInput {
+  category: 'transport' | 'loading' | 'packaging' | 'duty' | 'other';
+  custom_label?: string;
+  memo?: string;
+  amount: number;
+  settlement: 'supplier_bill' | 'separate';
+  account_code?: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class MoneyService {
   private readonly supabase = inject(SupabaseService);
@@ -84,13 +114,15 @@ export class MoneyService {
 
   // --- Reads ---
 
-  /** Real money accounts (allow_manual_posting) — the account picker source. */
+  /** Active postable asset accounts used by cash, bank, and mobile-money pickers. */
   async transactableAccounts(): Promise<LedgerAccount[]> {
     const { data, error } = await this.db
       .from('ledger_accounts')
       .select('*')
       .eq('allow_manual_posting', true)
       .eq('is_active', true)
+      .eq('is_parent', false)
+      .eq('type', 'asset')
       .order('code');
     if (error) throw error;
     return data;
@@ -153,6 +185,8 @@ export class MoneyService {
     pageSize: number;
     search?: string;
     accountCode?: string;
+    /** Mandatory account membership while `accountCode` may apply a second related-account filter. */
+    requiredAccountCode?: string;
     sourceType?: string;
     from?: string;
     to?: string;
@@ -161,10 +195,19 @@ export class MoneyService {
   }): Promise<{ rows: JournalEntryWithLines[]; count: number }> {
     // Filter through a separate relation alias so matching an account never
     // removes the journal entry's other side from the rendered transaction.
-    const select: string = input.accountCode
-      ? '*, account_filter:ledger_journal_lines!inner(ledger_accounts!inner(code)), ledger_journal_lines(*, ledger_accounts(code, name))'
-      : '*, ledger_journal_lines!entry_id(*, ledger_accounts(code, name))';
+    const filters = [
+      ...(input.requiredAccountCode
+        ? ['required_filter:ledger_journal_lines!inner(ledger_accounts!inner(code))']
+        : []),
+      ...(input.accountCode
+        ? ['account_filter:ledger_journal_lines!inner(ledger_accounts!inner(code))']
+        : []),
+    ];
+    const select = `*, ${filters.length ? filters.join(', ') + ', ' : ''}ledger_journal_lines!entry_id(*, ledger_accounts(code, name))`;
     let query = this.db.from('ledger_journal_entries').select(select, { count: 'exact' });
+    if (input.requiredAccountCode) {
+      query = query.eq('required_filter.ledger_accounts.code', input.requiredAccountCode);
+    }
     if (input.accountCode) {
       query = query.eq('account_filter.ledger_accounts.code', input.accountCode);
     }
@@ -318,7 +361,7 @@ export class MoneyService {
     to?: string;
     sortBy?: 'created_at' | 'purchase_date' | 'total_cost' | 'reference';
     sortDirection?: 'asc' | 'desc';
-  }): Promise<{ rows: (Purchase & { paid: number })[]; count: number }> {
+  }): Promise<{ rows: PurchaseHistoryRow[]; count: number }> {
     let query = this.db.from('purchase_history').select('*', { count: 'exact' });
     if (!input.allLocations) {
       query = query.eq('stock_location_id', input.locationId ?? this.locations.requireActiveId());
@@ -342,7 +385,7 @@ export class MoneyService {
       .range(start, start + input.pageSize - 1);
     if (error) throw error;
     return {
-      rows: (data ?? []).map(purchase => purchase as Purchase & { paid: number }),
+      rows: (data ?? []).map(purchase => purchase as PurchaseHistoryRow),
       count: count ?? 0,
     };
   }
@@ -360,6 +403,16 @@ export class MoneyService {
   async purchaseLines(purchaseId: string): Promise<PurchaseLine[]> {
     const { data, error } = await this.db
       .from('purchase_lines')
+      .select('*')
+      .eq('purchase_id', purchaseId)
+      .order('created_at');
+    if (error) throw error;
+    return data;
+  }
+
+  async purchaseExpenses(purchaseId: string): Promise<PurchaseExpense[]> {
+    const { data, error } = await this.db
+      .from('purchase_expenses')
       .select('*')
       .eq('purchase_id', purchaseId)
       .order('created_at');
@@ -737,6 +790,72 @@ export class MoneyService {
       ...(notes ? { p_notes: notes } : {}),
       ...(purchaseDate ? { p_purchase_date: purchaseDate } : {}),
       ...(stockLocationId ? { p_stock_location_id: stockLocationId } : {}),
+    });
+    if (error) throw rpcError(error);
+    this.parties.invalidateFinancials();
+    return data;
+  }
+
+  async recordPurchaseComplete(input: {
+    supplierId: string;
+    lines: PurchaseLineInput[];
+    expenses: PurchaseExpenseInput[];
+    paymentAmount: number;
+    reference?: string;
+    accountCode?: string;
+    notes?: string;
+    purchaseDate?: string;
+    stockLocationId?: string;
+  }): Promise<string> {
+    const { data, error } = await this.db.rpc('record_purchase_complete', {
+      p_supplier_id: input.supplierId,
+      p_lines: input.lines as never,
+      p_expenses: input.expenses as never,
+      p_payment_amount: input.paymentAmount,
+      ...(input.reference ? { p_reference: input.reference } : {}),
+      ...(input.accountCode ? { p_account_code: input.accountCode } : {}),
+      ...(input.notes ? { p_notes: input.notes } : {}),
+      ...(input.purchaseDate ? { p_purchase_date: input.purchaseDate } : {}),
+      ...(input.stockLocationId ? { p_stock_location_id: input.stockLocationId } : {}),
+    });
+    if (error) throw rpcError(error);
+    this.parties.invalidateFinancials();
+    return data;
+  }
+
+  async savePurchaseDraftComplete(input: {
+    draftId?: string;
+    supplierId: string;
+    lines: PurchaseLineInput[];
+    expenses: PurchaseExpenseInput[];
+    reference?: string;
+    notes?: string;
+    purchaseDate: string;
+    stockLocationId?: string;
+    paymentMode?: 'paid' | 'partial' | 'later';
+    paymentAmount?: number;
+    accountCode?: string;
+  }): Promise<string> {
+    const { data, error } = await this.db.rpc('save_purchase_draft_complete', {
+      p_supplier_id: input.supplierId,
+      p_lines: input.lines as never,
+      p_expenses: input.expenses as never,
+      p_purchase_date: input.purchaseDate,
+      ...(input.draftId ? { p_draft_id: input.draftId } : {}),
+      ...(input.reference ? { p_reference: input.reference } : {}),
+      ...(input.notes ? { p_notes: input.notes } : {}),
+      ...(input.stockLocationId ? { p_stock_location_id: input.stockLocationId } : {}),
+      ...(input.paymentMode ? { p_payment_mode: input.paymentMode } : {}),
+      ...(input.paymentAmount !== undefined ? { p_payment_amount: input.paymentAmount } : {}),
+      ...(input.accountCode ? { p_account_code: input.accountCode } : {}),
+    });
+    if (error) throw rpcError(error);
+    return data;
+  }
+
+  async confirmPurchaseDraftComplete(draftId: string): Promise<string> {
+    const { data, error } = await this.db.rpc('confirm_purchase_draft_complete', {
+      p_draft_id: draftId,
     });
     if (error) throw rpcError(error);
     this.parties.invalidateFinancials();

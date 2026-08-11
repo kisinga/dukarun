@@ -2,7 +2,7 @@
 # Dukarun Application Services
 # =====================================
 #
-# This file contains only application services (backend, frontend, super-admin).
+# This file contains only the retained application services (backend and frontend).
 # Infrastructure services (databases, cache, observability) are in docker-compose.services.yml
 # Images are built by Coolify (or locally) from Dockerfiles; no registry pull.
 #
@@ -144,66 +144,6 @@ services:
         - curl
         - -f
         - http://localhost:4200/health
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-
-  # ========================================
-  # Super Admin (Angular + Nginx, port 4201)
-  # ========================================
-  super-admin:
-    build:
-      context: ../..
-      dockerfile: ./archive/vendure/super-admin/Dockerfile
-    platform: linux/amd64
-    restart: unless-stopped
-    networks:
-      - dukarun_services_network
-    environment:
-      # Same pattern as frontend: nginx proxies /admin-api to backend; app uses relative URL only.
-      BACKEND_HOST: ${BACKEND_HOST}
-      BACKEND_PORT: ${BACKEND_PORT}
-    ports:
-      - '127.0.0.1:${SUPERADMIN_PORT:-4201}:4201'
-    depends_on:
-      backend:
-        condition: service_healthy
-    healthcheck:
-      test:
-        - CMD
-        - curl
-        - -f
-        - http://localhost:4201/health
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-
-  storefront:
-    build:
-      context: ../..
-      dockerfile: ./archive/vendure/storefront/Dockerfile
-    platform: linux/amd64
-    restart: unless-stopped
-    networks:
-      - dukarun_services_network
-    environment:
-      # nginx proxies /shop-api, /assets and SEO endpoints to backend; app uses relative URLs only.
-      # Route every merchant subdomain (*.dukarun.com) to this service in the reverse proxy / Coolify.
-      BACKEND_HOST: ${BACKEND_HOST}
-      BACKEND_PORT: ${BACKEND_PORT}
-    ports:
-      - '127.0.0.1:${STOREFRONT_PORT:-4202}:4202'
-    depends_on:
-      backend:
-        condition: service_healthy
-    healthcheck:
-      test:
-        - CMD
-        - curl
-        - -f
-        - http://localhost:4202/health
       interval: 30s
       timeout: 10s
       retries: 3

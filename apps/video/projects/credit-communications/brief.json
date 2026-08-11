@@ -1,0 +1,13 @@
+{
+  "projectId": "credit-communications",
+  "title": "Keep every balance clear",
+  "audience": "Kenyan shop owners who manage customer credit and supplier balances",
+  "objective": "Show clear customer and supplier accounts, correctly allocated payments, and timely customer communication through SMS and WhatsApp.",
+  "language": "en-KE",
+  "targetDurationSeconds": 20,
+  "targetWordRange": [35, 44],
+  "claimIds": ["customer-credit", "supplier-purchases", "automated-customer-comms"],
+  "callToAction": "Get started",
+  "narrationMode": "human",
+  "renderTargets": ["wide", "vertical", "square"]
+}

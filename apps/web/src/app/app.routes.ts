@@ -1,9 +1,16 @@
-import { Routes } from '@angular/router';
+import { Routes, type CanDeactivateFn } from '@angular/router';
 import { authGuard, guestGuard } from './core/auth.guard';
 import { locationGuard } from './core/location.guard';
 import { permissionGuard } from './core/permission.guard';
 import { featureGuard } from './core/feature.guard';
 import { legalAcceptanceGuard } from './legal/legal.guard';
+
+interface UnsavedChangesComponent {
+  canDeactivate(): boolean;
+}
+
+const confirmUnsavedChanges: CanDeactivateFn<UnsavedChangesComponent> = component =>
+  component.canDeactivate();
 
 export const routes: Routes = [
   {
@@ -140,6 +147,18 @@ export const routes: Routes = [
         path: 'suppliers',
         loadComponent: () =>
           import('./suppliers/suppliers.component').then(m => m.SuppliersComponent),
+      },
+      {
+        path: 'purchases/new',
+        canDeactivate: [confirmUnsavedChanges],
+        loadComponent: () =>
+          import('./purchases/purchase-editor.component').then(m => m.PurchaseEditorComponent),
+      },
+      {
+        path: 'purchases/drafts/:id',
+        canDeactivate: [confirmUnsavedChanges],
+        loadComponent: () =>
+          import('./purchases/purchase-editor.component').then(m => m.PurchaseEditorComponent),
       },
       {
         path: 'purchases',

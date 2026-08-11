@@ -18,7 +18,7 @@ interface DocSection {
 
 /**
  * Public getting-started guide and feature documentation. Sections are
- * collapsed accordions with stable anchor ids — homepage feature cards
+ * collapsed accordions with stable anchor ids. Homepage feature cards
  * deep-link into them (/docs#offline, /docs#credit, …).
  * Everything documented here is a shipped v2 feature.
  */
@@ -253,7 +253,7 @@ export class DocsComponent {
       summary: 'Trust your team, verify the sensitive stuff.',
       details: [
         'Roles decide what each person can do: cashiers sell, managers approve, owners see everything. Permissions are enforced by the app itself.',
-        'Sensitive actions — like large discounts, stock adjustments, or refunds — can be held for approval. The request reaches a manager, who approves or rejects with one tap.',
+        'Sensitive actions, including large discounts, stock adjustments, or refunds, can be held for approval. The request reaches a manager, who approves or rejects with one tap.',
         'An audit trail records who did what and when, so "I don\'t know what happened" stops being an answer.',
       ],
     },
@@ -285,7 +285,7 @@ export class DocsComponent {
       title: 'Team management',
       summary: 'Who works here, and who did what.',
       details: [
-        'Invite staff by phone, assign roles, and deactivate access the day someone leaves — their sales history stays intact.',
+        'Invite staff by phone, assign roles, and deactivate access when someone leaves. Their sales history stays intact.',
         'Staff performance views show sales per person, so pay and performance conversations both have numbers behind them.',
         'Optional commissions can be configured per team member where that fits how you pay.',
       ],
@@ -296,7 +296,7 @@ export class DocsComponent {
       title: 'Suppliers & purchases',
       summary: 'What you owe, next to what you are owed.',
       details: [
-        'Record purchases from suppliers as they happen — they add stock and create payables in one step.',
+        'Record purchases from suppliers as they happen. They add stock and create payables in one step.',
         'The money view puts supplier payables next to customer receivables, so you see your true position in one place.',
       ],
     },

@@ -1,0 +1,86 @@
+{
+  "projectId": "sale-records",
+  "title": "Keep every sale on record",
+  "language": "en-KE",
+  "fps": 30,
+  "durationInFrames": 637,
+  "promptVersion": "sale-records-v1",
+  "model": "human-authored",
+  "callToAction": "Get started",
+  "narration": [
+    {
+      "id": "find-and-pay",
+      "text": "Find the item by name, quick selection or barcode, then take cash or M-Pesa.",
+      "source": "script",
+      "audioFile": null,
+      "startFrame": 0,
+      "endFrame": 208
+    },
+    {
+      "id": "records-update",
+      "text": "Dukarun records the sale, updates stock and posts it to the books.",
+      "source": "script",
+      "audioFile": null,
+      "startFrame": 208,
+      "endFrame": 371
+    },
+    {
+      "id": "offline-sync",
+      "text": "If the connection drops, the sale stays on the device and syncs when the internet returns.",
+      "source": "script",
+      "audioFile": null,
+      "startFrame": 371,
+      "endFrame": 547
+    }
+  ],
+  "scenes": [
+    {
+      "id": "find-and-pay",
+      "template": "barcode-sale",
+      "startFrame": 0,
+      "durationInFrames": 208,
+      "headline": "Record every sale.",
+      "body": "Search. Quick add. Barcode.",
+      "claimIds": ["product-selection", "cash-mpesa"],
+      "narrationSegmentIds": ["find-and-pay"],
+      "data": {
+        "total": 185
+      }
+    },
+    {
+      "id": "records-update",
+      "template": "transaction-flow",
+      "startFrame": 208,
+      "durationInFrames": 163,
+      "headline": "Stock and books update.",
+      "body": "One complete transaction record.",
+      "claimIds": ["inventory-updates", "ledger-posting"],
+      "narrationSegmentIds": ["records-update"],
+      "data": {}
+    },
+    {
+      "id": "offline-sync",
+      "template": "offline-sync",
+      "startFrame": 371,
+      "durationInFrames": 176,
+      "headline": "Saved on the device.",
+      "body": "Synced when the connection returns.",
+      "claimIds": ["offline-selling"],
+      "narrationSegmentIds": ["offline-sync"],
+      "data": {
+        "total": 185
+      }
+    },
+    {
+      "id": "close",
+      "template": "cta",
+      "startFrame": 547,
+      "durationInFrames": 90,
+      "headline": "Keep every sale on record.",
+      "body": "Run your business with Dukarun.",
+      "claimIds": [],
+      "narrationSegmentIds": [],
+      "data": {}
+    }
+  ]
+}

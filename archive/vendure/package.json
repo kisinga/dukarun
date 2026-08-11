@@ -4,20 +4,14 @@
   "private": true,
   "workspaces": [
     "backend",
-    "frontend",
-    "storefront",
-    "super-admin"
+    "frontend"
   ],
   "scripts": {
     "dev:backend": "npm run dev -w @dukarun/backend",
     "dev:frontend": "npm start -w @dukarun/frontend",
-    "dev:storefront": "npm start -w @dukarun/storefront",
-    "dev:super-admin": "npm start -w super-admin",
-    "build": "npm run build:backend && npm run build:frontend && npm run build:storefront && npm run build:super-admin",
+    "build": "npm run build:backend && npm run build:frontend",
     "build:backend": "npm run build -w @dukarun/backend",
     "build:frontend": "npm run build -w @dukarun/frontend",
-    "build:storefront": "npm run build -w @dukarun/storefront",
-    "build:super-admin": "npm run build -w super-admin",
     "test:backend": "npm test -w @dukarun/backend",
     "test:frontend": "npm run test:headless -w @dukarun/frontend",
     "services:up": "docker compose -f docker-compose.services.yml -f docker-compose.services.override.yml up -d",

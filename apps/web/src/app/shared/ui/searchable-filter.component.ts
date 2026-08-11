@@ -18,7 +18,7 @@ export interface SearchableFilterOption {
   searchText?: string;
 }
 
-/** A bounded, searchable alternative to rendering large entity lists in a select. */
+/** Searchable choice/filter for entity lists that can reasonably grow beyond ten options. */
 @Component({
   selector: 'app-searchable-filter',
   imports: [IconComponent],
@@ -26,7 +26,9 @@ export interface SearchableFilterOption {
   template: `
     <button
       type="button"
-      class="input input-bordered input-sm flex w-full items-center gap-2 text-left font-normal"
+      class="input input-bordered flex w-full items-center gap-2 text-left font-normal"
+      [class.input-sm]="controlSize() === 'sm'"
+      [class.h-12]="controlSize() === 'md'"
       role="combobox"
       [attr.aria-expanded]="open()"
       [attr.aria-label]="ariaLabel()"
@@ -114,6 +116,7 @@ export class SearchableFilterComponent {
   readonly searchPlaceholder = input('Search…');
   readonly ariaLabel = input('Filter');
   readonly maxResults = input(10);
+  readonly controlSize = input<'sm' | 'md'>('sm');
 
   protected readonly open = signal(false);
   protected readonly query = signal('');

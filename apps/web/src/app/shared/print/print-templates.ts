@@ -129,6 +129,13 @@ export interface PurchaseData {
       product?: { id: string; name: string; manufacturerName?: string };
     };
   }>;
+  expenses?: Array<{
+    id: string;
+    category: string;
+    custom_label?: string | null;
+    memo?: string | null;
+    amount: number;
+  }>;
 }
 
 /**
@@ -968,6 +975,19 @@ export class A4PurchaseTemplate {
                                 </tr>
             `;
     });
+
+    for (const expense of purchase.expenses ?? []) {
+      const category = expense.custom_label || expense.category;
+      const label = expense.memo ? `${category} · ${expense.memo}` : category;
+      html += `
+                                <tr>
+                                    <td>${label}</td>
+                                    <td class="text-right">—</td>
+                                    <td class="text-right">—</td>
+                                    <td class="text-right">${this.formatCurrency(expense.amount, 'KES')}</td>
+                                </tr>
+            `;
+    }
 
     html += `
                             </tbody>

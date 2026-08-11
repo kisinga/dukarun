@@ -46,8 +46,8 @@ interface Testimonial {
 }
 
 /**
- * Public landing page. Every claim here maps to a shipped v2 feature —
- * no camera recognition, no public storefronts, no push notifications.
+ * Public landing page. Every claim here maps to a shipped v2 feature.
+ * Product claims are grounded in shipped application workflows.
  * The till demo is fully client-side with fictional products and prices.
  */
 @Component({
@@ -68,8 +68,8 @@ interface Testimonial {
           Every shilling,<br />accounted for<span class="text-primary">.</span>
         </h1>
         <p class="mkt-lead mx-auto mt-5 max-w-xl">
-          Sell by cash or M-Pesa, with or without internet. Every sale goes straight into a proper
-          double-entry ledger, so your books are always up to date.
+          Record every sale, stock movement, credit balance and expense, even when the internet
+          drops. Keep accurate books and make decisions from numbers you can trust.
         </p>
         <div class="mt-8 flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
           <a [href]="appUrl('/register')" class="btn btn-primary btn-lg min-h-11">
@@ -95,17 +95,24 @@ interface Testimonial {
         <div class="mkt-container">
           <div class="text-center">
             <span class="mkt-eyebrow">See it in action</span>
-            <h2 id="overview-video-heading" class="mkt-h2 mt-2">From the counter to the books</h2>
+            <h2 id="overview-video-heading" class="mkt-h2 mt-2">
+              Turn daily work into reliable numbers
+            </h2>
             <p class="mkt-lead mx-auto mt-3 max-w-xl">
-              One sale, one minute: sell offline, sync safely, and see the books update.
+              Sales, stock, staff, customer balances and controls stay on record across every
+              location.
             </p>
           </div>
           <div class="mt-10">
             <app-marketing-video
-              title="Dukarun offline point-of-sale walkthrough"
-              [src]="videoUrl('offline-pos-full-wide.mp4')"
-              [poster]="videoUrl('offline-pos-full-wide.png')"
-              [captions]="videoUrl('offline-pos.en-KE.vtt')"
+              title="Dukarun product overview"
+              duration="1:27"
+              summary="Sales, stock, credit and accounting in one connected record."
+              [src]="videoUrl('product-overview-full-wide.mp4')"
+              [mobileSrc]="videoUrl('product-overview-full-square.mp4')"
+              [poster]="videoUrl('product-overview-full-wide.png')"
+              [mobilePoster]="videoUrl('product-overview-full-square.png')"
+              [captions]="videoUrl('product-overview.en-KE.vtt')"
             />
           </div>
         </div>
@@ -356,7 +363,7 @@ interface Testimonial {
               routerLink="/docs"
               [fragment]="feature.docId"
               class="mkt-card flex flex-col gap-3 p-5"
-              [attr.aria-label]="feature.title + ' — read the documentation'"
+              [attr.aria-label]="'Read the documentation for ' + feature.title"
             >
               <span
                 class="flex h-10 w-10 items-center justify-center rounded-field bg-primary/10 text-primary"
@@ -380,31 +387,6 @@ interface Testimonial {
         </div>
       </div>
     </section>
-
-    @if (marketingVideoBaseUrl) {
-      <!-- Focused walkthroughs -->
-      <section class="bg-base-100 py-14 sm:py-20" aria-labelledby="workflow-videos-heading">
-        <div class="mkt-container">
-          <div class="text-center">
-            <span class="mkt-eyebrow">Fifteen-second walkthroughs</span>
-            <h2 id="workflow-videos-heading" class="mkt-h2 mt-2">The important parts, up close</h2>
-          </div>
-          <div class="mt-10 grid gap-6 md:grid-cols-3">
-            @for (video of workflowVideos; track video.file) {
-              <article class="mkt-card p-4 sm:p-5">
-                <app-marketing-video
-                  [title]="video.title"
-                  [src]="videoUrl(video.file)"
-                  [poster]="videoUrl(video.poster)"
-                  [caption]="video.caption"
-                  preload="none"
-                />
-              </article>
-            }
-          </div>
-        </div>
-      </section>
-    }
 
     <!-- A day at the duka -->
     <section class="bg-base-100 py-14 sm:py-20" aria-labelledby="day-heading">
@@ -473,7 +455,7 @@ interface Testimonial {
                   {{ kes(plan.price_yearly) }} per year
                   @if (yearlySaving(plan) > 0) {
                     <span class="font-semibold text-primary">
-                      — save {{ kes(yearlySaving(plan)) }}
+                      Save {{ kes(yearlySaving(plan)) }}
                     </span>
                   }
                 </p>
@@ -594,27 +576,6 @@ export class HomeComponent implements OnInit {
   protected readonly trialDays = signal<number | null>(this.initialConfig?.trialDays ?? null);
   protected readonly pricingLoading = signal(this.initialPlans === null);
   protected readonly marketingVideoBaseUrl = environment.marketingVideoBaseUrl.replace(/\/+$/, '');
-  protected readonly workflowVideos = [
-    {
-      title: 'Offline selling and safe synchronization',
-      file: 'offline-pos-offline-square.mp4',
-      poster: 'offline-pos-offline-square.png',
-      caption: 'Keep serving customers while sales wait safely for the network.',
-    },
-    {
-      title: 'Automatic double-entry ledger posting',
-      file: 'offline-pos-ledger-square.mp4',
-      poster: 'offline-pos-ledger-square.png',
-      caption: 'See the payment and sale land in balanced books.',
-    },
-    {
-      title: 'Owner dashboard update',
-      file: 'offline-pos-dashboard-square.mp4',
-      poster: 'offline-pos-dashboard-square.png',
-      caption: 'Review revenue, sales, margin, and synchronization status.',
-    },
-  ] as const;
-
   protected videoUrl(file: string): string {
     return `${this.marketingVideoBaseUrl}/${file}`;
   }

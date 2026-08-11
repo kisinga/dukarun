@@ -1,0 +1,20 @@
+{
+  "projectId": "stock-decisions",
+  "title": "Act on numbers you can trust",
+  "audience": "Kenyan shop owners who need current stock and performance visibility across locations",
+  "objective": "Show how Dukarun connects sales performance, margin, stock attention, purchases, adjustments, and location transfers for better decisions.",
+  "language": "en-KE",
+  "targetDurationSeconds": 20,
+  "targetWordRange": [35, 44],
+  "claimIds": [
+    "owner-dashboard",
+    "multi-location-dashboard",
+    "supplier-purchases",
+    "stock-adjustments",
+    "stock-transfers",
+    "business-reporting"
+  ],
+  "callToAction": "Get started",
+  "narrationMode": "human",
+  "renderTargets": ["wide", "vertical", "square"]
+}

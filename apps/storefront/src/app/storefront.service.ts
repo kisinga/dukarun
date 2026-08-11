@@ -65,6 +65,10 @@ export interface ExternalDocument {
 
 const DIRECTORY_KEY = makeStateKey<StorefrontInfo[]>('storefront:directory');
 const shopKey = (slug: string) => makeStateKey<StorefrontInfo | null>(`storefront:shop:${slug}`);
+const catalogPageKey = (slug: string, limit: number, offset: number) =>
+  makeStateKey<CatalogPage>(`storefront:catalog:${slug}:${limit}:${offset}`);
+const collectionsKey = (slug: string) =>
+  makeStateKey<ShopCollection[]>(`storefront:collections:${slug}`);
 
 /**
  * Anonymous read-only access to the public storefront surface.
@@ -89,6 +93,22 @@ export class StorefrontService {
     public_whatsapp_number: '+254700000000',
     catalogue_visible: true,
   };
+  private readonly fixtureCatalog: CatalogRow[] = [
+    {
+      available: true,
+      image_path: '',
+      kind: 'stock',
+      manufacturer_id: '00000000-0000-0000-0000-000000000002',
+      manufacturer_name: 'Fixture Foods',
+      price: 165,
+      product_id: '00000000-0000-0000-0000-000000000003',
+      product_name: 'Fixture Sugar 1kg',
+      sku: 'FIX-SUGAR-1KG',
+      total_count: 1,
+      variant_id: '00000000-0000-0000-0000-000000000004',
+      variant_name: 'Default',
+    },
+  ];
 
   /** All public storefronts (the directory at `/`). */
   transferredDirectory(): StorefrontInfo[] | null {
@@ -100,6 +120,18 @@ export class StorefrontService {
   transferredStorefront(slug: string): StorefrontInfo | null | undefined {
     const key = shopKey(slug);
     return this.transferState.hasKey(key) ? this.transferState.get(key, null) : undefined;
+  }
+
+  transferredCatalogPage(slug: string, limit = 12, offset = 0): CatalogPage | null {
+    const key = catalogPageKey(slug, limit, offset);
+    return this.transferState.hasKey(key)
+      ? this.transferState.get(key, { rows: [], total: 0, offset })
+      : null;
+  }
+
+  transferredCollections(slug: string): ShopCollection[] | null {
+    const key = collectionsKey(slug);
+    return this.transferState.hasKey(key) ? this.transferState.get(key, []) : null;
   }
 
   async directory(force = false): Promise<StorefrontInfo[]> {
@@ -156,39 +188,62 @@ export class StorefrontService {
       collectionId?: string | null;
       limit?: number;
       offset?: number;
+      force?: boolean;
     } = {}
   ): Promise<CatalogPage> {
-    if (environment.publicDataMode === 'fixture') return { rows: [], total: 0, offset: 0 };
-    return this.track(async () => {
-      const limit = options.limit ?? 12;
-      const requestedOffset = options.offset ?? 0;
-      const search = options.search?.trim();
-      const collectionId = options.collectionId;
-      const fetchPage = async (offset: number): Promise<CatalogPage> => {
-        const { data, error } = await this.client.rpc('storefront_catalog_page', {
-          p_slug: slug,
-          p_limit: limit,
-          p_offset: offset,
-          ...(search ? { p_search: search } : {}),
-          ...(collectionId ? { p_collection_id: collectionId } : {}),
-        });
-        if (error) throw error;
-        return { rows: data, total: Number(data[0]?.total_count ?? 0), offset };
-      };
+    const limit = options.limit ?? 12;
+    const requestedOffset = options.offset ?? 0;
+    const key = catalogPageKey(slug, limit, requestedOffset);
+    const cacheable = !options.search?.trim() && !options.collectionId;
+    if (!options.force && cacheable && this.transferState.hasKey(key)) {
+      return this.transferState.get(key, { rows: [], total: 0, offset: requestedOffset });
+    }
+    const fixtureRows = options.search?.trim()
+      ? this.fixtureCatalog.filter(row =>
+          row.product_name.toLowerCase().includes(options.search!.trim().toLowerCase())
+        )
+      : this.fixtureCatalog;
+    const page =
+      environment.publicDataMode === 'fixture'
+        ? {
+            rows: fixtureRows.slice(requestedOffset, requestedOffset + limit),
+            total: fixtureRows.length,
+            offset: requestedOffset,
+          }
+        : await this.track(async () => {
+            const search = options.search?.trim();
+            const collectionId = options.collectionId;
+            const fetchPage = async (offset: number): Promise<CatalogPage> => {
+              const { data, error } = await this.client.rpc('storefront_catalog_page', {
+                p_slug: slug,
+                p_limit: limit,
+                p_offset: offset,
+                ...(search ? { p_search: search } : {}),
+                ...(collectionId ? { p_collection_id: collectionId } : {}),
+              });
+              if (error) throw error;
+              return { rows: data, total: Number(data[0]?.total_count ?? 0), offset };
+            };
 
-      const requestedPage = await fetchPage(requestedOffset);
-      if (requestedPage.rows.length > 0 || requestedOffset === 0) return requestedPage;
+            const requestedPage = await fetchPage(requestedOffset);
+            if (requestedPage.rows.length > 0 || requestedOffset === 0) return requestedPage;
 
-      const firstPage = await fetchPage(0);
-      if (firstPage.total === 0) return firstPage;
-      const lastOffset = Math.floor((firstPage.total - 1) / limit) * limit;
-      return lastOffset === 0 ? firstPage : fetchPage(lastOffset);
-    });
+            const firstPage = await fetchPage(0);
+            if (firstPage.total === 0) return firstPage;
+            const lastOffset = Math.floor((firstPage.total - 1) / limit) * limit;
+            return lastOffset === 0 ? firstPage : fetchPage(lastOffset);
+          });
+    if (isPlatformServer(this.platformId) && cacheable) this.transferState.set(key, page);
+    return page;
   }
 
   /** The variants needed by one product detail route only. */
   async product(slug: string, productId: string): Promise<CatalogRow[]> {
-    if (environment.publicDataMode === 'fixture') return [];
+    if (environment.publicDataMode === 'fixture') {
+      return slug === this.fixtureShop.slug
+        ? this.fixtureCatalog.filter(row => row.product_id === productId)
+        : [];
+    }
     return this.track(async () => {
       const { data, error } = await this.client.rpc('storefront_product', {
         p_slug: slug,
@@ -200,13 +255,21 @@ export class StorefrontService {
   }
 
   /** Active collections for the shop. */
-  async collections(slug: string): Promise<ShopCollection[]> {
-    if (environment.publicDataMode === 'fixture') return [];
-    return this.track(async () => {
-      const { data, error } = await this.client.rpc('storefront_collections', { p_slug: slug });
-      if (error) throw error;
-      return data;
-    });
+  async collections(slug: string, force = false): Promise<ShopCollection[]> {
+    const key = collectionsKey(slug);
+    if (!force && this.transferState.hasKey(key)) return this.transferState.get(key, []);
+    const collections =
+      environment.publicDataMode === 'fixture'
+        ? []
+        : await this.track(async () => {
+            const { data, error } = await this.client.rpc('storefront_collections', {
+              p_slug: slug,
+            });
+            if (error) throw error;
+            return data;
+          });
+    if (isPlatformServer(this.platformId)) this.transferState.set(key, collections);
+    return collections;
   }
 
   /** Public product-image URL from a storage path. */

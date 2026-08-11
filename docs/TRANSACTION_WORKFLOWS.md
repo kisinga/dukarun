@@ -34,6 +34,15 @@ stock, fractional quantities follow the variant setting, and stock locations are
 - `record_purchase_with_payment` and `confirm_purchase_draft_with_payment` accept the initial
   amount paid. Zero records credit, the full total records paid now, and an in-between amount
   records a credit purchase plus its allocated supplier payment atomically.
+- `record_purchase_complete` is the purchase-workspace contract. Each line carries both unit cost
+  and line total plus the user's authoritative input. Total-authoritative lines retain the exact
+  invoice amount; batch `original_cost`/`remaining_cost` carry that value through FIFO so final
+  COGS cannot lose a rounding residual.
+- Purchase-associated expenses post in the same transaction. Supplier-bill expenses increase the
+  invoice/AP total; separately paid expenses credit their selected asset account immediately.
+  Both debit `EXPENSES`, remain linked to the purchase, and never affect product-cost intelligence.
+- Purchase drafts retain receiving, payment, exact line totals, and expense intent. Draft save has
+  no stock, cash, AP, or journal effect; confirmation revalidates every account and permission.
 - `pay_purchase` allocates payment to one purchase; `pay_supplier` remains the oldest-first
   supplier-level shortcut.
 

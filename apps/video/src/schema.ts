@@ -7,6 +7,20 @@ export const NarrationModeSchema = z.enum(['human', 'mixed', 'silent']);
 export type NarrationMode = z.infer<typeof NarrationModeSchema>;
 
 export const SceneTemplateSchema = z.enum([
+  'business-operations',
+  'records-breakdown',
+  'dukarun-transition',
+  'overview-hook',
+  'barcode-sale',
+  'transaction-flow',
+  'remote-dashboard',
+  'staff-performance',
+  'customer-comms',
+  'operations-snapshot',
+  'offline-sync',
+  'credit-accounts',
+  'customer-reminders',
+  'stock-operations',
   'brand-hook',
   'phone-pos',
   'offline-state',
@@ -103,7 +117,6 @@ export type ApprovalRecord = z.infer<typeof ApprovalRecordSchema>;
 export const CompositionPropsSchema = z.object({
   manifest: ScriptManifestSchema,
   target: RenderTargetSchema,
-  cutdown: z.enum(['full', 'offline', 'ledger', 'dashboard']).default('full'),
   review: z.boolean().default(false),
   voice: VoiceRuntimeSchema.nullable().default(null),
 });
@@ -140,7 +153,7 @@ export function validateManifest(
 
   const words = countWords(manifest.narration.map(segment => segment.text).join(' '));
   if (wordRange && (words < wordRange[0] || words > wordRange[1])) {
-    throw new Error(`Narration has ${words} words; expected ${wordRange[0]}–${wordRange[1]}`);
+    throw new Error(`Narration has ${words} words; expected ${wordRange[0]} to ${wordRange[1]}`);
   }
 
   return manifest;

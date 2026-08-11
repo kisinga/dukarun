@@ -34,13 +34,10 @@ import {
   type ScriptManifest,
   type VoiceRuntime,
 } from '../src/schema';
-import type { Cutdown } from '../src/timeline';
-
 loadEnvironment({ path: path.join(repoRoot, '.env'), quiet: true });
 
 const execFileAsync = promisify(execFile);
-const DEFAULT_PROJECT = 'offline-pos';
-const CUTDOWNS: Cutdown[] = ['full', 'offline', 'ledger', 'dashboard'];
+const DEFAULT_PROJECT = 'product-overview';
 
 type Arguments = {
   command: string;
@@ -225,13 +222,12 @@ async function render(projectId: string, review: boolean, only?: string): Promis
     await readJson(path.join(projectDirectory(projectId), 'brief.json'))
   );
   const requested = only ? new Set(only.split(',').map(value => value.trim())) : null;
-  const renderJobs = CUTDOWNS.flatMap(cutdown =>
-    brief.renderTargets.map(target => ({
-      cutdown,
+  const renderJobs = brief.renderTargets
+    .map(target => ({
       target,
-      id: `${projectId}-${cutdown}-${target}`,
+      id: `${projectId}-full-${target}`,
     }))
-  ).filter(job => !requested || requested.has(job.id));
+    .filter(job => !requested || requested.has(job.id));
   if (renderJobs.length === 0)
     throw new Error('No compositions matched --only. Use comma-separated composition IDs.');
 
@@ -253,7 +249,7 @@ async function render(projectId: string, review: boolean, only?: string): Promis
 
   for (const [index, job] of renderJobs.entries()) {
     console.log(`[${index + 1}/${renderJobs.length}] Rendering ${job.id}`);
-    const inputProps = { manifest, target: job.target, cutdown: job.cutdown, review, voice };
+    const inputProps = { manifest, target: job.target, review, voice };
     const composition = await selectComposition({ serveUrl, id: job.id, inputProps });
     const videoFile = path.join(outputDirectory, `${job.id}.mp4`);
     const thumbnailFile = path.join(outputDirectory, `${job.id}.png`);

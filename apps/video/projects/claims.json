@@ -3,14 +3,14 @@
     "id": "offline-selling",
     "wording": "Keep selling when the network drops; sales wait safely and sync when connectivity returns.",
     "status": "shipped",
-    "source": "apps/web/src/app/marketing/home/home.component.ts",
+    "source": "apps/web/src/app/pos/offline/sync.service.ts",
     "contexts": ["overview", "walkthrough", "marketing"]
   },
   {
     "id": "cash-mpesa",
     "wording": "Take payment by cash or M-Pesa from the point of sale.",
     "status": "shipped",
-    "source": "apps/web/src/app/marketing/home/home.component.ts",
+    "source": "apps/web/src/app/pos/sell/sell.component.ts",
     "contexts": ["overview", "walkthrough", "marketing"]
   },
   {
@@ -25,6 +25,125 @@
     "wording": "Owners can review revenue, sales, margin, stock attention, and sync status from the dashboard.",
     "status": "shipped",
     "source": "apps/web/src/app/pages/dashboard/dashboard.component.ts",
+    "contexts": ["overview", "walkthrough", "marketing"]
+  },
+  {
+    "id": "product-selection",
+    "wording": "Cashiers can find products by searching by product, manufacturer, or SKU, choosing quick products, or scanning barcodes with the device camera or barcode-scanner hardware.",
+    "status": "shipped",
+    "source": "apps/web/src/app/pos/sell/sell.component.ts",
+    "contexts": ["overview", "walkthrough", "marketing"]
+  },
+  {
+    "id": "inventory-updates",
+    "wording": "Completed sales update tracked inventory as part of the transaction workflow.",
+    "status": "shipped",
+    "source": "docs/TRANSACTION_WORKFLOWS.md",
+    "contexts": ["overview", "walkthrough", "marketing"]
+  },
+  {
+    "id": "multi-location-dashboard",
+    "wording": "Owners can compare sales, revenue, margin, and performance across business locations.",
+    "status": "shipped",
+    "source": "apps/web/src/app/pages/dashboard/dashboard.component.ts",
+    "contexts": ["overview", "walkthrough", "marketing"]
+  },
+  {
+    "id": "staff-performance",
+    "wording": "Authorized owners can compare staff sales performance and review daily results.",
+    "status": "shipped",
+    "source": "apps/web/src/app/performance/staff-performance.component.ts",
+    "contexts": ["overview", "walkthrough", "marketing"]
+  },
+  {
+    "id": "sales-commissions",
+    "wording": "Commission plans can be assigned to staff and used to prepare reviewable statements from net collections.",
+    "status": "shipped",
+    "source": "apps/web/src/app/commissions/commissions.component.ts",
+    "contexts": ["overview", "walkthrough", "marketing"]
+  },
+  {
+    "id": "customer-credit",
+    "wording": "Customer credit sales, balances, payment history, and allocations are recorded per customer.",
+    "status": "shipped",
+    "source": "apps/web/src/app/customers/customers.component.ts",
+    "contexts": ["overview", "walkthrough", "marketing"]
+  },
+  {
+    "id": "automated-customer-comms",
+    "wording": "Customer documents and scheduled payment reminders can be sent through SMS or WhatsApp.",
+    "status": "shipped",
+    "source": "apps/web/src/app/settings/settings.component.ts",
+    "contexts": ["overview", "walkthrough", "marketing"]
+  },
+  {
+    "id": "approval-controls",
+    "wording": "Authorized managers can review and decide approval requests for sensitive business actions.",
+    "status": "shipped",
+    "source": "apps/web/src/app/approvals/approvals.component.ts",
+    "contexts": ["overview", "walkthrough", "marketing"]
+  },
+  {
+    "id": "role-permissions",
+    "wording": "Business roles determine which actions each staff member can perform.",
+    "status": "shipped",
+    "source": "apps/web/src/app/core/permissions.service.ts",
+    "contexts": ["overview", "walkthrough", "marketing"]
+  },
+  {
+    "id": "audit-history",
+    "wording": "Authorized users can inspect who performed recorded business actions and what changed.",
+    "status": "shipped",
+    "source": "apps/web/src/app/audit/audit.component.ts",
+    "contexts": ["overview", "walkthrough", "marketing"]
+  },
+  {
+    "id": "supplier-purchases",
+    "wording": "Purchases, suppliers, payments, and outstanding supplier balances can be recorded and reviewed.",
+    "status": "shipped",
+    "source": "apps/web/src/app/suppliers/suppliers.component.ts",
+    "contexts": ["overview", "walkthrough", "marketing"]
+  },
+  {
+    "id": "stock-adjustments",
+    "wording": "Authorized stock adjustments record quantity changes and their reasons.",
+    "status": "shipped",
+    "source": "apps/web/src/app/stock-adjustments/stock-adjustments.component.ts",
+    "contexts": ["overview", "walkthrough", "marketing"]
+  },
+  {
+    "id": "stock-transfers",
+    "wording": "Stock can be transferred and tracked between business locations.",
+    "status": "shipped",
+    "source": "apps/web/src/app/inventory/stock-transfers.component.ts",
+    "contexts": ["overview", "walkthrough", "marketing"]
+  },
+  {
+    "id": "expense-management",
+    "wording": "Business expenses can be recorded and reviewed alongside the rest of the books.",
+    "status": "shipped",
+    "source": "apps/web/src/app/money/expenses/money-expenses.component.ts",
+    "contexts": ["overview", "walkthrough", "marketing"]
+  },
+  {
+    "id": "money-transfers",
+    "wording": "Cash transfers between accounts can be recorded and reviewed.",
+    "status": "shipped",
+    "source": "apps/web/src/app/money/transfers/money-transfers.component.ts",
+    "contexts": ["overview", "walkthrough", "marketing"]
+  },
+  {
+    "id": "business-reporting",
+    "wording": "Sales, products, customers, stock, and other business results are available in reports.",
+    "status": "shipped",
+    "source": "apps/web/src/app/reports/reports.component.ts",
+    "contexts": ["overview", "walkthrough", "marketing"]
+  },
+  {
+    "id": "proformas",
+    "wording": "Proformas can be prepared, reviewed, and converted into sales.",
+    "status": "shipped",
+    "source": "apps/web/src/app/pos/proformas/proformas.component.ts",
     "contexts": ["overview", "walkthrough", "marketing"]
   }
 ]

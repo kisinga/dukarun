@@ -1,0 +1,19 @@
+{
+  "projectId": "sale-records",
+  "title": "Keep every sale on record",
+  "audience": "Kenyan shop owners who need reliable sales, stock, and accounting records",
+  "objective": "Show how a sale is captured through several product-finding methods, recorded through payment, reflected in stock and the books, and protected during a connection drop.",
+  "language": "en-KE",
+  "targetDurationSeconds": 20,
+  "targetWordRange": [40, 48],
+  "claimIds": [
+    "product-selection",
+    "cash-mpesa",
+    "offline-selling",
+    "inventory-updates",
+    "ledger-posting"
+  ],
+  "callToAction": "Get started",
+  "narrationMode": "human",
+  "renderTargets": ["wide", "vertical", "square"]
+}

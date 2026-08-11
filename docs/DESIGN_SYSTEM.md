@@ -166,6 +166,12 @@ Compose pages from these — never hand-roll what a primitive owns:
 - **`<app-form-field label="…">`** — one field recipe (label above the control, optional
   `hint` / `error`, `required` marker). Wrap every input/select in forms; add `w-full` to
   the projected control. No bare `form-control`/`label-text` blocks.
+- **Searchable entity choices** — native `<select>` is only for small, intrinsically bounded
+  enumerations (roughly ten options or fewer: status, mode, settlement). Any party, catalog, or
+  other entity list that can reasonably grow past ten uses `<app-searchable-filter>` or a server
+  typeahead, even when today’s fixture has only a few rows. Search matches identifying secondary
+  text (for example supplier phone/email or product SKU), limits the visible result set, and keeps
+  keyboard/combobox semantics. The ten-item threshold is a design heuristic, not a data cap.
 - **`<button appButton>` / `<a appButton>`** — one action idiom: `variant="primary|secondary|soft|outline|ghost|error"`,
   `size="sm|md"`, `[iconOnly]` for square icon actions, and `[loading]` to swap in a spinner
   and disable. `primary` is the one page/sheet CTA; `secondary` is a quiet filled action;

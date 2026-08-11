@@ -247,7 +247,8 @@ export class MoneyExpensesComponent implements OnInit, OnDestroy {
         this.money.journalPage({
           page: this.historyPage(),
           pageSize: this.historyPageSize(),
-          sourceType: 'Expense',
+          // Expense history is account-driven so costs posted atomically with purchases appear too.
+          requiredAccountCode: 'EXPENSES',
           search: this.historySearch(),
           accountCode: this.historyAccount() || undefined,
           from: this.historyFrom() || undefined,

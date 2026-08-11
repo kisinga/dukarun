@@ -25,13 +25,19 @@ if (mode === 'live') {
   slugs = rows.map(row => row.slug).filter(Boolean);
 }
 
-const urls = ['', ...slugs.map(slug => `/${encodeURIComponent(slug)}`)];
+const urls = [
+  new URL('/', `${baseUrl}/`).toString(),
+  ...slugs.map(slug => new URL(`/${encodeURIComponent(slug)}`, `${baseUrl}/`).toString()),
+];
 const xml =
   '<?xml version="1.0" encoding="UTF-8"?>\n' +
   '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
-  urls.map(path => `  <url><loc>${baseUrl}${path}</loc></url>`).join('\n') +
+  urls.map(url => `  <url><loc>${url}</loc></url>`).join('\n') +
   '\n</urlset>\n';
-const target = resolve('public/sitemap.xml');
+const publicDir = resolve('public');
+const target = resolve(publicDir, 'sitemap.xml');
+const robotsTarget = resolve(publicDir, 'robots.txt');
 mkdirSync(resolve('public'), { recursive: true });
 writeFileSync(target, xml);
-console.log(`[sitemap:storefront] wrote ${target} (${urls.length} URLs)`);
+writeFileSync(robotsTarget, `User-agent: *\nAllow: /\nSitemap: ${baseUrl}/sitemap.xml\n`);
+console.log(`[sitemap:storefront] wrote sitemap.xml and robots.txt (${urls.length} URLs)`);

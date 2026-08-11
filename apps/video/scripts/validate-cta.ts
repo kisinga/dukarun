@@ -4,13 +4,13 @@ import { bundle } from '@remotion/bundler';
 import { renderStill, selectComposition } from '@remotion/renderer';
 import { videoRoot } from '../src/node-utils';
 import type { RenderTarget } from '../src/schema';
-import type { Cutdown } from '../src/timeline';
 
 const targets: RenderTarget[] = ['wide', 'vertical', 'square'];
-const endings: Array<{ cutdown: Cutdown; frame: number }> = [
-  { cutdown: 'full', frame: 1770 },
-  { cutdown: 'ledger', frame: 420 },
-  { cutdown: 'dashboard', frame: 410 },
+const endings: Array<{ projectId: string; frame: number }> = [
+  { projectId: 'product-overview', frame: 2400 },
+  { projectId: 'sale-records', frame: 570 },
+  { projectId: 'credit-communications', frame: 570 },
+  { projectId: 'stock-decisions', frame: 570 },
 ];
 
 const outputDirectory = path.join(videoRoot, '.cache', 'cta-validation');
@@ -23,7 +23,7 @@ const serveUrl = await bundle({
 
 for (const ending of endings) {
   for (const target of targets) {
-    const id = `offline-pos-${ending.cutdown}-${target}`;
+    const id = `${ending.projectId}-full-${target}`;
     const composition = await selectComposition({ serveUrl, id });
     const output = path.join(outputDirectory, `${id}.png`);
     await renderStill({

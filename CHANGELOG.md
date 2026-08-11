@@ -27,4 +27,4 @@
   Vendure retention window. See `docs/V1_V2_MIGRATION.md`; this release is not complete until its
   production-readiness gates pass.
 
-Historical Vendure and PocketBase release notes are preserved under `archive/`.
+Retired-system history and lessons are summarized in `archive/REFERENCE.md`.

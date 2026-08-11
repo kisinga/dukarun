@@ -239,7 +239,15 @@ export class ProductDetailComponent implements OnInit {
     try {
       const shop = await this.storefront.storefront(this.shopSlug);
       this.shop.set(shop);
-      if (!shop?.catalogue_visible) return;
+      if (!shop?.catalogue_visible) {
+        this.seo.set(
+          'Product not found',
+          'This product is not available.',
+          `/${this.shopSlug}/products/${this.productId}`,
+          true
+        );
+        return;
+      }
       const product =
         groupCatalog(await this.storefront.product(this.shopSlug, this.productId))[0] ?? null;
       this.product.set(product);
@@ -288,7 +296,10 @@ export class ProductDetailComponent implements OnInit {
     this.seo.set(
       `${product.name} · ${shop.name}`,
       `View ${product.name} at ${shop.name} and order on WhatsApp.`,
-      path
+      path,
+      false,
+      this.imageUrl(product.imagePath),
+      'product'
     );
     this.seo.setStructuredData({
       '@context': 'https://schema.org',

@@ -2,7 +2,6 @@ import { Audio } from '@remotion/media';
 import { AbsoluteFill, Sequence, staticFile, useCurrentFrame } from 'remotion';
 import type { CompositionProps, NarrationSegment } from './schema';
 import { SceneRenderer } from './scenes';
-import { timelineFor } from './timeline';
 
 function activeCaption(segments: readonly NarrationSegment[], frame: number): string | null {
   const segment = segments.find(item => frame >= item.startFrame && frame < item.endFrame);
@@ -15,10 +14,9 @@ function activeCaption(segments: readonly NarrationSegment[], frame: number): st
   return chunks[Math.min(chunks.length - 1, Math.floor(progress * chunks.length))];
 }
 
-export function PilotVideo({ manifest, target, cutdown, review, voice }: CompositionProps) {
+export function PilotVideo({ manifest, target, review, voice }: CompositionProps) {
   const frame = useCurrentFrame();
-  const scenes = timelineFor(manifest, cutdown);
-  const caption = cutdown === 'full' ? activeCaption(manifest.narration, frame) : null;
+  const caption = activeCaption(manifest.narration, frame);
   const segmentAudio = manifest.narration.filter(segment => Boolean(segment.audioFile));
   const masterVolume = (audioFrame: number) =>
     segmentAudio.some(segment => audioFrame >= segment.startFrame && audioFrame < segment.endFrame)
@@ -26,7 +24,7 @@ export function PilotVideo({ manifest, target, cutdown, review, voice }: Composi
       : 1;
   return (
     <AbsoluteFill className={`video-root ${target}`}>
-      {scenes.map(scene => (
+      {manifest.scenes.map(scene => (
         <Sequence
           key={scene.id}
           from={scene.startFrame}
@@ -36,20 +34,18 @@ export function PilotVideo({ manifest, target, cutdown, review, voice }: Composi
           <SceneRenderer scene={scene} target={target} />
         </Sequence>
       ))}
-      {cutdown === 'full' && voice?.masterAudioFile ? (
+      {voice?.masterAudioFile ? (
         <Audio src={staticFile(voice.masterAudioFile)} volume={masterVolume} />
       ) : null}
-      {cutdown === 'full'
-        ? segmentAudio.map(segment => (
-            <Sequence
-              key={`audio-${segment.id}`}
-              from={segment.startFrame}
-              durationInFrames={segment.endFrame - segment.startFrame}
-            >
-              <Audio src={staticFile(segment.audioFile!)} volume={1} />
-            </Sequence>
-          ))
-        : null}
+      {segmentAudio.map(segment => (
+        <Sequence
+          key={`audio-${segment.id}`}
+          from={segment.startFrame}
+          durationInFrames={segment.endFrame - segment.startFrame}
+        >
+          <Audio src={staticFile(segment.audioFile!)} volume={1} />
+        </Sequence>
+      ))}
       {caption ? (
         <div className="caption">
           <span>{caption}</span>

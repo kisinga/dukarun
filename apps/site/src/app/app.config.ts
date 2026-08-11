@@ -30,6 +30,7 @@ import {
   heroUsers,
   heroXMark,
 } from '@ng-icons/heroicons/outline';
+import { heroPlaySolid } from '@ng-icons/heroicons/solid';
 import { routes } from './app.routes';
 
 export const appConfig: ApplicationConfig = {
@@ -58,6 +59,7 @@ export const appConfig: ApplicationConfig = {
       heroLockClosed,
       heroLockOpen,
       heroPrinter,
+      heroPlaySolid,
       heroShoppingCart,
       heroSignalSlash,
       heroSparkles,
