@@ -179,7 +179,9 @@ begin
      or array_position(v_remove_ids, null) is not null
      or cardinality(v_remove_ids) <> (
        select count(distinct value)::integer from unnest(v_remove_ids) value
-     ) then raise exception 'invalid_category_ids'; end if;
+     )
+     or cardinality(v_add_ids) + cardinality(v_remove_ids) > 100
+  then raise exception 'invalid_category_ids'; end if;
   if v_add_ids && v_remove_ids then raise exception 'category_change_overlap'; end if;
   if (
     select count(*) from public.products

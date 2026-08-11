@@ -1106,13 +1106,17 @@ export class SellComponent implements OnInit {
   );
   protected readonly categoryDirectory = computed(() => {
     const query = this.categorySearch().trim().toLocaleLowerCase();
+    const optionCountByProduct = new Map<string, number>();
+    for (const variant of this.activeCatalog()) {
+      const productId = variant.product_id!;
+      optionCountByProduct.set(productId, (optionCountByProduct.get(productId) ?? 0) + 1);
+    }
     const productIdsByCategory = new Map<string, Set<string>>();
     for (const link of this.catalogCache.productCategories()) {
       const productIds = productIdsByCategory.get(link.category_id) ?? new Set<string>();
       productIds.add(link.product_id);
       productIdsByCategory.set(link.category_id, productIds);
     }
-    const activeProductIds = new Set(this.activeCatalog().map(variant => variant.product_id!));
     return this.catalogCache
       .categories()
       .filter(
@@ -1121,13 +1125,15 @@ export class SellComponent implements OnInit {
       .map(category => {
         const linked = productIdsByCategory.get(category.id) ?? new Set<string>();
         const productIds = new Set(
-          [...linked].filter(productId => activeProductIds.has(productId))
+          [...linked].filter(productId => optionCountByProduct.has(productId))
         );
         return {
           ...category,
           productCount: productIds.size,
-          optionCount: this.activeCatalog().filter(variant => productIds.has(variant.product_id!))
-            .length,
+          optionCount: [...productIds].reduce(
+            (count, productId) => count + (optionCountByProduct.get(productId) ?? 0),
+            0
+          ),
         };
       })
       .filter(category => category.productCount > 0);

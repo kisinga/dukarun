@@ -1,6 +1,6 @@
 -- Canonical category schema, mutations, filters, storefront, and cache events.
 begin;
-select plan(30);
+select plan(31);
 
 select testkit.create_user('87878787-8787-4787-8787-878787878781', 'category-admin@local.test');
 select testkit.create_user('87878787-8787-4787-8787-878787878782', 'category-peer@local.test');
@@ -121,6 +121,14 @@ select throws_ok(
 select throws_ok(
   $$select public.patch_product_categories(array(select gen_random_uuid() from generate_series(1,101)), '{}'::uuid[], '{}'::uuid[])$$,
   'P0001', 'invalid_product_ids', 'batch size is limited to 100 products'
+);
+select throws_ok(
+  $$select public.patch_product_categories(
+    array['87000000-0000-4000-8000-000000000001']::uuid[],
+    array(select gen_random_uuid() from generate_series(1,101)),
+    '{}'::uuid[]
+  )$$,
+  'P0001', 'invalid_category_ids', 'batch size is limited to 100 category changes'
 );
 
 select testkit.as_user(

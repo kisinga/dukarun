@@ -55,7 +55,7 @@ type StagedChange = 'add' | 'remove';
                 <button
                   type="button"
                   class="flex min-w-0 flex-1 items-center gap-3 text-left"
-                  [disabled]="busy() || !connectivity.online()"
+                  [disabled]="working() || !connectivity.online()"
                   [attr.aria-label]="categoryActionLabel(category)"
                   (click)="toggle(category.id)"
                 >
@@ -77,7 +77,7 @@ type StagedChange = 'add' | 'remove';
                     type="button"
                     variant="ghost"
                     size="sm"
-                    [disabled]="busy()"
+                    [disabled]="working()"
                     (click)="undo(category.id)"
                   >
                     Undo
@@ -110,7 +110,7 @@ type StagedChange = 'add' | 'remove';
                 variant="outline"
                 [loading]="creating()"
                 [disabled]="
-                  busy() || !connectivity.online() || newCategoryName.value.trim().length === 0
+                  working() || !connectivity.online() || newCategoryName.value.trim().length === 0
                 "
                 (click)="createCategory()"
               >
@@ -128,7 +128,7 @@ type StagedChange = 'add' | 'remove';
             appButton
             type="button"
             variant="ghost"
-            [disabled]="busy()"
+            [disabled]="working()"
             (click)="closed.emit()"
           >
             Cancel
@@ -138,7 +138,7 @@ type StagedChange = 'add' | 'remove';
             type="button"
             variant="primary"
             [loading]="busy()"
-            [disabled]="!connectivity.online() || staged().size === 0"
+            [disabled]="working() || !connectivity.online() || staged().size === 0"
             (click)="apply()"
           >
             Apply changes
@@ -146,7 +146,7 @@ type StagedChange = 'add' | 'remove';
         </footer>
       </div>
       <form method="dialog" class="modal-backdrop">
-        <button type="button" aria-label="Close" [disabled]="busy()" (click)="closed.emit()">
+        <button type="button" aria-label="Close" [disabled]="working()" (click)="closed.emit()">
           close
         </button>
       </form>
@@ -169,6 +169,7 @@ export class BatchProductCategoriesDialogComponent {
   protected readonly staged = signal<Map<string, StagedChange>>(new Map());
   protected readonly busy = signal(false);
   protected readonly creating = signal(false);
+  protected readonly working = computed(() => this.busy() || this.creating());
   protected readonly error = signal<string | null>(null);
 
   protected readonly matchingCategories = computed(() => {
@@ -214,12 +215,14 @@ export class BatchProductCategoriesDialogComponent {
   }
 
   protected toggle(categoryId: string): void {
+    if (this.working() || !this.connectivity.online()) return;
     const next = new Map(this.staged());
     next.set(categoryId, this.effectiveState(categoryId) === 'all' ? 'remove' : 'add');
     this.staged.set(next);
   }
 
   protected undo(categoryId: string): void {
+    if (this.working()) return;
     const next = new Map(this.staged());
     next.delete(categoryId);
     this.staged.set(next);
@@ -227,7 +230,7 @@ export class BatchProductCategoriesDialogComponent {
 
   protected async createCategory(): Promise<void> {
     const name = this.newCategoryName.value.trim();
-    if (!name || this.creating() || !this.connectivity.online()) return;
+    if (!name || this.working() || !this.connectivity.online()) return;
     this.creating.set(true);
     this.error.set(null);
     try {
@@ -246,7 +249,7 @@ export class BatchProductCategoriesDialogComponent {
   }
 
   protected async apply(): Promise<void> {
-    if (this.busy() || this.staged().size === 0 || !this.connectivity.online()) return;
+    if (this.working() || this.staged().size === 0 || !this.connectivity.online()) return;
     const add: string[] = [];
     const remove: string[] = [];
     for (const [categoryId, change] of this.staged()) {
