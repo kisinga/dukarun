@@ -1267,6 +1267,7 @@ export class SellComponent implements OnInit {
   );
   protected readonly approvalSent = signal(false);
   private approvalSentTimer: ReturnType<typeof setTimeout> | null = null;
+  private saleAttempt: { fingerprint: string; clientRef: string } | null = null;
   private searchSeq = 0;
   private barcodeQueue: Promise<void> = Promise.resolve();
   private searchKeystrokes: number[] = [];
@@ -1765,9 +1766,13 @@ export class SellComponent implements OnInit {
     this.busy.set(true);
     const customerId = this.cart.customerId();
     const lines = this.cart.toSaleLines();
-    // Use the same reference for the first request and every possible replay.
-    // This closes the ambiguous "server committed, response was lost" window.
-    const clientRef = crypto.randomUUID();
+    // Retain one key across ambiguous retries, but rotate it when the sale
+    // payload changes so an edited cart cannot replay an earlier completion.
+    const fingerprint = JSON.stringify({ customerId, lines, payments, settlement });
+    if (this.saleAttempt?.fingerprint !== fingerprint) {
+      this.saleAttempt = { fingerprint, clientRef: crypto.randomUUID() };
+    }
+    const clientRef = this.saleAttempt.clientRef;
     if (!this.connectivity.online()) {
       if (settlement) {
         this.error.set('Customer deposits and mixed credit require an online connection.');
@@ -1777,6 +1782,7 @@ export class SellComponent implements OnInit {
       }
       try {
         await this.queueSale(customerId, lines, payments, clientRef);
+        this.saleAttempt = null;
       } catch (err) {
         this.error.set(err instanceof Error ? err.message : 'Could not safely queue the sale');
       } finally {
@@ -1837,6 +1843,7 @@ export class SellComponent implements OnInit {
       }
       this.checkoutOpen.set(false);
       this.cart.clear();
+      this.saleAttempt = null;
       this.selectedCustomer.set(null);
       this.customerDepositBalance.set(0);
       if (result.status === 'approval_required') {
@@ -1848,13 +1855,14 @@ export class SellComponent implements OnInit {
       if (!(err instanceof PosRpcError) && !settlement) {
         try {
           await this.queueSale(customerId, lines, payments, clientRef);
+          this.saleAttempt = null;
         } catch (queueError) {
           this.error.set(
             queueError instanceof Error ? queueError.message : 'Could not safely queue the sale'
           );
         }
       } else {
-        this.error.set(err.message);
+        this.error.set(err instanceof Error ? err.message : 'Sale could not be completed');
         this.checkoutOpen.set(false);
       }
     } finally {

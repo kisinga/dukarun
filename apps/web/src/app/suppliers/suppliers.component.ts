@@ -45,6 +45,7 @@ import {
   LedgerAccount,
   MoneyCustomer,
   MoneyService,
+  PrepaymentActivityRow,
   PurchaseDraft,
   PurchaseExpense,
   PurchaseHistoryRow,
@@ -1409,11 +1410,17 @@ interface ParsedPurchaseLine {
                 }
               </div>
 
-              <div class="mt-3 grid grid-cols-2 gap-2">
+              <div class="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
                 <app-stat-card
                   label="We owe"
                   [value]="perms.has('ViewFinancials') ? fmt(s.ap_balance) : 'Hidden'"
                   [tone]="s.ap_balance > 0 ? 'warning' : 'neutral'"
+                />
+                <app-stat-card
+                  label="Advance with supplier"
+                  [value]="perms.has('ViewFinancials') ? fmt(supplierAdvanceBalance()) : 'Hidden'"
+                  [tone]="supplierAdvanceBalance() > 0 ? 'success' : 'neutral'"
+                  [sub]="supplierNetPosition(s)"
                 />
                 <app-stat-card
                   label="Credit available"
@@ -1456,6 +1463,101 @@ interface ParsedPurchaseLine {
               <div class="mt-4 flex flex-col gap-4">
                 @if (perms.has('ManageSupplierCreditPurchases')) {
                   <section>
+                    <h3 class="section-title mb-1">Pay advance to supplier</h3>
+                    <p class="type-caption">Held separately until you apply it to a purchase.</p>
+                    <form
+                      (submit)="$event.preventDefault(); recordAdvance(s.id)"
+                      class="mt-2 grid gap-2 sm:grid-cols-2"
+                    >
+                      <app-form-field label="Advance amount (KES)">
+                        <input
+                          class="input input-bordered input-sm"
+                          inputmode="numeric"
+                          [formControl]="advanceAmount"
+                        />
+                      </app-form-field>
+                      <app-form-field label="Pay from">
+                        <select
+                          class="select select-bordered select-sm"
+                          [formControl]="advanceAccount"
+                        >
+                          @for (a of accounts(); track a.code) {
+                            <option [value]="a.code">{{ a.code }} — {{ a.name }}</option>
+                          }
+                        </select>
+                      </app-form-field>
+                      <app-form-field label="Reference">
+                        <input
+                          class="input input-bordered input-sm"
+                          [formControl]="advanceReference"
+                        />
+                      </app-form-field>
+                      <button
+                        appButton
+                        type="submit"
+                        class="self-end justify-self-start"
+                        [disabled]="busy() || !cashierSession.canTakePayment()"
+                      >
+                        Record advance
+                      </button>
+                    </form>
+                    @if (supplierAdvanceBalance() > 0) {
+                      <details class="mt-2 rounded-field border border-base-300 p-2">
+                        <summary class="cursor-pointer text-sm font-medium">
+                          Supplier returned unused advance
+                        </summary>
+                        <form
+                          (submit)="$event.preventDefault(); recordAdvanceReturn(s.id)"
+                          class="mt-2 grid gap-2 sm:grid-cols-2"
+                        >
+                          <app-form-field label="Amount returned (KES)">
+                            <input
+                              class="input input-bordered input-sm"
+                              inputmode="numeric"
+                              [formControl]="advanceReturnAmount"
+                            />
+                          </app-form-field>
+                          <app-form-field label="Received into">
+                            <select
+                              class="select select-bordered select-sm"
+                              [formControl]="advanceReturnAccount"
+                            >
+                              @for (a of accounts(); track a.code) {
+                                <option [value]="a.code">{{ a.name }}</option>
+                              }
+                            </select>
+                          </app-form-field>
+                          <app-form-field label="Reason" [required]="true">
+                            <input
+                              class="input input-bordered input-sm"
+                              [formControl]="advanceReturnReason"
+                            />
+                          </app-form-field>
+                          <app-form-field label="Reference">
+                            <input
+                              class="input input-bordered input-sm"
+                              [formControl]="advanceReturnReference"
+                            />
+                          </app-form-field>
+                          <button
+                            appButton
+                            variant="outline"
+                            type="submit"
+                            class="self-end justify-self-start"
+                            [disabled]="
+                              busy() ||
+                              !cashierSession.canTakePayment() ||
+                              !advanceReturnReason.value.trim()
+                            "
+                          >
+                            Record return
+                          </button>
+                        </form>
+                      </details>
+                    }
+                  </section>
+
+                  <section>
                     <h3 class="section-title mb-2">Pay this supplier</h3>
                     @if (s.ap_balance <= 0) {
                       <p class="text-xs text-base-content/60">We do not owe this supplier.</p>
@@ -1496,6 +1598,34 @@ interface ParsedPurchaseLine {
                         </button>
                       </form>
                     }
+                  </section>
+                }
+
+                @if (perms.has('ViewFinancials') && advanceActivity().length > 0) {
+                  <section class="border-t border-base-300/60 pt-3">
+                    <h3 class="section-title mb-2">Advance activity</h3>
+                    <ol class="divide-y divide-base-300/60 rounded-field border border-base-300">
+                      @for (row of advanceActivity(); track row.id) {
+                        <li class="flex items-center justify-between gap-3 p-2 text-sm">
+                          <div class="min-w-0">
+                            <p class="truncate">{{ row.description }}</p>
+                            <p class="type-caption">
+                              {{ time(row.occurred_at) }}
+                              @if (row.reference) {
+                                · {{ row.reference }}
+                              }
+                            </p>
+                          </div>
+                          <span
+                            class="shrink-0 font-semibold tabular-nums"
+                            [class.text-success]="row.direction === 'increase'"
+                            [class.text-error]="row.direction === 'decrease'"
+                          >
+                            {{ row.direction === 'increase' ? '+' : '−' }}{{ fmt(row.amount) }}
+                          </span>
+                        </li>
+                      }
+                    </ol>
                   </section>
                 }
 
@@ -1597,6 +1727,18 @@ interface ParsedPurchaseLine {
                               p.paid < p.total_cost &&
                               perms.has('ManageSupplierCreditPurchases')
                             ) {
+                              @if (supplierAdvanceBalance() > 0) {
+                                <button
+                                  appButton
+                                  variant="soft"
+                                  size="sm"
+                                  type="button"
+                                  [disabled]="busy()"
+                                  (click)="applyAdvanceToPurchase(p)"
+                                >
+                                  Use advance
+                                </button>
+                              }
                               <button
                                 appButton
                                 variant="outline"
@@ -2263,6 +2405,18 @@ export class SuppliersComponent implements OnInit, OnDestroy {
   protected readonly payPurchaseId = signal<string | null>(null);
   protected readonly selectedPayAmount = new FormControl('', { nonNullable: true });
   protected readonly selectedPayAccount = new FormControl('', { nonNullable: true });
+  protected readonly supplierAdvanceBalance = signal(0);
+  protected readonly advanceActivity = signal<PrepaymentActivityRow[]>([]);
+  protected readonly advanceAmount = new FormControl('', { nonNullable: true });
+  protected readonly advanceAccount = new FormControl('', { nonNullable: true });
+  protected readonly advanceReference = new FormControl('', { nonNullable: true });
+  protected readonly advanceReturnAmount = new FormControl('', { nonNullable: true });
+  protected readonly advanceReturnAccount = new FormControl('', { nonNullable: true });
+  protected readonly advanceReturnReason = new FormControl('', { nonNullable: true });
+  protected readonly advanceReturnReference = new FormControl('', { nonNullable: true });
+  private advanceClientRef: string | null = null;
+  private advanceApplicationAttempt: { purchaseId: string; clientRef: string } | null = null;
+  private advanceReturnClientRef: string | null = null;
 
   protected readonly busy = signal(false);
   protected readonly loading = signal(false);
@@ -2497,6 +2651,10 @@ export class SuppliersComponent implements OnInit, OnDestroy {
       if (!this.payAccount.value && accounts.length > 0) this.payAccount.setValue(accounts[0].code);
       if (!this.selectedPayAccount.value && accounts.length > 0)
         this.selectedPayAccount.setValue(accounts[0].code);
+      if (!this.advanceAccount.value && accounts.length > 0)
+        this.advanceAccount.setValue(accounts[0].code);
+      if (!this.advanceReturnAccount.value && accounts.length > 0)
+        this.advanceReturnAccount.setValue(accounts[0].code);
       const locations = this.locations();
       if (!this.purchaseLocation.value && locations.length > 0) {
         this.purchaseLocation.setValue(this.locationContext.activeId() ?? locations[0].id);
@@ -3250,6 +3408,141 @@ export class SuppliersComponent implements OnInit, OnDestroy {
     }
   }
 
+  protected supplierNetPosition(supplier: SupplierWithAp): string {
+    if (!this.perms.has('ViewFinancials')) return 'Financials hidden';
+    const net = supplier.ap_balance - this.supplierAdvanceBalance();
+    if (net > 0) return `Net: we owe ${this.fmt(net)}`;
+    if (net < 0) return `Net: ${this.fmt(-net)} remains with supplier`;
+    return 'Net position settled';
+  }
+
+  protected async recordAdvance(supplierId: string): Promise<void> {
+    try {
+      await this.cashierSession.assertOpen('paying a supplier advance');
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Open a cashier session first');
+      return;
+    }
+    const amount = parseKes(this.advanceAmount.value);
+    if (amount === null || amount <= 0) {
+      this.error.set('Enter a valid advance amount');
+      return;
+    }
+    this.busy.set(true);
+    this.error.set(null);
+    try {
+      await this.money.recordSupplierAdvance({
+        supplierId,
+        amount,
+        accountCode: this.advanceAccount.value,
+        reference: this.advanceReference.value.trim() || undefined,
+        clientRef: (this.advanceClientRef ??= crypto.randomUUID()),
+      });
+      this.advanceClientRef = null;
+      this.advanceAmount.setValue('');
+      this.advanceReference.setValue('');
+      this.notice.set('Supplier advance recorded');
+      try {
+        await this.refreshSupplierAdvance(supplierId);
+      } catch {
+        this.error.set('Supplier advance was recorded, but the balance could not refresh');
+      }
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Could not record advance');
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected async applyAdvanceToPurchase(purchase: PurchaseRow): Promise<void> {
+    const amount = Math.min(this.supplierAdvanceBalance(), purchase.total_cost - purchase.paid);
+    if (amount <= 0) return;
+    this.busy.set(true);
+    this.error.set(null);
+    try {
+      if (this.advanceApplicationAttempt?.purchaseId !== purchase.id) {
+        this.advanceApplicationAttempt = {
+          purchaseId: purchase.id,
+          clientRef: crypto.randomUUID(),
+        };
+      }
+      await this.money.applySupplierAdvance(
+        purchase.id,
+        amount,
+        this.advanceApplicationAttempt.clientRef
+      );
+      this.advanceApplicationAttempt = null;
+      this.notice.set(`${this.fmt(amount)} supplier advance applied`);
+      try {
+        await this.refreshPaymentSurfaces();
+      } catch {
+        this.error.set('Supplier advance was applied, but purchase balances could not refresh');
+      }
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Could not apply supplier advance');
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected async recordAdvanceReturn(supplierId: string): Promise<void> {
+    try {
+      await this.cashierSession.assertOpen('recording a supplier advance return');
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Open a cashier session first');
+      return;
+    }
+    const amount = parseKes(this.advanceReturnAmount.value);
+    const reason = this.advanceReturnReason.value.trim();
+    if (amount === null || amount <= 0 || amount > this.supplierAdvanceBalance()) {
+      this.error.set('Enter an amount within the available supplier advance');
+      return;
+    }
+    if (!reason) {
+      this.error.set('Enter a return reason');
+      return;
+    }
+    this.busy.set(true);
+    this.error.set(null);
+    try {
+      await this.money.recordSupplierAdvanceReturn({
+        supplierId,
+        amount,
+        accountCode: this.advanceReturnAccount.value,
+        reason,
+        reference: this.advanceReturnReference.value.trim() || undefined,
+        clientRef: (this.advanceReturnClientRef ??= crypto.randomUUID()),
+      });
+      this.advanceReturnClientRef = null;
+      this.advanceReturnAmount.setValue('');
+      this.advanceReturnReason.setValue('');
+      this.advanceReturnReference.setValue('');
+      this.notice.set('Supplier advance return recorded');
+      try {
+        await this.refreshSupplierAdvance(supplierId);
+      } catch {
+        this.error.set('Supplier return was recorded, but the balance could not refresh');
+      }
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Could not record advance return');
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  private async refreshSupplierAdvance(supplierId: string): Promise<void> {
+    const [balance, activity] = await Promise.all([
+      this.money.supplierAdvanceAvailable(supplierId),
+      this.perms.has('ViewFinancials')
+        ? this.money.supplierAdvanceActivity(supplierId)
+        : Promise.resolve([]),
+    ]);
+    if (this.drawerSupplierId() === supplierId) {
+      this.supplierAdvanceBalance.set(balance);
+      this.advanceActivity.set(activity);
+    }
+  }
+
   protected openSupplierDrawer(supplier: SupplierWithAp): void {
     this.drawerSupplierId.set(supplier.id);
     this.payPurchaseId.set(null);
@@ -3258,7 +3551,20 @@ export class SuppliersComponent implements OnInit, OnDestroy {
     this.supplierCreditLimit.setValue(formatKesInput(supplier.supplier_credit_limit));
     this.supplierTermsDays.setValue(supplier.supplier_credit_terms_days ?? 0);
     this.drawerPurchases.set([]);
+    this.supplierAdvanceBalance.set(0);
+    this.advanceActivity.set([]);
+    this.advanceAmount.setValue('');
+    this.advanceReference.setValue('');
+    this.advanceReturnReference.setValue('');
+    this.advanceClientRef = null;
+    this.advanceApplicationAttempt = null;
+    this.advanceReturnClientRef = null;
     void this.loadDrawerPurchases(supplier.id);
+    if (this.perms.has('ManageSupplierCreditPurchases') || this.perms.has('ViewFinancials')) {
+      void this.refreshSupplierAdvance(supplier.id).catch(error => {
+        this.error.set(error instanceof Error ? error.message : 'Could not load supplier advance');
+      });
+    }
   }
 
   private async loadDrawerPurchases(supplierId: string): Promise<void> {
@@ -3304,6 +3610,7 @@ export class SuppliersComponent implements OnInit, OnDestroy {
       );
     }
     if (openSupplierId) refreshes.push(this.loadDrawerPurchases(openSupplierId));
+    if (openSupplierId) refreshes.push(this.refreshSupplierAdvance(openSupplierId));
     const results = await Promise.allSettled(refreshes);
     if (results.some(result => result.status === 'rejected')) {
       this.error.set(
@@ -3317,6 +3624,8 @@ export class SuppliersComponent implements OnInit, OnDestroy {
     this.drawerPurchasesSequence++;
     this.drawerSupplierId.set(null);
     this.payPurchaseId.set(null);
+    this.supplierAdvanceBalance.set(0);
+    this.advanceActivity.set([]);
     this.supplierCreating.set(false);
     this.drawerEditing.set(false);
     this.editingSupplier.set(null);

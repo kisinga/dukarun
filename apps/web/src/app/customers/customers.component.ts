@@ -19,6 +19,7 @@ import {
   CustomerStatementRow,
   MoneyCustomer,
   MoneyService,
+  PrepaymentActivityRow,
 } from '../money/money.service';
 import { OrderWithCustomer, PosService } from '../pos/pos.service';
 import { ButtonComponent } from '../shared/ui/button.component';
@@ -56,6 +57,8 @@ type CreditOrder = {
   id: string;
   code: string;
   total: number;
+  paid: number;
+  outstanding: number;
   status: string;
   created_at: string;
 };
@@ -686,6 +689,151 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
                   }
 
                   <section class="border-t border-base-300/60 pt-3">
+                    <div class="flex items-center justify-between gap-3">
+                      <div>
+                        <h3 class="section-title">Money held for customer</h3>
+                        <p class="type-caption">Separate from what the customer owes us.</p>
+                        @if (perms.has('ViewFinancials')) {
+                          <p class="type-caption">{{ customerNetPosition(c) }}</p>
+                        }
+                      </div>
+                      <span class="font-semibold tabular-nums">
+                        <app-money [amount]="customerDepositBalance()" />
+                      </span>
+                    </div>
+                    @if (perms.has('SettleOrder')) {
+                      <form
+                        (submit)="$event.preventDefault(); receiveDeposit(c.id)"
+                        class="mt-3 grid gap-2 rounded-field border border-base-300 bg-base-200/50 p-2 sm:grid-cols-3"
+                      >
+                        <app-form-field label="Deposit received (KES)">
+                          <input
+                            class="input input-bordered input-sm"
+                            inputmode="numeric"
+                            [formControl]="depositAmount"
+                          />
+                        </app-form-field>
+                        <app-form-field label="Method">
+                          <select
+                            class="select select-bordered select-sm"
+                            [formControl]="depositMethod"
+                          >
+                            @for (m of methods(); track m) {
+                              <option [value]="m">{{ methodOptionLabel(m) }}</option>
+                            }
+                          </select>
+                        </app-form-field>
+                        <app-form-field label="Reference">
+                          <input
+                            class="input input-bordered input-sm"
+                            [formControl]="depositReference"
+                          />
+                        </app-form-field>
+                        <button
+                          appButton
+                          type="submit"
+                          class="sm:col-span-3 sm:justify-self-start"
+                          [disabled]="busy() || !cashierSession.canTakePayment()"
+                        >
+                          Receive deposit
+                        </button>
+                      </form>
+                    }
+                    @if (
+                      customerDepositBalance() > 0 &&
+                      (perms.has('SettleOrder') || perms.has('ReverseOrder'))
+                    ) {
+                      <details class="mt-2 rounded-field border border-base-300 p-2">
+                        <summary class="cursor-pointer text-sm font-medium">
+                          Refund unused deposit
+                        </summary>
+                        <form
+                          (submit)="$event.preventDefault(); refundDeposit(c.id)"
+                          class="mt-2 grid gap-2 sm:grid-cols-4"
+                        >
+                          <app-form-field label="Refund amount (KES)">
+                            <input
+                              class="input input-bordered input-sm"
+                              inputmode="numeric"
+                              [formControl]="depositRefundAmount"
+                            />
+                          </app-form-field>
+                          <app-form-field label="Method">
+                            <select
+                              class="select select-bordered select-sm"
+                              [formControl]="depositRefundMethod"
+                            >
+                              <option value="">Original deposit channel</option>
+                              @for (m of methods(); track m) {
+                                <option [value]="m">{{ methodOptionLabel(m) }}</option>
+                              }
+                            </select>
+                          </app-form-field>
+                          <app-form-field label="Reference">
+                            <input
+                              class="input input-bordered input-sm"
+                              [formControl]="depositRefundReference"
+                            />
+                          </app-form-field>
+                          <app-form-field label="Reason" [required]="true">
+                            <input
+                              class="input input-bordered input-sm"
+                              [formControl]="depositRefundReason"
+                            />
+                          </app-form-field>
+                          <button
+                            appButton
+                            variant="outline"
+                            type="submit"
+                            class="sm:col-span-3 sm:justify-self-start"
+                            [disabled]="
+                              busy() ||
+                              !cashierSession.canTakePayment() ||
+                              !depositRefundReason.value.trim()
+                            "
+                          >
+                            {{
+                              perms.has('ReverseOrder')
+                                ? 'Refund deposit'
+                                : 'Request refund approval'
+                            }}
+                          </button>
+                        </form>
+                      </details>
+                    }
+                    @if (perms.has('ViewFinancials') && depositActivity().length > 0) {
+                      <div class="mt-3">
+                        <h4 class="type-heading mb-2">Deposit activity</h4>
+                        <ol
+                          class="divide-y divide-base-300/60 rounded-field border border-base-300"
+                        >
+                          @for (row of depositActivity(); track row.id) {
+                            <li class="flex items-center justify-between gap-3 p-2 text-sm">
+                              <div class="min-w-0">
+                                <p class="truncate">{{ row.description }}</p>
+                                <p class="type-caption">
+                                  {{ date(row.occurred_at) }}
+                                  @if (row.reference) {
+                                    · {{ row.reference }}
+                                  }
+                                </p>
+                              </div>
+                              <span
+                                class="shrink-0 font-semibold tabular-nums"
+                                [class.text-success]="row.direction === 'increase'"
+                                [class.text-error]="row.direction === 'decrease'"
+                              >
+                                {{ row.direction === 'increase' ? '+' : '−'
+                                }}{{ fmtKes(row.amount) }}
+                              </span>
+                            </li>
+                          }
+                        </ol>
+                      </div>
+                    }
+                  </section>
+
+                  <section class="border-t border-base-300/60 pt-3">
                     <h3 class="section-title mb-2">Credit sales</h3>
                     @if (!cashierSession.canTakePayment() && creditOrders().length > 0) {
                       <app-session-required-notice action="collecting a repayment" />
@@ -748,7 +896,7 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
                               />
                               <span class="text-sm font-semibold tabular-nums"
                                 ><app-money
-                                  [amount]="o.total"
+                                  [amount]="o.outstanding"
                                   [masked]="!perms.has('ViewFinancials')"
                               /></span>
                               <button
@@ -762,12 +910,23 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
                                 View
                               </button>
                               @if (perms.has('SettleOrder')) {
+                                @if (customerDepositBalance() > 0) {
+                                  <button
+                                    appButton
+                                    variant="soft"
+                                    size="sm"
+                                    type="button"
+                                    (click)="startDepositApplication(o.id, o.outstanding)"
+                                  >
+                                    Use deposit
+                                  </button>
+                                }
                                 <button
                                   appButton
                                   variant="outline"
                                   size="sm"
                                   [disabled]="!cashierSession.canTakePayment()"
-                                  (click)="startRepay(o.id, o.total)"
+                                  (click)="startRepay(o.id, o.outstanding)"
                                 >
                                   Repay
                                 </button>
@@ -817,6 +976,32 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
                                   size="sm"
                                   type="button"
                                   (click)="repayFor.set(null)"
+                                >
+                                  Cancel
+                                </button>
+                              </form>
+                            }
+                            @if (depositApplyFor() === o.id) {
+                              <form
+                                (submit)="$event.preventDefault(); applyDeposit(o.id)"
+                                class="mt-2 flex flex-wrap items-end gap-2 rounded-field border border-info/30 bg-info/5 p-2"
+                              >
+                                <app-form-field label="Deposit to use (KES)">
+                                  <input
+                                    class="input input-bordered input-xs w-28"
+                                    inputmode="numeric"
+                                    [formControl]="depositApplyAmount"
+                                  />
+                                </app-form-field>
+                                <button appButton size="sm" type="submit" [disabled]="busy()">
+                                  Apply
+                                </button>
+                                <button
+                                  appButton
+                                  variant="ghost"
+                                  size="sm"
+                                  type="button"
+                                  (click)="depositApplyFor.set(null)"
                                 >
                                   Cancel
                                 </button>
@@ -1054,6 +1239,9 @@ export class CustomersComponent implements OnInit {
   protected readonly statementHasMore = signal(false);
   protected readonly statementBusy = signal(false);
   private statementSequence = 0;
+  private depositClientRef: string | null = null;
+  private depositApplicationClientRef: string | null = null;
+  private depositRefundClientRef: string | null = null;
   protected readonly companyInfo = signal<CompanyPrintInfo | null>(null);
   protected readonly customerApprovals = signal<Approval[]>([]);
   protected readonly pageCustomerApprovals = signal<Map<string, Approval>>(new Map());
@@ -1062,6 +1250,9 @@ export class CustomersComponent implements OnInit {
   protected readonly highlightedApprovalId = signal<string | null>(null);
   protected readonly methods = signal<string[]>([]);
   protected readonly repayFor = signal<string | null>(null);
+  protected readonly depositApplyFor = signal<string | null>(null);
+  protected readonly customerDepositBalance = signal(0);
+  protected readonly depositActivity = signal<PrepaymentActivityRow[]>([]);
   protected readonly detailLoading = signal(false);
 
   protected readonly query = signal('');
@@ -1098,6 +1289,14 @@ export class CustomersComponent implements OnInit {
   protected readonly repayAmount = new FormControl('', { nonNullable: true });
   protected readonly repayMethod = new FormControl('cash', { nonNullable: true });
   protected readonly repayReference = new FormControl('', { nonNullable: true });
+  protected readonly depositAmount = new FormControl('', { nonNullable: true });
+  protected readonly depositMethod = new FormControl('cash', { nonNullable: true });
+  protected readonly depositReference = new FormControl('', { nonNullable: true });
+  protected readonly depositApplyAmount = new FormControl('', { nonNullable: true });
+  protected readonly depositRefundAmount = new FormControl('', { nonNullable: true });
+  protected readonly depositRefundMethod = new FormControl('', { nonNullable: true });
+  protected readonly depositRefundReference = new FormControl('', { nonNullable: true });
+  protected readonly depositRefundReason = new FormControl('', { nonNullable: true });
   protected readonly bulkAmount = new FormControl('', { nonNullable: true });
   protected readonly bulkMethod = new FormControl('cash', { nonNullable: true });
   protected readonly bulkReference = new FormControl('', { nonNullable: true });
@@ -1284,6 +1483,14 @@ export class CustomersComponent implements OnInit {
     const statementSequence = ++this.statementSequence;
     this.selectedCustomerId.set(customerId);
     this.repayFor.set(null);
+    this.depositApplyFor.set(null);
+    this.customerDepositBalance.set(0);
+    this.depositActivity.set([]);
+    this.depositClientRef = null;
+    this.depositApplicationClientRef = null;
+    this.depositRefundClientRef = null;
+    this.depositRefundMethod.setValue('');
+    this.depositRefundReference.setValue('');
     this.orders.set([]);
     this.creditOrders.set([]);
     this.statement.set([]);
@@ -1304,13 +1511,23 @@ export class CustomersComponent implements OnInit {
       const statementRequest = this.perms.has('ViewFinancials')
         ? this.money.customerStatement(customerId, undefined, CUSTOMER_STATEMENT_PAGE_SIZE)
         : Promise.resolve({ rows: [], hasMore: false });
-      const [orders, creditOrders, statementPage, company, approvals] = await Promise.all([
-        this.pos.customerOrders(customerId),
-        this.money.creditOrders(customerId),
-        statementRequest,
-        this.receiptData.companyPrintInfo().catch(() => null),
-        this.approvals.forCustomer(customerId),
-      ]);
+      const depositActivityRequest = this.perms.has('ViewFinancials')
+        ? this.money.customerDepositActivity(customerId)
+        : Promise.resolve([]);
+      const [orders, creditOrders, statementPage, company, approvals, depositBalance, activity] =
+        await Promise.all([
+          this.pos.customerOrders(customerId),
+          this.money.creditOrders(customerId),
+          statementRequest,
+          this.receiptData.companyPrintInfo().catch(() => null),
+          this.approvals.forCustomer(customerId),
+          this.perms.has('SettleOrder') ||
+          this.perms.has('ReverseOrder') ||
+          this.perms.has('ViewFinancials')
+            ? this.money.customerDepositAvailable(customerId)
+            : Promise.resolve(0),
+          depositActivityRequest,
+        ]);
       // Ignore stale results when the drawer was closed (or reopened) meanwhile.
       if (this.selectedCustomerId() !== customerId || statementSequence !== this.statementSequence)
         return;
@@ -1320,6 +1537,8 @@ export class CustomersComponent implements OnInit {
       this.statementHasMore.set(statementPage.hasMore);
       this.companyInfo.set(company);
       this.customerApprovals.set(approvals);
+      this.customerDepositBalance.set(depositBalance);
+      this.depositActivity.set(activity);
       this.customerApprovalPeople.set(
         await this.approvals.staffNames(
           approvals.flatMap(approval => [approval.requested_by, approval.decided_by])
@@ -1345,6 +1564,14 @@ export class CustomersComponent implements OnInit {
     this.statementSequence++;
     this.selectedCustomerId.set(null);
     this.repayFor.set(null);
+    this.depositApplyFor.set(null);
+    this.customerDepositBalance.set(0);
+    this.depositActivity.set([]);
+    this.depositClientRef = null;
+    this.depositApplicationClientRef = null;
+    this.depositRefundClientRef = null;
+    this.depositRefundMethod.setValue('');
+    this.depositRefundReference.setValue('');
     this.detailLoading.set(false);
     this.creating.set(false);
     this.drawerEditing.set(false);
@@ -1532,6 +1759,147 @@ export class CustomersComponent implements OnInit {
     this.repayFor.set(orderId);
     this.repayAmount.setValue(formatKesInput(total));
     this.repayReference.setValue('');
+  }
+
+  protected async receiveDeposit(customerId: string): Promise<void> {
+    try {
+      await this.cashierSession.assertOpen('receiving a customer deposit');
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Open a cashier session first');
+      return;
+    }
+    const amount = parseKes(this.depositAmount.value);
+    if (amount === null || amount <= 0) {
+      this.error.set('Enter a valid deposit amount');
+      return;
+    }
+    this.busy.set(true);
+    this.error.set(null);
+    try {
+      await this.money.recordCustomerDeposit({
+        customerId,
+        amount,
+        methodCode: this.depositMethod.value,
+        reference: this.depositReference.value.trim() || undefined,
+        clientRef: (this.depositClientRef ??= crypto.randomUUID()),
+      });
+      this.depositClientRef = null;
+      this.depositAmount.setValue('');
+      this.depositReference.setValue('');
+      this.notice.set('Customer deposit received');
+      try {
+        await Promise.all([
+          this.refreshCustomerDepositData(customerId),
+          this.refreshCustomerStatement(customerId),
+        ]);
+      } catch {
+        this.error.set('Deposit was received, but balances could not refresh');
+      }
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Could not receive deposit');
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected startDepositApplication(orderId: string, orderTotal: number): void {
+    if (this.depositApplyFor() !== orderId) this.depositApplicationClientRef = null;
+    this.depositApplyFor.set(orderId);
+    this.depositApplyAmount.setValue(
+      formatKesInput(Math.min(orderTotal, this.customerDepositBalance()))
+    );
+  }
+
+  protected async applyDeposit(orderId: string): Promise<void> {
+    const amount = parseKes(this.depositApplyAmount.value);
+    if (amount === null || amount <= 0) {
+      this.error.set('Enter a valid deposit amount');
+      return;
+    }
+    const customerId = this.selectedCustomerId();
+    if (!customerId) return;
+    this.busy.set(true);
+    this.error.set(null);
+    try {
+      await this.money.applyCustomerDeposit(
+        orderId,
+        amount,
+        (this.depositApplicationClientRef ??= crypto.randomUUID())
+      );
+      this.depositApplicationClientRef = null;
+      this.depositApplyFor.set(null);
+      this.notice.set('Customer deposit applied');
+      try {
+        await Promise.all([
+          this.refreshCustomerDepositData(customerId),
+          this.money.creditOrders(customerId).then(rows => this.creditOrders.set(rows)),
+          this.pos.customerOrders(customerId).then(rows => this.orders.set(rows)),
+          this.refreshCustomerStatement(customerId),
+        ]);
+      } catch {
+        this.error.set('Deposit was applied, but balances could not refresh');
+      }
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Could not apply deposit');
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected async refundDeposit(customerId: string): Promise<void> {
+    const amount = parseKes(this.depositRefundAmount.value);
+    const reason = this.depositRefundReason.value.trim();
+    if (amount === null || amount <= 0 || amount > this.customerDepositBalance()) {
+      this.error.set('Enter a refund amount within the held balance');
+      return;
+    }
+    if (!reason) {
+      this.error.set('Enter a refund reason');
+      return;
+    }
+    this.busy.set(true);
+    this.error.set(null);
+    try {
+      const outcome = await this.money.refundCustomerDeposit({
+        customerId,
+        amount,
+        reason,
+        methodCode: this.depositRefundMethod.value || undefined,
+        reference: this.depositRefundReference.value.trim() || undefined,
+        clientRef: (this.depositRefundClientRef ??= crypto.randomUUID()),
+      });
+      this.depositRefundAmount.setValue('');
+      this.depositRefundMethod.setValue('');
+      this.depositRefundReference.setValue('');
+      this.depositRefundReason.setValue('');
+      this.depositRefundClientRef = null;
+      if (outcome.status === 'approval_required') {
+        this.notice.set('Deposit refund sent for approval');
+      } else {
+        this.notice.set('Customer deposit refunded');
+        try {
+          await this.refreshCustomerDepositData(customerId);
+        } catch {
+          this.error.set('Deposit was refunded, but the balance could not refresh');
+        }
+      }
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Could not refund deposit');
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  private async refreshCustomerDepositData(customerId: string): Promise<void> {
+    const [balance, activity] = await Promise.all([
+      this.money.customerDepositAvailable(customerId),
+      this.perms.has('ViewFinancials')
+        ? this.money.customerDepositActivity(customerId)
+        : Promise.resolve([]),
+    ]);
+    if (this.selectedCustomerId() !== customerId) return;
+    this.customerDepositBalance.set(balance);
+    this.depositActivity.set(activity);
   }
 
   protected async repay(orderId: string): Promise<void> {
@@ -1762,6 +2130,13 @@ export class CustomersComponent implements OnInit {
 
   protected customerCreditAvailable(customer: CustomerWithAr): number {
     return Math.max(0, customer.credit_limit - customer.ar_balance);
+  }
+
+  protected customerNetPosition(customer: CustomerWithAr): string {
+    const net = customer.ar_balance - this.customerDepositBalance();
+    if (net > 0) return `Net: customer owes us ${formatKes(net)}`;
+    if (net < 0) return `Net: we hold ${formatKes(-net)} for customer`;
+    return 'Net position settled';
   }
 
   protected approvalTone(status: Approval['status']): BadgeType {

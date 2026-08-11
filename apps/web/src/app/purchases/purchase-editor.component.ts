@@ -800,6 +800,7 @@ export class PurchaseEditorComponent implements OnInit {
   private nextKey = 1;
   private searchRequest = 0;
   private purchaseClientRef: string = crypto.randomUUID();
+  private advanceAwareDraft = false;
   private exitAllowed = false;
 
   protected readonly goodsSubtotal = computed(() =>
@@ -1194,17 +1195,18 @@ export class PurchaseEditorComponent implements OnInit {
         paymentAmount: this.initialPayment(),
         accountCode: this.account.value || undefined,
       };
-      const id =
-        this.advanceUsed() > 0
-          ? await this.money.savePurchaseDraftWithAdvance({
-              ...common,
-              advanceAmount: this.advanceUsed(),
-              clientRef: this.purchaseClientRef,
-            })
-          : await this.money.savePurchaseDraftComplete({
-              ...common,
-              paymentMode: this.paymentMode.value,
-            });
+      const useAdvanceDraftRpc = this.advanceUsed() > 0 || this.advanceAwareDraft;
+      const id = useAdvanceDraftRpc
+        ? await this.money.savePurchaseDraftWithAdvance({
+            ...common,
+            advanceAmount: this.advanceUsed(),
+            clientRef: this.purchaseClientRef,
+          })
+        : await this.money.savePurchaseDraftComplete({
+            ...common,
+            paymentMode: this.paymentMode.value,
+          });
+      if (useAdvanceDraftRpc) this.advanceAwareDraft = true;
       this.draftId.set(id);
       this.dirty.set(false);
       this.notice.set('Purchase draft saved');
@@ -1236,12 +1238,13 @@ export class PurchaseEditorComponent implements OnInit {
           paymentAmount: this.initialPayment(),
           accountCode: this.account.value || undefined,
         };
-        if (this.advanceUsed() > 0) {
+        if (this.advanceUsed() > 0 || this.advanceAwareDraft) {
           await this.money.savePurchaseDraftWithAdvance({
             ...common,
             advanceAmount: this.advanceUsed(),
             clientRef: this.purchaseClientRef,
           });
+          this.advanceAwareDraft = true;
           purchaseId = await this.money.confirmPurchaseDraftWithAdvance(this.draftId()!);
         } else {
           await this.money.savePurchaseDraftComplete({
@@ -1398,6 +1401,7 @@ export class PurchaseEditorComponent implements OnInit {
     const restoredAdvance = Number(
       (draft as unknown as { advance_amount?: number }).advance_amount ?? 0
     );
+    this.advanceAwareDraft = restoredAdvance > 0 || !!draft.client_ref;
     this.advanceAmount.setValue(formatKesInput(restoredAdvance));
     void this.money.supplierAdvanceAvailable(draft.supplier_id).then(balance => {
       if (this.supplier.value === draft.supplier_id) this.supplierAdvanceAvailable.set(balance);

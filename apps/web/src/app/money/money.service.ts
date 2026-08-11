@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import type { Database } from '@dukarun/shared-types';
+import type { Database, Json } from '@dukarun/shared-types';
 import { SupabaseService } from '../core/supabase.service';
 import { rpcError } from '../pos/pos.service';
 import { LocationContextService } from '../core/location-context.service';
@@ -47,6 +47,17 @@ export type CustomerStatementCursor = Pick<CustomerStatementRow, 'id' | 'date'>;
 export type CustomerStatementPage = {
   rows: CustomerStatementRow[];
   hasMore: boolean;
+};
+
+export type PrepaymentActivityRow = {
+  id: string;
+  occurred_at: string;
+  activity_kind: string;
+  amount: number;
+  direction: 'increase' | 'decrease';
+  reference: string | null;
+  status: string;
+  description: string;
 };
 
 export type ReconAccountWithParent = ReconAccount & {
@@ -134,9 +145,19 @@ export class MoneyService {
       p_location_id: this.locations.requireActiveId(),
     });
     if (error) throw error;
-    return data
-      .filter(method => method.is_cashier_controlled)
-      .map(method => ({ account_code: method.ledger_account_code, label: method.name }));
+    const accounts = new Map<string, CashierAccount>();
+    for (const method of data.filter(method => method.is_cashier_controlled)) {
+      const existing = accounts.get(method.ledger_account_code);
+      if (existing) {
+        existing.label = `${existing.label} / ${method.name}`;
+      } else {
+        accounts.set(method.ledger_account_code, {
+          account_code: method.ledger_account_code,
+          label: method.name,
+        });
+      }
+    }
+    return [...accounts.values()];
   }
 
   /** Enabled non-credit payment method codes (for repayment/allocation selects). */
@@ -146,6 +167,150 @@ export class MoneyService {
     });
     if (error) throw error;
     return data.filter(method => method.code !== 'credit').map(method => method.code);
+  }
+
+  async customerDepositAvailable(customerId: string): Promise<number> {
+    const { data, error } = await this.db.rpc('customer_deposit_available', {
+      p_customer_id: customerId,
+    });
+    if (error) throw rpcError(error);
+    return Number(data ?? 0);
+  }
+
+  async supplierAdvanceAvailable(supplierId: string): Promise<number> {
+    const { data, error } = await this.db.rpc('supplier_advance_available', {
+      p_supplier_id: supplierId,
+    });
+    if (error) throw rpcError(error);
+    return Number(data ?? 0);
+  }
+
+  async customerDepositActivity(customerId: string): Promise<PrepaymentActivityRow[]> {
+    const { data, error } = await this.db.rpc('customer_deposit_activity', {
+      p_customer_id: customerId,
+      p_limit: 50,
+    });
+    if (error) throw rpcError(error);
+    return (data ?? []) as unknown as PrepaymentActivityRow[];
+  }
+
+  async supplierAdvanceActivity(supplierId: string): Promise<PrepaymentActivityRow[]> {
+    const { data, error } = await this.db.rpc('supplier_advance_activity', {
+      p_supplier_id: supplierId,
+      p_limit: 50,
+    });
+    if (error) throw rpcError(error);
+    return (data ?? []) as unknown as PrepaymentActivityRow[];
+  }
+
+  async recordCustomerDeposit(input: {
+    customerId: string;
+    amount: number;
+    methodCode: string;
+    reference?: string;
+    clientRef: string;
+  }): Promise<string> {
+    const { data, error } = await this.db.rpc('record_customer_deposit', {
+      p_customer_id: input.customerId,
+      p_amount: input.amount,
+      p_method_code: input.methodCode,
+      p_location_id: this.locations.requireActiveId(),
+      p_client_ref: input.clientRef,
+      ...(input.reference ? { p_reference: input.reference } : {}),
+    });
+    if (error) throw rpcError(error);
+    this.parties.invalidateFinancials();
+    return data as unknown as string;
+  }
+
+  async applyCustomerDeposit(orderId: string, amount: number, clientRef: string): Promise<string> {
+    const { data, error } = await this.db.rpc('apply_customer_deposit', {
+      p_order_id: orderId,
+      p_amount: amount,
+      p_client_ref: clientRef,
+    });
+    if (error) throw rpcError(error);
+    this.parties.invalidateFinancials();
+    return data as unknown as string;
+  }
+
+  async refundCustomerDeposit(input: {
+    customerId: string;
+    amount: number;
+    reason: string;
+    methodCode?: string;
+    reference?: string;
+    clientRef: string;
+  }): Promise<ActionOutcome> {
+    const { data, error } = await this.db.rpc('post_customer_deposit_refund', {
+      p_customer_id: input.customerId,
+      p_amount: input.amount,
+      p_reason: input.reason,
+      p_location_id: this.locations.requireActiveId(),
+      p_client_ref: input.clientRef,
+      ...(input.methodCode ? { p_method_code: input.methodCode } : {}),
+      ...(input.reference ? { p_reference: input.reference } : {}),
+    });
+    if (error) throw rpcError(error);
+    this.parties.invalidateFinancials();
+    return data as unknown as ActionOutcome;
+  }
+
+  async recordSupplierAdvance(input: {
+    supplierId: string;
+    amount: number;
+    accountCode: string;
+    reference?: string;
+    clientRef: string;
+  }): Promise<string> {
+    const { data, error } = await this.db.rpc('record_supplier_advance', {
+      p_supplier_id: input.supplierId,
+      p_amount: input.amount,
+      p_account_code: input.accountCode,
+      p_location_id: this.locations.requireActiveId(),
+      p_client_ref: input.clientRef,
+      ...(input.reference ? { p_reference: input.reference } : {}),
+    });
+    if (error) throw rpcError(error);
+    this.parties.invalidateFinancials();
+    return data as unknown as string;
+  }
+
+  async applySupplierAdvance(
+    purchaseId: string,
+    amount: number,
+    clientRef: string
+  ): Promise<string> {
+    const { data, error } = await this.db.rpc('apply_supplier_advance', {
+      p_purchase_id: purchaseId,
+      p_amount: amount,
+      p_client_ref: clientRef,
+    });
+    if (error) throw rpcError(error);
+    this.parties.invalidateFinancials();
+    return data as unknown as string;
+  }
+
+  async recordSupplierAdvanceReturn(input: {
+    supplierId: string;
+    amount: number;
+    accountCode: string;
+    reason: string;
+    reference?: string;
+    clientRef: string;
+  }): Promise<string> {
+    const { data, error } = await this.db.rpc('record_supplier_advance_return', {
+      p_supplier_id: input.supplierId,
+      p_amount: input.amount,
+      p_account_code: input.accountCode,
+      p_reason: input.reason,
+      p_location_id: this.locations.requireActiveId(),
+      p_client_ref: input.clientRef,
+      ...(input.reference ? { p_reference: input.reference } : {}),
+    });
+    if (error) throw rpcError(error);
+    this.parties.invalidateFinancials();
+    return data as unknown as string;
   }
 
   async journalBySource(sourceType: string, limit = 20): Promise<JournalEntryWithLines[]> {
@@ -328,7 +493,27 @@ export class MoneyService {
       .order('created_at', { ascending: false })
       .limit(20);
     if (error) throw error;
-    return data;
+    const orders = data ?? [];
+    if (orders.length === 0) return [];
+    const { data: payments, error: paymentError } = await this.db
+      .from('payments')
+      .select('order_id, amount')
+      .in(
+        'order_id',
+        orders.map(order => order.id)
+      )
+      .eq('status', 'settled');
+    if (paymentError) throw paymentError;
+    const paidByOrder = new Map<string, number>();
+    for (const payment of payments ?? []) {
+      paidByOrder.set(payment.order_id, (paidByOrder.get(payment.order_id) ?? 0) + payment.amount);
+    }
+    return orders
+      .map(order => {
+        const paid = paidByOrder.get(order.id) ?? 0;
+        return { ...order, paid, outstanding: Math.max(order.total - paid, 0) };
+      })
+      .filter(order => order.outstanding > 0);
   }
 
   async customerStatement(
@@ -426,6 +611,7 @@ export class MoneyService {
       .from('purchase_payments')
       .select('*')
       .eq('purchase_id', purchaseId)
+      .eq('status', 'settled')
       .order('created_at');
     if (error) throw error;
     return data;
@@ -823,6 +1009,39 @@ export class MoneyService {
     return data;
   }
 
+  async recordPurchaseWithAdvance(input: {
+    supplierId: string;
+    lines: PurchaseLineInput[];
+    expenses: PurchaseExpenseInput[];
+    paymentAmount: number;
+    advanceAmount: number;
+    creditAmount: number;
+    reference?: string;
+    accountCode?: string;
+    notes?: string;
+    purchaseDate?: string;
+    stockLocationId?: string;
+    clientRef: string;
+  }): Promise<string> {
+    const { data, error } = await this.db.rpc('record_purchase_with_advance', {
+      p_supplier_id: input.supplierId,
+      p_lines: input.lines as unknown as Json,
+      p_expenses: input.expenses as unknown as Json,
+      p_payment_amount: input.paymentAmount,
+      p_advance_amount: input.advanceAmount,
+      p_credit_amount: input.creditAmount,
+      p_client_ref: input.clientRef,
+      ...(input.reference ? { p_reference: input.reference } : {}),
+      ...(input.accountCode ? { p_account_code: input.accountCode } : {}),
+      ...(input.notes ? { p_notes: input.notes } : {}),
+      ...(input.purchaseDate ? { p_purchase_date: input.purchaseDate } : {}),
+      ...(input.stockLocationId ? { p_stock_location_id: input.stockLocationId } : {}),
+    });
+    if (error) throw rpcError(error);
+    this.parties.invalidateFinancials();
+    return data as unknown as string;
+  }
+
   async savePurchaseDraftComplete(input: {
     draftId?: string;
     supplierId: string;
@@ -851,6 +1070,47 @@ export class MoneyService {
     });
     if (error) throw rpcError(error);
     return data;
+  }
+
+  async savePurchaseDraftWithAdvance(input: {
+    draftId?: string;
+    supplierId: string;
+    lines: PurchaseLineInput[];
+    expenses: PurchaseExpenseInput[];
+    reference?: string;
+    notes?: string;
+    purchaseDate: string;
+    stockLocationId?: string;
+    paymentAmount: number;
+    advanceAmount: number;
+    accountCode?: string;
+    clientRef: string;
+  }): Promise<string> {
+    const { data, error } = await this.db.rpc('save_purchase_draft_with_advance', {
+      p_supplier_id: input.supplierId,
+      p_lines: input.lines as unknown as Json,
+      p_expenses: input.expenses as unknown as Json,
+      p_purchase_date: input.purchaseDate,
+      p_payment_amount: input.paymentAmount,
+      p_advance_amount: input.advanceAmount,
+      p_client_ref: input.clientRef,
+      ...(input.draftId ? { p_draft_id: input.draftId } : {}),
+      ...(input.reference ? { p_reference: input.reference } : {}),
+      ...(input.notes ? { p_notes: input.notes } : {}),
+      ...(input.stockLocationId ? { p_stock_location_id: input.stockLocationId } : {}),
+      ...(input.accountCode ? { p_account_code: input.accountCode } : {}),
+    });
+    if (error) throw rpcError(error);
+    return data as unknown as string;
+  }
+
+  async confirmPurchaseDraftWithAdvance(draftId: string): Promise<string> {
+    const { data, error } = await this.db.rpc('confirm_purchase_draft_with_advance', {
+      p_draft_id: draftId,
+    });
+    if (error) throw rpcError(error);
+    this.parties.invalidateFinancials();
+    return data as unknown as string;
   }
 
   async confirmPurchaseDraftComplete(draftId: string): Promise<string> {
