@@ -20,7 +20,10 @@ services:
         SITE_PUBLIC_URL: ${SITE_PUBLIC_URL:-https://dukarun.com}
         APP_PUBLIC_URL: ${APP_PUBLIC_URL:-https://app.dukarun.com}
         STOREFRONT_PUBLIC_URL: ${STOREFRONT_PUBLIC_URL:-https://store.dukarun.com}
+        MARKETING_VIDEO_BASE_URL: ${MARKETING_VIDEO_BASE_URL:-https://dukarun.com/media/video/product-overview}
         PUBLIC_DATA_MODE: live
+    volumes:
+      - /var/lib/dukarun/marketing-media:/usr/share/nginx/html/media:ro
     restart: unless-stopped
 
   web:
