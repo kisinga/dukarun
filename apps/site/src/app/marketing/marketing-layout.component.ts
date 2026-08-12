@@ -152,7 +152,7 @@ interface NavLink {
               rel="noopener noreferrer"
               class="whatsapp-link flex min-h-8 items-center text-sm font-semibold"
             >
-              WhatsApp us
+              Chat on WhatsApp
             </a>
             <span class="text-xs text-base-content/50">{{ whatsappDisplay }}</span>
           </nav>

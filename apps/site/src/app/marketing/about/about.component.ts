@@ -100,10 +100,10 @@ import { dukarunWhatsAppUrl } from '../../core/public-contact';
             [href]="whatsappUrl"
             target="_blank"
             rel="noopener noreferrer"
-            class="btn whatsapp-button btn-lg min-h-11 gap-2"
+            class="btn whatsapp-action"
           >
             <app-icon name="whatsapp" size="md" />
-            Talk to us on WhatsApp
+            Chat on WhatsApp
           </a>
         </div>
       </div>

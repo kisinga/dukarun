@@ -91,10 +91,10 @@ interface Channel {
                 [href]="setupWhatsAppUrl"
                 target="_blank"
                 rel="noopener noreferrer"
-                class="btn whatsapp-button min-h-11"
+                class="btn whatsapp-action"
               >
                 <app-icon name="whatsapp" size="md" />
-                Ask for a quote on WhatsApp
+                Ask about setup on WhatsApp
               </a>
             </div>
           </div>
@@ -115,10 +115,10 @@ interface Channel {
             [href]="whatsappUrl"
             target="_blank"
             rel="noopener noreferrer"
-            class="btn whatsapp-button-outline min-h-11 px-5"
+            class="btn whatsapp-action"
           >
             <app-icon name="whatsapp" size="md" />
-            WhatsApp us
+            Chat on WhatsApp
           </a>
           <a href="mailto:hello@dukarun.com" class="btn btn-outline btn-lg min-h-11">
             <app-icon name="heroEnvelope" size="md" />
