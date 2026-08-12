@@ -15,6 +15,7 @@ import {
 } from '../../shared/ui/list-search-bar.component';
 import { PaginationComponent } from '../../shared/ui/pagination.component';
 import { StatBarComponent } from '../../shared/ui/stat-bar.component';
+import { DrawerComponent } from '../../shared/ui/drawer.component';
 
 @Component({
   selector: 'app-money-expenses',
@@ -28,6 +29,7 @@ import { StatBarComponent } from '../../shared/ui/stat-bar.component';
     ListSearchBarComponent,
     PaginationComponent,
     StatBarComponent,
+    DrawerComponent,
   ],
   template: `
     <div class="mb-3 flex items-start gap-3">
@@ -48,16 +50,29 @@ import { StatBarComponent } from '../../shared/ui/stat-bar.component';
       >
         <app-icon name="heroArrowPath" />
       </button>
+      <button appButton type="button" (click)="formOpen.set(true)">
+        <app-icon name="heroPlus" /> Record expense
+      </button>
     </div>
 
     @if (!cashierSession.canTakePayment()) {
       <app-session-required-notice action="recording an expense" />
     }
 
-    <div class="card mb-4 bg-base-100">
-      <div class="card-body p-4">
-        <h2 class="section-title mb-2">Record expense</h2>
-        <form (submit)="$event.preventDefault(); submit()" class="grid gap-3 sm:grid-cols-2">
+    @if (formOpen()) {
+      <app-drawer
+        #expenseDrawer
+        [open]="true"
+        title="Record expense"
+        subtitle="Post business spending to the ledger"
+        [dirty]="expenseFormDirty()"
+        (closed)="resetExpenseForm()"
+      >
+        <form
+          id="expense-form"
+          (submit)="$event.preventDefault(); submit()"
+          class="grid gap-3 sm:grid-cols-2"
+        >
           <app-form-field label="Paid from">
             <select class="select select-bordered select-sm w-full" [formControl]="account">
               @for (a of accounts(); track a.code) {
@@ -90,16 +105,6 @@ import { StatBarComponent } from '../../shared/ui/stat-bar.component';
               [formControl]="memo"
             />
           </app-form-field>
-          <div class="sm:col-span-2">
-            <button
-              appButton
-              type="submit"
-              [loading]="busy()"
-              [disabled]="!cashierSession.canTakePayment()"
-            >
-              Post expense
-            </button>
-          </div>
         </form>
         @if (error()) {
           <p class="mt-2 text-sm text-error">{{ error() }}</p>
@@ -107,8 +112,22 @@ import { StatBarComponent } from '../../shared/ui/stat-bar.component';
         @if (notice()) {
           <p class="mt-2 text-sm text-success">{{ notice() }}</p>
         }
-      </div>
-    </div>
+        <div drawerFooter class="flex justify-end gap-2">
+          <button appButton variant="ghost" type="button" (click)="expenseDrawer.requestClose()">
+            Cancel
+          </button>
+          <button
+            appButton
+            type="submit"
+            form="expense-form"
+            [loading]="busy()"
+            [disabled]="!cashierSession.canTakePayment()"
+          >
+            Post expense
+          </button>
+        </div>
+      </app-drawer>
+    }
 
     <app-list-search-bar
       placeholder="Search category, memo, or reference…"
@@ -119,6 +138,9 @@ import { StatBarComponent } from '../../shared/ui/stat-bar.component';
       (sortKeyChange)="historySort.set($event); reloadHistory()"
       [sortDirection]="historyDirection()"
       (sortDirectionChange)="historyDirection.set($event); reloadHistory()"
+      [filtersEnabled]="true"
+      [activeFilterCount]="historyFilterCount()"
+      (clearFilters)="clearHistoryFilters()"
     >
       <app-stat-bar summary [stats]="historyStats()" />
       <div filters class="grid gap-2 sm:grid-cols-2 lg:flex lg:flex-wrap lg:items-end">
@@ -208,6 +230,7 @@ export class MoneyExpensesComponent implements OnInit, OnDestroy {
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
+  protected readonly formOpen = signal(false);
   protected readonly historySearch = signal('');
   protected readonly historyAccount = signal('');
   protected readonly historyFrom = signal(this.monthStartIso());
@@ -301,6 +324,25 @@ export class MoneyExpensesComponent implements OnInit, OnDestroy {
   protected allTimeActive(): boolean {
     return !this.historyFrom() && !this.historyTo();
   }
+  protected historyFilterCount(): number {
+    return Number(Boolean(this.historyAccount())) + Number(!this.monthActive());
+  }
+  protected clearHistoryFilters(): void {
+    this.historyAccount.set('');
+    this.setMonth();
+  }
+  protected expenseFormDirty(): boolean {
+    return Boolean(
+      this.amount.value.trim() || this.category.value.trim() || this.memo.value.trim()
+    );
+  }
+  protected resetExpenseForm(): void {
+    this.formOpen.set(false);
+    this.amount.setValue('');
+    this.category.setValue('');
+    this.memo.setValue('');
+    this.error.set(null);
+  }
   protected reloadHistory(): void {
     this.historyPage.set(1);
     void this.load();
@@ -342,6 +384,7 @@ export class MoneyExpensesComponent implements OnInit, OnDestroy {
       this.amount.setValue('');
       this.category.setValue('');
       this.memo.setValue('');
+      this.formOpen.set(false);
       await this.load();
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Failed to post expense');

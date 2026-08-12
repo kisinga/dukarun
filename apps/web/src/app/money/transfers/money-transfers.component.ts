@@ -16,6 +16,7 @@ import {
 } from '../../shared/ui/list-search-bar.component';
 import { PaginationComponent } from '../../shared/ui/pagination.component';
 import { StatBarComponent } from '../../shared/ui/stat-bar.component';
+import { DrawerComponent } from '../../shared/ui/drawer.component';
 
 @Component({
   selector: 'app-money-transfers',
@@ -29,6 +30,7 @@ import { StatBarComponent } from '../../shared/ui/stat-bar.component';
     ListSearchBarComponent,
     PaginationComponent,
     StatBarComponent,
+    DrawerComponent,
   ],
   template: `
     <div class="mb-3 flex items-start gap-3">
@@ -49,16 +51,29 @@ import { StatBarComponent } from '../../shared/ui/stat-bar.component';
       >
         <app-icon name="heroArrowPath" />
       </button>
+      <button appButton type="button" (click)="formOpen.set(true)">
+        <app-icon name="heroPlus" /> New transfer
+      </button>
     </div>
 
     @if (!cashierSession.canTakePayment()) {
       <app-session-required-notice action="moving money between accounts" />
     }
 
-    <div class="card mb-4 bg-base-100">
-      <div class="card-body p-4">
-        <h2 class="section-title mb-2">New transfer</h2>
-        <form (submit)="$event.preventDefault(); submit()" class="grid gap-3 sm:grid-cols-2">
+    @if (formOpen()) {
+      <app-drawer
+        #transferDrawer
+        [open]="true"
+        title="New transfer"
+        subtitle="Move money between controlled accounts"
+        [dirty]="transferFormDirty()"
+        (closed)="resetTransferForm()"
+      >
+        <form
+          id="transfer-form"
+          (submit)="$event.preventDefault(); submit()"
+          class="grid gap-3 sm:grid-cols-2"
+        >
           <app-form-field label="From">
             <select class="select select-bordered select-sm w-full" [formControl]="from">
               @for (a of accounts(); track a.code) {
@@ -104,16 +119,6 @@ import { StatBarComponent } from '../../shared/ui/stat-bar.component';
               Source and destination are the same account.
             </p>
           }
-          <div class="sm:col-span-2">
-            <button
-              appButton
-              type="submit"
-              [loading]="busy()"
-              [disabled]="sameAccount() || !cashierSession.canTakePayment()"
-            >
-              Post transfer
-            </button>
-          </div>
         </form>
         @if (error()) {
           <p class="mt-2 text-sm text-error">{{ error() }}</p>
@@ -121,8 +126,22 @@ import { StatBarComponent } from '../../shared/ui/stat-bar.component';
         @if (notice()) {
           <p class="mt-2 text-sm text-success">{{ notice() }}</p>
         }
-      </div>
-    </div>
+        <div drawerFooter class="flex justify-end gap-2">
+          <button appButton variant="ghost" type="button" (click)="transferDrawer.requestClose()">
+            Cancel
+          </button>
+          <button
+            appButton
+            type="submit"
+            form="transfer-form"
+            [loading]="busy()"
+            [disabled]="sameAccount() || !cashierSession.canTakePayment()"
+          >
+            Post transfer
+          </button>
+        </div>
+      </app-drawer>
+    }
 
     <app-list-search-bar
       placeholder="Search memo or reference…"
@@ -133,6 +152,9 @@ import { StatBarComponent } from '../../shared/ui/stat-bar.component';
       (sortKeyChange)="historySort.set($event); reloadHistory()"
       [sortDirection]="historyDirection()"
       (sortDirectionChange)="historyDirection.set($event); reloadHistory()"
+      [filtersEnabled]="true"
+      [activeFilterCount]="historyFilterCount()"
+      (clearFilters)="clearHistoryFilters()"
     >
       <app-stat-bar summary [stats]="historyStats()" />
       <div filters class="grid gap-2 sm:grid-cols-2 lg:flex lg:flex-wrap lg:items-end">
@@ -223,6 +245,7 @@ export class MoneyTransfersComponent implements OnInit, OnDestroy {
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
+  protected readonly formOpen = signal(false);
   protected readonly sameAccount = computed(
     () => this.fromValue() !== '' && this.fromValue() === this.toValue()
   );
@@ -321,6 +344,24 @@ export class MoneyTransfersComponent implements OnInit, OnDestroy {
   protected allTimeActive(): boolean {
     return !this.historyFrom() && !this.historyTo();
   }
+  protected historyFilterCount(): number {
+    return Number(Boolean(this.historyAccount())) + Number(!this.monthActive());
+  }
+  protected clearHistoryFilters(): void {
+    this.historyAccount.set('');
+    this.setMonth();
+  }
+  protected transferFormDirty(): boolean {
+    return Boolean(this.principal.value.trim() || this.fee.value.trim() || this.memo.value.trim());
+  }
+  protected resetTransferForm(): void {
+    this.formOpen.set(false);
+    this.principal.setValue('');
+    this.fee.setValue('');
+    this.memo.setValue('');
+    this.error.set(null);
+    this.transferId = crypto.randomUUID();
+  }
   protected reloadHistory(): void {
     this.historyPage.set(1);
     void this.load();
@@ -369,6 +410,7 @@ export class MoneyTransfersComponent implements OnInit, OnDestroy {
       this.principal.setValue('');
       this.fee.setValue('');
       this.memo.setValue('');
+      this.formOpen.set(false);
       this.transferId = crypto.randomUUID();
       await this.load();
     } catch (err) {

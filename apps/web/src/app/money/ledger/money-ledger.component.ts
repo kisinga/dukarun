@@ -11,6 +11,7 @@ import {
 } from '../../shared/ui/list-search-bar.component';
 import { PaginationComponent } from '../../shared/ui/pagination.component';
 import { JournalEntryWithLines, LedgerAccountWithBalance, MoneyService } from '../money.service';
+import { MobileListComponent } from '../../shared/ui/mobile-list.component';
 
 const JOURNAL_SORT_OPTIONS: readonly ListSortOption[] = [
   { value: 'posted_at', label: 'Posted date' },
@@ -27,12 +28,28 @@ const JOURNAL_SORT_OPTIONS: readonly ListSortOption[] = [
     EmptyStateComponent,
     ListSearchBarComponent,
     PaginationComponent,
+    MobileListComponent,
   ],
   template: `
     <div class="space-y-4">
       <section>
-        <h2 class="type-section mb-2">Account balances</h2>
-        <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+        <label class="form-control md:hidden">
+          <span class="label-text mb-1 text-xs font-semibold">Account</span>
+          <select
+            class="select select-bordered min-h-11 w-full"
+            [value]="accountCode()"
+            (change)="selectAccount($event)"
+          >
+            <option value="">All accounts</option>
+            @for (account of accounts(); track account.id) {
+              <option [value]="account.code">
+                {{ account.code }} — {{ account.name }} — {{ fmt(account.balance) }}
+              </option>
+            }
+          </select>
+        </label>
+        <h2 class="type-section mb-2 hidden md:block">Account balances</h2>
+        <div class="hidden gap-2 sm:grid-cols-2 md:grid xl:grid-cols-4">
           @for (account of accounts(); track account.id) {
             <button
               type="button"
@@ -56,6 +73,9 @@ const JOURNAL_SORT_OPTIONS: readonly ListSortOption[] = [
         (sortKeyChange)="changeSort($event, journalSortDirection())"
         [sortDirection]="journalSortDirection()"
         (sortDirectionChange)="changeSort(journalSort(), $event)"
+        [filtersEnabled]="true"
+        [activeFilterCount]="ledgerActiveFilterCount()"
+        (clearFilters)="clearFilters()"
       >
         <div filters class="flex flex-wrap items-end gap-2">
           <label class="form-control">
@@ -108,64 +128,113 @@ const JOURNAL_SORT_OPTIONS: readonly ListSortOption[] = [
           description="Try a wider date range or clear the filters."
         />
       } @else {
-        <app-data-table-shell title="Journal" [description]="total() + ' entries'">
-          <table class="table table-sm">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Source</th>
-                <th>Description</th>
-                <th class="text-right">Debit</th>
-                <th class="text-right">Credit</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (entry of rows(); track entry.id) {
-                <tr>
-                  <td class="whitespace-nowrap text-sm">{{ entry.posted_at | date: 'medium' }}</td>
-                  <td>
-                    <span class="badge badge-ghost badge-sm">{{ entry.source_type }}</span>
-                    <div class="max-w-36 truncate font-mono text-xs text-base-content/50">
-                      {{ entry.source_id }}
+        <app-mobile-list>
+          @for (entry of rows(); track entry.id) {
+            <div mobileListRow>
+              <button
+                type="button"
+                class="flex min-h-20 w-full items-center gap-3 p-3 text-left"
+                [attr.aria-expanded]="expanded() === entry.id"
+                (click)="toggle(entry.id)"
+              >
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-center gap-2">
+                    <span class="badge badge-ghost badge-xs">{{ entry.source_type }}</span>
+                    <span class="type-caption">{{ entry.posted_at | date: 'mediumDate' }}</span>
+                  </div>
+                  <p class="mt-1 truncate text-sm font-medium">
+                    {{ entry.memo || 'No description' }}
+                  </p>
+                </div>
+                <div class="shrink-0 text-right text-sm tabular-nums">
+                  @if (entryDebit(entry) > 0) {
+                    <p class="font-semibold">Dr {{ fmt(entryDebit(entry)) }}</p>
+                  }
+                  @if (entryCredit(entry) > 0) {
+                    <p class="font-semibold">Cr {{ fmt(entryCredit(entry)) }}</p>
+                  }
+                </div>
+              </button>
+              @if (expanded() === entry.id) {
+                <div class="border-t border-base-200 bg-base-200/30 px-3 py-2">
+                  @for (line of entry.ledger_journal_lines; track line.id) {
+                    <div class="flex items-center gap-2 py-1 text-xs">
+                      <span class="font-mono font-semibold">{{ line.ledger_accounts?.code }}</span>
+                      <span class="min-w-0 flex-1 truncate text-base-content/60">{{
+                        line.ledger_accounts?.name
+                      }}</span>
+                      <span class="shrink-0 tabular-nums">
+                        {{ line.debit ? 'Dr ' + fmt(line.debit) : 'Cr ' + fmt(line.credit) }}
+                      </span>
                     </div>
-                  </td>
-                  <td>{{ entry.memo }}</td>
-                  <td class="text-right font-medium">{{ fmt(entryDebit(entry)) }}</td>
-                  <td class="text-right font-medium">{{ fmt(entryCredit(entry)) }}</td>
-                  <td class="text-right">
-                    <button class="btn btn-ghost btn-xs" (click)="toggle(entry.id)">
-                      {{ expanded() === entry.id ? 'Hide' : 'Details' }}
-                    </button>
-                  </td>
+                  }
+                </div>
+              }
+            </div>
+          }
+        </app-mobile-list>
+        <div class="hidden lg:block">
+          <app-data-table-shell title="Journal" [description]="total() + ' entries'">
+            <table class="table table-sm">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Source</th>
+                  <th>Description</th>
+                  <th class="text-right">Debit</th>
+                  <th class="text-right">Credit</th>
+                  <th></th>
                 </tr>
-                @if (expanded() === entry.id) {
-                  <tr class="row-detail">
-                    <td colspan="6">
-                      <div class="grid gap-2 sm:grid-cols-2">
-                        @for (line of entry.ledger_journal_lines; track line.id) {
-                          <div
-                            class="flex items-center gap-3 rounded-field border border-base-300/60 bg-base-100 p-2 text-sm"
-                          >
-                            <span
-                              ><strong class="font-mono">{{ line.ledger_accounts?.code }}</strong
-                              ><br /><span class="text-base-content/60">{{
-                                line.ledger_accounts?.name
-                              }}</span></span
-                            >
-                            <span class="ml-auto tabular-nums">{{
-                              line.debit ? 'Dr ' + fmt(line.debit) : 'Cr ' + fmt(line.credit)
-                            }}</span>
-                          </div>
-                        }
+              </thead>
+              <tbody>
+                @for (entry of rows(); track entry.id) {
+                  <tr>
+                    <td class="whitespace-nowrap text-sm">
+                      {{ entry.posted_at | date: 'medium' }}
+                    </td>
+                    <td>
+                      <span class="badge badge-ghost badge-sm">{{ entry.source_type }}</span>
+                      <div class="max-w-36 truncate font-mono text-xs text-base-content/50">
+                        {{ entry.source_id }}
                       </div>
                     </td>
+                    <td>{{ entry.memo }}</td>
+                    <td class="text-right font-medium">{{ fmt(entryDebit(entry)) }}</td>
+                    <td class="text-right font-medium">{{ fmt(entryCredit(entry)) }}</td>
+                    <td class="text-right">
+                      <button class="btn btn-ghost btn-xs" (click)="toggle(entry.id)">
+                        {{ expanded() === entry.id ? 'Hide' : 'Details' }}
+                      </button>
+                    </td>
                   </tr>
+                  @if (expanded() === entry.id) {
+                    <tr class="row-detail">
+                      <td colspan="6">
+                        <div class="grid gap-2 sm:grid-cols-2">
+                          @for (line of entry.ledger_journal_lines; track line.id) {
+                            <div
+                              class="flex items-center gap-3 rounded-field border border-base-300/60 bg-base-100 p-2 text-sm"
+                            >
+                              <span
+                                ><strong class="font-mono">{{ line.ledger_accounts?.code }}</strong
+                                ><br /><span class="text-base-content/60">{{
+                                  line.ledger_accounts?.name
+                                }}</span></span
+                              >
+                              <span class="ml-auto tabular-nums">{{
+                                line.debit ? 'Dr ' + fmt(line.debit) : 'Cr ' + fmt(line.credit)
+                              }}</span>
+                            </div>
+                          }
+                        </div>
+                      </td>
+                    </tr>
+                  }
                 }
-              }
-            </tbody>
-          </table>
-        </app-data-table-shell>
+              </tbody>
+            </table>
+          </app-data-table-shell>
+        </div>
         <div class="mt-3">
           <app-pagination
             [currentPage]="page()"
@@ -255,6 +324,19 @@ export class MoneyLedgerComponent implements OnInit {
     this.search.set('');
     this.sourceType.set('');
     await this.applyFilters();
+  }
+  protected selectAccount(event: Event): void {
+    const code = (event.target as HTMLSelectElement).value;
+    if (code) void this.filterByAccount(code);
+    else void this.clearAccountFilter();
+  }
+  protected ledgerActiveFilterCount(): number {
+    return (
+      Number(Boolean(this.accountCode())) +
+      Number(Boolean(this.sourceType())) +
+      Number(Boolean(this.from())) +
+      Number(Boolean(this.to()))
+    );
   }
   protected async clearAccountFilter(): Promise<void> {
     this.accountCode.set('');

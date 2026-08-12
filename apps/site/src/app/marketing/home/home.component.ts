@@ -7,9 +7,10 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { isPlatformBrowser } from '@angular/common';
+import { DatePipe, isPlatformBrowser } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { environment } from '../../../environments/environment';
+import { BlogPostSummary, BlogService } from '../../blog/blog.service';
 import { IconComponent } from '../../shared/ui/icon.component';
 import { MarketingVideoComponent } from '../marketing-video.component';
 import { PublicPricingService, PublicSubscriptionPlan } from '../public-pricing.service';
@@ -52,7 +53,7 @@ interface Testimonial {
  */
 @Component({
   selector: 'app-marketing-home',
-  imports: [RouterLink, IconComponent, MarketingVideoComponent],
+  imports: [RouterLink, DatePipe, IconComponent, MarketingVideoComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <!-- Hero -->
@@ -507,6 +508,58 @@ interface Testimonial {
       </div>
     </section>
 
+    @if (featuredPost(); as post) {
+      <!-- Featured journal story -->
+      <section class="bg-base-100 py-14 sm:py-20" aria-labelledby="journal-heading">
+        <div class="mkt-container">
+          <article
+            class="grid overflow-hidden rounded-[1.25rem] border border-base-300/70 bg-base-200/45 shadow-sm lg:grid-cols-[0.9fr_1.1fr]"
+          >
+            <a
+              [routerLink]="['/blog', post.slug]"
+              class="relative block min-h-64 overflow-hidden bg-neutral sm:min-h-80"
+              aria-label="Read {{ post.title }}"
+            >
+              @if (blogCover(post); as image) {
+                <img
+                  [src]="image"
+                  [alt]="post.cover_image_alt || ''"
+                  loading="lazy"
+                  class="absolute inset-0 h-full w-full object-cover"
+                />
+              } @else {
+                <div class="absolute inset-0 flex items-end bg-neutral p-8 text-neutral-content">
+                  <span class="text-7xl font-bold tracking-[-0.07em] text-primary">D.</span>
+                </div>
+              }
+            </a>
+            <div class="flex flex-col justify-center p-7 sm:p-10 lg:p-12">
+              <span class="mkt-eyebrow">From the Dukarun journal</span>
+              <h2 id="journal-heading" class="mt-3 text-3xl font-bold leading-tight tracking-tight">
+                <a [routerLink]="['/blog', post.slug]" class="hover:text-primary">{{
+                  post.title
+                }}</a>
+              </h2>
+              <p class="mt-4 mb-0 text-base leading-relaxed text-base-content/65">
+                {{ post.excerpt }}
+              </p>
+              <div class="mt-5 flex gap-4 text-sm text-base-content/50">
+                <span>{{ post.published_at | date: 'd MMM y' }}</span>
+                <span>{{ post.reading_minutes }} min read</span>
+              </div>
+              <a
+                [routerLink]="['/blog', post.slug]"
+                class="mt-7 inline-flex min-h-11 items-center gap-2 self-start font-semibold text-primary"
+              >
+                Read the story
+                <app-icon name="heroArrowRight" size="sm" />
+              </a>
+            </div>
+          </article>
+        </div>
+      </section>
+    }
+
     <!-- FAQ -->
     <section class="bg-base-100 py-14 sm:py-20" aria-labelledby="faq-heading">
       <div class="mkt-container max-w-3xl">
@@ -568,6 +621,7 @@ interface Testimonial {
 export class HomeComponent implements OnInit {
   protected readonly appUrl = appUrl;
   private readonly publicPricing = inject(PublicPricingService);
+  private readonly blog = inject(BlogService);
   private readonly platformId = inject(PLATFORM_ID);
   private readonly initialPlans = this.publicPricing.transferredPlans();
   private readonly initialConfig = this.publicPricing.transferredBillingConfig();
@@ -575,6 +629,7 @@ export class HomeComponent implements OnInit {
   protected readonly pricingPlans = signal<PublicSubscriptionPlan[]>(this.initialPlans ?? []);
   protected readonly trialDays = signal<number | null>(this.initialConfig?.trialDays ?? null);
   protected readonly pricingLoading = signal(this.initialPlans === null);
+  protected readonly featuredPost = signal<BlogPostSummary | null>(null);
   protected readonly marketingVideoBaseUrl = environment.marketingVideoBaseUrl.replace(/\/+$/, '');
   protected videoUrl(file: string): string {
     return `${this.marketingVideoBaseUrl}/${file}`;
@@ -582,13 +637,19 @@ export class HomeComponent implements OnInit {
 
   async ngOnInit(): Promise<void> {
     const refresh = isPlatformBrowser(this.platformId) && this.initialPlans !== null;
-    const [plans, config] = await Promise.allSettled([
+    const [plans, config, featured] = await Promise.allSettled([
       this.publicPricing.activePlans(refresh),
       this.publicPricing.billingConfig(refresh),
+      this.blog.featuredPost(isPlatformBrowser(this.platformId)),
     ]);
     if (plans.status === 'fulfilled') this.pricingPlans.set(plans.value);
     if (config.status === 'fulfilled') this.trialDays.set(config.value?.trialDays ?? null);
+    if (featured.status === 'fulfilled') this.featuredPost.set(featured.value);
     this.pricingLoading.set(false);
+  }
+
+  protected blogCover(post: BlogPostSummary): string | null {
+    return this.blog.coverUrl(post.cover_image_path);
   }
 
   protected readonly trustPoints = ['No hardware needed', 'Works offline', 'Cancel anytime'];

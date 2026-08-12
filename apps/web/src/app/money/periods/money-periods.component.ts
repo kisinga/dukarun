@@ -8,6 +8,7 @@ import { FormFieldComponent } from '../../shared/ui/form-field.component';
 import { MoneyComponent } from '../../shared/ui/money.component';
 import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
 import { IconComponent } from '../../shared/ui/icon.component';
+import { MobileListComponent } from '../../shared/ui/mobile-list.component';
 import {
   AccountingPeriod,
   CashierAccount,
@@ -28,6 +29,7 @@ import {
     EmptyStateComponent,
     StatusBadgeComponent,
     IconComponent,
+    MobileListComponent,
   ],
   template: `
     <div class="mb-3 flex items-start gap-3">
@@ -173,82 +175,72 @@ import {
                 <span class="badge badge-outline">{{ recon.scope }}</span>
                 <span class="type-caption">{{ time(recon.created_at) }}</span>
               </div>
-              <div class="table-scroll">
-                <table class="table table-sm mt-2">
-                  <thead>
-                    <tr>
-                      <th>Account</th>
-                      <th class="text-right">Declared</th>
-                      <th class="text-right">Expected</th>
-                      <th class="text-right">Variance</th>
-                      <th></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    @for (ra of recon.reconciliation_accounts; track ra.id) {
-                      <tr>
-                        <td class="font-mono text-xs">{{ ra.account_code }}</td>
-                        <td class="text-right"><app-money [amount]="ra.declared" /></td>
-                        <td class="text-right"><app-money [amount]="ra.expected" /></td>
-                        <td
-                          class="text-right font-semibold"
-                          [class.text-error]="ra.variance !== 0 && !ra.reviewed_at"
-                        >
-                          <app-money [amount]="ra.variance" />
-                        </td>
-                        <td class="text-right">
-                          @if (ra.reviewed_at) {
-                            <span class="type-caption">
-                              Reviewed · User …{{ shortId(ra.reviewed_by) }} ·
-                              {{ date(ra.reviewed_at) }}
-                            </span>
-                          } @else if (ra.variance !== 0) {
-                            @if (!perms.has('ManageReconciliation')) {
-                              <span class="type-caption">Manager review</span>
-                            } @else if (!canRevert(recon.id)) {
-                              <span
-                                class="type-caption"
-                                title="A newer opening, closing, or reconciliation has occurred"
-                              >
-                                Review window closed
-                              </span>
-                            } @else if (revertingFor() === ra.id) {
-                              <div class="flex items-center justify-end gap-1">
-                                <input
-                                  type="text"
-                                  class="input input-bordered input-xs w-36"
-                                  placeholder="Reason (optional)"
-                                  [formControl]="revertReason"
-                                />
-                                <button
-                                  class="btn btn-warning btn-xs"
-                                  [disabled]="busy()"
-                                  (click)="confirmRevert(ra.id)"
-                                >
-                                  Confirm
-                                </button>
-                                <button
-                                  class="btn btn-ghost btn-xs"
-                                  (click)="revertingFor.set(null)"
-                                >
-                                  Cancel
-                                </button>
-                              </div>
-                            } @else {
-                              <button
-                                class="btn btn-warning btn-outline btn-xs"
-                                [disabled]="busy()"
-                                (click)="startRevert(ra.id)"
-                              >
-                                Revert
-                              </button>
-                            }
-                          }
-                        </td>
-                      </tr>
-                    }
-                  </tbody>
-                </table>
+              <div class="mt-2 divide-y divide-base-200 rounded-box border border-base-300/60">
+                @for (ra of recon.reconciliation_accounts; track ra.id) {
+                  <div class="p-3">
+                    <div class="flex items-center gap-3">
+                      <div class="min-w-0 flex-1">
+                        <p class="font-mono text-sm font-semibold">{{ ra.account_code }}</p>
+                        <p class="type-caption mt-1">
+                          Declared <app-money [amount]="ra.declared" /> · expected
+                          <app-money [amount]="ra.expected" />
+                        </p>
+                      </div>
+                      <p
+                        class="shrink-0 font-semibold"
+                        [class.text-error]="ra.variance !== 0 && !ra.reviewed_at"
+                      >
+                        <app-money [amount]="ra.variance" />
+                      </p>
+                    </div>
+                    <div class="mt-2 text-right">
+                      @if (ra.reviewed_at) {
+                        <span class="type-caption">
+                          Reviewed · User …{{ shortId(ra.reviewed_by) }} ·
+                          {{ date(ra.reviewed_at) }}
+                        </span>
+                      } @else if (ra.variance !== 0) {
+                        @if (!perms.has('ManageReconciliation')) {
+                          <span class="type-caption">Manager review</span>
+                        } @else if (!canRevert(recon.id)) {
+                          <span
+                            class="type-caption"
+                            title="A newer opening, closing, or reconciliation has occurred"
+                          >
+                            Review window closed
+                          </span>
+                        } @else if (revertingFor() === ra.id) {
+                          <div class="flex items-center justify-end gap-1">
+                            <input
+                              type="text"
+                              class="input input-bordered input-xs w-36"
+                              placeholder="Reason (optional)"
+                              [formControl]="revertReason"
+                            />
+                            <button
+                              class="btn btn-warning btn-xs"
+                              [disabled]="busy()"
+                              (click)="confirmRevert(ra.id)"
+                            >
+                              Confirm
+                            </button>
+                            <button class="btn btn-ghost btn-xs" (click)="revertingFor.set(null)">
+                              Cancel
+                            </button>
+                          </div>
+                        } @else {
+                          <button
+                            class="btn btn-warning btn-outline btn-xs"
+                            [disabled]="busy()"
+                            (click)="startRevert(ra.id)"
+                          >
+                            Revert
+                          </button>
+                        }
+                      }
+                    </div>
+                  </div>
+                }
               </div>
             </div>
           </div>
@@ -265,8 +257,21 @@ import {
         description="Reconcile, then close your first accounting period below."
       />
     } @else {
-      <div class="card bg-base-100">
-        <table class="table table-sm">
+      <app-mobile-list>
+        @for (p of periods(); track p.id) {
+          <div mobileListRow>
+            <div class="flex min-h-16 items-center justify-between gap-3 p-3">
+              <div class="min-w-0">
+                <p class="font-semibold">{{ p.start_date }} – {{ p.end_date }}</p>
+                <p class="type-caption mt-0.5">Accounting period</p>
+              </div>
+              <app-status-badge type="neutral" [label]="p.status" />
+            </div>
+          </div>
+        }
+      </app-mobile-list>
+      <div class="hidden lg:block">
+        <table class="table table-sm rounded-box border border-base-300 bg-base-100">
           <thead>
             <tr>
               <th>Start</th>

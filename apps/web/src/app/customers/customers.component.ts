@@ -51,6 +51,8 @@ import { StatCardComponent } from '../shared/ui/stat-card.component';
 import { DeleteConfirmationModalComponent } from '../shared/ui/delete-confirmation-modal.component';
 import { PartyCacheService } from '../core/party-cache.service';
 import { Approval, ApprovalsService } from '../approvals/approvals.service';
+import { MobileListComponent } from '../shared/ui/mobile-list.component';
+import { PageActionsComponent } from '../shared/ui/page-actions.component';
 
 type CustomerWithAr = MoneyCustomer & { ar_balance: number } & AgingInfo;
 type CreditOrder = {
@@ -86,6 +88,8 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
     StatBarComponent,
     StatCardComponent,
     DeleteConfirmationModalComponent,
+    MobileListComponent,
+    PageActionsComponent,
   ],
   template: `
     <app-page
@@ -93,22 +97,24 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
       subtitle="Manage customer details, credit access, balances, and repayment history."
       [wide]="true"
     >
-      <button
-        actions
-        appButton
-        variant="ghost"
-        [iconOnly]="true"
-        [loading]="loading()"
-        type="button"
-        title="Refresh customers"
-        aria-label="Refresh customers"
-        (click)="load()"
-      >
-        <app-icon name="heroArrowPath" />
-      </button>
-      <button actions appButton type="button" (click)="startCreate()">
-        <app-icon name="heroPlus" /> Add customer
-      </button>
+      <app-page-actions actions>
+        <button
+          utilityAction
+          appButton
+          variant="ghost"
+          [iconOnly]="true"
+          [loading]="loading()"
+          type="button"
+          title="Refresh customers"
+          aria-label="Refresh customers"
+          (click)="load()"
+        >
+          <app-icon name="heroArrowPath" />
+        </button>
+        <button primaryAction appButton type="button" (click)="startCreate()">
+          <app-icon name="heroPlus" /> Add customer
+        </button>
+      </app-page-actions>
 
       @if (error()) {
         <div role="alert" class="alert alert-error mb-3 text-sm">{{ error() }}</div>
@@ -132,6 +138,9 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
         (sortKeyChange)="customerSort.set($event); customerPage.set(1)"
         [sortDirection]="customerSortDirection()"
         (sortDirectionChange)="customerSortDirection.set($event); customerPage.set(1)"
+        [filtersEnabled]="true"
+        [activeFilterCount]="accountStatus() === 'active' ? 0 : 1"
+        (clearFilters)="clearCustomerFilters()"
       >
         <app-stat-bar summary [stats]="customerStats()" />
         <div filters class="flex items-center gap-2">
@@ -298,10 +307,11 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
           </app-data-table-shell>
         </div>
 
-        <div class="flex flex-col gap-2 lg:hidden">
+        <app-mobile-list>
           @for (c of pagedCustomers(); track c.id) {
             <div
-              class="card cursor-pointer bg-base-100"
+              mobileListRow
+              class="cursor-pointer"
               role="button"
               tabindex="0"
               [class.border-primary]="selectedCustomerId() === c.id"
@@ -309,71 +319,41 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
               (click)="openCustomer(c.id)"
               (keydown.enter)="openCustomer(c.id)"
             >
-              <div class="card-body p-4">
-                <div class="flex flex-wrap items-center gap-3">
-                  <app-entity-avatar
-                    size="sm"
-                    [firstName]="c.first_name"
-                    [lastName]="c.last_name ?? ''"
-                  />
-                  <span class="font-semibold">{{ name(c) }}</span>
-                  @if (c.deleted_at) {
-                    <app-status-badge size="xs" type="error" label="Deleted" />
-                  }
-                  @if (latestCustomerApproval(c.id); as approval) {
-                    <app-status-badge
-                      size="xs"
-                      [type]="approvalTone(approval.status)"
-                      [label]="
-                        approval.status === 'pending'
-                          ? 'Policy change pending'
-                          : 'Policy ' + approval.status
-                      "
-                    />
-                  }
-                  <span class="text-xs text-base-content/60">{{ c.phone ?? '' }}</span>
-                  <span
-                    class="ml-auto"
-                    [class.font-bold]="c.ar_balance > 0"
-                    [class.text-error]="c.ar_balance > 0"
-                    [class.text-base-content/60]="c.ar_balance === 0"
-                  >
+              <div class="flex min-h-20 items-center gap-3 p-3">
+                <app-entity-avatar
+                  size="sm"
+                  [firstName]="c.first_name"
+                  [lastName]="c.last_name ?? ''"
+                />
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-center gap-2">
+                    <span class="truncate font-semibold">{{ name(c) }}</span>
+                    @if (c.deleted_at) {
+                      <app-status-badge size="xs" type="error" label="Deleted" />
+                    }
+                  </div>
+                  <p class="type-caption mt-1 truncate">
+                    {{ c.phone || 'No phone' }}
+                    @if (c.days_outstanding !== null && c.ar_balance > 0) {
+                      · {{ c.days_outstanding }} days · {{ c.bucket }}
+                    }
+                  </p>
+                </div>
+                <div
+                  class="shrink-0 text-right"
+                  [class.font-bold]="c.ar_balance > 0"
+                  [class.text-error]="c.ar_balance > 0"
+                  [class.text-base-content/60]="c.ar_balance === 0"
+                >
+                  <p class="tabular-nums">
                     <app-money [amount]="c.ar_balance" [masked]="!perms.has('ViewFinancials')" />
-                    owed to us
-                  </span>
-                  @if (c.deleted_at) {
-                    @if (perms.has('ManageCustomers')) {
-                      <button
-                        appButton
-                        variant="ghost"
-                        (click)="$event.stopPropagation(); restoreCustomer(c)"
-                      >
-                        Restore
-                      </button>
-                    }
-                  } @else {
-                    <button
-                      appButton
-                      variant="ghost"
-                      (click)="$event.stopPropagation(); startEdit(c)"
-                    >
-                      Edit
-                    </button>
-                    @if (perms.has('ManageCustomers')) {
-                      <button
-                        appButton
-                        variant="ghost"
-                        (click)="$event.stopPropagation(); startDelete(c)"
-                      >
-                        Delete
-                      </button>
-                    }
-                  }
+                  </p>
+                  <p class="type-caption">owed to us</p>
                 </div>
               </div>
             </div>
           }
-        </div>
+        </app-mobile-list>
 
         <!-- Customer detail/edit drawer -->
         @if (selectedCustomerId() !== null || creating()) {
@@ -1405,18 +1385,33 @@ export class CustomersComponent implements OnInit {
         customer.ar_balance > 0 && customer.bucket !== null && customer.bucket !== 'current'
     ).length;
     return [
-      { label: 'Active customers', value: active.length },
+      {
+        label: 'Active customers',
+        value: active.length,
+        mobilePriority: 'primary' as const,
+      },
       {
         label: 'Owed to us',
         value: this.perms.has('ViewFinancials') ? formatKes(outstanding) : 'Hidden',
         tone: outstanding > 0 ? ('warning' as const) : ('neutral' as const),
+        mobilePriority: 'primary' as const,
       },
       {
         label: 'Credit approved',
         value: active.filter(customer => customer.is_credit_approved).length,
+        mobilePriority: 'secondary' as const,
       },
-      { label: 'Overdue to us', value: overdue, tone: 'error' as const },
-      { label: 'Deleted', value: rows.length - active.length },
+      {
+        label: 'Overdue to us',
+        value: overdue,
+        tone: 'error' as const,
+        mobilePriority: 'secondary' as const,
+      },
+      {
+        label: 'Deleted',
+        value: rows.length - active.length,
+        mobilePriority: 'secondary' as const,
+      },
     ];
   });
   protected readonly deleteConfirmationData = computed(() => {
@@ -1630,6 +1625,11 @@ export class CustomersComponent implements OnInit {
     this.accountStatus.set(
       (event.target as HTMLSelectElement).value as 'active' | 'deleted' | 'all'
     );
+    this.customerPage.set(1);
+  }
+
+  protected clearCustomerFilters(): void {
+    this.accountStatus.set('active');
     this.customerPage.set(1);
   }
 

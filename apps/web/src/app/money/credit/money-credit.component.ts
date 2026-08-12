@@ -115,6 +115,7 @@ interface CreditParty {
         (sortKeyChange)="creditSort.set($event); page.set(1)"
         [sortDirection]="creditSortDirection()"
         (sortDirectionChange)="creditSortDirection.set($event); page.set(1)"
+        [filtersEnabled]="true"
       >
         <app-stat-bar summary [stats]="positionStats()" />
         <div filters class="flex flex-wrap gap-1 rounded-field bg-base-200 p-1">
@@ -314,16 +315,22 @@ export class MoneyCreditComponent implements OnInit {
     const payables = this.payables();
     const net = receivables - payables;
     return [
-      { label: 'Customers owe us', value: this.moneyLabel(receivables) },
+      {
+        label: 'Customers owe us',
+        value: this.moneyLabel(receivables),
+        mobilePriority: 'primary' as const,
+      },
       {
         label: 'We owe suppliers',
         value: this.moneyLabel(payables),
         tone: payables > 0 ? ('warning' as const) : ('neutral' as const),
+        mobilePriority: 'primary' as const,
       },
       {
         label: net >= 0 ? 'Net owed to us' : 'Net we owe',
         value: this.moneyLabel(Math.abs(net)),
         tone: net < 0 ? ('warning' as const) : ('neutral' as const),
+        mobilePriority: 'secondary' as const,
       },
       {
         label: 'Overdue customers',
@@ -332,6 +339,7 @@ export class MoneyCreditComponent implements OnInit {
             customer.ar_balance > 0 && customer.bucket !== null && customer.bucket !== 'current'
         ).length,
         tone: 'error' as const,
+        mobilePriority: 'secondary' as const,
       },
     ];
   });

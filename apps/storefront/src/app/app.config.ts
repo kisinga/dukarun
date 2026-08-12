@@ -10,6 +10,7 @@ import {
   heroChevronRight,
   heroListBullet,
   heroQueueList,
+  heroShare,
   heroSquares2x2,
 } from '@ng-icons/heroicons/outline';
 
@@ -22,6 +23,6 @@ export const appConfig: ApplicationConfig = {
     provideClientHydration(withEventReplay()),
     provideRouter(routes, withInMemoryScrolling({ scrollPositionRestoration: 'enabled' })),
     provideNgIconsConfig({ size: '1rem' }),
-    provideIcons({ heroChevronRight, heroListBullet, heroQueueList, heroSquares2x2 }),
+    provideIcons({ heroChevronRight, heroListBullet, heroQueueList, heroShare, heroSquares2x2 }),
   ],
 };

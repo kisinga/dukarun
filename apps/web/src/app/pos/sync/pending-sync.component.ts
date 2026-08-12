@@ -7,6 +7,8 @@ import { ConnectivityService } from '../offline/connectivity.service';
 import type { OutboxEntry } from '../offline/offline-db';
 import { SyncService } from '../offline/sync.service';
 import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
+import { MobileListComponent } from '../../shared/ui/mobile-list.component';
+import { PageActionsComponent } from '../../shared/ui/page-actions.component';
 
 /**
  * Pending sync — the offline outbox. Queued sales are local-only until the
@@ -21,6 +23,8 @@ import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
     EmptyStateComponent,
     StatusBadgeComponent,
     DeleteConfirmationModalComponent,
+    MobileListComponent,
+    PageActionsComponent,
   ],
   template: `
     <app-page
@@ -28,14 +32,21 @@ import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
       [badge]="sync.entries().length"
       subtitle="Posted when you're back online. Until then they're only on this device — not in Today's Sales, not in the books."
     >
-      <button
-        actions
-        class="btn btn-primary btn-sm ml-auto"
-        [disabled]="!connectivity.online() || sync.syncing() || sync.queuedCount() === 0"
-        (click)="syncNow()"
-      >
-        {{ sync.syncing() ? 'Syncing…' : 'Sync now' }}
-      </button>
+      <app-page-actions actions>
+        <button
+          primaryAction
+          class="btn btn-primary btn-sm"
+          [disabled]="!connectivity.online() || sync.syncing() || sync.queuedCount() === 0"
+          (click)="syncNow()"
+        >
+          {{ sync.syncing() ? 'Syncing…' : 'Sync now' }}
+        </button>
+      </app-page-actions>
+
+      <p class="mb-3 rounded-field bg-info/10 px-3 py-2 text-xs text-base-content/75 md:hidden">
+        Queued sales remain only on this device until they sync; they are not yet in Sales or the
+        books.
+      </p>
 
       @if (notice()) {
         <p class="mb-2 text-sm text-success">{{ notice() }}</p>
@@ -67,14 +78,15 @@ import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
           "
         />
       } @else {
-        <div class="flex flex-col gap-2">
+        <app-mobile-list [desktopVisible]="true">
           @for (entry of sync.entries(); track entry.client_ref) {
             <div
-              class="card bg-base-100"
+              mobileListRow
+              class="bg-base-100"
               [class.border]="entry.status === 'failed'"
               [class.border-error]="entry.status === 'failed'"
             >
-              <div class="card-body p-4">
+              <div class="p-3">
                 <div class="flex flex-wrap items-center gap-3">
                   <span class="font-mono text-sm">{{ shortRef(entry.client_ref) }}</span>
                   <span class="text-sm text-base-content/60">
@@ -109,7 +121,7 @@ import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
               </div>
             </div>
           }
-        </div>
+        </app-mobile-list>
       }
       <app-delete-confirmation-modal
         [data]="discardData()"

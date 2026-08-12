@@ -15,6 +15,7 @@ import { IconComponent } from '../shared/ui/icon.component';
 import { PageLayoutComponent } from '../shared/ui/page-layout.component';
 import { StockTransferListRow, StockTransfersService } from './stock-transfers.service';
 import { PaginationComponent } from '../shared/ui/pagination.component';
+import { PageActionsComponent } from '../shared/ui/page-actions.component';
 
 interface TransferLine {
   variant: Variant;
@@ -33,6 +34,7 @@ interface TransferLine {
     IconComponent,
     PageLayoutComponent,
     PaginationComponent,
+    PageActionsComponent,
   ],
   template: `
     <app-page
@@ -40,6 +42,19 @@ interface TransferLine {
       subtitle="Move stock between business locations without changing company inventory value."
       [wide]="true"
     >
+      @if (locations.isMultiLocation()) {
+        <app-page-actions actions>
+          <button
+            primaryAction
+            appButton
+            type="button"
+            class="lg:hidden"
+            (click)="editorOpen.set(true)"
+          >
+            <app-icon name="heroPlus" /> New transfer
+          </button>
+        </app-page-actions>
+      }
       @if (!locations.isMultiLocation()) {
         <app-empty-state
           icon="heroArrowsRightLeft"
@@ -62,10 +77,26 @@ interface TransferLine {
           </div>
         }
 
-        <div class="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(22rem,.8fr)]">
-          <section class="card bg-base-100">
+        <div class="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(22rem,.8fr)]">
+          <section
+            class="stock-transfer-editor order-2 card bg-base-100 lg:order-1"
+            [class.stock-transfer-editor-open]="editorOpen()"
+          >
             <div class="card-body p-4 sm:p-6">
-              <h2 class="section-title">New transfer</h2>
+              <div class="flex items-center justify-between gap-3">
+                <h2 class="section-title">New transfer</h2>
+                <button
+                  appButton
+                  variant="ghost"
+                  [iconOnly]="true"
+                  type="button"
+                  class="lg:hidden"
+                  aria-label="Cancel transfer"
+                  (click)="editorOpen.set(false)"
+                >
+                  <app-icon name="heroXMark" />
+                </button>
+              </div>
               <div class="mt-4 grid gap-3 sm:grid-cols-2">
                 <app-form-field label="From">
                   <div
@@ -118,59 +149,59 @@ interface TransferLine {
               }
 
               @if (lines().length > 0) {
-                <div class="table-scroll mt-4 rounded-box border border-base-300">
-                  <table class="table table-sm">
-                    <thead>
-                      <tr>
-                        <th>Product</th>
-                        <th class="w-32">Quantity</th>
-                        <th></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      @for (line of lines(); track line.variant.variant_id) {
-                        <tr>
-                          <td>
-                            <p class="font-medium">{{ label(line.variant) }}</p>
-                            <p class="type-caption">
-                              {{ line.variant.manufacturer_name || 'Manufacturer not set' }} ·
-                              {{ line.variant.sku }} ·
-                              {{ quantity(line.variant.stock ?? 0) }} available
-                            </p>
-                          </td>
-                          <td>
-                            <input
-                              type="number"
-                              min="0.001"
-                              [max]="line.variant.stock ?? 0"
-                              [step]="line.variant.allow_fractional ? '0.001' : '1'"
-                              class="input input-bordered input-sm w-28"
-                              [value]="line.quantity"
-                              (input)="setQuantity(line.variant.variant_id!, $event)"
-                            />
-                          </td>
-                          <td class="text-right">
-                            <button
-                              appButton
-                              variant="ghost"
-                              size="sm"
-                              type="button"
-                              (click)="removeLine(line.variant.variant_id!)"
-                            >
-                              Remove
-                            </button>
-                          </td>
-                        </tr>
-                      }
-                    </tbody>
-                  </table>
+                <div class="mt-4 divide-y divide-base-200 rounded-box border border-base-300">
+                  @for (line of lines(); track line.variant.variant_id) {
+                    <div
+                      class="grid gap-3 p-3 sm:grid-cols-[minmax(0,1fr)_8rem_auto] sm:items-center"
+                    >
+                      <div class="min-w-0">
+                        <p class="font-medium">{{ label(line.variant) }}</p>
+                        <p class="type-caption">
+                          {{ line.variant.manufacturer_name || 'Manufacturer not set' }} ·
+                          {{ line.variant.sku }} · {{ quantity(line.variant.stock ?? 0) }} available
+                        </p>
+                      </div>
+                      <div>
+                        <label class="type-caption mb-1 block sm:hidden">Quantity</label>
+                        <input
+                          type="number"
+                          min="0.001"
+                          [max]="line.variant.stock ?? 0"
+                          [step]="line.variant.allow_fractional ? '0.001' : '1'"
+                          class="input input-bordered input-sm w-full"
+                          [value]="line.quantity"
+                          (input)="setQuantity(line.variant.variant_id!, $event)"
+                        />
+                      </div>
+                      <div class="text-right">
+                        <button
+                          appButton
+                          variant="ghost"
+                          size="sm"
+                          type="button"
+                          (click)="removeLine(line.variant.variant_id!)"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  }
                 </div>
               }
 
               <app-form-field label="Notes" hint="Optional transfer reference." class="mt-4">
                 <input type="text" class="input input-bordered w-full" [formControl]="notes" />
               </app-form-field>
-              <div class="mt-4 flex justify-end">
+              <div class="stock-transfer-actions mt-4 flex justify-end gap-2">
+                <button
+                  appButton
+                  variant="ghost"
+                  type="button"
+                  class="lg:hidden"
+                  (click)="editorOpen.set(false)"
+                >
+                  Cancel
+                </button>
                 <button
                   appButton
                   type="button"
@@ -184,7 +215,7 @@ interface TransferLine {
             </div>
           </section>
 
-          <section class="card h-fit bg-base-100">
+          <section class="order-1 card h-fit bg-base-100 lg:order-2">
             <div class="card-body p-4">
               <div class="flex items-center justify-between gap-2">
                 <h2 class="section-title">Transfer history</h2>
@@ -320,6 +351,7 @@ export class StockTransfersComponent implements OnInit {
   protected readonly saving = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
+  protected readonly editorOpen = signal(false);
   protected readonly destinations = computed(() =>
     this.locations.locations().filter(location => location.id !== this.locations.activeId())
   );
@@ -397,6 +429,7 @@ export class StockTransfersComponent implements OnInit {
       this.lines.set([]);
       this.notes.setValue('');
       this.notice.set('Stock transferred');
+      this.editorOpen.set(false);
       await Promise.all([this.loadHistory(), this.sync.refreshProductSnapshot()]);
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Transfer failed');

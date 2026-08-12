@@ -11,6 +11,7 @@ import {
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { renderSafeMarkdown } from '@dukarun/legal-markdown';
+import { environment } from '../../environments/environment';
 import { appUrl } from '../core/public-url';
 import { SiteSeoService } from '../core/site-seo.service';
 import { IconComponent } from '../shared/ui/icon.component';
@@ -331,18 +332,6 @@ export class BlogArticleComponent implements OnInit {
         if (this.scrollFrame !== null) cancelAnimationFrame(this.scrollFrame);
         window.removeEventListener('scroll', this.onScroll);
       });
-      void this.blog
-        .post(this.slug, true)
-        .then(fresh => {
-          if (!fresh) {
-            this.post.set(null);
-            this.notFound.set(true);
-            this.seo.applyNotFound();
-          } else if (fresh.revision_id !== article.revision_id) {
-            this.apply(fresh);
-          }
-        })
-        .catch(() => undefined);
     }
   }
 
@@ -372,11 +361,13 @@ export class BlogArticleComponent implements OnInit {
   protected async shareArticle(): Promise<void> {
     const article = this.post();
     if (!article || !isPlatformBrowser(this.platformId)) return;
+    const url = new URL(`/blog/${article.slug}`, environment.sitePublicUrl).toString();
     try {
       if (navigator.share) {
-        await navigator.share({ title: article.title, text: article.excerpt, url: location.href });
+        // URL-only lets WhatsApp build the preview from the canonical Open Graph response.
+        await navigator.share({ url });
       } else {
-        await navigator.clipboard.writeText(location.href);
+        await navigator.clipboard.writeText(url);
         this.shareNotice.set('Link copied');
         setTimeout(() => this.shareNotice.set(null), 2_000);
       }

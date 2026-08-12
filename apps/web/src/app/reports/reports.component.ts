@@ -6,6 +6,12 @@ import { EmptyStateComponent } from '../shared/ui/empty-state.component';
 import { PaginationComponent } from '../shared/ui/pagination.component';
 import { PageLayoutComponent } from '../shared/ui/page-layout.component';
 import { DailySummary, ReportsService } from './reports.service';
+import { ButtonComponent } from '../shared/ui/button.component';
+import { DrawerComponent } from '../shared/ui/drawer.component';
+import { FormFieldComponent } from '../shared/ui/form-field.component';
+import { IconComponent } from '../shared/ui/icon.component';
+import { MobileListComponent } from '../shared/ui/mobile-list.component';
+import { PageActionsComponent } from '../shared/ui/page-actions.component';
 
 type Tab = 'sales' | 'products' | 'customers' | 'inventory';
 
@@ -38,11 +44,46 @@ type InventoryRow = {
 
 @Component({
   selector: 'app-reports',
-  imports: [ReactiveFormsModule, PageLayoutComponent, EmptyStateComponent, PaginationComponent],
+  imports: [
+    ReactiveFormsModule,
+    PageLayoutComponent,
+    EmptyStateComponent,
+    PaginationComponent,
+    ButtonComponent,
+    DrawerComponent,
+    FormFieldComponent,
+    IconComponent,
+    MobileListComponent,
+    PageActionsComponent,
+  ],
   template: `
     <app-page title="Reports" [wide]="true">
+      <app-page-actions actions>
+        <button
+          utilityAction
+          appButton
+          variant="ghost"
+          [iconOnly]="true"
+          type="button"
+          title="Refresh reports"
+          aria-label="Refresh reports"
+          [loading]="loading()"
+          (click)="load()"
+        >
+          <app-icon name="heroArrowPath" />
+        </button>
+        <button
+          primaryAction
+          appButton
+          type="button"
+          class="md:hidden"
+          (click)="filtersOpen.set(true)"
+        >
+          <app-icon name="heroFunnel" /> Period
+        </button>
+      </app-page-actions>
       <!-- Date range -->
-      <div class="card mb-4 bg-base-100">
+      <div class="card mb-4 hidden bg-base-100 md:block">
         <div class="card-body flex-row flex-wrap items-end gap-3 p-4">
           <label class="form-control">
             <span class="label-text text-xs">From</span>
@@ -59,11 +100,47 @@ type InventoryRow = {
         </div>
       </div>
 
+      @if (filtersOpen()) {
+        <app-drawer
+          [open]="true"
+          title="Report period"
+          subtitle="Choose the dates included in every report"
+          (closed)="cancelReportFilters()"
+        >
+          <div class="grid gap-3">
+            <app-form-field label="From">
+              <input type="date" class="input input-bordered w-full" [formControl]="from" />
+            </app-form-field>
+            <app-form-field label="To">
+              <input type="date" class="input input-bordered w-full" [formControl]="to" />
+            </app-form-field>
+          </div>
+          <div drawerFooter class="flex justify-end gap-2">
+            <button appButton variant="ghost" type="button" (click)="cancelReportFilters()">
+              Cancel
+            </button>
+            <button appButton type="button" [loading]="loading()" (click)="applyReportFilters()">
+              View report
+            </button>
+          </div>
+        </app-drawer>
+      }
+
       @if (error()) {
         <p class="mb-2 text-sm text-error">{{ error() }}</p>
       }
 
-      <div role="tablist" class="tabs tabs-boxed mb-4">
+      <select
+        class="select select-bordered mb-3 min-h-11 w-full sm:hidden"
+        [value]="tab()"
+        (change)="setReportTab($event)"
+      >
+        <option value="sales">Sales</option>
+        <option value="products">Products</option>
+        <option value="customers">Customers</option>
+        <option value="inventory">Inventory</option>
+      </select>
+      <div role="tablist" class="tabs tabs-boxed mb-4 hidden sm:flex">
         <a
           role="tab"
           class="tab min-h-11"
@@ -104,8 +181,30 @@ type InventoryRow = {
             description="Daily revenue, COGS, and margin appear here."
           />
         } @else {
+          <app-mobile-list>
+            @for (d of pagedSummary(); track d.day) {
+              <div mobileListRow class="flex min-h-20 items-center gap-3 p-3">
+                <div class="min-w-0 flex-1">
+                  <p class="font-semibold">{{ d.day }}</p>
+                  <p class="type-caption mt-1">
+                    {{ d.orders }} sales · COGS {{ fmt(d.cogs ?? 0) }}
+                  </p>
+                </div>
+                <div class="shrink-0 text-right">
+                  <p class="font-semibold tabular-nums">{{ fmt(d.revenue ?? 0) }}</p>
+                  <p
+                    class="type-caption tabular-nums"
+                    [class.text-success]="(d.margin ?? 0) > 0"
+                    [class.text-error]="(d.margin ?? 0) < 0"
+                  >
+                    margin {{ fmt(d.margin ?? 0) }}
+                  </p>
+                </div>
+              </div>
+            }
+          </app-mobile-list>
           <div class="card bg-base-100">
-            <div class="table-scroll">
+            <div class="hidden lg:block">
               <table class="table table-sm">
                 <thead>
                   <tr>
@@ -172,8 +271,30 @@ type InventoryRow = {
             description="Variants rank here by revenue once you sell."
           />
         } @else {
-          <div class="card bg-base-100">
-            <div class="table-scroll">
+          <app-mobile-list>
+            @for (p of products(); track p.variantId) {
+              <div mobileListRow class="flex min-h-20 items-center gap-3 p-3">
+                <div class="min-w-0 flex-1">
+                  <p class="truncate font-semibold">{{ p.label }}</p>
+                  <p class="type-caption mt-1 truncate">
+                    {{ p.manufacturer }} · qty {{ p.quantity }}
+                  </p>
+                </div>
+                <div class="shrink-0 text-right">
+                  <p class="font-semibold tabular-nums">{{ fmt(p.revenue) }}</p>
+                  <p
+                    class="type-caption tabular-nums"
+                    [class.text-success]="p.margin > 0"
+                    [class.text-error]="p.margin < 0"
+                  >
+                    margin {{ fmt(p.margin) }}
+                  </p>
+                </div>
+              </div>
+            }
+          </app-mobile-list>
+          <div class="hidden bg-base-100 lg:block lg:rounded-box">
+            <div class="hidden lg:block">
               <table class="table table-sm">
                 <thead>
                   <tr>
@@ -220,8 +341,28 @@ type InventoryRow = {
             description="Customers rank here by revenue, with their AR movement."
           />
         } @else {
-          <div class="card bg-base-100">
-            <div class="table-scroll">
+          <app-mobile-list>
+            @for (c of customers(); track c.customerId) {
+              <div mobileListRow class="flex min-h-20 items-center gap-3 p-3">
+                <div class="min-w-0 flex-1">
+                  <p class="truncate font-semibold">{{ c.name }}</p>
+                  <p class="type-caption mt-1">{{ c.orders }} sales</p>
+                </div>
+                <div class="shrink-0 text-right">
+                  <p class="font-semibold tabular-nums">{{ fmt(c.revenue) }}</p>
+                  <p
+                    class="type-caption tabular-nums"
+                    [class.text-error]="c.arDelta > 0"
+                    [class.text-success]="c.arDelta < 0"
+                  >
+                    AR Δ {{ fmt(c.arDelta) }}
+                  </p>
+                </div>
+              </div>
+            }
+          </app-mobile-list>
+          <div class="hidden bg-base-100 lg:block lg:rounded-box">
+            <div class="hidden lg:block">
               <table class="table table-sm">
                 <thead>
                   <tr>
@@ -282,8 +423,24 @@ type InventoryRow = {
             description="Opening stock and received purchases appear here."
           />
         } @else {
-          <div class="card overflow-hidden bg-base-100">
-            <div class="table-scroll">
+          <app-mobile-list>
+            @for (row of inventory(); track row.variantId) {
+              <div mobileListRow class="flex min-h-20 items-center gap-3 p-3">
+                <div class="min-w-0 flex-1">
+                  <p class="truncate font-semibold">{{ row.label }}</p>
+                  <p class="type-caption mt-1 truncate">
+                    {{ row.manufacturer }} · {{ row.stock }} on hand
+                  </p>
+                </div>
+                <div class="shrink-0 text-right">
+                  <p class="font-semibold tabular-nums">{{ fmt(row.value) }}</p>
+                  <p class="type-caption tabular-nums">retail {{ fmt(row.retailValue) }}</p>
+                </div>
+              </div>
+            }
+          </app-mobile-list>
+          <div class="hidden overflow-hidden bg-base-100 lg:block lg:rounded-box">
+            <div class="hidden lg:block">
               <table class="table table-sm">
                 <thead>
                   <tr>
@@ -324,6 +481,8 @@ export class ReportsComponent implements OnInit {
   protected readonly tab = signal<Tab>('sales');
   protected readonly from = new FormControl(this.daysAgoIso(29), { nonNullable: true });
   protected readonly to = new FormControl(this.todayIso(), { nonNullable: true });
+  private appliedFrom = this.from.value;
+  private appliedTo = this.to.value;
 
   protected readonly summary = signal<DailySummary[]>([]);
   protected readonly products = signal<ProductRow[]>([]);
@@ -331,6 +490,7 @@ export class ReportsComponent implements OnInit {
   protected readonly inventory = signal<InventoryRow[]>([]);
   protected readonly error = signal<string | null>(null);
   protected readonly loading = signal(false);
+  protected readonly filtersOpen = signal(false);
   protected readonly page = signal(1);
   protected readonly pageSize = 15;
 
@@ -407,11 +567,28 @@ export class ReportsComponent implements OnInit {
           })
           .sort((a, b) => b.value - a.value)
       );
+      this.appliedFrom = since;
+      this.appliedTo = until;
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Failed to load reports');
     } finally {
       this.loading.set(false);
     }
+  }
+
+  protected async applyReportFilters(): Promise<void> {
+    await this.load();
+    if (!this.error()) this.filtersOpen.set(false);
+  }
+
+  protected cancelReportFilters(): void {
+    this.from.setValue(this.appliedFrom);
+    this.to.setValue(this.appliedTo);
+    this.filtersOpen.set(false);
+  }
+
+  protected setReportTab(event: Event): void {
+    this.tab.set((event.target as HTMLSelectElement).value as Tab);
   }
 
   private async aggregateProducts(

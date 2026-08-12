@@ -11,17 +11,17 @@ import { NgIcon } from '@ng-icons/core';
   imports: [NgIcon],
   template: `
     <div class="border-t border-base-300/70 pt-3">
-      <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div class="flex flex-wrap items-center justify-center gap-x-3 gap-y-2 lg:justify-start">
-          <span class="text-sm text-base-content/60">
+      <div class="flex items-center justify-between gap-2">
+        <div class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
+          <span class="truncate text-xs text-base-content/60 md:text-sm">
             <span class="font-semibold text-base-content">{{ startItem() }}-{{ endItem() }}</span>
             of
             <span class="font-semibold text-base-content">{{ totalItems() }}</span>
             {{ itemLabel() }}
           </span>
           @if (showItemsPerPage()) {
-            <span class="hidden h-4 w-px bg-base-300 sm:inline-block"></span>
-            <label class="flex items-center gap-2 text-sm text-base-content/60">
+            <span class="hidden h-4 w-px bg-base-300 md:inline-block"></span>
+            <label class="hidden items-center gap-2 text-sm text-base-content/60 md:flex">
               <span>Show</span>
               <select
                 class="select select-bordered h-8 min-h-8 w-20 select-xs"
@@ -36,10 +36,10 @@ import { NgIcon } from '@ng-icons/core';
           }
         </div>
 
-        <div class="flex items-center justify-center gap-2 lg:justify-end">
+        <div class="flex shrink-0 items-center justify-end gap-1 md:gap-2">
           <div class="join">
             <button
-              class="join-item btn btn-square btn-sm"
+              class="join-item btn btn-square btn-sm hidden md:inline-flex"
               [disabled]="currentPage() === 1"
               (click)="onPageChange(1)"
               aria-label="First page"
@@ -58,7 +58,7 @@ import { NgIcon } from '@ng-icons/core';
             </button>
           </div>
 
-          <div class="join hidden sm:flex">
+          <div class="join hidden md:flex">
             @for (page of pageNumbers(); track page) {
               <button
                 class="join-item btn min-w-9 btn-sm"
@@ -71,7 +71,7 @@ import { NgIcon } from '@ng-icons/core';
             }
           </div>
 
-          <span class="badge badge-primary px-4 font-bold sm:hidden">
+          <span class="badge badge-primary px-3 font-bold md:hidden">
             {{ currentPage() }} / {{ totalPages() }}
           </span>
 
@@ -86,7 +86,7 @@ import { NgIcon } from '@ng-icons/core';
               <ng-icon name="heroChevronRight" size="1rem" />
             </button>
             <button
-              class="join-item btn btn-square btn-sm"
+              class="join-item btn btn-square btn-sm hidden md:inline-flex"
               [disabled]="currentPage() === totalPages()"
               (click)="onPageChange(totalPages())"
               aria-label="Last page"

@@ -52,7 +52,7 @@ Must read on a dim, glare-struck phone screen.
 One primary action per screen, in the standard page-header action group.
 
 - Touch targets ≥ 44px; keep create actions in the same header position at every breakpoint.
-- Modals are full-screen on phones — encoded globally on `.modal-box` in `styles.scss`
+- Complex line-item and multi-step modals are full-screen on phones — encoded globally on `.modal-box` in `styles.scss`
   (`h-full` on mobile, `md:h-auto md:max-h-[90vh]` on desktop). Don't add your own
   height handling; per-modal width via `md:max-w-*` only.
 - Transitions are 150–200ms, no ornamental animation in dashboard flows. Always honor
@@ -75,6 +75,31 @@ The orange is a spice, not a sauce.
 - Phone layout is designed first, always.
 - Desktop adds density and width via `lg:` enhancements (tables, accounting, reports) —
   same tokens, same components, no separate desktop design.
+
+## Mobile ergonomics contract
+
+The authenticated app is usable without horizontal page scrolling at every width from 320px.
+The first useful list record should be visible in a 390×844 viewport unless a critical warning
+must precede it.
+
+- The shell header is 56px. Phone page gutters are 16px, tablet gutters 24px, and desktop
+  gutters 32px. Phone pages start 12px below their header and use 16px between major sections.
+- The phone bottom navigation is Home, Sell, Products. The menu remains the complete navigation.
+- Page headers have one title row. Descriptive subtitles hide below 768px; critical wording becomes
+  a compact inline notice. Use `<app-page-actions>` with one `primaryAction`, at most one
+  `utilityAction`, and mobile secondary controls in `overflowAction`.
+- All phone touch targets are at least 44px. Sticky navigation and action bars include safe-area
+  padding and remain usable with the software keyboard.
+- Operational records use one `<app-mobile-list>` surface with divided 64–88px rows. Each row has
+  identity, one supporting line, one key value/count, status, and at most one urgent action.
+  Editing and destructive actions belong in the record task sheet.
+- Tables are desktop-only from `lg` (1024px) and must be paired with a phone list through the
+  responsive data pattern. `table-scroll` and page-level horizontal overflow are prohibited.
+- Phone list toolbars keep search visible. Sort uses the anchored menu; Filters opens the bottom
+  sheet, applies changes immediately, exposes active filter chips/count, and ends with View results
+  and Clear all. Phone summaries expose exactly two primary metrics before More summary.
+- Phone pagination is range, previous, page/total, next. First/last and page-size controls are
+  desktop concerns.
 
 ### Connectivity is app state, not page decoration
 
@@ -184,9 +209,21 @@ Compose pages from these — never hand-roll what a primitive owns:
   `direction="in|out"` for money-meaning colour, and `masked` for hidden figures. Never
   `{{ formatKes(...) }}` in templates (string composition in TS, e.g. option labels, is fine).
 - **`<app-icon>`** — icons on the 4-size scale (see Icons).
-- **`<app-drawer>`** — right-side slide-over for record detail (customer, supplier):
-  `[(open)]`, `title`, optional `subtitle`, a `[leading]` header slot (entity avatar), an
-  `[actions]` header slot, and a scrollable projected body. Backdrop click or Escape closes.
+- **`<app-page-actions>`** — the only page-header action group. Project one control into
+  `[primaryAction]`, an optional refresh/status control into `[utilityAction]`, and secondary
+  controls into `[overflowAction]`. Overflow controls render inline on desktop and in one menu
+  on phones.
+- **`<app-mobile-list>` / `<app-responsive-data-view>`** — the shared phone list surface and
+  desktop/mobile pairing boundary. Domain pages own row content; the primitives own visibility,
+  border, radius, and dividers.
+- **`<app-drawer>`** — bottom task sheet below 768px and 480px right-side drawer above it:
+  `[(open)]`, `title`, optional `subtitle`, `dirty`, `mobileDismissLabel`, a `[leading]` header
+  slot, an `[actions]` header slot, `[drawerFooter]`, and a scrollable projected body. Backdrop,
+  Escape, close, and footer dismissal all use the same close request. Drawers do not add synthetic
+  browser-history entries; route-level overlays must model their open state in the route itself.
+  The phone sheet is auto-height up to 92dvh with sticky header/footer and safe-area padding.
+  Read-only sheets keep Done visible; forms keep Cancel and Save visible. Dirty forms confirm
+  before discarding. Opening traps focus and locks background scroll; closing restores both.
   Close is two-phase: the panel plays its exit transition, then `(closed)` emits — parents
   clear their selection there, not on `openChange`. Keep the selected row highlighted while
   the drawer is open.
@@ -221,13 +258,12 @@ Every list page is the same four blocks, top to bottom — no improvisation:
 1. **`<app-page title="…" [wide]="true">`** — list pages share the wide table canvas and
    standard header. Stats strip via `app-stat-bar` pills
    (tones are money-meaning only — neutral totals, warning/error for states that need
-   action; the bar's zero-guard handles the rest). **The create action lives in the
-   `[actions]` slot**: one `<button appButton>` with a `heroPlus` icon ("Add Customer",
-   "Record Adjustment"…). Never in the table footer, never a bare floating row.
-   Header actions always follow one order: status, ghost icon-only refresh, secondary related
-   navigation, primary create. Related navigation uses a domain icon; reserve `heroPlus` for
-   the create action. Refresh includes a tooltip, accessible label, and loading state but no
-   visible text label.
+   action; the bar's zero-guard handles the rest). Project one `<app-page-actions>` into the
+   page `[actions]` slot. Put the create control in `[primaryAction]`, refresh/status in
+   `[utilityAction]`, and secondary navigation in `[overflowAction]`. Never put create in the
+   table footer or a floating row. Related navigation uses a domain icon; reserve `heroPlus`
+   for create. Refresh includes a tooltip, accessible label, and loading state but no visible
+   text label.
 2. **`<app-list-search-bar>`** — the common list top bar. Its first row hosts the compact
    search field and lightweight `app-stat-bar` in `[summary]`. Optional `[filters]` sit in a
    quieter divided row below so dense filter controls never distort the shared list identity;
@@ -240,11 +276,14 @@ Every list page is the same four blocks, top to bottom — no improvisation:
    use the same class; searches without a custom action keep native clearing. Two clear controls
    are always a design-language defect.
 3. **Data surface** — desktop: `<app-data-table-shell>` containing a semantic table with
-   row-click navigation to the detail view (no "View" buttons); mobile: a per-domain card
-   component. Empty state = `<app-empty-state>`.
+   row-click navigation to the detail view (no "View" buttons); mobile: `<app-mobile-list>`
+   with compact domain-owned rows. Use `<app-responsive-data-view>` when the two forms share
+   one boundary. Separate shadowed record cards and horizontally scrolling tables are not
+   mobile list patterns. Empty state = `<app-empty-state>`.
 4. **`<app-pagination>`** — the shared component, placed outside the data-table shell with
    `mt-3` so pagination has the same breathing room on table and mobile-card layouts. Primary
-   datasets use database counts, `.range()` pagination and the page-size selector. Client-side
+   datasets use database counts and `.range()` pagination. Page-size and first/last controls
+   are desktop-only; phone pagination remains range, previous, page/total, next. Client-side
    slicing is reserved for already-loaded embedded detail lists. No hand-rolled `join`
    pagination.
 

@@ -39,6 +39,7 @@ import {
   type NamedSnapshot,
 } from '../../pos/offline/offline-db';
 import { CacheJournalService, type CacheStreamHandler } from '../../core/cache-journal.service';
+import { PageActionsComponent } from '../../shared/ui/page-actions.component';
 
 type TopVariant = {
   variantId: string;
@@ -62,36 +63,39 @@ type SalesChartPoint = DailySummary & { day: string; revenue: number; heightPerc
     PageLayoutComponent,
     RouterLink,
     StatCardComponent,
+    PageActionsComponent,
   ],
   template: `
     <app-page title="Dashboard" [subtitle]="dashboardSubtitle()" [wide]="true">
-      <button
-        actions
-        appButton
-        variant="ghost"
-        [iconOnly]="true"
-        [loading]="loading()"
-        type="button"
-        title="Refresh dashboard"
-        aria-label="Refresh dashboard"
-        (click)="refresh()"
-      >
-        <app-icon name="heroArrowPath" />
-      </button>
-      @if (canViewFinancials() && locations.isMultiLocation()) {
-        <select
-          actions
-          class="select select-bordered select-sm"
-          aria-label="Dashboard location"
-          [value]="dashboardLocationId() ?? ''"
-          (change)="changeDashboardLocation($event)"
+      <app-page-actions actions>
+        <button
+          utilityAction
+          appButton
+          variant="ghost"
+          [iconOnly]="true"
+          [loading]="loading()"
+          type="button"
+          title="Refresh dashboard"
+          aria-label="Refresh dashboard"
+          (click)="refresh()"
         >
-          <option value="">All locations</option>
-          @for (location of locations.locations(); track location.id) {
-            <option [value]="location.id">{{ location.name }}</option>
-          }
-        </select>
-      }
+          <app-icon name="heroArrowPath" />
+        </button>
+        @if (canViewFinancials() && locations.isMultiLocation()) {
+          <select
+            overflowAction
+            class="select select-bordered select-sm"
+            aria-label="Dashboard location"
+            [value]="dashboardLocationId() ?? ''"
+            (change)="changeDashboardLocation($event)"
+          >
+            <option value="">All locations</option>
+            @for (location of locations.locations(); track location.id) {
+              <option [value]="location.id">{{ location.name }}</option>
+            }
+          </select>
+        }
+      </app-page-actions>
 
       <div class="space-y-6">
         @if (loadError()) {
@@ -266,29 +270,25 @@ type SalesChartPoint = DailySummary & { day: string; revenue: number; heightPerc
                 "
               />
             </div>
-            <div class="table-scroll rounded-box border border-base-300 bg-base-100">
-              <table class="table table-sm">
-                <thead>
-                  <tr>
-                    <th>Location</th>
-                    <th class="text-right">Orders</th>
-                    <th class="text-right">Volume</th>
-                    <th class="text-right">Revenue</th>
-                    <th class="text-right">Margin</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @for (location of locationRows(); track location.location_id) {
-                    <tr class="cursor-pointer hover" (click)="showLocation(location.location_id)">
-                      <td class="font-medium">{{ location.location_name }}</td>
-                      <td class="text-right">{{ location.orders }}</td>
-                      <td class="text-right">{{ quantity(location.quantity) }}</td>
-                      <td class="text-right"><app-money [amount]="location.revenue" /></td>
-                      <td class="text-right"><app-money [amount]="location.margin" /></td>
-                    </tr>
-                  }
-                </tbody>
-              </table>
+            <div class="divide-y divide-base-200 rounded-box border border-base-300 bg-base-100">
+              @for (location of locationRows(); track location.location_id) {
+                <button
+                  type="button"
+                  class="flex min-h-20 w-full items-center gap-3 p-3 text-left hover:bg-base-200/40"
+                  (click)="showLocation(location.location_id)"
+                >
+                  <div class="min-w-0 flex-1">
+                    <p class="truncate font-semibold">{{ location.location_name }}</p>
+                    <p class="type-caption mt-1">
+                      {{ location.orders }} orders · {{ quantity(location.quantity) }} units
+                    </p>
+                  </div>
+                  <div class="shrink-0 text-right">
+                    <p class="font-semibold"><app-money [amount]="location.revenue" /></p>
+                    <p class="type-caption">margin <app-money [amount]="location.margin" /></p>
+                  </div>
+                </button>
+              }
             </div>
           </section>
         }
@@ -385,27 +385,21 @@ type SalesChartPoint = DailySummary & { day: string; revenue: number; heightPerc
                   </div>
 
                   @if (salesChartExpanded()) {
-                    <div class="table-scroll mt-3 border-t border-base-300/70 pt-2">
-                      <table class="table table-xs">
-                        <thead>
-                          <tr>
-                            <th>Day</th>
-                            <th class="text-right">Sales</th>
-                            <th class="text-right">Revenue</th>
-                            <th class="text-right">Margin</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          @for (day of week(); track day.day) {
-                            <tr>
-                              <td>{{ shortDay(day.day) }}</td>
-                              <td class="text-right">{{ day.orders ?? 0 }}</td>
-                              <td class="text-right"><app-money [amount]="day.revenue ?? 0" /></td>
-                              <td class="text-right"><app-money [amount]="day.margin ?? 0" /></td>
-                            </tr>
-                          }
-                        </tbody>
-                      </table>
+                    <div class="mt-3 divide-y divide-base-200 border-t border-base-300/70 pt-2">
+                      @for (day of week(); track day.day) {
+                        <div class="flex items-center gap-3 py-2 text-sm">
+                          <div class="min-w-0 flex-1">
+                            <p class="font-medium">{{ shortDay(day.day) }}</p>
+                            <p class="type-caption">{{ day.orders ?? 0 }} sales</p>
+                          </div>
+                          <div class="shrink-0 text-right">
+                            <p class="font-semibold"><app-money [amount]="day.revenue ?? 0" /></p>
+                            <p class="type-caption">
+                              margin <app-money [amount]="day.margin ?? 0" />
+                            </p>
+                          </div>
+                        </div>
+                      }
                     </div>
                   }
                 </div>
@@ -440,41 +434,28 @@ type SalesChartPoint = DailySummary & { day: string; revenue: number; heightPerc
                   description="Products rank here once completed sales have stock cost."
                 />
               } @else {
-                <div class="table-scroll">
-                  <table class="table table-sm">
-                    <thead>
-                      <tr>
-                        <th>Variant</th>
-                        <th class="text-right">Qty</th>
-                        <th class="text-right">Revenue</th>
-                        <th class="text-right">Margin</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      @for (variant of topVariants(); track variant.variantId) {
-                        <tr>
-                          <td>
-                            <p>
-                              <span class="font-medium">{{ variant.label }}</span>
-                              <span class="type-caption ml-2">#{{ $index + 1 }}</span>
-                            </p>
-                            <p class="type-caption">{{ variant.manufacturer }}</p>
-                          </td>
-                          <td class="text-right">{{ quantity(variant.quantity) }}</td>
-                          <td class="text-right font-medium">
-                            <app-money [amount]="variant.revenue" />
-                          </td>
-                          <td
-                            class="text-right font-medium"
-                            [class.text-success]="variant.margin > 0"
-                            [class.text-error]="variant.margin < 0"
-                          >
-                            <app-money [amount]="variant.margin" />
-                          </td>
-                        </tr>
-                      }
-                    </tbody>
-                  </table>
+                <div class="divide-y divide-base-200">
+                  @for (variant of topVariants(); track variant.variantId) {
+                    <div class="flex min-h-20 items-center gap-3 px-4 py-3">
+                      <div class="min-w-0 flex-1">
+                        <p class="truncate">
+                          <span class="font-medium">{{ variant.label }}</span>
+                          <span class="type-caption ml-2">#{{ $index + 1 }}</span>
+                        </p>
+                        <p class="type-caption truncate">
+                          {{ variant.manufacturer }} · qty {{ quantity(variant.quantity) }}
+                        </p>
+                      </div>
+                      <div
+                        class="shrink-0 text-right font-medium"
+                        [class.text-success]="variant.margin > 0"
+                        [class.text-error]="variant.margin < 0"
+                      >
+                        <p class="text-base-content"><app-money [amount]="variant.revenue" /></p>
+                        <p class="type-caption">margin <app-money [amount]="variant.margin" /></p>
+                      </div>
+                    </div>
+                  }
                 </div>
               }
             </article>

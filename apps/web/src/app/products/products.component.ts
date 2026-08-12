@@ -33,6 +33,8 @@ import { MoneyComponent } from '../shared/ui/money.component';
 import { StatBarComponent } from '../shared/ui/stat-bar.component';
 import { StatCardComponent } from '../shared/ui/stat-card.component';
 import { DrawerComponent } from '../shared/ui/drawer.component';
+import { MobileListComponent } from '../shared/ui/mobile-list.component';
+import { PageActionsComponent } from '../shared/ui/page-actions.component';
 import { CompanyPreferencesService } from '../core/company-preferences.service';
 import { PermissionsService } from '../core/permissions.service';
 import { CatalogCacheService } from '../core/catalog-cache.service';
@@ -48,12 +50,14 @@ import {
   SearchableFilterComponent,
   type SearchableFilterOption,
 } from '../shared/ui/searchable-filter.component';
+import { PublicProductLinkService } from './public-product-link.service';
 
 type StockInfo = { stock: number; stock_value: number };
 type ProductStatusFilter = 'all' | 'active' | 'inactive';
 type StockStatusFilter = 'all' | 'in_stock' | 'out_of_stock' | 'not_tracked';
 type ManagementVariant = Variant & { stock_value?: number | null };
 type ProductGroup = { family: Product; variants: ManagementVariant[] };
+type ShareFeedback = { kind: 'success' | 'error'; message: string };
 const DEFAULT_PRODUCT_STATUS_FILTER: ProductStatusFilter = 'active';
 
 const PRODUCT_SORT_OPTIONS: readonly ListSortOption[] = [
@@ -114,6 +118,8 @@ interface ProductEditorRow {
     BarcodeLabelDialogComponent,
     SearchableFilterComponent,
     BatchProductCategoriesDialogComponent,
+    MobileListComponent,
+    PageActionsComponent,
   ],
   template: `
     <app-page
@@ -121,47 +127,66 @@ interface ProductEditorRow {
       subtitle="Manage the catalog, pricing, variants, and the stock available to sell."
       [wide]="true"
     >
-      <button
-        actions
-        appButton
-        variant="ghost"
-        [iconOnly]="true"
-        [loading]="loading()"
-        type="button"
-        title="Refresh products"
-        aria-label="Refresh products"
-        (click)="load()"
-      >
-        <app-icon name="heroArrowPath" />
-      </button>
-      <button actions appButton variant="secondary" type="button" (click)="openCatalogueLabels()">
-        <app-icon name="heroPrinter" /> Print labels
-      </button>
-      @if (perms.has('ManageCatalog')) {
+      <app-page-actions actions>
         <button
-          actions
+          utilityAction
+          appButton
+          variant="ghost"
+          [iconOnly]="true"
+          [loading]="loading()"
+          type="button"
+          title="Refresh products"
+          aria-label="Refresh products"
+          (click)="load()"
+        >
+          <app-icon name="heroArrowPath" />
+        </button>
+        <button
+          overflowAction
           appButton
           variant="secondary"
-          [loading]="transferBusy()"
           type="button"
-          (click)="exportProducts()"
+          (click)="openCatalogueLabels()"
         >
-          <app-icon name="heroArrowDownTray" /> Export
+          <app-icon name="heroPrinter" /> Print labels
         </button>
-      }
-      @if (perms.has('ManageCatalog')) {
-        <button actions appButton variant="secondary" type="button" (click)="importOpen.set(true)">
-          <app-icon name="heroArrowUpTray" /> Import
+        @if (perms.has('ManageCatalog')) {
+          <button
+            overflowAction
+            appButton
+            variant="secondary"
+            [loading]="transferBusy()"
+            type="button"
+            (click)="exportProducts()"
+          >
+            <app-icon name="heroArrowDownTray" /> Export
+          </button>
+        }
+        @if (perms.has('ManageCatalog')) {
+          <button
+            overflowAction
+            appButton
+            variant="secondary"
+            type="button"
+            (click)="importOpen.set(true)"
+          >
+            <app-icon name="heroArrowUpTray" /> Import
+          </button>
+        }
+        <button
+          overflowAction
+          appButton
+          variant="secondary"
+          (click)="categoriesOpen.set(!categoriesOpen())"
+        >
+          <app-icon name="heroQueueList" /> Categories
         </button>
-      }
-      <button actions appButton variant="secondary" (click)="categoriesOpen.set(!categoriesOpen())">
-        <app-icon name="heroQueueList" /> Categories
-      </button>
-      @if (perms.has('ManageStockAdjustments')) {
-        <button actions appButton variant="primary" (click)="startFamilyCreate()">
-          <app-icon name="heroPlus" /> Add product
-        </button>
-      }
+        @if (perms.has('ManageStockAdjustments')) {
+          <button primaryAction appButton variant="primary" (click)="startFamilyCreate()">
+            <app-icon name="heroPlus" /> Add product
+          </button>
+        }
+      </app-page-actions>
 
       @if (error()) {
         <div role="alert" class="alert alert-error mb-3 text-sm">
@@ -262,65 +287,114 @@ interface ProductEditorRow {
                 No categories yet — group products for the storefront or reports.
               </p>
             } @else {
-              <table class="table table-sm mt-2">
-                <thead>
-                  <tr>
-                    <th>Name</th>
-                    <th>Slug</th>
-                    <th class="text-right">Products</th>
-                    <th>Status</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @for (c of categories(); track c.id) {
-                    <tr>
-                      <td class="text-sm font-medium">{{ c.name }}</td>
-                      <td class="font-mono text-xs">{{ c.slug }}</td>
-                      <td class="text-right">{{ c.product_count }}</td>
-                      <td>
-                        @if (!c.active) {
-                          <app-status-badge size="xs" type="neutral" label="inactive" />
-                        }
-                      </td>
-                      <td class="whitespace-nowrap text-right">
-                        @if (perms.has('ManageCatalog')) {
+              <app-mobile-list class="mt-3">
+                @for (c of categories(); track c.id) {
+                  <div mobileListRow>
+                    <div class="flex min-h-16 items-center gap-3 p-3">
+                      <button
+                        type="button"
+                        class="min-w-0 flex-1 text-left"
+                        [disabled]="!perms.has('ManageCatalog') || !connectivity.online()"
+                        (click)="startCategoryEdit(c)"
+                      >
+                        <span class="block truncate font-semibold">{{ c.name }}</span>
+                        <span class="type-caption mt-0.5 block truncate">
+                          {{ c.slug }} · {{ c.product_count }} products
+                        </span>
+                      </button>
+                      <app-status-badge
+                        size="xs"
+                        [type]="c.active ? 'neutral' : 'warning'"
+                        [label]="c.active ? 'active' : 'inactive'"
+                      />
+                      @if (perms.has('ManageCatalog')) {
+                        @if (c.active) {
                           <button
                             appButton
                             variant="ghost"
                             size="sm"
-                            [disabled]="!connectivity.online()"
-                            (click)="startCategoryEdit(c)"
+                            [disabled]="busy() || !connectivity.online()"
+                            (click)="confirmDeactivate({ kind: 'category', category: c })"
                           >
-                            Edit
+                            Deactivate
                           </button>
-                          @if (c.active) {
-                            <button
-                              appButton
-                              variant="error"
-                              size="sm"
-                              [disabled]="busy() || !connectivity.online()"
-                              (click)="confirmDeactivate({ kind: 'category', category: c })"
-                            >
-                              Deactivate
-                            </button>
-                          } @else {
-                            <button
-                              appButton
-                              variant="outline"
-                              size="sm"
-                              [disabled]="busy() || !connectivity.online()"
-                              (click)="setCategoryActive(c, true)"
-                            >
-                              Reactivate
-                            </button>
-                          }
+                        } @else {
+                          <button
+                            appButton
+                            variant="outline"
+                            size="sm"
+                            [disabled]="busy() || !connectivity.online()"
+                            (click)="setCategoryActive(c, true)"
+                          >
+                            Reactivate
+                          </button>
                         }
-                      </td>
+                      }
+                    </div>
+                  </div>
+                }
+              </app-mobile-list>
+              <div class="mt-2 hidden lg:block">
+                <table class="table table-sm">
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Slug</th>
+                      <th class="text-right">Products</th>
+                      <th>Status</th>
+                      <th></th>
                     </tr>
-                  }
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    @for (c of categories(); track c.id) {
+                      <tr>
+                        <td class="text-sm font-medium">{{ c.name }}</td>
+                        <td class="font-mono text-xs">{{ c.slug }}</td>
+                        <td class="text-right">{{ c.product_count }}</td>
+                        <td>
+                          @if (!c.active) {
+                            <app-status-badge size="xs" type="neutral" label="inactive" />
+                          }
+                        </td>
+                        <td class="whitespace-nowrap text-right">
+                          @if (perms.has('ManageCatalog')) {
+                            <button
+                              appButton
+                              variant="ghost"
+                              size="sm"
+                              [disabled]="!connectivity.online()"
+                              (click)="startCategoryEdit(c)"
+                            >
+                              Edit
+                            </button>
+                            @if (c.active) {
+                              <button
+                                appButton
+                                variant="error"
+                                size="sm"
+                                [disabled]="busy() || !connectivity.online()"
+                                (click)="confirmDeactivate({ kind: 'category', category: c })"
+                              >
+                                Deactivate
+                              </button>
+                            } @else {
+                              <button
+                                appButton
+                                variant="outline"
+                                size="sm"
+                                [disabled]="busy() || !connectivity.online()"
+                                (click)="setCategoryActive(c, true)"
+                              >
+                                Reactivate
+                              </button>
+                            }
+                          }
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
             }
           </div>
         </div>
@@ -334,12 +408,14 @@ interface ProductEditorRow {
               class="flex h-full flex-col md:h-auto"
               (submit)="$event.preventDefault(); saveProductEditor()"
             >
-              <header class="flex items-start justify-between gap-3 border-b border-base-300 p-4">
-                <div>
-                  <h2 class="type-title">
+              <header
+                class="product-editor-header flex shrink-0 items-start justify-between gap-3 border-b border-base-300 px-4 py-3 sm:px-6 sm:py-4"
+              >
+                <div class="min-w-0">
+                  <h2 class="type-title truncate">
                     {{ mode === 'create' ? 'New product' : 'Edit ' + editingFamily()!.name }}
                   </h2>
-                  <p class="type-caption mt-1">Product details and variants are saved together.</p>
+                  <p class="type-caption mt-0.5">Details and variants save together.</p>
                 </div>
                 <button
                   appButton
@@ -354,29 +430,50 @@ interface ProductEditorRow {
               </header>
 
               <nav
-                class="grid grid-cols-2 gap-2 border-b border-base-300 px-4 py-3"
+                class="grid shrink-0 grid-cols-2 border-b border-base-300 px-4 sm:px-6"
                 aria-label="Product editor steps"
               >
                 <button
-                  appButton
                   type="button"
-                  [variant]="editorStep() === 1 ? 'soft' : 'ghost'"
+                  class="flex min-h-11 items-center justify-center gap-2 border-b-2 px-2 text-sm font-semibold transition-colors"
+                  [class.border-primary]="editorStep() === 1"
+                  [class.text-primary]="editorStep() === 1"
+                  [class.border-transparent]="editorStep() !== 1"
+                  [attr.aria-current]="editorStep() === 1 ? 'step' : null"
                   (click)="editorStep.set(1)"
                 >
-                  1. Details
+                  <span
+                    class="flex h-6 w-6 items-center justify-center rounded-full text-xs"
+                    [class.bg-primary]="editorStep() === 1"
+                    [class.text-primary-content]="editorStep() === 1"
+                    [class.bg-base-200]="editorStep() !== 1"
+                    >1</span
+                  >
+                  Details
                 </button>
                 <button
-                  appButton
                   type="button"
-                  [variant]="editorStep() === 2 ? 'soft' : 'ghost'"
+                  class="flex min-h-11 items-center justify-center gap-2 border-b-2 px-2 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+                  [class.border-primary]="editorStep() === 2"
+                  [class.text-primary]="editorStep() === 2"
+                  [class.border-transparent]="editorStep() !== 2"
                   [disabled]="familyName.value.trim().length === 0"
+                  [attr.aria-current]="editorStep() === 2 ? 'step' : null"
                   (click)="editorStep.set(2)"
                 >
-                  2. Variants ({{ editorRows.length }})
+                  <span
+                    class="flex h-6 w-6 items-center justify-center rounded-full text-xs"
+                    [class.bg-primary]="editorStep() === 2"
+                    [class.text-primary-content]="editorStep() === 2"
+                    [class.bg-base-200]="editorStep() !== 2"
+                    >2</span
+                  >
+                  Variants
+                  <span class="type-caption">{{ editorRows.length }}</span>
                 </button>
               </nav>
 
-              <div class="min-h-0 flex-1 overflow-y-auto p-4">
+              <div class="product-editor-body min-h-0 flex-1 overflow-y-auto p-4 pb-6 sm:p-6">
                 @if (error()) {
                   <div role="alert" class="alert alert-error mb-4 py-2 text-sm">
                     <app-icon name="heroExclamationTriangle" />
@@ -385,7 +482,7 @@ interface ProductEditorRow {
                 }
 
                 @if (editorStep() === 1) {
-                  <section class="grid gap-4 sm:grid-cols-2">
+                  <section class="grid gap-5 sm:grid-cols-2">
                     <app-form-field label="Product name" [required]="true">
                       <input
                         type="text"
@@ -416,7 +513,7 @@ interface ProductEditorRow {
                       label="Shared barcode"
                       hint="Scan the package barcode or enter it manually. Only suitable for products with one variant."
                     >
-                      <div class="flex gap-1.5">
+                      <div class="flex gap-2">
                         <input
                           type="text"
                           class="input input-bordered min-w-0 flex-1 font-mono"
@@ -431,6 +528,7 @@ interface ProductEditorRow {
                           type="button"
                           variant="outline"
                           size="sm"
+                          class="shrink-0"
                           title="Scan barcode with camera"
                           aria-label="Scan shared product barcode"
                           (click)="scanFamilyBarcode()"
@@ -483,8 +581,27 @@ interface ProductEditorRow {
                     </div>
                   }
 
+                  @if (mode === 'create') {
+                    <div
+                      class="mt-5 flex items-start gap-3 rounded-field border border-base-300/70 bg-base-200/60 p-3"
+                    >
+                      <span
+                        class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-base-100 text-primary"
+                        aria-hidden="true"
+                      >
+                        <app-icon name="heroQueueList" />
+                      </span>
+                      <div>
+                        <p class="text-sm font-semibold">Next: pricing and stock</p>
+                        <p class="type-caption mt-0.5">
+                          Add a selling price, SKU, and opening stock for the first variant.
+                        </p>
+                      </div>
+                    </div>
+                  }
+
                   @if (mode === 'edit') {
-                    <section class="mt-6 border-t border-base-300 pt-4">
+                    <section class="mt-5 border-t border-base-300 pt-4">
                       <label
                         class="flex min-h-11 cursor-pointer items-center justify-between gap-4"
                       >
@@ -502,7 +619,7 @@ interface ProductEditorRow {
                       </label>
                     </section>
 
-                    <section class="mt-6 border-t border-base-300 pt-4">
+                    <section class="mt-5 border-t border-base-300 pt-4">
                       <h3 class="section-title">Product image</h3>
                       <div class="mt-3 flex flex-wrap items-center gap-3">
                         @if (imageUrl(editingFamily()!.image_path); as url) {
@@ -518,7 +635,7 @@ interface ProductEditorRow {
                         <input
                           type="file"
                           accept="image/*"
-                          class="file-input file-input-bordered file-input-sm max-w-xs"
+                          class="file-input file-input-bordered file-input-sm w-full max-w-sm"
                           [disabled]="imageBusy()"
                           (change)="uploadImage($event)"
                         />
@@ -539,7 +656,7 @@ interface ProductEditorRow {
                       </p>
                     </section>
 
-                    <section class="mt-6 border-t border-base-300 pt-4">
+                    <section class="mt-5 border-t border-base-300 pt-4">
                       <h3 class="section-title">Categories</h3>
                       @if (
                         perms.has('ManageCatalog') &&
@@ -925,29 +1042,45 @@ interface ProductEditorRow {
               </div>
 
               <footer
-                class="flex items-center justify-between gap-3 border-t border-base-300 bg-base-100 p-4"
+                class="grid shrink-0 grid-cols-[minmax(0,.75fr)_minmax(0,1.25fr)] gap-2 border-t border-base-300 bg-base-100 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:flex sm:items-center sm:justify-between sm:px-6 sm:py-4"
               >
                 @if (editorStep() === 1) {
-                  <button appButton type="button" variant="ghost" (click)="closeProductEditor()">
+                  <button
+                    appButton
+                    type="button"
+                    variant="outline"
+                    class="w-full sm:w-auto"
+                    (click)="closeProductEditor()"
+                  >
                     Cancel
                   </button>
                   <button
                     appButton
                     type="button"
                     variant="primary"
+                    class="w-full sm:w-auto"
                     [disabled]="familyName.value.trim().length === 0"
                     (click)="editorStep.set(2)"
                   >
-                    Continue to variants
+                    <span class="sm:hidden">Next: variants</span>
+                    <span class="hidden sm:inline">Continue to variants</span>
                   </button>
                 } @else {
-                  <button appButton type="button" variant="ghost" (click)="editorStep.set(1)">
-                    Back to details
+                  <button
+                    appButton
+                    type="button"
+                    variant="outline"
+                    class="w-full sm:w-auto"
+                    (click)="editorStep.set(1)"
+                  >
+                    <span class="sm:hidden">Details</span>
+                    <span class="hidden sm:inline">Back to details</span>
                   </button>
                   <button
                     appButton
                     type="submit"
                     variant="primary"
+                    class="w-full sm:w-auto"
                     [loading]="busy()"
                     [disabled]="
                       editorLoading() ||
@@ -975,6 +1108,9 @@ interface ProductEditorRow {
         [sortOptions]="productSortOptions"
         [(sortKey)]="productSort"
         [(sortDirection)]="productSortDirection"
+        [filtersEnabled]="true"
+        [activeFilterCount]="productActiveFilterCount()"
+        (clearFilters)="clearProductFilters()"
       >
         <app-stat-bar summary [stats]="productStats()" />
         <div filters class="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
@@ -1070,17 +1206,18 @@ interface ProductEditorRow {
           "
         />
       } @else {
-        <div class="flex flex-col gap-2 lg:hidden">
+        <app-mobile-list>
           @for (group of pagedGroups(); track group.family.id) {
             <div
-              class="card cursor-pointer bg-base-100"
+              mobileListRow
+              class="cursor-pointer"
               role="button"
               tabindex="0"
               [class.border-primary]="selectedProductId() === group.family.id"
               (click)="openProduct(group.family.id)"
               (keydown.enter)="openProduct(group.family.id)"
             >
-              <div class="card-body p-4">
+              <div class="p-3">
                 <div class="flex items-start gap-3">
                   @if (perms.has('ManageCatalog') && categoryMembershipsComplete()) {
                     <input
@@ -1104,52 +1241,35 @@ interface ProductEditorRow {
                   }
                   <div class="min-w-0 flex-1">
                     <span class="block truncate font-semibold">{{ group.family.name }}</span>
-                    @if (manufacturerName(group.family.manufacturer_id); as manufacturer) {
-                      <span class="badge badge-ghost badge-sm mt-1">{{ manufacturer }}</span>
-                    }
                     <span class="type-caption mt-0.5 block">
+                      {{ manufacturerName(group.family.manufacturer_id) || 'No manufacturer' }} ·
                       {{ group.variants.length }}
                       {{ group.variants.length === 1 ? 'variant' : 'variants' }}
-                      @if (group.family.barcode) {
-                        · <span class="font-mono">{{ group.family.barcode }}</span>
-                      }
                     </span>
-                    @if (productCategoryNames(group.family.id); as categoryNames) {
-                      @if (categoryNames.length > 0) {
-                        <div class="mt-1 flex flex-wrap gap-1">
-                          @for (name of categoryNames.slice(0, 2); track name) {
-                            <span class="badge badge-ghost badge-sm">{{ name }}</span>
-                          }
-                          @if (categoryNames.length > 2) {
-                            <span class="badge badge-ghost badge-sm"
-                              >+{{ categoryNames.length - 2 }}</span
-                            >
-                          }
-                        </div>
-                      }
+                  </div>
+                  <div class="shrink-0 text-right">
+                    @if (familyTracksInventory(group.variants)) {
+                      <p class="font-semibold tabular-nums">
+                        {{ familyStock(group.variants) }} units
+                      </p>
+                    } @else {
+                      <p class="type-caption">Not tracked</p>
+                    }
+                    @if (!group.family.active) {
+                      <app-status-badge size="xs" type="warning" label="inactive" />
+                    } @else if (
+                      familyTracksInventory(group.variants) && familyStock(group.variants) <= 0
+                    ) {
+                      <app-status-badge size="xs" type="warning" label="out of stock" />
+                    } @else {
+                      <app-status-badge size="xs" type="neutral" label="active" />
                     }
                   </div>
-                  @if (!group.family.active) {
-                    <app-status-badge type="warning" label="inactive" />
-                  }
                 </div>
-
-                @if (perms.has('ManageStockAdjustments')) {
-                  <div class="mt-3 flex flex-wrap gap-1.5 border-t border-base-200 pt-3">
-                    <button
-                      appButton
-                      variant="outline"
-                      size="sm"
-                      (click)="$event.stopPropagation(); startFamilyEdit(group.family)"
-                    >
-                      Edit product
-                    </button>
-                  </div>
-                }
               </div>
             </div>
           }
-        </div>
+        </app-mobile-list>
         <div class="hidden lg:block">
           <app-data-table-shell
             title="Product catalog"
@@ -1297,6 +1417,21 @@ interface ProductEditorRow {
             group.variants.length + (group.variants.length === 1 ? ' variant' : ' variants')
           "
         >
+          @if (canShareProduct(group)) {
+            <button
+              actions
+              appButton
+              variant="ghost"
+              [iconOnly]="true"
+              [loading]="shareBusy()"
+              type="button"
+              title="Share product"
+              aria-label="Share product"
+              (click)="shareProduct(group)"
+            >
+              <app-icon name="heroShare" />
+            </button>
+          }
           @if (perms.has('ManageStockAdjustments')) {
             <button
               actions
@@ -1525,6 +1660,25 @@ interface ProductEditorRow {
         </app-drawer>
       }
 
+      @if (shareFeedback(); as feedback) {
+        <div
+          class="toast toast-bottom toast-end z-[70]"
+          [attr.aria-live]="feedback.kind === 'error' ? 'assertive' : 'polite'"
+        >
+          <div
+            class="alert max-w-sm shadow-overlay"
+            [class.alert-error]="feedback.kind === 'error'"
+            [class.alert-success]="feedback.kind === 'success'"
+            [attr.role]="feedback.kind === 'error' ? 'alert' : 'status'"
+          >
+            <app-icon
+              [name]="feedback.kind === 'error' ? 'heroExclamationTriangle' : 'heroCheckCircle'"
+            />
+            <span>{{ feedback.message }}</span>
+          </div>
+        </div>
+      }
+
       <app-delete-confirmation-modal
         [data]="deactivateData()"
         title="Deactivate?"
@@ -1565,14 +1719,43 @@ interface ProductEditorRow {
   `,
   styles: `
     .product-editor {
-      width: 100%;
+      width: 100dvw;
       max-width: 100%;
+      height: 100dvh;
+      max-height: 100dvh;
+      border: 0;
+      border-radius: 0;
+      overflow: hidden;
+    }
+
+    .product-editor-body {
+      scrollbar-width: thin;
+      scrollbar-color: color-mix(in oklab, var(--color-base-content) 22%, transparent) transparent;
+    }
+
+    .product-editor-body::-webkit-scrollbar {
+      width: 0.375rem;
+    }
+
+    .product-editor-body::-webkit-scrollbar-thumb {
+      border-radius: var(--radius-selector);
+      background: color-mix(in oklab, var(--color-base-content) 22%, transparent);
+    }
+
+    @media (max-width: 767px) {
+      .product-editor-header {
+        padding-top: max(0.75rem, env(safe-area-inset-top));
+      }
     }
 
     @media (min-width: 768px) {
       .product-editor {
         width: min(48rem, calc(100vw - 3rem));
         max-width: 48rem;
+        height: auto;
+        max-height: 90dvh;
+        border: 1px solid color-mix(in oklab, var(--color-base-300) 60%, transparent);
+        border-radius: var(--radius-box);
       }
     }
   `,
@@ -1584,6 +1767,7 @@ export class ProductsComponent implements OnInit {
   private readonly locationContext = inject(LocationContextService);
   protected readonly connectivity = inject(ConnectivityService);
   private readonly productTransfer = inject(ProductTransferService);
+  private readonly publicProductLinks = inject(PublicProductLinkService);
   protected readonly preferences = inject(CompanyPreferencesService);
   protected readonly perms = inject(PermissionsService);
 
@@ -1630,6 +1814,8 @@ export class ProductsComponent implements OnInit {
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
+  protected readonly shareBusy = signal(false);
+  protected readonly shareFeedback = signal<ShareFeedback | null>(null);
   protected readonly transferBusy = signal(false);
   protected readonly importOpen = signal(false);
   protected readonly page = signal(1);
@@ -1640,6 +1826,7 @@ export class ProductsComponent implements OnInit {
   private readonly serverLoaded = signal(false);
   private serverRequest = 0;
   private serverSearchTimer: ReturnType<typeof setTimeout> | null = null;
+  private shareFeedbackTimer: ReturnType<typeof setTimeout> | null = null;
   protected readonly serverMode = computed(() => this.productStatusFilter() !== 'active');
 
   /** Image picker state (family edit panel). */
@@ -1810,6 +1997,13 @@ export class ProductsComponent implements OnInit {
       this.manufacturerFilter() !== 'all' ||
       (this.categoryMembershipsComplete() && this.categoryFilter() !== 'all')
   );
+  protected readonly productActiveFilterCount = computed(
+    () =>
+      Number(this.productStatusFilter() !== DEFAULT_PRODUCT_STATUS_FILTER) +
+      Number(this.stockStatusFilter() !== 'all') +
+      Number(this.manufacturerFilter() !== 'all') +
+      Number(this.categoryMembershipsComplete() && this.categoryFilter() !== 'all')
+  );
   protected readonly productStats = computed(() => {
     const groups = this.grouped();
     const variants = groups.reduce((count, group) => count + group.variants.length, 0);
@@ -1828,16 +2022,30 @@ export class ProductsComponent implements OnInit {
       {
         label: 'Matching products',
         value: this.serverMode() && this.serverLoaded() ? this.serverTotal() : groups.length,
+        mobilePriority: 'primary' as const,
       },
-      { label: 'Variants shown', value: variants },
+      { label: 'Variants shown', value: variants, mobilePriority: 'secondary' as const },
       {
         label: 'Out of stock',
         value: outOfStock,
         tone: outOfStock > 0 ? ('warning' as const) : ('neutral' as const),
+        mobilePriority: 'primary' as const,
       },
-      { label: 'Cost value', value: this.fmt(this.totalStockValue()) },
-      { label: 'Wholesale value', value: this.fmt(this.totalWholesaleStockValue()) },
-      { label: 'Retail value', value: this.fmt(this.totalRetailStockValue()) },
+      {
+        label: 'Cost value',
+        value: this.fmt(this.totalStockValue()),
+        mobilePriority: 'secondary' as const,
+      },
+      {
+        label: 'Wholesale value',
+        value: this.fmt(this.totalWholesaleStockValue()),
+        mobilePriority: 'secondary' as const,
+      },
+      {
+        label: 'Retail value',
+        value: this.fmt(this.totalRetailStockValue()),
+        mobilePriority: 'secondary' as const,
+      },
     ];
   });
   protected readonly totalPages = computed(() =>
@@ -1999,6 +2207,7 @@ export class ProductsComponent implements OnInit {
 
   async ngOnInit(): Promise<void> {
     this.loading.set(true);
+    void this.publicProductLinks.load().catch(() => undefined);
     const hydrated = await this.catalogCache.ensureLoaded();
     if (hydrated) this.loading.set(false);
     void this.preferences.refresh();
@@ -2305,9 +2514,39 @@ export class ProductsComponent implements OnInit {
   }
 
   protected openProduct(productId: string): void {
+    void this.publicProductLinks.load().catch(() => undefined);
     this.selectedProductId.set(productId);
     this.batchesFor.set(null);
     this.batches.set([]);
+  }
+
+  protected canShareProduct(group: ProductGroup): boolean {
+    return group.family.active && group.variants.some(variant => variant.variant_active);
+  }
+
+  protected async shareProduct(group: ProductGroup): Promise<void> {
+    if (this.shareBusy()) return;
+    this.shareBusy.set(true);
+    this.clearShareFeedback();
+    try {
+      const url = await this.publicProductLinks.productUrl(group.family.id);
+      if (!url) throw new Error('This product is not available on the public storefront.');
+      if (navigator.share) {
+        // URL-only lets WhatsApp build the current preview through the public renderer.
+        await navigator.share({ url });
+      } else {
+        await navigator.clipboard.writeText(url);
+        this.showShareFeedback('success', 'Product link copied');
+      }
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+      this.showShareFeedback(
+        'error',
+        error instanceof Error ? error.message : 'Could not share product'
+      );
+    } finally {
+      this.shareBusy.set(false);
+    }
   }
 
   /** Called by the drawer after its close transition finishes. */
@@ -2315,6 +2554,18 @@ export class ProductsComponent implements OnInit {
     this.selectedProductId.set(null);
     this.batchesFor.set(null);
     this.batches.set([]);
+  }
+
+  private showShareFeedback(kind: ShareFeedback['kind'], message: string): void {
+    this.clearShareFeedback();
+    this.shareFeedback.set({ kind, message });
+    this.shareFeedbackTimer = setTimeout(() => this.clearShareFeedback(), 4_000);
+  }
+
+  private clearShareFeedback(): void {
+    if (this.shareFeedbackTimer) clearTimeout(this.shareFeedbackTimer);
+    this.shareFeedbackTimer = null;
+    this.shareFeedback.set(null);
   }
 
   /** The product editor is a two-step modal (surface 3) — close the drawer first. */

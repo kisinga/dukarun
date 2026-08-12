@@ -44,6 +44,8 @@ import { StatCardComponent } from '../../shared/ui/stat-card.component';
 import { MoneyComponent } from '../../shared/ui/money.component';
 import { Approval, ApprovalsService } from '../../approvals/approvals.service';
 import { DocumentSendComponent } from '../../communications/document-send.component';
+import { MobileListComponent } from '../../shared/ui/mobile-list.component';
+import { PageActionsComponent } from '../../shared/ui/page-actions.component';
 
 const PROFORMA_STATUSES = ['draft', 'expired'];
 
@@ -76,6 +78,8 @@ const PROFORMA_SORT_OPTIONS: readonly ListSortOption[] = [
     StatCardComponent,
     MoneyComponent,
     DocumentSendComponent,
+    MobileListComponent,
+    PageActionsComponent,
   ],
   template: `
     <app-page
@@ -84,20 +88,24 @@ const PROFORMA_SORT_OPTIONS: readonly ListSortOption[] = [
       [badge]="orderQueueCounts.proformas()"
       [wide]="true"
     >
-      <button
-        actions
-        appButton
-        variant="ghost"
-        [iconOnly]="true"
-        [loading]="loading()"
-        type="button"
-        title="Refresh proformas"
-        aria-label="Refresh proformas"
-        (click)="load()"
-      >
-        <app-icon name="heroArrowPath" />
-      </button>
-      <a actions appButton routerLink="/pos/sell"> <app-icon name="heroPlus" /> New proforma </a>
+      <app-page-actions actions>
+        <button
+          utilityAction
+          appButton
+          variant="ghost"
+          [iconOnly]="true"
+          [loading]="loading()"
+          type="button"
+          title="Refresh proformas"
+          aria-label="Refresh proformas"
+          (click)="load()"
+        >
+          <app-icon name="heroArrowPath" />
+        </button>
+        <a primaryAction appButton routerLink="/pos/sell">
+          <app-icon name="heroPlus" /> New proforma
+        </a>
+      </app-page-actions>
 
       @if (error()) {
         <div role="alert" class="alert alert-error mb-3 text-sm">
@@ -142,6 +150,9 @@ const PROFORMA_SORT_OPTIONS: readonly ListSortOption[] = [
         (sortKeyChange)="changeSort($event, proformaSortDirection())"
         [sortDirection]="proformaSortDirection()"
         (sortDirectionChange)="changeSort(proformaSort(), $event)"
+        [filtersEnabled]="true"
+        [activeFilterCount]="proformaFilterCount()"
+        (clearFilters)="clearFilters()"
       >
         <app-stat-bar summary [stats]="proformaStats()" />
         <div filters class="grid gap-2 sm:grid-cols-2 lg:flex lg:flex-wrap lg:items-end">
@@ -181,17 +192,18 @@ const PROFORMA_SORT_OPTIONS: readonly ListSortOption[] = [
           ctaLink="/pos/sell"
         />
       } @else {
-        <div class="flex flex-col gap-2 lg:hidden">
+        <app-mobile-list>
           @for (draft of proformas(); track draft.id) {
             <div
-              class="card cursor-pointer bg-base-100"
+              mobileListRow
+              class="cursor-pointer"
               role="button"
               tabindex="0"
               [class.border-primary]="selectedDraftId() === draft.id"
               (click)="openPreview(draft.id)"
               (keydown.enter)="openPreview(draft.id)"
             >
-              <div class="card-body gap-3 p-4">
+              <div class="p-3">
                 <div class="flex items-start justify-between gap-3">
                   <div class="min-w-0">
                     <div class="flex flex-wrap items-center gap-2">
@@ -220,68 +232,34 @@ const PROFORMA_SORT_OPTIONS: readonly ListSortOption[] = [
                       {{ validityLabel(draft) }}
                     </p>
                   </div>
-                  <span class="shrink-0 font-bold tabular-nums">
-                    <app-money [amount]="draft.total" />
-                  </span>
-                </div>
-
-                <div class="flex flex-wrap items-center gap-2 border-t border-base-300/60 pt-3">
-                  @if (draft.status === 'draft') {
-                    <button
-                      appButton
-                      variant="outline"
-                      size="sm"
-                      (click)="$event.stopPropagation(); edit(draft.id)"
-                    >
-                      <app-icon name="heroPencilSquare" /> Edit
-                    </button>
-                    @if (printerEnabled()) {
+                  <div class="shrink-0 text-right">
+                    <p class="font-bold tabular-nums"><app-money [amount]="draft.total" /></p>
+                    @if (draft.status === 'draft') {
                       <button
                         appButton
-                        variant="ghost"
                         size="sm"
-                        [disabled]="printing()"
-                        (click)="$event.stopPropagation(); printProforma(draft.id)"
+                        class="mt-2"
+                        [disabled]="
+                          !cashierSession.canTakePayment() ||
+                          busy() ||
+                          draftApproval(draft.id)?.status === 'pending'
+                        "
+                        (click)="$event.stopPropagation(); startConversion(draft)"
                       >
-                        <app-icon name="heroPrinter" /> Print
+                        {{
+                          draftApproval(draft.id)?.status === 'approved'
+                            ? 'Continue checkout'
+                            : 'Convert to sale'
+                        }}
+                        <app-icon name="heroArrowRight" />
                       </button>
                     }
-                  }
-                  <button
-                    appButton
-                    variant="ghost"
-                    size="sm"
-                    class="text-error"
-                    [disabled]="busy()"
-                    (click)="$event.stopPropagation(); startDelete(draft)"
-                  >
-                    <app-icon name="heroXMark" /> Delete
-                  </button>
-                  @if (draft.status === 'draft') {
-                    <button
-                      appButton
-                      size="sm"
-                      class="ml-auto"
-                      [disabled]="
-                        !cashierSession.canTakePayment() ||
-                        busy() ||
-                        draftApproval(draft.id)?.status === 'pending'
-                      "
-                      (click)="$event.stopPropagation(); startConversion(draft)"
-                    >
-                      {{
-                        draftApproval(draft.id)?.status === 'approved'
-                          ? 'Continue checkout'
-                          : 'Convert to sale'
-                      }}
-                      <app-icon name="heroArrowRight" />
-                    </button>
-                  }
+                  </div>
                 </div>
               </div>
             </div>
           }
-        </div>
+        </app-mobile-list>
 
         <div class="hidden lg:block">
           <app-data-table-shell
@@ -688,16 +666,27 @@ export class ProformasComponent implements OnInit, OnDestroy {
   protected readonly proformaStats = computed(() => {
     const rows = this.proformas();
     return [
-      { label: 'Matching proformas', value: this.totalItems() },
-      { label: 'Active on page', value: this.activeOnPage(), tone: 'info' as const },
+      {
+        label: 'Matching proformas',
+        value: this.totalItems(),
+        mobilePriority: 'primary' as const,
+      },
+      {
+        label: 'Active on page',
+        value: this.activeOnPage(),
+        tone: 'info' as const,
+        mobilePriority: 'primary' as const,
+      },
       {
         label: 'Expired on page',
         value: rows.filter(proforma => proforma.status === 'expired').length,
         tone: 'error' as const,
+        mobilePriority: 'secondary' as const,
       },
       {
         label: 'Value on page',
         value: formatKes(rows.reduce((total, proforma) => total + proforma.total, 0)),
+        mobilePriority: 'secondary' as const,
       },
     ];
   });
@@ -804,6 +793,10 @@ export class ProformasComponent implements OnInit, OnDestroy {
   protected async applyFilters(): Promise<void> {
     this.page.set(1);
     await this.load();
+  }
+
+  protected proformaFilterCount(): number {
+    return Number(this.status.value !== 'all') + Number(Boolean(this.from.value || this.to.value));
   }
 
   protected async clearFilters(): Promise<void> {

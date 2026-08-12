@@ -34,6 +34,8 @@ import { FormFieldComponent } from '../shared/ui/form-field.component';
 import { IconComponent } from '../shared/ui/icon.component';
 import { StatBarComponent } from '../shared/ui/stat-bar.component';
 import { MoneyComponent } from '../shared/ui/money.component';
+import { MobileListComponent } from '../shared/ui/mobile-list.component';
+import { PageActionsComponent } from '../shared/ui/page-actions.component';
 import { PermissionsService } from '../core/permissions.service';
 import { Approval, ApprovalsService } from '../approvals/approvals.service';
 import { RecentSalesCacheService } from '../core/recent-sales-cache.service';
@@ -78,6 +80,8 @@ const SALE_SORT_OPTIONS: readonly ListSortOption[] = [
     MoneyComponent,
     DocumentSendComponent,
     SearchableFilterComponent,
+    MobileListComponent,
+    PageActionsComponent,
   ],
   template: `
     <app-page
@@ -85,19 +89,21 @@ const SALE_SORT_OPTIONS: readonly ListSortOption[] = [
       subtitle="Review completed sales, cashier handoffs, proformas, refunds, and voids."
       [wide]="true"
     >
-      <button
-        actions
-        appButton
-        variant="ghost"
-        [iconOnly]="true"
-        [loading]="loading()"
-        type="button"
-        title="Refresh sales"
-        aria-label="Refresh sales"
-        (click)="load()"
-      >
-        <app-icon name="heroArrowPath" />
-      </button>
+      <app-page-actions actions>
+        <button
+          utilityAction
+          appButton
+          variant="ghost"
+          [iconOnly]="true"
+          [loading]="loading()"
+          type="button"
+          title="Refresh sales"
+          aria-label="Refresh sales"
+          (click)="load()"
+        >
+          <app-icon name="heroArrowPath" />
+        </button>
+      </app-page-actions>
 
       @if (error()) {
         <div role="alert" class="alert alert-error mb-3 text-sm">
@@ -127,6 +133,9 @@ const SALE_SORT_OPTIONS: readonly ListSortOption[] = [
         (sortKeyChange)="changeSort($event, saleSortDirection())"
         [sortDirection]="saleSortDirection()"
         (sortDirectionChange)="changeSort(saleSort(), $event)"
+        [filtersEnabled]="true"
+        [activeFilterCount]="salesActiveFilterCount()"
+        (clearFilters)="clearSalesFilters()"
       >
         <app-stat-bar summary [stats]="salesStats()" />
         <div filters class="grid gap-2 sm:grid-cols-2 lg:flex lg:flex-wrap lg:items-end">
@@ -249,47 +258,36 @@ const SALE_SORT_OPTIONS: readonly ListSortOption[] = [
           />
         </div>
       } @else {
-        <div class="mt-3 flex flex-col gap-2 lg:hidden">
+        <app-mobile-list class="mt-3">
           @for (order of orders(); track order.id) {
             <div
-              class="card cursor-pointer bg-base-100"
+              mobileListRow
+              class="cursor-pointer"
               role="button"
               tabindex="0"
               [class.border-primary]="selectedOrderId() === order.id"
               (click)="openOrder(order.id)"
               (keydown.enter)="openOrder(order.id)"
             >
-              <div class="card-body p-4">
-                <div class="flex flex-wrap items-center gap-3">
-                  <span class="font-mono font-semibold">{{ order.code }}</span>
-                  <span class="text-sm text-base-content/60">{{ time(order.created_at) }}</span>
-                  <span class="text-sm">{{ customerName(order) }}</span>
-                  <app-status-badge
-                    [type]="statusType(order.status)"
-                    [label]="statusLabel(order.status, order.id)"
-                  />
-                  @if (order.is_credit_sale) {
+              <div class="flex min-h-20 items-center gap-3 p-3">
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-center gap-2">
+                    <span class="truncate font-mono font-semibold">{{ order.code }}</span>
                     <app-status-badge
-                      [type]="creditBadge(order).type"
-                      [label]="creditBadge(order).label"
+                      size="xs"
+                      [type]="statusType(order.status)"
+                      [label]="statusLabel(order.status, order.id)"
                     />
-                  }
-                  @for (approval of approvalBadges(order.id); track approval.id) {
-                    <span
-                      class="badge badge-sm"
-                      [class.badge-warning]="approval.status === 'pending'"
-                      [class.badge-success]="approval.status === 'approved'"
-                      [class.badge-error]="
-                        approval.status === 'denied' || approval.status === 'expired'
-                      "
-                      [class.badge-ghost]="approval.status === 'cancelled'"
-                    >
-                      {{ approvalBadgeLabel(approval) }}
-                    </span>
-                  }
-                  <span class="ml-auto font-bold tabular-nums"
-                    ><app-money [amount]="order.total"
-                  /></span>
+                  </div>
+                  <p class="type-caption mt-1 truncate">
+                    {{ time(order.created_at) }} · {{ customerName(order) }}
+                    @if (order.is_credit_sale) {
+                      · {{ creditBadge(order).label }}
+                    }
+                  </p>
+                </div>
+                <div class="shrink-0 text-right">
+                  <p class="font-bold tabular-nums"><app-money [amount]="order.total" /></p>
                   @if (
                     order.status === 'pending_payment' &&
                     order.cashier_pending_at &&
@@ -306,29 +304,12 @@ const SALE_SORT_OPTIONS: readonly ListSortOption[] = [
                       <app-icon name="heroBanknotes" />
                       Collect payment
                     </a>
-                  } @else if (order.status === 'draft') {
-                    <a
-                      appButton
-                      variant="outline"
-                      size="sm"
-                      routerLink="/pos/proformas"
-                      (click)="$event.stopPropagation()"
-                    >
-                      <app-icon name="heroDocumentText" />
-                      Open proforma
-                    </a>
                   }
                 </div>
-
-                @if (order.status === 'voided' && order.void_reason) {
-                  <p class="mt-1 text-xs text-base-content/60">
-                    Void reason: {{ order.void_reason }}
-                  </p>
-                }
               </div>
             </div>
           }
-        </div>
+        </app-mobile-list>
 
         <div class="mt-3 hidden lg:block">
           <app-data-table-shell
@@ -1046,13 +1027,28 @@ export class OrdersComponent implements OnInit, OnDestroy {
     const completed = rows.filter(order => order.status === 'completed');
     const pending = rows.filter(order => order.status === 'pending_payment').length;
     return [
-      { label: 'Matching sales', value: this.totalItems() },
+      {
+        label: 'Matching sales',
+        value: this.totalItems(),
+        mobilePriority: 'primary' as const,
+      },
       {
         label: 'Sales value on page',
         value: formatKes(completed.reduce((sum, order) => sum + order.total, 0)),
+        mobilePriority: 'primary' as const,
       },
-      { label: 'Completed on page', value: completed.length, tone: 'success' as const },
-      { label: 'Awaiting payment', value: pending, tone: 'warning' as const },
+      {
+        label: 'Completed on page',
+        value: completed.length,
+        tone: 'success' as const,
+        mobilePriority: 'secondary' as const,
+      },
+      {
+        label: 'Awaiting payment',
+        value: pending,
+        tone: 'warning' as const,
+        mobilePriority: 'secondary' as const,
+      },
     ];
   });
 
@@ -1082,6 +1078,20 @@ export class OrdersComponent implements OnInit, OnDestroy {
   protected async apply(): Promise<void> {
     this.page.set(1);
     await this.load();
+  }
+
+  protected salesActiveFilterCount(): number {
+    return (
+      Number(this.status.value !== 'all') +
+      Number(Boolean(this.customerId())) +
+      Number(!this.todayActive())
+    );
+  }
+
+  protected async clearSalesFilters(): Promise<void> {
+    this.status.setValue('all');
+    this.customerId.set(null);
+    await this.setToday();
   }
 
   protected async setToday(): Promise<void> {

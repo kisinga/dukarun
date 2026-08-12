@@ -17,7 +17,8 @@ import { EntitlementsService } from '../core/entitlements.service';
 import { PermissionsService } from '../core/permissions.service';
 import { SupabaseService } from '../core/supabase.service';
 import { ProfileService } from '../profile/profile.service';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { ButtonComponent } from '../shared/ui/button.component';
 import { IconComponent } from '../shared/ui/icon.component';
 import { DataTableShellComponent } from '../shared/ui/data-table-shell.component';
@@ -30,6 +31,9 @@ import {
 import { sortList } from '../shared/ui/list-sort';
 import { StatBarComponent } from '../shared/ui/stat-bar.component';
 import { EmptyStateComponent } from '../shared/ui/empty-state.component';
+import { DrawerComponent } from '../shared/ui/drawer.component';
+import { MobileListComponent } from '../shared/ui/mobile-list.component';
+import { PageActionsComponent } from '../shared/ui/page-actions.component';
 
 const MEMBER_SORT_OPTIONS: readonly ListSortOption[] = [
   { value: 'name', label: 'Member name' },
@@ -55,6 +59,9 @@ const MEMBER_SORT_OPTIONS: readonly ListSortOption[] = [
     ListSearchBarComponent,
     StatBarComponent,
     EmptyStateComponent,
+    DrawerComponent,
+    MobileListComponent,
+    PageActionsComponent,
   ],
   template: `
     <app-page
@@ -62,22 +69,31 @@ const MEMBER_SORT_OPTIONS: readonly ListSortOption[] = [
       subtitle="Manage member access, account status, roles, and permissions."
       [wide]="true"
     >
-      <button
-        actions
-        appButton
-        variant="ghost"
-        [iconOnly]="true"
-        [loading]="loading()"
-        type="button"
-        title="Refresh team"
-        aria-label="Refresh team"
-        (click)="load()"
-      >
-        <app-icon name="heroArrowPath" />
-      </button>
-      <button actions appButton type="button" (click)="memberFormOpen.set(true)">
-        <app-icon name="heroPlus" /> Add member
-      </button>
+      <app-page-actions actions>
+        <button
+          utilityAction
+          appButton
+          variant="ghost"
+          [iconOnly]="true"
+          [loading]="loading()"
+          type="button"
+          title="Refresh team"
+          aria-label="Refresh team"
+          (click)="load()"
+        >
+          <app-icon name="heroArrowPath" />
+        </button>
+        @if (activeTab() === 'members') {
+          <button primaryAction appButton type="button" (click)="memberFormOpen.set(true)">
+            <app-icon name="heroPlus" /> Add member
+          </button>
+        }
+        @if (activeTab() === 'roles') {
+          <button primaryAction appButton type="button" (click)="startRoleCreate()">
+            <app-icon name="heroPlus" /> New role
+          </button>
+        }
+      </app-page-actions>
 
       @if (error()) {
         <div role="alert" class="alert alert-error mb-3 text-sm">
@@ -92,28 +108,42 @@ const MEMBER_SORT_OPTIONS: readonly ListSortOption[] = [
         </div>
       }
 
-      <!-- Add member -->
-      @if (memberFormOpen()) {
-        <div class="card mb-4 bg-base-100">
-          <div class="card-body p-4">
-            <div class="flex items-start justify-between gap-3">
-              <div>
-                <h2 class="section-title">Add member</h2>
-                <p class="type-caption mt-1">
-                  The person must have logged in at least once before they can be added.
-                </p>
-              </div>
-              <button
-                appButton
-                variant="ghost"
-                [iconOnly]="true"
-                type="button"
-                aria-label="Close add member form"
-                (click)="memberFormOpen.set(false)"
-              >
-                <app-icon name="heroXMark" />
-              </button>
-            </div>
+      <div role="tablist" aria-label="Team section" class="tabs tabs-box mb-3 w-fit">
+        <button
+          role="tab"
+          type="button"
+          class="tab min-h-11"
+          [class.tab-active]="activeTab() === 'members'"
+          [attr.aria-selected]="activeTab() === 'members'"
+          (click)="setTab('members')"
+        >
+          Members
+        </button>
+        <button
+          role="tab"
+          type="button"
+          class="tab min-h-11"
+          [class.tab-active]="activeTab() === 'roles'"
+          [attr.aria-selected]="activeTab() === 'roles'"
+          (click)="setTab('roles')"
+        >
+          Roles
+        </button>
+      </div>
+
+      @if (activeTab() === 'members') {
+        <!-- Add member -->
+        @if (memberFormOpen()) {
+          <app-drawer
+            [open]="true"
+            title="Add member"
+            subtitle="Assign their initial access role"
+            [dirty]="memberFormDirty()"
+            (closed)="resetMemberForm()"
+          >
+            <p class="type-caption">
+              The person must have logged in at least once before they can be added.
+            </p>
             @if (!canAddMember()) {
               <div class="alert mt-2 border border-warning/20 bg-warning/5 text-sm">
                 <span class="flex-1">
@@ -124,8 +154,9 @@ const MEMBER_SORT_OPTIONS: readonly ListSortOption[] = [
               </div>
             }
             <form
+              id="add-member-form"
               (submit)="$event.preventDefault(); addMember()"
-              class="mt-3 grid items-end gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_auto]"
+              class="mt-4 grid gap-3"
             >
               <app-form-field label="Name" [required]="true">
                 <input
@@ -150,10 +181,15 @@ const MEMBER_SORT_OPTIONS: readonly ListSortOption[] = [
                   }
                 </select>
               </app-form-field>
+            </form>
+            <div drawerFooter class="flex justify-end gap-2">
+              <button appButton variant="ghost" type="button" (click)="closeMemberForm()">
+                Cancel
+              </button>
               <button
                 appButton
                 type="submit"
-                size="sm"
+                form="add-member-form"
                 [disabled]="
                   busy() ||
                   roles().length === 0 ||
@@ -164,214 +200,215 @@ const MEMBER_SORT_OPTIONS: readonly ListSortOption[] = [
               >
                 Add member
               </button>
-            </form>
-          </div>
-        </div>
-      }
+            </div>
+          </app-drawer>
+        }
 
-      <!-- Members -->
-      <app-list-search-bar
-        placeholder="Search member, role, or status…"
-        [searchQuery]="memberQuery()"
-        (searchQueryChange)="memberQuery.set($event); memberPage.set(1)"
-        [sortOptions]="memberSortOptions"
-        [sortKey]="memberSort()"
-        (sortKeyChange)="memberSort.set($event); memberPage.set(1)"
-        [sortDirection]="memberSortDirection()"
-        (sortDirectionChange)="memberSortDirection.set($event); memberPage.set(1)"
-      >
-        <app-stat-bar summary [stats]="teamStats()" />
-      </app-list-search-bar>
+        <!-- Members -->
+        <app-list-search-bar
+          placeholder="Search member, role, or status…"
+          [searchQuery]="memberQuery()"
+          (searchQueryChange)="memberQuery.set($event); memberPage.set(1)"
+          [sortOptions]="memberSortOptions"
+          [sortKey]="memberSort()"
+          (sortKeyChange)="memberSort.set($event); memberPage.set(1)"
+          [sortDirection]="memberSortDirection()"
+          (sortDirectionChange)="memberSortDirection.set($event); memberPage.set(1)"
+        >
+          <app-stat-bar summary [stats]="teamStats()" />
+        </app-list-search-bar>
 
-      @if (!loading() && filteredMembers().length === 0) {
-        <app-empty-state
-          [compact]="true"
-          icon="heroUsers"
-          [title]="memberQuery() ? 'No matching members' : 'No team members yet'"
-          description="Add a member from the page header."
-        />
-      } @else {
-        <div class="hidden lg:block">
-          <app-data-table-shell
-            title="Members"
-            [description]="filteredMembers().length + ' members'"
-          >
-            <table class="table table-sm">
-              <thead>
-                <tr>
-                  <th>User</th>
-                  <th>Role</th>
-                  <th>Status</th>
-                  <th>Joined</th>
-                  <th class="text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                @for (m of pagedMembers(); track m.id) {
+        @if (!loading() && filteredMembers().length === 0) {
+          <app-empty-state
+            [compact]="true"
+            icon="heroUsers"
+            [title]="memberQuery() ? 'No matching members' : 'No team members yet'"
+            description="Add a member from the page header."
+          />
+        } @else {
+          <div class="hidden lg:block">
+            <app-data-table-shell
+              title="Members"
+              [description]="filteredMembers().length + ' members'"
+            >
+              <table class="table table-sm">
+                <thead>
                   <tr>
-                    <td>
-                      <div class="table-entity">
-                        <app-entity-avatar
-                          size="sm"
-                          [firstName]="m.staff_profile?.display_name ?? m.roles?.name ?? '?'"
-                          [imageUrl]="memberAvatarUrl(m)"
-                        />
-                        <div>
-                          <p class="table-primary" [title]="m.user_id">
-                            {{ memberNameFor(m) }}
-                            @if (isSelf(m)) {
-                              <span class="badge badge-xs badge-outline ml-1">You</span>
-                            }
-                            @if (isPrimaryContact(m)) {
-                              <span class="badge badge-xs badge-primary ml-1">Primary contact</span>
-                            }
-                          </p>
-                          <p class="table-secondary font-mono">User …{{ shortId(m.user_id) }}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td>
-                      <select
-                        class="select select-bordered select-xs"
-                        [value]="m.role_id ?? ''"
-                        [disabled]="busy() || roles().length === 0 || isSelf(m)"
-                        [title]="
-                          isSelf(m) ? 'Ask another admin to change your role' : 'Change role'
-                        "
-                        aria-label="Change role"
-                        (change)="changeRole(m, $any($event.target))"
-                      >
-                        @if (!m.role_id) {
-                          <option value="" disabled>No role</option>
-                        }
-                        @for (r of roles(); track r.id) {
-                          <option [value]="r.id" [selected]="r.id === m.role_id">
-                            {{ r.name }}
-                          </option>
-                        }
-                      </select>
-                    </td>
-                    <td>
-                      <app-status-badge
-                        size="xs"
-                        [type]="memberStatusType(m.authorization_status)"
-                        [label]="m.authorization_status"
-                      />
-                    </td>
-                    <td>{{ date(m.created_at) }}</td>
-                    <td class="table-actions">
-                      @if (locations().length > 1) {
-                        <button
-                          appButton
-                          variant="ghost"
-                          size="sm"
-                          [disabled]="busy()"
-                          (click)="editMemberLocations(m)"
-                        >
-                          Locations
-                        </button>
-                      }
-                      <button
-                        appButton
-                        variant="ghost"
-                        size="sm"
-                        [disabled]="busy()"
-                        (click)="renameMember(m)"
-                      >
-                        Rename
-                      </button>
-                      @if (canBePrimaryContact(m)) {
-                        <label class="flex cursor-pointer items-center gap-2 text-xs">
-                          <span>Primary contact</span>
-                          <input
-                            type="checkbox"
-                            class="toggle toggle-primary toggle-sm"
-                            [checked]="isPrimaryContact(m)"
-                            [disabled]="busy() || isPrimaryContact(m)"
-                            [attr.aria-label]="'Make ' + memberNameFor(m) + ' primary contact'"
-                            (change)="makePrimaryContact(m)"
-                          />
-                        </label>
-                      }
-                      @if (!isSelf(m)) {
-                        @if (m.authorization_status === 'disabled') {
-                          <button
-                            appButton
-                            variant="outline"
-                            size="sm"
-                            [disabled]="busy() || !canAddMember()"
-                            (click)="setStatus(m, 'approved')"
-                          >
-                            Enable
-                          </button>
-                        } @else {
-                          <button
-                            appButton
-                            variant="outline"
-                            size="sm"
-                            [disabled]="busy()"
-                            (click)="setStatus(m, 'disabled')"
-                          >
-                            Disable
-                          </button>
-                        }
-                        <button
-                          appButton
-                          variant="ghost"
-                          size="sm"
-                          class="ml-1 text-error"
-                          [disabled]="busy()"
-                          (click)="startRemove(m)"
-                        >
-                          Remove
-                        </button>
-                      }
-                    </td>
+                    <th>Member</th>
+                    <th>Role</th>
+                    <th>Status</th>
+                    <th>Locations</th>
+                    <th>Joined</th>
+                    <th class="text-right">Actions</th>
                   </tr>
-                }
-              </tbody>
-            </table>
-          </app-data-table-shell>
-        </div>
+                </thead>
+                <tbody>
+                  @for (m of pagedMembers(); track m.id) {
+                    <tr>
+                      <td>
+                        <div class="table-entity">
+                          <app-entity-avatar
+                            size="sm"
+                            [firstName]="m.staff_profile?.display_name ?? m.roles?.name ?? '?'"
+                            [imageUrl]="memberAvatarUrl(m)"
+                          />
+                          <div>
+                            <p class="table-primary" [title]="m.user_id">
+                              {{ memberNameFor(m) }}
+                              @if (isSelf(m)) {
+                                <span class="badge badge-xs badge-outline ml-1">You</span>
+                              }
+                              @if (isPrimaryContact(m)) {
+                                <span class="badge badge-xs badge-primary ml-1"
+                                  >Primary contact</span
+                                >
+                              }
+                            </p>
+                            <p class="table-secondary font-mono">User …{{ shortId(m.user_id) }}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        <select
+                          class="select select-bordered select-xs w-40"
+                          [value]="m.role_id ?? ''"
+                          [disabled]="busy() || roles().length === 0 || isSelf(m)"
+                          [title]="
+                            isSelf(m) ? 'Ask another admin to change your role' : 'Change role'
+                          "
+                          aria-label="Change role"
+                          (change)="changeRole(m, $any($event.target))"
+                        >
+                          @if (!m.role_id) {
+                            <option value="" disabled>No role</option>
+                          }
+                          @for (r of roles(); track r.id) {
+                            <option [value]="r.id" [selected]="r.id === m.role_id">
+                              {{ r.name }}
+                            </option>
+                          }
+                        </select>
+                      </td>
+                      <td>
+                        <app-status-badge
+                          size="xs"
+                          [type]="memberStatusType(m.authorization_status)"
+                          [label]="m.authorization_status"
+                        />
+                      </td>
+                      <td>
+                        <p class="table-primary">{{ primaryLocationName(m) }}</p>
+                        @if (additionalLocationCount(m) > 0) {
+                          <p class="table-secondary">+{{ additionalLocationCount(m) }} more</p>
+                        }
+                      </td>
+                      <td>{{ date(m.created_at) }}</td>
+                      <td class="table-actions">
+                        <button
+                          appButton
+                          variant="ghost"
+                          [iconOnly]="true"
+                          type="button"
+                          title="Member actions"
+                          aria-label="Member actions"
+                          [attr.aria-expanded]="memberMenuId() === m.id"
+                          (click)="memberMenuId.set(memberMenuId() === m.id ? null : m.id)"
+                        >
+                          <app-icon name="heroEllipsisVertical" />
+                        </button>
+                        @if (memberMenuId() === m.id) {
+                          <div
+                            class="absolute right-3 z-20 mt-12 w-56 rounded-box border border-base-300 bg-base-100 p-1 text-left shadow-overlay"
+                          >
+                            <button
+                              class="menu-item"
+                              type="button"
+                              (click)="memberMenuId.set(null); renameMember(m)"
+                            >
+                              Rename
+                            </button>
+                            <button
+                              class="menu-item"
+                              type="button"
+                              (click)="memberMenuId.set(null); editMemberLocations(m)"
+                            >
+                              Manage locations
+                            </button>
+                            <button
+                              class="menu-item"
+                              type="button"
+                              [disabled]="busy() || isPrimaryContact(m) || !canBePrimaryContact(m)"
+                              (click)="memberMenuId.set(null); makePrimaryContact(m)"
+                            >
+                              Make primary contact
+                            </button>
+                            <button
+                              class="menu-item"
+                              type="button"
+                              [disabled]="
+                                busy() ||
+                                isSelf(m) ||
+                                (m.authorization_status === 'disabled' && !canAddMember())
+                              "
+                              [title]="isSelf(m) ? 'Another admin must change your access' : ''"
+                              (click)="
+                                memberMenuId.set(null);
+                                setStatus(
+                                  m,
+                                  m.authorization_status === 'disabled' ? 'approved' : 'disabled'
+                                )
+                              "
+                            >
+                              {{ m.authorization_status === 'disabled' ? 'Enable' : 'Disable' }}
+                            </button>
+                            <button
+                              class="menu-item text-error"
+                              type="button"
+                              [disabled]="busy() || isSelf(m)"
+                              [title]="isSelf(m) ? 'You cannot remove your own membership' : ''"
+                              (click)="memberMenuId.set(null); startRemove(m)"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        }
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </app-data-table-shell>
+          </div>
 
-        <div class="flex flex-col gap-2 lg:hidden">
-          @for (m of pagedMembers(); track m.id) {
-            <div class="card bg-base-100">
-              <div class="card-body gap-3 p-4">
-                <div class="flex items-center gap-3">
+          <app-mobile-list>
+            @for (m of pagedMembers(); track m.id) {
+              <div
+                mobileListRow
+                class="cursor-pointer"
+                role="button"
+                tabindex="0"
+                (click)="selectedMemberId.set(m.id)"
+                (keydown.enter)="selectedMemberId.set(m.id)"
+              >
+                <div class="flex min-h-20 items-center gap-3 p-3">
                   <app-entity-avatar
                     size="sm"
                     [firstName]="m.staff_profile?.display_name ?? m.roles?.name ?? '?'"
                     [imageUrl]="memberAvatarUrl(m)"
                   />
                   <div class="min-w-0 flex-1">
-                    <p class="text-sm font-semibold" [title]="m.user_id">
-                      {{ memberNameFor(m) }}
+                    <div class="flex items-center gap-1.5">
+                      <p class="truncate font-semibold" [title]="m.user_id">
+                        {{ memberNameFor(m) }}
+                      </p>
                       @if (isSelf(m)) {
-                        <span class="badge badge-xs badge-outline ml-1">You</span>
+                        <span class="badge badge-xs badge-outline">You</span>
                       }
                       @if (isPrimaryContact(m)) {
-                        <span class="badge badge-xs badge-primary ml-1">Primary contact</span>
+                        <span class="badge badge-xs badge-primary">Primary</span>
                       }
-                    </p>
-                    <p class="type-caption mt-0.5">User …{{ shortId(m.user_id) }}</p>
-                    <select
-                      class="select select-bordered select-xs mt-1"
-                      [value]="m.role_id ?? ''"
-                      [disabled]="busy() || roles().length === 0 || isSelf(m)"
-                      [title]="isSelf(m) ? 'Ask another admin to change your role' : 'Change role'"
-                      aria-label="Change role"
-                      (change)="changeRole(m, $any($event.target))"
-                    >
-                      @if (!m.role_id) {
-                        <option value="" disabled>No role</option>
-                      }
-                      @for (r of roles(); track r.id) {
-                        <option [value]="r.id" [selected]="r.id === m.role_id">
-                          {{ r.name }}
-                        </option>
-                      }
-                    </select>
+                    </div>
+                    <p class="type-caption mt-1 truncate">{{ m.roles?.name || 'No role' }}</p>
                   </div>
                   <app-status-badge
                     size="xs"
@@ -379,176 +416,141 @@ const MEMBER_SORT_OPTIONS: readonly ListSortOption[] = [
                     [label]="m.authorization_status"
                   />
                 </div>
-                <div class="flex items-center gap-2 border-t border-base-300/60 pt-3">
-                  <span class="type-caption">Joined {{ date(m.created_at) }}</span>
-                  @if (locations().length > 1) {
-                    <button
-                      appButton
-                      variant="ghost"
-                      size="sm"
-                      [disabled]="busy()"
-                      (click)="editMemberLocations(m)"
-                    >
-                      Locations
-                    </button>
+              </div>
+            }
+          </app-mobile-list>
+
+          <div class="mt-3 mb-6">
+            <app-pagination
+              [currentPage]="memberPage()"
+              [totalPages]="memberTotalPages()"
+              [totalItems]="filteredMembers().length"
+              [itemsPerPage]="memberPageSize()"
+              itemLabel="members"
+              [showItemsPerPage]="true"
+              (pageChange)="memberPage.set($event)"
+              (itemsPerPageChange)="memberPageSize.set($event); memberPage.set(1)"
+            />
+          </div>
+        }
+      }
+
+      <!-- Roles -->
+      @if (activeTab() === 'roles') {
+        <div class="mb-2 flex items-center justify-between">
+          <div>
+            <h2 class="section-title">Roles</h2>
+            <p class="type-caption mt-1">Permission bundles assigned to team members.</p>
+          </div>
+        </div>
+
+        @if (roleFormOpen()) {
+          <app-drawer
+            [open]="true"
+            [title]="editingRole() ? 'Edit ' + editingRole()!.name : 'New role'"
+            subtitle="Choose only the access this role needs"
+            [dirty]="roleFormDirty()"
+            (closed)="closeRoleForm()"
+          >
+            <form
+              id="role-form"
+              (submit)="$event.preventDefault(); saveRole()"
+              class="flex flex-col gap-4"
+            >
+              <app-form-field label="Role name" [required]="true" class="max-w-xs">
+                <input type="text" class="input input-bordered input-sm" [formControl]="roleName" />
+              </app-form-field>
+              @for (group of permissionGroups; track group.label) {
+                <fieldset class="rounded-box border border-base-300 p-3">
+                  <legend class="px-1 text-sm font-semibold">{{ group.label }}</legend>
+                  <div class="grid gap-1 sm:grid-cols-2">
+                    @for (perm of group.permissions; track perm) {
+                      <label class="flex min-h-11 cursor-pointer items-center gap-3 text-sm">
+                        <input
+                          type="checkbox"
+                          class="checkbox checkbox-sm"
+                          [checked]="rolePermissions().has(perm)"
+                          (change)="togglePermission(perm)"
+                        />
+                        <span>{{ permissionLabel(perm) }}</span>
+                      </label>
+                    }
+                  </div>
+                </fieldset>
+              }
+            </form>
+            <div drawerFooter class="flex justify-end gap-2">
+              <button appButton variant="ghost" type="button" (click)="cancelRoleForm()">
+                Cancel
+              </button>
+              <button
+                appButton
+                type="submit"
+                form="role-form"
+                [loading]="busy()"
+                [disabled]="busy() || roleName.value.trim().length === 0"
+              >
+                {{ editingRole() ? 'Save role' : 'Create role' }}
+              </button>
+            </div>
+          </app-drawer>
+        }
+
+        <app-mobile-list>
+          @for (r of roles(); track r.id) {
+            <button
+              mobileListRow
+              type="button"
+              class="flex min-h-20 w-full items-center gap-3 p-3 text-left"
+              (click)="startRoleEdit(r)"
+            >
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2">
+                  <span class="truncate font-semibold">{{ r.name }}</span>
+                  @if (r.is_template) {
+                    <span class="badge badge-xs badge-outline">template</span>
+                  }
+                </div>
+                <p class="type-caption mt-1">
+                  {{ roleMemberCount(r.id) }} members · {{ r.permissions.length }} permissions
+                </p>
+              </div>
+              <app-icon name="heroChevronRight" />
+            </button>
+          }
+        </app-mobile-list>
+        <div class="hidden gap-2 md:grid md:grid-cols-2">
+          @for (r of roles(); track r.id) {
+            <div class="card bg-base-100">
+              <div class="card-body p-4">
+                <div class="flex items-center gap-3">
+                  <span class="font-semibold">{{ r.name }}</span>
+                  @if (r.is_template) {
+                    <span class="badge badge-xs badge-outline">template</span>
                   }
                   <button
                     appButton
                     variant="ghost"
                     size="sm"
                     class="ml-auto"
-                    [disabled]="busy()"
-                    (click)="renameMember(m)"
+                    (click)="startRoleEdit(r)"
                   >
-                    Rename
+                    <app-icon name="heroPencilSquare" /> Edit
                   </button>
-                  @if (canBePrimaryContact(m)) {
-                    <label class="flex cursor-pointer items-center gap-2 text-xs">
-                      <span>Primary contact</span>
-                      <input
-                        type="checkbox"
-                        class="toggle toggle-primary toggle-sm"
-                        [checked]="isPrimaryContact(m)"
-                        [disabled]="busy() || isPrimaryContact(m)"
-                        [attr.aria-label]="'Make ' + memberNameFor(m) + ' primary contact'"
-                        (change)="makePrimaryContact(m)"
-                      />
-                    </label>
-                  }
-                  @if (!isSelf(m)) {
-                    @if (m.authorization_status === 'disabled') {
-                      <button
-                        appButton
-                        variant="outline"
-                        size="sm"
-                        [disabled]="busy() || !canAddMember()"
-                        (click)="setStatus(m, 'approved')"
-                      >
-                        Enable
-                      </button>
-                    } @else {
-                      <button
-                        appButton
-                        variant="outline"
-                        size="sm"
-                        [disabled]="busy()"
-                        (click)="setStatus(m, 'disabled')"
-                      >
-                        Disable
-                      </button>
-                    }
-                    <button
-                      appButton
-                      variant="ghost"
-                      size="sm"
-                      class="text-error"
-                      [disabled]="busy()"
-                      (click)="startRemove(m)"
-                    >
-                      Remove
-                    </button>
+                </div>
+                <div class="mt-1 flex flex-wrap gap-1">
+                  <span class="type-caption mr-2">
+                    {{ roleMemberCount(r.id) }} members · {{ r.permissions.length }} permissions
+                  </span>
+                  @for (perm of r.permissions; track perm) {
+                    <span class="badge badge-xs badge-ghost">{{ permissionLabel(perm) }}</span>
                   }
                 </div>
               </div>
             </div>
           }
         </div>
-
-        <div class="mt-3 mb-6">
-          <app-pagination
-            [currentPage]="memberPage()"
-            [totalPages]="memberTotalPages()"
-            [totalItems]="filteredMembers().length"
-            [itemsPerPage]="memberPageSize()"
-            itemLabel="members"
-            [showItemsPerPage]="true"
-            (pageChange)="memberPage.set($event)"
-            (itemsPerPageChange)="memberPageSize.set($event); memberPage.set(1)"
-          />
-        </div>
       }
-
-      <!-- Roles -->
-      <div class="mb-2 flex items-center justify-between">
-        <div>
-          <h2 class="section-title">Roles</h2>
-          <p class="type-caption mt-1">Permission bundles assigned to team members.</p>
-        </div>
-        <button appButton variant="outline" size="sm" (click)="startRoleCreate()">
-          <app-icon name="heroPlus" /> New role
-        </button>
-      </div>
-
-      @if (roleFormOpen()) {
-        <div class="card mb-4 bg-base-100">
-          <div class="card-body p-4">
-            <h3 class="card-title text-base">
-              {{ editingRole() ? 'Edit ' + editingRole()!.name : 'New role' }}
-            </h3>
-            <form (submit)="$event.preventDefault(); saveRole()" class="mt-3 flex flex-col gap-3">
-              <app-form-field label="Role name" [required]="true" class="max-w-xs">
-                <input type="text" class="input input-bordered input-sm" [formControl]="roleName" />
-              </app-form-field>
-              <div class="grid grid-cols-2 gap-1 sm:grid-cols-3">
-                @for (perm of allPermissions; track perm) {
-                  <label class="label cursor-pointer justify-start gap-2 py-0">
-                    <input
-                      type="checkbox"
-                      class="checkbox checkbox-sm"
-                      [checked]="rolePermissions().has(perm)"
-                      (change)="togglePermission(perm)"
-                    />
-                    <span class="label-text text-xs">{{ permissionLabels[perm] }}</span>
-                  </label>
-                }
-              </div>
-              <div class="flex gap-2">
-                <button
-                  appButton
-                  type="submit"
-                  size="sm"
-                  [loading]="busy()"
-                  [disabled]="busy() || roleName.value.trim().length === 0"
-                >
-                  {{ editingRole() ? 'Save role' : 'Create role' }}
-                </button>
-                <button appButton variant="ghost" type="button" size="sm" (click)="closeRoleForm()">
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      }
-
-      <div class="grid gap-2 md:grid-cols-2">
-        @for (r of roles(); track r.id) {
-          <div class="card bg-base-100">
-            <div class="card-body p-4">
-              <div class="flex items-center gap-3">
-                <span class="font-semibold">{{ r.name }}</span>
-                @if (r.is_template) {
-                  <span class="badge badge-xs badge-outline">template</span>
-                }
-                <button
-                  appButton
-                  variant="ghost"
-                  size="sm"
-                  class="ml-auto"
-                  (click)="startRoleEdit(r)"
-                >
-                  <app-icon name="heroPencilSquare" /> Edit
-                </button>
-              </div>
-              <div class="mt-1 flex flex-wrap gap-1">
-                @for (perm of r.permissions; track perm) {
-                  <span class="badge badge-xs badge-ghost">{{ permissionLabel(perm) }}</span>
-                }
-              </div>
-            </div>
-          </div>
-        }
-      </div>
       <app-delete-confirmation-modal
         [data]="removeData()"
         title="Remove team member?"
@@ -558,59 +560,176 @@ const MEMBER_SORT_OPTIONS: readonly ListSortOption[] = [
         (confirm)="confirmRemove()"
       />
 
-      @if (locationMember(); as member) {
-        <div class="modal modal-open" role="dialog" aria-modal="true" aria-label="Member locations">
-          <div class="modal-box max-w-lg">
-            <h2 class="section-title">Locations for {{ memberNameFor(member) }}</h2>
-            <p class="type-caption mt-1">
-              Choose where this person can work. One location must be primary.
-            </p>
-            <div class="mt-4 divide-y divide-base-200 rounded-box border border-base-300">
-              @for (location of locations(); track location.id) {
-                <div class="flex min-h-12 items-center gap-3 px-3">
-                  <input
-                    type="checkbox"
-                    class="checkbox checkbox-sm"
-                    [checked]="selectedLocations().has(location.id)"
-                    (change)="toggleMemberLocation(location.id)"
-                  />
-                  <span class="min-w-0 flex-1 text-sm font-medium">{{ location.name }}</span>
-                  <label class="label cursor-pointer gap-2">
-                    <input
-                      type="radio"
-                      name="primary-location"
-                      class="radio radio-sm"
-                      [checked]="primaryLocationId() === location.id"
-                      [disabled]="!selectedLocations().has(location.id)"
-                      (change)="primaryLocationId.set(location.id)"
-                    />
-                    <span class="label-text text-xs">Primary</span>
-                  </label>
-                </div>
+      @if (selectedMember(); as member) {
+        <app-drawer
+          [open]="true"
+          (closed)="selectedMemberId.set(null)"
+          [title]="memberNameFor(member)"
+          [subtitle]="'Joined ' + date(member.created_at)"
+          mobileDismissLabel="Done"
+        >
+          <app-entity-avatar
+            leading
+            size="sm"
+            [firstName]="memberNameFor(member)"
+            [imageUrl]="memberAvatarUrl(member)"
+          />
+          <div class="flex flex-wrap items-center gap-2">
+            @if (isSelf(member)) {
+              <span class="badge badge-sm badge-outline">You</span>
+            }
+            @if (isPrimaryContact(member)) {
+              <span class="badge badge-sm badge-primary">Primary contact</span>
+            }
+            <app-status-badge
+              size="xs"
+              [type]="memberStatusType(member.authorization_status)"
+              [label]="member.authorization_status"
+            />
+          </div>
+
+          <app-form-field label="Role" class="mt-4 block">
+            <select
+              class="select select-bordered w-full"
+              [value]="member.role_id ?? ''"
+              [disabled]="busy() || roles().length === 0 || isSelf(member)"
+              [title]="isSelf(member) ? 'Ask another admin to change your role' : 'Change role'"
+              (change)="changeRole(member, $any($event.target))"
+            >
+              @if (!member.role_id) {
+                <option value="" disabled>No role</option>
               }
-            </div>
-            <div class="modal-action">
-              <button appButton variant="ghost" type="button" (click)="locationMember.set(null)">
-                Cancel
+              @for (r of roles(); track r.id) {
+                <option [value]="r.id" [selected]="r.id === member.role_id">{{ r.name }}</option>
+              }
+            </select>
+          </app-form-field>
+
+          <div class="mt-4 rounded-box border border-base-300 p-3">
+            <p class="text-sm font-semibold">Locations</p>
+            <p class="type-caption mt-1">
+              {{ primaryLocationName(member) }}
+              @if (additionalLocationCount(member) > 0) {
+                · +{{ additionalLocationCount(member) }} more
+              }
+            </p>
+            @if (locations().length > 1) {
+              <button
+                appButton
+                variant="outline"
+                class="mt-3 w-full"
+                type="button"
+                (click)="editMemberLocations(member)"
+              >
+                Manage locations
+              </button>
+            }
+          </div>
+
+          <div class="mt-4 grid gap-2">
+            <button
+              appButton
+              variant="outline"
+              type="button"
+              [disabled]="busy()"
+              (click)="renameMember(member)"
+            >
+              Rename member
+            </button>
+            @if (canBePrimaryContact(member) && !isPrimaryContact(member)) {
+              <button
+                appButton
+                variant="outline"
+                type="button"
+                [disabled]="busy()"
+                (click)="makePrimaryContact(member)"
+              >
+                Make primary contact
+              </button>
+            }
+            @if (!isSelf(member)) {
+              <button
+                appButton
+                variant="outline"
+                type="button"
+                [disabled]="
+                  busy() || (member.authorization_status === 'disabled' && !canAddMember())
+                "
+                (click)="
+                  setStatus(
+                    member,
+                    member.authorization_status === 'disabled' ? 'approved' : 'disabled'
+                  )
+                "
+              >
+                {{
+                  member.authorization_status === 'disabled' ? 'Enable member' : 'Disable member'
+                }}
               </button>
               <button
                 appButton
+                variant="error"
                 type="button"
-                [loading]="busy()"
-                [disabled]="selectedLocations().size === 0 || !primaryLocationId()"
-                (click)="saveMemberLocations()"
+                [disabled]="busy()"
+                (click)="selectedMemberId.set(null); startRemove(member)"
               >
-                Save locations
+                Remove member
               </button>
-            </div>
+            } @else {
+              <p class="type-caption text-center">
+                Another admin must change your access or remove you.
+              </p>
+            }
           </div>
-          <button
-            class="modal-backdrop"
-            type="button"
-            aria-label="Close"
-            (click)="locationMember.set(null)"
-          ></button>
-        </div>
+        </app-drawer>
+      }
+
+      @if (locationMember(); as member) {
+        <app-drawer
+          [open]="true"
+          (closed)="locationMember.set(null)"
+          [title]="'Locations for ' + memberNameFor(member)"
+          subtitle="Choose where this person can work and set one primary location"
+        >
+          <div class="divide-y divide-base-200 rounded-box border border-base-300">
+            @for (location of locations(); track location.id) {
+              <div class="flex min-h-12 items-center gap-3 px-3">
+                <input
+                  type="checkbox"
+                  class="checkbox checkbox-sm"
+                  [checked]="selectedLocations().has(location.id)"
+                  (change)="toggleMemberLocation(location.id)"
+                />
+                <span class="min-w-0 flex-1 text-sm font-medium">{{ location.name }}</span>
+                <label class="label cursor-pointer gap-2">
+                  <input
+                    type="radio"
+                    name="primary-location"
+                    class="radio radio-sm"
+                    [checked]="primaryLocationId() === location.id"
+                    [disabled]="!selectedLocations().has(location.id)"
+                    (change)="primaryLocationId.set(location.id)"
+                  />
+                  <span class="label-text text-xs">Primary</span>
+                </label>
+              </div>
+            }
+          </div>
+          <div drawerFooter class="flex justify-end gap-2">
+            <button appButton variant="ghost" type="button" (click)="locationMember.set(null)">
+              Cancel
+            </button>
+            <button
+              appButton
+              type="button"
+              [loading]="busy()"
+              [disabled]="selectedLocations().size === 0 || !primaryLocationId()"
+              (click)="saveMemberLocations()"
+            >
+              Save locations
+            </button>
+          </div>
+        </app-drawer>
       }
     </app-page>
   `,
@@ -621,12 +740,53 @@ export class TeamComponent implements OnInit {
   private readonly profile = inject(ProfileService);
   private readonly permissions = inject(PermissionsService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
+  private readonly routeParams = toSignal(this.route.queryParamMap, {
+    initialValue: this.route.snapshot.queryParamMap,
+  });
   protected readonly entitlements = inject(EntitlementsService);
+  protected readonly activeTab = computed<'members' | 'roles'>(() =>
+    this.routeParams().get('tab') === 'roles' ? 'roles' : 'members'
+  );
 
   protected readonly currentUserId = computed(() => this.supabase.session()?.user.id ?? null);
 
   protected readonly allPermissions = ALL_PERMISSIONS;
   protected readonly permissionLabels = PERMISSION_LABELS;
+  protected readonly permissionGroups = [
+    {
+      label: 'Sales',
+      permissions: ['ManageApprovals', 'OverridePrice', 'ReverseOrder', 'SettleOrder'],
+    },
+    {
+      label: 'Inventory',
+      permissions: ['ManageCatalog', 'ManageStockAdjustments'],
+    },
+    {
+      label: 'Customers / Suppliers',
+      permissions: [
+        'ApproveCustomerCredit',
+        'ManageCustomerCreditLimit',
+        'ManageCustomers',
+        'OverrideCustomerBalance',
+        'ManageSupplierCreditPurchases',
+      ],
+    },
+    {
+      label: 'Money',
+      permissions: [
+        'ViewFinancials',
+        'ManageReconciliation',
+        'CloseAccountingPeriod',
+        'CreateInterAccountTransfer',
+        'ManageCommissions',
+      ],
+    },
+    {
+      label: 'Administration',
+      permissions: ['ManageTeam', 'ViewAuditTrail', 'ViewStaffPerformance', 'ManageCommunications'],
+    },
+  ] as const;
   protected readonly members = this.team.members;
   protected readonly roles = this.team.roles;
   protected readonly locations = this.team.locations;
@@ -635,6 +795,11 @@ export class TeamComponent implements OnInit {
   protected readonly selectedLocations = signal<Set<string>>(new Set());
   protected readonly primaryLocationId = signal<string | null>(null);
   protected readonly memberFormOpen = signal(false);
+  protected readonly selectedMemberId = signal<string | null>(null);
+  protected readonly selectedMember = computed(
+    () => this.members().find(member => member.id === this.selectedMemberId()) ?? null
+  );
+  protected readonly memberMenuId = signal<string | null>(null);
   protected readonly memberQuery = signal('');
   protected readonly memberSortOptions = MEMBER_SORT_OPTIONS;
   protected readonly memberSort = signal('name');
@@ -720,19 +885,38 @@ export class TeamComponent implements OnInit {
     () => this.members().filter(member => member.authorization_status === 'approved').length
   );
   protected readonly teamStats = computed(() => [
-    { label: 'Members', value: this.members().length },
-    { label: 'Active', value: this.activeMemberCount(), tone: 'success' as const },
+    {
+      label: 'Members',
+      value: this.members().length,
+      mobilePriority: 'primary' as const,
+    },
+    {
+      label: 'Active',
+      value: this.activeMemberCount(),
+      tone: 'success' as const,
+      mobilePriority: 'primary' as const,
+    },
     {
       label: 'Pending',
       value: this.members().filter(member => member.authorization_status === 'pending').length,
       tone: 'warning' as const,
+      mobilePriority: 'secondary' as const,
     },
-    { label: 'Roles', value: this.roles().length },
+    { label: 'Roles', value: this.roles().length, mobilePriority: 'secondary' as const },
   ]);
   protected readonly canAddMember = computed(() => {
     const limit = this.memberLimit();
     return limit === null || this.activeMemberCount() < limit;
   });
+
+  protected setTab(tab: 'members' | 'roles'): void {
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { tab },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
+  }
 
   async ngOnInit(): Promise<void> {
     try {
@@ -778,6 +962,22 @@ export class TeamComponent implements OnInit {
     } finally {
       this.busy.set(false);
     }
+  }
+
+  protected memberFormDirty(): boolean {
+    return this.memberName.value.trim().length > 0 || this.memberPhone.value.trim().length > 0;
+  }
+
+  protected closeMemberForm(): void {
+    if (this.memberFormDirty() && !window.confirm('Discard changes?')) return;
+    this.resetMemberForm();
+  }
+
+  protected resetMemberForm(): void {
+    this.memberFormOpen.set(false);
+    this.memberName.setValue('');
+    this.memberPhone.setValue('');
+    this.memberRole.setValue(this.roles()[0]?.id ?? '');
   }
 
   protected async setStatus(m: MembershipWithRole, status: string): Promise<void> {
@@ -887,6 +1087,23 @@ export class TeamComponent implements OnInit {
     this.primaryLocationId.set(
       assignments.find(item => item.is_primary)?.location_id ?? assignments[0]?.location_id ?? null
     );
+    this.selectedMemberId.set(null);
+  }
+
+  protected primaryLocationName(member: MembershipWithRole): string {
+    const assignments = this.membershipLocations().filter(item => item.membership_id === member.id);
+    const primary = assignments.find(item => item.is_primary) ?? assignments[0];
+    return (
+      this.locations().find(location => location.id === primary?.location_id)?.name ??
+      'All locations'
+    );
+  }
+
+  protected additionalLocationCount(member: MembershipWithRole): number {
+    return Math.max(
+      0,
+      this.membershipLocations().filter(item => item.membership_id === member.id).length - 1
+    );
   }
 
   protected toggleMemberLocation(locationId: string): void {
@@ -957,6 +1174,27 @@ export class TeamComponent implements OnInit {
   protected closeRoleForm(): void {
     this.roleFormOpen.set(false);
     this.editingRole.set(null);
+  }
+
+  protected roleFormDirty(): boolean {
+    const editing = this.editingRole();
+    const originalName = editing?.name ?? '';
+    const original = new Set(editing?.permissions ?? []);
+    const current = this.rolePermissions();
+    return (
+      this.roleName.value.trim() !== originalName ||
+      original.size !== current.size ||
+      [...original].some(permission => !current.has(permission))
+    );
+  }
+
+  protected cancelRoleForm(): void {
+    if (this.roleFormDirty() && !window.confirm('Discard changes?')) return;
+    this.closeRoleForm();
+  }
+
+  protected roleMemberCount(roleId: string): number {
+    return this.members().filter(member => member.role_id === roleId).length;
   }
 
   protected togglePermission(perm: string): void {

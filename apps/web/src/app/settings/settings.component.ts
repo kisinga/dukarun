@@ -21,6 +21,7 @@ import { IconComponent } from '../shared/ui/icon.component';
 import { CashierSessionService } from '../core/cashier-session.service';
 import { ReceiptDataService } from '../shared/print/receipt-data.service';
 import { imageExtension, resizeImage } from '../shared/ui/image.util';
+import { MobileListComponent } from '../shared/ui/mobile-list.component';
 
 type SectionKey = 'profile' | 'pos' | 'inventory' | 'cash';
 type ReminderDraft = {
@@ -40,6 +41,7 @@ type ReminderDraft = {
     IconComponent,
     FormFieldComponent,
     MoneyComponent,
+    MobileListComponent,
   ],
   template: `
     <app-page title="Settings">
@@ -486,7 +488,44 @@ type ReminderDraft = {
                 </p>
               }
 
-              <div class="table-scroll mt-3">
+              <app-mobile-list class="mt-3">
+                @for (location of locations(); track location.id) {
+                  <div mobileListRow class="p-3">
+                    <div class="flex items-center gap-3">
+                      <div class="min-w-0 flex-1">
+                        <div class="flex items-center gap-2">
+                          <p class="truncate font-semibold">{{ location.name }}</p>
+                          @if (location.is_default) {
+                            <span class="badge badge-primary badge-xs">Default</span>
+                          }
+                        </div>
+                        <p class="type-caption mt-1 font-mono">{{ location.code }}</p>
+                      </div>
+                      @if (perms.has('ManageStockAdjustments')) {
+                        <button
+                          appButton
+                          variant="ghost"
+                          size="sm"
+                          (click)="startLocationEdit(location)"
+                        >
+                          Edit
+                        </button>
+                        @if (!location.is_default) {
+                          <button
+                            appButton
+                            variant="error"
+                            size="sm"
+                            (click)="startLocationDelete(location)"
+                          >
+                            Delete
+                          </button>
+                        }
+                      }
+                    </div>
+                  </div>
+                }
+              </app-mobile-list>
+              <div class="mt-3 hidden lg:block">
                 <table class="table table-sm">
                   <thead>
                     <tr>
@@ -728,7 +767,82 @@ type ReminderDraft = {
                     <app-icon name="heroArrowRight" />
                   </a>
                 </div>
-                <div class="table-scroll">
+                <app-mobile-list class="mt-3">
+                  @for (pm of paymentMethods(); track pm.code) {
+                    <div mobileListRow class="p-3">
+                      <div class="flex items-start justify-between gap-3">
+                        <div class="min-w-0">
+                          <p class="truncate font-semibold">{{ pm.name }}</p>
+                          <p class="type-caption mt-1">
+                            {{ pm.code }} · {{ reconciliationLabel(pm.reconciliation_type) }}
+                          </p>
+                        </div>
+                        @if (locations().length > 1) {
+                          <details class="dropdown dropdown-end shrink-0">
+                            <summary class="btn btn-ghost btn-sm min-h-11">
+                              {{ paymentLocationLabel(pm) }}
+                            </summary>
+                            <div
+                              class="dropdown-content z-20 mt-1 w-64 max-w-[calc(100vw-2rem)] rounded-box border border-base-300 bg-base-100 p-2 shadow-overlay"
+                            >
+                              @for (location of locations(); track location.id) {
+                                <label class="label min-h-11 cursor-pointer justify-start gap-2">
+                                  <input
+                                    type="checkbox"
+                                    class="checkbox checkbox-sm"
+                                    [checked]="paymentMethodEnabledAt(pm, location.id)"
+                                    [disabled]="busy()"
+                                    (change)="togglePaymentLocation(pm, location.id, $event)"
+                                  />
+                                  <span class="label-text">{{ location.name }}</span>
+                                </label>
+                              }
+                            </div>
+                          </details>
+                        }
+                      </div>
+                      <div class="mt-3 grid grid-cols-3 gap-2 rounded-field bg-base-200/50 p-2">
+                        <label
+                          class="flex min-h-11 flex-col items-center justify-center gap-1 text-xs"
+                        >
+                          <input
+                            type="checkbox"
+                            class="toggle toggle-sm"
+                            [checked]="pm.enabled"
+                            (change)="toggleMethod(pm, 'enabled', $event)"
+                            [disabled]="busy()"
+                          />
+                          Enabled
+                        </label>
+                        <label
+                          class="flex min-h-11 flex-col items-center justify-center gap-1 text-xs"
+                        >
+                          <input
+                            type="checkbox"
+                            class="toggle toggle-sm"
+                            [checked]="pm.requires_reconciliation"
+                            (change)="toggleMethod(pm, 'requires_reconciliation', $event)"
+                            [disabled]="busy()"
+                          />
+                          Reconcile
+                        </label>
+                        <label
+                          class="flex min-h-11 flex-col items-center justify-center gap-1 text-xs"
+                        >
+                          <input
+                            type="checkbox"
+                            class="toggle toggle-sm"
+                            [checked]="pm.is_cashier_controlled"
+                            (change)="toggleMethod(pm, 'is_cashier_controlled', $event)"
+                            [disabled]="busy()"
+                          />
+                          Cashier
+                        </label>
+                      </div>
+                    </div>
+                  }
+                </app-mobile-list>
+                <div class="hidden lg:block">
                   <table class="table table-sm mt-2">
                     <thead>
                       <tr>

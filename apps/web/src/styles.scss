@@ -86,6 +86,22 @@ input.search-with-custom-clear::-ms-clear {
     }
   }
 
+  /* Short, reversible decisions belong in a content-height phone sheet, not a full task modal. */
+  .modal-box.modal-box-compact {
+    height: auto;
+    max-height: 92dvh;
+    width: 100%;
+    max-width: 100%;
+    border-radius: var(--radius-box) var(--radius-box) 0 0;
+    overflow: hidden;
+
+    @media (min-width: 768px) {
+      width: min(28rem, calc(100vw - 3rem));
+      max-width: 28rem;
+      border-radius: var(--radius-box);
+    }
+  }
+
   /* Table language: calm uppercase headers, middle-aligned cells,
      tabular-nums on right-aligned (amount) cells. */
   .dashboard-main .table {
@@ -360,20 +376,24 @@ input.search-with-custom-clear::-ms-clear {
 }
 
 @layer components {
-  /* Page content wrapper: centered, padded, never edge-to-edge. */
+  /* Page content wrapper: one responsive gutter, never double padded. */
   .page {
     margin-left: auto;
     margin-right: auto;
     width: 100%;
     max-width: 72rem; // max-w-6xl; reports/tables may bump to max-w-7xl via .page-wide
+    padding-top: 0.75rem;
+    padding-bottom: 1.5rem;
     padding-left: 1rem;
     padding-right: 1rem;
 
-    @media (min-width: 640px) {
+    @media (min-width: 768px) {
+      padding-top: 1rem;
       padding-left: 1.5rem;
       padding-right: 1.5rem;
     }
     @media (min-width: 1024px) {
+      padding-top: 1.5rem;
       padding-left: 2rem;
       padding-right: 2rem;
     }
@@ -382,6 +402,142 @@ input.search-with-custom-clear::-ms-clear {
   .page-wide,
   .page-workspace {
     max-width: 80rem; // max-w-7xl
+  }
+
+  /* Responsive page actions: secondary actions collapse into one phone menu. */
+  .page-actions-overflow {
+    position: absolute;
+    top: calc(100% + 0.375rem);
+    right: 0;
+    z-index: 50;
+    display: none;
+    width: max-content;
+    min-width: 12rem;
+    max-width: calc(100vw - 2rem);
+    flex-direction: column;
+    gap: 0.125rem;
+    padding: 0.375rem;
+    border: 1px solid var(--color-base-300);
+    border-radius: var(--radius-box);
+    background: var(--color-base-100);
+    box-shadow: var(--shadow-overlay);
+  }
+
+  .page-actions-overflow-open {
+    display: flex;
+  }
+
+  .page-actions-overflow-wrap:not(:has(.page-actions-overflow > *)) {
+    display: none;
+  }
+
+  .page-actions-overflow > .counter-btn,
+  .page-actions-overflow > a,
+  .page-actions-overflow > button {
+    width: 100%;
+    justify-content: flex-start;
+    border-color: transparent;
+    background: transparent;
+    color: var(--color-base-content);
+  }
+
+  @media (min-width: 768px) {
+    .page-actions-overflow-wrap {
+      display: block !important;
+    }
+
+    .page-actions-overflow {
+      position: static;
+      display: flex;
+      width: auto;
+      min-width: 0;
+      max-width: none;
+      flex-direction: row;
+      gap: 0.5rem;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      box-shadow: none;
+    }
+
+    .page-actions-overflow > .counter-btn,
+    .page-actions-overflow > a,
+    .page-actions-overflow > button {
+      width: auto;
+    }
+  }
+
+  /* Phone datasets share one surface and compact, two-column scanning rows. */
+  .mobile-list [mobileListRow] {
+    width: 100%;
+    min-width: 0;
+    min-height: 4rem;
+    border-bottom: 1px solid color-mix(in oklab, var(--color-base-300) 70%, transparent);
+    text-align: left;
+  }
+
+  .mobile-list [mobileListRow]:last-child {
+    border-bottom: 0;
+  }
+
+  .mobile-list [mobileListRow][role='button'],
+  .mobile-list button[mobileListRow],
+  .mobile-list a[mobileListRow] {
+    cursor: pointer;
+    transition: background-color 120ms ease;
+  }
+
+  .mobile-list [mobileListRow][role='button']:hover,
+  .mobile-list button[mobileListRow]:hover,
+  .mobile-list a[mobileListRow]:hover {
+    background: color-mix(in oklab, var(--color-primary) 4%, var(--color-base-100));
+  }
+
+  .mobile-list-primary {
+    min-width: 0;
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1.25rem;
+  }
+
+  .mobile-list-secondary {
+    min-width: 0;
+    overflow: hidden;
+    color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+    font-size: 0.75rem;
+    line-height: 1rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mobile-list-value {
+    flex: none;
+    text-align: right;
+    font-size: 0.875rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .menu-item {
+    display: flex;
+    min-height: 2.75rem;
+    width: 100%;
+    align-items: center;
+    border-radius: var(--radius-field);
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    text-align: left;
+  }
+
+  .menu-item:hover:not(:disabled),
+  .menu-item:focus-visible:not(:disabled) {
+    background: color-mix(in oklab, var(--color-base-content) 8%, transparent);
+  }
+
+  .menu-item:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
   }
 
   /* ONE nav-item recipe (sidebar, drawer, footer links). Ghost by default;
@@ -581,15 +737,29 @@ body {
   }
 }
 
-/* Right-edge fade for horizontally scrollable strips (money tabs etc.) */
-.scroll-fade-r {
-  mask-image: linear-gradient(to right, black 88%, transparent);
-  -webkit-mask-image: linear-gradient(to right, black 88%, transparent);
-}
+@media (max-width: 1023px) {
+  .stock-transfer-editor:not(.stock-transfer-editor-open) {
+    display: none;
+  }
 
-/* Mobile: tables that can't shrink scroll horizontally instead of overflowing */
-.table-scroll {
-  width: 100%;
-  min-width: 0;
-  overflow-x: auto;
+  .stock-transfer-editor.stock-transfer-editor-open {
+    position: fixed;
+    inset: 0;
+    z-index: 70;
+    display: block;
+    overflow-y: auto;
+    border: 0;
+    border-radius: 0;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .stock-transfer-editor-open .stock-transfer-actions {
+    position: sticky;
+    bottom: 0;
+    margin-inline: -1rem;
+    margin-bottom: -1rem;
+    border-top: 1px solid var(--color-base-300);
+    background: var(--color-base-100);
+    padding: 0.75rem 1rem max(0.75rem, env(safe-area-inset-bottom));
+  }
 }

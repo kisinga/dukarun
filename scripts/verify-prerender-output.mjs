@@ -20,17 +20,7 @@ function requireMatchingSocialTitle(html, label) {
   }
 }
 
-for (const route of [
-  '',
-  'about',
-  'contact',
-  'docs',
-  'blog',
-  'privacy',
-  'terms',
-  'dpa',
-  'subprocessors',
-]) {
+for (const route of ['', 'about', 'contact', 'docs', 'privacy', 'terms', 'dpa', 'subprocessors']) {
   const html = requireFile(resolve(site, route, 'index.html'));
   for (const marker of [
     '<html lang="en-KE"',
@@ -56,19 +46,8 @@ const fixtureMode =
   process.env.PUBLIC_DATA_MODE === 'fixture' ||
   !process.env.SUPABASE_URL ||
   !process.env.SUPABASE_ANON_KEY;
-if (fixtureMode) {
-  const fixtureBlog = requireFile(resolve(site, 'blog/keep-stock-and-cash-in-step/index.html'));
-  for (const marker of [
-    'Keep stock and cash in step',
-    '"@type":"BlogPosting"',
-    'property="og:type" content="article"',
-  ]) {
-    if (!fixtureBlog.includes(marker))
-      throw new Error(`Prerendered fixture blog is missing: ${marker}`);
-  }
-  if (!siteSitemap.includes('/blog/keep-stock-and-cash-in-step')) {
-    throw new Error('Site sitemap is missing the fixture blog post.');
-  }
+if (existsSync(resolve(site, 'blog/keep-stock-and-cash-in-step/index.html'))) {
+  throw new Error('Blog articles must be crawler-rendered instead of prerendered at build time.');
 }
 const canonicalMatch = siteIndex.match(/<link rel="canonical" href="([^"]+)">/);
 if (!canonicalMatch) throw new Error('Site root is missing its canonical URL.');
@@ -111,73 +90,22 @@ if (
   throw new Error('Public site must not install a PWA.');
 }
 
-const directory = requireFile(resolve(storefront, 'index.html'));
+const directory = requireFile(resolve(storefront, 'index.csr.html'));
 const sitemap = requireFile(resolve(storefront, 'sitemap.xml'));
 const storefrontRobots = requireFile(resolve(storefront, 'robots.txt'));
 if (!directory.includes('<title>') || !sitemap.includes('<urlset')) {
   throw new Error('Storefront directory or sitemap is incomplete.');
 }
-for (const marker of [
-  '<html lang="en-KE"',
-  'property="og:title"',
-  'property="og:description"',
-  'property="og:image"',
-  'name="twitter:card"',
-  'rel="icon"',
-]) {
+for (const marker of ['<html lang="en-KE"', 'rel="icon"', 'noindex, nofollow']) {
   if (!directory.includes(marker)) throw new Error(`Storefront directory is missing ${marker}`);
 }
-requireMatchingSocialTitle(directory, 'Storefront directory');
-const storefrontCanonicalMatch = directory.match(/<link rel="canonical" href="([^"]+)">/);
-if (!storefrontCanonicalMatch) throw new Error('Storefront root is missing its canonical URL.');
-const storefrontOrigin = new URL(storefrontCanonicalMatch[1]).origin;
-if (
-  (process.env.CI === 'true' || process.env.PUBLIC_DATA_MODE === 'live') &&
-  !storefrontOrigin.startsWith('https://')
-) {
-  throw new Error(`Production storefront canonical must use HTTPS: ${storefrontOrigin}`);
-}
+const storefrontOrigin = new URL(process.env.STOREFRONT_PUBLIC_URL || 'http://localhost:4204')
+  .origin;
 if (!storefrontRobots.includes(`Sitemap: ${storefrontOrigin}/sitemap.xml`)) {
   throw new Error('Storefront robots.txt sitemap origin differs from its canonical origin.');
 }
 if (existsSync(resolve(storefront, 'statement')) || existsSync(resolve(storefront, 'document'))) {
   throw new Error('Private token routes must not be prerendered.');
-}
-
-const shopPaths = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)]
-  .map(match => new URL(match[1]).pathname.replace(/^\/+|\/+$/g, ''))
-  .filter(Boolean);
-for (const slug of shopPaths) {
-  const html = requireFile(resolve(storefront, slug, 'index.html'));
-  for (const marker of [
-    '<title>',
-    'rel="canonical"',
-    'property="og:title"',
-    'property="og:image"',
-    'name="twitter:card"',
-    'application/ld+json',
-    'rel="icon"',
-    `storefront:catalog:${slug}:12:0`,
-  ]) {
-    if (!html.includes(marker)) throw new Error(`Storefront /${slug} is missing ${marker}`);
-  }
-  requireMatchingSocialTitle(html, `Storefront /${slug}`);
-  for (const forbidden of [
-    'customer_first_name',
-    'outstanding_total',
-    'document_number',
-    'live stock',
-  ]) {
-    if (html.toLowerCase().includes(forbidden.toLowerCase())) {
-      throw new Error(`Storefront /${slug} contains private or live data marker: ${forbidden}`);
-    }
-  }
-  if (html.includes('Nothing listed yet')) {
-    throw new Error(`Storefront /${slug} claims an empty catalog before browser loading.`);
-  }
-  if (fixtureMode && !html.includes(`/${slug}/products/`)) {
-    throw new Error(`Storefront /${slug} is missing server-rendered product links.`);
-  }
 }
 
 requireFile(resolve(web, 'ngsw.json'));
@@ -197,6 +125,12 @@ for (const marker of [
   'location ~ ^/(?:statement|document)/',
   'X-Robots-Tag "noindex, nofollow, noarchive"',
   'Referrer-Policy "no-referrer"',
+  'public-content-renderer',
+  'facebookexternalhit',
+  'whatsapp',
+  'googlebot',
+  'location = /sitemap.xml',
+  'X-Original-URI $request_uri',
 ]) {
   if (!csrNginx.includes(marker)) throw new Error(`Static nginx is missing ${marker}`);
 }

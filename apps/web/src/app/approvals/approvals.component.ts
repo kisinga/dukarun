@@ -22,6 +22,8 @@ import {
   ApprovalDecisionResult,
   ApprovalReviewDrawerComponent,
 } from './approval-review-drawer.component';
+import { MobileListComponent } from '../shared/ui/mobile-list.component';
+import { PageActionsComponent } from '../shared/ui/page-actions.component';
 
 const APPROVAL_SORT_OPTIONS: readonly ListSortOption[] = [
   { value: 'date', label: 'Activity date' },
@@ -53,6 +55,8 @@ const TYPE_BADGE: Record<string, string> = {
     StatBarComponent,
     StatusBadgeComponent,
     ApprovalReviewDrawerComponent,
+    MobileListComponent,
+    PageActionsComponent,
   ],
   template: `
     <app-page
@@ -61,19 +65,21 @@ const TYPE_BADGE: Record<string, string> = {
       [badge]="approvals.pending().length"
       [wide]="true"
     >
-      <button
-        actions
-        appButton
-        variant="ghost"
-        [iconOnly]="true"
-        [loading]="loading()"
-        type="button"
-        title="Refresh approvals"
-        aria-label="Refresh approvals"
-        (click)="refresh()"
-      >
-        <app-icon name="heroArrowPath" />
-      </button>
+      <app-page-actions actions>
+        <button
+          utilityAction
+          appButton
+          variant="ghost"
+          [iconOnly]="true"
+          [loading]="loading()"
+          type="button"
+          title="Refresh approvals"
+          aria-label="Refresh approvals"
+          (click)="refresh()"
+        >
+          <app-icon name="heroArrowPath" />
+        </button>
+      </app-page-actions>
       @if (error()) {
         <div role="alert" class="alert alert-error mb-3 text-sm">
           <app-icon name="heroExclamationTriangle" />
@@ -87,25 +93,30 @@ const TYPE_BADGE: Record<string, string> = {
         </div>
       }
 
-      <div class="type-caption mb-4 grid gap-1 rounded-box bg-base-100 p-3 md:grid-cols-3">
-        <p>
-          <span class="font-semibold">below wholesale</span> — a price below wholesale needs
-          sign-off.
-        </p>
-        <p><span class="font-semibold">order reversal</span> — a void needs sign-off.</p>
-        <p><span class="font-semibold">sale refund</span> — a refund needs sign-off.</p>
-        <p>
-          <span class="font-semibold">payment reversal</span> — a settled payment needs sign-off.
-        </p>
-        <p>
-          <span class="font-semibold">overdraft</span> — a record of who authorized credit over the
-          limit.
-        </p>
-        <p>
-          <span class="font-semibold">direct account payment</span> — a sale tendered to a non-till
-          account needs finance sign-off.
-        </p>
-      </div>
+      <details class="mb-3 rounded-box border border-base-300/70 bg-base-100">
+        <summary class="flex min-h-11 cursor-pointer items-center px-3 text-sm font-semibold">
+          How approvals work
+        </summary>
+        <div class="type-caption grid gap-2 border-t border-base-200 p-3 md:grid-cols-3">
+          <p>
+            <span class="font-semibold">below wholesale</span> — a price below wholesale needs
+            sign-off.
+          </p>
+          <p><span class="font-semibold">order reversal</span> — a void needs sign-off.</p>
+          <p><span class="font-semibold">sale refund</span> — a refund needs sign-off.</p>
+          <p>
+            <span class="font-semibold">payment reversal</span> — a settled payment needs sign-off.
+          </p>
+          <p>
+            <span class="font-semibold">overdraft</span> — a record of who authorized credit over
+            the limit.
+          </p>
+          <p>
+            <span class="font-semibold">direct account payment</span> — a sale tendered to a
+            non-till account needs finance sign-off.
+          </p>
+        </div>
+      </details>
 
       <app-list-search-bar
         placeholder="Search request type, order, or details…"
@@ -131,22 +142,25 @@ const TYPE_BADGE: Record<string, string> = {
           description="Nothing waiting for a decision. Void and below-wholesale requests land here."
         />
       } @else {
-        <div class="flex flex-col gap-2 lg:hidden">
+        <app-mobile-list>
           @for (a of pagedPending(); track a.id) {
-            <div class="card bg-base-100">
-              <div class="card-body p-4">
-                <div class="flex flex-wrap items-center gap-3">
-                  <span class="badge" [class]="typeBadge(a.type)">{{ typeLabel(a.type) }}</span>
-                  <span class="type-caption">by {{ personName(a.requested_by) }}</span>
-                  <span class="type-caption">{{ age(a.created_at) }}</span>
-                  <span class="ml-auto"></span>
-                  <button appButton size="sm" (click)="openReview(a)">Review</button>
+            <div mobileListRow>
+              <div class="flex min-h-20 items-center gap-3 p-3">
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-center gap-2">
+                    <span class="badge badge-xs" [class]="typeBadge(a.type)">{{
+                      typeLabel(a.type)
+                    }}</span>
+                    <span class="type-caption">{{ age(a.created_at) }}</span>
+                  </div>
+                  <p class="mt-1 line-clamp-2 text-sm">{{ summary(a) }}</p>
+                  <p class="type-caption mt-1">by {{ personName(a.requested_by) }}</p>
                 </div>
-                <p class="mt-1 text-sm">{{ summary(a) }}</p>
+                <button appButton size="sm" (click)="openReview(a)">Review</button>
               </div>
             </div>
           }
-        </div>
+        </app-mobile-list>
 
         <div class="hidden lg:block">
           <app-data-table-shell
@@ -201,60 +215,89 @@ const TYPE_BADGE: Record<string, string> = {
       @if (filteredDecided().length === 0) {
         <p class="mt-2 text-sm text-base-content/60">No decisions yet.</p>
       } @else {
-        <app-data-table-shell
-          class="mt-2 block"
-          title="Decided requests"
-          [description]="filteredDecided().length + ' recent decisions'"
-        >
-          <table class="table table-sm">
-            <thead>
-              <tr>
-                <th>Type</th>
-                <th>Summary</th>
-                <th>Status</th>
-                <th>Decided by</th>
-                <th>Reason</th>
-                <th class="text-right">Details</th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (a of pagedDecided(); track a.id) {
+        <app-mobile-list class="mt-2">
+          @for (a of pagedDecided(); track a.id) {
+            <button
+              mobileListRow
+              type="button"
+              class="flex min-h-20 w-full items-center gap-3 p-3 text-left"
+              (click)="openReview(a)"
+            >
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2">
+                  <span class="badge badge-xs" [class]="typeBadge(a.type)">{{
+                    typeLabel(a.type)
+                  }}</span>
+                  <app-status-badge
+                    size="xs"
+                    [type]="a.status === 'approved' ? 'success' : 'error'"
+                    [label]="a.status"
+                  />
+                </div>
+                <p class="mt-1 truncate text-sm">{{ summary(a) }}</p>
+                <p class="type-caption mt-1 truncate">
+                  {{ personName(a.decided_by) }} · {{ a.decision_reason || 'No reason' }}
+                </p>
+              </div>
+              <app-icon name="heroChevronRight" />
+            </button>
+          }
+        </app-mobile-list>
+        <div class="mt-2 hidden lg:block">
+          <app-data-table-shell
+            title="Decided requests"
+            [description]="filteredDecided().length + ' recent decisions'"
+          >
+            <table class="table table-sm">
+              <thead>
                 <tr>
-                  <td>
-                    <span class="badge badge-xs" [class]="typeBadge(a.type)">{{
-                      typeLabel(a.type)
-                    }}</span>
-                  </td>
-                  <td class="text-sm">{{ summary(a) }}</td>
-                  <td>
-                    <app-status-badge
-                      size="xs"
-                      [type]="a.status === 'approved' ? 'success' : 'error'"
-                      [label]="a.status"
-                    />
-                  </td>
-                  <td class="type-caption">{{ personName(a.decided_by) }}</td>
-                  <td class="text-xs text-base-content/60">{{ a.decision_reason ?? '—' }}</td>
-                  <td class="table-actions">
-                    <button appButton variant="ghost" size="sm" (click)="openReview(a)">
-                      View
-                    </button>
-                  </td>
+                  <th>Type</th>
+                  <th>Summary</th>
+                  <th>Status</th>
+                  <th>Decided by</th>
+                  <th>Reason</th>
+                  <th class="text-right">Details</th>
                 </tr>
-              }
-            </tbody>
-          </table>
-          <div tableFooter>
-            <app-pagination
-              [currentPage]="decidedPage()"
-              [totalPages]="decidedTotalPages()"
-              [totalItems]="filteredDecided().length"
-              [itemsPerPage]="pageSize()"
-              itemLabel="decisions"
-              (pageChange)="decidedPage.set($event)"
-            />
-          </div>
-        </app-data-table-shell>
+              </thead>
+              <tbody>
+                @for (a of pagedDecided(); track a.id) {
+                  <tr>
+                    <td>
+                      <span class="badge badge-xs" [class]="typeBadge(a.type)">{{
+                        typeLabel(a.type)
+                      }}</span>
+                    </td>
+                    <td class="text-sm">{{ summary(a) }}</td>
+                    <td>
+                      <app-status-badge
+                        size="xs"
+                        [type]="a.status === 'approved' ? 'success' : 'error'"
+                        [label]="a.status"
+                      />
+                    </td>
+                    <td class="type-caption">{{ personName(a.decided_by) }}</td>
+                    <td class="text-xs text-base-content/60">{{ a.decision_reason ?? '—' }}</td>
+                    <td class="table-actions">
+                      <button appButton variant="ghost" size="sm" (click)="openReview(a)">
+                        View
+                      </button>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </app-data-table-shell>
+        </div>
+        <div class="mt-3">
+          <app-pagination
+            [currentPage]="decidedPage()"
+            [totalPages]="decidedTotalPages()"
+            [totalItems]="filteredDecided().length"
+            [itemsPerPage]="pageSize()"
+            itemLabel="decisions"
+            (pageChange)="decidedPage.set($event)"
+          />
+        </div>
       }
 
       @if (selectedApproval(); as approval) {
@@ -311,11 +354,13 @@ export class ApprovalsComponent implements OnInit {
       label: 'Pending',
       value: this.approvals.pending().length,
       tone: 'warning' as const,
+      mobilePriority: 'primary' as const,
     },
     {
       label: 'Price exceptions',
       value: this.approvals.pending().filter(approval => approval.type === 'below_wholesale')
         .length,
+      mobilePriority: 'primary' as const,
     },
     {
       label: 'Reversals',
@@ -325,8 +370,13 @@ export class ApprovalsComponent implements OnInit {
           ['order_reversal', 'sale_refund', 'payment_reversal'].includes(approval.type)
         ).length,
       tone: 'error' as const,
+      mobilePriority: 'secondary' as const,
     },
-    { label: 'Recent decisions', value: this.approvals.decided().length },
+    {
+      label: 'Recent decisions',
+      value: this.approvals.decided().length,
+      mobilePriority: 'secondary' as const,
+    },
   ]);
 
   private readonly orderCodeMap = signal<Map<string, string>>(new Map());

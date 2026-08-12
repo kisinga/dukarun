@@ -11,37 +11,35 @@ import type { JournalEntryWithLines } from './money.service';
     @if (!loading() && entries().length === 0) {
       <app-empty-state icon="heroBanknotes" [title]="emptyText()" />
     } @else {
-      <div class="flex flex-col gap-2">
+      <div class="overflow-hidden rounded-box border border-base-300/70 bg-base-100">
         @for (entry of entries(); track entry.id) {
-          <div class="card bg-base-100 shadow">
-            <div class="card-body p-4">
-              <div class="flex flex-wrap items-center gap-3">
-                <span class="text-sm font-semibold">{{ entry.entry_date }}</span>
-                <span class="text-sm text-base-content/70">{{ entry.memo ?? '—' }}</span>
-                <span class="ml-auto font-bold tabular-nums"
-                  ><app-money [amount]="total(entry)"
-                /></span>
-              </div>
-              <table class="table table-xs mt-2">
-                <tbody>
-                  @for (line of entry.ledger_journal_lines; track line.id) {
-                    <tr>
-                      <td class="font-mono text-xs">{{ line.ledger_accounts?.code }}</td>
-                      <td class="text-xs text-base-content/60">{{ line.ledger_accounts?.name }}</td>
-                      <td class="text-right text-xs">
-                        @if (line.debit > 0) {
-                          DR <app-money [amount]="line.debit" />
-                        }
-                      </td>
-                      <td class="text-right text-xs">
-                        @if (line.credit > 0) {
-                          CR <app-money [amount]="line.credit" />
-                        }
-                      </td>
-                    </tr>
-                  }
-                </tbody>
-              </table>
+          <div class="border-b border-base-200 p-3 last:border-b-0">
+            <div class="flex items-center gap-3">
+              <span class="text-sm font-semibold">{{ entry.entry_date }}</span>
+              <span class="min-w-0 flex-1 truncate text-sm text-base-content/70">{{
+                entry.memo ?? '—'
+              }}</span>
+              <span class="ml-auto font-bold tabular-nums"
+                ><app-money [amount]="total(entry)"
+              /></span>
+            </div>
+            <div class="mt-2 divide-y divide-base-200/60">
+              @for (line of entry.ledger_journal_lines; track line.id) {
+                <div class="flex items-center gap-2 py-1 text-xs">
+                  <span class="font-mono font-semibold">{{ line.ledger_accounts?.code }}</span>
+                  <span class="min-w-0 flex-1 truncate text-base-content/60">{{
+                    line.ledger_accounts?.name
+                  }}</span>
+                  <span class="shrink-0 tabular-nums">
+                    @if (line.debit > 0) {
+                      DR <app-money [amount]="line.debit" />
+                    }
+                    @if (line.credit > 0) {
+                      CR <app-money [amount]="line.credit" />
+                    }
+                  </span>
+                </div>
+              }
             </div>
           </div>
         }

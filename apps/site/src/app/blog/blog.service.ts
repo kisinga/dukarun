@@ -36,6 +36,7 @@ export type BlogEventType =
   'post_view' | 'engaged_10s' | 'scroll_50' | 'scroll_90' | 'cta_click' | 'share_click';
 
 const listKey = makeStateKey<BlogPostSummary[]>('site:blog:list');
+const featuredKey = makeStateKey<BlogPostSummary | null>('site:blog:featured');
 const postKey = (slug: string) => makeStateKey<PublishedBlogPost | null>(`site:blog:${slug}`);
 
 @Injectable({ providedIn: 'root' })
@@ -81,6 +82,21 @@ export class BlogService {
             return data as unknown as PublishedBlogPost | null;
           });
     if (isPlatformServer(this.platformId)) this.transferState.set(key, post);
+    return post;
+  }
+
+  async featuredPost(force = false): Promise<BlogPostSummary | null> {
+    if (!force && this.transferState.hasKey(featuredKey))
+      return this.transferState.get(featuredKey, null);
+    const post =
+      environment.publicDataMode === 'fixture'
+        ? (FIXTURE_BLOG_POSTS[0] ?? null)
+        : await this.track(async () => {
+            const { data, error } = await this.supabase.client.rpc('public_featured_blog_post');
+            if (error) throw error;
+            return data as unknown as BlogPostSummary | null;
+          });
+    if (isPlatformServer(this.platformId)) this.transferState.set(featuredKey, post);
     return post;
   }
 

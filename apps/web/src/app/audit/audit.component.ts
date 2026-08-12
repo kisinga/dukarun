@@ -14,6 +14,8 @@ import { PageLayoutComponent } from '../shared/ui/page-layout.component';
 import { PaginationComponent } from '../shared/ui/pagination.component';
 import { ButtonComponent } from '../shared/ui/button.component';
 import { FormFieldComponent } from '../shared/ui/form-field.component';
+import { MobileListComponent } from '../shared/ui/mobile-list.component';
+import { PageActionsComponent } from '../shared/ui/page-actions.component';
 
 interface ChangeItem {
   field: string;
@@ -88,6 +90,8 @@ const REASON_FIELDS = new Set(['decision_reason', 'void_reason', 'reason', 'note
     PaginationComponent,
     ButtonComponent,
     FormFieldComponent,
+    MobileListComponent,
+    PageActionsComponent,
   ],
   template: `
     <app-page
@@ -97,24 +101,27 @@ const REASON_FIELDS = new Set(['decision_reason', 'void_reason', 'reason', 'note
       backLabel="Settings"
       [wide]="true"
     >
-      <button
-        actions
-        appButton
-        variant="ghost"
-        [iconOnly]="true"
-        type="button"
-        title="Refresh audit trail"
-        aria-label="Refresh audit trail"
-        [loading]="loading()"
-        (click)="load()"
-      >
-        <app-icon name="heroArrowPath" />
-      </button>
+      <app-page-actions actions>
+        <button
+          utilityAction
+          appButton
+          variant="ghost"
+          [iconOnly]="true"
+          type="button"
+          title="Refresh audit trail"
+          aria-label="Refresh audit trail"
+          [loading]="loading()"
+          (click)="load()"
+        >
+          <app-icon name="heroArrowPath" />
+        </button>
+      </app-page-actions>
 
       <app-list-search-bar
         placeholder="Search activity, record, reason, or person…"
         [searchQuery]="search()"
         (searchQueryChange)="onSearch($event)"
+        [filtersEnabled]="true"
       >
         <span summary class="type-caption">
           @if (loading() && events().length === 0) {
@@ -226,8 +233,8 @@ const REASON_FIELDS = new Set(['decision_reason', 'void_reason', 'reason', 'note
           }
         </app-empty-state>
       } @else {
-        <div class="card hidden overflow-hidden bg-base-100 md:block">
-          <div class="table-scroll">
+        <div class="card hidden overflow-hidden bg-base-100 lg:block">
+          <div>
             <table class="table">
               <thead>
                 <tr>
@@ -279,17 +286,18 @@ const REASON_FIELDS = new Set(['decision_reason', 'void_reason', 'reason', 'note
           </div>
         </div>
 
-        <div class="space-y-3 md:hidden">
+        <app-mobile-list>
           @for (event of events(); track event.event_id) {
             <article
-              class="card cursor-pointer bg-base-100"
+              mobileListRow
+              class="cursor-pointer"
               role="button"
               tabindex="0"
               [class.border-primary]="selectedEventId() === event.event_id"
               (click)="openEvent(event.event_id)"
               (keydown.enter)="openEvent(event.event_id)"
             >
-              <div class="min-h-11 w-full p-4 text-left">
+              <div class="min-h-16 w-full p-3 text-left">
                 <div class="flex items-start gap-3">
                   <span
                     class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-base-200 text-base-content/60"
@@ -314,7 +322,7 @@ const REASON_FIELDS = new Set(['decision_reason', 'void_reason', 'reason', 'note
               </div>
             </article>
           }
-        </div>
+        </app-mobile-list>
 
         <!-- Audit event detail drawer (read-only) -->
         @if (selectedEvent(); as event) {

@@ -381,6 +381,7 @@ export type Database = {
           archived_at: string | null
           created_at: string
           created_by: string
+          featured_at: string | null
           id: string
           slug: string
           updated_at: string
@@ -389,6 +390,7 @@ export type Database = {
           archived_at?: string | null
           created_at?: string
           created_by: string
+          featured_at?: string | null
           id?: string
           slug: string
           updated_at?: string
@@ -397,6 +399,7 @@ export type Database = {
           archived_at?: string | null
           created_at?: string
           created_by?: string
+          featured_at?: string | null
           id?: string
           slug?: string
           updated_at?: string
@@ -8273,6 +8276,10 @@ export type Database = {
       }
       platform_blog_post: { Args: { p_post_id: string }; Returns: Json }
       platform_blog_posts: { Args: never; Returns: Json }
+      platform_feature_blog_post: {
+        Args: { p_post_id: string }
+        Returns: boolean
+      }
       platform_campaign_metrics: {
         Args: { p_campaign_id: string }
         Returns: Json
@@ -8784,6 +8791,7 @@ export type Database = {
       }
       public_billing_config: { Args: never; Returns: Json }
       public_blog_post: { Args: { p_slug: string }; Returns: Json }
+      public_featured_blog_post: { Args: never; Returns: Json }
       public_blog_posts: {
         Args: {
           p_before?: string
@@ -8794,6 +8802,7 @@ export type Database = {
         Returns: Json
       }
       public_blog_sitemap: { Args: never; Returns: Json }
+      public_storefront_sitemap: { Args: never; Returns: Json }
       public_customer_statement: { Args: { p_token: string }; Returns: Json }
       public_external_document: { Args: { p_token: string }; Returns: Json }
       publish_due_blog_posts: { Args: never; Returns: number }
@@ -9732,4 +9741,3 @@ export const Constants = {
     Enums: {},
   },
 } as const
-

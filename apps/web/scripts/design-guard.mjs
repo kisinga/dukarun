@@ -125,6 +125,28 @@ const RULES = [
       'Primary list pagination sits outside DataTableShell with mt-3 so desktop tables and mobile cards share one rhythm.',
   },
   {
+    id: 'legacy-table-scroll',
+    exts: ['.html', '.ts', '.scss', '.css'],
+    re: /\btable-scroll\b/g,
+    message:
+      'Horizontal table scrolling is not a mobile data pattern — pair a compact mobile list with a desktop table.',
+  },
+  {
+    id: 'direct-page-action',
+    exts: ['.html', '.ts'],
+    re: /<(?:button|a|span)\b[^>]*\sactions(?:\s|>)/g,
+    exclude: ['shared/ui/page-actions.component.ts'],
+    message:
+      'Page-header controls must be projected through <app-page-actions> using primaryAction, utilityAction, or overflowAction.',
+  },
+  {
+    id: 'small-interactive-target',
+    exts: ['.html', '.ts'],
+    re: /<(?:button|a|select|input|summary)\b[^>]*class="[^"]*\b(?:h|min-h)-(?:[1-9]|10)\b[^"]*"/g,
+    message:
+      'Phone controls must provide a 44px target (h-11/min-h-11) or use a shared button/control recipe that enforces it.',
+  },
+  {
     id: 'hardcoded-hex',
     exts: ['.scss', '.css'],
     re: /#[0-9a-fA-F]{3,8}\b/g,
@@ -152,6 +174,156 @@ function countMatches(content, re) {
   const flags = re.flags.includes('g') ? re.flags : re.flags + 'g';
   const m = content.match(new RegExp(re.source, flags));
   return m ? m.length : 0;
+}
+
+const VOID_ELEMENTS = new Set([
+  'area',
+  'base',
+  'br',
+  'col',
+  'embed',
+  'hr',
+  'img',
+  'input',
+  'link',
+  'meta',
+  'param',
+  'source',
+  'track',
+  'wbr',
+]);
+
+function templateFragments(content, ext) {
+  if (ext === '.html') return [{ content, offset: 0 }];
+  const fragments = [];
+  const startRe = /\btemplate\s*:\s*`/g;
+  for (const match of content.matchAll(startRe)) {
+    const start = match.index + match[0].length;
+    let end = start;
+    while (end < content.length) {
+      if (content[end] === '`' && content[end - 1] !== '\\') break;
+      end++;
+    }
+    fragments.push({ content: content.slice(start, end), offset: start });
+    startRe.lastIndex = end + 1;
+  }
+  return fragments;
+}
+
+function elementTree(content) {
+  const root = {
+    name: '#root',
+    attrs: '',
+    start: 0,
+    end: content.length,
+    parent: null,
+    children: [],
+  };
+  const stack = [root];
+  let cursor = 0;
+
+  while (cursor < content.length) {
+    const start = content.indexOf('<', cursor);
+    if (start < 0) break;
+    let end = start + 1;
+    let quote = null;
+    while (end < content.length) {
+      const char = content[end];
+      if (quote) {
+        if (char === quote && content[end - 1] !== '\\') quote = null;
+      } else if (char === '"' || char === "'") {
+        quote = char;
+      } else if (char === '>') {
+        break;
+      }
+      end++;
+    }
+    if (end >= content.length) break;
+
+    const raw = content.slice(start, end + 1);
+    const parsed = raw.match(/^<\s*(\/?)\s*([A-Za-z][\w:-]*)\b([\s\S]*?)>$/);
+    cursor = end + 1;
+    if (!parsed) continue;
+    const closing = parsed[1] === '/';
+    const name = parsed[2].toLowerCase();
+    if (closing) {
+      for (let index = stack.length - 1; index > 0; index--) {
+        if (stack[index].name !== name) continue;
+        stack[index].end = end + 1;
+        stack.length = index;
+        break;
+      }
+      continue;
+    }
+
+    const parent = stack.at(-1);
+    const node = {
+      name,
+      attrs: parsed[3],
+      start,
+      end: end + 1,
+      parent,
+      children: [],
+    };
+    parent.children.push(node);
+    if (!raw.endsWith('/>') && !VOID_ELEMENTS.has(name)) stack.push(node);
+  }
+
+  return root;
+}
+
+function staticClasses(node) {
+  const match = node.attrs.match(/\bclass\s*=\s*(["'])([\s\S]*?)\1/);
+  return new Set((match?.[2] ?? '').split(/\s+/).filter(Boolean));
+}
+
+function containsMobileRows(node) {
+  if (node.name === 'app-mobile-list' || /\bmobileListRow\b/.test(node.attrs)) return true;
+  if (staticClasses(node).has('lg:hidden')) return true;
+  return node.children.some(containsMobileRows);
+}
+
+function collectNodes(node, name, result = []) {
+  if (node.name === name) result.push(node);
+  for (const child of node.children) collectNodes(child, name, result);
+  return result;
+}
+
+function hasAdjacentMobilePair(boundary) {
+  let scope = boundary;
+  for (let depth = 0; depth < 3 && scope.parent; depth++) {
+    const siblings = scope.parent.children;
+    const scopeIndex = siblings.indexOf(scope);
+    const nearby = siblings.slice(Math.max(0, scopeIndex - 2), scopeIndex + 3);
+    if (nearby.some(node => node !== scope && containsMobileRows(node))) return true;
+    scope = scope.parent;
+  }
+  return false;
+}
+
+function responsiveTableProblems(content, ext) {
+  const problems = [];
+  for (const fragment of templateFragments(content, ext)) {
+    const root = elementTree(fragment.content);
+    for (const table of collectNodes(root, 'table')) {
+      let boundary = table.parent;
+      while (boundary && boundary.name !== '#root') {
+        const classes = staticClasses(boundary);
+        if (classes.has('hidden') && classes.has('lg:block')) break;
+        boundary = boundary.parent;
+      }
+      const line = content.slice(0, fragment.offset + table.start).split('\n').length;
+      if (!boundary || boundary.name === '#root') {
+        problems.push(`L${line}: table is not inside a hidden/lg:block desktop boundary`);
+        continue;
+      }
+
+      if (!hasAdjacentMobilePair(boundary)) {
+        problems.push(`L${line}: desktop table has no adjacent mobile row/list representation`);
+      }
+    }
+  }
+  return problems;
 }
 
 const args = process.argv.slice(2);
@@ -252,6 +424,22 @@ if (!seed) {
     console.error(
       `✖ [unregistered-icon] ${file}: ${names.join(', ')}\n    Register every Heroicon in provideIcons({ … }) in app.config.ts.`
     );
+  }
+
+  // Authenticated data tables must each be an intentional desktop representation,
+  // paired beside a compact mobile row/list alternative. Print templates are
+  // documents, not viewport UI, and are the only exception.
+  for (const file of files) {
+    if (!['.html', '.ts'].includes(path.extname(file))) continue;
+    const rel = path.relative(APP, file);
+    if (rel.startsWith(`shared${path.sep}print${path.sep}`)) continue;
+    const content = fs.readFileSync(file, 'utf8');
+    if (!content.includes('<table')) continue;
+    const problems = responsiveTableProblems(content, path.extname(file));
+    if (problems.length > 0) {
+      failures++;
+      console.error(`✖ [unpaired-responsive-table] ${rel}\n    ${problems.join('\n    ')}`);
+    }
   }
 }
 

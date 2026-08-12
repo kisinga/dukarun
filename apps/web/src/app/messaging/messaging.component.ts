@@ -23,6 +23,8 @@ import {
   SearchableFilterComponent,
   type SearchableFilterOption,
 } from '../shared/ui/searchable-filter.component';
+import { MobileListComponent } from '../shared/ui/mobile-list.component';
+import { PageActionsComponent } from '../shared/ui/page-actions.component';
 
 const STATUS_TYPE: Record<string, 'success' | 'warning' | 'error' | 'neutral'> = {
   pending: 'warning',
@@ -57,6 +59,8 @@ const RELATED_PARTY_SEARCH_ID_LIMIT = 50;
     StatBarComponent,
     RouterLink,
     SearchableFilterComponent,
+    MobileListComponent,
+    PageActionsComponent,
   ],
   template: `
     <app-page
@@ -64,19 +68,21 @@ const RELATED_PARTY_SEARCH_ID_LIMIT = 50;
       subtitle="Monitor approved transactional SMS and WhatsApp delivery."
       [wide]="true"
     >
-      <button
-        actions
-        appButton
-        variant="ghost"
-        [iconOnly]="true"
-        [loading]="loading()"
-        type="button"
-        title="Refresh delivery history"
-        aria-label="Refresh delivery history"
-        (click)="load()"
-      >
-        <app-icon name="heroArrowPath" />
-      </button>
+      <app-page-actions actions>
+        <button
+          utilityAction
+          appButton
+          variant="ghost"
+          [iconOnly]="true"
+          [loading]="loading()"
+          type="button"
+          title="Refresh delivery history"
+          aria-label="Refresh delivery history"
+          (click)="load()"
+        >
+          <app-icon name="heroArrowPath" />
+        </button>
+      </app-page-actions>
 
       @if (error()) {
         <div role="alert" class="alert alert-error mb-3 text-sm">
@@ -120,6 +126,9 @@ const RELATED_PARTY_SEARCH_ID_LIMIT = 50;
         (sortKeyChange)="messageSort.set($event); reloadFromStart()"
         [sortDirection]="messageSortDirection()"
         (sortDirectionChange)="messageSortDirection.set($event); reloadFromStart()"
+        [filtersEnabled]="true"
+        [activeFilterCount]="messageFilterCount()"
+        (clearFilters)="clearMessageFilters()"
       >
         <app-stat-bar summary [stats]="messageStats()" />
         <div filters class="grid gap-2 sm:grid-cols-2 lg:flex lg:flex-wrap lg:items-end">
@@ -312,10 +321,10 @@ const RELATED_PARTY_SEARCH_ID_LIMIT = 50;
           </app-data-table-shell>
         </div>
 
-        <div class="flex flex-col gap-2 lg:hidden">
+        <app-mobile-list>
           @for (message of outbox(); track message.id) {
-            <div class="card bg-base-100">
-              <div class="card-body gap-3 p-4">
+            <div mobileListRow>
+              <div class="grid min-h-20 gap-3 p-3">
                 <div class="flex items-start justify-between gap-3">
                   <div class="min-w-0">
                     <div class="flex flex-wrap items-center gap-2">
@@ -369,7 +378,7 @@ const RELATED_PARTY_SEARCH_ID_LIMIT = 50;
               </div>
             </div>
           }
-        </div>
+        </app-mobile-list>
 
         <div class="mt-3">
           <app-pagination
@@ -438,24 +447,39 @@ export class CommunicationsComponent implements OnInit, OnDestroy {
       this.documentFilter() !== 'all' ||
       !this.last30Active()
   );
+  protected readonly messageFilterCount = computed(
+    () =>
+      Number(this.channelFilter() !== 'all') +
+      Number(this.statusFilter() !== 'all') +
+      Number(this.partyFilter() !== 'all') +
+      Number(this.documentFilter() !== 'all') +
+      Number(!this.last30Active())
+  );
   protected readonly messageStats = computed(() => {
     const rows = this.outbox();
     return [
-      { label: 'Matching deliveries', value: this.outboxTotal() },
+      {
+        label: 'Matching deliveries',
+        value: this.outboxTotal(),
+        mobilePriority: 'primary' as const,
+      },
       {
         label: 'Pending on page',
         value: rows.filter(message => message.status === 'pending').length,
         tone: 'warning' as const,
+        mobilePriority: 'primary' as const,
       },
       {
         label: 'Sent on page',
         value: rows.filter(message => message.status === 'sent').length,
         tone: 'success' as const,
+        mobilePriority: 'secondary' as const,
       },
       {
         label: 'Failed on page',
         value: rows.filter(message => message.status === 'failed').length,
         tone: 'error' as const,
+        mobilePriority: 'secondary' as const,
       },
     ];
   });
@@ -601,6 +625,16 @@ export class CommunicationsComponent implements OnInit, OnDestroy {
   protected setAllTime(): void {
     this.from.set('');
     this.to.set('');
+    this.reloadFromStart();
+  }
+
+  protected clearMessageFilters(): void {
+    this.channelFilter.set('all');
+    this.statusFilter.set('all');
+    this.partyFilter.set('all');
+    this.documentFilter.set('all');
+    this.from.set(this.daysAgoIso(29));
+    this.to.set(this.todayIso());
     this.reloadFromStart();
   }
 
