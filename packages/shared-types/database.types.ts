@@ -5279,9 +5279,9 @@ export type Database = {
         Row: {
           client_ref: string | null
           company_id: string
-          credit_due_at: string | null
           created_at: string
           created_by: string | null
+          credit_due_at: string | null
           goods_subtotal: number
           id: string
           is_credit: boolean
@@ -5295,9 +5295,9 @@ export type Database = {
         Insert: {
           client_ref?: string | null
           company_id: string
-          credit_due_at?: string | null
           created_at?: string
           created_by?: string | null
+          credit_due_at?: string | null
           goods_subtotal?: number
           id?: string
           is_credit?: boolean
@@ -5311,9 +5311,9 @@ export type Database = {
         Update: {
           client_ref?: string | null
           company_id?: string
-          credit_due_at?: string | null
           created_at?: string
           created_by?: string | null
+          credit_due_at?: string | null
           goods_subtotal?: number
           id?: string
           is_credit?: boolean
@@ -9749,3 +9749,4 @@ export const Constants = {
     Enums: {},
   },
 } as const
+
