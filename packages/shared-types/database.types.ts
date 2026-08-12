@@ -8298,10 +8298,6 @@ export type Database = {
         Args: { p_post_id: string }
         Returns: boolean
       }
-      platform_delete_blog_post: {
-        Args: { p_post_id: string }
-        Returns: boolean
-      }
       platform_company_legal_status: {
         Args: never
         Returns: {
@@ -8312,6 +8308,10 @@ export type Database = {
           legal_status: string
           terms_version: string
         }[]
+      }
+      platform_delete_blog_post: {
+        Args: { p_post_id: string }
+        Returns: boolean
       }
       platform_discard_legal_draft: {
         Args: { p_id: string }
@@ -9745,3 +9745,4 @@ export const Constants = {
     Enums: {},
   },
 } as const
+
