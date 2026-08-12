@@ -1406,10 +1406,40 @@ interface PendingProductImage {
                       </td>
                     }
                     <td>
-                      <span class="font-semibold">{{ group.family.name }}</span>
-                      <p class="type-caption mt-0.5 font-mono">
-                        {{ group.family.barcode || 'No shared barcode' }}
-                      </p>
+                      <div class="flex min-w-0 items-center gap-3">
+                        <div
+                          class="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-field border border-base-300 bg-base-200 text-base-content/35"
+                          aria-hidden="true"
+                        >
+                          @if (imageUrl(group.family.image_path); as thumb) {
+                            @if (!brokenImages().has(group.family.image_path!)) {
+                              <img
+                                [src]="thumb"
+                                alt=""
+                                loading="lazy"
+                                decoding="async"
+                                class="h-full w-full object-cover"
+                                (error)="markBroken(group.family.image_path!)"
+                              />
+                            } @else {
+                              <app-icon name="heroCube" size="lg" />
+                            }
+                          } @else {
+                            <app-icon name="heroCube" size="lg" />
+                          }
+                        </div>
+                        <div class="min-w-0">
+                          <span
+                            class="block max-w-64 truncate font-semibold"
+                            [title]="group.family.name"
+                          >
+                            {{ group.family.name }}
+                          </span>
+                          <p class="type-caption mt-0.5 truncate font-mono">
+                            {{ group.family.barcode || 'No shared barcode' }}
+                          </p>
+                        </div>
+                      </div>
                     </td>
                     <td>
                       @if (manufacturerName(group.family.manufacturer_id); as manufacturer) {

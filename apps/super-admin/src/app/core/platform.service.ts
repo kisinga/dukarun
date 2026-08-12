@@ -298,10 +298,11 @@ export class PlatformService {
   }
 
   async uploadBlogMedia(postId: string, file: File): Promise<string> {
-    const extension = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+    const safeFile = await this.prepareBlogMedia(file);
+    const extension = safeFile.name.split('.').pop()?.toLowerCase() || 'jpg';
     const path = `${postId}/${crypto.randomUUID()}.${extension}`;
-    const { error } = await this.db.storage.from('blog-media').upload(path, file, {
-      contentType: file.type,
+    const { error } = await this.db.storage.from('blog-media').upload(path, safeFile, {
+      contentType: safeFile.type,
       upsert: false,
     });
     if (error) throw error;
@@ -318,6 +319,55 @@ export class PlatformService {
 
   blogMediaUrl(path: string): string {
     return this.db.storage.from('blog-media').getPublicUrl(path).data.publicUrl;
+  }
+
+  private async prepareBlogMedia(file: File): Promise<File> {
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml'];
+    if (file.size > 5 * 1024 * 1024 || !allowedTypes.includes(file.type)) {
+      throw new Error('Use a JPEG, PNG, WebP, or safe SVG image up to 5 MB.');
+    }
+    if (file.type !== 'image/svg+xml') return file;
+
+    const source = await file.text();
+    if (/<!DOCTYPE|<!ENTITY/i.test(source)) throw new Error('This SVG contains unsafe XML.');
+
+    const document = new DOMParser().parseFromString(source, 'image/svg+xml');
+    const root = document.documentElement;
+    if (
+      root.localName !== 'svg' ||
+      root.namespaceURI !== 'http://www.w3.org/2000/svg' ||
+      document.querySelector('parsererror')
+    ) {
+      throw new Error('The selected SVG is not valid.');
+    }
+
+    document
+      .querySelectorAll(
+        'script, foreignObject, iframe, object, embed, image, audio, video, canvas, style, animate, animateMotion, animateTransform, set'
+      )
+      .forEach(element => element.remove());
+
+    document.querySelectorAll('*').forEach(element => {
+      for (const attribute of [...element.attributes]) {
+        const name = attribute.name.toLowerCase();
+        const value = attribute.value.trim();
+        const isLocalReference = value.startsWith('#');
+        if (
+          name.startsWith('on') ||
+          name === 'style' ||
+          ((name === 'href' || name === 'xlink:href') && !isLocalReference) ||
+          /(?:javascript|vbscript|data):/i.test(value)
+        ) {
+          element.removeAttribute(attribute.name);
+        }
+      }
+    });
+
+    const sanitized = new XMLSerializer().serializeToString(document);
+    return new File([sanitized], file.name, {
+      type: 'image/svg+xml',
+      lastModified: file.lastModified,
+    });
   }
 
   async siteDeployments(): Promise<SiteDeployment[]> {

@@ -1,5 +1,11 @@
 begin;
-select plan(45);
+select plan(46);
+
+select ok(
+  (select allowed_mime_types @> array['image/svg+xml']::text[]
+     from storage.buckets where id='blog-media'),
+  'blog media accepts SVG uploads'
+);
 
 select testkit.create_user('90000000-0000-0000-0000-000000000001', 'blog-platform@test.local');
 select testkit.create_user('90000000-0000-0000-0000-000000000002', 'blog-outsider@test.local');

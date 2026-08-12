@@ -386,7 +386,7 @@ import { PageHeaderComponent } from '../../shared/ui/page-header.component';
                 >
                   <input
                     type="file"
-                    accept="image/jpeg,image/png,image/webp"
+                    accept="image/jpeg,image/png,image/webp,image/svg+xml,.svg"
                     class="sr-only"
                     [disabled]="!selected() || busy()"
                     (change)="uploadCover($event)"
@@ -450,7 +450,7 @@ import { PageHeaderComponent } from '../../shared/ui/page-header.component';
               >
                 <input
                   type="file"
-                  accept="image/jpeg,image/png,image/webp"
+                  accept="image/jpeg,image/png,image/webp,image/svg+xml,.svg"
                   class="sr-only"
                   [disabled]="!selected() || busy() || !inlineImageAlt.value.trim()"
                   (change)="uploadInlineImage($event)"
@@ -458,7 +458,8 @@ import { PageHeaderComponent } from '../../shared/ui/page-header.component';
                 {{ selected() ? 'Upload and insert at cursor' : 'Save draft to upload' }}
               </label>
               <p class="mb-0 text-[0.68rem] leading-relaxed text-base-content/45">
-                JPEG, PNG, or WebP up to 5 MB. The description is required for accessibility.
+                JPEG, PNG, WebP, or safe SVG up to 5 MB. The description is required for
+                accessibility.
               </p>
             </div>
           </section>
@@ -942,7 +943,7 @@ export class BlogComponent implements OnInit {
     const id = this.selected()?.post_id;
     if (!file || !id) return;
     if (!this.validBlogImage(file)) {
-      this.error.set('Use a JPEG, PNG, or WebP image up to 5 MB.');
+      this.error.set('Use a JPEG, PNG, WebP, or safe SVG image up to 5 MB.');
       input.value = '';
       return;
     }
@@ -967,7 +968,7 @@ export class BlogComponent implements OnInit {
       return;
     }
     if (!this.validBlogImage(file)) {
-      this.error.set('Use a JPEG, PNG, or WebP image up to 5 MB.');
+      this.error.set('Use a JPEG, PNG, WebP, or safe SVG image up to 5 MB.');
       input.value = '';
       return;
     }
@@ -987,7 +988,8 @@ export class BlogComponent implements OnInit {
 
   private validBlogImage(file: File): boolean {
     return (
-      file.size <= 5 * 1024 * 1024 && ['image/jpeg', 'image/png', 'image/webp'].includes(file.type)
+      file.size <= 5 * 1024 * 1024 &&
+      ['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml'].includes(file.type)
     );
   }
 
