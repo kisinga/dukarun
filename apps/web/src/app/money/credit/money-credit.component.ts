@@ -40,14 +40,14 @@ const EMPTY_METRICS: CreditHealthDashboard['metrics'] = {
     StatCardComponent,
   ],
   template: `
-    <section class="space-y-6">
+    <section class="space-y-4">
       <div class="flex items-start gap-3">
         <div class="min-w-0 flex-1">
           <h2 class="section-title">Credit health</h2>
           <p class="type-caption mt-1">
             Collection risk, upcoming supplier obligations, and credit exposure.
             @if (dashboard(); as data) {
-              <span>Updated {{ data.generated_at | date: 'mediumTime' }}.</span>
+              <span>Updated {{ data.generated_at | date: 'MMM d, h:mm a' }}.</span>
             }
           </p>
         </div>
@@ -84,31 +84,65 @@ const EMPTY_METRICS: CreditHealthDashboard['metrics'] = {
           Loading credit health
         </div>
       } @else if (dashboard(); as data) {
-        <section aria-label="Credit health summary" class="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <app-stat-card
-            label="Receivables"
-            [value]="fmt(metrics().receivables)"
-            [sub]="overduePercent() + '% overdue'"
-            [tone]="metrics().overdue_receivables > 0 ? 'error' : 'neutral'"
-          />
-          <app-stat-card
-            label="60+ day exposure"
-            [value]="fmt(metrics().severe_receivables)"
-            [sub]="severePercent() + '% of receivables'"
-            [tone]="metrics().severe_receivables > 0 ? 'error' : 'neutral'"
-          />
-          <app-stat-card
-            label="Supplier due within 7d"
-            [value]="fmt(metrics().payables_due_soon)"
-            [sub]="fmt(metrics().payables) + ' total AP'"
-            [tone]="metrics().payables_due_soon > 0 ? 'warning' : 'neutral'"
-          />
-          <app-stat-card
-            label="Accounts over limit"
-            [value]="countLabel(metrics().over_limit_parties)"
-            [sub]="'Top 5 hold ' + metrics().top_five_concentration + '% of AR'"
-            [tone]="metrics().over_limit_parties > 0 ? 'error' : 'neutral'"
-          />
+        <section
+          aria-label="Credit health summary"
+          class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
+        >
+          <a
+            class="block rounded-box focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            [routerLink]="[]"
+            fragment="credit-aging"
+            aria-label="View receivables aging"
+          >
+            <app-stat-card
+              label="Net receivables"
+              [value]="fmt(metrics().receivables)"
+              [sub]="fmt(metrics().overdue_receivables) + ' in overdue invoices'"
+              action="View aging"
+            />
+          </a>
+          <a
+            class="block rounded-box focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            [routerLink]="[]"
+            fragment="credit-aging"
+            aria-label="View invoices over 60 days"
+          >
+            <app-stat-card
+              label="Over 60 days"
+              [value]="fmt(metrics().severe_receivables)"
+              [sub]="severeSummary()"
+              [tone]="metrics().severe_receivables > 0 ? 'error' : 'neutral'"
+              action="View aging"
+            />
+          </a>
+          <a
+            class="block rounded-box focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            [routerLink]="[]"
+            fragment="credit-actions"
+            aria-label="View supplier bills requiring attention"
+          >
+            <app-stat-card
+              label="Supplier bills due by 7d"
+              [value]="fmt(metrics().payables_due_soon)"
+              [sub]="fmt(metrics().payables) + ' total payables'"
+              [tone]="metrics().payables_due_soon > 0 ? 'warning' : 'neutral'"
+              action="Review suppliers"
+            />
+          </a>
+          <a
+            class="block rounded-box focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            [routerLink]="[]"
+            fragment="credit-risk"
+            aria-label="View customer credit-limit risk"
+          >
+            <app-stat-card
+              label="Accounts over limit"
+              [value]="countLabel(metrics().over_limit_parties)"
+              [sub]="overLimitSummary()"
+              [tone]="metrics().over_limit_parties > 0 ? 'error' : 'neutral'"
+              action="View limit usage"
+            />
+          </a>
         </section>
 
         @if (!hasExposure()) {
@@ -125,18 +159,29 @@ const EMPTY_METRICS: CreditHealthDashboard['metrics'] = {
             aria-label="Credit exposure insights"
             class="grid items-start gap-4 xl:grid-cols-12"
           >
-            <article class="card overflow-hidden bg-base-100 xl:col-span-7">
+            <article
+              id="credit-aging"
+              class="card scroll-mt-4 overflow-hidden bg-base-100 xl:col-span-7"
+            >
               <div class="border-b border-base-300/60 px-4 py-3">
                 <h3 class="section-title">Exposure by due status</h3>
-                <p class="type-caption mt-1">Open balances grouped by days past due.</p>
+                <p class="type-caption mt-1">Open invoice balances grouped by days past due.</p>
               </div>
               <div class="divide-y divide-base-200 px-4">
                 @for (side of creditSides; track side) {
                   @if (agingTotal(side) > 0) {
                     <div class="py-4">
                       <div class="flex items-baseline justify-between gap-3">
-                        <p class="text-sm font-semibold">{{ sideLabel(side) }}</p>
-                        <p class="text-sm font-semibold">
+                        <div>
+                          <p class="text-sm font-semibold">{{ sideLabel(side) }}</p>
+                          @if (agingAdjustment(side) !== 0) {
+                            <p class="type-caption mt-0.5">
+                              Net after account credits and adjustments:
+                              <app-money [amount]="sideNetTotal(side)" />
+                            </p>
+                          }
+                        </div>
+                        <p class="shrink-0 text-sm font-semibold">
                           <app-money [amount]="agingTotal(side)" />
                         </p>
                       </div>
@@ -153,22 +198,55 @@ const EMPTY_METRICS: CreditHealthDashboard['metrics'] = {
                           ></span>
                         }
                       </div>
-                      <div class="mt-3 flex flex-wrap gap-x-5 gap-y-2">
+                      <div class="mt-3 grid gap-2 sm:grid-cols-2">
                         @for (bucket of activeAgingRows(side); track bucket.bucket) {
-                          <div class="flex items-center gap-2 text-xs">
-                            <span
-                              class="h-2.5 w-2.5 shrink-0 rounded-sm"
-                              [class]="agingTone(bucket.bucket)"
-                            ></span>
-                            <span class="text-base-content/60">{{
-                              agingLabel(bucket.bucket)
-                            }}</span>
-                            <span class="font-semibold tabular-nums">
-                              <app-money [amount]="bucket.amount" />
+                          <button
+                            type="button"
+                            class="rounded-field border border-base-300/70 px-2.5 py-2 text-left text-xs transition-colors hover:border-primary/50 hover:bg-primary/5"
+                            [class.border-primary]="agingSelected(side, bucket.bucket)"
+                            [class.bg-base-200]="agingSelected(side, bucket.bucket)"
+                            [attr.aria-pressed]="agingSelected(side, bucket.bucket)"
+                            (click)="toggleAging(side, bucket.bucket)"
+                          >
+                            <span class="flex items-center gap-2">
+                              <span
+                                class="h-2.5 w-2.5 shrink-0 rounded-sm"
+                                [class]="agingTone(bucket.bucket)"
+                              ></span>
+                              <span class="min-w-0 flex-1 text-base-content/70">
+                                {{ agingLabel(bucket.bucket) }}
+                              </span>
+                              <span class="shrink-0 font-semibold tabular-nums">
+                                <app-money [amount]="bucket.amount" />
+                              </span>
                             </span>
-                          </div>
+                            <span class="mt-1 block pl-4 text-base-content/50">
+                              {{ documentCountLabel(bucket.documents) }} ·
+                              {{ agingShare(bucket, side) }}% of open {{ sideNoun(side) }}
+                            </span>
+                          </button>
                         }
                       </div>
+                      @if (selectedAgingRow(side); as selected) {
+                        <div
+                          class="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-field bg-primary/5 px-3 py-2 text-xs"
+                          aria-live="polite"
+                        >
+                          <p>
+                            <span class="font-semibold">{{ agingLabel(selected.bucket) }}</span>
+                            contains {{ documentCountLabel(selected.documents) }} worth
+                            <app-money [amount]="selected.amount" />.
+                          </p>
+                          <a
+                            appButton
+                            variant="ghost"
+                            size="sm"
+                            [routerLink]="side === 'receivables' ? '/customers' : '/suppliers'"
+                          >
+                            Review {{ side === 'receivables' ? 'customers' : 'suppliers' }}
+                          </a>
+                        </div>
+                      }
                     </div>
                   } @else {
                     <app-empty-state
@@ -188,7 +266,7 @@ const EMPTY_METRICS: CreditHealthDashboard['metrics'] = {
               >
                 <div>
                   <h3 class="section-title">Balance trend</h3>
-                  <p class="type-caption mt-1">Finalized ledger balance.</p>
+                  <p class="type-caption mt-1">Closing receivables and payables by day.</p>
                 </div>
                 <div class="flex items-center gap-1 rounded-field bg-base-200 p-1">
                   @for (days of trendRanges; track days) {
@@ -215,19 +293,36 @@ const EMPTY_METRICS: CreditHealthDashboard['metrics'] = {
                     description="The trend appears after credit sales or purchases are posted."
                   />
                 } @else {
-                  <div class="mb-3 flex flex-wrap gap-x-5 gap-y-2 text-xs">
-                    <span class="flex items-center gap-2">
-                      <span class="h-0.5 w-5 bg-error"></span>
-                      Receivables {{ trendDeltaLabel('receivables') }}
-                    </span>
-                    <span class="flex items-center gap-2">
-                      <span class="h-0.5 w-5 bg-warning"></span>
-                      Payables {{ trendDeltaLabel('payables') }}
-                    </span>
+                  <div class="mb-3 grid gap-2 text-xs sm:grid-cols-2">
+                    <div class="flex items-start gap-2 rounded-field bg-error/5 px-2.5 py-2">
+                      <span class="mt-1.5 h-0.5 w-5 shrink-0 bg-error"></span>
+                      <div>
+                        <p class="font-semibold">
+                          Receivables <app-money [amount]="trendCurrent('receivables')" />
+                        </p>
+                        <p class="text-base-content/60">
+                          {{ trendDeltaLabel('receivables') }} over {{ trendDays() }} days
+                        </p>
+                      </div>
+                    </div>
+                    <div class="flex items-start gap-2 rounded-field bg-warning/5 px-2.5 py-2">
+                      <span class="mt-1.5 h-0.5 w-5 shrink-0 bg-warning"></span>
+                      <div>
+                        <p class="font-semibold">
+                          Payables <app-money [amount]="trendCurrent('payables')" />
+                        </p>
+                        <p class="text-base-content/60">
+                          {{ trendDeltaLabel('payables') }} over {{ trendDays() }} days
+                        </p>
+                      </div>
+                    </div>
                   </div>
                   <div
-                    class="relative h-48 overflow-hidden rounded-field bg-base-200/40 px-3 pb-2 pt-3"
+                    class="relative h-44 overflow-hidden rounded-field bg-base-200/40 px-3 pb-2 pt-5"
                   >
+                    <span class="absolute right-2 top-1 text-xs text-base-content/45">
+                      Scale {{ fmt(trendScale()) }}
+                    </span>
                     <span class="absolute inset-x-0 top-1/4 border-t border-base-300/60"></span>
                     <span class="absolute inset-x-0 top-1/2 border-t border-base-300/60"></span>
                     <span class="absolute inset-x-0 top-3/4 border-t border-base-300/60"></span>
@@ -265,17 +360,28 @@ const EMPTY_METRICS: CreditHealthDashboard['metrics'] = {
           </section>
 
           @if (hasRiskAnalysis()) {
-            <section
-              aria-label="Credit risk analysis"
-              class="grid items-start gap-4 lg:grid-cols-2"
+            <article
+              id="credit-risk"
+              aria-label="Customer credit risk"
+              class="card scroll-mt-4 overflow-hidden bg-base-100"
             >
-              @if (utilizationParties() > 0) {
-                <article class="card overflow-hidden bg-base-100">
-                  <div class="border-b border-base-300/60 px-4 py-3">
-                    <h3 class="section-title">Customer limit utilization</h3>
-                    <p class="type-caption mt-1">Distribution of accounts with defined limits.</p>
-                  </div>
-                  <div class="p-4">
+              <div class="border-b border-base-300/60 px-4 py-3">
+                <h3 class="section-title">Customer credit risk</h3>
+                <p class="type-caption mt-1">
+                  Limit usage and the customers holding the largest balances.
+                </p>
+              </div>
+              <div class="grid lg:grid-cols-2 lg:divide-x lg:divide-base-200">
+                @if (utilizationParties() > 0) {
+                  <section class="p-4" aria-labelledby="limit-utilization-heading">
+                    <div class="mb-3 flex items-baseline justify-between gap-3">
+                      <h4 id="limit-utilization-heading" class="text-sm font-semibold">
+                        Limit utilization
+                      </h4>
+                      <span class="type-caption">
+                        {{ partyCountLabel(utilizationParties()) }}
+                      </span>
+                    </div>
                     <div
                       class="flex h-3 overflow-hidden rounded-full bg-base-200"
                       role="img"
@@ -288,9 +394,15 @@ const EMPTY_METRICS: CreditHealthDashboard['metrics'] = {
                         ></span>
                       }
                     </div>
-                    <div class="mt-4 grid gap-x-6 gap-y-3 sm:grid-cols-2">
+                    <div class="mt-4 grid gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-1">
                       @for (bucket of activeUtilizationRows(); track bucket.bucket) {
-                        <div class="flex items-start gap-2">
+                        <button
+                          type="button"
+                          class="flex w-full items-start gap-2 rounded-field p-2 text-left transition-colors hover:bg-primary/5"
+                          [class.bg-base-200]="utilizationSelected(bucket.bucket)"
+                          [attr.aria-pressed]="utilizationSelected(bucket.bucket)"
+                          (click)="toggleUtilization(bucket.bucket)"
+                        >
                           <span
                             class="mt-1 h-2.5 w-2.5 shrink-0 rounded-sm"
                             [class]="utilizationTone(bucket.bucket)"
@@ -306,51 +418,72 @@ const EMPTY_METRICS: CreditHealthDashboard['metrics'] = {
                               <app-money [amount]="bucket.amount" /> outstanding
                             </p>
                           </div>
-                        </div>
+                        </button>
                       }
                     </div>
-                  </div>
-                </article>
-              }
-
-              @if (data.concentration.length > 0) {
-                <article class="card overflow-hidden bg-base-100">
-                  <div class="border-b border-base-300/60 px-4 py-3">
-                    <h3 class="section-title">Receivables concentration</h3>
-                    <p class="type-caption mt-1">Customers holding the largest share of AR.</p>
-                  </div>
-                  <div class="divide-y divide-base-200 px-4">
-                    @for (party of data.concentration; track party.party_id) {
-                      <a
-                        class="flex min-h-16 items-center gap-3 py-2 hover:text-primary"
-                        [routerLink]="['/customers']"
-                        [queryParams]="{ customer: party.party_id }"
-                      >
-                        <app-entity-avatar size="sm" [firstName]="party.party_name" />
-                        <div class="min-w-0 flex-1">
-                          <div class="flex items-center justify-between gap-3">
-                            <p class="truncate text-sm font-semibold">{{ party.party_name }}</p>
-                            <p class="shrink-0 text-sm font-semibold">
-                              <app-money [amount]="party.amount" />
-                            </p>
-                          </div>
-                          <div class="mt-1.5 h-1.5 overflow-hidden rounded-full bg-base-200">
-                            <div
-                              class="h-full rounded-full bg-primary"
-                              [style.width.%]="party.share"
-                            ></div>
-                          </div>
-                          <p class="type-caption mt-1">{{ party.share }}% of receivables</p>
-                        </div>
-                      </a>
+                    @if (selectedUtilizationRow(); as selected) {
+                      <div class="mt-3 rounded-field bg-primary/5 p-3 text-xs" aria-live="polite">
+                        <p class="font-semibold">{{ utilizationLabel(selected.bucket) }}</p>
+                        <p class="mt-1 text-base-content/70">
+                          {{ utilizationGuidance(selected.bucket) }}
+                          {{ utilizationShare(selected) }}% of accounts with limits are in this
+                          category.
+                        </p>
+                        <a appButton variant="ghost" size="sm" class="mt-2" routerLink="/customers">
+                          Review customer accounts
+                        </a>
+                      </div>
                     }
-                  </div>
-                </article>
-              }
-            </section>
+                  </section>
+                }
+
+                @if (data.concentration.length > 0) {
+                  <section class="p-4" aria-labelledby="concentration-heading">
+                    <div class="mb-1 flex items-baseline justify-between gap-3">
+                      <h4 id="concentration-heading" class="text-sm font-semibold">
+                        Largest balances
+                      </h4>
+                      <span class="type-caption">
+                        Top 5 · {{ metrics().top_five_concentration }}%
+                      </span>
+                    </div>
+                    <div class="divide-y divide-base-200">
+                      @for (party of data.concentration; track party.party_id) {
+                        <a
+                          class="flex min-h-14 items-center gap-3 py-2 hover:text-primary"
+                          [routerLink]="['/customers']"
+                          [queryParams]="{ customer: party.party_id }"
+                        >
+                          <app-entity-avatar size="sm" [firstName]="party.party_name" />
+                          <div class="min-w-0 flex-1">
+                            <div class="flex items-center justify-between gap-3">
+                              <p class="truncate text-sm font-semibold">{{ party.party_name }}</p>
+                              <p class="shrink-0 text-sm font-semibold">
+                                <app-money [amount]="party.amount" />
+                              </p>
+                            </div>
+                            <div class="mt-1.5 h-1.5 overflow-hidden rounded-full bg-base-200">
+                              <div
+                                class="h-full rounded-full bg-primary"
+                                [style.width.%]="party.share"
+                              ></div>
+                            </div>
+                            <p class="type-caption mt-1">{{ party.share }}% of receivables</p>
+                          </div>
+                        </a>
+                      }
+                    </div>
+                  </section>
+                }
+              </div>
+            </article>
           }
 
-          <section aria-labelledby="credit-actions-heading" class="space-y-3">
+          <section
+            id="credit-actions"
+            aria-labelledby="credit-actions-heading"
+            class="scroll-mt-4 space-y-3"
+          >
             <div>
               <h3 id="credit-actions-heading" class="section-title">Needs attention</h3>
               <p class="type-caption mt-1">Prioritized collection and supplier-payment work.</p>
@@ -473,6 +606,13 @@ export class MoneyCreditComponent implements OnInit {
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly trendDays = signal(90);
+  protected readonly agingDrill = signal<{
+    side: CreditHealthSide;
+    bucket: CreditHealthAgingBucket['bucket'];
+  } | null>(null);
+  protected readonly utilizationDrill = signal<CreditHealthUtilizationBucket['bucket'] | null>(
+    null
+  );
   protected readonly trendRanges = [30, 90] as const;
   protected readonly creditSides: CreditHealthSide[] = ['receivables', 'payables'];
   protected readonly fmt = formatKes;
@@ -480,12 +620,6 @@ export class MoneyCreditComponent implements OnInit {
   protected readonly metrics = computed(() => this.dashboard()?.metrics ?? EMPTY_METRICS);
   protected readonly hasExposure = computed(
     () => this.metrics().receivables > 0 || this.metrics().payables > 0
-  );
-  protected readonly overduePercent = computed(() =>
-    this.percent(this.metrics().overdue_receivables, this.metrics().receivables)
-  );
-  protected readonly severePercent = computed(() =>
-    this.percent(this.metrics().severe_receivables, this.metrics().receivables)
   );
   protected readonly utilizationParties = computed(() =>
     (this.dashboard()?.utilization ?? []).reduce((sum, bucket) => sum + bucket.parties, 0)
@@ -503,9 +637,12 @@ export class MoneyCreditComponent implements OnInit {
   );
   protected readonly trendChartPoints = computed(() => {
     const trend = this.dashboard()?.trend ?? [];
-    const stride = Math.max(1, Math.ceil(trend.length / 30));
+    const stride = Math.max(1, Math.ceil(trend.length / 24));
     return trend.filter((_, index) => index % stride === 0 || index === trend.length - 1);
   });
+  protected readonly trendScale = computed(() =>
+    Math.max(...(this.dashboard()?.trend ?? []).flatMap(row => [row.receivables, row.payables]), 0)
+  );
 
   async ngOnInit(): Promise<void> {
     await this.load();
@@ -546,6 +683,30 @@ export class MoneyCreditComponent implements OnInit {
     return total > 0 ? (bucket.amount / total) * 100 : 0;
   }
 
+  protected agingShare(bucket: CreditHealthAgingBucket, side: CreditHealthSide): number {
+    return Math.round(this.agingWidth(bucket, side));
+  }
+
+  protected toggleAging(side: CreditHealthSide, bucket: CreditHealthAgingBucket['bucket']): void {
+    this.agingDrill.update(selected =>
+      selected?.side === side && selected.bucket === bucket ? null : { side, bucket }
+    );
+  }
+
+  protected agingSelected(
+    side: CreditHealthSide,
+    bucket: CreditHealthAgingBucket['bucket']
+  ): boolean {
+    const selected = this.agingDrill();
+    return selected?.side === side && selected.bucket === bucket;
+  }
+
+  protected selectedAgingRow(side: CreditHealthSide): CreditHealthAgingBucket | null {
+    const selected = this.agingDrill();
+    if (!selected || selected.side !== side) return null;
+    return this.agingRows(side).find(bucket => bucket.bucket === selected.bucket) ?? null;
+  }
+
   protected agingLabel(bucket: CreditHealthAgingBucket['bucket']): string {
     switch (bucket) {
       case 'current':
@@ -577,7 +738,23 @@ export class MoneyCreditComponent implements OnInit {
   }
 
   protected sideLabel(side: CreditHealthSide): string {
-    return side === 'receivables' ? 'Customers owe us' : 'We owe suppliers';
+    return side === 'receivables' ? 'Open customer invoices' : 'Open supplier bills';
+  }
+
+  protected sideNoun(side: CreditHealthSide): string {
+    return side === 'receivables' ? 'invoices' : 'bills';
+  }
+
+  protected documentCountLabel(count: number): string {
+    return `${count} ${count === 1 ? 'document' : 'documents'}`;
+  }
+
+  protected sideNetTotal(side: CreditHealthSide): number {
+    return side === 'receivables' ? this.metrics().receivables : this.metrics().payables;
+  }
+
+  protected agingAdjustment(side: CreditHealthSide): number {
+    return this.sideNetTotal(side) - this.agingTotal(side);
   }
 
   protected activeUtilizationRows(): CreditHealthUtilizationBucket[] {
@@ -611,7 +788,35 @@ export class MoneyCreditComponent implements OnInit {
   }
 
   protected utilizationShare(bucket: CreditHealthUtilizationBucket): number {
-    return this.utilizationParties() > 0 ? (bucket.parties / this.utilizationParties()) * 100 : 0;
+    return this.utilizationParties() > 0
+      ? Math.round((bucket.parties / this.utilizationParties()) * 100)
+      : 0;
+  }
+
+  protected toggleUtilization(bucket: CreditHealthUtilizationBucket['bucket']): void {
+    this.utilizationDrill.update(selected => (selected === bucket ? null : bucket));
+  }
+
+  protected utilizationSelected(bucket: CreditHealthUtilizationBucket['bucket']): boolean {
+    return this.utilizationDrill() === bucket;
+  }
+
+  protected selectedUtilizationRow(): CreditHealthUtilizationBucket | null {
+    const selected = this.utilizationDrill();
+    return (this.dashboard()?.utilization ?? []).find(bucket => bucket.bucket === selected) ?? null;
+  }
+
+  protected utilizationGuidance(bucket: CreditHealthUtilizationBucket['bucket']): string {
+    switch (bucket) {
+      case 'under_50':
+        return 'These accounts have comfortable credit headroom.';
+      case '50_80':
+        return 'These accounts should be monitored before further credit sales.';
+      case '80_100':
+        return 'These accounts are close to their approved limit.';
+      default:
+        return 'These accounts require review before receiving more credit.';
+    }
   }
 
   protected partyCountLabel(count: number): string {
@@ -620,6 +825,20 @@ export class MoneyCreditComponent implements OnInit {
 
   protected countLabel(count: number): string {
     return count.toLocaleString('en-KE');
+  }
+
+  protected overLimitSummary(): string {
+    return this.metrics().over_limit_parties > 0
+      ? `${this.metrics().top_five_concentration}% of receivables held by the top 5`
+      : 'No customer is above their credit limit';
+  }
+
+  protected severeSummary(): string {
+    const severe = this.metrics().severe_receivables;
+    const net = this.metrics().receivables;
+    if (severe <= 0) return 'No invoices are over 60 days old';
+    if (net > 0 && severe <= net) return `${Math.round((severe / net) * 100)}% of net receivables`;
+    return 'Gross exposure before account credits and adjustments';
   }
 
   protected trendBarHeight(point: CreditHealthTrendPoint, side: CreditHealthSide): number {
@@ -643,6 +862,11 @@ export class MoneyCreditComponent implements OnInit {
     return `${delta > 0 ? '↑' : '↓'} ${formatKes(Math.abs(delta))}`;
   }
 
+  protected trendCurrent(side: CreditHealthSide): number {
+    const latest = this.dashboard()?.trend.at(-1);
+    return latest ? this.trendValue(latest, side) : 0;
+  }
+
   protected firstTrendDay(): string | null {
     return this.dashboard()?.trend[0]?.day ?? null;
   }
@@ -653,9 +877,5 @@ export class MoneyCreditComponent implements OnInit {
 
   private trendValue(point: CreditHealthTrendPoint, side: CreditHealthSide): number {
     return side === 'receivables' ? point.receivables : point.payables;
-  }
-
-  private percent(value: number, total: number): number {
-    return total > 0 ? Math.round((value / total) * 100) : 0;
   }
 }

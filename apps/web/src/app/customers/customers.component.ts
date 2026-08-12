@@ -64,6 +64,13 @@ type CreditOrder = {
   status: string;
   created_at: string;
 };
+type BulkPaymentPlan = {
+  applied: number;
+  excess: number;
+  allocations: { code: string; amount: number; clearsInvoice: boolean }[];
+  hiddenAllocations: number;
+  clearedInvoices: number;
+};
 
 const CUSTOMER_STATEMENT_PAGE_SIZE = 25;
 const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
@@ -859,6 +866,62 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
                           >
                             Allocate oldest first
                           </button>
+                          @if (bulkPaymentPlan(); as plan) {
+                            <div
+                              class="sm:col-span-3 rounded-field border border-info/30 bg-info/5 p-3 text-sm"
+                              aria-live="polite"
+                            >
+                              <div class="flex flex-wrap items-start justify-between gap-2">
+                                <div>
+                                  <p class="font-semibold">How this payment will be applied</p>
+                                  <p class="type-caption mt-0.5">
+                                    Oldest invoices are cleared first.
+                                  </p>
+                                </div>
+                                <p class="shrink-0 font-semibold tabular-nums">
+                                  <app-money [amount]="plan.applied + plan.excess" /> received
+                                </p>
+                              </div>
+                              <ol class="mt-2 flex flex-wrap gap-2">
+                                @for (allocation of plan.allocations; track allocation.code) {
+                                  <li
+                                    class="rounded-field border border-base-300/70 bg-base-100 px-2 py-1 text-xs"
+                                  >
+                                    <span class="font-mono">{{ allocation.code }}</span>
+                                    · <app-money [amount]="allocation.amount" />
+                                    @if (allocation.clearsInvoice) {
+                                      <span class="text-success"> · cleared</span>
+                                    }
+                                  </li>
+                                }
+                                @if (plan.hiddenAllocations > 0) {
+                                  <li class="px-1 py-1 text-xs text-base-content/60">
+                                    +{{ plan.hiddenAllocations }} more
+                                  </li>
+                                }
+                              </ol>
+                              <div class="mt-2 grid gap-2 sm:grid-cols-2">
+                                <p class="rounded-field bg-base-100 px-2.5 py-2 text-xs">
+                                  <span class="text-base-content/60">Applied to invoices</span
+                                  ><br />
+                                  <span class="font-semibold tabular-nums">
+                                    <app-money [amount]="plan.applied" />
+                                    @if (plan.clearedInvoices > 0) {
+                                      · {{ plan.clearedInvoices }} cleared
+                                    }
+                                  </span>
+                                </p>
+                                @if (plan.excess > 0) {
+                                  <p class="rounded-field bg-info/10 px-2.5 py-2 text-xs">
+                                    <span class="text-base-content/60">Carried forward</span><br />
+                                    <span class="font-semibold tabular-nums text-info">
+                                      <app-money [amount]="plan.excess" /> as downpayment
+                                    </span>
+                                  </p>
+                                }
+                              </div>
+                            </div>
+                          }
                         </form>
                       }
                       <ul class="divide-y divide-base-200">
@@ -1973,6 +2036,36 @@ export class CustomersComponent implements OnInit {
     } finally {
       this.busy.set(false);
     }
+  }
+
+  protected bulkPaymentPlan(): BulkPaymentPlan | null {
+    const amount = parseKes(this.bulkAmount.value);
+    if (amount === null || amount <= 0) return null;
+
+    let remaining = amount;
+    const allAllocations: BulkPaymentPlan['allocations'] = [];
+    const oldestFirst = [...this.creditOrders()].sort(
+      (a, b) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id)
+    );
+    for (const order of oldestFirst) {
+      if (remaining <= 0) break;
+      const applied = Math.min(remaining, order.outstanding);
+      allAllocations.push({
+        code: order.code,
+        amount: applied,
+        clearsInvoice: applied === order.outstanding,
+      });
+      remaining -= applied;
+    }
+
+    if (allAllocations.length <= 1 && remaining === 0) return null;
+    return {
+      applied: amount - remaining,
+      excess: remaining,
+      allocations: allAllocations.slice(0, 3),
+      hiddenAllocations: Math.max(allAllocations.length - 3, 0),
+      clearedInvoices: allAllocations.filter(allocation => allocation.clearsInvoice).length,
+    };
   }
 
   protected async adjustBalance(customerId: string): Promise<void> {
