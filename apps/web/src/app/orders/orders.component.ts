@@ -313,7 +313,7 @@ const SALE_SORT_OPTIONS: readonly ListSortOption[] = [
 
         <div class="mt-3 hidden lg:block">
           <app-data-table-shell
-            title="Sales history"
+            heading="Sales history"
             [description]="totalItems() + ' matching sales'"
           >
             <table class="table table-sm">

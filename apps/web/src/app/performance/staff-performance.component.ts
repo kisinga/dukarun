@@ -134,7 +134,7 @@ import { PageActionsComponent } from '../shared/ui/page-actions.component';
         </app-mobile-list>
         <div class="hidden lg:block">
           <app-data-table-shell
-            title="Salesperson leaderboard"
+            heading="Salesperson leaderboard"
             [description]="filteredRows().length + ' staff records · click a row for daily detail'"
           >
             <table class="table table-sm">

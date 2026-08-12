@@ -168,7 +168,7 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
       } @else {
         <div class="mb-3 hidden lg:block">
           <app-data-table-shell
-            title="Customer accounts"
+            heading="Customer accounts"
             [description]="filtered().length + ' matching customers'"
           >
             <table class="table">

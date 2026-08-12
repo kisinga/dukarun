@@ -74,7 +74,16 @@ import { DrawerComponent } from '../../shared/ui/drawer.component';
           class="grid gap-3 sm:grid-cols-2"
         >
           <app-form-field label="Paid from">
-            <select class="select select-bordered select-sm w-full" [formControl]="account">
+            <select
+              class="select select-bordered select-sm w-full"
+              [formControl]="account"
+              [attr.aria-busy]="loading()"
+            >
+              @if (accounts().length === 0) {
+                <option value="">
+                  {{ loading() ? 'Loading accounts…' : 'No accounts available' }}
+                </option>
+              }
               @for (a of accounts(); track a.code) {
                 <option [value]="a.code">{{ a.code }} — {{ a.name }}</option>
               }
@@ -121,7 +130,7 @@ import { DrawerComponent } from '../../shared/ui/drawer.component';
             type="submit"
             form="expense-form"
             [loading]="busy()"
-            [disabled]="!cashierSession.canTakePayment()"
+            [disabled]="accounts().length === 0 || !cashierSession.canTakePayment()"
           >
             Post expense
           </button>
@@ -264,34 +273,43 @@ export class MoneyExpensesComponent implements OnInit, OnDestroy {
   protected async load(): Promise<void> {
     const sequence = ++this.loadSequence;
     this.loading.set(true);
-    try {
-      const [accounts, result] = await Promise.all([
-        this.money.transactableAccounts(),
-        this.money.journalPage({
-          page: this.historyPage(),
-          pageSize: this.historyPageSize(),
-          // Expense history is account-driven so costs posted atomically with purchases appear too.
-          requiredAccountCode: 'EXPENSES',
-          search: this.historySearch(),
-          accountCode: this.historyAccount() || undefined,
-          from: this.historyFrom() || undefined,
-          to: this.historyTo() || undefined,
-          sortBy: this.historySort() as 'posted_at' | 'memo',
-          sortDirection: this.historyDirection(),
-        }),
-      ]);
-      if (sequence !== this.loadSequence) return;
+    const [accountResult, historyResult] = await Promise.allSettled([
+      this.money.transactableAccounts(),
+      this.money.journalPage({
+        page: this.historyPage(),
+        pageSize: this.historyPageSize(),
+        // Expense history is account-driven so costs posted atomically with purchases appear too.
+        requiredAccountCode: 'EXPENSES',
+        search: this.historySearch(),
+        accountCode: this.historyAccount() || undefined,
+        from: this.historyFrom() || undefined,
+        to: this.historyTo() || undefined,
+        sortBy: this.historySort() as 'posted_at' | 'memo',
+        sortDirection: this.historyDirection(),
+      }),
+    ]);
+    if (sequence !== this.loadSequence) return;
+
+    const errors: string[] = [];
+    if (accountResult.status === 'fulfilled') {
+      const accounts = accountResult.value;
       this.accounts.set(accounts);
-      this.entries.set(result.rows);
-      this.historyTotal.set(result.count);
       if (!this.account.value && accounts.length > 0) this.account.setValue(accounts[0].code);
-      this.error.set(null);
-    } catch (err) {
-      if (sequence === this.loadSequence)
-        this.error.set(err instanceof Error ? err.message : 'Failed to load');
-    } finally {
-      if (sequence === this.loadSequence) this.loading.set(false);
+    } else {
+      errors.push(this.loadError(accountResult.reason, 'Failed to load accounts'));
     }
+    if (historyResult.status === 'fulfilled') {
+      this.entries.set(historyResult.value.rows);
+      this.historyTotal.set(historyResult.value.count);
+    } else {
+      errors.push(this.loadError(historyResult.reason, 'Failed to load expense history'));
+    }
+    this.error.set(errors.length > 0 ? errors.join('. ') : null);
+    this.loading.set(false);
+  }
+
+  private loadError(reason: unknown, fallback: string): string {
+    return reason instanceof Error ? reason.message : fallback;
   }
 
   protected onHistorySearch(value: string): void {

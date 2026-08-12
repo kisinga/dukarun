@@ -164,7 +164,7 @@ const TYPE_BADGE: Record<string, string> = {
 
         <div class="hidden lg:block">
           <app-data-table-shell
-            title="Pending decisions"
+            heading="Pending decisions"
             [description]="filteredPending().length + ' awaiting review'"
           >
             <table class="table table-sm">
@@ -245,7 +245,7 @@ const TYPE_BADGE: Record<string, string> = {
         </app-mobile-list>
         <div class="mt-2 hidden lg:block">
           <app-data-table-shell
-            title="Decided requests"
+            heading="Decided requests"
             [description]="filteredDecided().length + ' recent decisions'"
           >
             <table class="table table-sm">

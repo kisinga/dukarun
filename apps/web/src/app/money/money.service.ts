@@ -6,6 +6,7 @@ import { LocationContextService } from '../core/location-context.service';
 import { PartyCacheService } from '../core/party-cache.service';
 import { ActionExecutorService, type ActionOutcome } from '../core/action-executor.service';
 import { nairobiDayEndExclusive, nairobiDayStart } from '../core/nairobi-date';
+import { journalPageSelect } from './journal-query';
 
 export type LedgerAccount = Database['public']['Tables']['ledger_accounts']['Row'];
 export type JournalEntry = Database['public']['Tables']['ledger_journal_entries']['Row'];
@@ -358,17 +359,9 @@ export class MoneyService {
     sortBy?: 'posted_at' | 'source_type' | 'memo';
     sortDirection?: 'asc' | 'desc';
   }): Promise<{ rows: JournalEntryWithLines[]; count: number }> {
-    // Filter through a separate relation alias so matching an account never
+    // Filter through separate relation aliases so matching an account never
     // removes the journal entry's other side from the rendered transaction.
-    const filters = [
-      ...(input.requiredAccountCode
-        ? ['required_filter:ledger_journal_lines!inner(ledger_accounts!inner(code))']
-        : []),
-      ...(input.accountCode
-        ? ['account_filter:ledger_journal_lines!inner(ledger_accounts!inner(code))']
-        : []),
-    ];
-    const select = `*, ${filters.length ? filters.join(', ') + ', ' : ''}ledger_journal_lines!entry_id(*, ledger_accounts(code, name))`;
+    const select = journalPageSelect(input);
     let query = this.db.from('ledger_journal_entries').select(select, { count: 'exact' });
     if (input.requiredAccountCode) {
       query = query.eq('required_filter.ledger_accounts.code', input.requiredAccountCode);

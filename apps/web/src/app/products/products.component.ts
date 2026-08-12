@@ -1357,7 +1357,7 @@ interface PendingProductImage {
         </app-mobile-list>
         <div class="hidden lg:block">
           <app-data-table-shell
-            title="Product catalog"
+            heading="Product catalog"
             [description]="grouped().length + ' matching products'"
           >
             <table class="table table-sm">
