@@ -6,6 +6,7 @@ import {
   LegalDocumentVersion,
   PlatformService,
 } from '../../core/platform.service';
+import { PageHeaderComponent } from '../../shared/ui/page-header.component';
 
 const TYPES: { value: LegalDocumentType; label: string }[] = [
   { value: 'privacy', label: 'Privacy Notice' },
@@ -16,21 +17,18 @@ const TYPES: { value: LegalDocumentType; label: string }[] = [
 
 @Component({
   selector: 'app-legal',
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, PageHeaderComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="mx-auto max-w-7xl space-y-5">
-      <header class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p class="type-caption">Platform publishing</p>
-          <h1 class="type-title">Legal documents</h1>
-          <p class="mt-1 max-w-2xl text-sm text-base-content/65">
-            Paste approved Markdown from Git, compare its hash, preview it, then publish an
-            immutable snapshot.
-          </p>
-        </div>
-        <button type="button" class="btn btn-primary" (click)="newDraft()">New draft</button>
-      </header>
+      <app-page-header
+        title="Legal documents"
+        subtitle="Verify approved Markdown, preview changes and publish an immutable snapshot"
+      >
+        <button actions type="button" class="btn btn-primary min-h-11" (click)="newDraft()">
+          New draft
+        </button>
+      </app-page-header>
 
       @if (error() || notice()) {
         <div class="toast toast-end toast-top z-50 mt-14">

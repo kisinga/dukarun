@@ -297,6 +297,17 @@ export class PlatformService {
     if (error) throw rpcError(error);
   }
 
+  async deleteBlogPost(postId: string): Promise<void> {
+    const { error } = await this.db.rpc('platform_delete_blog_post', { p_post_id: postId });
+    if (!error) return;
+    if (error.message.includes('blog_post_has_registration_attributions')) {
+      throw new Error(
+        'This article is linked to registration attribution data. Unpublish it instead.'
+      );
+    }
+    throw rpcError(error);
+  }
+
   async uploadBlogMedia(postId: string, file: File): Promise<string> {
     const safeFile = await this.prepareBlogMedia(file);
     const extension = safeFile.name.split('.').pop()?.toLowerCase() || 'jpg';

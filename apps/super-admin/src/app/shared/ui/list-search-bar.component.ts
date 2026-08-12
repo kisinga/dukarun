@@ -5,11 +5,11 @@ import { NgIcon } from '@ng-icons/core';
 @Component({
   selector: 'app-list-search-bar',
   imports: [ReactiveFormsModule, NgIcon],
-  host: { class: 'mb-4 block' },
+  host: { class: 'mb-5 block' },
   template: `
-    <section class="card flex flex-col gap-3 bg-base-100 p-4">
+    <section class="card flex flex-col gap-3 bg-base-100 p-3 sm:p-3.5">
       <div class="flex flex-col gap-3 lg:flex-row lg:items-center">
-        <div class="relative min-w-0 lg:w-96 lg:flex-none">
+        <div class="relative min-w-0 lg:w-[24rem] lg:flex-none">
           <ng-icon
             name="heroMagnifyingGlass"
             class="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-base-content/40"

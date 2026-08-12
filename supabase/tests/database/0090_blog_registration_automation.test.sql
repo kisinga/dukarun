@@ -1,5 +1,5 @@
 begin;
-select plan(46);
+select plan(50);
 
 select ok(
   (select allowed_mime_types @> array['image/svg+xml']::text[]
@@ -239,6 +239,25 @@ set local role authenticated;
 set local request.jwt.claims = '{"sub":"90000000-0000-0000-0000-000000000001","role":"authenticated","is_platform_admin":true}';
 select is(jsonb_array_length(public.platform_site_deployments()), 1,
   'platform admin can inspect deployment status');
+reset role;
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"90000000-0000-0000-0000-000000000001","role":"authenticated","is_platform_admin":true}';
+select is(public.platform_archive_blog_post(
+  (select (result->>'post_id')::uuid from saved_blog)), true,
+  'platform admin can unpublish an article with a newer draft');
+select is(public.public_blog_post('stock-and-cash-basics'), null::jsonb,
+  'an unpublished article is no longer public');
+create temp table disposable_blog as
+select public.platform_save_blog_draft(
+  null,'delete-this-draft','Delete this draft','Disposable article','# Disposable','Dukarun team'
+) result;
+select is(public.platform_delete_blog_post(
+  (select (result->>'post_id')::uuid from disposable_blog)), true,
+  'platform admin can permanently delete an article');
+select is(public.platform_blog_post(
+  (select (result->>'post_id')::uuid from disposable_blog)), null::jsonb,
+  'the deleted article no longer exists');
 reset role;
 
 select * from finish();
