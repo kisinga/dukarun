@@ -9,7 +9,7 @@ const reviewMarkers =
 let failed = false;
 
 for (const type of types) {
-  const url = new URL(`../docs/legal/documents/${type}.md`, import.meta.url);
+  const url = new URL(`../../docs/legal/documents/${type}.md`, import.meta.url);
   const source = readFileSync(url, 'utf8');
   const normalized = source.replace(/\r\n?/g, '\n');
   const issues = [];

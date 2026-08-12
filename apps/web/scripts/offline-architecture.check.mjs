@@ -73,4 +73,4 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-console.log(`offline-safety-guard: ${checks.length} invariants passed.`);
+console.log(`offline-architecture: ${checks.length} invariants passed.`);

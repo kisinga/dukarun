@@ -18,7 +18,7 @@ The public applications read Supabase directly and do not ship a fallback copy.
 ## Publishing a version
 
 1. Edit the relevant Markdown file in `docs/legal/documents` and review it through Git.
-2. Run `node scripts/verify-legal-documents.mjs` and retain the printed hash.
+2. Run `node tools/verification/legal-documents.check.mjs` and retain the printed hash.
 3. In super-admin, create or open a draft, paste the Markdown, enter the version and dates, and save.
 4. Preview the draft and confirm that its calculated hash matches the Git hash.
 5. Publish the draft. Published snapshots are immutable and the previous version is superseded.

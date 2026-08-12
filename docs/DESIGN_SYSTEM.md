@@ -2,8 +2,8 @@
 
 This document is the normative spec for all Dukarun dashboard UI. It is short on purpose:
 the real enforcement lives in code — tokens in `apps/web/src/styles.scss` (`@theme` + global
-recipes), shared components in `apps/web/src/app/shared/ui/`, and the `design-guard` CI gate
-(`apps/web/scripts/design-guard.mjs`, run via `npm run design-guard` in `apps/web`). The frozen
+recipes), shared components in `apps/web/src/app/shared/ui/`, and the design CI gate
+(`apps/web/scripts/design.check.mjs`, run via `npm run check:design` in `apps/web`). The frozen
 Vendure dashboard lives at `archive/vendure/frontend/` and is not an active reference. If this
 doc and the active code disagree, **the code is wrong** — fix the code or update this doc in the
 same PR.
@@ -306,8 +306,8 @@ FAB or move it into the list toolbar.
 Every entity gets **one** detail surface and **one** edit surface, chosen by content
 weight — never improvised per page. The four legacy idioms (inline `tr.row-detail`
 entity detail, hand-rolled per-page modals, separate routes for inspection, inline
-top-of-page edit cards) are being retired; see `DETAIL_SURFACES_ROLLOUT.md` for the
-migration scope.
+top-of-page edit cards) are prohibited for drawer-backed entities. The rollout is
+complete; use the rules and explicit exceptions below for all new work.
 
 1. **Detail → the drawer (`app-drawer`).** The default for record detail. Row click
    opens it (no "View" buttons, per the row language); the row stays highlighted
@@ -426,7 +426,7 @@ vocabulary — same meaning, same shape; different data, different cells:
   tabular values, and `.table-actions` owns the final icon-action cell. These recipes and all
   cell spacing/hover/selected/footer states live in `styles.scss`; pages do not restyle them.
 
-## Enforcement checklist (review + `npm run design-guard` in `apps/web`)
+## Enforcement checklist (review + `npm run check:design` in `apps/web`)
 
 - [ ] No dashboard text > `text-2xl`; titles/hero numbers are `tracking-tight`; amounts are `tabular-nums`.
 - [ ] One card recipe; no nested bordered boxes; heavy shadows only on overlays.

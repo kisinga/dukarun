@@ -30,7 +30,7 @@ interface NavLink {
           </a>
 
           <div class="ml-auto hidden items-center gap-1 md:flex">
-            @for (link of links; track link.path) {
+            @for (link of links; track link.label) {
               <a
                 [routerLink]="link.path"
                 [fragment]="link.fragment"
@@ -70,7 +70,7 @@ interface NavLink {
         @if (menuOpen()) {
           <div class="border-t border-base-300/60 bg-base-100 md:hidden">
             <div class="mkt-container flex flex-col py-2">
-              @for (link of links; track link.path) {
+              @for (link of links; track link.label) {
                 <a
                   [routerLink]="link.path"
                   [fragment]="link.fragment"
@@ -114,7 +114,7 @@ interface NavLink {
           </div>
           <nav class="flex flex-col gap-1" aria-label="Pages">
             <span class="mkt-eyebrow mb-1">Pages</span>
-            @for (link of links; track link.path) {
+            @for (link of links; track link.label) {
               <a
                 [routerLink]="link.path"
                 [fragment]="link.fragment"

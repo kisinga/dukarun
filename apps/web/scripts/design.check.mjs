@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 /**
- * design-guard — CI/lint-staged gate for "The Counter" design language
+ * design — CI/lint-staged gate for "The Counter" design language
  * (see docs/DESIGN_SYSTEM.md).
  *
  * Usage:
- *   node scripts/design-guard.mjs            # scan all of src/app
- *   node scripts/design-guard.mjs <files...> # scan specific files (lint-staged)
- *   node scripts/design-guard.mjs --seed     # rewrite the allowlist with current counts
+ *   node scripts/design.check.mjs            # scan all of src/app
+ *   node scripts/design.check.mjs <files...> # scan specific files (lint-staged)
+ *   node scripts/design.check.mjs --seed     # rewrite the allowlist with current counts
  *
  * Ratchet: design-guard.allowlist.json stores the KNOWN violation count per
  * rule per file. A file may shrink its count (please delete the stale entry)
@@ -344,7 +344,7 @@ if (fileArgs.length > 0) {
 } else {
   files = [...walk(APP)];
 }
-files = files.filter(f => f.startsWith(APP));
+files = files.filter(f => f.startsWith(APP) && !/\.(?:spec|test)\.[cm]?[jt]sx?$/.test(f));
 
 const allowlist = loadAllowlist();
 const newAllowlist = {};

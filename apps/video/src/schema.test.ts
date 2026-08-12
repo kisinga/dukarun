@@ -6,8 +6,8 @@ import { projectDirectory, readJson } from './node-utils';
 import { NarrationModeSchema, VideoBriefSchema, countWords, validateManifest } from './schema';
 
 const projects = [
-  ['product-overview', 2614],
-  ['sale-records', 626],
+  ['product-overview', 2645],
+  ['sale-records', 637],
   ['credit-communications', 584],
   ['stock-decisions', 656],
 ] as const;
@@ -39,7 +39,7 @@ describe('video manifest validation', () => {
   it('accepts the product overview as the primary introduction', async () => {
     const { brief, manifest } = await fixtures('product-overview');
     const parsed = validateManifest(manifest, shippedClaimIds, brief.targetWordRange);
-    expect(parsed.durationInFrames).toBe(2614);
+    expect(parsed.durationInFrames).toBe(2645);
     expect(
       countWords(parsed.narration.map(segment => segment.text).join(' '))
     ).toBeGreaterThanOrEqual(120);

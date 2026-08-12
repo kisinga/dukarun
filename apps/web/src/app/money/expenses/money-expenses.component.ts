@@ -6,6 +6,7 @@ import { FormFieldComponent } from '../../shared/ui/form-field.component';
 import { JournalListComponent } from '../journal-list.component';
 import { JournalEntryWithLines, LedgerAccount, MoneyService } from '../money.service';
 import { CashierSessionService } from '../../core/cashier-session.service';
+import { errorMessage } from '../../core/error-message';
 import { SessionRequiredNoticeComponent } from '../../shared/ui/session-required-notice.component';
 import { IconComponent } from '../../shared/ui/icon.component';
 import {
@@ -77,17 +78,29 @@ import { DrawerComponent } from '../../shared/ui/drawer.component';
             <select
               class="select select-bordered select-sm w-full"
               [formControl]="account"
-              [attr.aria-busy]="loading()"
+              [attr.aria-busy]="accountsLoading()"
             >
               @if (accounts().length === 0) {
                 <option value="">
-                  {{ loading() ? 'Loading accounts…' : 'No accounts available' }}
+                  {{
+                    accountsLoading()
+                      ? 'Loading accounts…'
+                      : accountsError()
+                        ? 'Accounts unavailable — retry'
+                        : 'No accounts configured'
+                  }}
                 </option>
               }
               @for (a of accounts(); track a.code) {
                 <option [value]="a.code">{{ a.code }} — {{ a.name }}</option>
               }
             </select>
+            @if (accountsError()) {
+              <p class="mt-1 text-xs text-error" role="alert">
+                {{ accountsError() }}
+                <button type="button" class="link" (click)="load()">Retry</button>
+              </p>
+            }
           </app-form-field>
           <app-form-field label="Amount (KES)">
             <input
@@ -207,9 +220,15 @@ import { DrawerComponent } from '../../shared/ui/drawer.component';
         </div>
       </div>
     </app-list-search-bar>
+    @if (historyError()) {
+      <p class="mb-3 text-sm text-error" role="alert">
+        {{ historyError() }}
+        <button type="button" class="link" (click)="load()">Retry history</button>
+      </p>
+    }
     <app-journal-list
       [entries]="entries()"
-      [loading]="loading()"
+      [loading]="historyLoading()"
       emptyText="No expenses posted yet."
     />
     <app-pagination
@@ -236,7 +255,11 @@ export class MoneyExpensesComponent implements OnInit, OnDestroy {
   protected readonly category = new FormControl('', { nonNullable: true });
   protected readonly memo = new FormControl('', { nonNullable: true });
   protected readonly busy = signal(false);
-  protected readonly loading = signal(false);
+  protected readonly accountsLoading = signal(false);
+  protected readonly historyLoading = signal(false);
+  protected readonly loading = computed(() => this.accountsLoading() || this.historyLoading());
+  protected readonly accountsError = signal<string | null>(null);
+  protected readonly historyError = signal<string | null>(null);
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
   protected readonly formOpen = signal(false);
@@ -272,44 +295,57 @@ export class MoneyExpensesComponent implements OnInit, OnDestroy {
 
   protected async load(): Promise<void> {
     const sequence = ++this.loadSequence;
-    this.loading.set(true);
-    const [accountResult, historyResult] = await Promise.allSettled([
-      this.money.transactableAccounts(),
-      this.money.journalPage({
-        page: this.historyPage(),
-        pageSize: this.historyPageSize(),
-        // Expense history is account-driven so costs posted atomically with purchases appear too.
-        requiredAccountCode: 'EXPENSES',
-        search: this.historySearch(),
-        accountCode: this.historyAccount() || undefined,
-        from: this.historyFrom() || undefined,
-        to: this.historyTo() || undefined,
-        sortBy: this.historySort() as 'posted_at' | 'memo',
-        sortDirection: this.historyDirection(),
-      }),
-    ]);
-    if (sequence !== this.loadSequence) return;
+    this.accountsLoading.set(true);
+    this.historyLoading.set(true);
 
-    const errors: string[] = [];
-    if (accountResult.status === 'fulfilled') {
-      const accounts = accountResult.value;
-      this.accounts.set(accounts);
-      if (!this.account.value && accounts.length > 0) this.account.setValue(accounts[0].code);
-    } else {
-      errors.push(this.loadError(accountResult.reason, 'Failed to load accounts'));
-    }
-    if (historyResult.status === 'fulfilled') {
-      this.entries.set(historyResult.value.rows);
-      this.historyTotal.set(historyResult.value.count);
-    } else {
-      errors.push(this.loadError(historyResult.reason, 'Failed to load expense history'));
-    }
-    this.error.set(errors.length > 0 ? errors.join('. ') : null);
-    this.loading.set(false);
-  }
+    const accountTask = Promise.resolve()
+      .then(() => this.money.transactableAccounts())
+      .then(accounts => {
+        if (sequence !== this.loadSequence) return;
+        this.accounts.set(accounts);
+        this.accountsError.set(null);
+        if (!this.account.value && accounts.length > 0) this.account.setValue(accounts[0].code);
+      })
+      .catch(reason => {
+        if (sequence === this.loadSequence) {
+          this.accountsError.set(errorMessage(reason, 'Failed to load accounts'));
+        }
+      })
+      .finally(() => {
+        if (sequence === this.loadSequence) this.accountsLoading.set(false);
+      });
 
-  private loadError(reason: unknown, fallback: string): string {
-    return reason instanceof Error ? reason.message : fallback;
+    const historyTask = Promise.resolve()
+      .then(() =>
+        this.money.journalPage({
+          page: this.historyPage(),
+          pageSize: this.historyPageSize(),
+          // Expense history is account-driven so costs posted atomically with purchases appear too.
+          requiredAccountCode: 'EXPENSES',
+          search: this.historySearch(),
+          accountCode: this.historyAccount() || undefined,
+          from: this.historyFrom() || undefined,
+          to: this.historyTo() || undefined,
+          sortBy: this.historySort() as 'posted_at' | 'memo',
+          sortDirection: this.historyDirection(),
+        })
+      )
+      .then(result => {
+        if (sequence !== this.loadSequence) return;
+        this.entries.set(result.rows);
+        this.historyTotal.set(result.count);
+        this.historyError.set(null);
+      })
+      .catch(reason => {
+        if (sequence === this.loadSequence) {
+          this.historyError.set(errorMessage(reason, 'Failed to load expense history'));
+        }
+      })
+      .finally(() => {
+        if (sequence === this.loadSequence) this.historyLoading.set(false);
+      });
+
+    await Promise.all([accountTask, historyTask]);
   }
 
   protected onHistorySearch(value: string): void {
