@@ -5279,6 +5279,7 @@ export type Database = {
         Row: {
           client_ref: string | null
           company_id: string
+          credit_due_at: string | null
           created_at: string
           created_by: string | null
           goods_subtotal: number
@@ -5294,6 +5295,7 @@ export type Database = {
         Insert: {
           client_ref?: string | null
           company_id: string
+          credit_due_at?: string | null
           created_at?: string
           created_by?: string | null
           goods_subtotal?: number
@@ -5309,6 +5311,7 @@ export type Database = {
         Update: {
           client_ref?: string | null
           company_id?: string
+          credit_due_at?: string | null
           created_at?: string
           created_by?: string | null
           goods_subtotal?: number
@@ -7907,6 +7910,7 @@ export type Database = {
         Args: { p_code: string; p_is_default?: boolean; p_name: string }
         Returns: string
       }
+      credit_health_dashboard: { Args: { p_days?: number }; Returns: Json }
       credit_reminder_scan: { Args: never; Returns: number }
       current_access_snapshot: { Args: never; Returns: Json }
       current_company_id: { Args: never; Returns: string }
@@ -9745,4 +9749,3 @@ export const Constants = {
     Enums: {},
   },
 } as const
-
