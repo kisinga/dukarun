@@ -2571,11 +2571,11 @@ export class SuppliersComponent implements OnInit, OnDestroy {
 
   async ngOnInit(): Promise<void> {
     this.purchaseLocationFilter.set(this.locationContext.requireActiveId());
+    const params = this.route.snapshot.queryParamMap;
     if (this.isPurchasePage()) {
       if (window.history.state?.purchaseRecorded) {
         this.notice.set('Purchase recorded successfully. Stock and accounting are up to date.');
       }
-      const params = this.route.snapshot.queryParamMap;
       this.purchaseSupplierFilter.set(params.get('supplier') ?? 'all');
       this.purchasePaymentFilter.set(params.get('payment') ?? 'all');
       this.purchaseQuery.set(params.get('q') ?? '');
@@ -2591,6 +2591,11 @@ export class SuppliersComponent implements OnInit, OnDestroy {
     ]);
     this.printerEnabled.set(printerEnabled);
     await this.load();
+    if (!this.isPurchasePage()) {
+      const supplierId = params.get('supplier');
+      const supplier = supplierId ? this.suppliers().find(row => row.id === supplierId) : null;
+      if (supplier) this.openSupplierDrawer(supplier, false);
+    }
   }
 
   ngOnDestroy(): void {
@@ -3572,7 +3577,7 @@ export class SuppliersComponent implements OnInit, OnDestroy {
     }
   }
 
-  protected openSupplierDrawer(supplier: SupplierWithAp): void {
+  protected openSupplierDrawer(supplier: SupplierWithAp, updateUrl = true): void {
     this.drawerSupplierId.set(supplier.id);
     this.payPurchaseId.set(null);
     this.paySupplierId.setValue(supplier.id);
@@ -3592,6 +3597,14 @@ export class SuppliersComponent implements OnInit, OnDestroy {
     if (this.perms.has('ManageSupplierCreditPurchases') || this.perms.has('ViewFinancials')) {
       void this.refreshSupplierAdvance(supplier.id).catch(error => {
         this.error.set(error instanceof Error ? error.message : 'Could not load supplier advance');
+      });
+    }
+    if (updateUrl && !this.isPurchasePage()) {
+      void this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams: { supplier: supplier.id },
+        queryParamsHandling: 'merge',
+        replaceUrl: true,
       });
     }
   }
@@ -3658,6 +3671,14 @@ export class SuppliersComponent implements OnInit, OnDestroy {
     this.supplierCreating.set(false);
     this.drawerEditing.set(false);
     this.editingSupplier.set(null);
+    if (!this.isPurchasePage()) {
+      void this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams: { supplier: null },
+        queryParamsHandling: 'merge',
+        replaceUrl: true,
+      });
+    }
   }
 
   /** Edit in place: flip the open drawer to its form without closing it. */

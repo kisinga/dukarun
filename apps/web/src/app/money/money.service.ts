@@ -70,6 +70,73 @@ export type AgingInfo = {
   bucket: string | null;
 };
 
+export type CreditHealthSide = 'receivables' | 'payables';
+
+export interface CreditHealthAgingBucket {
+  side: CreditHealthSide;
+  bucket: 'current' | '1-30' | '31-60' | '60+' | 'unscheduled';
+  amount: number;
+  documents: number;
+}
+
+export interface CreditHealthUtilizationBucket {
+  bucket: 'under_50' | '50_80' | '80_100' | 'over_limit';
+  parties: number;
+  amount: number;
+}
+
+export interface CreditHealthConcentration {
+  party_id: string;
+  party_name: string;
+  amount: number;
+  share: number;
+}
+
+export interface CreditHealthCollectionAction {
+  party_id: string;
+  party_name: string;
+  outstanding: number;
+  credit_limit: number;
+  oldest_due_date: string | null;
+  days_overdue: number;
+  overdue_amount: number;
+  reason: string;
+}
+
+export interface CreditHealthPaymentAction {
+  party_id: string;
+  party_name: string;
+  outstanding: number;
+  due_amount: number;
+  next_due_date: string | null;
+  days_overdue: number;
+}
+
+export interface CreditHealthTrendPoint {
+  day: string;
+  receivables: number;
+  payables: number;
+}
+
+export interface CreditHealthDashboard {
+  generated_at: string;
+  metrics: {
+    receivables: number;
+    payables: number;
+    overdue_receivables: number;
+    severe_receivables: number;
+    payables_due_soon: number;
+    over_limit_parties: number;
+    top_five_concentration: number;
+  };
+  aging: CreditHealthAgingBucket[];
+  utilization: CreditHealthUtilizationBucket[];
+  concentration: CreditHealthConcentration[];
+  collect_now: CreditHealthCollectionAction[];
+  pay_soon: CreditHealthPaymentAction[];
+  trend: CreditHealthTrendPoint[];
+}
+
 export type JournalLineWithAccount = JournalLine & {
   ledger_accounts: Pick<LedgerAccount, 'code' | 'name'> | null;
 };
@@ -125,6 +192,14 @@ export class MoneyService {
   }
 
   // --- Reads ---
+
+  async creditHealthDashboard(days = 90): Promise<CreditHealthDashboard> {
+    const { data, error } = await this.db.rpc('credit_health_dashboard', {
+      p_days: Math.min(Math.max(Math.trunc(days), 30), 365),
+    });
+    if (error) throw rpcError(error);
+    return data as unknown as CreditHealthDashboard;
+  }
 
   /** Active postable asset accounts used by cash, bank, and mobile-money pickers. */
   async transactableAccounts(): Promise<LedgerAccount[]> {

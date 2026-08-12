@@ -5281,6 +5281,7 @@ export type Database = {
           company_id: string
           created_at: string
           created_by: string | null
+          credit_due_at: string | null
           goods_subtotal: number
           id: string
           is_credit: boolean
@@ -5296,6 +5297,7 @@ export type Database = {
           company_id: string
           created_at?: string
           created_by?: string | null
+          credit_due_at?: string | null
           goods_subtotal?: number
           id?: string
           is_credit?: boolean
@@ -5311,6 +5313,7 @@ export type Database = {
           company_id?: string
           created_at?: string
           created_by?: string | null
+          credit_due_at?: string | null
           goods_subtotal?: number
           id?: string
           is_credit?: boolean
@@ -7907,6 +7910,7 @@ export type Database = {
         Args: { p_code: string; p_is_default?: boolean; p_name: string }
         Returns: string
       }
+      credit_health_dashboard: { Args: { p_days?: number }; Returns: Json }
       credit_reminder_scan: { Args: never; Returns: number }
       current_access_snapshot: { Args: never; Returns: Json }
       current_company_id: { Args: never; Returns: string }
