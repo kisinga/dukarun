@@ -67,6 +67,11 @@ const CLOSE_MS = 150;
           <div class="flex-1 overflow-y-auto overscroll-contain p-5 sm:p-6">
             <ng-content />
           </div>
+          <footer
+            class="empty:hidden border-t border-base-300/70 bg-base-100/95 p-4 backdrop-blur sm:px-6"
+          >
+            <ng-content select="[footer]" />
+          </footer>
         </section>
       </div>
     }

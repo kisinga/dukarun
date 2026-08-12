@@ -42,25 +42,83 @@ import { PageHeaderComponent } from '../../shared/ui/page-header.component';
       <div class="alert alert-success mb-5" role="status">{{ notice() }}</div>
     }
 
-    <section
-      class="mb-5 grid overflow-hidden rounded-box border border-base-300/70 bg-base-100 shadow-card sm:grid-cols-4"
-      aria-label="Editorial overview"
-    >
-      @for (item of publicationSummary(); track item.label) {
-        <div
-          class="border-b border-base-300/60 px-4 py-3.5 last:border-0 sm:border-r sm:border-b-0 sm:last:border-r-0"
-        >
-          <span class="type-caption block">{{ item.label }}</span>
-          <strong class="mt-1 block text-lg font-semibold tabular-nums">{{ item.value }}</strong>
+    @if (metrics(); as m) {
+      <section
+        class="mb-6 overflow-hidden rounded-box border border-base-300/70 bg-base-100 shadow-card"
+        aria-labelledby="performance-heading"
+      >
+        <header class="flex flex-wrap items-start justify-between gap-3 px-5 py-4">
+          <div>
+            <h2 id="performance-heading" class="text-sm font-semibold">Editorial performance</h2>
+            <p class="mt-0.5 text-xs text-base-content/45">
+              How journal content is reaching and converting readers
+            </p>
+          </div>
+          <span class="rounded-full bg-base-200 px-3 py-1 text-xs font-medium text-base-content/55">
+            Last 30 days
+          </span>
+        </header>
+        <div class="grid border-t border-base-300/60 sm:grid-cols-5">
+          @for (card of metricCards(m); track card.label) {
+            <div
+              class="border-b border-base-300/60 px-5 py-4 last:border-b-0 sm:border-r sm:border-b-0 sm:last:border-r-0"
+            >
+              <p class="text-xs text-base-content/45">{{ card.label }}</p>
+              <strong
+                class="mt-1 block text-2xl font-semibold tracking-tight tabular-nums"
+                [class.text-primary]="card.label === 'Registrations'"
+                >{{ card.value }}</strong
+              >
+            </div>
+          }
         </div>
-      }
-    </section>
+        @if (m.posts.length) {
+          <details class="collapse collapse-arrow rounded-none border-t border-base-300/60">
+            <summary class="collapse-title min-h-12 px-5 py-3 text-sm font-semibold">
+              Article breakdown
+              <span class="ml-2 text-xs font-normal text-base-content/45">
+                {{ m.posts.length }} tracked
+              </span>
+            </summary>
+            <div class="collapse-content px-0 pb-0">
+              <div class="overflow-x-auto border-t border-base-300/60">
+                <table class="table table-sm">
+                  <thead>
+                    <tr>
+                      <th>Article</th>
+                      <th class="text-right">Views</th>
+                      <th class="text-right">Readers</th>
+                      <th class="text-right">CTA</th>
+                      <th class="text-right">Registrations</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (row of m.posts; track row.post_id) {
+                      <tr>
+                        <td>
+                          <strong>{{ row.title }}</strong>
+                          <span class="ml-2 text-xs text-base-content/40">/{{ row.slug }}</span>
+                        </td>
+                        <td class="text-right">{{ row.views }}</td>
+                        <td class="text-right">{{ row.unique_readers }}</td>
+                        <td class="text-right">{{ row.cta_clicks }}</td>
+                        <td class="text-right">{{ row.registrations }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </details>
+        }
+      </section>
+    }
 
     <div
       class="editor-shell grid items-start gap-5 lg:grid-cols-[16rem_minmax(0,1fr)] 2xl:grid-cols-[16rem_minmax(0,1fr)_19.5rem]"
     >
       <aside
-        class="order-3 overflow-hidden rounded-box border border-base-300/70 bg-base-100 shadow-card lg:order-none lg:col-start-1 lg:row-start-1 2xl:sticky 2xl:top-5"
+        class="order-1 overflow-hidden rounded-box border border-base-300/70 bg-base-100 shadow-card lg:order-none lg:col-start-1 lg:row-start-1 2xl:sticky 2xl:top-5"
       >
         <div class="border-b border-base-300/60 p-4">
           <div class="flex items-center justify-between gap-3">
@@ -131,7 +189,7 @@ import { PageHeaderComponent } from '../../shared/ui/page-header.component';
 
       <form class="contents" (submit)="$event.preventDefault(); save()">
         <main
-          class="order-1 min-w-0 overflow-hidden rounded-box border border-base-300/70 bg-base-100 shadow-card lg:col-start-2 lg:row-span-2 lg:row-start-1 2xl:col-start-auto 2xl:row-span-1"
+          class="order-2 min-w-0 overflow-hidden rounded-box border border-base-300/70 bg-base-100 shadow-card lg:col-start-2 lg:row-span-2 lg:row-start-1 2xl:col-start-auto 2xl:row-span-1"
         >
           <header
             class="sticky top-[4.5rem] z-20 flex min-h-16 flex-wrap items-center justify-between gap-3 border-b border-base-300/60 bg-base-100/95 px-5 py-3 backdrop-blur-md"
@@ -154,16 +212,6 @@ import { PageHeaderComponent } from '../../shared/ui/page-header.component';
               }
             </div>
             <div class="flex items-center gap-2">
-              @if (selected()?.publication_state === 'draft') {
-                <button
-                  type="button"
-                  class="btn btn-ghost btn-sm min-h-10 text-success"
-                  [disabled]="busy() || editorDirty()"
-                  (click)="publish()"
-                >
-                  Publish
-                </button>
-              }
               <button
                 type="submit"
                 class="btn btn-primary btn-sm min-h-10 px-5"
@@ -299,7 +347,7 @@ import { PageHeaderComponent } from '../../shared/ui/page-header.component';
         </main>
 
         <aside
-          class="editor-inspector order-2 space-y-4 lg:order-none lg:col-start-1 lg:row-start-2 2xl:col-start-3 2xl:row-start-1 2xl:sticky 2xl:top-5"
+          class="editor-inspector order-3 space-y-4 lg:order-none lg:col-start-1 lg:row-start-2 2xl:col-start-3 2xl:row-start-1 2xl:sticky 2xl:top-5"
         >
           <section class="rounded-box border border-base-300/70 bg-base-100 shadow-sm">
             <div class="border-b border-base-200 px-4 py-3">
@@ -541,58 +589,6 @@ import { PageHeaderComponent } from '../../shared/ui/page-header.component';
       </form>
     </div>
 
-    @if (metrics(); as m) {
-      <details
-        class="collapse collapse-arrow mt-6 rounded-box border border-base-300/70 bg-base-100"
-      >
-        <summary class="collapse-title min-h-16 py-4">
-          <span class="font-semibold">Performance</span>
-          <span class="ml-2 text-sm font-normal text-base-content/45">Last 30 days</span>
-        </summary>
-        <div class="collapse-content">
-          <div
-            class="grid gap-px overflow-hidden rounded-lg border border-base-200 bg-base-200 sm:grid-cols-5"
-          >
-            @for (card of metricCards(m); track card.label) {
-              <div class="bg-base-100 p-4">
-                <p class="text-xs text-base-content/45">{{ card.label }}</p>
-                <strong class="mt-1 block text-2xl font-semibold">{{ card.value }}</strong>
-              </div>
-            }
-          </div>
-          @if (m.posts.length) {
-            <div class="mt-5 overflow-x-auto">
-              <table class="table table-sm">
-                <thead>
-                  <tr>
-                    <th>Article</th>
-                    <th class="text-right">Views</th>
-                    <th class="text-right">Readers</th>
-                    <th class="text-right">CTA</th>
-                    <th class="text-right">Registrations</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @for (row of m.posts; track row.post_id) {
-                    <tr>
-                      <td>
-                        <strong>{{ row.title }}</strong>
-                        <span class="ml-2 text-xs text-base-content/40">/{{ row.slug }}</span>
-                      </td>
-                      <td class="text-right">{{ row.views }}</td>
-                      <td class="text-right">{{ row.unique_readers }}</td>
-                      <td class="text-right">{{ row.cta_clicks }}</td>
-                      <td class="text-right">{{ row.registrations }}</td>
-                    </tr>
-                  }
-                </tbody>
-              </table>
-            </div>
-          }
-        </div>
-      </details>
-    }
-
     @if (deployments().length) {
       <details
         class="collapse collapse-arrow mt-4 rounded-box border border-base-300/70 bg-base-100"
@@ -782,21 +778,6 @@ export class BlogComponent implements OnInit {
       ? this.posts().filter(post => `${post.title} ${post.slug}`.toLowerCase().includes(query))
       : this.posts();
   });
-  protected readonly publicationSummary = computed(() => {
-    const posts = this.posts();
-    return [
-      { label: 'Total articles', value: posts.length },
-      {
-        label: 'Published',
-        value: posts.filter(post => post.publication_state === 'published').length,
-      },
-      { label: 'Drafts', value: posts.filter(post => post.publication_state === 'draft').length },
-      {
-        label: 'Scheduled',
-        value: posts.filter(post => post.publication_state === 'scheduled').length,
-      },
-    ];
-  });
 
   async ngOnInit(): Promise<void> {
     this.updatePreview();
@@ -816,7 +797,7 @@ export class BlogComponent implements OnInit {
     return [
       { label: 'Views', value: m.views },
       { label: 'Unique readers', value: m.unique_readers },
-      { label: 'Engaged', value: m.engaged_readers },
+      { label: 'Engaged readers', value: m.engaged_readers },
       { label: 'CTA clicks', value: m.cta_clicks },
       { label: 'Registrations', value: m.registrations },
     ];

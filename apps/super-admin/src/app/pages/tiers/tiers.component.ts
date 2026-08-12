@@ -225,8 +225,12 @@ const FEATURE_FIELDS = [
         subtitle="Pricing, limits and capabilities"
         (closed)="editorClosed()"
       >
-        <form class="space-y-6" (submit)="$event.preventDefault(); save()">
-          <section class="space-y-3">
+        <form id="tier-editor-form" class="space-y-8" (submit)="$event.preventDefault(); save()">
+          @if (error()) {
+            <div class="alert alert-error text-sm" role="alert">{{ error() }}</div>
+          }
+
+          <section class="space-y-4">
             <div>
               <h3 class="section-title">Tier identity</h3>
               <p class="type-caption mt-1">The code is permanent after creation.</p>
@@ -256,7 +260,7 @@ const FEATURE_FIELDS = [
             }
           </section>
 
-          <section class="space-y-3 border-t border-base-300/60 pt-5">
+          <section class="space-y-4 border-t border-base-300/60 pt-6">
             <div>
               <h3 class="section-title">Pricing</h3>
               <p class="type-caption mt-1">Whole Kenyan shillings.</p>
@@ -281,28 +285,30 @@ const FEATURE_FIELDS = [
             </div>
           </section>
 
-          <section class="space-y-3 border-t border-base-300/60 pt-5">
+          <section class="space-y-4 border-t border-base-300/60 pt-6">
             <div>
               <h3 class="section-title">Usage limits</h3>
               <p class="type-caption mt-1">
                 Leave blank for unlimited; use zero to block new usage.
               </p>
             </div>
-            @for (field of limitFields; track field.key) {
-              <app-form-field [label]="field.label" [hint]="field.help">
-                <input
-                  type="number"
-                  min="0"
-                  class="input input-bordered w-full"
-                  [value]="limits()[field.key] ?? ''"
-                  (input)="setLimit(field.key, $any($event.target).value)"
-                />
-              </app-form-field>
-            }
+            <div class="grid gap-x-4 gap-y-5 sm:grid-cols-2">
+              @for (field of limitFields; track field.key) {
+                <app-form-field [label]="field.label" [hint]="field.help">
+                  <input
+                    type="number"
+                    min="0"
+                    class="input input-bordered w-full"
+                    [value]="limits()[field.key] ?? ''"
+                    (input)="setLimit(field.key, $any($event.target).value)"
+                  />
+                </app-form-field>
+              }
+            </div>
           </section>
 
-          <fieldset class="space-y-2 border-t border-base-300/60 pt-5">
-            <legend class="section-title">Capabilities</legend>
+          <fieldset class="space-y-2 border-t border-base-300/60 pt-6">
+            <legend class="section-title mb-2">Capabilities</legend>
             @for (field of featureFields; track field.key) {
               <label
                 class="flex min-h-11 cursor-pointer items-start gap-3 rounded-field px-2 py-2 hover:bg-base-200/60"
@@ -320,25 +326,29 @@ const FEATURE_FIELDS = [
               </label>
             }
           </fieldset>
-
-          <div
-            class="sticky bottom-0 -mx-4 flex gap-2 border-t border-base-300 bg-base-100 px-4 py-3"
-          >
-            <button
-              type="submit"
-              class="btn btn-primary min-h-11 flex-1"
-              [disabled]="busy() || name.value.trim().length === 0"
-            >
-              @if (busy()) {
-                <span class="loading loading-spinner loading-sm"></span>
-              }
-              {{ busy() ? 'Saving…' : editing() ? 'Save changes' : 'Create tier' }}
-            </button>
-            <button type="button" class="btn btn-ghost min-h-11" (click)="closeEditor()">
-              Cancel
-            </button>
-          </div>
         </form>
+
+        <div footer class="flex w-full flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <button
+            type="button"
+            class="btn btn-ghost min-h-11 sm:min-w-24"
+            [disabled]="busy()"
+            (click)="closeEditor()"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            form="tier-editor-form"
+            class="btn btn-primary min-h-11 sm:min-w-40"
+            [disabled]="busy() || name.value.trim().length === 0"
+          >
+            @if (busy()) {
+              <span class="loading loading-spinner loading-sm"></span>
+            }
+            {{ busy() ? 'Saving…' : editing() ? 'Save changes' : 'Create tier' }}
+          </button>
+        </div>
       </app-drawer>
     }
   `,
@@ -480,6 +490,7 @@ export class TiersComponent implements OnInit {
   }
 
   private openEditor(): void {
+    this.error.set(null);
     this.editorMounted.set(true);
     this.drawerOpen.set(true);
   }
