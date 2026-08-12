@@ -23,6 +23,11 @@ import { Component, input } from '@angular/core';
         @if (sub()) {
           <p class="mt-0.5 text-xs text-base-content/60">{{ sub() }}</p>
         }
+        @if (action()) {
+          <p class="mt-2 flex items-center gap-1 text-xs font-semibold text-primary">
+            {{ action() }} <span aria-hidden="true">→</span>
+          </p>
+        }
       </div>
     </div>
   `,
@@ -31,5 +36,6 @@ export class StatCardComponent {
   readonly label = input.required<string>();
   readonly value = input.required<string>();
   readonly sub = input<string>();
+  readonly action = input<string>();
   readonly tone = input<'neutral' | 'success' | 'error' | 'warning'>('neutral');
 }
