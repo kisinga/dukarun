@@ -78,21 +78,18 @@ const CLOSE_MS = 150;
             <ng-content />
           </div>
 
-          @if (hasFooter()) {
-            <footer
-              class="shrink-0 border-t border-base-300/70 bg-base-100 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:px-6"
-            >
-              <ng-content select="[drawerFooter]" />
-            </footer>
-          } @else {
-            <footer
-              class="shrink-0 border-t border-base-300/70 bg-base-100 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:hidden"
-            >
+          <footer
+            class="shrink-0 border-t border-base-300/70 bg-base-100 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:px-6"
+            [class.task-sheet-default-footer]="!hasFooter()"
+          >
+            <!-- Keep projection unconditional: hasFooter() is detected from this rendered slot. -->
+            <ng-content select="[drawerFooter]" />
+            @if (!hasFooter()) {
               <button appButton type="button" class="w-full" (click)="requestClose()">
                 {{ mobileDismissLabel() }}
               </button>
-            </footer>
-          }
+            }
+          </footer>
 
           @if (confirmDiscard()) {
             <div
@@ -151,6 +148,10 @@ const CLOSE_MS = 150;
     }
 
     @media (min-width: 768px) {
+      .task-sheet-default-footer {
+        display: none;
+      }
+
       .task-sheet-panel {
         top: 0;
         bottom: 0;
