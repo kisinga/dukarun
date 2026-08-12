@@ -257,9 +257,13 @@ import { BlogService, PublishedBlogPost } from './blog.service';
       line-height: 1.65;
     }
     :host ::ng-deep .blog-prose img {
-      margin: 2rem 0;
       width: 100%;
-      border-radius: 0.75rem;
+      border-radius: 0.9rem;
+      border: 1px solid color-mix(in oklab, var(--color-base-300) 70%, transparent);
+      box-shadow: var(--shadow-card);
+    }
+    :host ::ng-deep .blog-prose figure {
+      margin: 2.5rem 0;
     }
     :host ::ng-deep .blog-prose table {
       display: block;

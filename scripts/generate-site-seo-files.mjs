@@ -4,7 +4,18 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const baseUrl = new URL(process.env.SITE_PUBLIC_URL || 'http://localhost:4202');
-const routes = ['', 'about', 'contact', 'docs', 'blog', 'privacy', 'terms', 'dpa', 'subprocessors'];
+const routes = [
+  '',
+  'about',
+  'contact',
+  'docs',
+  'docs/hardware',
+  'blog',
+  'privacy',
+  'terms',
+  'dpa',
+  'subprocessors',
+];
 const urls = routes.map(route =>
   new URL(route, `${baseUrl.toString().replace(/\/+$/, '')}/`).toString()
 );

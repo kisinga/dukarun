@@ -429,6 +429,40 @@ import { PageHeaderComponent } from '../../shared/ui/page-header.component';
             </div>
           </section>
 
+          <section class="rounded-box border border-base-300/70 bg-base-100">
+            <div class="border-b border-base-200 px-4 py-3">
+              <h2 class="text-sm font-semibold">Article image</h2>
+            </div>
+            <div class="space-y-3 p-4">
+              <label class="form-control gap-1.5">
+                <span class="text-xs font-medium text-base-content/60">Image description</span>
+                <input
+                  class="input input-bordered input-sm w-full"
+                  maxlength="200"
+                  placeholder="What the screenshot shows"
+                  [formControl]="inlineImageAlt"
+                />
+              </label>
+              <label
+                class="flex min-h-11 cursor-pointer items-center justify-center rounded-lg border border-dashed border-base-300 bg-base-200/35 px-3 text-center text-xs font-semibold text-base-content/60 transition-colors hover:border-primary/40 hover:bg-primary/5"
+                [class.pointer-events-none]="!selected() || busy() || !inlineImageAlt.value.trim()"
+                [class.opacity-50]="!selected() || busy() || !inlineImageAlt.value.trim()"
+              >
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  class="sr-only"
+                  [disabled]="!selected() || busy() || !inlineImageAlt.value.trim()"
+                  (change)="uploadInlineImage($event)"
+                />
+                {{ selected() ? 'Upload and insert at cursor' : 'Save draft to upload' }}
+              </label>
+              <p class="mb-0 text-[0.68rem] leading-relaxed text-base-content/45">
+                JPEG, PNG, or WebP up to 5 MB. The description is required for accessibility.
+              </p>
+            </div>
+          </section>
+
           <details
             class="collapse collapse-arrow rounded-box border border-base-300/70 bg-base-100"
           >
@@ -626,6 +660,14 @@ import { PageHeaderComponent } from '../../shared/ui/page-header.component';
       padding-left: 1rem;
       color: color-mix(in oklab, var(--color-base-content) 68%, transparent);
     }
+    :host ::ng-deep .blog-preview figure {
+      margin: 1.5rem 0;
+    }
+    :host ::ng-deep .blog-preview img {
+      width: 100%;
+      border-radius: 0.75rem;
+      border: 1px solid var(--color-base-300);
+    }
     :host ::ng-deep .blog-preview pre {
       margin: 1.5rem 0;
       overflow-x: auto;
@@ -677,6 +719,7 @@ export class BlogComponent implements OnInit {
   protected readonly seoTitle = new FormControl('', { nonNullable: true });
   protected readonly seoDescription = new FormControl('', { nonNullable: true });
   protected readonly coverAlt = new FormControl('', { nonNullable: true });
+  protected readonly inlineImageAlt = new FormControl('', { nonNullable: true });
   protected readonly scheduledFor = new FormControl('', { nonNullable: true });
   protected readonly filteredPosts = computed(() => {
     const query = this.searchQuery().trim().toLowerCase();
@@ -737,6 +780,7 @@ export class BlogComponent implements OnInit {
     this.seoTitle.setValue('');
     this.seoDescription.setValue('');
     this.coverAlt.setValue('');
+    this.inlineImageAlt.setValue('');
     this.scheduledFor.setValue('');
     this.coverPath.set(null);
     this.coverUrl.set(null);
@@ -761,6 +805,7 @@ export class BlogComponent implements OnInit {
     this.seoTitle.setValue(post.seo_title ?? '');
     this.seoDescription.setValue(post.seo_description ?? '');
     this.coverAlt.setValue(post.cover_image_alt ?? '');
+    this.inlineImageAlt.setValue('');
     this.scheduledFor.setValue(post.scheduled_for ? this.localDateTime(post.scheduled_for) : '');
     this.coverPath.set(post.cover_image_path);
     this.coverUrl.set(this.platform.blogCoverUrl(post.cover_image_path));
@@ -846,7 +891,7 @@ export class BlogComponent implements OnInit {
     if (!id || this.editorDirty()) return;
     await this.run(async () => {
       await this.platform.publishBlogPost(id);
-      this.notice.set('Article published; SEO rebuild queued');
+      this.notice.set('Article published');
       await this.load(id);
     });
   }
@@ -885,21 +930,20 @@ export class BlogComponent implements OnInit {
     if (!id || !confirm('Archive this public article?')) return;
     await this.run(async () => {
       await this.platform.archiveBlogPost(id);
-      this.notice.set('Article archived; SEO rebuild queued');
+      this.notice.set('Article archived');
       await this.load();
       this.newPost();
     });
   }
 
   protected async uploadCover(event: Event): Promise<void> {
-    const file = (event.target as HTMLInputElement).files?.[0];
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
     const id = this.selected()?.post_id;
     if (!file || !id) return;
-    if (
-      file.size > 5 * 1024 * 1024 ||
-      !['image/jpeg', 'image/png', 'image/webp'].includes(file.type)
-    ) {
+    if (!this.validBlogImage(file)) {
       this.error.set('Use a JPEG, PNG, or WebP image up to 5 MB.');
+      input.value = '';
       return;
     }
     await this.run(async () => {
@@ -908,6 +952,63 @@ export class BlogComponent implements OnInit {
       this.coverUrl.set(this.platform.blogCoverUrl(path));
       this.coverChanged.set(true);
       this.notice.set('Cover uploaded; save the draft to attach it.');
+    });
+    input.value = '';
+  }
+
+  protected async uploadInlineImage(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    const id = this.selected()?.post_id;
+    const alt = this.inlineImageAlt.value.trim();
+    if (!file || !id || !alt) {
+      this.error.set('Describe the image before uploading it.');
+      input.value = '';
+      return;
+    }
+    if (!this.validBlogImage(file)) {
+      this.error.set('Use a JPEG, PNG, or WebP image up to 5 MB.');
+      input.value = '';
+      return;
+    }
+    const editor = this.markdownEditor?.nativeElement;
+    const start = editor?.selectionStart ?? this.markdown.value.length;
+    const end = editor?.selectionEnd ?? start;
+    await this.run(async () => {
+      const path = await this.platform.uploadBlogMedia(id, file);
+      const url = this.platform.blogMediaUrl(path);
+      const imageMarkdown = `![${alt.replaceAll(']', '')}](${url})`;
+      this.insertMarkdownBlock(imageMarkdown, start, end);
+      this.inlineImageAlt.setValue('');
+      this.notice.set('Image uploaded and inserted; save the draft to keep the change.');
+    });
+    input.value = '';
+  }
+
+  private validBlogImage(file: File): boolean {
+    return (
+      file.size <= 5 * 1024 * 1024 && ['image/jpeg', 'image/png', 'image/webp'].includes(file.type)
+    );
+  }
+
+  private insertMarkdownBlock(markdown: string, start: number, end: number): void {
+    const value = this.markdown.value;
+    const before = value.slice(0, start);
+    const after = value.slice(end);
+    const prefix =
+      before.length > 0 && !before.endsWith('\n\n') ? (before.endsWith('\n') ? '\n' : '\n\n') : '';
+    const suffix =
+      after.length > 0 && !after.startsWith('\n\n') ? (after.startsWith('\n') ? '\n' : '\n\n') : '';
+    const inserted = `${prefix}${markdown}${suffix}`;
+    this.markdown.setValue(before + inserted + after);
+    this.markdown.markAsDirty();
+    this.updatePreview();
+    requestAnimationFrame(() => {
+      const editor = this.markdownEditor?.nativeElement;
+      if (!editor) return;
+      const cursor = before.length + inserted.length;
+      editor.focus();
+      editor.setSelectionRange(cursor, cursor);
     });
   }
 

@@ -31,7 +31,7 @@ const HTML_HEADERS = {
   'Content-Type': 'text/html; charset=utf-8',
   'Cache-Control': 'no-store',
   'X-Content-Type-Options': 'nosniff',
-  'Content-Security-Policy': "default-src 'none'; img-src https:; style-src 'unsafe-inline'",
+  'Content-Security-Policy': "default-src 'none'; img-src 'self' https:; style-src 'unsafe-inline'",
 };
 
 function response(body: string, contentType: string, status = 200): Response {

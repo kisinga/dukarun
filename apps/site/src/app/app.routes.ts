@@ -68,6 +68,16 @@ export const routes: Routes = [
           import('./marketing/contact/contact.component').then(m => m.ContactComponent),
       },
       {
+        path: 'docs/hardware',
+        title: 'Barcode scanners and printer setup | Dukarun',
+        data: {
+          description:
+            'Set up phone scanning, USB barcode scanners, label printers, and receipt printers for Dukarun.',
+        },
+        loadComponent: () =>
+          import('./marketing/docs/hardware.component').then(m => m.HardwareComponent),
+      },
+      {
         path: 'docs',
         title: 'Getting started | Dukarun',
         data: { description: 'Learn how to set up Dukarun, sell, sync, and close the day.' },

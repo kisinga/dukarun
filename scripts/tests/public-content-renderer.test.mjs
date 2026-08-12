@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { renderSafeMarkdown as renderBrowserMarkdown } from '../../packages/legal-markdown.ts';
 import {
   parsePublicContentRoute,
   renderBlogArticle,
+  renderSafeMarkdown,
   renderProduct,
   renderSiteSitemap,
   renderStorefrontSitemap,
@@ -93,6 +95,29 @@ test('dynamic sitemap contains current blog revisions', () => {
   ]);
   assert.match(sitemap, /<loc>https:\/\/dukarun\.com\/blog\/stock-control<\/loc>/);
   assert.match(sitemap, /<lastmod>2026-08-12T07:00:00\.000Z<\/lastmod>/);
+  assert.match(sitemap, /<loc>https:\/\/dukarun\.com\/docs\/hardware<\/loc>/);
+});
+
+test('safe markdown renders accessible block images from approved sources', () => {
+  const source =
+    'Before\n\n![Phone scanning a service](/assets/blog/scan.svg)\n\n![Closing summary](https://cdn.example/closing.webp)';
+  const html = renderSafeMarkdown(source);
+  assert.match(
+    html,
+    /<figure><img src="\/assets\/blog\/scan\.svg" alt="Phone scanning a service" loading="lazy" decoding="async"><\/figure>/
+  );
+  assert.match(html, /src="https:\/\/cdn\.example\/closing\.webp" alt="Closing summary"/);
+  assert.equal(renderBrowserMarkdown(source).html, html);
+});
+
+test('safe markdown leaves unsafe or inaccessible image syntax inert', () => {
+  const html = renderSafeMarkdown(
+    '![Unsafe](javascript:alert(1))\n\n![](https://cdn.example/no-alt.webp)\n\n![Data](data:image/png;base64,abc)\n\n<script>alert(1)</script>'
+  );
+  assert.doesNotMatch(html, /<img/);
+  assert.doesNotMatch(html, /<script>alert/);
+  assert.match(html, /!\[Unsafe\]/);
+  assert.match(html, /&lt;script&gt;alert/);
 });
 
 test('storefront sitemap contains current shops and products', () => {

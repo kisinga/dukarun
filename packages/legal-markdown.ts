@@ -35,6 +35,16 @@ function inline(value: string): string {
     .replace(/(^|[^*])\*([^*]+)\*/g, '$1<em>$2</em>');
 }
 
+function safeImageSource(value: string): string | null {
+  if (/^\/(?!\/)/.test(value)) return value;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
 function slug(value: string, used: Set<string>): string {
   const base =
     value
@@ -75,6 +85,28 @@ export function renderLegalMarkdown(
     if (!line) {
       closeParagraph();
       closeList();
+      continue;
+    }
+
+    const image = /^!\[([^\]]+)]\(([^)\s]+)\)$/.exec(line);
+    if (image) {
+      closeParagraph();
+      closeList();
+      const src = safeImageSource(image[2]);
+      const alt = image[1].trim();
+      if (src && alt) {
+        html.push(
+          `<figure><img src="${escapeHtml(src)}" alt="${escapeHtml(alt)}" loading="lazy" decoding="async"></figure>`
+        );
+      } else {
+        html.push(`<p>${escapeHtml(line)}</p>`);
+      }
+      continue;
+    }
+    if (line.startsWith('![')) {
+      closeParagraph();
+      closeList();
+      html.push(`<p>${escapeHtml(line)}</p>`);
       continue;
     }
 

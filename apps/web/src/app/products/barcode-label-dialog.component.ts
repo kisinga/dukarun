@@ -5,6 +5,7 @@ import { PosService, rpcError, variantLabel, type Variant } from '../pos/pos.ser
 import { ButtonComponent } from '../shared/ui/button.component';
 import { IconComponent } from '../shared/ui/icon.component';
 import { PermissionsService } from '../core/permissions.service';
+import { siteUrl } from '../core/public-url';
 import {
   BarcodeLabelPrintService,
   BarcodeLabelRenderError,
@@ -29,6 +30,14 @@ const LABEL_LAYOUT_KEY = 'dukarun-barcode-label-layout';
             <p class="type-caption mt-1">
               Labels contain the item name, variant, SKU, and barcode. Prices are not printed.
             </p>
+            <a
+              [href]="hardwareGuideUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="link link-primary mt-1 inline-flex min-h-11 items-center text-xs font-medium"
+            >
+              Printer and paper setup
+            </a>
           </div>
           <button
             appButton
@@ -208,6 +217,7 @@ export class BarcodeLabelDialogComponent {
   private readonly cache = inject(CatalogCacheService);
   private readonly labels = inject(BarcodeLabelPrintService);
   protected readonly perms = inject(PermissionsService);
+  protected readonly hardwareGuideUrl = siteUrl('/docs/hardware');
 
   readonly mode = input.required<'catalogue' | 'single'>();
   readonly variants = input.required<Variant[]>();

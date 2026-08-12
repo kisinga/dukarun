@@ -20,7 +20,17 @@ function requireMatchingSocialTitle(html, label) {
   }
 }
 
-for (const route of ['', 'about', 'contact', 'docs', 'privacy', 'terms', 'dpa', 'subprocessors']) {
+for (const route of [
+  '',
+  'about',
+  'contact',
+  'docs',
+  'docs/hardware',
+  'privacy',
+  'terms',
+  'dpa',
+  'subprocessors',
+]) {
   const html = requireFile(resolve(site, route, 'index.html'));
   for (const marker of [
     '<html lang="en-KE"',
@@ -68,6 +78,13 @@ if (!siteRobots.includes(`Sitemap: ${siteOrigin}/sitemap.xml`)) {
 }
 if (!siteIndex.includes('"@type":"FAQPage"')) {
   throw new Error('Site root is missing FAQPage structured data.');
+}
+
+const hardwareDocs = requireFile(resolve(site, 'docs/hardware/index.html'));
+for (const marker of ['phone camera', '50 × 30 mm', '52 mm and 80 mm', 'system print dialog']) {
+  if (!hardwareDocs.includes(marker)) {
+    throw new Error(`Prerendered hardware documentation is missing: ${marker}`);
+  }
 }
 
 const privacy = requireFile(resolve(site, 'privacy/index.html'));
