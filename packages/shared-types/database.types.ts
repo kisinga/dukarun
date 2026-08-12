@@ -8276,10 +8276,6 @@ export type Database = {
       }
       platform_blog_post: { Args: { p_post_id: string }; Returns: Json }
       platform_blog_posts: { Args: never; Returns: Json }
-      platform_feature_blog_post: {
-        Args: { p_post_id: string }
-        Returns: boolean
-      }
       platform_campaign_metrics: {
         Args: { p_campaign_id: string }
         Returns: Json
@@ -8324,6 +8320,10 @@ export type Database = {
       platform_external_communication_metrics: {
         Args: { p_since?: string }
         Returns: Json
+      }
+      platform_feature_blog_post: {
+        Args: { p_post_id: string }
+        Returns: boolean
       }
       platform_launch_campaign: {
         Args: { p_campaign_id: string; p_scheduled_for?: string }
@@ -8791,7 +8791,6 @@ export type Database = {
       }
       public_billing_config: { Args: never; Returns: Json }
       public_blog_post: { Args: { p_slug: string }; Returns: Json }
-      public_featured_blog_post: { Args: never; Returns: Json }
       public_blog_posts: {
         Args: {
           p_before?: string
@@ -8802,9 +8801,10 @@ export type Database = {
         Returns: Json
       }
       public_blog_sitemap: { Args: never; Returns: Json }
-      public_storefront_sitemap: { Args: never; Returns: Json }
       public_customer_statement: { Args: { p_token: string }; Returns: Json }
       public_external_document: { Args: { p_token: string }; Returns: Json }
+      public_featured_blog_post: { Args: never; Returns: Json }
+      public_storefront_sitemap: { Args: never; Returns: Json }
       publish_due_blog_posts: { Args: never; Returns: number }
       published_legal_document: {
         Args: { p_document_type: string }
@@ -9741,3 +9741,4 @@ export const Constants = {
     Enums: {},
   },
 } as const
+
