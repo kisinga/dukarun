@@ -39,6 +39,7 @@
     "sb:test": "supabase test db",
     "prototype:prepayments": "node --no-warnings prototypes/prepayments/verify.mjs",
     "sb:test:communications-concurrency": "node scripts/test-communications-concurrency.mjs",
+    "sb:test:ledger-concurrency": "node scripts/test-ledger-concurrency.mjs",
     "sb:test:fresh": "supabase db reset && supabase test db",
     "sb:lint": "supabase db lint",
     "test:barcode-hardware": "node --no-warnings --experimental-strip-types --test scripts/tests/barcode-hardware.test.mjs",

@@ -3147,6 +3147,7 @@ export type Database = {
           company_id: string
           created_at: string
           entry_date: string
+          finalized_at: string | null
           id: string
           memo: string | null
           payload_hash: string | null
@@ -3159,6 +3160,7 @@ export type Database = {
           company_id: string
           created_at?: string
           entry_date: string
+          finalized_at?: string | null
           id?: string
           memo?: string | null
           payload_hash?: string | null
@@ -3171,6 +3173,7 @@ export type Database = {
           company_id?: string
           created_at?: string
           entry_date?: string
+          finalized_at?: string | null
           id?: string
           memo?: string | null
           payload_hash?: string | null
@@ -8083,6 +8086,10 @@ export type Database = {
       }
       issue_customer_statement_link: {
         Args: { p_company_id: string; p_customer_id: string }
+        Returns: string
+      }
+      journal_entry_payload_hash: {
+        Args: { p_entry_id: string }
         Returns: string
       }
       journal_payload_hash: {
