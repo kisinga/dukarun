@@ -146,7 +146,7 @@ fi
 
 if [ "$SYNC_FUNCTIONS" = "1" ]; then
   echo "→ syncing edge functions to ${SSH_HOST}:${FUNCTIONS_VOLUME}"
-  for fn in _shared paystack-charge paystack-webhook notification-flush platform-message-test site-deploy; do
+  for fn in _shared paystack-charge paystack-webhook notification-flush platform-message-test public-content-renderer site-deploy; do
     rsync -az --delete -e "ssh ${SSH_OPTS[*]}" \
       "supabase/functions/${fn}/" "${SSH_HOST}:${FUNCTIONS_VOLUME}/${fn}/"
   done

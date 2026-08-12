@@ -109,6 +109,8 @@ export interface PlatformBlogPost {
   seo_description: string | null;
   scheduled_for: string | null;
   published_at: string | null;
+  featured_at: string | null;
+  has_published_version: boolean;
   archived_at: string | null;
   created_at: string;
   updated_at: string;
@@ -267,6 +269,11 @@ export class PlatformService {
 
   async publishBlogPost(postId: string): Promise<void> {
     const { error } = await this.db.rpc('platform_publish_blog_post', { p_post_id: postId });
+    if (error) throw rpcError(error);
+  }
+
+  async featureBlogPost(postId: string): Promise<void> {
+    const { error } = await this.db.rpc('platform_feature_blog_post', { p_post_id: postId });
     if (error) throw rpcError(error);
   }
 

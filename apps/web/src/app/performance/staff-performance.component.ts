@@ -12,6 +12,10 @@ import { PageLayoutComponent } from '../shared/ui/page-layout.component';
 import { StatCardComponent } from '../shared/ui/stat-card.component';
 import { StatusBadgeComponent } from '../shared/ui/status-badge.component';
 import { PerformanceService, StaffDailyPerformance, StaffPerformance } from './performance.service';
+import { ListSearchBarComponent } from '../shared/ui/list-search-bar.component';
+import { MobileListComponent } from '../shared/ui/mobile-list.component';
+import { StatBarComponent } from '../shared/ui/stat-bar.component';
+import { PageActionsComponent } from '../shared/ui/page-actions.component';
 
 @Component({
   selector: 'app-staff-performance',
@@ -27,6 +31,10 @@ import { PerformanceService, StaffDailyPerformance, StaffPerformance } from './p
     PageLayoutComponent,
     StatCardComponent,
     StatusBadgeComponent,
+    ListSearchBarComponent,
+    MobileListComponent,
+    StatBarComponent,
+    PageActionsComponent,
   ],
   template: `
     <app-page
@@ -34,39 +42,51 @@ import { PerformanceService, StaffDailyPerformance, StaffPerformance } from './p
       subtitle="Sales value, volume, collections, refunds, voids, margin, and held (unpaid) sales by salesperson."
       [wide]="true"
     >
-      <button
-        actions
-        appButton
-        variant="ghost"
-        [iconOnly]="true"
-        [loading]="loading()"
-        type="button"
-        title="Refresh performance"
-        aria-label="Refresh performance"
-        (click)="load()"
-      >
-        <app-icon name="heroArrowPath" />
-      </button>
+      <app-page-actions actions>
+        <button
+          utilityAction
+          appButton
+          variant="ghost"
+          [iconOnly]="true"
+          [loading]="loading()"
+          type="button"
+          title="Refresh performance"
+          aria-label="Refresh performance"
+          (click)="load()"
+        >
+          <app-icon name="heroArrowPath" />
+        </button>
+      </app-page-actions>
 
-      <div class="card mb-4 bg-base-100">
-        <div class="card-body flex-row flex-wrap items-end gap-3 p-4">
+      <app-list-search-bar
+        placeholder="Search name, role, or status…"
+        [searchQuery]="searchQuery()"
+        (searchQueryChange)="searchQuery.set($event)"
+        [filtersEnabled]="true"
+        [activeFilterCount]="performanceFilterCount()"
+        (clearFilters)="clearPerformanceFilters()"
+        filterSheetTitle="Performance period"
+      >
+        <app-stat-bar summary [stats]="performanceStats()" />
+        <div filters class="grid grid-cols-2 gap-3 md:flex md:items-end">
           <app-form-field label="From">
-            <input type="date" class="input input-bordered input-sm" [formControl]="from" />
-          </app-form-field>
-          <app-form-field label="To">
-            <input type="date" class="input input-bordered input-sm" [formControl]="to" />
-          </app-form-field>
-          <app-form-field label="Find staff" class="min-w-56 flex-1">
             <input
-              type="search"
+              type="date"
               class="input input-bordered input-sm w-full"
-              placeholder="Name, role, or status…"
-              [formControl]="search"
+              [formControl]="from"
+              (change)="load()"
             />
           </app-form-field>
-          <button appButton type="button" [loading]="loading()" (click)="load()">Apply</button>
+          <app-form-field label="To">
+            <input
+              type="date"
+              class="input input-bordered input-sm w-full"
+              [formControl]="to"
+              (change)="load()"
+            />
+          </app-form-field>
         </div>
-      </div>
+      </app-list-search-bar>
 
       @if (error()) {
         <div role="alert" class="alert alert-error mb-4 text-sm">
@@ -74,48 +94,6 @@ import { PerformanceService, StaffDailyPerformance, StaffPerformance } from './p
           <span>{{ error() }}</span>
         </div>
       }
-
-      <div class="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4 xl:grid-cols-7">
-        <app-stat-card
-          label="Net sales"
-          [value]="fmt(totals().netSales)"
-          [sub]="
-            comparisonLabel(totals().netSales, previousTotals().netSales) + ' vs previous period'
-          "
-        />
-        <app-stat-card
-          label="Gross sales"
-          [value]="fmt(totals().grossSales)"
-          sub="Completed checkouts"
-        />
-        <app-stat-card
-          label="Transactions"
-          [value]="String(totals().transactions)"
-          sub="Completed checkouts"
-        />
-        <app-stat-card
-          label="Quantity"
-          [value]="quantity(totals().quantity)"
-          sub="Net sold line quantity"
-        />
-        <app-stat-card
-          label="Collected"
-          [value]="fmt(totals().collected)"
-          sub="Net payment events"
-        />
-        <app-stat-card
-          label="Margin"
-          [value]="fmt(totals().margin)"
-          sub="Net sales less COGS"
-          [tone]="totals().margin < 0 ? 'error' : 'success'"
-        />
-        <app-stat-card
-          label="Refunds + voids"
-          [value]="fmt(totals().refunds + totals().voided)"
-          sub="Reversed value"
-          tone="warning"
-        />
-      </div>
 
       @if (!loading() && filteredRows().length === 0) {
         <app-empty-state
@@ -125,82 +103,113 @@ import { PerformanceService, StaffDailyPerformance, StaffPerformance } from './p
           description="Try a wider date range or complete the first sale."
         />
       } @else {
-        <app-data-table-shell
-          title="Salesperson leaderboard"
-          [description]="filteredRows().length + ' staff records · click a row for daily detail'"
-        >
-          <table class="table table-sm">
-            <thead>
-              <tr>
-                <th>Staff member</th>
-                <th class="text-right">Transactions</th>
-                <th class="text-right">Quantity</th>
-                <th class="text-right">Gross sales</th>
-                <th class="text-right">Refunds / voids</th>
-                <th class="text-right">Net sales</th>
-                <th class="text-right">Vs previous</th>
-                <th class="text-right">Collected</th>
-                <th class="text-right">Margin</th>
-                <th class="text-right">Average</th>
-                <th class="text-right">Held (unpaid)</th>
-                <th class="text-right">Held value</th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (row of filteredRows(); track row.staff_user_id ?? row.display_name) {
-                <tr
-                  role="button"
-                  tabindex="0"
-                  class="cursor-pointer"
-                  [class.table-row-active]="selected()?.staff_user_id === row.staff_user_id"
-                  (click)="selectStaff(row)"
-                  (keydown.enter)="selectStaff(row)"
-                >
-                  <td>
-                    <span class="font-semibold">{{ row.display_name }}</span>
-                    <div class="mt-1 flex items-center gap-2">
-                      <span class="type-caption">{{ row.role_name || 'No current role' }}</span>
-                      <app-status-badge
-                        size="xs"
-                        [type]="row.authorization_status === 'approved' ? 'neutral' : 'warning'"
-                        [label]="row.authorization_status"
-                      />
-                    </div>
-                  </td>
-                  <td class="text-right">{{ row.transactions }}</td>
-                  <td class="text-right">{{ quantity(row.quantity) }}</td>
-                  <td class="text-right"><app-money [amount]="row.gross_sales" /></td>
-                  <td class="text-right text-warning">
-                    <app-money [amount]="row.refunds + row.voided_sales" />
-                  </td>
-                  <td class="text-right font-semibold"><app-money [amount]="row.net_sales" /></td>
-                  <td
-                    class="text-right"
-                    [class.text-success]="staffComparison(row) >= 0"
-                    [class.text-error]="staffComparison(row) < 0"
-                  >
-                    {{ comparisonLabel(row.net_sales, previousFor(row)?.net_sales ?? 0) }}
-                  </td>
-                  <td class="text-right"><app-money [amount]="row.collected" /></td>
-                  <td
-                    class="text-right"
-                    [class.text-success]="row.margin > 0"
-                    [class.text-error]="row.margin < 0"
-                  >
-                    <app-money [amount]="row.margin" />
-                  </td>
-                  <td class="text-right"><app-money [amount]="row.average_sale" /></td>
-                  <td class="text-right" [class.text-warning]="row.held_count > 0">
-                    {{ row.held_count }}
-                  </td>
-                  <td class="text-right" [class.text-warning]="row.held_value > 0">
-                    <app-money [amount]="row.held_value" />
-                  </td>
+        <app-mobile-list>
+          @for (row of filteredRows(); track row.staff_user_id ?? row.display_name) {
+            <button
+              mobileListRow
+              type="button"
+              class="flex min-h-20 w-full items-center gap-3 p-3 text-left"
+              [class.bg-base-200/50]="selected()?.staff_user_id === row.staff_user_id"
+              (click)="selectStaff(row)"
+            >
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2">
+                  <span class="truncate font-semibold">{{ row.display_name }}</span>
+                  <app-status-badge
+                    size="xs"
+                    [type]="row.authorization_status === 'approved' ? 'neutral' : 'warning'"
+                    [label]="row.authorization_status"
+                  />
+                </div>
+                <p class="type-caption mt-1 truncate">
+                  {{ row.role_name || 'No current role' }} · {{ row.transactions }} transactions
+                </p>
+              </div>
+              <div class="shrink-0 text-right">
+                <p class="font-semibold tabular-nums"><app-money [amount]="row.net_sales" /></p>
+                <p class="type-caption">collected <app-money [amount]="row.collected" /></p>
+              </div>
+            </button>
+          }
+        </app-mobile-list>
+        <div class="hidden lg:block">
+          <app-data-table-shell
+            title="Salesperson leaderboard"
+            [description]="filteredRows().length + ' staff records · click a row for daily detail'"
+          >
+            <table class="table table-sm">
+              <thead>
+                <tr>
+                  <th>Staff member</th>
+                  <th class="text-right">Transactions</th>
+                  <th class="text-right">Quantity</th>
+                  <th class="text-right">Gross sales</th>
+                  <th class="text-right">Refunds / voids</th>
+                  <th class="text-right">Net sales</th>
+                  <th class="text-right">Vs previous</th>
+                  <th class="text-right">Collected</th>
+                  <th class="text-right">Margin</th>
+                  <th class="text-right">Average</th>
+                  <th class="text-right">Held (unpaid)</th>
+                  <th class="text-right">Held value</th>
                 </tr>
-              }
-            </tbody>
-          </table>
-        </app-data-table-shell>
+              </thead>
+              <tbody>
+                @for (row of filteredRows(); track row.staff_user_id ?? row.display_name) {
+                  <tr
+                    role="button"
+                    tabindex="0"
+                    class="cursor-pointer"
+                    [class.table-row-active]="selected()?.staff_user_id === row.staff_user_id"
+                    (click)="selectStaff(row)"
+                    (keydown.enter)="selectStaff(row)"
+                  >
+                    <td>
+                      <span class="font-semibold">{{ row.display_name }}</span>
+                      <div class="mt-1 flex items-center gap-2">
+                        <span class="type-caption">{{ row.role_name || 'No current role' }}</span>
+                        <app-status-badge
+                          size="xs"
+                          [type]="row.authorization_status === 'approved' ? 'neutral' : 'warning'"
+                          [label]="row.authorization_status"
+                        />
+                      </div>
+                    </td>
+                    <td class="text-right">{{ row.transactions }}</td>
+                    <td class="text-right">{{ quantity(row.quantity) }}</td>
+                    <td class="text-right"><app-money [amount]="row.gross_sales" /></td>
+                    <td class="text-right text-warning">
+                      <app-money [amount]="row.refunds + row.voided_sales" />
+                    </td>
+                    <td class="text-right font-semibold"><app-money [amount]="row.net_sales" /></td>
+                    <td
+                      class="text-right"
+                      [class.text-success]="staffComparison(row) >= 0"
+                      [class.text-error]="staffComparison(row) < 0"
+                    >
+                      {{ comparisonLabel(row.net_sales, previousFor(row)?.net_sales ?? 0) }}
+                    </td>
+                    <td class="text-right"><app-money [amount]="row.collected" /></td>
+                    <td
+                      class="text-right"
+                      [class.text-success]="row.margin > 0"
+                      [class.text-error]="row.margin < 0"
+                    >
+                      <app-money [amount]="row.margin" />
+                    </td>
+                    <td class="text-right"><app-money [amount]="row.average_sale" /></td>
+                    <td class="text-right" [class.text-warning]="row.held_count > 0">
+                      {{ row.held_count }}
+                    </td>
+                    <td class="text-right" [class.text-warning]="row.held_value > 0">
+                      <app-money [amount]="row.held_value" />
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </app-data-table-shell>
+        </div>
       }
 
       @if (selected(); as staff) {
@@ -281,7 +290,7 @@ export class StaffPerformanceComponent implements OnInit {
   protected readonly String = String;
   protected readonly from = new FormControl(this.daysAgoIso(29), { nonNullable: true });
   protected readonly to = new FormControl(this.todayIso(), { nonNullable: true });
-  protected readonly search = new FormControl('', { nonNullable: true });
+  protected readonly searchQuery = signal('');
   protected readonly rows = signal<StaffPerformance[]>([]);
   protected readonly previousRows = signal<StaffPerformance[]>([]);
   protected readonly daily = signal<StaffDailyPerformance[]>([]);
@@ -291,7 +300,7 @@ export class StaffPerformanceComponent implements OnInit {
   protected readonly error = signal<string | null>(null);
 
   protected readonly filteredRows = computed(() => {
-    const query = this.search.value.trim().toLowerCase();
+    const query = this.searchQuery().trim().toLowerCase();
     if (!query) return this.rows();
     return this.rows().filter(row =>
       [row.display_name, row.role_name, row.authorization_status]
@@ -331,6 +340,55 @@ export class StaffPerformanceComponent implements OnInit {
       { netSales: 0 }
     )
   );
+  protected readonly performanceStats = computed(() => [
+    {
+      label: 'Net sales',
+      value: this.fmt(this.totals().netSales),
+      mobilePriority: 'primary' as const,
+    },
+    {
+      label: 'Collected',
+      value: this.fmt(this.totals().collected),
+      mobilePriority: 'primary' as const,
+    },
+    {
+      label: 'Gross sales',
+      value: this.fmt(this.totals().grossSales),
+      mobilePriority: 'secondary' as const,
+    },
+    {
+      label: 'Transactions',
+      value: this.totals().transactions,
+      mobilePriority: 'secondary' as const,
+    },
+    {
+      label: 'Quantity',
+      value: this.quantity(this.totals().quantity),
+      mobilePriority: 'secondary' as const,
+    },
+    {
+      label: 'Margin',
+      value: this.fmt(this.totals().margin),
+      tone: this.totals().margin < 0 ? ('error' as const) : ('success' as const),
+      mobilePriority: 'secondary' as const,
+    },
+    {
+      label: 'Refunds + voids',
+      value: this.fmt(this.totals().refunds + this.totals().voided),
+      tone: 'warning' as const,
+      mobilePriority: 'secondary' as const,
+    },
+  ]);
+
+  protected performanceFilterCount(): number {
+    return Number(this.from.value !== this.daysAgoIso(29) || this.to.value !== this.todayIso());
+  }
+
+  protected clearPerformanceFilters(): void {
+    this.from.setValue(this.daysAgoIso(29));
+    this.to.setValue(this.todayIso());
+    void this.load();
+  }
 
   async ngOnInit(): Promise<void> {
     await this.load();

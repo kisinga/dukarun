@@ -1708,6 +1708,47 @@ try {
         warn(`entry ${e.entry_id}: rounding drift ${delta} repaired on largest ${side} line`);
       }
 
+      // Seal only entries created by this run, after every imported line and
+      // rounding repair is complete. The deferred database invariant rejects
+      // the transaction if any header remains unfinalized, unbalanced, or does
+      // not match its canonical persisted payload hash.
+      const newEntryIds = [...newEntryOldIds].map(oldId => entryIdMap.get(oldId)).filter(Boolean);
+      if (newEntryIds.length) {
+        const finalized = await tgt.query(
+          `update public.ledger_journal_entries e
+           set payload_hash=public.journal_entry_payload_hash(e.id),
+               finalized_at=now()
+           where e.company_id=$1 and e.id=any($2::uuid[]) and e.finalized_at is null
+           returning e.id`,
+          [companyId, newEntryIds]
+        );
+        if (finalized.rowCount !== newEntryIds.length) {
+          throw new Error(
+            `ledger finalization mismatch: expected ${newEntryIds.length}, finalized ${finalized.rowCount}`
+          );
+        }
+
+        const { rows: invalidEntries } = await tgt.query(
+          `select e.id
+           from public.ledger_journal_entries e
+           left join lateral (
+             select coalesce(sum(l.debit),0)::bigint as debit,
+                    coalesce(sum(l.credit),0)::bigint as credit
+             from public.ledger_journal_lines l where l.entry_id=e.id
+           ) totals on true
+           where e.company_id=$1 and e.id=any($2::uuid[])
+             and (e.finalized_at is null or e.payload_hash is null
+               or e.payload_hash is distinct from public.journal_entry_payload_hash(e.id)
+               or totals.debit<>totals.credit or totals.debit=0)`,
+          [companyId, newEntryIds]
+        );
+        if (invalidEntries.length) {
+          throw new Error(
+            `invalid finalized ledger entries: ${invalidEntries.map(entry => entry.id).join(', ')}`
+          );
+        }
+      }
+
       // backfill orders.cashier_session_id from remapped meta (new-system link)
       for (const [oid, sid] of orderSession) {
         await tgt.query(

@@ -10,6 +10,9 @@ import { MoneyComponent } from '../shared/ui/money.component';
 import { PageLayoutComponent } from '../shared/ui/page-layout.component';
 import { StatCardComponent } from '../shared/ui/stat-card.component';
 import { BadgeType, StatusBadgeComponent } from '../shared/ui/status-badge.component';
+import { MobileListComponent } from '../shared/ui/mobile-list.component';
+import { DrawerComponent } from '../shared/ui/drawer.component';
+import { PageActionsComponent } from '../shared/ui/page-actions.component';
 import {
   CommissionAssignment,
   CommissionPeriod,
@@ -32,6 +35,9 @@ import {
     PageLayoutComponent,
     StatCardComponent,
     StatusBadgeComponent,
+    MobileListComponent,
+    DrawerComponent,
+    PageActionsComponent,
   ],
   template: `
     <app-page
@@ -39,19 +45,40 @@ import {
       subtitle="Assign effective-dated rates and prepare reviewable commission statements from net collections."
       [wide]="true"
     >
-      <button
-        actions
-        appButton
-        variant="ghost"
-        [iconOnly]="true"
-        [loading]="loading()"
-        type="button"
-        title="Refresh commissions"
-        aria-label="Refresh commissions"
-        (click)="load()"
-      >
-        <app-icon name="heroArrowPath" />
-      </button>
+      <app-page-actions actions>
+        <button
+          utilityAction
+          appButton
+          variant="ghost"
+          [iconOnly]="true"
+          [loading]="loading()"
+          type="button"
+          title="Refresh commissions"
+          aria-label="Refresh commissions"
+          (click)="load()"
+        >
+          <app-icon name="heroArrowPath" />
+        </button>
+        @if (activeTab() === 'plans') {
+          <button primaryAction appButton type="button" (click)="openPlanCreate()">
+            <app-icon name="heroPlus" /> New plan
+          </button>
+        } @else if (activeTab() === 'assignments') {
+          <button
+            primaryAction
+            appButton
+            type="button"
+            [disabled]="staff().length === 0 || activePlans().length === 0"
+            (click)="openAssignmentCreate()"
+          >
+            <app-icon name="heroPlus" /> Assign plan
+          </button>
+        } @else {
+          <button primaryAction appButton type="button" (click)="periodFormOpen.set(true)">
+            <app-icon name="heroPlus" /> Generate
+          </button>
+        }
+      </app-page-actions>
 
       @if (error()) {
         <div role="alert" class="alert alert-error mb-4 text-sm">
@@ -65,6 +92,21 @@ import {
           <span>{{ notice() }}</span>
         </div>
       }
+
+      <div role="tablist" aria-label="Commission section" class="tabs tabs-box mb-3 w-fit">
+        @for (item of commissionTabs; track item.value) {
+          <button
+            role="tab"
+            type="button"
+            class="tab min-h-11"
+            [class.tab-active]="activeTab() === item.value"
+            [attr.aria-selected]="activeTab() === item.value"
+            (click)="activeTab.set(item.value)"
+          >
+            {{ item.label }}
+          </button>
+        }
+      </div>
 
       <div class="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <app-stat-card
@@ -92,94 +134,40 @@ import {
       </div>
 
       <section class="mb-6 grid items-start gap-4 xl:grid-cols-2">
-        <div class="card bg-base-100">
-          <div class="card-body p-4">
-            <div>
-              <h2 class="section-title">Commission plans</h2>
-              <p class="type-caption mt-1">
-                Rates apply to net collected sales, including reversals.
-              </p>
-            </div>
-            <form
-              class="mt-4 grid items-end gap-3 sm:grid-cols-2"
-              (submit)="$event.preventDefault(); savePlan()"
-            >
-              <app-form-field label="Plan name" [required]="true">
-                <input
-                  type="text"
-                  class="input input-bordered input-sm w-full"
-                  placeholder="Standard sales"
-                  [formControl]="planName"
-                />
-              </app-form-field>
-              <app-form-field label="Rate (%)" [required]="true" hint="0 to 100%">
-                <input
-                  type="number"
-                  class="input input-bordered input-sm w-full"
-                  min="0"
-                  max="100"
-                  step="0.01"
-                  [formControl]="planRate"
-                />
-              </app-form-field>
-              <app-form-field label="Effective from" [required]="true">
-                <input
-                  type="date"
-                  class="input input-bordered input-sm w-full"
-                  [formControl]="planFrom"
-                />
-              </app-form-field>
-              <app-form-field label="Effective to" hint="Leave blank for no end date">
-                <input
-                  type="date"
-                  class="input input-bordered input-sm w-full"
-                  [formControl]="planTo"
-                />
-              </app-form-field>
-              <button
-                appButton
-                type="submit"
-                [loading]="busy()"
-                [disabled]="
-                  !planName.value.trim() ||
-                  planRate.value == null ||
-                  planRate.value < 0 ||
-                  planRate.value > 100
-                "
-              >
-                {{ editingPlan() ? 'Save plan' : 'Create plan' }}
-              </button>
-              @if (editingPlan()) {
-                <button appButton variant="ghost" type="button" (click)="closePlanForm()">
-                  Cancel edit
-                </button>
-              }
-            </form>
-
-            @if (plans().length > 0) {
-              <div class="table-scroll mt-4 border-t border-base-300 pt-3">
-                <table class="table table-sm">
-                  <thead>
-                    <tr>
-                      <th>Plan</th>
-                      <th class="text-right">Rate</th>
-                      <th>Effective dates</th>
-                      <th class="text-right">State</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    @for (plan of plans(); track plan.id) {
-                      <tr>
-                        <td class="font-medium">{{ plan.name }}</td>
-                        <td class="text-right">{{ rate(plan.rate_bps) }}</td>
-                        <td>{{ plan.effective_from }} → {{ plan.effective_to || 'ongoing' }}</td>
-                        <td class="text-right">
-                          <div class="flex justify-end gap-1">
+        @if (activeTab() === 'plans') {
+          <div class="card bg-base-100">
+            <div class="card-body p-4">
+              <div>
+                <h2 class="section-title">Commission plans</h2>
+                <p class="type-caption mt-1">
+                  Rates apply to net collected sales, including reversals.
+                </p>
+              </div>
+              @if (plans().length > 0) {
+                <app-mobile-list class="mt-4 border-t border-base-300 pt-3">
+                  @for (plan of plans(); track plan.id) {
+                    <div mobileListRow class="p-3">
+                      <div class="flex items-center gap-3">
+                        <div class="min-w-0 flex-1">
+                          <div class="flex items-center gap-2">
+                            <p class="truncate font-semibold">{{ plan.name }}</p>
+                            <app-status-badge
+                              size="xs"
+                              [type]="plan.active ? 'success' : 'neutral'"
+                              [label]="plan.active ? 'Active' : 'Inactive'"
+                            />
+                          </div>
+                          <p class="type-caption mt-1">
+                            {{ plan.effective_from }} → {{ plan.effective_to || 'ongoing' }}
+                          </p>
+                        </div>
+                        <div class="shrink-0 text-right">
+                          <p class="font-semibold">{{ rate(plan.rate_bps) }}</p>
+                          <div class="mt-1 flex items-center gap-1">
                             <button
                               appButton
                               variant="ghost"
                               size="sm"
-                              [disabled]="busy()"
                               (click)="startPlanEdit(plan)"
                             >
                               Edit
@@ -194,244 +182,438 @@ import {
                               {{ plan.active ? 'Deactivate' : 'Activate' }}
                             </button>
                           </div>
-                        </td>
-                      </tr>
-                    }
-                  </tbody>
-                </table>
-              </div>
-            }
-          </div>
-        </div>
-
-        <div class="card bg-base-100">
-          <div class="card-body p-4">
-            <div>
-              <h2 class="section-title">Staff assignments</h2>
-              <p class="type-caption mt-1">
-                One non-overlapping plan can apply to a staff member at a time.
-              </p>
-            </div>
-            @if (staff().length === 0) {
-              <app-empty-state
-                [embedded]="true"
-                [compact]="true"
-                icon="heroUserGroup"
-                title="No staff profiles"
-                description="Add and name team members before assigning commission plans."
-              />
-            } @else if (activePlans().length === 0) {
-              <app-empty-state
-                [embedded]="true"
-                [compact]="true"
-                icon="heroBanknotes"
-                title="No active plan"
-                description="Create or reactivate a plan before assigning it."
-              />
-            } @else {
-              <form
-                class="mt-4 grid items-end gap-3 sm:grid-cols-2"
-                (submit)="$event.preventDefault(); assignPlan()"
-              >
-                <app-form-field label="Staff member" [required]="true">
-                  <select
-                    class="select select-bordered select-sm w-full"
-                    [formControl]="assignmentStaff"
-                  >
-                    @for (person of staff(); track person.user_id) {
-                      <option [value]="person.user_id">
-                        {{ person.display_name }} · {{ person.last_role_name || 'No current role' }}
-                      </option>
-                    }
-                  </select>
-                </app-form-field>
-                <app-form-field label="Plan" [required]="true">
-                  <select
-                    class="select select-bordered select-sm w-full"
-                    [formControl]="assignmentPlan"
-                  >
-                    @for (plan of activePlans(); track plan.id) {
-                      <option [value]="plan.id">{{ plan.name }} · {{ rate(plan.rate_bps) }}</option>
-                    }
-                  </select>
-                </app-form-field>
-                <app-form-field label="Effective from" [required]="true">
-                  <input
-                    type="date"
-                    class="input input-bordered input-sm w-full"
-                    [formControl]="assignmentFrom"
-                  />
-                </app-form-field>
-                <app-form-field label="Effective to" hint="Leave blank for no end date">
-                  <input
-                    type="date"
-                    class="input input-bordered input-sm w-full"
-                    [formControl]="assignmentTo"
-                  />
-                </app-form-field>
-                <button
-                  appButton
-                  type="submit"
-                  [loading]="busy()"
-                  [disabled]="!assignmentStaff.value || !assignmentPlan.value"
-                >
-                  {{ editingAssignment() ? 'Save assignment' : 'Assign plan' }}
-                </button>
-                @if (editingAssignment()) {
-                  <button appButton variant="ghost" type="button" (click)="closeAssignmentForm()">
-                    Cancel edit
-                  </button>
-                }
-              </form>
-            }
-
-            @if (assignments().length > 0) {
-              <div class="table-scroll mt-4 border-t border-base-300 pt-3">
-                <table class="table table-sm">
-                  <thead>
-                    <tr>
-                      <th>Staff member</th>
-                      <th>Plan</th>
-                      <th>Effective dates</th>
-                      <th class="text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    @for (assignment of assignments(); track assignment.id) {
+                        </div>
+                      </div>
+                    </div>
+                  }
+                </app-mobile-list>
+                <div class="mt-4 hidden border-t border-base-300 pt-3 lg:block">
+                  <table class="table table-sm">
+                    <thead>
                       <tr>
-                        <td class="font-medium">{{ staffName(assignment.staff_user_id) }}</td>
-                        <td>{{ planNameFor(assignment.plan_id) }}</td>
-                        <td>
+                        <th>Plan</th>
+                        <th class="text-right">Rate</th>
+                        <th>Effective dates</th>
+                        <th class="text-right">State</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (plan of plans(); track plan.id) {
+                        <tr>
+                          <td class="font-medium">{{ plan.name }}</td>
+                          <td class="text-right">{{ rate(plan.rate_bps) }}</td>
+                          <td>{{ plan.effective_from }} → {{ plan.effective_to || 'ongoing' }}</td>
+                          <td class="text-right">
+                            <div class="flex justify-end gap-1">
+                              <button
+                                appButton
+                                variant="ghost"
+                                size="sm"
+                                [disabled]="busy()"
+                                (click)="startPlanEdit(plan)"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                appButton
+                                variant="ghost"
+                                size="sm"
+                                [disabled]="busy()"
+                                (click)="togglePlan(plan)"
+                              >
+                                {{ plan.active ? 'Deactivate' : 'Activate' }}
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              }
+            </div>
+          </div>
+        }
+
+        @if (activeTab() === 'assignments') {
+          <div class="card bg-base-100">
+            <div class="card-body p-4">
+              <div>
+                <h2 class="section-title">Staff assignments</h2>
+                <p class="type-caption mt-1">
+                  One non-overlapping plan can apply to a staff member at a time.
+                </p>
+              </div>
+              @if (staff().length === 0) {
+                <app-empty-state
+                  [embedded]="true"
+                  [compact]="true"
+                  icon="heroUserGroup"
+                  title="No staff profiles"
+                  description="Add and name team members before assigning commission plans."
+                />
+              } @else if (activePlans().length === 0) {
+                <app-empty-state
+                  [embedded]="true"
+                  [compact]="true"
+                  icon="heroBanknotes"
+                  title="No active plan"
+                  description="Create or reactivate a plan before assigning it."
+                />
+              }
+
+              @if (assignments().length > 0) {
+                <app-mobile-list class="mt-4 border-t border-base-300 pt-3">
+                  @for (assignment of assignments(); track assignment.id) {
+                    <button
+                      mobileListRow
+                      type="button"
+                      class="flex min-h-20 w-full items-center gap-3 p-3 text-left"
+                      (click)="startAssignmentEdit(assignment)"
+                    >
+                      <div class="min-w-0 flex-1">
+                        <p class="truncate font-semibold">
+                          {{ staffName(assignment.staff_user_id) }}
+                        </p>
+                        <p class="type-caption mt-1 truncate">
                           {{ assignment.effective_from }} →
                           {{ assignment.effective_to || 'ongoing' }}
-                        </td>
-                        <td class="text-right">
-                          <button
-                            appButton
-                            variant="ghost"
-                            size="sm"
-                            [disabled]="busy()"
-                            (click)="startAssignmentEdit(assignment)"
-                          >
-                            Edit
-                          </button>
-                        </td>
+                        </p>
+                      </div>
+                      <p class="shrink-0 font-medium">{{ planNameFor(assignment.plan_id) }}</p>
+                    </button>
+                  }
+                </app-mobile-list>
+                <div class="mt-4 hidden border-t border-base-300 pt-3 lg:block">
+                  <table class="table table-sm">
+                    <thead>
+                      <tr>
+                        <th>Staff member</th>
+                        <th>Plan</th>
+                        <th>Effective dates</th>
+                        <th class="text-right">Actions</th>
                       </tr>
-                    }
-                  </tbody>
-                </table>
-              </div>
-            }
+                    </thead>
+                    <tbody>
+                      @for (assignment of assignments(); track assignment.id) {
+                        <tr>
+                          <td class="font-medium">{{ staffName(assignment.staff_user_id) }}</td>
+                          <td>{{ planNameFor(assignment.plan_id) }}</td>
+                          <td>
+                            {{ assignment.effective_from }} →
+                            {{ assignment.effective_to || 'ongoing' }}
+                          </td>
+                          <td class="text-right">
+                            <button
+                              appButton
+                              variant="ghost"
+                              size="sm"
+                              [disabled]="busy()"
+                              (click)="startAssignmentEdit(assignment)"
+                            >
+                              Edit
+                            </button>
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              }
+            </div>
           </div>
-        </div>
+        }
       </section>
 
-      <section>
-        <div class="card mb-4 bg-base-100">
-          <div class="card-body flex-row flex-wrap items-end gap-3 p-4">
-            <div class="mr-auto min-w-56">
-              <h2 class="section-title">Commission periods</h2>
-              <p class="type-caption mt-1">
-                Drafts can be regenerated; approved and paid periods are locked.
-              </p>
-            </div>
-            <app-form-field label="Period from">
-              <input type="date" class="input input-bordered input-sm" [formControl]="periodFrom" />
-            </app-form-field>
-            <app-form-field label="Period to">
-              <input type="date" class="input input-bordered input-sm" [formControl]="periodTo" />
-            </app-form-field>
-            <button appButton type="button" [loading]="busy()" (click)="generatePeriod()">
-              Generate draft
-            </button>
+      @if (activeTab() === 'statements') {
+        <section>
+          <div class="mb-3">
+            <h2 class="section-title">Commission periods</h2>
+            <p class="type-caption mt-1">
+              Drafts can be regenerated; approved and paid periods are locked.
+            </p>
           </div>
-        </div>
 
-        @if (!loading() && periods().length === 0) {
-          <app-empty-state
-            [compact]="true"
-            icon="heroBanknotes"
-            title="No commission periods"
-            description="Generate a draft after assigning plans and collecting sales."
-          />
-        } @else {
-          <app-data-table-shell
-            title="Statements"
-            [description]="
-              periods().length + ' generated periods · collected basis is net of reversals'
-            "
-          >
-            <table class="table table-sm">
-              <thead>
-                <tr>
-                  <th>Period</th>
-                  <th>Status</th>
-                  <th class="text-right">Staff</th>
-                  <th class="text-right">Net collected basis</th>
-                  <th class="text-right">Commission</th>
-                  <th class="text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                @for (period of periods(); track period.id) {
-                  <tr>
-                    <td>
-                      <p class="font-medium">{{ period.start_date }} → {{ period.end_date }}</p>
-                      @if (period.paid_at || period.approved_at) {
-                        <p class="type-caption mt-0.5">
-                          {{
-                            period.paid_at
-                              ? 'Paid ' + dateTime(period.paid_at)
-                              : 'Approved ' + dateTime(period.approved_at)
-                          }}
-                        </p>
-                      }
-                    </td>
-                    <td>
+          @if (!loading() && periods().length === 0) {
+            <app-empty-state
+              [compact]="true"
+              icon="heroBanknotes"
+              title="No commission periods"
+              description="Generate a draft after assigning plans and collecting sales."
+            />
+          } @else {
+            <app-mobile-list>
+              @for (period of periods(); track period.id) {
+                <button
+                  mobileListRow
+                  type="button"
+                  class="flex min-h-20 w-full items-center gap-3 p-3 text-left"
+                  (click)="openStatement(period)"
+                >
+                  <div class="min-w-0 flex-1">
+                    <p class="font-semibold">{{ period.start_date }} → {{ period.end_date }}</p>
+                    <div class="mt-1 flex items-center gap-2">
                       <app-status-badge
                         size="xs"
                         [type]="periodBadge(period.status)"
                         [label]="period.status"
                       />
-                    </td>
-                    <td class="text-right">{{ period.staff_count }}</td>
-                    <td class="text-right"><app-money [amount]="period.basis_total" /></td>
-                    <td class="text-right font-semibold">
-                      <app-money [amount]="period.commission_total" />
-                    </td>
-                    <td class="table-actions">
-                      <button appButton variant="ghost" size="sm" (click)="openStatement(period)">
-                        Review
-                      </button>
-                      @if (period.status === 'draft') {
-                        <button
-                          appButton
-                          variant="outline"
-                          size="sm"
-                          [disabled]="busy()"
-                          (click)="transition(period, 'approved')"
-                        >
-                          Approve
-                        </button>
-                      } @else if (period.status === 'approved') {
-                        <button
-                          appButton
-                          variant="outline"
-                          size="sm"
-                          [disabled]="busy()"
-                          (click)="transition(period, 'paid')"
-                        >
-                          Mark paid
-                        </button>
-                      }
-                    </td>
-                  </tr>
+                      <span class="type-caption">{{ period.staff_count }} staff</span>
+                    </div>
+                  </div>
+                  <div class="shrink-0 text-right">
+                    <p class="font-semibold"><app-money [amount]="period.commission_total" /></p>
+                    <p class="type-caption">basis <app-money [amount]="period.basis_total" /></p>
+                  </div>
+                </button>
+              }
+            </app-mobile-list>
+            <div class="hidden lg:block">
+              <app-data-table-shell
+                title="Statements"
+                [description]="
+                  periods().length + ' generated periods · collected basis is net of reversals'
+                "
+              >
+                <table class="table table-sm">
+                  <thead>
+                    <tr>
+                      <th>Period</th>
+                      <th>Status</th>
+                      <th class="text-right">Staff</th>
+                      <th class="text-right">Net collected basis</th>
+                      <th class="text-right">Commission</th>
+                      <th class="text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (period of periods(); track period.id) {
+                      <tr>
+                        <td>
+                          <p class="font-medium">{{ period.start_date }} → {{ period.end_date }}</p>
+                          @if (period.paid_at || period.approved_at) {
+                            <p class="type-caption mt-0.5">
+                              {{
+                                period.paid_at
+                                  ? 'Paid ' + dateTime(period.paid_at)
+                                  : 'Approved ' + dateTime(period.approved_at)
+                              }}
+                            </p>
+                          }
+                        </td>
+                        <td>
+                          <app-status-badge
+                            size="xs"
+                            [type]="periodBadge(period.status)"
+                            [label]="period.status"
+                          />
+                        </td>
+                        <td class="text-right">{{ period.staff_count }}</td>
+                        <td class="text-right"><app-money [amount]="period.basis_total" /></td>
+                        <td class="text-right font-semibold">
+                          <app-money [amount]="period.commission_total" />
+                        </td>
+                        <td class="table-actions">
+                          <button
+                            appButton
+                            variant="ghost"
+                            size="sm"
+                            (click)="openStatement(period)"
+                          >
+                            Review
+                          </button>
+                          @if (period.status === 'draft') {
+                            <button
+                              appButton
+                              variant="outline"
+                              size="sm"
+                              [disabled]="busy()"
+                              (click)="transition(period, 'approved')"
+                            >
+                              Approve
+                            </button>
+                          } @else if (period.status === 'approved') {
+                            <button
+                              appButton
+                              variant="outline"
+                              size="sm"
+                              [disabled]="busy()"
+                              (click)="transition(period, 'paid')"
+                            >
+                              Mark paid
+                            </button>
+                          }
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </app-data-table-shell>
+            </div>
+          }
+        </section>
+      }
+
+      @if (planFormOpen()) {
+        <app-drawer
+          #planDrawer
+          [open]="true"
+          [title]="editingPlan() ? 'Edit commission plan' : 'New commission plan'"
+          subtitle="Set the rate and effective dates"
+          [dirty]="planName.dirty || planRate.dirty || planFrom.dirty || planTo.dirty"
+          (closed)="closePlanForm()"
+        >
+          <form
+            id="commission-plan-form"
+            class="grid gap-4"
+            (submit)="$event.preventDefault(); savePlan()"
+          >
+            <app-form-field label="Plan name" [required]="true">
+              <input
+                type="text"
+                class="input input-bordered w-full"
+                placeholder="Standard sales"
+                [formControl]="planName"
+              />
+            </app-form-field>
+            <app-form-field label="Rate (%)" [required]="true" hint="0 to 100%">
+              <input
+                type="number"
+                class="input input-bordered w-full"
+                min="0"
+                max="100"
+                step="0.01"
+                [formControl]="planRate"
+              />
+            </app-form-field>
+            <app-form-field label="Effective from" [required]="true">
+              <input type="date" class="input input-bordered w-full" [formControl]="planFrom" />
+            </app-form-field>
+            <app-form-field label="Effective to" hint="Leave blank for no end date">
+              <input type="date" class="input input-bordered w-full" [formControl]="planTo" />
+            </app-form-field>
+          </form>
+          <div drawerFooter class="flex justify-end gap-2">
+            <button appButton variant="ghost" type="button" (click)="planDrawer.requestClose()">
+              Cancel
+            </button>
+            <button
+              appButton
+              type="submit"
+              form="commission-plan-form"
+              [loading]="busy()"
+              [disabled]="
+                !planName.value.trim() ||
+                planRate.value == null ||
+                planRate.value < 0 ||
+                planRate.value > 100
+              "
+            >
+              {{ editingPlan() ? 'Save plan' : 'Create plan' }}
+            </button>
+          </div>
+        </app-drawer>
+      }
+
+      @if (assignmentFormOpen()) {
+        <app-drawer
+          #assignmentDrawer
+          [open]="true"
+          [title]="editingAssignment() ? 'Edit assignment' : 'Assign commission plan'"
+          subtitle="Choose who the plan applies to and when"
+          [dirty]="
+            assignmentStaff.dirty ||
+            assignmentPlan.dirty ||
+            assignmentFrom.dirty ||
+            assignmentTo.dirty
+          "
+          (closed)="closeAssignmentForm()"
+        >
+          <form
+            id="commission-assignment-form"
+            class="grid gap-4"
+            (submit)="$event.preventDefault(); assignPlan()"
+          >
+            <app-form-field label="Staff member" [required]="true">
+              <select class="select select-bordered w-full" [formControl]="assignmentStaff">
+                @for (person of staff(); track person.user_id) {
+                  <option [value]="person.user_id">
+                    {{ person.display_name }} · {{ person.last_role_name || 'No current role' }}
+                  </option>
                 }
-              </tbody>
-            </table>
-          </app-data-table-shell>
-        }
-      </section>
+              </select>
+            </app-form-field>
+            <app-form-field label="Plan" [required]="true">
+              <select class="select select-bordered w-full" [formControl]="assignmentPlan">
+                @for (plan of activePlans(); track plan.id) {
+                  <option [value]="plan.id">{{ plan.name }} · {{ rate(plan.rate_bps) }}</option>
+                }
+              </select>
+            </app-form-field>
+            <app-form-field label="Effective from" [required]="true">
+              <input
+                type="date"
+                class="input input-bordered w-full"
+                [formControl]="assignmentFrom"
+              />
+            </app-form-field>
+            <app-form-field label="Effective to" hint="Leave blank for no end date">
+              <input type="date" class="input input-bordered w-full" [formControl]="assignmentTo" />
+            </app-form-field>
+          </form>
+          <div drawerFooter class="flex justify-end gap-2">
+            <button
+              appButton
+              variant="ghost"
+              type="button"
+              (click)="assignmentDrawer.requestClose()"
+            >
+              Cancel
+            </button>
+            <button
+              appButton
+              type="submit"
+              form="commission-assignment-form"
+              [loading]="busy()"
+              [disabled]="!assignmentStaff.value || !assignmentPlan.value"
+            >
+              {{ editingAssignment() ? 'Save assignment' : 'Assign plan' }}
+            </button>
+          </div>
+        </app-drawer>
+      }
+
+      @if (periodFormOpen()) {
+        <app-drawer
+          #periodDrawer
+          [open]="true"
+          title="Generate commission statement"
+          subtitle="Create or regenerate a draft for this period"
+          [dirty]="periodFrom.dirty || periodTo.dirty"
+          (closed)="closePeriodForm()"
+        >
+          <form
+            id="commission-period-form"
+            class="grid gap-4"
+            (submit)="$event.preventDefault(); generatePeriod()"
+          >
+            <app-form-field label="Period from" [required]="true">
+              <input type="date" class="input input-bordered w-full" [formControl]="periodFrom" />
+            </app-form-field>
+            <app-form-field label="Period to" [required]="true">
+              <input type="date" class="input input-bordered w-full" [formControl]="periodTo" />
+            </app-form-field>
+          </form>
+          <div drawerFooter class="flex justify-end gap-2">
+            <button appButton variant="ghost" type="button" (click)="periodDrawer.requestClose()">
+              Cancel
+            </button>
+            <button appButton type="submit" form="commission-period-form" [loading]="busy()">
+              Generate draft
+            </button>
+          </div>
+        </app-drawer>
+      }
 
       @if (selectedPeriod(); as period) {
         <div
@@ -477,7 +659,23 @@ import {
                 description="Check staff assignments, plan dates, and collected sales in this period."
               />
             } @else {
-              <div class="table-scroll mt-4">
+              <app-mobile-list class="mt-4">
+                @for (row of statement(); track row.staff_user_id) {
+                  <div mobileListRow class="flex min-h-20 items-center gap-3 p-3">
+                    <div class="min-w-0 flex-1">
+                      <p class="truncate font-semibold">{{ row.staff_name }}</p>
+                      <p class="type-caption mt-1">
+                        {{ row.event_count }} events · basis
+                        <app-money [amount]="row.basis_total" />
+                      </p>
+                    </div>
+                    <p class="shrink-0 font-semibold">
+                      <app-money [amount]="row.commission_total" />
+                    </p>
+                  </div>
+                }
+              </app-mobile-list>
+              <div class="mt-4 hidden lg:block">
                 <table class="table table-sm">
                   <thead>
                     <tr>
@@ -592,6 +790,15 @@ export class CommissionsComponent implements OnInit {
   protected readonly busy = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
+  protected readonly activeTab = signal<'plans' | 'assignments' | 'statements'>('plans');
+  protected readonly planFormOpen = signal(false);
+  protected readonly assignmentFormOpen = signal(false);
+  protected readonly periodFormOpen = signal(false);
+  protected readonly commissionTabs = [
+    { value: 'plans' as const, label: 'Plans' },
+    { value: 'assignments' as const, label: 'Assignments' },
+    { value: 'statements' as const, label: 'Statements' },
+  ];
 
   protected readonly planName = new FormControl('', { nonNullable: true });
   protected readonly planRate = new FormControl(2, { nonNullable: true });
@@ -670,14 +877,24 @@ export class CommissionsComponent implements OnInit {
     this.planRate.setValue(plan.rate_bps / 100);
     this.planFrom.setValue(plan.effective_from);
     this.planTo.setValue(plan.effective_to ?? '');
+    this.planFormOpen.set(true);
+  }
+
+  protected openPlanCreate(): void {
+    this.closePlanForm();
+    this.planFormOpen.set(true);
   }
 
   protected closePlanForm(): void {
+    this.planFormOpen.set(false);
     this.editingPlan.set(null);
     this.planName.setValue('');
     this.planRate.setValue(2);
     this.planFrom.setValue(this.todayIso());
     this.planTo.setValue('');
+    [this.planName, this.planRate, this.planFrom, this.planTo].forEach(control =>
+      control.markAsPristine()
+    );
   }
 
   protected async togglePlan(plan: CommissionPlan): Promise<void> {
@@ -723,13 +940,31 @@ export class CommissionsComponent implements OnInit {
     this.assignmentPlan.setValue(assignment.plan_id);
     this.assignmentFrom.setValue(assignment.effective_from);
     this.assignmentTo.setValue(assignment.effective_to ?? '');
+    this.assignmentFormOpen.set(true);
+  }
+
+  protected openAssignmentCreate(): void {
+    this.closeAssignmentForm();
+    this.assignmentFormOpen.set(true);
   }
 
   protected closeAssignmentForm(): void {
+    this.assignmentFormOpen.set(false);
     this.editingAssignment.set(null);
     this.assignmentFrom.setValue(this.todayIso());
     this.assignmentTo.setValue('');
     this.seedSelections();
+    [this.assignmentStaff, this.assignmentPlan, this.assignmentFrom, this.assignmentTo].forEach(
+      control => control.markAsPristine()
+    );
+  }
+
+  protected closePeriodForm(): void {
+    this.periodFormOpen.set(false);
+    this.periodFrom.setValue(this.monthStartIso());
+    this.periodTo.setValue(this.todayIso());
+    this.periodFrom.markAsPristine();
+    this.periodTo.markAsPristine();
   }
 
   protected async generatePeriod(): Promise<void> {
@@ -739,6 +974,7 @@ export class CommissionsComponent implements OnInit {
     await this.run(async () => {
       await this.commissions.generatePeriod(this.periodFrom.value, this.periodTo.value);
       this.notice.set('Draft commission statement generated');
+      this.closePeriodForm();
       await this.load();
     }, 'Failed to generate commission period');
   }

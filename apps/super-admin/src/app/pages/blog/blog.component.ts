@@ -85,6 +85,9 @@ import { PageHeaderComponent } from '../../shared/ui/page-header.component';
                   <strong class="line-clamp-2 text-sm font-medium leading-snug">{{
                     post.title || 'Untitled article'
                   }}</strong>
+                  @if (post.featured_at) {
+                    <span class="badge badge-primary badge-xs mt-1">Featured</span>
+                  }
                   <span class="mt-1 block truncate text-xs text-base-content/45"
                     >/{{ post.slug }}</span
                   >
@@ -283,6 +286,11 @@ import { PageHeaderComponent } from '../../shared/ui/page-header.component';
                   selected()?.publication_state || 'Unsaved'
                 }}</span>
               </div>
+              @if (selected()?.featured_at) {
+                <p class="rounded-lg bg-primary/10 p-3 text-xs leading-relaxed text-primary">
+                  This is the featured story on the homepage and blog page.
+                </p>
+              }
               <label class="form-control gap-1.5">
                 <span class="text-xs font-medium text-base-content/60">Schedule in Nairobi</span>
                 <input
@@ -339,6 +347,16 @@ import { PageHeaderComponent } from '../../shared/ui/page-header.component';
                     (click)="archive()"
                   >
                     Archive article
+                  </button>
+                }
+                @if (selected()?.has_published_version && !selected()?.featured_at) {
+                  <button
+                    type="button"
+                    class="btn btn-outline btn-sm w-full"
+                    [disabled]="busy()"
+                    (click)="feature()"
+                  >
+                    Feature on website
                   </button>
                 }
               </div>
@@ -841,6 +859,15 @@ export class BlogComponent implements OnInit {
         new Date(`${this.scheduledFor.value}:00+03:00`).toISOString()
       );
       this.notice.set('Article scheduled');
+      await this.load(id);
+    });
+  }
+  protected async feature(): Promise<void> {
+    const id = this.selected()?.post_id;
+    if (!id) return;
+    await this.run(async () => {
+      await this.platform.featureBlogPost(id);
+      this.notice.set('Featured story updated on the homepage and blog page');
       await this.load(id);
     });
   }

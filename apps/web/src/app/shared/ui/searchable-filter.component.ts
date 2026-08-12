@@ -41,11 +41,17 @@ export interface SearchableFilterOption {
     </button>
 
     @if (open()) {
+      <button
+        type="button"
+        class="fixed inset-0 z-[75] bg-base-content/35 md:hidden"
+        aria-label="Close choices"
+        (click)="close()"
+      ></button>
       <div
-        class="absolute left-0 z-40 mt-1 w-full rounded-box border border-base-300 bg-base-100 p-2 shadow-overlay"
+        class="fixed inset-x-4 bottom-[max(1rem,env(safe-area-inset-bottom))] z-[80] max-h-[70dvh] w-auto rounded-box border border-base-300 bg-base-100 p-2 shadow-overlay md:absolute md:inset-x-auto md:top-full md:bottom-auto md:left-0 md:z-40 md:mt-1 md:max-h-none md:w-full"
         role="listbox"
       >
-        <label class="input input-bordered input-sm flex items-center gap-2">
+        <label class="input input-bordered flex min-h-11 items-center gap-2 input-sm">
           <app-icon name="heroMagnifyingGlass" class="shrink-0 text-base-content/50" />
           <input
             #searchInput
@@ -59,10 +65,10 @@ export interface SearchableFilterOption {
           />
         </label>
 
-        <div class="mt-2 max-h-64 overflow-y-auto">
+        <div class="mt-2 max-h-[calc(70dvh-4.5rem)] overflow-y-auto md:max-h-64">
           <button
             type="button"
-            class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-base-200"
+            class="flex min-h-11 w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-base-200"
             [class.bg-base-200]="value() === emptyValue()"
             (click)="choose(emptyValue())"
           >
@@ -73,7 +79,7 @@ export interface SearchableFilterOption {
           @for (option of visibleOptions(); track option.value) {
             <button
               type="button"
-              class="flex w-full items-start gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-base-200"
+              class="flex min-h-11 w-full items-start gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-base-200"
               [class.bg-base-200]="value() === option.value"
               (click)="choose(option.value)"
             >

@@ -1,6 +1,7 @@
 import { Component, OnInit, PLATFORM_ID, computed, inject, signal } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
+import { NgIcon } from '@ng-icons/core';
 import { CatalogProduct, catalogLabel, groupCatalog, isVariantAvailable } from './catalog.models';
 import { CatalogRow, StorefrontInfo, StorefrontService } from './storefront.service';
 import { StorefrontBrandComponent } from './storefront-brand.component';
@@ -14,7 +15,7 @@ function formatKes(amount: number): string {
 
 @Component({
   selector: 'app-product-detail',
-  imports: [RouterLink, StorefrontBrandComponent, PoweredByDukarunComponent],
+  imports: [RouterLink, NgIcon, StorefrontBrandComponent, PoweredByDukarunComponent],
   template: `
     <main class="min-h-screen bg-base-200 pb-24">
       @if (shop(); as s) {
@@ -158,12 +159,21 @@ function formatKes(amount: number): string {
                   </div>
                 }
 
+                <button
+                  type="button"
+                  class="btn btn-outline mt-5 min-h-12 w-full rounded-2xl"
+                  (click)="shareProduct()"
+                >
+                  <ng-icon name="heroShare" size="1.1rem" aria-hidden="true" />
+                  {{ shareNotice() || 'Share product' }}
+                </button>
+
                 @if (orderLink(); as href) {
                   <a
                     [href]="href"
                     target="_blank"
                     rel="noopener"
-                    class="btn btn-primary mt-5 min-h-14 w-full rounded-2xl text-base"
+                    class="btn btn-primary mt-3 min-h-14 w-full rounded-2xl text-base"
                     [class.btn-disabled]="selectedVariant() && !available(selectedVariant()!)"
                     >Order this on WhatsApp</a
                   >
@@ -213,6 +223,7 @@ export class ProductDetailComponent implements OnInit {
   protected readonly selectedVariantId = signal<string | null>(null);
   protected readonly loading = signal(true);
   protected readonly loadError = signal(false);
+  protected readonly shareNotice = signal<string | null>(null);
   protected readonly selectedVariant = computed(
     () =>
       this.product()?.variants.find(variant => variant.variant_id === this.selectedVariantId()) ??
@@ -288,8 +299,31 @@ export class ProductDetailComponent implements OnInit {
   protected companyLogoUrl(path: string | null): string | null {
     return this.storefront.companyLogoUrl(path);
   }
+  protected async shareProduct(): Promise<void> {
+    if (!isPlatformBrowser(this.platformId)) return;
+    const url = new URL(
+      `/${this.shopSlug}/products/${this.productId}`,
+      `${environment.storefrontPublicUrl.replace(/\/+$/, '')}/`
+    ).toString();
+    try {
+      if (navigator.share) {
+        // URL-only is intentional: WhatsApp Status reliably builds the image from og:image.
+        await navigator.share({ url });
+      } else {
+        await navigator.clipboard.writeText(url);
+        this.showShareNotice('Link copied');
+      }
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+      this.showShareNotice('Could not share');
+    }
+  }
   protected waLink(phone: string, text: string): string {
     return `https://wa.me/${phone.replace(/[^\d]/g, '')}?text=${encodeURIComponent(text)}`;
+  }
+  private showShareNotice(message: string): void {
+    this.shareNotice.set(message);
+    setTimeout(() => this.shareNotice.set(null), 2_000);
   }
   private applySeo(shop: StorefrontInfo, product: CatalogProduct): void {
     const path = `/${this.shopSlug}/products/${this.productId}`;

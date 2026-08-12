@@ -62,6 +62,8 @@ import {
   type SearchableFilterOption,
 } from '../shared/ui/searchable-filter.component';
 import { DocumentSendComponent } from '../communications/document-send.component';
+import { MobileListComponent } from '../shared/ui/mobile-list.component';
+import { PageActionsComponent } from '../shared/ui/page-actions.component';
 
 type SupplierWithAp = MoneyCustomer & { ap_balance: number } & AgingInfo;
 type PurchasePaymentMode = 'paid' | 'partial' | 'later';
@@ -118,6 +120,8 @@ interface ParsedPurchaseLine {
     PaginationComponent,
     DocumentSendComponent,
     SearchableFilterComponent,
+    MobileListComponent,
+    PageActionsComponent,
   ],
   template: `
     <app-page
@@ -129,39 +133,41 @@ interface ParsedPurchaseLine {
           : 'Manage supplier relationships, balances, and purchasing performance.'
       "
     >
-      <button
-        actions
-        appButton
-        variant="ghost"
-        [iconOnly]="true"
-        [loading]="loading()"
-        type="button"
-        [title]="isPurchasePage() ? 'Refresh purchases' : 'Refresh suppliers'"
-        [attr.aria-label]="isPurchasePage() ? 'Refresh purchases' : 'Refresh suppliers'"
-        (click)="load()"
-      >
-        <app-icon name="heroArrowPath" />
-      </button>
-      @if (isPurchasePage()) {
-        <a actions appButton variant="secondary" routerLink="/suppliers">
-          <app-icon name="heroTruck" /> Suppliers
-        </a>
-      }
-      @if (isPurchasePage()) {
-        <a actions appButton routerLink="/purchases/new">
-          <app-icon name="heroPlus" /> Record purchase
-        </a>
-      }
-      @if (!isPurchasePage()) {
-        <a actions appButton variant="secondary" routerLink="/purchases/new">
-          <app-icon name="heroShoppingCart" /> New purchase
-        </a>
-      }
-      @if (!isPurchasePage()) {
-        <button actions appButton type="button" (click)="startSupplierCreate()">
-          <app-icon name="heroPlus" /> Add supplier
+      <app-page-actions actions>
+        <button
+          utilityAction
+          appButton
+          variant="ghost"
+          [iconOnly]="true"
+          [loading]="loading()"
+          type="button"
+          [title]="isPurchasePage() ? 'Refresh purchases' : 'Refresh suppliers'"
+          [attr.aria-label]="isPurchasePage() ? 'Refresh purchases' : 'Refresh suppliers'"
+          (click)="load()"
+        >
+          <app-icon name="heroArrowPath" />
         </button>
-      }
+        @if (isPurchasePage()) {
+          <a overflowAction appButton variant="secondary" routerLink="/suppliers">
+            <app-icon name="heroTruck" /> Suppliers
+          </a>
+        }
+        @if (isPurchasePage()) {
+          <a primaryAction appButton routerLink="/purchases/new">
+            <app-icon name="heroPlus" /> Record purchase
+          </a>
+        }
+        @if (!isPurchasePage()) {
+          <a overflowAction appButton variant="secondary" routerLink="/purchases/new">
+            <app-icon name="heroShoppingCart" /> New purchase
+          </a>
+        }
+        @if (!isPurchasePage()) {
+          <button primaryAction appButton type="button" (click)="startSupplierCreate()">
+            <app-icon name="heroPlus" /> Add supplier
+          </button>
+        }
+      </app-page-actions>
 
       @if (error()) {
         <div role="alert" class="alert alert-error mb-3 text-sm">
@@ -191,6 +197,9 @@ interface ParsedPurchaseLine {
           (sortKeyChange)="supplierSort.set($event); supplierPage.set(1)"
           [sortDirection]="supplierSortDirection()"
           (sortDirectionChange)="supplierSortDirection.set($event); supplierPage.set(1)"
+          [filtersEnabled]="true"
+          [activeFilterCount]="supplierActiveFilterCount()"
+          (clearFilters)="clearSupplierFilters()"
         >
           <app-stat-bar summary [stats]="supplierSummary()" />
           <div filters class="grid gap-2 sm:grid-cols-2 lg:flex lg:items-end">
@@ -1155,126 +1164,47 @@ interface ParsedPurchaseLine {
             </section>
           }
           @if (!isPurchasePage()) {
-            <section class="card bg-base-100 lg:hidden">
-              <div class="card-body p-4">
-                <div class="flex items-center justify-between gap-2">
-                  <h2 class="section-title">What we owe suppliers</h2>
-                  <span class="type-caption">Money we owe suppliers</span>
-                </div>
-                @if (filteredSuppliers().length === 0) {
-                  <app-empty-state
-                    [embedded]="true"
-                    [compact]="true"
-                    icon="heroTruck"
-                    title="No suppliers yet"
-                    description="Create a supplier to start recording purchases."
-                  />
-                } @else {
-                  <div class="mt-1 flex flex-col divide-y divide-base-200">
-                    @for (s of pagedSuppliers(); track s.id) {
-                      <div
-                        class="cursor-pointer py-3"
-                        role="button"
-                        tabindex="0"
-                        [class.opacity-60]="!s.supplier_active"
-                        [class.bg-base-200/50]="drawerSupplierId() === s.id"
-                        (click)="openSupplierDrawer(s)"
-                        (keydown.enter)="openSupplierDrawer(s)"
-                      >
-                        <div class="flex items-center gap-3">
-                          <div class="min-w-0 flex-1">
-                            <p class="truncate text-sm font-medium">{{ name(s) }}</p>
-                            <p class="type-caption">{{ s.phone || 'No phone' }}</p>
-                            @if (!s.supplier_active) {
-                              <app-status-badge size="xs" type="neutral" label="archived" />
-                            }
-                            @if (perms.has('ViewFinancials')) {
-                              <p class="type-caption mt-1">
-                                @if (s.supplier_credit_limit > 0) {
-                                  Limit <app-money [amount]="s.supplier_credit_limit" /> ·
-                                  <app-money [amount]="supplierCreditAvailable(s)" /> available
-                                } @else {
-                                  Credit has no configured cap
-                                }
-                                @if (s.supplier_credit_terms_days) {
-                                  · {{ s.supplier_credit_terms_days }}d terms
-                                }
-                              </p>
-                            }
-                          </div>
-                          <div class="text-right">
-                            <p
-                              class="text-sm font-semibold"
-                              [class.text-warning]="s.ap_balance > 0"
-                            >
-                              <app-money
-                                [amount]="s.ap_balance"
-                                [masked]="!perms.has('ViewFinancials')"
-                              />
-                            </p>
-                            @if (s.days_outstanding !== null) {
-                              <div class="mt-1 flex items-center justify-end gap-1">
-                                <span class="type-caption">{{ s.days_outstanding }}d</span>
-                                <span class="badge badge-xs" [class]="bucketBadge(s.bucket)">
-                                  {{ s.bucket }}
-                                </span>
-                              </div>
-                            } @else {
-                              <span class="type-caption">{{
-                                s.ap_balance > 0 ? 'We owe this supplier' : 'Nothing owed'
-                              }}</span>
-                            }
-                          </div>
-                        </div>
-                        @if (supplierStats(s.id); as stats) {
-                          <div
-                            class="mt-2 grid grid-cols-2 gap-2 rounded-field bg-base-200/50 p-2 sm:grid-cols-4"
-                          >
-                            <div>
-                              <p class="type-caption">Purchases</p>
-                              <p class="text-sm font-semibold">{{ stats.purchases }}</p>
-                            </div>
-                            <div>
-                              <p class="type-caption">Products supplied</p>
-                              <p class="text-sm font-semibold">{{ stats.products }}</p>
-                            </div>
-                            <div>
-                              <p class="type-caption">Average order</p>
-                              <p class="text-sm font-semibold">{{ fmt(stats.averageOrder) }}</p>
-                            </div>
-                            <div>
-                              <p class="type-caption">Price leader</p>
-                              <p class="text-sm font-semibold">{{ stats.bestPrices }} product(s)</p>
-                            </div>
-                          </div>
+            <app-mobile-list>
+              @for (s of pagedSuppliers(); track s.id) {
+                <div
+                  mobileListRow
+                  class="cursor-pointer"
+                  role="button"
+                  tabindex="0"
+                  [class.opacity-60]="!s.supplier_active"
+                  [class.bg-base-200/50]="drawerSupplierId() === s.id"
+                  (click)="openSupplierDrawer(s)"
+                  (keydown.enter)="openSupplierDrawer(s)"
+                >
+                  <div class="flex min-h-20 items-center gap-3 p-3">
+                    <div class="min-w-0 flex-1">
+                      <div class="flex items-center gap-2">
+                        <p class="truncate font-semibold">{{ name(s) }}</p>
+                        @if (!s.supplier_active) {
+                          <app-status-badge size="xs" type="neutral" label="archived" />
                         }
-                        <div class="mt-2 flex justify-end">
-                          <button
-                            appButton
-                            variant="ghost"
-                            size="sm"
-                            (click)="$event.stopPropagation(); startSupplierEdit(s)"
-                          >
-                            Edit
-                          </button>
-                          @if (perms.has('ManageSupplierCreditPurchases')) {
-                            <button
-                              appButton
-                              variant="ghost"
-                              size="sm"
-                              [disabled]="busy()"
-                              (click)="$event.stopPropagation(); setSupplierActive(s)"
-                            >
-                              {{ s.supplier_active ? 'Archive' : 'Reactivate' }}
-                            </button>
-                          }
-                        </div>
                       </div>
-                    }
+                      <p class="type-caption mt-1 truncate">
+                        {{ s.phone || 'No phone' }} · {{ s.supplier_credit_terms_days || 0 }}d terms
+                      </p>
+                    </div>
+                    <div class="shrink-0 text-right">
+                      <p class="font-semibold tabular-nums" [class.text-warning]="s.ap_balance > 0">
+                        <app-money
+                          [amount]="s.ap_balance"
+                          [masked]="!perms.has('ViewFinancials')"
+                        />
+                      </p>
+                      @if (s.days_outstanding !== null) {
+                        <p class="type-caption">{{ s.days_outstanding }}d · {{ s.bucket }}</p>
+                      } @else {
+                        <p class="type-caption">{{ s.ap_balance > 0 ? 'we owe' : 'clear' }}</p>
+                      }
+                    </div>
                   </div>
-                }
-              </div>
-            </section>
+                </div>
+              }
+            </app-mobile-list>
           }
         </aside>
       </div>
@@ -1409,6 +1339,19 @@ interface ParsedPurchaseLine {
                   />
                 }
               </div>
+
+              @if (perms.has('ManageSupplierCreditPurchases')) {
+                <button
+                  appButton
+                  variant="outline"
+                  type="button"
+                  class="mt-3 w-full"
+                  [disabled]="busy()"
+                  (click)="setSupplierActive(s)"
+                >
+                  {{ s.supplier_active ? 'Archive supplier' : 'Reactivate supplier' }}
+                </button>
+              }
 
               <div class="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
                 <app-stat-card
@@ -1817,6 +1760,9 @@ interface ParsedPurchaseLine {
             (sortKeyChange)="purchaseSort.set($event); reloadPurchases()"
             [sortDirection]="purchaseSortDirection()"
             (sortDirectionChange)="purchaseSortDirection.set($event); reloadPurchases()"
+            [filtersEnabled]="true"
+            [activeFilterCount]="purchaseActiveFilterCount()"
+            (clearFilters)="clearPurchaseFilters()"
           >
             <app-stat-bar summary [stats]="purchaseSummary()" />
             <div filters class="grid gap-2 sm:grid-cols-2 lg:flex lg:flex-wrap lg:items-end">
@@ -1910,85 +1856,122 @@ interface ParsedPurchaseLine {
               "
             />
           } @else {
-            <app-data-table-shell
-              title="Purchase history"
-              [description]="purchaseHistoryTotal() + ' matching purchases'"
-            >
-              <table class="table table-sm">
-                <thead>
-                  <tr>
-                    <th>Date</th>
-                    <th>Supplier</th>
-                    <th>Payment</th>
-                    <th>Reference</th>
-                    <th class="text-right">Total</th>
-                    <th class="text-right">Status</th>
-                    <th class="text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @for (p of purchases(); track p.id) {
-                    <tr
-                      role="button"
-                      tabindex="0"
-                      class="cursor-pointer"
-                      [class.table-row-active]="drawerPurchaseId() === p.id"
-                      (click)="openPurchaseDrawer(p)"
-                      (keydown.enter)="openPurchaseDrawer(p)"
-                    >
-                      <td class="whitespace-nowrap text-sm">{{ time(p.purchase_date) }}</td>
-                      <td class="font-medium">{{ supplierName(p.supplier_id) }}</td>
-                      <td class="text-sm">{{ p.is_credit ? 'Pay later' : 'Paid now' }}</td>
-                      <td class="type-caption">{{ p.reference || '—' }}</td>
-                      <td class="text-right font-semibold">
+            <app-mobile-list>
+              @for (p of purchases(); track p.id) {
+                <div
+                  mobileListRow
+                  class="cursor-pointer"
+                  role="button"
+                  tabindex="0"
+                  [class.bg-base-200/50]="drawerPurchaseId() === p.id"
+                  (click)="openPurchaseDrawer(p)"
+                  (keydown.enter)="openPurchaseDrawer(p)"
+                >
+                  <div class="flex min-h-20 items-center gap-3 p-3">
+                    <div class="min-w-0 flex-1">
+                      <p class="truncate font-semibold">{{ supplierName(p.supplier_id) }}</p>
+                      <p class="type-caption mt-1 truncate">
+                        {{ time(p.purchase_date) }} · {{ p.reference || 'No reference' }}
+                      </p>
+                    </div>
+                    <div class="shrink-0 text-right">
+                      <p class="font-semibold tabular-nums">
                         <app-money
                           [amount]="p.total_cost"
                           [masked]="!perms.has('ViewFinancials')"
                         />
-                      </td>
-                      <td class="text-right">
-                        <app-status-badge
-                          [type]="purchaseStatusType(p)"
-                          [label]="purchaseStatusLabel(p)"
-                        />
-                      </td>
-                      <td class="table-actions" (click)="$event.stopPropagation()">
-                        @if (printerEnabled()) {
-                          <button
-                            appButton
-                            variant="ghost"
-                            [iconOnly]="true"
-                            type="button"
-                            title="Print PO"
-                            aria-label="Print PO"
-                            (click)="printPurchase(p.id)"
-                          >
-                            <app-icon name="heroPrinter" />
-                          </button>
-                        }
-                        @if (
-                          p.is_credit &&
-                          p.paid < p.total_cost &&
-                          perms.has('ManageSupplierCreditPurchases')
-                        ) {
-                          <button
-                            appButton
-                            variant="ghost"
-                            [iconOnly]="true"
-                            type="button"
-                            title="Pay this purchase"
-                            aria-label="Pay this purchase"
-                            (click)="openPurchaseDrawer(p); startPurchasePayment(p)"
-                          >
-                            <app-icon name="heroBanknotes" />
-                          </button>
-                        }
-                      </td>
+                      </p>
+                      <app-status-badge
+                        size="xs"
+                        [type]="purchaseStatusType(p)"
+                        [label]="purchaseStatusLabel(p)"
+                      />
+                    </div>
+                  </div>
+                </div>
+              }
+            </app-mobile-list>
+            <div class="hidden lg:block">
+              <app-data-table-shell
+                title="Purchase history"
+                [description]="purchaseHistoryTotal() + ' matching purchases'"
+              >
+                <table class="table table-sm">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Supplier</th>
+                      <th>Payment</th>
+                      <th>Reference</th>
+                      <th class="text-right">Total</th>
+                      <th class="text-right">Status</th>
+                      <th class="text-right">Actions</th>
                     </tr>
-                  }
-                </tbody>
-              </table>
-            </app-data-table-shell>
+                  </thead>
+                  <tbody>
+                    @for (p of purchases(); track p.id) {
+                      <tr
+                        role="button"
+                        tabindex="0"
+                        class="cursor-pointer"
+                        [class.table-row-active]="drawerPurchaseId() === p.id"
+                        (click)="openPurchaseDrawer(p)"
+                        (keydown.enter)="openPurchaseDrawer(p)"
+                      >
+                        <td class="whitespace-nowrap text-sm">{{ time(p.purchase_date) }}</td>
+                        <td class="font-medium">{{ supplierName(p.supplier_id) }}</td>
+                        <td class="text-sm">{{ p.is_credit ? 'Pay later' : 'Paid now' }}</td>
+                        <td class="type-caption">{{ p.reference || '—' }}</td>
+                        <td class="text-right font-semibold">
+                          <app-money
+                            [amount]="p.total_cost"
+                            [masked]="!perms.has('ViewFinancials')"
+                          />
+                        </td>
+                        <td class="text-right">
+                          <app-status-badge
+                            [type]="purchaseStatusType(p)"
+                            [label]="purchaseStatusLabel(p)"
+                          />
+                        </td>
+                        <td class="table-actions" (click)="$event.stopPropagation()">
+                          @if (printerEnabled()) {
+                            <button
+                              appButton
+                              variant="ghost"
+                              [iconOnly]="true"
+                              type="button"
+                              title="Print PO"
+                              aria-label="Print PO"
+                              (click)="printPurchase(p.id)"
+                            >
+                              <app-icon name="heroPrinter" />
+                            </button>
+                          }
+                          @if (
+                            p.is_credit &&
+                            p.paid < p.total_cost &&
+                            perms.has('ManageSupplierCreditPurchases')
+                          ) {
+                            <button
+                              appButton
+                              variant="ghost"
+                              [iconOnly]="true"
+                              type="button"
+                              title="Pay this purchase"
+                              aria-label="Pay this purchase"
+                              (click)="openPurchaseDrawer(p); startPurchasePayment(p)"
+                            >
+                              <app-icon name="heroBanknotes" />
+                            </button>
+                          }
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </app-data-table-shell>
+            </div>
 
             <!-- Purchase detail drawer -->
             @if (drawerPurchase(); as p) {
@@ -2524,21 +2507,28 @@ export class SuppliersComponent implements OnInit, OnDestroy {
     this.purchaseMetrics().reduce((sum, metric) => sum + Number(metric.open_purchase_count ?? 0), 0)
   );
   protected readonly supplierSummary = computed(() => [
-    { label: 'Active suppliers', value: this.activeSuppliers().length },
+    {
+      label: 'Active suppliers',
+      value: this.activeSuppliers().length,
+      mobilePriority: 'primary' as const,
+    },
     {
       label: 'We owe',
       value: this.perms.has('ViewFinancials') ? this.fmt(this.totalOutstanding()) : 'Hidden',
       tone: this.totalOutstanding() > 0 ? ('warning' as const) : ('neutral' as const),
+      mobilePriority: 'primary' as const,
     },
     {
       label: 'Suppliers we owe',
       value: this.suppliersOwed().length,
       tone: this.suppliersOwed().length > 0 ? ('warning' as const) : ('neutral' as const),
+      mobilePriority: 'secondary' as const,
     },
     {
       label: 'Purchases we owe',
       value: this.openCreditPurchases(),
       tone: this.openCreditPurchases() > 0 ? ('warning' as const) : ('neutral' as const),
+      mobilePriority: 'secondary' as const,
     },
   ]);
   protected readonly purchaseSummary = computed(() => {
@@ -2549,20 +2539,27 @@ export class SuppliersComponent implements OnInit, OnDestroy {
       0
     );
     return [
-      { label: 'Matching purchases', value: this.purchaseHistoryTotal() },
+      {
+        label: 'Matching purchases',
+        value: this.purchaseHistoryTotal(),
+        mobilePriority: 'primary' as const,
+      },
       {
         label: 'Value on page',
         value: this.perms.has('ViewFinancials') ? this.fmt(value) : 'Hidden',
+        mobilePriority: 'primary' as const,
       },
       {
         label: 'Still to pay on page',
         value: this.perms.has('ViewFinancials') ? this.fmt(outstanding) : 'Hidden',
         tone: outstanding > 0 ? ('warning' as const) : ('neutral' as const),
+        mobilePriority: 'secondary' as const,
       },
       {
         label: 'Drafts',
         value: this.drafts().length,
         tone: this.drafts().length > 0 ? ('warning' as const) : ('neutral' as const),
+        mobilePriority: 'secondary' as const,
       },
     ];
   });
@@ -2690,6 +2687,38 @@ export class SuppliersComponent implements OnInit, OnDestroy {
     else if (kind === 'balance') this.supplierBalanceFilter.set(value);
     else this.supplierAgeFilter.set(value);
     this.supplierPage.set(1);
+  }
+
+  protected supplierActiveFilterCount(): number {
+    return (
+      Number(this.supplierStatusFilter() !== 'all') +
+      Number(this.supplierBalanceFilter() !== 'all') +
+      Number(this.supplierAgeFilter() !== 'all')
+    );
+  }
+
+  protected clearSupplierFilters(): void {
+    this.supplierStatusFilter.set('all');
+    this.supplierBalanceFilter.set('all');
+    this.supplierAgeFilter.set('all');
+    this.supplierPage.set(1);
+  }
+
+  protected purchaseActiveFilterCount(): number {
+    return (
+      Number(this.purchaseSupplierFilter() !== 'all') +
+      Number(this.purchasePaymentFilter() !== 'all') +
+      Number(!this.purchaseMonthActive())
+    );
+  }
+
+  protected clearPurchaseFilters(): void {
+    this.purchaseSupplierFilter.set('all');
+    this.purchasePaymentFilter.set('all');
+    this.purchaseLocationFilter.set(this.locationContext.requireActiveId());
+    this.purchaseFrom.set(this.monthStartIso());
+    this.purchaseTo.set(this.todayIso());
+    this.reloadPurchases();
   }
 
   protected setPurchaseFilter(kind: 'location' | 'payment', event: Event): void {

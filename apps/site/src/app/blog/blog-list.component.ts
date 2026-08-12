@@ -1,9 +1,8 @@
-import { DatePipe, isPlatformBrowser } from '@angular/common';
+import { DatePipe } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
   OnInit,
-  PLATFORM_ID,
   computed,
   inject,
   signal,
@@ -224,29 +223,22 @@ import { BlogPostSummary, BlogService } from './blog.service';
 })
 export class BlogListComponent implements OnInit {
   private readonly blog = inject(BlogService);
-  private readonly platformId = inject(PLATFORM_ID);
   protected readonly posts = signal<BlogPostSummary[]>([]);
   protected readonly loading = signal(true);
   protected readonly loadingMore = signal(false);
   protected readonly hasMore = signal(false);
   protected readonly error = signal<string | null>(null);
-  protected readonly featured = computed(() => this.posts()[0] ?? null);
-  protected readonly morePosts = computed(() => this.posts().slice(1));
+  protected readonly featured = signal<BlogPostSummary | null>(null);
+  protected readonly morePosts = computed(() =>
+    this.posts().filter(post => post.post_id !== this.featured()?.post_id)
+  );
 
   async ngOnInit(): Promise<void> {
     try {
-      const posts = await this.blog.posts();
+      const [posts, featured] = await Promise.all([this.blog.posts(), this.blog.featuredPost()]);
       this.posts.set(posts);
+      this.featured.set(featured);
       this.hasMore.set(posts.length === 24);
-      if (isPlatformBrowser(this.platformId)) {
-        void this.blog
-          .posts(true)
-          .then(fresh => {
-            this.posts.set(fresh);
-            this.hasMore.set(fresh.length === 24);
-          })
-          .catch(() => undefined);
-      }
     } catch {
       this.error.set('Articles could not be loaded. Please try again.');
     } finally {

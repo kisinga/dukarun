@@ -5,6 +5,8 @@ import { PageLayoutComponent } from '../shared/ui/page-layout.component';
 import { IconComponent } from '../shared/ui/icon.component';
 import { ButtonComponent } from '../shared/ui/button.component';
 import { AppNotification, NotificationsService } from './notifications.service';
+import { MobileListComponent } from '../shared/ui/mobile-list.component';
+import { PageActionsComponent } from '../shared/ui/page-actions.component';
 
 const TYPE_ICON: Record<string, string> = {
   credit_reminder: 'heroBanknotes',
@@ -16,13 +18,22 @@ const TYPE_ICON: Record<string, string> = {
 
 @Component({
   selector: 'app-notifications',
-  imports: [PageLayoutComponent, EmptyStateComponent, IconComponent, ButtonComponent],
+  imports: [
+    PageLayoutComponent,
+    EmptyStateComponent,
+    IconComponent,
+    ButtonComponent,
+    MobileListComponent,
+    PageActionsComponent,
+  ],
   template: `
     <app-page title="Notifications" [badge]="notifications.unreadCount()">
       @if (notifications.unreadCount() > 0) {
-        <button actions appButton variant="ghost" [disabled]="busy()" (click)="markAll()">
-          Mark all read
-        </button>
+        <app-page-actions actions>
+          <button utilityAction appButton variant="ghost" [disabled]="busy()" (click)="markAll()">
+            Mark all read
+          </button>
+        </app-page-actions>
       }
 
       @if (error()) {
@@ -36,14 +47,15 @@ const TYPE_ICON: Record<string, string> = {
           description="Credit reminders, approvals, and stock alerts land here."
         />
       } @else {
-        <div class="flex flex-col gap-2">
+        <app-mobile-list [desktopVisible]="true">
           @for (n of notifications.notifications(); track n.id) {
             <button
-              class="card w-full bg-base-100 text-left"
+              mobileListRow
+              class="w-full bg-base-100 text-left"
               [class.opacity-60]="n.read_at !== null"
               (click)="open(n)"
             >
-              <div class="card-body flex-row items-start gap-3 p-4">
+              <div class="flex min-h-20 items-start gap-3 p-3">
                 <div
                   class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
                   [class.bg-primary/10]="n.read_at === null"
@@ -85,7 +97,7 @@ const TYPE_ICON: Record<string, string> = {
               </div>
             </button>
           }
-        </div>
+        </app-mobile-list>
       }
     </app-page>
   `,

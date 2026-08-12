@@ -10,8 +10,8 @@ import { NgIcon } from '@ng-icons/core';
   selector: 'app-page-header',
   imports: [RouterLink, NgIcon],
   template: `
-    <div class="mb-4 flex flex-wrap items-start gap-x-4 gap-y-3">
-      <div class="min-w-0">
+    <div class="page-header mb-4 grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-2">
+      <div class="min-w-0 self-center">
         @if (backLink(); as link) {
           <a
             [routerLink]="link"
@@ -34,10 +34,10 @@ import { NgIcon } from '@ng-icons/core';
           }
         </h1>
         @if (subtitle()) {
-          <p class="mt-0.5 text-sm text-base-content/60">{{ subtitle() }}</p>
+          <p class="mt-0.5 hidden text-sm text-base-content/60 md:block">{{ subtitle() }}</p>
         }
       </div>
-      <div class="ml-auto flex flex-wrap items-center justify-end gap-2">
+      <div class="flex min-w-0 items-center justify-end gap-2">
         <!-- PageLayout already selects [actions] before forwarding them. Direct users of
              PageHeader project only header actions, so filtering a second time would drop
              forwarded nodes. -->

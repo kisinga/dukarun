@@ -207,12 +207,6 @@ export class StorefrontService {
     return shops;
   }
 
-  async prerenderSlugs(): Promise<string[]> {
-    return (await this.directory())
-      .map(shop => shop.slug)
-      .filter((slug): slug is string => Boolean(slug));
-  }
-
   /** Shop identity by slug (null = unknown slug → 404 state). */
   async storefront(slug: string, force = false): Promise<StorefrontInfo | null> {
     const key = shopKey(slug);

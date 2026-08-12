@@ -67,7 +67,7 @@ select is(jsonb_array_length(public.public_blog_posts()), 1,
 select is(jsonb_array_length(public.public_blog_sitemap()), 1,
   'public sitemap projection contains every publication without pagination');
 select is((select count(*)::integer from public.public_site_deploy_requests
-  where reason='blog_publish'), 1, 'publishing queues one SEO deployment request');
+  where reason='blog_publish'), 0, 'publishing needs no frontend deployment');
 select throws_ok(
   $$select public.platform_save_blog_draft(
     (select (result->>'post_id')::uuid from saved_blog), 'renamed-after-publish',
@@ -211,10 +211,12 @@ select is((select status from public.companies where id=(select (result->>'compa
 
 set local role service_role;
 set local request.jwt.claims = '{"role":"service_role"}';
+insert into public.public_site_deploy_requests(reason,resource_type)
+values('manual','frontend');
 create temp table deploy_claim as select public.claim_public_site_deployment() result;
 grant select on pg_temp.deploy_claim to authenticated, service_role;
 select ok((select (result->>'deployment_id')::uuid from deploy_claim) is not null,
-  'deploy worker atomically claims pending publication work');
+  'deploy worker atomically claims pending build work');
 select is((select max(attempt_count) from public.public_site_deploy_requests), 1,
   'claiming deployment work increments its bounded retry counter');
 select is(public.finalize_public_site_deployment(

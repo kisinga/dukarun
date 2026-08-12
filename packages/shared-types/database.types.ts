@@ -381,6 +381,7 @@ export type Database = {
           archived_at: string | null
           created_at: string
           created_by: string
+          featured_at: string | null
           id: string
           slug: string
           updated_at: string
@@ -389,6 +390,7 @@ export type Database = {
           archived_at?: string | null
           created_at?: string
           created_by: string
+          featured_at?: string | null
           id?: string
           slug: string
           updated_at?: string
@@ -397,6 +399,7 @@ export type Database = {
           archived_at?: string | null
           created_at?: string
           created_by?: string
+          featured_at?: string | null
           id?: string
           slug?: string
           updated_at?: string
@@ -3147,6 +3150,7 @@ export type Database = {
           company_id: string
           created_at: string
           entry_date: string
+          finalized_at: string | null
           id: string
           memo: string | null
           payload_hash: string | null
@@ -3159,6 +3163,7 @@ export type Database = {
           company_id: string
           created_at?: string
           entry_date: string
+          finalized_at?: string | null
           id?: string
           memo?: string | null
           payload_hash?: string | null
@@ -3171,6 +3176,7 @@ export type Database = {
           company_id?: string
           created_at?: string
           entry_date?: string
+          finalized_at?: string | null
           id?: string
           memo?: string | null
           payload_hash?: string | null
@@ -8085,6 +8091,10 @@ export type Database = {
         Args: { p_company_id: string; p_customer_id: string }
         Returns: string
       }
+      journal_entry_payload_hash: {
+        Args: { p_entry_id: string }
+        Returns: string
+      }
       journal_payload_hash: {
         Args: { p_entry_date: string; p_lines: Json; p_memo: string }
         Returns: string
@@ -8310,6 +8320,10 @@ export type Database = {
       platform_external_communication_metrics: {
         Args: { p_since?: string }
         Returns: Json
+      }
+      platform_feature_blog_post: {
+        Args: { p_post_id: string }
+        Returns: boolean
       }
       platform_launch_campaign: {
         Args: { p_campaign_id: string; p_scheduled_for?: string }
@@ -8789,6 +8803,8 @@ export type Database = {
       public_blog_sitemap: { Args: never; Returns: Json }
       public_customer_statement: { Args: { p_token: string }; Returns: Json }
       public_external_document: { Args: { p_token: string }; Returns: Json }
+      public_featured_blog_post: { Args: never; Returns: Json }
+      public_storefront_sitemap: { Args: never; Returns: Json }
       publish_due_blog_posts: { Args: never; Returns: number }
       published_legal_document: {
         Args: { p_document_type: string }

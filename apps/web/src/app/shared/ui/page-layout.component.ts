@@ -12,7 +12,7 @@ import { PageHeaderComponent } from './page-header.component';
   // `title` is a component input, not a native tooltip for the entire page.
   host: { '[attr.title]': 'null' },
   template: `
-    <main class="dashboard-main min-h-screen bg-base-200 p-4">
+    <main class="dashboard-main min-h-screen bg-base-200">
       <div
         class="page"
         [class.page-wide]="wide() || workspace()"

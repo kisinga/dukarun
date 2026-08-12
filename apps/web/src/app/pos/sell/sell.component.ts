@@ -36,6 +36,7 @@ import { SellCartLineComponent } from './sell-cart-line.component';
 import { MyPendingSalesComponent } from './my-pending-sales.component';
 import { SessionRequiredNoticeComponent } from '../../shared/ui/session-required-notice.component';
 import { BarcodeScannerComponent } from '../../shared/ui/barcode-scanner.component';
+import { PageActionsComponent } from '../../shared/ui/page-actions.component';
 import { ScanFeedbackService } from '../../shared/ui/scan-feedback.service';
 import { isRapidScannerBurst, isTextEntryTarget } from '../keyboard-wedge';
 import { CatalogCacheService } from '../../core/catalog-cache.service';
@@ -81,6 +82,7 @@ type CatalogView = 'grid' | 'list' | 'categories';
     MyPendingSalesComponent,
     SessionRequiredNoticeComponent,
     BarcodeScannerComponent,
+    PageActionsComponent,
   ],
   template: `
     <app-page
@@ -88,39 +90,43 @@ type CatalogView = 'grid' | 'list' | 'categories';
       subtitle="Find an item, adjust it, and take payment without leaving the counter."
       [workspace]="true"
     >
-      @if (cart.draftId()) {
-        <span actions class="badge badge-info">Editing proforma</span>
-      }
-      @if (sync.usingCachedCatalog()) {
-        <span actions class="badge badge-warning">{{ sync.catalogStatusLabel() }}</span>
-      }
-      @if (sync.usingCachedCatalog() && connectivity.online()) {
-        <button
-          actions
-          appButton
-          variant="ghost"
-          size="sm"
-          [loading]="catalogRefreshing()"
-          (click)="refreshCatalog()"
-        >
-          Refresh catalog
-        </button>
-      }
-      @if (cashierSession.usingCachedState()) {
-        <span actions class="badge badge-warning">{{ cashierSession.cachedStatusLabel() }}</span>
-      }
-      @if (cashierSession.configurationLoaded() && !cashierSession.cashierFlowEnabled()) {
-        <span
-          actions
-          class="badge badge-info cursor-help"
-          title="Take payment here to complete the sale; the cashier queue is not used."
-        >
-          Direct checkout
-        </span>
-      }
-      @if (cashierSession.cashierFlowEnabled()) {
-        <app-my-pending-sales actions />
-      }
+      <app-page-actions actions>
+        @if (cart.draftId()) {
+          <span utilityAction class="badge badge-info">Editing proforma</span>
+        }
+        @if (sync.usingCachedCatalog()) {
+          <span utilityAction class="badge badge-warning">{{ sync.catalogStatusLabel() }}</span>
+        }
+        @if (sync.usingCachedCatalog() && connectivity.online()) {
+          <button
+            overflowAction
+            appButton
+            variant="ghost"
+            size="sm"
+            [loading]="catalogRefreshing()"
+            (click)="refreshCatalog()"
+          >
+            Refresh catalog
+          </button>
+        }
+        @if (cashierSession.usingCachedState()) {
+          <span overflowAction class="badge badge-warning">{{
+            cashierSession.cachedStatusLabel()
+          }}</span>
+        }
+        @if (cashierSession.configurationLoaded() && !cashierSession.cashierFlowEnabled()) {
+          <span
+            overflowAction
+            class="badge badge-info cursor-help"
+            title="Take payment here to complete the sale; the cashier queue is not used."
+          >
+            Direct checkout
+          </span>
+        }
+        @if (cashierSession.cashierFlowEnabled()) {
+          <app-my-pending-sales overflowAction />
+        }
+      </app-page-actions>
 
       @if (cashierSession.cashControlEnabled() && !cashierSession.isOpen()) {
         <app-session-required-notice action="taking payment or completing a sale" />
@@ -963,68 +969,103 @@ type CatalogView = 'grid' | 'list' | 'categories';
       }
       @if (creditConfirmOpen()) {
         <dialog
-          class="modal modal-open"
+          class="modal modal-bottom modal-open md:modal-middle"
           aria-labelledby="credit-confirm-heading"
           (cancel)="$event.preventDefault(); creditConfirmOpen.set(false)"
         >
-          <div class="modal-box border border-base-300/60 bg-base-100">
-            <h2 id="credit-confirm-heading" class="type-title">Sell on credit?</h2>
-            @if (selectedCustomer(); as customer) {
-              <dl class="mt-3 flex flex-col gap-2 text-sm">
-                <div class="flex items-center justify-between gap-3">
-                  <dt class="text-base-content/60">Customer</dt>
-                  <dd class="font-semibold">{{ customerName(customer) }}</dd>
-                </div>
-                <div class="flex items-center justify-between gap-3">
-                  <dt class="text-base-content/60">Amount due</dt>
-                  <dd class="font-semibold tabular-nums">
-                    <app-money [amount]="cart.total()" />
-                  </dd>
-                </div>
-                @if (customer.credit_limit > 0) {
-                  <div class="flex items-center justify-between gap-3">
-                    <dt class="text-base-content/60">Projected balance</dt>
-                    <dd
-                      class="font-semibold tabular-nums"
-                      [class.text-warning]="creditExceedsLimit()"
-                    >
-                      <app-money [amount]="customer.ar_balance + cart.total()" />
-                    </dd>
-                  </div>
-                  <div class="flex items-center justify-between gap-3">
-                    <dt class="text-base-content/60">Credit limit</dt>
-                    <dd class="font-semibold tabular-nums">
-                      <app-money [amount]="customer.credit_limit" />
-                    </dd>
-                  </div>
-                }
-              </dl>
-              @if (creditApprovalRequired()) {
-                <div role="status" class="alert alert-warning mt-4 text-sm">
-                  <app-icon name="heroExclamationTriangle" />
-                  <span
-                    >This sale exceeds the limit and will be held without changing inventory until
-                    approved.</span
-                  >
-                </div>
-                <app-form-field
-                  class="mt-3 block"
-                  label="Reason for the exception"
-                  [required]="true"
-                >
-                  <textarea
-                    class="textarea textarea-bordered min-h-20 w-full"
-                    [formControl]="creditApprovalReason"
-                    placeholder="Why should this customer exceed their limit?"
-                  ></textarea>
-                </app-form-field>
-              }
-            }
-            <div class="mt-4 flex justify-end gap-2">
+          <div class="modal-box modal-box-compact border border-base-300/60 bg-base-100 p-0">
+            <header class="flex items-start gap-3 border-b border-base-300/70 px-4 py-3">
+              <span
+                class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary"
+                aria-hidden="true"
+              >
+                <app-icon name="heroCreditCard" size="lg" />
+              </span>
+              <div class="min-w-0 flex-1">
+                <h2 id="credit-confirm-heading" class="type-title">Confirm credit sale</h2>
+                <p class="type-caption mt-0.5">
+                  The amount will be added to this customer's balance.
+                </p>
+              </div>
               <button
                 appButton
+                type="button"
                 variant="ghost"
+                [iconOnly]="true"
+                aria-label="Close credit confirmation"
+                [disabled]="busy()"
+                (click)="creditConfirmOpen.set(false)"
+              >
+                <app-icon name="heroXMark" />
+              </button>
+            </header>
+
+            <div class="max-h-[65dvh] overflow-y-auto px-4 py-4">
+              @if (selectedCustomer(); as customer) {
+                <div
+                  class="flex items-center justify-between gap-4 border-b border-base-300/70 pb-3"
+                >
+                  <div class="min-w-0">
+                    <p class="type-caption">Customer</p>
+                    <p class="truncate font-semibold">{{ customerName(customer) }}</p>
+                  </div>
+                  <div class="shrink-0 text-right">
+                    <p class="type-caption">Amount due</p>
+                    <p class="type-title tabular-nums"><app-money [amount]="cart.total()" /></p>
+                  </div>
+                </div>
+
+                @if (customer.credit_limit > 0) {
+                  <dl class="mt-3 grid grid-cols-2 gap-3 rounded-field bg-base-200/70 p-3 text-sm">
+                    <div>
+                      <dt class="type-caption">Balance after sale</dt>
+                      <dd
+                        class="mt-0.5 font-semibold tabular-nums"
+                        [class.text-warning]="creditExceedsLimit()"
+                      >
+                        <app-money [amount]="customer.ar_balance + cart.total()" />
+                      </dd>
+                    </div>
+                    <div class="text-right">
+                      <dt class="type-caption">Credit limit</dt>
+                      <dd class="mt-0.5 font-semibold tabular-nums">
+                        <app-money [amount]="customer.credit_limit" />
+                      </dd>
+                    </div>
+                  </dl>
+                }
+
+                @if (creditApprovalRequired()) {
+                  <div role="status" class="alert alert-warning mt-3 text-sm">
+                    <app-icon name="heroExclamationTriangle" />
+                    <span
+                      >This exceeds the credit limit. The sale will wait for approval and stock will
+                      not change yet.</span
+                    >
+                  </div>
+                  <app-form-field
+                    class="mt-3 block"
+                    label="Reason for the exception"
+                    [required]="true"
+                  >
+                    <textarea
+                      class="textarea textarea-bordered min-h-20 w-full"
+                      [formControl]="creditApprovalReason"
+                      placeholder="Why should this customer exceed their limit?"
+                    ></textarea>
+                  </app-form-field>
+                }
+              }
+            </div>
+
+            <footer
+              class="grid grid-cols-2 gap-2 border-t border-base-300/70 bg-base-100 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+            >
+              <button
+                appButton
+                variant="outline"
                 size="md"
+                class="w-full"
                 type="button"
                 [disabled]="busy()"
                 (click)="creditConfirmOpen.set(false)"
@@ -1034,6 +1075,7 @@ type CatalogView = 'grid' | 'list' | 'categories';
               <button
                 appButton
                 size="md"
+                class="w-full"
                 type="button"
                 [loading]="busy()"
                 [disabled]="
@@ -1041,9 +1083,13 @@ type CatalogView = 'grid' | 'list' | 'categories';
                 "
                 (click)="confirmCreditSale()"
               >
-                {{ creditApprovalRequired() ? 'Request credit approval' : 'Confirm credit sale' }}
+                @if (creditApprovalRequired()) {
+                  Request approval
+                } @else {
+                  Confirm sale
+                }
               </button>
-            </div>
+            </footer>
           </div>
           <form method="dialog" class="modal-backdrop">
             <button type="button" aria-label="Cancel" (click)="creditConfirmOpen.set(false)">
@@ -1106,7 +1152,7 @@ export class SellComponent implements OnInit {
   protected readonly results = signal<Variant[]>([]);
   protected readonly topVariants = signal<Variant[]>([]);
   protected readonly searchMode = computed(() => this.searchQuery().trim().length >= 2);
-  protected readonly catalogView = signal<CatalogView>('grid');
+  protected readonly catalogView = signal<CatalogView>('list');
   protected readonly selectedCategoryId = signal<string | null>(null);
   protected readonly categorySearch = signal('');
   protected readonly categoryVisibleLimit = signal(24);

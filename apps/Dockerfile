@@ -57,6 +57,9 @@ RUN cd apps/$APP && npm run build
 
 RUN echo "🔍 Validating build output..." && \
     BUILD_DIR="/app/apps/$APP/dist/$APP/browser" && \
+    if [ ! -f "$BUILD_DIR/index.html" ] && [ -f "$BUILD_DIR/index.csr.html" ]; then \
+      cp "$BUILD_DIR/index.csr.html" "$BUILD_DIR/index.html"; \
+    fi && \
     if [ ! -f "$BUILD_DIR/index.html" ]; then \
       echo "❌ ERROR: index.html not found in $BUILD_DIR" && \
       find /app/apps/$APP/dist -type d -maxdepth 3 2>/dev/null || true && \
@@ -67,6 +70,8 @@ RUN echo "🔍 Validating build output..." && \
 # Stage 2: Production nginx server
 FROM nginx:1.27-alpine
 ARG APP
+ARG SUPABASE_URL
+ARG SUPABASE_ANON_KEY
 
 RUN apk add --no-cache curl
 RUN rm -rf /etc/nginx/conf.d/default.conf /usr/share/nginx/html/*
@@ -75,9 +80,16 @@ COPY --from=builder /app/apps/$APP/dist/$APP/browser /usr/share/nginx/html
 COPY apps/nginx.conf /tmp/nginx-csr.conf
 COPY apps/nginx-spa.conf /tmp/nginx-spa.conf
 RUN case "$APP" in \
-      site|storefront) cp /tmp/nginx-csr.conf /etc/nginx/conf.d/default.conf ;; \
+      site|storefront) test -n "$SUPABASE_URL" && test -n "$SUPABASE_ANON_KEY" ;; \
       web|super-admin) cp /tmp/nginx-spa.conf /etc/nginx/conf.d/default.conf ;; \
-    esac && rm /tmp/nginx-csr.conf /tmp/nginx-spa.conf
+    esac && \
+    if [ "$APP" = "site" ] || [ "$APP" = "storefront" ]; then \
+      sed -e "s|__SUPABASE_URL__|${SUPABASE_URL%/}|g" \
+          -e "s|__SUPABASE_ANON_KEY__|$SUPABASE_ANON_KEY|g" \
+          -e "s|__APP__|$APP|g" \
+          /tmp/nginx-csr.conf > /etc/nginx/conf.d/default.conf; \
+    fi && \
+    rm /tmp/nginx-csr.conf /tmp/nginx-spa.conf && nginx -t
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s \
   CMD curl -f http://localhost/ || exit 1

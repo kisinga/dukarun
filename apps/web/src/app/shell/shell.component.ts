@@ -61,7 +61,9 @@ interface NavSection {
 
       <div class="drawer-content flex min-h-screen flex-col">
         <!-- Top navbar -->
-        <div class="navbar sticky top-0 z-40 min-h-16 border-b border-base-300 bg-base-100 px-4">
+        <div
+          class="navbar sticky top-0 z-40 h-14 min-h-14 border-b border-base-300 bg-base-100 px-3 md:px-4"
+        >
           <div class="flex-none lg:hidden">
             <label for="app-drawer" class="btn btn-square btn-ghost btn-sm" aria-label="Open menu">
               <app-icon name="heroBars3" size="lg" />
@@ -72,7 +74,7 @@ interface NavSection {
           <div class="flex-1"></div>
 
           @if (locations.isMultiLocation()) {
-            <label class="mr-2 hidden items-center gap-2 sm:flex">
+            <label class="mr-2 hidden items-center gap-2 lg:flex">
               <span class="text-xs font-medium text-base-content/55">Working location</span>
               <select
                 class="select select-bordered select-sm max-w-52"
@@ -95,7 +97,7 @@ interface NavSection {
                 aria-label="Offline"
               >
                 <app-icon name="heroSignalSlash" size="sm" />
-                Offline
+                <span class="hidden sm:inline">Offline</span>
               </span>
             }
 
@@ -184,7 +186,7 @@ interface NavSection {
             }
 
             <button
-              class="btn btn-ghost btn-sm min-h-11 min-w-11"
+              class="btn btn-ghost btn-sm hidden min-h-11 min-w-11 md:inline-flex"
               [title]="theme.theme() === 'light' ? 'Switch to dark mode' : 'Switch to light mode'"
               [attr.aria-label]="
                 theme.theme() === 'light' ? 'Switch to dark mode' : 'Switch to light mode'
@@ -211,6 +213,12 @@ interface NavSection {
                     <app-icon name="heroUserCircle" />
                     My profile
                   </a>
+                </li>
+                <li class="md:hidden">
+                  <button type="button" (click)="theme.toggle()">
+                    <app-icon [name]="theme.theme() === 'light' ? 'heroMoon' : 'heroSun'" />
+                    {{ theme.theme() === 'light' ? 'Dark mode' : 'Light mode' }}
+                  </button>
                 </li>
                 <li>
                   <a [href]="siteUrl('/privacy')"><app-icon name="heroLockClosed" />Privacy</a>
@@ -247,7 +255,9 @@ interface NavSection {
         }
 
         <!-- Page content -->
-        <main class="flex-1 overflow-auto bg-base-200/40 pb-20 lg:pb-0">
+        <main
+          class="flex-1 overflow-auto bg-base-200/40 pb-[calc(4rem+env(safe-area-inset-bottom,0px))] lg:pb-0"
+        >
           @if (legal.status(); as legalStatus) {
             @if (
               legalStatus.required && !legalStatus.accepted && !legalStatus.enforcement_started
@@ -295,14 +305,14 @@ interface NavSection {
               <span class="bottom-nav-ico"><app-icon name="heroShoppingCart" size="lg" /></span>
               <span class="bottom-nav-label">Sell</span>
             </a>
-            <label
-              for="app-drawer"
-              class="bottom-nav-item flex-1 cursor-pointer justify-center"
-              aria-label="Open menu"
+            <a
+              routerLink="/products"
+              routerLinkActive="bottom-nav-active"
+              class="bottom-nav-item flex-1 justify-center"
             >
-              <span class="bottom-nav-ico"><app-icon name="heroBars3" size="lg" /></span>
-              <span class="bottom-nav-label">More</span>
-            </label>
+              <span class="bottom-nav-ico"><app-icon name="heroCube" size="lg" /></span>
+              <span class="bottom-nav-label">Products</span>
+            </a>
           </div>
         </nav>
       </div>
@@ -357,6 +367,23 @@ interface NavSection {
           </div>
 
           <div class="flex-1 overflow-y-auto px-2 py-2">
+            @if (locations.isMultiLocation()) {
+              <div class="mb-2 border-b border-base-300 px-2 pb-3 lg:hidden">
+                <label class="form-field-label" for="mobile-working-location"
+                  >Working location</label
+                >
+                <select
+                  id="mobile-working-location"
+                  class="select select-bordered select-sm mt-1 w-full"
+                  [value]="locations.activeId()"
+                  (change)="changeLocation($event)"
+                >
+                  @for (location of locations.locations(); track location.id) {
+                    <option [value]="location.id">{{ location.name }}</option>
+                  }
+                </select>
+              </div>
+            }
             <nav class="space-y-1">
               @for (section of visibleSections(); track section.label ?? 'top') {
                 @if (section.label) {
