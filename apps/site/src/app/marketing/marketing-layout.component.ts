@@ -123,8 +123,16 @@ interface NavLink {
               </a>
             }
           </nav>
-          <nav class="flex flex-col gap-1" aria-label="Account">
-            <span class="mkt-eyebrow mb-1">Account</span>
+          <nav class="flex flex-col gap-1" aria-label="Resources">
+            <span class="mkt-eyebrow mb-1">Resources</span>
+            @for (link of resourceLinks; track link.path) {
+              <a
+                [routerLink]="link.path"
+                class="flex min-h-8 items-center text-sm text-base-content/70 hover:text-base-content"
+              >
+                {{ link.label }}
+              </a>
+            }
             <a
               [href]="appUrl('/register')"
               class="flex min-h-8 items-center text-sm text-base-content/70 hover:text-base-content"
@@ -187,9 +195,12 @@ export class MarketingLayoutComponent {
   protected readonly links: NavLink[] = [
     { label: 'Home', path: '/' },
     { label: 'Pricing', path: '/', fragment: 'pricing' },
-    { label: 'Guide', path: '/docs' },
     { label: 'Blog', path: '/blog' },
     { label: 'About', path: '/about' },
     { label: 'Contact', path: '/contact' },
+  ];
+  protected readonly resourceLinks: NavLink[] = [
+    { label: 'Getting started', path: '/docs' },
+    { label: 'Hardware setup', path: '/docs/hardware' },
   ];
 }

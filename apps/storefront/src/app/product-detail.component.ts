@@ -216,7 +216,7 @@ export class ProductDetailComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly platformId = inject(PLATFORM_ID);
   private readonly seo = inject(StorefrontSeoService);
-  protected readonly shopSlug = this.route.snapshot.paramMap.get('slug') ?? '';
+  protected readonly shopSlug = (this.route.snapshot.paramMap.get('slug') ?? '').toLowerCase();
   private readonly productId = this.route.snapshot.paramMap.get('productId') ?? '';
   protected readonly shop = signal<StorefrontInfo | null>(null);
   protected readonly product = signal<CatalogProduct | null>(null);

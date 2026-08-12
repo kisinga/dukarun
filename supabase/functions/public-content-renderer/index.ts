@@ -31,7 +31,7 @@ const HTML_HEADERS = {
   'Content-Type': 'text/html; charset=utf-8',
   'Cache-Control': 'no-store',
   'X-Content-Type-Options': 'nosniff',
-  'Content-Security-Policy': "default-src 'none'; img-src https:; style-src 'unsafe-inline'",
+  'Content-Security-Policy': "default-src 'none'; img-src 'self' https:; style-src 'unsafe-inline'",
 };
 
 function response(body: string, contentType: string, status = 200): Response {
@@ -51,15 +51,30 @@ function html(body: string, status = 200): Response {
 function publicRequest(request: Request): {
   app: PublicApp;
   origin: string;
+  storageOrigin: string;
   requestUri: string;
 } | null {
   const app = request.headers.get('X-Public-App');
   const requestUri = request.headers.get('X-Original-URI');
+  const storageOrigin =
+    request.headers.get('X-Public-Storage-Origin') ??
+    Deno.env.get('SUPABASE_PUBLIC_URL') ??
+    supabaseUrl;
   if ((app !== 'site' && app !== 'storefront') || !requestUri) return null;
   try {
     const parsedOrigin = new URL(publicOrigins[app]);
-    if (!['http:', 'https:'].includes(parsedOrigin.protocol)) return null;
-    return { app, origin: parsedOrigin.origin, requestUri };
+    const parsedStorageOrigin = new URL(storageOrigin);
+    if (
+      !['http:', 'https:'].includes(parsedOrigin.protocol) ||
+      !['http:', 'https:'].includes(parsedStorageOrigin.protocol)
+    )
+      return null;
+    return {
+      app,
+      origin: parsedOrigin.origin,
+      storageOrigin: parsedStorageOrigin.origin,
+      requestUri,
+    };
   } catch {
     return null;
   }
@@ -105,7 +120,7 @@ Deno.serve(async request => {
       const post = data as unknown as PublicBlogPost | null;
       if (!post) return html(renderNotFound(context.origin), 404);
       const image =
-        storageObjectUrl(supabaseUrl, 'blog-media', post.cover_image_path) ??
+        storageObjectUrl(context.storageOrigin, 'blog-media', post.cover_image_path) ??
         new URL(
           '/media/video/product-overview/product-overview-full-wide.png',
           `${context.origin}/`
@@ -141,7 +156,7 @@ Deno.serve(async request => {
       const shop = shops?.[0] as PublicStorefront | undefined;
       if (!shop) return html(renderNotFound(context.origin), 404);
       const image =
-        storageObjectUrl(supabaseUrl, 'company-logos', shop.logo_path) ??
+        storageObjectUrl(context.storageOrigin, 'company-logos', shop.logo_path) ??
         new URL(
           '/media/video/product-overview/product-overview-full-wide.png',
           'https://dukarun.com/'
@@ -170,8 +185,8 @@ Deno.serve(async request => {
     const product = productRows[0];
     if (!shop?.catalogue_visible || !product) return html(renderNotFound(context.origin), 404);
     const image =
-      storageObjectUrl(supabaseUrl, 'product-images', product.image_path) ??
-      storageObjectUrl(supabaseUrl, 'company-logos', shop.logo_path) ??
+      storageObjectUrl(context.storageOrigin, 'product-images', product.image_path) ??
+      storageObjectUrl(context.storageOrigin, 'company-logos', shop.logo_path) ??
       new URL(
         '/media/video/product-overview/product-overview-full-wide.png',
         'https://dukarun.com/'

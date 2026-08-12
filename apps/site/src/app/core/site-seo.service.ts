@@ -22,7 +22,7 @@ const FAQ_ENTITIES = [
     name: 'Do I need special hardware?',
     acceptedAnswer: {
       '@type': 'Answer',
-      text: 'No. Dukarun runs on the Android phone you already have, and on any desktop browser for the back office. Any Bluetooth or USB receipt printer works if you want paper.',
+      text: 'No. Dukarun runs on the Android phone you already have, and on any desktop browser for the back office. For paper receipts, use a Bluetooth or USB printer that is available through your device’s normal print service and supports 52 mm or 80 mm paper.',
     },
   },
   {

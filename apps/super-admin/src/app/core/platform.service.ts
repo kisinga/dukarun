@@ -297,7 +297,7 @@ export class PlatformService {
     if (error) throw rpcError(error);
   }
 
-  async uploadBlogCover(postId: string, file: File): Promise<string> {
+  async uploadBlogMedia(postId: string, file: File): Promise<string> {
     const extension = file.name.split('.').pop()?.toLowerCase() || 'jpg';
     const path = `${postId}/${crypto.randomUUID()}.${extension}`;
     const { error } = await this.db.storage.from('blog-media').upload(path, file, {
@@ -308,8 +308,16 @@ export class PlatformService {
     return path;
   }
 
+  async uploadBlogCover(postId: string, file: File): Promise<string> {
+    return this.uploadBlogMedia(postId, file);
+  }
+
   blogCoverUrl(path: string | null): string | null {
     return path ? this.db.storage.from('blog-media').getPublicUrl(path).data.publicUrl : null;
+  }
+
+  blogMediaUrl(path: string): string {
+    return this.db.storage.from('blog-media').getPublicUrl(path).data.publicUrl;
   }
 
   async siteDeployments(): Promise<SiteDeployment[]> {

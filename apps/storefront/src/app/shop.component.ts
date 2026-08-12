@@ -541,7 +541,7 @@ export class ShopComponent implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly platformId = inject(PLATFORM_ID);
   private readonly seo = inject(StorefrontSeoService);
-  protected readonly slug = this.route.snapshot.paramMap.get('slug') ?? '';
+  protected readonly slug = (this.route.snapshot.paramMap.get('slug') ?? '').toLowerCase();
   private readonly initialShop = this.slug
     ? this.storefront.transferredStorefront(this.slug)
     : undefined;

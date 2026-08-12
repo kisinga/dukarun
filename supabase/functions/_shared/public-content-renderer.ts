@@ -47,6 +47,7 @@ const SITE_ROUTES = [
   'about',
   'contact',
   'docs',
+  'docs/hardware',
   'blog',
   'privacy',
   'terms',
@@ -55,7 +56,7 @@ const SITE_ROUTES = [
 ] as const;
 const SOCIAL_IMAGE_PATH = '/media/video/product-overview/product-overview-full-wide.png';
 const SLUG = '[a-z0-9]+(?:-[a-z0-9]+)*';
-const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}';
+const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
 
 export function parsePublicContentRoute(
   app: PublicApp,
@@ -106,6 +107,16 @@ function inlineMarkdown(value: string): string {
     .replace(/(^|[^*])\*([^*]+)\*/g, '$1<em>$2</em>');
 }
 
+function safeImageSource(value: string): string | null {
+  if (/^\/(?!\/)/.test(value)) return value;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Small escaped Markdown subset shared with the Angular public-content renderer. */
 export function renderSafeMarkdown(source: string): string {
   const lines = source.replace(/\r\n?/g, '\n').split('\n');
@@ -127,6 +138,27 @@ export function renderSafeMarkdown(source: string): string {
     if (!line) {
       closeParagraph();
       closeList();
+      continue;
+    }
+    const image = /^!\[([^\]]+)]\(([^)\s]+)\)$/.exec(line);
+    if (image) {
+      closeParagraph();
+      closeList();
+      const src = safeImageSource(image[2]);
+      const alt = image[1].trim();
+      if (src && alt) {
+        html.push(
+          `<figure><img src="${escapeHtml(src)}" alt="${escapeHtml(alt)}" loading="lazy" decoding="async"></figure>`
+        );
+      } else {
+        html.push(`<p>${escapeHtml(line)}</p>`);
+      }
+      continue;
+    }
+    if (line.startsWith('![')) {
+      closeParagraph();
+      closeList();
+      html.push(`<p>${escapeHtml(line)}</p>`);
       continue;
     }
     const heading = /^(#{1,3})\s+(.+)$/.exec(line);
@@ -240,7 +272,7 @@ function page(options: {
   <meta name="twitter:description" content="${safeDescription}">
   <meta name="twitter:image" content="${safeImage}">
   ${structuredData ? `<script type="application/ld+json">${jsonLd(structuredData)}</script>` : ''}
-  <style>body{font:16px/1.65 system-ui,sans-serif;max-width:48rem;margin:auto;padding:2rem;color:#202020}img{display:block;max-width:100%;height:auto}a{color:#b8401f}h1{line-height:1.15}header,article{margin-block:2rem}.meta{color:#666}</style>
+  <style>body{font:16px/1.65 system-ui,sans-serif;max-width:48rem;margin:auto;padding:2rem;color:#202020}img{display:block;max-width:100%;height:auto}figure{margin:2rem 0}a{color:#b8401f}h1{line-height:1.15}header,article{margin-block:2rem}.meta{color:#666}</style>
 </head>
 <body>${body}</body>
 </html>`;

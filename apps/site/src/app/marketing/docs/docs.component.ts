@@ -126,6 +126,20 @@ interface DocSection {
           <a routerLink="/contact" class="link link-primary font-medium">Ask us directly</a> and
           we'll answer.
         </p>
+        <aside
+          class="mt-10 flex flex-col gap-4 rounded-box border border-primary/20 bg-primary/5 p-6 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <div>
+            <p class="font-semibold">Setting up scanners or printers?</p>
+            <p class="mb-0 mt-1 text-sm text-base-content/70">
+              Check compatible hardware, paper sizes, test printing, and troubleshooting.
+            </p>
+          </div>
+          <a routerLink="/docs/hardware" class="btn btn-outline min-h-11 shrink-0">
+            Hardware setup
+            <app-icon name="heroArrowRight" size="sm" />
+          </a>
+        </aside>
       </div>
     </section>
 

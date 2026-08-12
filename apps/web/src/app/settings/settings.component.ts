@@ -30,6 +30,8 @@ type ReminderDraft = {
   key: string;
 };
 
+const PUBLIC_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
 @Component({
   selector: 'app-settings',
   imports: [
@@ -137,11 +139,19 @@ type ReminderDraft = {
                     [formControl]="name"
                   />
                 </app-form-field>
-                <app-form-field label="Public slug">
+                <app-form-field
+                  label="Public slug"
+                  hint="Lowercase letters, numbers, and single hyphens only."
+                  [error]="slug.invalid && slug.touched ? 'Enter a valid public slug.' : null"
+                >
                   <input
                     type="text"
                     class="input input-bordered input-sm w-full"
                     [formControl]="slug"
+                    maxlength="63"
+                    autocapitalize="none"
+                    autocomplete="off"
+                    spellcheck="false"
                   />
                 </app-form-field>
                 <app-form-field label="Business email">
@@ -995,7 +1005,10 @@ export class SettingsComponent implements OnInit {
   private readonly locationDeleteModal = viewChild(DeleteConfirmationModalComponent);
 
   protected readonly name = new FormControl('', { nonNullable: true });
-  protected readonly slug = new FormControl('', { nonNullable: true });
+  protected readonly slug = new FormControl('', {
+    nonNullable: true,
+    validators: [Validators.maxLength(63), Validators.pattern(PUBLIC_SLUG_PATTERN)],
+  });
   protected readonly whatsapp = new FormControl('', { nonNullable: true });
   protected readonly address = new FormControl('', { nonNullable: true });
   protected readonly email = new FormControl('', {
@@ -1235,6 +1248,7 @@ export class SettingsComponent implements OnInit {
     let patch: Partial<Omit<CompanySettings, 'id'>>;
     switch (section) {
       case 'profile':
+        this.slug.setValue(this.slug.value.trim().toLowerCase());
         if (this.name.value.trim().length === 0) {
           this.flash('profile', false, 'Company name is required');
           return;
@@ -1243,9 +1257,18 @@ export class SettingsComponent implements OnInit {
           this.flash('profile', false, 'Enter a valid business email');
           return;
         }
+        if (this.slug.invalid) {
+          this.slug.markAsTouched();
+          this.flash(
+            'profile',
+            false,
+            'Public slug may contain only lowercase letters, numbers, and single hyphens.'
+          );
+          return;
+        }
         patch = {
           name: this.name.value.trim(),
-          public_slug: this.slug.value.trim() || null,
+          public_slug: this.slug.value || null,
           public_whatsapp_number: this.whatsapp.value.trim() || null,
           address: this.address.value.trim() || null,
           email: this.email.value.trim() || null,
