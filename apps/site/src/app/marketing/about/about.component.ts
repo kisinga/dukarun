@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { IconComponent } from '../../shared/ui/icon.component';
 import { appUrl } from '../../core/public-url';
+import { dukarunWhatsAppUrl } from '../../core/public-contact';
 
 /**
  * Public about page. Why Dukarun exists and what it believes.
@@ -96,10 +97,13 @@ import { appUrl } from '../../core/public-url';
             <app-icon name="heroArrowRight" size="md" />
           </a>
           <a
-            routerLink="/contact"
-            class="btn btn-lg btn-outline min-h-11 border-white/70 text-white hover:bg-white/10"
+            [href]="whatsappUrl"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="btn whatsapp-button btn-lg min-h-11 gap-2"
           >
-            Talk to us
+            <app-icon name="whatsapp" size="md" />
+            Talk to us on WhatsApp
           </a>
         </div>
       </div>
@@ -108,6 +112,9 @@ import { appUrl } from '../../core/public-url';
 })
 export class AboutComponent {
   protected readonly appUrl = appUrl;
+  protected readonly whatsappUrl = dukarunWhatsAppUrl(
+    'Hello Dukarun, I would like to learn more about how Dukarun could work for my business.'
+  );
   protected readonly beliefs = [
     {
       icon: 'heroBanknotes',

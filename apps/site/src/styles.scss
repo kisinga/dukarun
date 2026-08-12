@@ -63,6 +63,53 @@
 }
 
 @layer components {
+  /* WhatsApp is a contact-channel accent, not a second product brand. */
+  .whatsapp-link {
+    color: #128c4b;
+    text-decoration-color: color-mix(in srgb, #128c4b 42%, transparent);
+    text-underline-offset: 0.18em;
+
+    &:hover {
+      color: #0b6f3a;
+      text-decoration-color: currentColor;
+    }
+  }
+
+  .btn.whatsapp-button {
+    border-color: #25d366;
+    background-color: #25d366;
+    color: #10391f;
+    box-shadow: 0 1px 2px rgb(16 57 31 / 0.14);
+
+    &:hover {
+      border-color: #20bd5a;
+      background-color: #20bd5a;
+      color: #0d321b;
+    }
+  }
+
+  .btn.whatsapp-button-outline {
+    border-color: color-mix(in srgb, #128c4b 58%, var(--color-base-300));
+    background-color: var(--color-base-100);
+    color: #128c4b;
+    box-shadow: none;
+
+    &:hover {
+      border-color: #128c4b;
+      background-color: color-mix(in srgb, #25d366 9%, var(--color-base-100));
+      color: #0b6f3a;
+    }
+  }
+
+  .whatsapp-channel {
+    border-color: color-mix(in srgb, #25d366 28%, var(--color-base-300));
+  }
+
+  .whatsapp-channel-icon {
+    background-color: color-mix(in srgb, #25d366 13%, transparent);
+    color: #128c4b;
+  }
+
   .card {
     border: 1px solid color-mix(in oklab, var(--color-base-300) 60%, transparent);
     box-shadow: var(--shadow-card);
