@@ -13,11 +13,11 @@ import { NgIcon } from '@ng-icons/core';
   template: `
     <div [class.card]="!embedded()" [class.bg-base-100]="!embedded()">
       <div [class.card-body]="!embedded()">
-        <div class="px-4 py-10 text-center sm:py-12">
+        <div class="px-4 py-12 text-center sm:py-16">
           <div
-            class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-base-200"
+            class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-base-300/60 bg-base-200/70"
           >
-            <ng-icon [name]="icon()" size="2.5rem" class="text-base-content/30" />
+            <ng-icon [name]="icon()" size="1.75rem" class="text-base-content/35" />
           </div>
           <h3 class="type-heading">{{ title() }}</h3>
           @if (description()) {

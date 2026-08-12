@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { IconComponent } from '../shared/ui/icon.component';
 import { appUrl } from '../core/public-url';
+import { DUKARUN_WHATSAPP_DISPLAY, dukarunWhatsAppUrl } from '../core/public-contact';
 
 interface NavLink {
   readonly label: string;
@@ -145,6 +146,15 @@ interface NavLink {
             >
               Log in
             </a>
+            <a
+              [href]="whatsappUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="whatsapp-link flex min-h-8 items-center text-sm font-semibold"
+            >
+              Chat on WhatsApp
+            </a>
+            <span class="text-xs text-base-content/50">{{ whatsappDisplay }}</span>
           </nav>
           <nav class="flex flex-col gap-1" aria-label="Legal">
             <span class="mkt-eyebrow mb-1">Legal</span>
@@ -184,6 +194,8 @@ interface NavLink {
 })
 export class MarketingLayoutComponent {
   protected readonly appUrl = appUrl;
+  protected readonly whatsappUrl = dukarunWhatsAppUrl();
+  protected readonly whatsappDisplay = DUKARUN_WHATSAPP_DISPLAY;
   protected readonly linkActiveOptions = {
     paths: 'exact',
     queryParams: 'ignored',

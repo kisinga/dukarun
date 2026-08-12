@@ -15,6 +15,7 @@ import { IconComponent } from '../../shared/ui/icon.component';
 import { MarketingVideoComponent } from '../marketing-video.component';
 import { PublicPricingService, PublicSubscriptionPlan } from '../public-pricing.service';
 import { appUrl } from '../../core/public-url';
+import { dukarunWhatsAppUrl } from '../../core/public-contact';
 
 interface DemoProduct {
   readonly id: string;
@@ -500,8 +501,15 @@ interface Testimonial {
           >
             <h3 class="font-semibold">Pricing is temporarily unavailable</h3>
             <p class="mt-2 mb-0 text-sm text-base-content/70">
-              Please <a routerLink="/contact" class="link link-primary">contact us</a> for the
-              current price.
+              Please
+              <a
+                [href]="pricingWhatsAppUrl"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="link whatsapp-link"
+                >ask us on WhatsApp</a
+              >
+              for the current price.
             </p>
           </div>
         }
@@ -584,7 +592,14 @@ interface Testimonial {
         <p class="mt-8 text-center text-sm text-base-content/70">
           Still curious? Read the
           <a routerLink="/docs" class="link link-primary font-medium">getting-started guide</a>
-          or <a routerLink="/contact" class="link link-primary font-medium">talk to us</a>.
+          or
+          <a
+            [href]="whatsappUrl"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="link whatsapp-link font-medium"
+            >talk to us on WhatsApp</a
+          >.
         </p>
       </div>
     </section>
@@ -605,10 +620,13 @@ interface Testimonial {
             <app-icon name="heroArrowRight" size="md" />
           </a>
           <a
-            routerLink="/contact"
-            class="btn btn-lg btn-outline min-h-11 border-white/70 text-white hover:bg-white/10"
+            [href]="whatsappUrl"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="btn whatsapp-action"
           >
-            Talk to us first
+            <app-icon name="whatsapp" size="md" />
+            Chat on WhatsApp
           </a>
         </div>
         <p class="mt-6 text-xs text-primary-content/70">
@@ -620,6 +638,12 @@ interface Testimonial {
 })
 export class HomeComponent implements OnInit {
   protected readonly appUrl = appUrl;
+  protected readonly whatsappUrl = dukarunWhatsAppUrl(
+    'Hello Dukarun, I would like to know whether Dukarun is right for my business.'
+  );
+  protected readonly pricingWhatsAppUrl = dukarunWhatsAppUrl(
+    'Hello Dukarun, I would like to ask about current Dukarun pricing.'
+  );
   private readonly publicPricing = inject(PublicPricingService);
   private readonly blog = inject(BlogService);
   private readonly platformId = inject(PLATFORM_ID);

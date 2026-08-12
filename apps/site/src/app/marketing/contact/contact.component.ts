@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { IconComponent } from '../../shared/ui/icon.component';
+import { DUKARUN_WHATSAPP_DISPLAY, dukarunWhatsAppUrl } from '../../core/public-contact';
 
 interface Channel {
   readonly icon: string;
@@ -9,6 +10,8 @@ interface Channel {
   readonly linkText: string;
   readonly linkHref: string;
   readonly external: boolean;
+  readonly newTab?: boolean;
+  readonly whatsapp?: boolean;
 }
 
 /**
@@ -26,26 +29,39 @@ interface Channel {
         <span class="mkt-eyebrow">Contact</span>
         <h1 class="mkt-h1 mt-3">Talk to us</h1>
         <p class="mkt-lead mx-auto mt-4 max-w-2xl">
-          Write to us and one of our experts will respond. We're constantly improving and your
-          feedback and queries are important to us.
+          Ask about the product, pricing, setup, or your account. Start a WhatsApp conversation for
+          the quickest path to the Dukarun team.
         </p>
       </div>
     </section>
 
     <!-- Channels -->
     <section class="bg-base-100 pb-14 sm:pb-20" aria-label="Contact channels">
-      <div class="mkt-container grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div class="mkt-container grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         @for (channel of channels; track channel.title) {
-          <article class="mkt-card flex flex-col gap-3 p-6">
+          <article
+            class="mkt-card flex flex-col gap-3 p-6"
+            [class.whatsapp-channel]="channel.whatsapp"
+          >
             <span
-              class="flex h-11 w-11 items-center justify-center rounded-field bg-primary/10 text-primary"
+              class="flex h-11 w-11 items-center justify-center rounded-field"
+              [class.bg-primary/10]="!channel.whatsapp"
+              [class.text-primary]="!channel.whatsapp"
+              [class.whatsapp-channel-icon]="channel.whatsapp"
             >
               <app-icon [name]="channel.icon" size="lg" />
             </span>
             <h2 class="text-lg font-semibold">{{ channel.title }}</h2>
             <p class="mb-0 flex-1 text-sm text-base-content/70">{{ channel.copy }}</p>
             @if (channel.external) {
-              <a [href]="channel.linkHref" class="link link-primary mt-1 font-medium">
+              <a
+                [href]="channel.linkHref"
+                [target]="channel.newTab ? '_blank' : null"
+                [rel]="channel.newTab ? 'noopener noreferrer' : null"
+                class="link mt-1 font-medium"
+                [class.link-primary]="!channel.whatsapp"
+                [class.whatsapp-link]="channel.whatsapp"
+              >
                 {{ channel.linkText }}
               </a>
             } @else {
@@ -71,9 +87,14 @@ interface Channel {
               begins.
             </p>
             <div class="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
-              <a href="mailto:hello@dukarun.com" class="btn btn-primary min-h-11">
-                <app-icon name="heroEnvelope" size="md" />
-                Email us for a quote
+              <a
+                [href]="setupWhatsAppUrl"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="btn whatsapp-action"
+              >
+                <app-icon name="whatsapp" size="md" />
+                Ask about setup on WhatsApp
               </a>
             </div>
           </div>
@@ -86,11 +107,20 @@ interface Channel {
       <div class="mkt-container text-center">
         <h2 id="expectation-heading" class="mkt-h2">You'll hear back from us</h2>
         <p class="mkt-lead mx-auto mt-3 max-w-xl">
-          Every message is read and answered by the team that builds dukarun. Email gets a reply
-          within one working day.
+          Every message is read by the team that builds Dukarun. We respond on WhatsApp during
+          Kenyan business hours, and email within one working day.
         </p>
         <div class="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
-          <a href="mailto:hello@dukarun.com" class="btn btn-primary btn-lg min-h-11">
+          <a
+            [href]="whatsappUrl"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="btn whatsapp-action"
+          >
+            <app-icon name="whatsapp" size="md" />
+            Chat on WhatsApp
+          </a>
+          <a href="mailto:hello@dukarun.com" class="btn btn-outline btn-lg min-h-11">
             <app-icon name="heroEnvelope" size="md" />
             hello&#64;dukarun.com
           </a>
@@ -101,7 +131,25 @@ interface Channel {
   `,
 })
 export class ContactComponent {
+  protected readonly whatsappUrl = dukarunWhatsAppUrl(
+    'Hello Dukarun, I would like to learn more about the product.'
+  );
+  protected readonly setupWhatsAppUrl = dukarunWhatsAppUrl(
+    'Hello Dukarun, I would like a quote for installation and staff training.'
+  );
   protected readonly channels: Channel[] = [
+    {
+      icon: 'whatsapp',
+      title: 'WhatsApp',
+      copy: 'The quickest way to ask about Dukarun, pricing, setup, or an existing account.',
+      linkText: DUKARUN_WHATSAPP_DISPLAY,
+      linkHref: dukarunWhatsAppUrl(
+        'Hello Dukarun, I have a question about Dukarun. Can you help me?'
+      ),
+      external: true,
+      newTab: true,
+      whatsapp: true,
+    },
     {
       icon: 'heroEnvelope',
       title: 'Email',

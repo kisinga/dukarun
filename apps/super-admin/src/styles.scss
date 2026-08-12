@@ -11,8 +11,8 @@
 
   // Depth tokens: `shadow-card` = whisper shadow for surfaces;
   // `shadow-overlay` = the only heavy shadow, reserved for menus/modals/popovers.
-  --shadow-card: 0 1px 2px 0 rgb(0 0 0 / 0.04), 0 2px 8px -2px rgb(0 0 0 / 0.06);
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.04), 0 2px 8px -2px rgb(0 0 0 / 0.06);
+  --shadow-card: 0 1px 2px rgb(28 25 23 / 0.025), 0 8px 24px -18px rgb(28 25 23 / 0.22);
+  --shadow-sm: 0 1px 2px rgb(28 25 23 / 0.025), 0 8px 24px -18px rgb(28 25 23 / 0.22);
   --shadow-overlay: 0 8px 24px -8px rgb(0 0 0 / 0.18), 0 2px 8px -2px rgb(0 0 0 / 0.08);
 }
 
@@ -26,8 +26,8 @@
 }
 
 @utility type-title {
-  font-size: 1.25rem; // 20px — page titles only
-  line-height: 1.75rem;
+  font-size: 1.5rem; // 24px — page titles only
+  line-height: 2rem;
   font-weight: 700;
   letter-spacing: -0.025em;
 }
@@ -56,6 +56,11 @@
     border-style: solid;
     border-color: color-mix(in oklab, var(--color-base-300) 60%, transparent);
     box-shadow: var(--shadow-card);
+  }
+
+  .dashboard-main .card,
+  .dashboard-main .data-table-shell {
+    border-color: color-mix(in oklab, var(--color-base-300) 72%, transparent);
   }
 
   /* Modals are full-screen on phones; desktop restores the floating box. */
@@ -130,7 +135,7 @@
   .dashboard-main > :not(router-outlet) {
     display: block;
     width: 100%;
-    max-width: 80rem;
+    max-width: 90rem;
     margin-inline: auto;
   }
 
@@ -165,8 +170,8 @@
   }
 
   .form-field-label {
-    font-weight: 500;
-    color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+    font-weight: 600;
+    color: color-mix(in oklab, var(--color-base-content) 68%, transparent);
   }
 
   .form-field-hint {
@@ -212,9 +217,9 @@
     display: flex;
     align-items: center;
     gap: 0.75rem;
-    padding: 0.5rem 0.75rem;
+    padding: 0.5rem 0.625rem;
     min-height: 2.75rem;
-    border-radius: var(--radius-field);
+    border-radius: 0.75rem;
     font-size: 0.875rem;
     font-weight: 500;
     color: var(--color-base-content);
@@ -233,14 +238,39 @@
     }
   }
 
+  .nav-group-label {
+    padding-inline: 0.625rem;
+    font-size: 0.6875rem;
+    line-height: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: color-mix(in oklab, var(--color-base-content) 38%, transparent);
+  }
+
+  .nav-item-icon {
+    display: flex;
+    width: 1.75rem;
+    height: 1.75rem;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.5rem;
+    transition: background-color 150ms ease;
+  }
+
   .nav-item-active,
   .nav-item-active:hover {
-    background-color: color-mix(in oklab, var(--color-primary) 10%, transparent);
+    background-color: color-mix(in oklab, var(--color-primary) 9%, var(--color-base-100));
     color: var(--color-primary);
     font-weight: 600;
 
     ng-icon {
       color: var(--color-primary);
+    }
+
+    .nav-item-icon {
+      background-color: color-mix(in oklab, var(--color-primary) 10%, transparent);
     }
   }
 
@@ -291,17 +321,17 @@
   logs: false;
 }
 
-// Warm & Bold (light) — default theme; soft gray anchors, orange accents
+// Warm & precise (light) — paper-like surfaces with the Dukarun orange accent.
 @plugin "daisyui/theme" {
   name: light;
   default: true;
   prefersdark: false;
   color-scheme: light;
 
-  --color-base-100: #fafafa;
-  --color-base-200: #ebebeb;
-  --color-base-300: #dedede;
-  --color-base-content: #2b2b2f;
+  --color-base-100: #fffefd;
+  --color-base-200: #f5f3ef;
+  --color-base-300: #e5e1da;
+  --color-base-content: #292724;
   --color-primary: #e85d2f;
   --color-primary-content: #ffffff;
   --color-secondary: #5a5a5a;
@@ -320,8 +350,8 @@
   --color-error-content: #ffffff;
 
   --radius-selector: 0.375rem;
-  --radius-field: 0.5rem;
-  --radius-box: 0.75rem;
+  --radius-field: 0.625rem;
+  --radius-box: 1rem;
   --size-selector: 0.25rem;
   --size-field: 0.25rem;
   --border: 1px;
@@ -336,10 +366,10 @@
   prefersdark: true;
   color-scheme: dark;
 
-  --color-base-100: #1c1c1f;
-  --color-base-200: #131316;
-  --color-base-300: #2a2a2e;
-  --color-base-content: #e8e8e6;
+  --color-base-100: #1d1c1a;
+  --color-base-200: #151412;
+  --color-base-300: #302e2a;
+  --color-base-content: #eeeae4;
   --color-primary: #e85d2f;
   --color-primary-content: #ffffff;
   --color-secondary: #71717a;
@@ -358,8 +388,8 @@
   --color-error-content: #ffffff;
 
   --radius-selector: 0.375rem;
-  --radius-field: 0.5rem;
-  --radius-box: 0.75rem;
+  --radius-field: 0.625rem;
+  --radius-box: 1rem;
   --size-selector: 0.25rem;
   --size-field: 0.25rem;
   --border: 1px;
@@ -378,6 +408,88 @@ html,
 body {
   min-height: 100%;
   background: var(--color-base-200);
+}
+
+.dashboard-main {
+  background:
+    radial-gradient(
+      circle at 82% -8%,
+      color-mix(in oklab, var(--color-primary) 5%, transparent),
+      transparent 24rem
+    ),
+    var(--color-base-200);
+}
+
+.console-topbar,
+.console-sidebar {
+  box-shadow: 0 1px 0 color-mix(in oklab, var(--color-base-300) 40%, transparent);
+}
+
+.input,
+.select,
+.textarea {
+  background-color: color-mix(in oklab, var(--color-base-100) 92%, var(--color-base-200));
+  border-color: color-mix(in oklab, var(--color-base-300) 88%, transparent);
+  outline: none;
+
+  &:focus,
+  &:focus-within {
+    border-color: color-mix(in oklab, var(--color-primary) 68%, var(--color-base-300));
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-primary) 10%, transparent);
+  }
+}
+
+.btn {
+  font-weight: 650;
+  letter-spacing: -0.005em;
+}
+
+.btn-primary {
+  box-shadow: 0 1px 2px rgb(28 25 23 / 0.12);
+}
+
+.badge {
+  border-radius: 999px;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+}
+
+button:focus-visible,
+a:focus-visible,
+[role='button']:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--color-primary) 72%, transparent);
+  outline-offset: 2px;
+}
+
+.alert {
+  border: 1px solid color-mix(in oklab, currentColor 16%, transparent);
+  border-radius: 0.875rem;
+  box-shadow: none;
+}
+
+.table-row-active > td {
+  background: color-mix(in oklab, var(--color-primary) 7%, var(--color-base-100)) !important;
+}
+
+.dashboard-main tr[role='button'] {
+  cursor: pointer;
+}
+
+@media (min-width: 1024px) {
+  .dashboard-main > :not(router-outlet) {
+    animation: page-enter 180ms ease-out both;
+  }
+}
+
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 button,

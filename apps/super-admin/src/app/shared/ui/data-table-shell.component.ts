@@ -5,10 +5,10 @@ import { Component, input } from '@angular/core';
   host: { class: 'block' },
   template: `
     <section
-      class="data-table-shell overflow-hidden rounded-box border border-base-300/70 bg-base-100"
+      class="data-table-shell overflow-hidden rounded-box border border-base-300/70 bg-base-100 shadow-card"
     >
       @if (title() || description()) {
-        <header class="border-b border-base-300/70 px-4 py-3">
+        <header class="border-b border-base-300/70 px-5 py-4">
           @if (title()) {
             <h2 class="type-heading">{{ title() }}</h2>
           }

@@ -4,7 +4,27 @@ import { NgIcon } from '@ng-icons/core';
 @Component({
   selector: 'app-icon',
   imports: [NgIcon],
-  template: `<ng-icon [name]="name()" [size]="px()" />`,
+  template: `
+    @if (name() === 'whatsapp') {
+      <span
+        class="whatsapp-mark"
+        [style.width]="px()"
+        [style.height]="px()"
+        aria-hidden="true"
+      ></span>
+    } @else {
+      <ng-icon [name]="name()" [size]="px()" />
+    }
+  `,
+  styles: `
+    .whatsapp-mark {
+      display: block;
+      flex: none;
+      background-color: currentColor;
+      mask: url('/assets/icons/whatsapp.svg') center / contain no-repeat;
+      -webkit-mask: url('/assets/icons/whatsapp.svg') center / contain no-repeat;
+    }
+  `,
   host: { class: 'inline-flex shrink-0 items-center justify-center leading-none' },
 })
 export class IconComponent {

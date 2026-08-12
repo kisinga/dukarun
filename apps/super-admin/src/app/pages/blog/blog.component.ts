@@ -12,6 +12,7 @@ import {
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { renderSafeMarkdown } from '@dukarun/legal-markdown';
+import { NgIcon } from '@ng-icons/core';
 import {
   PlatformBlogMetrics,
   PlatformBlogPost,
@@ -22,11 +23,16 @@ import { PageHeaderComponent } from '../../shared/ui/page-header.component';
 
 @Component({
   selector: 'app-platform-blog',
-  imports: [ReactiveFormsModule, DatePipe, PageHeaderComponent],
+  imports: [ReactiveFormsModule, DatePipe, PageHeaderComponent, NgIcon],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <app-page-header title="Editorial" subtitle="Write and publish stories for the Dukarun journal">
-      <button actions class="btn btn-primary min-h-11" (click)="newPost()">New article</button>
+    <app-page-header
+      title="Editorial studio"
+      subtitle="Create, schedule and measure stories for the Dukarun journal"
+    >
+      <button actions class="btn btn-primary min-h-11 gap-2 px-4" (click)="newPost()">
+        <ng-icon name="heroPlus" /> New article
+      </button>
     </app-page-header>
 
     @if (error()) {
@@ -36,37 +42,57 @@ import { PageHeaderComponent } from '../../shared/ui/page-header.component';
       <div class="alert alert-success mb-5" role="status">{{ notice() }}</div>
     }
 
+    <section
+      class="mb-5 grid overflow-hidden rounded-box border border-base-300/70 bg-base-100 shadow-card sm:grid-cols-4"
+      aria-label="Editorial overview"
+    >
+      @for (item of publicationSummary(); track item.label) {
+        <div
+          class="border-b border-base-300/60 px-4 py-3.5 last:border-0 sm:border-r sm:border-b-0 sm:last:border-r-0"
+        >
+          <span class="type-caption block">{{ item.label }}</span>
+          <strong class="mt-1 block text-lg font-semibold tabular-nums">{{ item.value }}</strong>
+        </div>
+      }
+    </section>
+
     <div
-      class="editor-shell grid items-start gap-5 lg:grid-cols-[15rem_minmax(0,1fr)] 2xl:grid-cols-[15rem_minmax(0,1fr)_18rem]"
+      class="editor-shell grid items-start gap-5 lg:grid-cols-[16rem_minmax(0,1fr)] 2xl:grid-cols-[16rem_minmax(0,1fr)_19.5rem]"
     >
       <aside
-        class="order-3 rounded-box border border-base-300/70 bg-base-100 lg:order-none lg:col-start-1 lg:row-start-1 2xl:sticky 2xl:top-5"
+        class="order-3 overflow-hidden rounded-box border border-base-300/70 bg-base-100 shadow-card lg:order-none lg:col-start-1 lg:row-start-1 2xl:sticky 2xl:top-5"
       >
-        <div class="border-b border-base-200 p-4">
+        <div class="border-b border-base-300/60 p-4">
           <div class="flex items-center justify-between gap-3">
             <div>
               <p class="text-xs font-semibold uppercase tracking-[0.16em] text-base-content/45">
-                Journal
+                Content library
               </p>
-              <h2 class="mt-1 font-semibold">All articles</h2>
+              <h2 class="mt-1 font-semibold tracking-tight">All articles</h2>
             </div>
             <span class="badge badge-neutral badge-sm">{{ posts().length }}</span>
           </div>
-          <input
-            type="search"
-            class="input input-bordered input-sm mt-4 w-full bg-base-200/45"
-            placeholder="Search titles…"
-            [value]="searchQuery()"
-            (input)="searchQuery.set($any($event.target).value)"
-          />
+          <div class="relative mt-4">
+            <ng-icon
+              name="heroMagnifyingGlass"
+              class="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-base-content/35"
+            />
+            <input
+              type="search"
+              class="input input-bordered input-sm w-full bg-base-200/30 pl-9"
+              placeholder="Search articles"
+              [value]="searchQuery()"
+              (input)="searchQuery.set($any($event.target).value)"
+            />
+          </div>
         </div>
         <div class="max-h-72 space-y-1 overflow-y-auto p-2 lg:max-h-[46vh] 2xl:max-h-[68vh]">
           @for (post of filteredPosts(); track post.post_id) {
             <button
               type="button"
-              class="group w-full rounded-lg border border-transparent px-3 py-3 text-left transition-colors hover:bg-base-200/70"
+              class="article-list-item group w-full rounded-xl border border-transparent px-3 py-3 text-left transition-colors hover:bg-base-200/65"
               [class.border-primary]="selected()?.post_id === post.post_id"
-              [class.bg-primary/10]="selected()?.post_id === post.post_id"
+              [class.bg-primary/8]="selected()?.post_id === post.post_id"
               (click)="selectPost(post)"
             >
               <div class="flex items-start gap-2.5">
@@ -105,10 +131,10 @@ import { PageHeaderComponent } from '../../shared/ui/page-header.component';
 
       <form class="contents" (submit)="$event.preventDefault(); save()">
         <main
-          class="order-1 min-w-0 overflow-hidden rounded-box border border-base-300/70 bg-base-100 shadow-sm lg:col-start-2 lg:row-span-2 lg:row-start-1 2xl:col-start-auto 2xl:row-span-1"
+          class="order-1 min-w-0 overflow-hidden rounded-box border border-base-300/70 bg-base-100 shadow-card lg:col-start-2 lg:row-span-2 lg:row-start-1 2xl:col-start-auto 2xl:row-span-1"
         >
           <header
-            class="flex min-h-16 flex-wrap items-center justify-between gap-3 border-b border-base-200 px-5 py-3"
+            class="sticky top-[4.5rem] z-20 flex min-h-16 flex-wrap items-center justify-between gap-3 border-b border-base-300/60 bg-base-100/95 px-5 py-3 backdrop-blur-md"
           >
             <div class="flex items-center gap-2">
               <span
@@ -118,7 +144,7 @@ import { PageHeaderComponent } from '../../shared/ui/page-header.component';
                 [class.bg-warning]="selected()?.publication_state === 'scheduled'"
                 [class.bg-base-300]="selected()?.publication_state === 'archived'"
               ></span>
-              <span class="text-sm font-medium capitalize">{{
+              <span class="text-sm font-semibold capitalize">{{
                 selected()?.publication_state || 'New draft'
               }}</span>
               @if (editorDirty()) {
@@ -148,9 +174,9 @@ import { PageHeaderComponent } from '../../shared/ui/page-header.component';
             </div>
           </header>
 
-          <div class="mx-auto max-w-4xl px-5 py-8 sm:px-10 sm:py-12">
+          <div class="mx-auto max-w-[52rem] px-5 py-9 sm:px-10 sm:py-14">
             <input
-              class="editor-title w-full bg-transparent text-3xl font-bold leading-tight tracking-tight outline-none placeholder:text-base-content/25 sm:text-5xl"
+              class="editor-title w-full bg-transparent text-3xl font-bold leading-[1.08] tracking-[-0.035em] outline-none placeholder:text-base-content/22 sm:text-[2.75rem]"
               maxlength="120"
               placeholder="Article title"
               aria-label="Article title"
@@ -169,7 +195,7 @@ import { PageHeaderComponent } from '../../shared/ui/page-header.component';
               />
             </div>
             <textarea
-              class="mt-7 w-full resize-none bg-transparent text-lg leading-relaxed text-base-content/65 outline-none placeholder:text-base-content/25"
+              class="mt-7 w-full resize-none border-l-2 border-base-300 bg-transparent py-1 pl-4 text-[1.0625rem] leading-relaxed text-base-content/62 outline-none placeholder:text-base-content/25 focus:border-primary"
               rows="3"
               maxlength="320"
               placeholder="A short summary that gives readers a reason to continue…"
@@ -273,7 +299,7 @@ import { PageHeaderComponent } from '../../shared/ui/page-header.component';
         </main>
 
         <aside
-          class="order-2 space-y-4 lg:order-none lg:col-start-1 lg:row-start-2 2xl:col-start-3 2xl:row-start-1 2xl:sticky 2xl:top-5"
+          class="editor-inspector order-2 space-y-4 lg:order-none lg:col-start-1 lg:row-start-2 2xl:col-start-3 2xl:row-start-1 2xl:sticky 2xl:top-5"
         >
           <section class="rounded-box border border-base-300/70 bg-base-100 shadow-sm">
             <div class="border-b border-base-200 px-4 py-3">
@@ -339,14 +365,14 @@ import { PageHeaderComponent } from '../../shared/ui/page-header.component';
                     Cancel schedule
                   </button>
                 }
-                @if (selected()?.publication_state === 'published') {
+                @if (selected()?.has_published_version && !selected()?.archived_at) {
                   <button
                     type="button"
-                    class="btn btn-ghost btn-sm text-error"
+                    class="btn btn-outline btn-sm w-full"
                     [disabled]="busy()"
-                    (click)="archive()"
+                    (click)="unpublish()"
                   >
-                    Archive article
+                    Unpublish article
                   </button>
                 }
                 @if (selected()?.has_published_version && !selected()?.featured_at) {
@@ -358,6 +384,18 @@ import { PageHeaderComponent } from '../../shared/ui/page-header.component';
                   >
                     Feature on website
                   </button>
+                }
+                @if (selected()) {
+                  <div class="mt-2 border-t border-base-200 pt-2">
+                    <button
+                      type="button"
+                      class="btn btn-ghost btn-sm w-full text-error"
+                      [disabled]="busy()"
+                      (click)="deleteArticle()"
+                    >
+                      Delete permanently
+                    </button>
+                  </div>
                 }
               </div>
             </div>
@@ -606,6 +644,22 @@ import { PageHeaderComponent } from '../../shared/ui/page-header.component';
       border-color: var(--color-primary);
       color: var(--color-primary);
     }
+    .article-list-item {
+      position: relative;
+    }
+    .article-list-item.border-primary::before {
+      position: absolute;
+      inset-block: 0.75rem;
+      left: -0.5rem;
+      width: 0.1875rem;
+      border-radius: 999px;
+      background: var(--color-primary);
+      content: '';
+    }
+    .editor-inspector section,
+    .editor-inspector details {
+      box-shadow: var(--shadow-card);
+    }
     .editor-title,
     .editor-body {
       caret-color: var(--color-primary);
@@ -727,6 +781,21 @@ export class BlogComponent implements OnInit {
     return query
       ? this.posts().filter(post => `${post.title} ${post.slug}`.toLowerCase().includes(query))
       : this.posts();
+  });
+  protected readonly publicationSummary = computed(() => {
+    const posts = this.posts();
+    return [
+      { label: 'Total articles', value: posts.length },
+      {
+        label: 'Published',
+        value: posts.filter(post => post.publication_state === 'published').length,
+      },
+      { label: 'Drafts', value: posts.filter(post => post.publication_state === 'draft').length },
+      {
+        label: 'Scheduled',
+        value: posts.filter(post => post.publication_state === 'scheduled').length,
+      },
+    ];
   });
 
   async ngOnInit(): Promise<void> {
@@ -926,12 +995,27 @@ export class BlogComponent implements OnInit {
       await this.load(id);
     });
   }
-  protected async archive(): Promise<void> {
+  protected async unpublish(): Promise<void> {
     const id = this.selected()?.post_id;
-    if (!id || !confirm('Archive this public article?')) return;
+    if (!id || !confirm('Unpublish this article? It will no longer appear on the public site.'))
+      return;
     await this.run(async () => {
       await this.platform.archiveBlogPost(id);
-      this.notice.set('Article archived');
+      this.notice.set('Article unpublished');
+      await this.load(id);
+    });
+  }
+
+  protected async deleteArticle(): Promise<void> {
+    const post = this.selected();
+    if (!post) return;
+    const confirmation = prompt(
+      `Permanently delete “${post.title || post.slug}”? This cannot be undone.\n\nType ${post.slug} to confirm.`
+    );
+    if (confirmation !== post.slug) return;
+    await this.run(async () => {
+      await this.platform.deleteBlogPost(post.post_id);
+      this.notice.set('Article permanently deleted');
       await this.load();
       this.newPost();
     });

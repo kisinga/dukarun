@@ -165,3 +165,55 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+/* Contact-channel styling is deliberately unlayered so DaisyUI cannot
+   override it with the generic button recipe. */
+.whatsapp-link {
+  color: #128c4b;
+  text-decoration-color: color-mix(in srgb, #128c4b 42%, transparent);
+  text-underline-offset: 0.18em;
+
+  &:hover {
+    color: #0b6f3a;
+    text-decoration-color: currentColor;
+  }
+}
+
+.btn.whatsapp-action {
+  min-height: 3rem;
+  height: 3rem;
+  padding-inline: 1rem;
+  gap: 0.5rem;
+  border: 1px solid color-mix(in srgb, #128c4b 48%, var(--color-base-300));
+  border-radius: var(--radius-field);
+  background: var(--color-base-100);
+  color: #0d743e;
+  font-size: 0.875rem;
+  font-weight: 650;
+  line-height: 1;
+  box-shadow: 0 1px 2px rgb(16 57 31 / 0.06);
+
+  &:hover {
+    border-color: #128c4b;
+    background: color-mix(in srgb, #25d366 9%, var(--color-base-100));
+    color: #0b6636;
+  }
+
+  &:focus-visible {
+    outline: 2px solid color-mix(in srgb, #25d366 65%, transparent);
+    outline-offset: 2px;
+  }
+}
+
+.whatsapp-channel {
+  border-color: color-mix(in srgb, #25d366 28%, var(--color-base-300));
+}
+
+.whatsapp-channel:hover {
+  border-color: color-mix(in srgb, #128c4b 52%, var(--color-base-300));
+}
+
+.whatsapp-channel-icon {
+  background-color: color-mix(in srgb, #25d366 13%, transparent);
+  color: #128c4b;
+}

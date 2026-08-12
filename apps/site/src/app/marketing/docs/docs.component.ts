@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { IconComponent } from '../../shared/ui/icon.component';
 import { appUrl } from '../../core/public-url';
+import { dukarunWhatsAppUrl } from '../../core/public-contact';
 
 interface Step {
   readonly title: string;
@@ -123,8 +124,14 @@ interface DocSection {
         </div>
         <p class="mt-8 text-center text-sm text-base-content/70">
           Something unclear?
-          <a routerLink="/contact" class="link link-primary font-medium">Ask us directly</a> and
-          we'll answer.
+          <a
+            [href]="whatsappUrl"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="link whatsapp-link font-medium"
+            >Ask us on WhatsApp</a
+          >
+          and we'll answer.
         </p>
         <aside
           class="mt-10 flex flex-col gap-4 rounded-box border border-primary/20 bg-primary/5 p-6 sm:flex-row sm:items-center sm:justify-between"
@@ -171,6 +178,9 @@ interface DocSection {
 })
 export class DocsComponent {
   protected readonly appUrl = appUrl;
+  protected readonly whatsappUrl = dukarunWhatsAppUrl(
+    'Hello Dukarun, I have a question about getting started.'
+  );
   protected readonly steps: Step[] = [
     {
       title: 'Create your account',
