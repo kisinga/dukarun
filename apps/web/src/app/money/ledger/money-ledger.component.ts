@@ -174,7 +174,7 @@ const JOURNAL_SORT_OPTIONS: readonly ListSortOption[] = [
           }
         </app-mobile-list>
         <div class="hidden lg:block">
-          <app-data-table-shell title="Journal" [description]="total() + ' entries'">
+          <app-data-table-shell heading="Journal" [description]="total() + ' entries'">
             <table class="table table-sm">
               <thead>
                 <tr>

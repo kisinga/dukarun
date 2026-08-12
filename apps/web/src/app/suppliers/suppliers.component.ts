@@ -248,7 +248,7 @@ interface ParsedPurchaseLine {
         } @else {
           <div class="mb-4 hidden lg:block">
             <app-data-table-shell
-              title="Supplier accounts"
+              heading="Supplier accounts"
               [description]="filteredSuppliers().length + ' matching suppliers'"
             >
               <table class="table">
@@ -1893,7 +1893,7 @@ interface ParsedPurchaseLine {
             </app-mobile-list>
             <div class="hidden lg:block">
               <app-data-table-shell
-                title="Purchase history"
+                heading="Purchase history"
                 [description]="purchaseHistoryTotal() + ' matching purchases'"
               >
                 <table class="table table-sm">

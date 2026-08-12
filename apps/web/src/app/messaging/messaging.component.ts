@@ -237,7 +237,7 @@ const RELATED_PARTY_SEARCH_ID_LIMIT = 50;
       } @else {
         <div class="hidden lg:block">
           <app-data-table-shell
-            title="Delivery history"
+            heading="Delivery history"
             [description]="outboxTotal() + ' matching deliveries'"
           >
             <table class="table table-sm">

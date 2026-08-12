@@ -294,8 +294,8 @@ type SalesChartPoint = DailySummary & { day: string; revenue: number; heightPerc
         }
 
         @if (canViewFinancials()) {
-          <section aria-label="Sales performance" class="grid gap-4 xl:grid-cols-12">
-            <article class="card h-full overflow-hidden bg-base-100 xl:col-span-7">
+          <section aria-label="Sales performance" class="grid items-start gap-4 xl:grid-cols-12">
+            <article class="card overflow-hidden bg-base-100 xl:col-span-7">
               <div
                 class="flex flex-wrap items-end justify-between gap-2 border-b border-base-300 px-4 py-3"
               >
@@ -406,7 +406,7 @@ type SalesChartPoint = DailySummary & { day: string; revenue: number; heightPerc
               }
             </article>
 
-            <article class="card h-full overflow-hidden bg-base-100 xl:col-span-5">
+            <article class="card overflow-hidden bg-base-100 xl:col-span-5">
               <div
                 class="flex flex-wrap items-end justify-between gap-2 border-b border-base-300 px-4 py-3"
               >

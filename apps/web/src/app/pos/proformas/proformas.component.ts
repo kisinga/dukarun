@@ -263,7 +263,7 @@ const PROFORMA_SORT_OPTIONS: readonly ListSortOption[] = [
 
         <div class="hidden lg:block">
           <app-data-table-shell
-            title="Saved proformas"
+            heading="Saved proformas"
             [description]="
               totalItems() + ' matching ' + (totalItems() === 1 ? 'proforma' : 'proformas')
             "

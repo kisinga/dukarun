@@ -44,6 +44,13 @@ const MEMBER_SORT_OPTIONS: readonly ListSortOption[] = [
 
 @Component({
   selector: 'app-team',
+  host: {
+    '(document:click)': 'closeMemberMenu()',
+    '(document:keydown.escape)': 'closeMemberMenu()',
+    '(document:wheel)': 'closeMemberMenu()',
+    '(document:touchmove)': 'closeMemberMenu()',
+    '(window:resize)': 'closeMemberMenu()',
+  },
   imports: [
     ReactiveFormsModule,
     PageLayoutComponent,
@@ -228,7 +235,7 @@ const MEMBER_SORT_OPTIONS: readonly ListSortOption[] = [
         } @else {
           <div class="hidden lg:block">
             <app-data-table-shell
-              title="Members"
+              heading="Members"
               [description]="filteredMembers().length + ' members'"
             >
               <table class="table table-sm">
@@ -309,75 +316,91 @@ const MEMBER_SORT_OPTIONS: readonly ListSortOption[] = [
                           variant="ghost"
                           [iconOnly]="true"
                           type="button"
-                          title="Member actions"
-                          aria-label="Member actions"
+                          aria-haspopup="menu"
+                          [attr.aria-label]="'Actions for ' + memberNameFor(m)"
                           [attr.aria-expanded]="memberMenuId() === m.id"
-                          (click)="memberMenuId.set(memberMenuId() === m.id ? null : m.id)"
+                          [attr.aria-controls]="
+                            memberMenuId() === m.id ? 'member-actions-menu' : null
+                          "
+                          (click)="toggleMemberMenu(m, $event)"
                         >
                           <app-icon name="heroEllipsisVertical" />
                         </button>
-                        @if (memberMenuId() === m.id) {
-                          <div
-                            class="absolute right-3 z-20 mt-12 w-56 rounded-box border border-base-300 bg-base-100 p-1 text-left shadow-overlay"
-                          >
-                            <button
-                              class="menu-item"
-                              type="button"
-                              (click)="memberMenuId.set(null); renameMember(m)"
-                            >
-                              Rename
-                            </button>
-                            <button
-                              class="menu-item"
-                              type="button"
-                              (click)="memberMenuId.set(null); editMemberLocations(m)"
-                            >
-                              Manage locations
-                            </button>
-                            <button
-                              class="menu-item"
-                              type="button"
-                              [disabled]="busy() || isPrimaryContact(m) || !canBePrimaryContact(m)"
-                              (click)="memberMenuId.set(null); makePrimaryContact(m)"
-                            >
-                              Make primary contact
-                            </button>
-                            <button
-                              class="menu-item"
-                              type="button"
-                              [disabled]="
-                                busy() ||
-                                isSelf(m) ||
-                                (m.authorization_status === 'disabled' && !canAddMember())
-                              "
-                              [title]="isSelf(m) ? 'Another admin must change your access' : ''"
-                              (click)="
-                                memberMenuId.set(null);
-                                setStatus(
-                                  m,
-                                  m.authorization_status === 'disabled' ? 'approved' : 'disabled'
-                                )
-                              "
-                            >
-                              {{ m.authorization_status === 'disabled' ? 'Enable' : 'Disable' }}
-                            </button>
-                            <button
-                              class="menu-item text-error"
-                              type="button"
-                              [disabled]="busy() || isSelf(m)"
-                              [title]="isSelf(m) ? 'You cannot remove your own membership' : ''"
-                              (click)="memberMenuId.set(null); startRemove(m)"
-                            >
-                              Remove
-                            </button>
-                          </div>
-                        }
                       </td>
                     </tr>
                   }
                 </tbody>
               </table>
             </app-data-table-shell>
+
+            @if (memberActionMenu(); as menu) {
+              <div
+                id="member-actions-menu"
+                class="fixed z-[80] max-h-[calc(100dvh-1.5rem)] w-56 overflow-y-auto rounded-box border border-base-300 bg-base-100 p-1 text-left shadow-overlay"
+                role="menu"
+                [attr.aria-label]="'Actions for ' + memberNameFor(menu.member)"
+                [style.top.px]="menu.top"
+                [style.left.px]="menu.left"
+                (click)="$event.stopPropagation()"
+              >
+                <button
+                  class="menu-item"
+                  role="menuitem"
+                  type="button"
+                  (click)="closeMemberMenu(); renameMember(menu.member)"
+                >
+                  Rename
+                </button>
+                <button
+                  class="menu-item"
+                  role="menuitem"
+                  type="button"
+                  (click)="closeMemberMenu(); editMemberLocations(menu.member)"
+                >
+                  Manage locations
+                </button>
+                <button
+                  class="menu-item"
+                  role="menuitem"
+                  type="button"
+                  [disabled]="
+                    busy() || isPrimaryContact(menu.member) || !canBePrimaryContact(menu.member)
+                  "
+                  (click)="closeMemberMenu(); makePrimaryContact(menu.member)"
+                >
+                  Make primary contact
+                </button>
+                <button
+                  class="menu-item"
+                  role="menuitem"
+                  type="button"
+                  [disabled]="
+                    busy() ||
+                    isSelf(menu.member) ||
+                    (menu.member.authorization_status === 'disabled' && !canAddMember())
+                  "
+                  (click)="
+                    closeMemberMenu();
+                    setStatus(
+                      menu.member,
+                      menu.member.authorization_status === 'disabled' ? 'approved' : 'disabled'
+                    )
+                  "
+                >
+                  {{ menu.member.authorization_status === 'disabled' ? 'Enable' : 'Disable' }}
+                </button>
+                <div class="my-1 border-t border-base-300/70" aria-hidden="true"></div>
+                <button
+                  class="menu-item text-error"
+                  role="menuitem"
+                  type="button"
+                  [disabled]="busy() || isSelf(menu.member)"
+                  (click)="closeMemberMenu(); startRemove(menu.member)"
+                >
+                  Remove member
+                </button>
+              </div>
+            }
           </div>
 
           <app-mobile-list>
@@ -800,6 +823,12 @@ export class TeamComponent implements OnInit {
     () => this.members().find(member => member.id === this.selectedMemberId()) ?? null
   );
   protected readonly memberMenuId = signal<string | null>(null);
+  protected readonly memberMenuPosition = signal<{ top: number; left: number } | null>(null);
+  protected readonly memberActionMenu = computed(() => {
+    const member = this.members().find(item => item.id === this.memberMenuId());
+    const position = this.memberMenuPosition();
+    return member && position ? { member, ...position } : null;
+  });
   protected readonly memberQuery = signal('');
   protected readonly memberSortOptions = MEMBER_SORT_OPTIONS;
   protected readonly memberSort = signal('name');
@@ -933,6 +962,39 @@ export class TeamComponent implements OnInit {
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Failed to load team');
     }
+  }
+
+  protected toggleMemberMenu(member: MembershipWithRole, event: MouseEvent): void {
+    event.stopPropagation();
+    if (this.memberMenuId() === member.id) {
+      this.closeMemberMenu();
+      return;
+    }
+
+    const trigger = event.currentTarget as HTMLElement;
+    const triggerBox = trigger.getBoundingClientRect();
+    const menuWidth = 224;
+    const menuHeight = 238;
+    const viewportEdge = 12;
+    const menuGap = 6;
+    const spaceBelow = window.innerHeight - triggerBox.bottom - viewportEdge;
+    const spaceAbove = triggerBox.top - viewportEdge;
+    const openAbove = spaceBelow < menuHeight && spaceAbove > spaceBelow;
+    const desiredTop = openAbove
+      ? triggerBox.top - menuHeight - menuGap
+      : triggerBox.bottom + menuGap;
+    const maxTop = Math.max(viewportEdge, window.innerHeight - menuHeight - viewportEdge);
+    const top = Math.min(Math.max(viewportEdge, desiredTop), maxTop);
+    const maxLeft = Math.max(viewportEdge, window.innerWidth - menuWidth - viewportEdge);
+    const left = Math.min(Math.max(viewportEdge, triggerBox.right - menuWidth), maxLeft);
+
+    this.memberMenuPosition.set({ top, left });
+    this.memberMenuId.set(member.id);
+  }
+
+  protected closeMemberMenu(): void {
+    this.memberMenuId.set(null);
+    this.memberMenuPosition.set(null);
   }
 
   protected async addMember(): Promise<void> {

@@ -370,7 +370,7 @@ import {
             </app-mobile-list>
             <div class="hidden lg:block">
               <app-data-table-shell
-                title="Statements"
+                heading="Statements"
                 [description]="
                   periods().length + ' generated periods · collected basis is net of reversals'
                 "

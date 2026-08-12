@@ -11,13 +11,13 @@ import { Component, input } from '@angular/core';
     <section
       class="data-table-shell overflow-hidden rounded-box border border-base-300/70 bg-base-100"
     >
-      @if (title() || description()) {
+      @if (heading() || description()) {
         <header
           class="flex flex-col gap-2 border-b border-base-300/70 px-4 py-3 sm:flex-row sm:items-center"
         >
           <div class="min-w-0">
-            @if (title()) {
-              <h2 class="text-base font-semibold text-base-content">{{ title() }}</h2>
+            @if (heading()) {
+              <h2 class="text-base font-semibold text-base-content">{{ heading() }}</h2>
             }
             @if (description()) {
               <p class="text-sm text-base-content/60">{{ description() }}</p>
@@ -32,6 +32,6 @@ import { Component, input } from '@angular/core';
   `,
 })
 export class DataTableShellComponent {
-  readonly title = input<string>();
+  readonly heading = input<string>();
   readonly description = input<string>();
 }

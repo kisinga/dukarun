@@ -225,7 +225,7 @@ const QUEUE_SORT_OPTIONS: readonly ListSortOption[] = [
 
         <div class="hidden lg:block">
           <app-data-table-shell
-            title="Waiting for payment"
+            heading="Waiting for payment"
             [description]="
               totalItems() + ' ' + (totalItems() === 1 ? 'sale' : 'sales') + ' in queue'
             "
