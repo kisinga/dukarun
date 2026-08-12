@@ -93,6 +93,12 @@ interface ProductEditorRow {
   active: boolean;
 }
 
+interface PendingProductImage {
+  blob: Blob;
+  extension: string;
+  previewUrl: string;
+}
+
 @Component({
   selector: 'app-products',
   imports: [
@@ -581,6 +587,122 @@ interface ProductEditorRow {
                     </div>
                   }
 
+                  <section class="mt-5 border-t border-base-300 pt-4">
+                    <div>
+                      <h3 class="section-title">Product photo</h3>
+                      <p id="product-photo-help" class="type-caption mt-0.5">
+                        A clear, well-lit photo makes the product easier to find while selling.
+                      </p>
+                    </div>
+
+                    <div
+                      class="mt-3 rounded-box border border-base-300 bg-base-200/40 p-3 sm:flex sm:items-center sm:gap-4"
+                    >
+                      <div
+                        class="mx-auto flex h-36 w-36 shrink-0 items-center justify-center overflow-hidden rounded-box border border-base-300 bg-base-100 sm:mx-0 sm:h-28 sm:w-28"
+                      >
+                        @if (productImagePreview(); as preview) {
+                          <img
+                            [src]="preview"
+                            [alt]="familyName.value.trim() || 'Product photo preview'"
+                            class="h-full w-full object-cover"
+                            (error)="markCurrentProductImageBroken()"
+                          />
+                        } @else {
+                          <div class="px-3 text-center text-base-content/45">
+                            <app-icon name="heroCamera" size="xl" />
+                            <p class="mt-1 text-xs">No photo yet</p>
+                          </div>
+                        }
+                      </div>
+
+                      <div class="mt-3 min-w-0 flex-1 sm:mt-0">
+                        <input
+                          #productCameraInput
+                          type="file"
+                          accept="image/*"
+                          capture="environment"
+                          class="hidden"
+                          aria-describedby="product-photo-help"
+                          [disabled]="imageBusy() || busy()"
+                          (change)="selectProductImage($event)"
+                        />
+                        <input
+                          #productPhotoInput
+                          type="file"
+                          accept="image/*"
+                          class="hidden"
+                          aria-describedby="product-photo-help"
+                          [disabled]="imageBusy() || busy()"
+                          (change)="selectProductImage($event)"
+                        />
+
+                        <div class="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+                          <button
+                            appButton
+                            type="button"
+                            variant="soft"
+                            class="w-full sm:w-auto"
+                            [disabled]="imageBusy() || busy()"
+                            (click)="productCameraInput.click()"
+                          >
+                            <app-icon name="heroCamera" />
+                            Take photo
+                          </button>
+                          <button
+                            appButton
+                            type="button"
+                            variant="outline"
+                            class="w-full sm:w-auto"
+                            [disabled]="imageBusy() || busy()"
+                            (click)="productPhotoInput.click()"
+                          >
+                            <app-icon name="heroArrowUpTray" />
+                            Choose photo
+                          </button>
+                        </div>
+
+                        @if (pendingProductImage() && mode === 'edit' && !imageBusy()) {
+                          <button
+                            appButton
+                            type="button"
+                            variant="outline"
+                            class="mt-2 w-full sm:w-auto"
+                            (click)="retryProductImageUpload()"
+                          >
+                            Retry upload
+                          </button>
+                        }
+
+                        @if (productImagePreview()) {
+                          <button
+                            appButton
+                            type="button"
+                            variant="ghost"
+                            class="mt-2 w-full text-error sm:w-auto"
+                            [disabled]="imageBusy() || busy()"
+                            (click)="removeImage()"
+                          >
+                            <app-icon name="heroXMark" />
+                            Remove photo
+                          </button>
+                        }
+
+                        <p class="type-caption mt-2" aria-live="polite">
+                          @if (imageBusy()) {
+                            {{ mode === 'create' ? 'Preparing photo…' : 'Uploading photo…' }}
+                          } @else if (pendingProductImage() && mode === 'create') {
+                            Ready — the photo will upload when you create the product.
+                          } @else if (pendingProductImage()) {
+                            Upload paused. Check your connection and retry.
+                          } @else {
+                            Photos are resized for faster uploads. You can replace them anytime.
+                          }
+                        </p>
+                      </div>
+                    </div>
+                  </section>
+
                   @if (mode === 'create') {
                     <div
                       class="mt-5 flex items-start gap-3 rounded-field border border-base-300/70 bg-base-200/60 p-3"
@@ -617,43 +739,6 @@ interface ProductEditorRow {
                           [formControl]="familyActive"
                         />
                       </label>
-                    </section>
-
-                    <section class="mt-5 border-t border-base-300 pt-4">
-                      <h3 class="section-title">Product image</h3>
-                      <div class="mt-3 flex flex-wrap items-center gap-3">
-                        @if (imageUrl(editingFamily()!.image_path); as url) {
-                          @if (!brokenImages().has(editingFamily()!.image_path!)) {
-                            <img
-                              [src]="url"
-                              alt="Product"
-                              class="h-16 w-16 rounded-field object-cover"
-                              (error)="markBroken(editingFamily()!.image_path!)"
-                            />
-                          }
-                        }
-                        <input
-                          type="file"
-                          accept="image/*"
-                          class="file-input file-input-bordered file-input-sm w-full max-w-sm"
-                          [disabled]="imageBusy()"
-                          (change)="uploadImage($event)"
-                        />
-                        @if (editingFamily()!.image_path) {
-                          <button
-                            appButton
-                            type="button"
-                            variant="error"
-                            [disabled]="imageBusy() || busy()"
-                            (click)="removeImage()"
-                          >
-                            Remove image
-                          </button>
-                        }
-                      </div>
-                      <p class="type-caption mt-2">
-                        {{ imageBusy() ? 'Uploading…' : 'Images are resized to 800px.' }}
-                      </p>
                     </section>
 
                     <section class="mt-5 border-t border-base-300 pt-4">
@@ -1829,9 +1914,16 @@ export class ProductsComponent implements OnInit {
   private shareFeedbackTimer: ReturnType<typeof setTimeout> | null = null;
   protected readonly serverMode = computed(() => this.productStatusFilter() !== 'active');
 
-  /** Image picker state (family edit panel). */
+  /** Camera/gallery state shared by product create and edit. */
   protected readonly imageBusy = signal(false);
+  protected readonly pendingProductImage = signal<PendingProductImage | null>(null);
   protected readonly brokenImages = signal<Set<string>>(new Set());
+  protected readonly productImagePreview = computed(() => {
+    const pending = this.pendingProductImage();
+    if (pending) return pending.previewUrl;
+    const path = this.editingFamily()?.image_path;
+    return path && !this.brokenImages().has(path) ? this.imageUrl(path) : null;
+  });
 
   /** Categories panel + per-family checkbox editor. */
   protected readonly categoriesOpen = signal(false);
@@ -2321,35 +2413,63 @@ export class ProductsComponent implements OnInit {
     this.brokenImages.update(set => new Set(set).add(path));
   }
 
-  protected async uploadImage(event: Event): Promise<void> {
+  protected markCurrentProductImageBroken(): void {
+    const path = this.editingFamily()?.image_path;
+    if (path && !this.pendingProductImage()) this.markBroken(path);
+  }
+
+  protected async selectProductImage(event: Event): Promise<void> {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
-    const family = this.editingFamily();
-    if (!file || !family) return;
-    const companyId = this.supabase.claims()?.company_id;
-    if (!companyId) {
-      this.error.set('No company in session — re-login');
-      return;
-    }
+    if (!file) return;
     this.imageBusy.set(true);
     this.error.set(null);
     try {
+      if (!file.type.startsWith('image/')) throw new Error('Choose a valid image file.');
       const resized = await resizeImage(file, 800);
-      const path = await this.pos.uploadProductImage(companyId, resized, imageExtension(file));
-      // Save the storage PATH (not the URL) on the family.
-      await this.pos.updateProduct(family.id, { image_path: path });
-      this.editingFamily.set({ ...family, image_path: path });
-      this.notice.set('Image uploaded');
-      await this.load();
+      this.clearPendingProductImage();
+      this.pendingProductImage.set({
+        blob: resized,
+        extension: imageExtension(resized),
+        previewUrl: URL.createObjectURL(resized),
+      });
+
+      const family = this.editingFamily();
+      if (this.editorMode() === 'edit' && family) {
+        await this.persistPendingProductImage(family.id, family.image_path);
+        this.notice.set('Product photo uploaded');
+        await this.load();
+      }
     } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Upload failed');
+      this.error.set(err instanceof Error ? err.message : 'Could not use that photo');
     } finally {
       this.imageBusy.set(false);
       input.value = '';
     }
   }
 
+  protected async retryProductImageUpload(): Promise<void> {
+    const family = this.editingFamily();
+    if (!family || !this.pendingProductImage() || this.imageBusy()) return;
+    this.imageBusy.set(true);
+    this.error.set(null);
+    try {
+      await this.persistPendingProductImage(family.id, family.image_path);
+      this.notice.set('Product photo uploaded');
+      await this.load();
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Photo upload failed');
+    } finally {
+      this.imageBusy.set(false);
+    }
+  }
+
   protected async removeImage(): Promise<void> {
+    if (this.pendingProductImage()) {
+      this.clearPendingProductImage();
+      this.error.set(null);
+      return;
+    }
     const family = this.editingFamily();
     if (!family?.image_path) return;
     this.imageBusy.set(true);
@@ -2358,13 +2478,45 @@ export class ProductsComponent implements OnInit {
       await this.pos.updateProduct(family.id, { image_path: '' });
       await this.pos.removeProductImage(family.image_path).catch(() => undefined);
       this.editingFamily.set({ ...family, image_path: null });
-      this.notice.set('Image removed');
+      this.notice.set('Product photo removed');
       await this.load();
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Remove failed');
     } finally {
       this.imageBusy.set(false);
     }
+  }
+
+  private async persistPendingProductImage(
+    productId: string,
+    previousPath: string | null
+  ): Promise<void> {
+    const pending = this.pendingProductImage();
+    if (!pending) return;
+    const companyId = this.supabase.claims()?.company_id;
+    if (!companyId) throw new Error('No company in session — re-login');
+
+    let path: string | null = null;
+    try {
+      path = await this.pos.uploadProductImage(companyId, pending.blob, pending.extension);
+      await this.pos.updateProduct(productId, { image_path: path });
+    } catch (error) {
+      if (path) await this.pos.removeProductImage(path).catch(() => undefined);
+      throw error;
+    }
+
+    const family = this.editingFamily();
+    if (family?.id === productId) this.editingFamily.set({ ...family, image_path: path });
+    this.clearPendingProductImage();
+    if (previousPath && previousPath !== path) {
+      await this.pos.removeProductImage(previousPath).catch(() => undefined);
+    }
+  }
+
+  private clearPendingProductImage(): void {
+    const pending = this.pendingProductImage();
+    if (pending) URL.revokeObjectURL(pending.previewUrl);
+    this.pendingProductImage.set(null);
   }
 
   // --- Categories ---
@@ -2596,6 +2748,7 @@ export class ProductsComponent implements OnInit {
 
   protected startFamilyCreate(): void {
     if (!this.perms.has('ManageStockAdjustments')) return;
+    this.clearPendingProductImage();
     this.error.set(null);
     this.editorLoading.set(false);
     this.editingFamily.set(null);
@@ -2613,6 +2766,7 @@ export class ProductsComponent implements OnInit {
 
   protected startFamilyEdit(family: Product, step: 1 | 2 = 1): void {
     if (!this.perms.has('ManageStockAdjustments')) return;
+    this.clearPendingProductImage();
     this.error.set(null);
     this.editingFamily.set(family);
     this.familyName.setValue(family.name);
@@ -2650,6 +2804,7 @@ export class ProductsComponent implements OnInit {
 
   protected closeProductEditor(): void {
     if (this.busy()) return;
+    this.clearPendingProductImage();
     this.editorLoading.set(false);
     this.editorMode.set(null);
     this.editingFamily.set(null);
@@ -2850,13 +3005,25 @@ export class ProductsComponent implements OnInit {
         ? (existingManufacturer?.id ?? (await this.pos.upsertManufacturer(manufacturerName)))
         : null;
       if (mode === 'create') {
-        await this.pos.createProductWithVariants({
+        const productId = await this.pos.createProductWithVariants({
           name,
           barcode: this.familyBarcode.value.trim() || undefined,
           manufacturer_id: manufacturerId,
           variants,
         });
-        this.notice.set(`Created ${name}`);
+        let photoUploadFailed = false;
+        if (this.pendingProductImage()) {
+          try {
+            await this.persistPendingProductImage(productId, null);
+          } catch {
+            photoUploadFailed = true;
+          }
+        }
+        this.notice.set(
+          photoUploadFailed
+            ? `Created ${name}, but the photo could not upload. You can add it by editing the product.`
+            : `Created ${name}`
+        );
       } else if (editing) {
         await this.pos.updateProductWithVariants({
           product_id: editing.id,
@@ -2869,10 +3036,21 @@ export class ProductsComponent implements OnInit {
         if (this.perms.has('ManageCatalog') && this.connectivity.online()) {
           await this.pos.setProductCategories(editing.id, [...this.familyCategories()]);
         }
+        let photoUploadFailed = false;
+        if (this.pendingProductImage()) {
+          try {
+            await this.persistPendingProductImage(editing.id, editing.image_path);
+          } catch {
+            photoUploadFailed = true;
+          }
+        }
         this.notice.set(
-          `Updated ${name} and ${variants.length} variant${variants.length === 1 ? '' : 's'}`
+          photoUploadFailed
+            ? `Updated ${name}, but the photo could not upload. Reopen the product to try again.`
+            : `Updated ${name} and ${variants.length} variant${variants.length === 1 ? '' : 's'}`
         );
       }
+      this.clearPendingProductImage();
       this.editorMode.set(null);
       this.editingFamily.set(null);
       await this.load();

@@ -23,6 +23,14 @@ test('routes only supported public content', () => {
     slug: 'jutik',
     productId,
   });
+  assert.deepEqual(
+    parsePublicContentRoute('storefront', '/tesla/products/7e520000-0000-0000-0000-000000000030'),
+    {
+      kind: 'product',
+      slug: 'tesla',
+      productId: '7e520000-0000-0000-0000-000000000030',
+    }
+  );
   assert.deepEqual(parsePublicContentRoute('site', '/sitemap.xml'), { kind: 'sitemap' });
   assert.deepEqual(parsePublicContentRoute('storefront', '/jutik'), {
     kind: 'shop',

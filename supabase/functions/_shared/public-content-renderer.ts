@@ -55,7 +55,7 @@ const SITE_ROUTES = [
 ] as const;
 const SOCIAL_IMAGE_PATH = '/media/video/product-overview/product-overview-full-wide.png';
 const SLUG = '[a-z0-9]+(?:-[a-z0-9]+)*';
-const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}';
+const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
 
 export function parsePublicContentRoute(
   app: PublicApp,

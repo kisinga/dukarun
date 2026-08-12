@@ -23,7 +23,7 @@ export async function resizeImage(file: File, maxPx = 800): Promise<Blob> {
 }
 
 /** File extension for the upload path (from MIME, defaulting to jpg). */
-export function imageExtension(file: File): string {
+export function imageExtension(file: Blob): string {
   if (file.type === 'image/png') return 'png';
   if (file.type === 'image/webp') return 'webp';
   return 'jpg';
