@@ -43,12 +43,49 @@ export type CustomerStatementRow = {
   debit: number;
   credit: number;
   balance: number;
+  activity_kind: string;
+  receipt_id: string | null;
+  details: CustomerReceiptDetails;
 };
 export type CustomerStatementCursor = Pick<CustomerStatementRow, 'id' | 'date'>;
 export type CustomerStatementPage = {
   rows: CustomerStatementRow[];
   hasMore: boolean;
 };
+
+export type CustomerReceiptAllocation = {
+  payment_id?: string;
+  order_id: string;
+  order_code: string;
+  amount: number;
+};
+
+export type CustomerReceiptDetails = {
+  receipt_id?: string;
+  amount?: number;
+  applied_amount?: number;
+  downpayment_amount?: number;
+  allocations?: CustomerReceiptAllocation[];
+};
+
+export type CustomerReceiptOutcome =
+  | ({
+      status: 'completed';
+      resource_id: string;
+      subject_id: string;
+      receipt_id: string;
+      amount: number;
+      applied_amount: number;
+      downpayment_amount: number;
+      allocations: CustomerReceiptAllocation[];
+    } & Record<string, unknown>)
+  | ({
+      status: 'approval_required';
+      approval_id: string;
+      subject_id: string;
+      receipt_id: string;
+      preview: CustomerReceiptDetails;
+    } & Record<string, unknown>);
 
 export type PrepaymentActivityRow = {
   id: string;
@@ -261,15 +298,6 @@ export class MoneyService {
     return Number(data ?? 0);
   }
 
-  async customerDepositActivity(customerId: string): Promise<PrepaymentActivityRow[]> {
-    const { data, error } = await this.db.rpc('customer_deposit_activity', {
-      p_customer_id: customerId,
-      p_limit: 50,
-    });
-    if (error) throw rpcError(error);
-    return (data ?? []) as unknown as PrepaymentActivityRow[];
-  }
-
   async supplierAdvanceActivity(supplierId: string): Promise<PrepaymentActivityRow[]> {
     const { data, error } = await this.db.rpc('supplier_advance_activity', {
       p_supplier_id: supplierId,
@@ -277,37 +305,6 @@ export class MoneyService {
     });
     if (error) throw rpcError(error);
     return (data ?? []) as unknown as PrepaymentActivityRow[];
-  }
-
-  async recordCustomerDeposit(input: {
-    customerId: string;
-    amount: number;
-    methodCode: string;
-    reference?: string;
-    clientRef: string;
-  }): Promise<string> {
-    const { data, error } = await this.db.rpc('record_customer_deposit', {
-      p_customer_id: input.customerId,
-      p_amount: input.amount,
-      p_method_code: input.methodCode,
-      p_location_id: this.locations.requireActiveId(),
-      p_client_ref: input.clientRef,
-      ...(input.reference ? { p_reference: input.reference } : {}),
-    });
-    if (error) throw rpcError(error);
-    this.parties.invalidateFinancials();
-    return data as unknown as string;
-  }
-
-  async applyCustomerDeposit(orderId: string, amount: number, clientRef: string): Promise<string> {
-    const { data, error } = await this.db.rpc('apply_customer_deposit', {
-      p_order_id: orderId,
-      p_amount: amount,
-      p_client_ref: clientRef,
-    });
-    if (error) throw rpcError(error);
-    this.parties.invalidateFinancials();
-    return data as unknown as string;
   }
 
   async refundCustomerDeposit(input: {
@@ -596,7 +593,10 @@ export class MoneyService {
     });
     if (error) throw rpcError(error);
     return {
-      rows: (data ?? []).map(({ has_more: _hasMore, ...row }) => row),
+      rows: (data ?? []).map(({ has_more: _hasMore, ...row }) => ({
+        ...row,
+        details: (row.details ?? {}) as CustomerReceiptDetails,
+      })),
       hasMore: data?.[0]?.has_more ?? false,
     };
   }
@@ -773,37 +773,50 @@ export class MoneyService {
     return data;
   }
 
-  async postPaymentAllocation(
-    orderId: string,
+  async postCustomerReceipt(
+    customerId: string,
     amount: number,
     methodCode: string,
-    reference?: string
-  ): Promise<string> {
-    const { data, error } = await this.db.rpc('post_payment_allocation', {
-      p_order_id: orderId,
-      p_amount: amount,
-      p_method_code: methodCode,
-      ...(reference ? { p_reference: reference } : {}),
+    reference: string | undefined,
+    clientRef: string
+  ): Promise<CustomerReceiptOutcome> {
+    const outcome = await this.actions.run(async () => {
+      const { data, error } = await this.db.rpc('post_customer_receipt', {
+        p_location_id: this.locations.requireActiveId(),
+        p_customer_id: customerId,
+        p_amount: amount,
+        p_method_code: methodCode,
+        p_client_ref: clientRef,
+        ...(reference ? { p_reference: reference } : {}),
+      });
+      if (error) throw rpcError(error);
+      return data;
     });
-    if (error) throw rpcError(error);
     this.parties.invalidateFinancials();
-    return data;
+    return outcome as CustomerReceiptOutcome;
   }
 
   async postCustomerPayment(
     customerId: string,
     amount: number,
     methodCode: string,
-    reference?: string
-  ): Promise<void> {
-    const { error } = await this.db.rpc('post_customer_payment', {
-      p_customer_id: customerId,
-      p_amount: amount,
-      p_method_code: methodCode,
-      ...(reference ? { p_reference: reference } : {}),
+    reference?: string,
+    clientRef: string = crypto.randomUUID()
+  ): Promise<CustomerReceiptOutcome> {
+    return this.postCustomerReceipt(customerId, amount, methodCode, reference, clientRef);
+  }
+
+  async reverseCustomerReceipt(receiptId: string, reason: string): Promise<ActionOutcome> {
+    const outcome = await this.actions.run(async () => {
+      const { data, error } = await this.db.rpc('post_customer_receipt_reversal', {
+        p_receipt_id: receiptId,
+        p_reason: reason,
+      });
+      if (error) throw rpcError(error);
+      return data;
     });
-    if (error) throw rpcError(error);
-    this.parties.invalidateFinancials();
+    if (outcome.status === 'completed') this.parties.invalidateFinancials();
+    return outcome;
   }
 
   async postRefund(

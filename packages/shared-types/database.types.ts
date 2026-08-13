@@ -558,6 +558,13 @@ export type Database = {
             foreignKeyName: "campaign_recipients_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
+            referencedRelation: "customer_account_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "campaign_recipients_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
             referencedRelation: "customer_ar_balances"
             referencedColumns: ["customer_id"]
           },
@@ -1961,6 +1968,13 @@ export type Database = {
             foreignKeyName: "credit_notification_checkpoints_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
+            referencedRelation: "customer_account_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "credit_notification_checkpoints_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
             referencedRelation: "customer_ar_balances"
             referencedColumns: ["customer_id"]
           },
@@ -2114,6 +2128,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "public_storefronts"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_deposit_applications_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_account_balances"
+            referencedColumns: ["customer_id"]
           },
           {
             foreignKeyName: "customer_deposit_applications_customer_id_fkey"
@@ -2294,6 +2315,13 @@ export type Database = {
             foreignKeyName: "customer_deposit_refunds_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
+            referencedRelation: "customer_account_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "customer_deposit_refunds_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
             referencedRelation: "customer_ar_balances"
             referencedColumns: ["customer_id"]
           },
@@ -2350,6 +2378,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           customer_id: string
+          customer_receipt_id: string | null
           id: string
           location_id: string
           method_code: string
@@ -2367,6 +2396,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           customer_id: string
+          customer_receipt_id?: string | null
           id?: string
           location_id: string
           method_code: string
@@ -2384,6 +2414,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           customer_id?: string
+          customer_receipt_id?: string | null
           id?: string
           location_id?: string
           method_code?: string
@@ -2414,6 +2445,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "public_storefronts"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_deposits_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_account_balances"
+            referencedColumns: ["customer_id"]
           },
           {
             foreignKeyName: "customer_deposits_customer_id_fkey"
@@ -2451,6 +2489,13 @@ export type Database = {
             referencedColumns: ["supplier_id"]
           },
           {
+            foreignKeyName: "customer_deposits_customer_receipt_id_fkey"
+            columns: ["customer_receipt_id"]
+            isOneToOne: false
+            referencedRelation: "customer_receipts"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "customer_deposits_location_id_fkey"
             columns: ["location_id"]
             isOneToOne: false
@@ -2466,15 +2511,161 @@ export type Database = {
           },
         ]
       }
+      customer_receipts: {
+        Row: {
+          amount: number
+          applied_amount: number
+          cashier_session_id: string | null
+          client_ref: string
+          company_id: string
+          created_at: string
+          created_by: string | null
+          customer_id: string
+          downpayment_amount: number
+          id: string
+          location_id: string
+          method_code: string
+          posted_at: string | null
+          reference: string | null
+          request_fingerprint: string
+          reversal_reason: string | null
+          reversed_at: string | null
+          reversed_by: string | null
+          status: string
+        }
+        Insert: {
+          amount: number
+          applied_amount?: number
+          cashier_session_id?: string | null
+          client_ref: string
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          customer_id: string
+          downpayment_amount?: number
+          id?: string
+          location_id: string
+          method_code: string
+          posted_at?: string | null
+          reference?: string | null
+          request_fingerprint: string
+          reversal_reason?: string | null
+          reversed_at?: string | null
+          reversed_by?: string | null
+          status?: string
+        }
+        Update: {
+          amount?: number
+          applied_amount?: number
+          cashier_session_id?: string | null
+          client_ref?: string
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string
+          downpayment_amount?: number
+          id?: string
+          location_id?: string
+          method_code?: string
+          posted_at?: string | null
+          reference?: string | null
+          request_fingerprint?: string
+          reversal_reason?: string | null
+          reversed_at?: string | null
+          reversed_by?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_receipts_cashier_session_id_fkey"
+            columns: ["cashier_session_id"]
+            isOneToOne: false
+            referencedRelation: "cashier_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_receipts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_receipts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_receipts_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_account_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "customer_receipts_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_ar_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "customer_receipts_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_deposit_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "customer_receipts_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_receipts_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_advance_balances"
+            referencedColumns: ["supplier_id"]
+          },
+          {
+            foreignKeyName: "customer_receipts_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_ap_balances"
+            referencedColumns: ["supplier_id"]
+          },
+          {
+            foreignKeyName: "customer_receipts_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "low_stock_variants_by_location"
+            referencedColumns: ["location_id"]
+          },
+          {
+            foreignKeyName: "customer_receipts_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "stock_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customer_statement_links: {
         Row: {
           company_id: string
           created_at: string
+          created_by: string | null
           customer_id: string
           expires_at: string
           first_opened_at: string | null
           id: string
           last_opened_at: string | null
+          link_source: string
           open_count: number
           revoked_at: string | null
           token_hash: string
@@ -2482,11 +2673,13 @@ export type Database = {
         Insert: {
           company_id: string
           created_at?: string
+          created_by?: string | null
           customer_id: string
           expires_at: string
           first_opened_at?: string | null
           id?: string
           last_opened_at?: string | null
+          link_source?: string
           open_count?: number
           revoked_at?: string | null
           token_hash: string
@@ -2494,11 +2687,13 @@ export type Database = {
         Update: {
           company_id?: string
           created_at?: string
+          created_by?: string | null
           customer_id?: string
           expires_at?: string
           first_opened_at?: string | null
           id?: string
           last_opened_at?: string | null
+          link_source?: string
           open_count?: number
           revoked_at?: string | null
           token_hash?: string
@@ -2517,6 +2712,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "public_storefronts"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_statement_links_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_account_balances"
+            referencedColumns: ["customer_id"]
           },
           {
             foreignKeyName: "customer_statement_links_customer_id_fkey"
@@ -2766,6 +2968,13 @@ export type Database = {
             foreignKeyName: "external_document_links_party_id_fkey"
             columns: ["party_id"]
             isOneToOne: false
+            referencedRelation: "customer_account_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "external_document_links_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
             referencedRelation: "customer_ar_balances"
             referencedColumns: ["customer_id"]
           },
@@ -2876,6 +3085,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "stock_locations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_batches_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "customer_account_balances"
+            referencedColumns: ["customer_id"]
           },
           {
             foreignKeyName: "inventory_batches_supplier_id_fkey"
@@ -3892,6 +4108,7 @@ export type Database = {
       }
       orders: {
         Row: {
+          account_sale_request_fingerprint: string | null
           cashier_pending_at: string | null
           cashier_session_id: string | null
           client_ref: string | null
@@ -3915,6 +4132,7 @@ export type Database = {
           voided_by: string | null
         }
         Insert: {
+          account_sale_request_fingerprint?: string | null
           cashier_pending_at?: string | null
           cashier_session_id?: string | null
           client_ref?: string | null
@@ -3938,6 +4156,7 @@ export type Database = {
           voided_by?: string | null
         }
         Update: {
+          account_sale_request_fingerprint?: string | null
           cashier_pending_at?: string | null
           cashier_session_id?: string | null
           client_ref?: string | null
@@ -3974,6 +4193,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "public_storefronts"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_account_balances"
+            referencedColumns: ["customer_id"]
           },
           {
             foreignKeyName: "orders_customer_id_fkey"
@@ -4166,6 +4392,13 @@ export type Database = {
             foreignKeyName: "outbox_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
+            referencedRelation: "customer_account_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "outbox_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
             referencedRelation: "customer_ar_balances"
             referencedColumns: ["customer_id"]
           },
@@ -4325,6 +4558,7 @@ export type Database = {
           company_id: string
           created_at: string
           customer_deposit_application_id: string | null
+          customer_receipt_id: string | null
           id: string
           location_id: string
           method_code: string
@@ -4339,6 +4573,7 @@ export type Database = {
           company_id: string
           created_at?: string
           customer_deposit_application_id?: string | null
+          customer_receipt_id?: string | null
           id?: string
           location_id: string
           method_code: string
@@ -4353,6 +4588,7 @@ export type Database = {
           company_id?: string
           created_at?: string
           customer_deposit_application_id?: string | null
+          customer_receipt_id?: string | null
           id?: string
           location_id?: string
           method_code?: string
@@ -4382,6 +4618,13 @@ export type Database = {
             columns: ["customer_deposit_application_id"]
             isOneToOne: false
             referencedRelation: "customer_deposit_applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_customer_receipt_id_fkey"
+            columns: ["customer_receipt_id"]
+            isOneToOne: false
+            referencedRelation: "customer_receipts"
             referencedColumns: ["id"]
           },
           {
@@ -4973,6 +5216,13 @@ export type Database = {
             foreignKeyName: "purchase_drafts_supplier_id_fkey"
             columns: ["supplier_id"]
             isOneToOne: false
+            referencedRelation: "customer_account_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "purchase_drafts_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
             referencedRelation: "customer_ar_balances"
             referencedColumns: ["customer_id"]
           },
@@ -5352,6 +5602,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "stock_locations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchases_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "customer_account_balances"
+            referencedColumns: ["customer_id"]
           },
           {
             foreignKeyName: "purchases_supplier_id_fkey"
@@ -6066,6 +6323,13 @@ export type Database = {
             foreignKeyName: "supplier_advance_applications_supplier_id_fkey"
             columns: ["supplier_id"]
             isOneToOne: false
+            referencedRelation: "customer_account_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "supplier_advance_applications_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
             referencedRelation: "customer_ar_balances"
             referencedColumns: ["customer_id"]
           },
@@ -6248,6 +6512,13 @@ export type Database = {
             foreignKeyName: "supplier_advance_returns_supplier_id_fkey"
             columns: ["supplier_id"]
             isOneToOne: false
+            referencedRelation: "customer_account_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "supplier_advance_returns_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
             referencedRelation: "customer_ar_balances"
             referencedColumns: ["customer_id"]
           },
@@ -6373,6 +6644,13 @@ export type Database = {
             foreignKeyName: "supplier_advances_supplier_id_fkey"
             columns: ["supplier_id"]
             isOneToOne: false
+            referencedRelation: "customer_account_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "supplier_advances_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
             referencedRelation: "customer_ar_balances"
             referencedColumns: ["customer_id"]
           },
@@ -6441,6 +6719,31 @@ export type Database = {
       }
     }
     Views: {
+      customer_account_balances: {
+        Row: {
+          company_id: string | null
+          customer_id: string | null
+          downpayment_balance: number | null
+          net_balance: number | null
+          receivable_balance: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customers_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customers_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customer_ar_balances: {
         Row: {
           balance: number | null
@@ -6558,6 +6861,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "public_storefronts"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_deposits_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_account_balances"
+            referencedColumns: ["customer_id"]
           },
           {
             foreignKeyName: "customer_deposits_customer_id_fkey"
@@ -6734,6 +7044,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "public_storefronts"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_account_balances"
+            referencedColumns: ["customer_id"]
           },
           {
             foreignKeyName: "orders_customer_id_fkey"
@@ -6991,6 +7308,13 @@ export type Database = {
             foreignKeyName: "purchases_supplier_id_fkey"
             columns: ["supplier_id"]
             isOneToOne: false
+            referencedRelation: "customer_account_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "purchases_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
             referencedRelation: "customer_ar_balances"
             referencedColumns: ["customer_id"]
           },
@@ -7047,6 +7371,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "public_storefronts"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_account_balances"
+            referencedColumns: ["customer_id"]
           },
           {
             foreignKeyName: "orders_customer_id_fkey"
@@ -7272,6 +7603,13 @@ export type Database = {
             foreignKeyName: "supplier_advances_supplier_id_fkey"
             columns: ["supplier_id"]
             isOneToOne: false
+            referencedRelation: "customer_account_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "supplier_advances_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
             referencedRelation: "customer_ar_balances"
             referencedColumns: ["customer_id"]
           },
@@ -7382,6 +7720,13 @@ export type Database = {
             foreignKeyName: "purchases_supplier_id_fkey"
             columns: ["supplier_id"]
             isOneToOne: false
+            referencedRelation: "customer_account_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "purchases_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
             referencedRelation: "customer_ar_balances"
             referencedColumns: ["customer_id"]
           },
@@ -7478,6 +7823,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "variant_catalog"
             referencedColumns: ["variant_id"]
+          },
+          {
+            foreignKeyName: "purchases_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "customer_account_balances"
+            referencedColumns: ["customer_id"]
           },
           {
             foreignKeyName: "purchases_supplier_id_fkey"
@@ -7960,6 +8312,11 @@ export type Database = {
         Args: { p_customer_id: string }
         Returns: number
       }
+      customer_receipt_preview: {
+        Args: { p_amount: number; p_customer_id: string }
+        Returns: Json
+      }
+      customer_receipt_result: { Args: { p_receipt_id: string }; Returns: Json }
       customer_statement: {
         Args: {
           p_before_date?: string
@@ -7968,15 +8325,22 @@ export type Database = {
           p_limit?: number
         }
         Returns: {
+          activity_kind: string
           balance: number
           credit: number
           date: string
           debit: number
           description: string
+          details: Json
           has_more: boolean
           id: string
+          receipt_id: string
           reference: string
         }[]
+      }
+      customer_statement_message_context: {
+        Args: { p_channel: string; p_customer_id: string }
+        Returns: Json
       }
       dashboard_location_snapshot: {
         Args: { p_location_id?: string; p_since?: string }
@@ -8016,6 +8380,14 @@ export type Database = {
       emit_cache_reset: {
         Args: { p_company_id: string; p_stream: string }
         Returns: number
+      }
+      execute_customer_receipt: {
+        Args: { p_receipt_id: string }
+        Returns: string
+      }
+      execute_customer_receipt_reversal: {
+        Args: { p_reason: string; p_receipt_id: string }
+        Returns: string
       }
       execute_payment_reversal: {
         Args: { p_payment_id: string; p_reason: string }
@@ -8092,7 +8464,12 @@ export type Database = {
         Returns: boolean
       }
       issue_customer_statement_link: {
-        Args: { p_company_id: string; p_customer_id: string }
+        Args: {
+          p_company_id: string
+          p_created_by?: string
+          p_customer_id: string
+          p_source?: string
+        }
         Returns: string
       }
       journal_entry_payload_hash: {
@@ -8201,6 +8578,10 @@ export type Database = {
           stock_value: number
           variant_id: string
         }[]
+      }
+      lock_customer_account: {
+        Args: { p_company_id: string; p_customer_id: string }
+        Returns: undefined
       }
       my_companies: {
         Args: never
@@ -8529,6 +8910,17 @@ export type Database = {
         Args: { p_amount: number; p_customer_id: string; p_reason: string }
         Returns: string
       }
+      post_credit_sale_at_location: {
+        Args: {
+          p_approval_reason?: string
+          p_client_ref?: string
+          p_customer_id: string
+          p_draft_id?: string
+          p_lines: Json
+          p_location_id: string
+        }
+        Returns: Json
+      }
       post_customer_deposit_refund: {
         Args: {
           p_amount: number
@@ -8548,6 +8940,21 @@ export type Database = {
           p_method_code: string
           p_reference?: string
         }
+        Returns: Json
+      }
+      post_customer_receipt: {
+        Args: {
+          p_amount: number
+          p_client_ref?: string
+          p_customer_id: string
+          p_location_id: string
+          p_method_code: string
+          p_reference?: string
+        }
+        Returns: Json
+      }
+      post_customer_receipt_reversal: {
+        Args: { p_reason: string; p_receipt_id: string }
         Returns: Json
       }
       post_expense: {
@@ -8723,6 +9130,10 @@ export type Database = {
         }
         Returns: string
       }
+      preview_customer_statement: {
+        Args: { p_channel: string; p_customer_id: string }
+        Returns: Json
+      }
       preview_external_document: {
         Args: {
           p_channel: string
@@ -8809,7 +9220,15 @@ export type Database = {
         Returns: Json
       }
       public_blog_sitemap: { Args: never; Returns: Json }
-      public_customer_statement: { Args: { p_token: string }; Returns: Json }
+      public_customer_statement: {
+        Args: {
+          p_before_date?: string
+          p_before_id?: string
+          p_limit?: number
+          p_token: string
+        }
+        Returns: Json
+      }
       public_external_document: { Args: { p_token: string }; Returns: Json }
       public_featured_blog_post: { Args: never; Returns: Json }
       public_storefront_sitemap: { Args: never; Returns: Json }
@@ -9024,6 +9443,10 @@ export type Database = {
         Returns: string
       }
       remove_team_member: { Args: { p_membership_id: string }; Returns: string }
+      render_customer_statement_message: {
+        Args: { p_context: Json; p_url: string }
+        Returns: Json
+      }
       render_external_document_message: {
         Args: { p_context: Json; p_copy: boolean; p_url: string }
         Returns: Json
@@ -9196,6 +9619,14 @@ export type Database = {
       seed_default_company_roles: {
         Args: { p_company_id: string }
         Returns: undefined
+      }
+      send_customer_statement: {
+        Args: {
+          p_bypass_quiet_hours?: boolean
+          p_channel: string
+          p_customer_id: string
+        }
+        Returns: Json
       }
       send_external_document: {
         Args: {

@@ -18,6 +18,9 @@ type Metadata = {
   order_total?: number;
   credit_limit?: number;
   projected_balance?: number;
+  automatic_customer_account?: boolean;
+  reviewed_deposit_amount?: number;
+  reviewed_credit_amount?: number;
 };
 
 @Component({
@@ -68,12 +71,33 @@ type Metadata = {
         </div>
       }
       @if (approval().type === 'overdraft') {
+        @if (metadata().automatic_customer_account) {
+          <div class="col-span-2 rounded-field border border-info/25 bg-info/5 p-3">
+            <p class="type-caption">Automatic account split reviewed</p>
+            <div class="mt-1 flex flex-wrap items-center justify-between gap-2 text-sm">
+              <span
+                >Downpayment
+                <strong>{{ format(metadata().reviewed_deposit_amount ?? 0) }}</strong></span
+              >
+              <span
+                >Residual credit
+                <strong>{{
+                  format(metadata().reviewed_credit_amount ?? order().total)
+                }}</strong></span
+              >
+            </div>
+            <p class="type-caption mt-1">
+              The server recalculates this split at approval. If credit exposure increases, this
+              request expires for a fresh review.
+            </p>
+          </div>
+        }
         <div class="rounded-field bg-warning/10 p-3">
           <p class="type-caption">Projected exposure</p>
           <p class="mt-1 font-bold"><app-money [amount]="projectedBalance()" /></p>
           <p class="type-caption">
             {{ format(metadata().ar_balance ?? 0) }} current +
-            {{ format(metadata().order_total ?? 0) }} sale
+            {{ format(metadata().reviewed_credit_amount ?? metadata().order_total ?? 0) }} credit
           </p>
         </div>
         <div class="rounded-field bg-base-200 p-3">

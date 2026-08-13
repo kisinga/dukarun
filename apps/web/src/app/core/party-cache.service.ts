@@ -18,7 +18,7 @@ import {
 import { postgrestIdBatches } from './postgrest-batches';
 
 type Customer = Database['public']['Tables']['customers']['Row'];
-type CustomerBalance = Database['public']['Views']['customer_ar_balances']['Row'];
+type CustomerBalance = Database['public']['Views']['customer_account_balances']['Row'];
 type SupplierBalance = Database['public']['Views']['supplier_ap_balances']['Row'];
 type CustomerAging = Pick<
   Database['public']['Views']['customer_credit_aging']['Row'],
@@ -31,6 +31,8 @@ type SupplierAging = Pick<
 
 interface FinancialProjection {
   ar: Map<string | null, number>;
+  downpayment: Map<string | null, number>;
+  net: Map<string | null, number>;
   ap: Map<string | null, number>;
   arAging: Map<string, CustomerAging>;
   apAging: Map<string, SupplierAging>;
@@ -241,7 +243,7 @@ export class PartyCacheService {
     const [balances, supplierBalances, customerAging, supplierAging] = await Promise.all([
       this.fetchAllPages<CustomerBalance>(async (from, to) => {
         const { data, error } = await this.supabase.client
-          .from('customer_ar_balances')
+          .from('customer_account_balances')
           .select('*')
           .order('customer_id')
           .range(from, to);
@@ -273,7 +275,9 @@ export class PartyCacheService {
       }),
     ]);
     return {
-      ar: new Map(balances.map(row => [row.customer_id, row.balance ?? 0])),
+      ar: new Map(balances.map(row => [row.customer_id, row.receivable_balance ?? 0])),
+      downpayment: new Map(balances.map(row => [row.customer_id, row.downpayment_balance ?? 0])),
+      net: new Map(balances.map(row => [row.customer_id, row.net_balance ?? 0])),
       ap: new Map(supplierBalances.map(row => [row.supplier_id, row.balance ?? 0])),
       arAging: new Map(
         customerAging.filter(row => row.customer_id !== null).map(row => [row.customer_id!, row])
@@ -303,6 +307,8 @@ export class PartyCacheService {
     return {
       ...row,
       ar_balance: values.ar.get(row.id) ?? 0,
+      downpayment_balance: values.downpayment.get(row.id) ?? 0,
+      net_balance: values.net.get(row.id) ?? 0,
       days_outstanding: values.arAging.get(row.id)?.days_outstanding ?? null,
       bucket: values.arAging.get(row.id)?.bucket ?? null,
     };
@@ -337,17 +343,19 @@ export class PartyCacheService {
   private async withCustomerBalances(customers: Customer[]): Promise<CachedCustomer[]> {
     if (customers.length === 0) return [];
     const { data, error } = await this.supabase.client
-      .from('customer_ar_balances')
-      .select('customer_id, balance')
+      .from('customer_account_balances')
+      .select('customer_id, receivable_balance, downpayment_balance, net_balance')
       .in(
         'customer_id',
         customers.map(row => row.id)
       );
     if (error) throw error;
-    const balances = new Map((data ?? []).map(row => [row.customer_id, row.balance ?? 0]));
+    const balances = new Map((data ?? []).map(row => [row.customer_id, row]));
     return customers.map(row => ({
       ...row,
-      ar_balance: balances.get(row.id) ?? 0,
+      ar_balance: balances.get(row.id)?.receivable_balance ?? 0,
+      downpayment_balance: balances.get(row.id)?.downpayment_balance ?? 0,
+      net_balance: balances.get(row.id)?.net_balance ?? 0,
       days_outstanding: null,
       bucket: null,
     }));
@@ -386,7 +394,10 @@ export class PartyCacheService {
       const [directoryResult, arResult, apResult, arAgingResult, apAgingResult] = await Promise.all(
         [
           this.supabase.client.from('customers').select('*').in('id', batch),
-          this.supabase.client.from('customer_ar_balances').select('*').in('customer_id', batch),
+          this.supabase.client
+            .from('customer_account_balances')
+            .select('*')
+            .in('customer_id', batch),
           this.supabase.client.from('supplier_ap_balances').select('*').in('supplier_id', batch),
           this.supabase.client
             .from('customer_credit_aging')
@@ -409,7 +420,9 @@ export class PartyCacheService {
     }
 
     const projection: FinancialProjection = {
-      ar: new Map(arRows.map(row => [row.customer_id, row.balance ?? 0])),
+      ar: new Map(arRows.map(row => [row.customer_id, row.receivable_balance ?? 0])),
+      downpayment: new Map(arRows.map(row => [row.customer_id, row.downpayment_balance ?? 0])),
+      net: new Map(arRows.map(row => [row.customer_id, row.net_balance ?? 0])),
       ap: new Map(apRows.map(row => [row.supplier_id, row.balance ?? 0])),
       arAging: new Map(
         arAgingRows.filter(row => row.customer_id !== null).map(row => [row.customer_id!, row])

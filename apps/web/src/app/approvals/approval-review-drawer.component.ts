@@ -26,9 +26,17 @@ export type ApprovalDecisionResult = {
 
 type ApprovalMetadata = {
   order_id?: string;
+  customer_id?: string;
+  receipt_id?: string;
   reason?: string;
   amount?: number;
   method_code?: string;
+  reference?: string;
+  allocation_preview?: {
+    applied_amount?: number;
+    downpayment_amount?: number;
+    allocations?: Array<{ order_code: string; amount: number }>;
+  };
 };
 
 @Component({
@@ -100,6 +108,50 @@ type ApprovalMetadata = {
             [payments]="payments()"
             [refunds]="refunds()"
           />
+        } @else if (approval().subject_type === 'customer_receipt') {
+          <section class="mt-4 rounded-box border border-base-300 p-3">
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <p class="section-title">Customer receipt</p>
+                <p class="type-caption">Allocation is recalculated when approved.</p>
+              </div>
+              <p class="font-bold tabular-nums">{{ money(metadata().amount ?? 0) }}</p>
+            </div>
+            <dl class="mt-3 grid grid-cols-2 gap-2 text-sm">
+              <div class="rounded-field bg-base-200 p-2">
+                <dt class="type-caption">Method</dt>
+                <dd class="font-semibold capitalize">{{ metadata().method_code ?? '—' }}</dd>
+              </div>
+              <div class="rounded-field bg-base-200 p-2">
+                <dt class="type-caption">Reference</dt>
+                <dd class="truncate font-semibold">{{ metadata().reference || 'Not supplied' }}</dd>
+              </div>
+              @if (metadata().allocation_preview; as preview) {
+                <div class="rounded-field bg-info/5 p-2">
+                  <dt class="type-caption">Invoices in current preview</dt>
+                  <dd class="font-semibold">{{ money(preview.applied_amount ?? 0) }}</dd>
+                </div>
+                <div class="rounded-field bg-info/5 p-2">
+                  <dt class="type-caption">Downpayment in current preview</dt>
+                  <dd class="font-semibold">{{ money(preview.downpayment_amount ?? 0) }}</dd>
+                </div>
+              }
+            </dl>
+            @if (approval().type === 'customer_receipt_reversal') {
+              <div role="alert" class="alert alert-warning mt-3 text-sm">
+                <app-icon name="heroExclamationTriangle" />
+                <span
+                  >The whole receipt will be reversed. This is blocked if its downpayment has been
+                  used or refunded.</span
+                >
+              </div>
+            } @else {
+              <p class="type-caption mt-3">
+                Newer invoice or payment activity can change the final invoice/downpayment split
+                without changing the amount received.
+              </p>
+            }
+          </section>
         } @else if (customer(); as linkedCustomer) {
           <app-approval-customer-context [approval]="approval()" [customer]="linkedCustomer" />
         }
@@ -212,6 +264,8 @@ export class ApprovalReviewDrawerComponent {
         return `Refund ${formatKes(meta.amount ?? 0)} via ${meta.method_code ?? 'selected method'}`;
       case 'payment_reversal':
         return 'Reverse the highlighted payment';
+      case 'customer_receipt_reversal':
+        return `Reverse the full ${formatKes(meta.amount ?? 0)} customer receipt`;
       case 'below_wholesale':
         return 'Approve below-wholesale pricing';
       case 'external_account_payment':
@@ -240,6 +294,9 @@ export class ApprovalReviewDrawerComponent {
     return new Intl.DateTimeFormat('en-KE', { dateStyle: 'medium', timeStyle: 'short' }).format(
       new Date(iso)
     );
+  }
+  protected money(amount: number): string {
+    return formatKes(amount);
   }
   protected retry(): void {
     void this.load(this.approval());
@@ -279,7 +336,12 @@ export class ApprovalReviewDrawerComponent {
     const orderId =
       (approval.metadata as ApprovalMetadata).order_id ??
       (approval.subject_type === 'order' ? approval.subject_id : null);
-    const customerId = approval.subject_type === 'customer' ? approval.subject_id : null;
+    const customerId =
+      approval.subject_type === 'customer'
+        ? approval.subject_id
+        : approval.subject_type === 'customer_receipt'
+          ? ((approval.metadata as ApprovalMetadata).customer_id ?? null)
+          : null;
     this.loading.set(true);
     this.error.set(null);
     this.order.set(null);

@@ -16,10 +16,10 @@ import { reconciliationLabel, reconciliationTypeForCode } from '../core/payment-
 import { PermissionsService } from '../core/permissions.service';
 import {
   AgingInfo,
+  CustomerReceiptOutcome,
   CustomerStatementRow,
   MoneyCustomer,
   MoneyService,
-  PrepaymentActivityRow,
 } from '../money/money.service';
 import { OrderWithCustomer, PosService } from '../pos/pos.service';
 import { ButtonComponent } from '../shared/ui/button.component';
@@ -53,8 +53,18 @@ import { PartyCacheService } from '../core/party-cache.service';
 import { Approval, ApprovalsService } from '../approvals/approvals.service';
 import { MobileListComponent } from '../shared/ui/mobile-list.component';
 import { PageActionsComponent } from '../shared/ui/page-actions.component';
+import {
+  customerAccountState,
+  planCustomerReceipt,
+  type CustomerReceiptPlan,
+} from './customer-account';
+import { CustomerStatementSendComponent } from '../communications/customer-statement-send.component';
 
-type CustomerWithAr = MoneyCustomer & { ar_balance: number } & AgingInfo;
+type CustomerWithAr = MoneyCustomer & {
+  ar_balance: number;
+  downpayment_balance: number;
+  net_balance: number;
+} & AgingInfo;
 type CreditOrder = {
   id: string;
   code: string;
@@ -64,14 +74,6 @@ type CreditOrder = {
   status: string;
   created_at: string;
 };
-type BulkPaymentPlan = {
-  applied: number;
-  excess: number;
-  allocations: { code: string; amount: number; clearsInvoice: boolean }[];
-  hiddenAllocations: number;
-  clearedInvoices: number;
-};
-
 const CUSTOMER_STATEMENT_PAGE_SIZE = 25;
 const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
 
@@ -97,6 +99,7 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
     DeleteConfirmationModalComponent,
     MobileListComponent,
     PageActionsComponent,
+    CustomerStatementSendComponent,
   ],
   template: `
     <app-page
@@ -676,34 +679,40 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
                   }
 
                   <section class="border-t border-base-300/60 pt-3">
-                    <div class="flex items-center justify-between gap-3">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
                       <div>
-                        <h3 class="section-title">Money held for customer</h3>
-                        <p class="type-caption">Separate from what the customer owes us.</p>
-                        @if (perms.has('ViewFinancials')) {
-                          <p class="type-caption">{{ customerNetPosition(c) }}</p>
-                        }
+                        <h3 class="section-title">Customer account</h3>
+                        <p class="type-caption">Invoices and downpayments share one balance.</p>
                       </div>
-                      <span class="font-semibold tabular-nums">
-                        <app-money [amount]="customerDepositBalance()" />
-                      </span>
+                      @if (perms.has('ViewFinancials')) {
+                        <div class="text-right">
+                          <p class="font-semibold tabular-nums">{{ customerAccountLabel() }}</p>
+                          <p class="type-caption">
+                            {{ fmtKes(customerOutstanding()) }} invoices ·
+                            {{ fmtKes(customerDepositBalance()) }} downpayment
+                          </p>
+                        </div>
+                      }
                     </div>
+                    @if (!cashierSession.canTakePayment()) {
+                      <app-session-required-notice action="receiving a customer payment" />
+                    }
                     @if (perms.has('SettleOrder')) {
                       <form
-                        (submit)="$event.preventDefault(); receiveDeposit(c.id)"
-                        class="mt-3 grid gap-2 rounded-field border border-base-300 bg-base-200/50 p-2 sm:grid-cols-3"
+                        (submit)="$event.preventDefault(); receivePayment(c.id)"
+                        class="mt-3 grid gap-2 rounded-field border border-base-300 bg-base-200/50 p-3 sm:grid-cols-3"
                       >
-                        <app-form-field label="Deposit received (KES)">
+                        <app-form-field label="Payment received (KES)">
                           <input
                             class="input input-bordered input-sm"
                             inputmode="numeric"
-                            [formControl]="depositAmount"
+                            [formControl]="bulkAmount"
                           />
                         </app-form-field>
                         <app-form-field label="Method">
                           <select
                             class="select select-bordered select-sm"
-                            [formControl]="depositMethod"
+                            [formControl]="bulkMethod"
                           >
                             @for (m of methods(); track m) {
                               <option [value]="m">{{ methodOptionLabel(m) }}</option>
@@ -713,7 +722,7 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
                         <app-form-field label="Reference">
                           <input
                             class="input input-bordered input-sm"
-                            [formControl]="depositReference"
+                            [formControl]="bulkReference"
                           />
                         </app-form-field>
                         <button
@@ -722,8 +731,78 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
                           class="sm:col-span-3 sm:justify-self-start"
                           [disabled]="busy() || !cashierSession.canTakePayment()"
                         >
-                          Receive deposit
+                          Receive payment
                         </button>
+                        @if (bulkPaymentPlan(); as plan) {
+                          <div
+                            class="sm:col-span-3 rounded-field border border-info/30 bg-info/5 p-3 text-sm"
+                            aria-live="polite"
+                          >
+                            <div class="flex flex-wrap items-start justify-between gap-2">
+                              <div>
+                                <p class="font-semibold">How this payment will be applied</p>
+                                <p class="type-caption mt-0.5">
+                                  Oldest invoices are cleared first.
+                                </p>
+                              </div>
+                              <p class="shrink-0 font-semibold tabular-nums">
+                                <app-money [amount]="plan.applied + plan.excess" /> received
+                              </p>
+                            </div>
+                            <ol class="mt-2 flex flex-wrap gap-2">
+                              @for (allocation of plan.allocations; track allocation.code) {
+                                <li
+                                  class="rounded-field border border-base-300/70 bg-base-100 px-2 py-1 text-xs"
+                                >
+                                  <span class="font-mono">{{ allocation.code }}</span> ·
+                                  <app-money [amount]="allocation.amount" />
+                                  @if (allocation.clearsInvoice) {
+                                    <span class="text-success"> · cleared</span>
+                                  }
+                                </li>
+                              }
+                              @if (plan.hiddenAllocations > 0) {
+                                <li class="px-1 py-1 text-xs text-base-content/60">
+                                  +{{ plan.hiddenAllocations }} more
+                                </li>
+                              }
+                            </ol>
+                            <div class="mt-2 grid gap-2 sm:grid-cols-2">
+                              <p class="rounded-field bg-base-100 px-2.5 py-2 text-xs">
+                                <span class="text-base-content/60">Applied to invoices</span><br />
+                                <span class="font-semibold tabular-nums"
+                                  ><app-money [amount]="plan.applied" />
+                                  @if (plan.clearedInvoices > 0) {
+                                    · {{ plan.clearedInvoices }} cleared
+                                  }
+                                </span>
+                              </p>
+                              @if (plan.excess > 0) {
+                                <p class="rounded-field bg-info/10 px-2.5 py-2 text-xs">
+                                  <span class="text-base-content/60">Available after receipt</span
+                                  ><br />
+                                  <span class="font-semibold tabular-nums text-info"
+                                    ><app-money [amount]="plan.excess" /> downpayment</span
+                                  >
+                                </p>
+                              }
+                            </div>
+                          </div>
+                        }
+                        @if (lastReceiptResult(); as result) {
+                          <div
+                            class="sm:col-span-3 rounded-field border border-success/30 bg-success/5 p-3 text-sm"
+                            role="status"
+                          >
+                            <p class="font-semibold">Receipt posted</p>
+                            <p class="type-caption mt-1">
+                              {{ fmtKes(result.applied_amount) }} applied to invoices
+                              @if (result.downpayment_amount > 0) {
+                                · {{ fmtKes(result.downpayment_amount) }} saved as downpayment
+                              }
+                            </p>
+                          </div>
+                        }
                       </form>
                     }
                     @if (
@@ -788,142 +867,17 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
                         </form>
                       </details>
                     }
-                    @if (perms.has('ViewFinancials') && depositActivity().length > 0) {
-                      <div class="mt-3">
-                        <h4 class="type-heading mb-2">Deposit activity</h4>
-                        <ol
-                          class="divide-y divide-base-300/60 rounded-field border border-base-300"
-                        >
-                          @for (row of depositActivity(); track row.id) {
-                            <li class="flex items-center justify-between gap-3 p-2 text-sm">
-                              <div class="min-w-0">
-                                <p class="truncate">{{ row.description }}</p>
-                                <p class="type-caption">
-                                  {{ date(row.occurred_at) }}
-                                  @if (row.reference) {
-                                    · {{ row.reference }}
-                                  }
-                                </p>
-                              </div>
-                              <span
-                                class="shrink-0 font-semibold tabular-nums"
-                                [class.text-success]="row.direction === 'increase'"
-                                [class.text-error]="row.direction === 'decrease'"
-                              >
-                                {{ row.direction === 'increase' ? '+' : '−'
-                                }}{{ fmtKes(row.amount) }}
-                              </span>
-                            </li>
-                          }
-                        </ol>
-                      </div>
-                    }
                   </section>
 
                   <section class="border-t border-base-300/60 pt-3">
-                    <h3 class="section-title mb-2">Credit sales</h3>
-                    @if (!cashierSession.canTakePayment() && creditOrders().length > 0) {
-                      <app-session-required-notice action="collecting a repayment" />
-                    }
+                    <h3 class="section-title mb-2">Open invoices</h3>
                     @if (creditOrders().length === 0) {
                       <app-empty-state
                         [compact]="true"
                         icon="heroCreditCard"
-                        title="No unpaid credit sales"
+                        title="No open invoices"
                       />
                     } @else {
-                      @if (perms.has('SettleOrder')) {
-                        <form
-                          (submit)="$event.preventDefault(); bulkRepay(c.id)"
-                          class="mb-3 grid gap-2 rounded-field border border-base-300 bg-base-200/50 p-2 sm:grid-cols-3"
-                        >
-                          <app-form-field label="Payment received (KES)"
-                            ><input
-                              class="input input-bordered input-sm"
-                              inputmode="numeric"
-                              [formControl]="bulkAmount"
-                          /></app-form-field>
-                          <app-form-field label="Method"
-                            ><select
-                              class="select select-bordered select-sm"
-                              [formControl]="bulkMethod"
-                            >
-                              @for (m of methods(); track m) {
-                                <option [value]="m">{{ methodOptionLabel(m) }}</option>
-                              }
-                            </select></app-form-field
-                          >
-                          <app-form-field label="Reference"
-                            ><input
-                              class="input input-bordered input-sm"
-                              [formControl]="bulkReference"
-                          /></app-form-field>
-                          <button
-                            appButton
-                            type="submit"
-                            class="sm:col-span-3 sm:justify-self-start"
-                            [disabled]="busy() || !cashierSession.canTakePayment()"
-                          >
-                            Allocate oldest first
-                          </button>
-                          @if (bulkPaymentPlan(); as plan) {
-                            <div
-                              class="sm:col-span-3 rounded-field border border-info/30 bg-info/5 p-3 text-sm"
-                              aria-live="polite"
-                            >
-                              <div class="flex flex-wrap items-start justify-between gap-2">
-                                <div>
-                                  <p class="font-semibold">How this payment will be applied</p>
-                                  <p class="type-caption mt-0.5">
-                                    Oldest invoices are cleared first.
-                                  </p>
-                                </div>
-                                <p class="shrink-0 font-semibold tabular-nums">
-                                  <app-money [amount]="plan.applied + plan.excess" /> received
-                                </p>
-                              </div>
-                              <ol class="mt-2 flex flex-wrap gap-2">
-                                @for (allocation of plan.allocations; track allocation.code) {
-                                  <li
-                                    class="rounded-field border border-base-300/70 bg-base-100 px-2 py-1 text-xs"
-                                  >
-                                    <span class="font-mono">{{ allocation.code }}</span>
-                                    · <app-money [amount]="allocation.amount" />
-                                    @if (allocation.clearsInvoice) {
-                                      <span class="text-success"> · cleared</span>
-                                    }
-                                  </li>
-                                }
-                                @if (plan.hiddenAllocations > 0) {
-                                  <li class="px-1 py-1 text-xs text-base-content/60">
-                                    +{{ plan.hiddenAllocations }} more
-                                  </li>
-                                }
-                              </ol>
-                              <div class="mt-2 grid gap-2 sm:grid-cols-2">
-                                <p class="rounded-field bg-base-100 px-2.5 py-2 text-xs">
-                                  <span class="text-base-content/60">Applied to invoices</span
-                                  ><br />
-                                  <span class="font-semibold tabular-nums">
-                                    <app-money [amount]="plan.applied" />
-                                    @if (plan.clearedInvoices > 0) {
-                                      · {{ plan.clearedInvoices }} cleared
-                                    }
-                                  </span>
-                                </p>
-                                @if (plan.excess > 0) {
-                                  <p class="rounded-field bg-info/10 px-2.5 py-2 text-xs">
-                                    <span class="text-base-content/60">Carried forward</span><br />
-                                    <span class="font-semibold tabular-nums text-info">
-                                      <app-money [amount]="plan.excess" /> as downpayment
-                                    </span>
-                                  </p>
-                                }
-                              </div>
-                            </div>
-                          }
-                        </form>
-                      }
                       <ul class="divide-y divide-base-200">
                         @for (o of creditOrders(); track o.id) {
                           <li class="py-2">
@@ -952,104 +906,7 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
                               >
                                 View
                               </button>
-                              @if (perms.has('SettleOrder')) {
-                                @if (customerDepositBalance() > 0) {
-                                  <button
-                                    appButton
-                                    variant="soft"
-                                    size="sm"
-                                    type="button"
-                                    (click)="startDepositApplication(o.id, o.outstanding)"
-                                  >
-                                    Use deposit
-                                  </button>
-                                }
-                                <button
-                                  appButton
-                                  variant="outline"
-                                  size="sm"
-                                  [disabled]="!cashierSession.canTakePayment()"
-                                  (click)="startRepay(o.id, o.outstanding)"
-                                >
-                                  Repay
-                                </button>
-                              }
                             </div>
-                            @if (repayFor() === o.id) {
-                              <form
-                                (submit)="$event.preventDefault(); repay(o.id)"
-                                class="mt-2 flex flex-wrap items-end gap-2 rounded-field border border-base-300 bg-base-200/50 p-2"
-                              >
-                                <app-form-field label="Amount (KES)">
-                                  <input
-                                    type="text"
-                                    inputmode="numeric"
-                                    class="input input-bordered input-xs w-24"
-                                    [formControl]="repayAmount"
-                                  />
-                                </app-form-field>
-                                <app-form-field label="Method">
-                                  <select
-                                    class="select select-bordered select-xs"
-                                    [formControl]="repayMethod"
-                                  >
-                                    @for (m of methods(); track m) {
-                                      <option [value]="m">{{ methodOptionLabel(m) }}</option>
-                                    }
-                                  </select>
-                                </app-form-field>
-                                <app-form-field label="Reference">
-                                  <input
-                                    type="text"
-                                    class="input input-bordered input-xs w-28"
-                                    [formControl]="repayReference"
-                                  />
-                                </app-form-field>
-                                <button
-                                  appButton
-                                  size="sm"
-                                  type="submit"
-                                  [disabled]="busy() || !cashierSession.canTakePayment()"
-                                >
-                                  Allocate
-                                </button>
-                                <button
-                                  appButton
-                                  variant="ghost"
-                                  size="sm"
-                                  type="button"
-                                  (click)="repayFor.set(null)"
-                                >
-                                  Cancel
-                                </button>
-                              </form>
-                            }
-                            @if (depositApplyFor() === o.id) {
-                              <form
-                                (submit)="$event.preventDefault(); applyDeposit(o.id)"
-                                class="mt-2 flex flex-wrap items-end gap-2 rounded-field border border-info/30 bg-info/5 p-2"
-                              >
-                                <app-form-field label="Deposit to use (KES)">
-                                  <input
-                                    class="input input-bordered input-xs w-28"
-                                    inputmode="numeric"
-                                    [formControl]="depositApplyAmount"
-                                  />
-                                </app-form-field>
-                                <button appButton size="sm" type="submit" [disabled]="busy()">
-                                  Apply
-                                </button>
-                                <button
-                                  appButton
-                                  variant="ghost"
-                                  size="sm"
-                                  type="button"
-                                  (click)="depositApplyFor.set(null)"
-                                >
-                                  Cancel
-                                </button>
-                              </form>
-                            }
                           </li>
                         }
                       </ul>
@@ -1147,6 +1004,15 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
                           {{ statementBusy() ? 'Preparing…' : 'Print' }}
                         </button>
                       </div>
+                      @if (perms.has('ManageCommunications') && statement().length > 0) {
+                        <app-customer-statement-send
+                          class="mb-3 block"
+                          [customerId]="c.id"
+                          [disabled]="statementBusy()"
+                          (sent)="notice.set($event)"
+                          (failed)="error.set($event)"
+                        />
+                      }
                       @if (statement().length === 0) {
                         <app-empty-state
                           [compact]="true"
@@ -1158,27 +1024,102 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
                           class="max-h-80 divide-y divide-base-200 overflow-y-auto print:max-h-none print:overflow-visible"
                         >
                           @for (row of statement(); track row.id) {
-                            <li class="flex items-center gap-3 py-2">
-                              <div class="min-w-0 flex-1">
-                                <p class="truncate text-sm">{{ row.description }}</p>
-                                <p class="type-caption">
-                                  {{ date(row.date) }} ·
-                                  <span class="font-mono">{{ row.reference }}</span>
-                                </p>
+                            <li class="py-2">
+                              <div class="flex items-center gap-3">
+                                <div class="min-w-0 flex-1">
+                                  <p class="truncate text-sm">{{ row.description }}</p>
+                                  <p class="type-caption">
+                                    {{ date(row.date) }} ·
+                                    <span class="font-mono">{{ row.reference }}</span>
+                                  </p>
+                                </div>
+                                <div class="shrink-0 text-right">
+                                  <p class="text-sm font-semibold tabular-nums">
+                                    {{ statementBalanceLabel(row.balance) }}
+                                  </p>
+                                  <p class="type-caption">
+                                    @if (row.debit > 0) {
+                                      charged <app-money [amount]="row.debit" direction="out" />
+                                    }
+                                    @if (row.credit > 0) {
+                                      paid <app-money [amount]="row.credit" direction="in" />
+                                    }
+                                  </p>
+                                </div>
                               </div>
-                              <div class="shrink-0 text-right">
-                                <p class="text-sm font-semibold tabular-nums">
-                                  <app-money [amount]="row.balance" />
-                                </p>
-                                <p class="type-caption">
-                                  @if (row.debit > 0) {
-                                    charged <app-money [amount]="row.debit" direction="out" />
+                              @if (row.receipt_id && row.details; as receipt) {
+                                <details
+                                  class="mt-2 rounded-field border border-base-300/70 bg-base-200/40 p-2 print:hidden"
+                                >
+                                  <summary class="cursor-pointer text-xs font-medium">
+                                    Receipt allocation
+                                  </summary>
+                                  <dl class="mt-2 grid grid-cols-2 gap-2 text-xs sm:grid-cols-3">
+                                    <div>
+                                      <dt class="text-base-content/60">Received</dt>
+                                      <dd class="font-semibold">
+                                        {{ fmtKes(receipt.amount ?? 0) }}
+                                      </dd>
+                                    </div>
+                                    <div>
+                                      <dt class="text-base-content/60">Invoices</dt>
+                                      <dd class="font-semibold">
+                                        {{ fmtKes(receipt.applied_amount ?? 0) }}
+                                      </dd>
+                                    </div>
+                                    <div>
+                                      <dt class="text-base-content/60">Downpayment</dt>
+                                      <dd class="font-semibold">
+                                        {{ fmtKes(receipt.downpayment_amount ?? 0) }}
+                                      </dd>
+                                    </div>
+                                  </dl>
+                                  @if ((receipt.allocations?.length ?? 0) > 0) {
+                                    <ul class="mt-2 flex flex-wrap gap-1.5">
+                                      @for (
+                                        allocation of receipt.allocations ?? [];
+                                        track allocation.order_id
+                                      ) {
+                                        <li class="rounded-field bg-base-100 px-2 py-1 text-xs">
+                                          <span class="font-mono">{{ allocation.order_code }}</span>
+                                          · {{ fmtKes(allocation.amount) }}
+                                        </li>
+                                      }
+                                    </ul>
                                   }
-                                  @if (row.credit > 0) {
-                                    paid <app-money [amount]="row.credit" direction="in" />
+                                  @if (
+                                    row.activity_kind === 'customer_receipt' &&
+                                    (perms.has('ReverseOrder') || perms.has('SettleOrder'))
+                                  ) {
+                                    <form
+                                      (submit)="
+                                        $event.preventDefault(); reverseReceipt(row.receipt_id!)
+                                      "
+                                      class="mt-2 flex flex-wrap items-end gap-2"
+                                    >
+                                      <app-form-field label="Reversal reason" [required]="true">
+                                        <input
+                                          class="input input-bordered input-xs"
+                                          [formControl]="receiptReversalReason"
+                                        />
+                                      </app-form-field>
+                                      <button
+                                        appButton
+                                        variant="outline"
+                                        size="sm"
+                                        type="submit"
+                                        [disabled]="busy() || !receiptReversalReason.value.trim()"
+                                      >
+                                        {{
+                                          perms.has('ReverseOrder')
+                                            ? 'Reverse receipt'
+                                            : 'Request reversal'
+                                        }}
+                                      </button>
+                                    </form>
                                   }
-                                </p>
-                              </div>
+                                </details>
+                              }
                             </li>
                           }
                         </ul>
@@ -1282,9 +1223,8 @@ export class CustomersComponent implements OnInit {
   protected readonly statementHasMore = signal(false);
   protected readonly statementBusy = signal(false);
   private statementSequence = 0;
-  private depositClientRef: string | null = null;
-  private depositApplicationClientRef: string | null = null;
   private depositRefundClientRef: string | null = null;
+  private receiptAttempt: { fingerprint: string; clientRef: string } | null = null;
   protected readonly companyInfo = signal<CompanyPrintInfo | null>(null);
   protected readonly customerApprovals = signal<Approval[]>([]);
   protected readonly pageCustomerApprovals = signal<Map<string, Approval>>(new Map());
@@ -1292,10 +1232,11 @@ export class CustomersComponent implements OnInit {
   protected readonly customerApprovalPeople = signal<Map<string, string>>(new Map());
   protected readonly highlightedApprovalId = signal<string | null>(null);
   protected readonly methods = signal<string[]>([]);
-  protected readonly repayFor = signal<string | null>(null);
-  protected readonly depositApplyFor = signal<string | null>(null);
   protected readonly customerDepositBalance = signal(0);
-  protected readonly depositActivity = signal<PrepaymentActivityRow[]>([]);
+  protected readonly lastReceiptResult = signal<Extract<
+    CustomerReceiptOutcome,
+    { status: 'completed' }
+  > | null>(null);
   protected readonly detailLoading = signal(false);
 
   protected readonly query = signal('');
@@ -1329,13 +1270,6 @@ export class CustomersComponent implements OnInit {
   protected readonly smsNotificationsEnabled = new FormControl(true, { nonNullable: true });
   protected readonly whatsappNotificationsEnabled = new FormControl(true, { nonNullable: true });
 
-  protected readonly repayAmount = new FormControl('', { nonNullable: true });
-  protected readonly repayMethod = new FormControl('cash', { nonNullable: true });
-  protected readonly repayReference = new FormControl('', { nonNullable: true });
-  protected readonly depositAmount = new FormControl('', { nonNullable: true });
-  protected readonly depositMethod = new FormControl('cash', { nonNullable: true });
-  protected readonly depositReference = new FormControl('', { nonNullable: true });
-  protected readonly depositApplyAmount = new FormControl('', { nonNullable: true });
   protected readonly depositRefundAmount = new FormControl('', { nonNullable: true });
   protected readonly depositRefundMethod = new FormControl('', { nonNullable: true });
   protected readonly depositRefundReference = new FormControl('', { nonNullable: true });
@@ -1343,6 +1277,7 @@ export class CustomersComponent implements OnInit {
   protected readonly bulkAmount = new FormControl('', { nonNullable: true });
   protected readonly bulkMethod = new FormControl('cash', { nonNullable: true });
   protected readonly bulkReference = new FormControl('', { nonNullable: true });
+  protected readonly receiptReversalReason = new FormControl('', { nonNullable: true });
   protected readonly adjustmentAmount = new FormControl('', { nonNullable: true });
   protected readonly adjustmentReason = new FormControl('', { nonNullable: true });
 
@@ -1540,12 +1475,9 @@ export class CustomersComponent implements OnInit {
   protected async openCustomer(customerId: string, updateUrl = true): Promise<void> {
     const statementSequence = ++this.statementSequence;
     this.selectedCustomerId.set(customerId);
-    this.repayFor.set(null);
-    this.depositApplyFor.set(null);
     this.customerDepositBalance.set(0);
-    this.depositActivity.set([]);
-    this.depositClientRef = null;
-    this.depositApplicationClientRef = null;
+    this.lastReceiptResult.set(null);
+    this.receiptAttempt = null;
     this.depositRefundClientRef = null;
     this.depositRefundMethod.setValue('');
     this.depositRefundReference.setValue('');
@@ -1569,10 +1501,7 @@ export class CustomersComponent implements OnInit {
       const statementRequest = this.perms.has('ViewFinancials')
         ? this.money.customerStatement(customerId, undefined, CUSTOMER_STATEMENT_PAGE_SIZE)
         : Promise.resolve({ rows: [], hasMore: false });
-      const depositActivityRequest = this.perms.has('ViewFinancials')
-        ? this.money.customerDepositActivity(customerId)
-        : Promise.resolve([]);
-      const [orders, creditOrders, statementPage, company, approvals, depositBalance, activity] =
+      const [orders, creditOrders, statementPage, company, approvals, depositBalance] =
         await Promise.all([
           this.pos.customerOrders(customerId),
           this.money.creditOrders(customerId),
@@ -1584,7 +1513,6 @@ export class CustomersComponent implements OnInit {
           this.perms.has('ViewFinancials')
             ? this.money.customerDepositAvailable(customerId)
             : Promise.resolve(0),
-          depositActivityRequest,
         ]);
       // Ignore stale results when the drawer was closed (or reopened) meanwhile.
       if (this.selectedCustomerId() !== customerId || statementSequence !== this.statementSequence)
@@ -1596,7 +1524,6 @@ export class CustomersComponent implements OnInit {
       this.companyInfo.set(company);
       this.customerApprovals.set(approvals);
       this.customerDepositBalance.set(depositBalance);
-      this.depositActivity.set(activity);
       this.customerApprovalPeople.set(
         await this.approvals.staffNames(
           approvals.flatMap(approval => [approval.requested_by, approval.decided_by])
@@ -1621,12 +1548,9 @@ export class CustomersComponent implements OnInit {
   protected closeCustomerDrawer(): void {
     this.statementSequence++;
     this.selectedCustomerId.set(null);
-    this.repayFor.set(null);
-    this.depositApplyFor.set(null);
     this.customerDepositBalance.set(0);
-    this.depositActivity.set([]);
-    this.depositClientRef = null;
-    this.depositApplicationClientRef = null;
+    this.lastReceiptResult.set(null);
+    this.receiptAttempt = null;
     this.depositRefundClientRef = null;
     this.depositRefundMethod.setValue('');
     this.depositRefundReference.setValue('');
@@ -1814,101 +1738,6 @@ export class CustomersComponent implements OnInit {
     }
   }
 
-  protected startRepay(orderId: string, total: number): void {
-    if (!this.cashierSession.canTakePayment()) {
-      this.error.set('Open a cashier session before collecting a repayment.');
-      return;
-    }
-    this.repayFor.set(orderId);
-    this.repayAmount.setValue(formatKesInput(total));
-    this.repayReference.setValue('');
-  }
-
-  protected async receiveDeposit(customerId: string): Promise<void> {
-    try {
-      await this.cashierSession.assertOpen('receiving a customer deposit');
-    } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Open a cashier session first');
-      return;
-    }
-    const amount = parseKes(this.depositAmount.value);
-    if (amount === null || amount <= 0) {
-      this.error.set('Enter a valid deposit amount');
-      return;
-    }
-    this.busy.set(true);
-    this.error.set(null);
-    try {
-      await this.money.recordCustomerDeposit({
-        customerId,
-        amount,
-        methodCode: this.depositMethod.value,
-        reference: this.depositReference.value.trim() || undefined,
-        clientRef: (this.depositClientRef ??= crypto.randomUUID()),
-      });
-      this.depositClientRef = null;
-      this.depositAmount.setValue('');
-      this.depositReference.setValue('');
-      this.notice.set('Customer deposit received');
-      try {
-        await Promise.all([
-          this.refreshCustomerDepositData(customerId),
-          this.refreshCustomerStatement(customerId),
-        ]);
-      } catch {
-        this.error.set('Deposit was received, but balances could not refresh');
-      }
-    } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Could not receive deposit');
-    } finally {
-      this.busy.set(false);
-    }
-  }
-
-  protected startDepositApplication(orderId: string, orderTotal: number): void {
-    if (this.depositApplyFor() !== orderId) this.depositApplicationClientRef = null;
-    this.depositApplyFor.set(orderId);
-    this.depositApplyAmount.setValue(
-      formatKesInput(Math.min(orderTotal, this.customerDepositBalance()))
-    );
-  }
-
-  protected async applyDeposit(orderId: string): Promise<void> {
-    const amount = parseKes(this.depositApplyAmount.value);
-    if (amount === null || amount <= 0) {
-      this.error.set('Enter a valid deposit amount');
-      return;
-    }
-    const customerId = this.selectedCustomerId();
-    if (!customerId) return;
-    this.busy.set(true);
-    this.error.set(null);
-    try {
-      await this.money.applyCustomerDeposit(
-        orderId,
-        amount,
-        (this.depositApplicationClientRef ??= crypto.randomUUID())
-      );
-      this.depositApplicationClientRef = null;
-      this.depositApplyFor.set(null);
-      this.notice.set('Customer deposit applied');
-      try {
-        await Promise.all([
-          this.refreshCustomerDepositData(customerId),
-          this.money.creditOrders(customerId).then(rows => this.creditOrders.set(rows)),
-          this.pos.customerOrders(customerId).then(rows => this.orders.set(rows)),
-          this.refreshCustomerStatement(customerId),
-        ]);
-      } catch {
-        this.error.set('Deposit was applied, but balances could not refresh');
-      }
-    } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Could not apply deposit');
-    } finally {
-      this.busy.set(false);
-    }
-  }
-
   protected async refundDeposit(customerId: string): Promise<void> {
     const amount = parseKes(this.depositRefundAmount.value);
     const reason = this.depositRefundReason.value.trim();
@@ -1954,56 +1783,12 @@ export class CustomersComponent implements OnInit {
   }
 
   private async refreshCustomerDepositData(customerId: string): Promise<void> {
-    const [balance, activity] = await Promise.all([
-      this.money.customerDepositAvailable(customerId),
-      this.perms.has('ViewFinancials')
-        ? this.money.customerDepositActivity(customerId)
-        : Promise.resolve([]),
-    ]);
+    const balance = await this.money.customerDepositAvailable(customerId);
     if (this.selectedCustomerId() !== customerId) return;
     this.customerDepositBalance.set(balance);
-    this.depositActivity.set(activity);
   }
 
-  protected async repay(orderId: string): Promise<void> {
-    try {
-      await this.cashierSession.assertOpen('collecting a repayment');
-    } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Open a cashier session first');
-      return;
-    }
-    const amount = parseKes(this.repayAmount.value);
-    if (amount === null || amount <= 0) {
-      this.error.set('Enter a valid repayment amount');
-      return;
-    }
-    this.busy.set(true);
-    this.error.set(null);
-    this.notice.set(null);
-    try {
-      await this.money.postPaymentAllocation(
-        orderId,
-        amount,
-        this.repayMethod.value,
-        this.repayReference.value.trim() || undefined
-      );
-      this.notice.set('Repayment allocated');
-      this.repayFor.set(null);
-      await this.load();
-      const current = this.customers().find(c => c.id === this.selectedCustomerId());
-      if (current) {
-        this.creditOrders.set(await this.money.creditOrders(current.id));
-        this.orders.set(await this.pos.customerOrders(current.id));
-        await this.refreshCustomerStatement(current.id);
-      }
-    } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Repayment failed');
-    } finally {
-      this.busy.set(false);
-    }
-  }
-
-  protected async bulkRepay(customerId: string): Promise<void> {
+  protected async receivePayment(customerId: string): Promise<void> {
     try {
       await this.cashierSession.assertOpen('collecting a repayment');
     } catch (error) {
@@ -2019,18 +1804,41 @@ export class CustomersComponent implements OnInit {
     this.error.set(null);
     this.notice.set(null);
     try {
-      await this.money.postCustomerPayment(
+      const fingerprint = JSON.stringify({
+        customerId,
+        amount,
+        method: this.bulkMethod.value,
+        reference: this.bulkReference.value.trim(),
+      });
+      if (this.receiptAttempt?.fingerprint !== fingerprint) {
+        this.receiptAttempt = { fingerprint, clientRef: crypto.randomUUID() };
+      }
+      const outcome = await this.money.postCustomerPayment(
         customerId,
         amount,
         this.bulkMethod.value,
-        this.bulkReference.value.trim() || undefined
+        this.bulkReference.value.trim() || undefined,
+        this.receiptAttempt.clientRef
       );
-      this.bulkAmount.setValue('');
-      this.bulkReference.setValue('');
-      this.notice.set('Payment allocated to the oldest outstanding credit sales');
-      await this.load();
-      this.creditOrders.set(await this.money.creditOrders(customerId));
-      await this.refreshCustomerStatement(customerId);
+      if (outcome.status === 'approval_required') {
+        this.notice.set('Payment sent for finance approval');
+      } else {
+        this.lastReceiptResult.set(outcome);
+        this.receiptAttempt = null;
+        this.bulkAmount.setValue('');
+        this.bulkReference.setValue('');
+        this.notice.set(
+          outcome.downpayment_amount > 0
+            ? 'Payment posted; the remainder is available as downpayment'
+            : 'Payment posted to the oldest invoices'
+        );
+        await Promise.all([
+          this.load(),
+          this.money.creditOrders(customerId).then(rows => this.creditOrders.set(rows)),
+          this.refreshCustomerStatement(customerId),
+          this.refreshCustomerDepositData(customerId),
+        ]);
+      }
     } catch (error) {
       this.error.set(error instanceof Error ? error.message : 'Payment failed');
     } finally {
@@ -2038,34 +1846,45 @@ export class CustomersComponent implements OnInit {
     }
   }
 
-  protected bulkPaymentPlan(): BulkPaymentPlan | null {
+  protected bulkPaymentPlan(): CustomerReceiptPlan | null {
     const amount = parseKes(this.bulkAmount.value);
     if (amount === null || amount <= 0) return null;
+    return planCustomerReceipt(amount, this.creditOrders());
+  }
 
-    let remaining = amount;
-    const allAllocations: BulkPaymentPlan['allocations'] = [];
-    const oldestFirst = [...this.creditOrders()].sort(
-      (a, b) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id)
-    );
-    for (const order of oldestFirst) {
-      if (remaining <= 0) break;
-      const applied = Math.min(remaining, order.outstanding);
-      allAllocations.push({
-        code: order.code,
-        amount: applied,
-        clearsInvoice: applied === order.outstanding,
-      });
-      remaining -= applied;
+  protected statementBalanceLabel(balance: number): string {
+    const state = customerAccountState(balance);
+    return balance === 0 ? state : `${state} ${formatKes(Math.abs(balance))}`;
+  }
+
+  protected async reverseReceipt(receiptId: string): Promise<void> {
+    const reason = this.receiptReversalReason.value.trim();
+    if (!reason) return;
+    const customerId = this.selectedCustomerId();
+    if (!customerId) return;
+    this.busy.set(true);
+    this.error.set(null);
+    try {
+      const outcome = await this.money.reverseCustomerReceipt(receiptId, reason);
+      this.receiptReversalReason.setValue('');
+      this.notice.set(
+        outcome.status === 'approval_required'
+          ? 'Receipt reversal sent for approval'
+          : 'Receipt reversed'
+      );
+      if (outcome.status === 'completed') {
+        await Promise.all([
+          this.load(),
+          this.money.creditOrders(customerId).then(rows => this.creditOrders.set(rows)),
+          this.refreshCustomerStatement(customerId),
+          this.refreshCustomerDepositData(customerId),
+        ]);
+      }
+    } catch (error) {
+      this.error.set(error instanceof Error ? error.message : 'Receipt could not be reversed');
+    } finally {
+      this.busy.set(false);
     }
-
-    if (allAllocations.length <= 1 && remaining === 0) return null;
-    return {
-      applied: amount - remaining,
-      excess: remaining,
-      allocations: allAllocations.slice(0, 3),
-      hiddenAllocations: Math.max(allAllocations.length - 3, 0),
-      clearedInvoices: allAllocations.filter(allocation => allocation.clearsInvoice).length,
-    };
   }
 
   protected async adjustBalance(customerId: string): Promise<void> {
@@ -2225,11 +2044,16 @@ export class CustomersComponent implements OnInit {
     return Math.max(0, customer.credit_limit - customer.ar_balance);
   }
 
-  protected customerNetPosition(customer: CustomerWithAr): string {
-    const net = customer.ar_balance - this.customerDepositBalance();
-    if (net > 0) return `Net: customer owes us ${formatKes(net)}`;
-    if (net < 0) return `Net: we hold ${formatKes(-net)} for customer`;
-    return 'Net position settled';
+  protected customerOutstanding(): number {
+    return this.creditOrders().reduce((sum, order) => sum + order.outstanding, 0);
+  }
+
+  protected customerAccountLabel(): string {
+    const net =
+      this.selectedCustomer()?.net_balance ??
+      this.customerOutstanding() - this.customerDepositBalance();
+    const state = customerAccountState(net);
+    return net === 0 ? state : `${state} ${formatKes(Math.abs(net))}`;
   }
 
   protected approvalTone(status: Approval['status']): BadgeType {

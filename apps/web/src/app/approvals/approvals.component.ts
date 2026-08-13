@@ -40,6 +40,7 @@ const TYPE_BADGE: Record<string, string> = {
   external_account_payment: 'badge-warning',
   sale_refund: 'badge-warning',
   payment_reversal: 'badge-error',
+  customer_receipt_reversal: 'badge-error',
 };
 
 @Component({
@@ -106,6 +107,10 @@ const TYPE_BADGE: Record<string, string> = {
           <p><span class="font-semibold">sale refund</span> — a refund needs sign-off.</p>
           <p>
             <span class="font-semibold">payment reversal</span> — a settled payment needs sign-off.
+          </p>
+          <p>
+            <span class="font-semibold">receipt reversal</span> — reverses every allocation in one
+            customer receipt.
           </p>
           <p>
             <span class="font-semibold">overdraft</span> — a record of who authorized credit over
@@ -367,7 +372,12 @@ export class ApprovalsComponent implements OnInit {
       value: this.approvals
         .pending()
         .filter(approval =>
-          ['order_reversal', 'sale_refund', 'payment_reversal'].includes(approval.type)
+          [
+            'order_reversal',
+            'sale_refund',
+            'payment_reversal',
+            'customer_receipt_reversal',
+          ].includes(approval.type)
         ).length,
       tone: 'error' as const,
       mobilePriority: 'secondary' as const,
@@ -519,8 +529,11 @@ export class ApprovalsComponent implements OnInit {
       order_total?: number;
       credit_limit?: number;
       payment_id?: string;
+      receipt_id?: string;
+      customer_id?: string;
       amount?: number;
       method_code?: string;
+      reference?: string;
       projected_balance?: number;
       previous?: { credit_limit: number; is_credit_approved: boolean; credit_terms_days: number };
       proposed?: { credit_limit: number; is_credit_approved: boolean; credit_terms_days: number };
@@ -533,7 +546,12 @@ export class ApprovalsComponent implements OnInit {
         return `Refund ${formatKes(meta.amount ?? 0)} from ${code ?? 'order'} via ${meta.method_code ?? 'payment method'}${meta.reason ? ` — ${meta.reason}` : ''}`;
       case 'payment_reversal':
         return `Reverse payment …${meta.payment_id?.slice(-8) ?? ''} on ${code ?? 'order'}${meta.reason ? ` — ${meta.reason}` : ''}`;
+      case 'customer_receipt_reversal':
+        return `Reverse full receipt ${formatKes(meta.amount ?? 0)}${meta.reference ? ` · ref ${meta.reference}` : ''}${meta.reason ? ` — ${meta.reason}` : ''}`;
       case 'external_account_payment': {
+        if (a.subject_type === 'customer_receipt') {
+          return `Receive ${formatKes(meta.amount ?? 0)} via ${meta.method_code ?? 'payment method'}${meta.reference ? ` · ref ${meta.reference}` : ''}`;
+        }
         const tenders = (meta.tenders ?? [])
           .map(
             t => `${t.method} ${formatKes(t.amount)}${t.reference ? ` (ref ${t.reference})` : ''}`

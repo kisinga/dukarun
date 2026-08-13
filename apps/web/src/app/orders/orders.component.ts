@@ -584,7 +584,14 @@ const SALE_SORT_OPTIONS: readonly ListSortOption[] = [
                             p.status === 'settled' &&
                             permissions.actionMode('payment.reverse') !== 'blocked'
                           ) {
-                            @if (isPending('payment_reversal', p.id)) {
+                            @if (
+                              isPending(
+                                p.customer_receipt_id
+                                  ? 'customer_receipt_reversal'
+                                  : 'payment_reversal',
+                                p.customer_receipt_id ?? p.id
+                              )
+                            ) {
                               <span class="badge badge-warning badge-xs">Approval pending</span>
                             } @else if (reversingPaymentId() !== p.id) {
                               <button
@@ -594,14 +601,16 @@ const SALE_SORT_OPTIONS: readonly ListSortOption[] = [
                               >
                                 {{
                                   permissions.actionMode('payment.reverse') === 'execute'
-                                    ? 'Reverse'
+                                    ? p.customer_receipt_id
+                                      ? 'Reverse receipt'
+                                      : 'Reverse'
                                     : 'Request reversal'
                                 }}
                               </button>
                             } @else {
                               <form
                                 class="flex items-center gap-1"
-                                (submit)="$event.preventDefault(); reversePayment(p.id)"
+                                (submit)="$event.preventDefault(); reversePayment(p)"
                               >
                                 <input
                                   class="input input-bordered input-xs w-40"
@@ -1382,17 +1391,26 @@ export class OrdersComponent implements OnInit, OnDestroy {
     this.paymentReversalReason.setValue('');
   }
 
-  protected async reversePayment(paymentId: string): Promise<void> {
+  protected async reversePayment(payment: Payment): Promise<void> {
     const reason = this.paymentReversalReason.value.trim();
     if (!reason) return;
     this.busy.set(true);
     this.error.set(null);
     try {
-      const result = await this.money.reversePayment(paymentId, reason);
+      const result = payment.customer_receipt_id
+        ? await this.money.reverseCustomerReceipt(payment.customer_receipt_id, reason)
+        : await this.money.reversePayment(payment.id, reason);
       this.reversingPaymentId.set(null);
       if (result.status === 'approval_required') {
-        this.addPending('payment_reversal', paymentId);
-        this.warning.set('Payment reversal request sent for approval');
+        this.addPending(
+          payment.customer_receipt_id ? 'customer_receipt_reversal' : 'payment_reversal',
+          payment.customer_receipt_id ?? payment.id
+        );
+        this.warning.set(
+          payment.customer_receipt_id
+            ? 'Whole receipt reversal sent for approval'
+            : 'Payment reversal request sent for approval'
+        );
       }
       const orderId = this.selectedOrderId();
       if (orderId) {
