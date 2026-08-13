@@ -46,12 +46,18 @@ jobs:
 
       - name: Start ephemeral local stack
         run: |
-          supabase start -o json > "$RUNNER_TEMP/supabase.json"
-          jq -r '
-            "SUPABASE_URL=\(.API_URL)",
-            "SUPABASE_ANON_KEY=\(.ANON_KEY)",
-            "SUPABASE_SERVICE_ROLE_KEY=\(.SERVICE_ROLE_KEY)"
-          ' "$RUNNER_TEMP/supabase.json" >> "$GITHUB_ENV"
+          supabase_raw="$RUNNER_TEMP/supabase-start.env"
+          supabase_env="$RUNNER_TEMP/supabase-github.env"
+          supabase start -o env > "$supabase_raw"
+          sed -nE \
+            -e 's/^API_URL="(.*)"$/SUPABASE_URL=\1/p' \
+            -e 's/^ANON_KEY="(.*)"$/SUPABASE_ANON_KEY=\1/p' \
+            -e 's/^SERVICE_ROLE_KEY="(.*)"$/SUPABASE_SERVICE_ROLE_KEY=\1/p' \
+            "$supabase_raw" > "$supabase_env"
+          grep -q '^SUPABASE_URL=.' "$supabase_env"
+          grep -q '^SUPABASE_ANON_KEY=.' "$supabase_env"
+          grep -q '^SUPABASE_SERVICE_ROLE_KEY=.' "$supabase_env"
+          sed -n 'p' "$supabase_env" >> "$GITHUB_ENV"
 
       - name: Lint migrations
         # pgtap's own extension functions produce false positives; lint our schema only.
