@@ -1123,31 +1123,61 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
                         }
                       }
                       @if (perms.has('OverrideCustomerBalance')) {
-                        <form
-                          (submit)="$event.preventDefault(); adjustBalance(c.id)"
-                          class="mt-3 flex flex-wrap items-end gap-2"
-                        >
-                          <app-form-field label="Balance adjustment (KES)"
-                            ><input
-                              class="input input-bordered input-sm w-32"
-                              placeholder="Use - to reduce"
-                              [formControl]="adjustmentAmount"
-                          /></app-form-field>
-                          <app-form-field label="Reason"
-                            ><input
-                              class="input input-bordered input-sm"
-                              [formControl]="adjustmentReason"
-                          /></app-form-field>
-                          <button
-                            appButton
-                            variant="outline"
-                            size="sm"
-                            type="submit"
-                            [disabled]="busy()"
+                        <div class="mt-3 border-t border-base-300/60 pt-3">
+                          <h3 class="section-title mb-1">Adjust customer balance</h3>
+                          <p class="type-caption">
+                            Correct what this customer owes without recording a sale or payment.
+                          </p>
+                          <form
+                            (submit)="$event.preventDefault(); adjustBalance(c)"
+                            class="mt-2 grid gap-2 sm:grid-cols-2"
                           >
-                            Post adjustment
-                          </button>
-                        </form>
+                            <app-form-field label="Adjustment">
+                              <select
+                                class="select select-bordered select-sm w-full"
+                                [formControl]="adjustmentDirection"
+                              >
+                                <option value="increase">Increase amount owed</option>
+                                <option value="decrease">Reduce amount owed</option>
+                              </select>
+                            </app-form-field>
+                            <app-form-field label="Amount (KES)">
+                              <input
+                                type="text"
+                                inputmode="numeric"
+                                class="input input-bordered input-sm w-full"
+                                [formControl]="adjustmentAmount"
+                              />
+                            </app-form-field>
+                            <app-form-field label="Reason" [required]="true">
+                              <input
+                                type="text"
+                                maxlength="500"
+                                class="input input-bordered input-sm w-full"
+                                placeholder="Why is this correction needed?"
+                                [formControl]="adjustmentReason"
+                              />
+                            </app-form-field>
+                            <div class="flex flex-col items-start justify-end gap-1">
+                              @let adjustmentPreview = customerAdjustmentPreview(c);
+                              @if (adjustmentPreview !== null) {
+                                <p class="type-caption">
+                                  Balance after adjustment:
+                                  <strong>{{ fmtKes(adjustmentPreview) }}</strong>
+                                </p>
+                              }
+                              <button
+                                appButton
+                                variant="outline"
+                                type="submit"
+                                [loading]="busy()"
+                                [disabled]="busy()"
+                              >
+                                Post adjustment
+                              </button>
+                            </div>
+                          </form>
+                        </div>
                       }
                     </section>
                   }
@@ -1263,6 +1293,9 @@ export class CustomersComponent implements OnInit {
   protected readonly bulkMethod = new FormControl('cash', { nonNullable: true });
   protected readonly bulkReference = new FormControl('', { nonNullable: true });
   protected readonly receiptReversalReason = new FormControl('', { nonNullable: true });
+  protected readonly adjustmentDirection = new FormControl<'increase' | 'decrease'>('increase', {
+    nonNullable: true,
+  });
   protected readonly adjustmentAmount = new FormControl('', { nonNullable: true });
   protected readonly adjustmentReason = new FormControl('', { nonNullable: true });
 
@@ -1466,6 +1499,9 @@ export class CustomersComponent implements OnInit {
     this.depositRefundClientRef = null;
     this.depositRefundMethod.setValue('');
     this.depositRefundReference.setValue('');
+    this.adjustmentDirection.setValue('increase');
+    this.adjustmentAmount.setValue('');
+    this.adjustmentReason.setValue('');
     this.orders.set([]);
     this.creditOrders.set([]);
     this.statement.set([]);
@@ -1539,6 +1575,9 @@ export class CustomersComponent implements OnInit {
     this.depositRefundClientRef = null;
     this.depositRefundMethod.setValue('');
     this.depositRefundReference.setValue('');
+    this.adjustmentDirection.setValue('increase');
+    this.adjustmentAmount.setValue('');
+    this.adjustmentReason.setValue('');
     this.detailLoading.set(false);
     this.creating.set(false);
     this.drawerEditing.set(false);
@@ -1872,27 +1911,36 @@ export class CustomersComponent implements OnInit {
     }
   }
 
-  protected async adjustBalance(customerId: string): Promise<void> {
-    const raw = Number(this.adjustmentAmount.value.replace(/,/g, '').trim());
-    const amount = Math.round(raw);
-    if (!Number.isFinite(amount) || amount === 0 || !this.adjustmentReason.value.trim()) {
-      this.error.set('Enter a non-zero adjustment and a reason');
+  protected customerAdjustmentPreview(customer: CustomerWithAr): number | null {
+    const amount = parseKes(this.adjustmentAmount.value);
+    if (amount === null || amount <= 0) return null;
+    if (this.adjustmentDirection.value === 'decrease' && amount > customer.ar_balance) return null;
+    return customer.ar_balance + (this.adjustmentDirection.value === 'increase' ? amount : -amount);
+  }
+
+  protected async adjustBalance(customer: CustomerWithAr): Promise<void> {
+    const amount = parseKes(this.adjustmentAmount.value);
+    const reason = this.adjustmentReason.value.trim();
+    if (amount === null || amount <= 0 || !reason) {
+      this.error.set('Enter a positive adjustment amount and a reason');
+      return;
+    }
+    if (this.adjustmentDirection.value === 'decrease' && amount > customer.ar_balance) {
+      this.error.set('The reduction cannot exceed the amount owed by this customer');
       return;
     }
     this.busy.set(true);
     this.error.set(null);
     this.notice.set(null);
     try {
-      await this.money.adjustCustomerBalance(
-        customerId,
-        amount,
-        this.adjustmentReason.value.trim()
-      );
+      const signedAmount = this.adjustmentDirection.value === 'increase' ? amount : -amount;
+      await this.money.adjustCustomerBalance(customer.id, signedAmount, reason);
+      this.adjustmentDirection.setValue('increase');
       this.adjustmentAmount.setValue('');
       this.adjustmentReason.setValue('');
-      this.notice.set('Amount owed to us adjusted');
+      this.notice.set(`Customer balance adjusted by ${this.fmtKes(amount)}.`);
       await this.load();
-      await this.refreshCustomerStatement(customerId);
+      await this.refreshCustomerStatement(customer.id);
     } catch (error) {
       this.error.set(error instanceof Error ? error.message : 'Adjustment failed');
     } finally {
