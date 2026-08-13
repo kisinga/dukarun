@@ -1,5 +1,12 @@
+import { Component, inject } from '@angular/core';
+import { TestBed } from '@angular/core/testing';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { PrintService } from './print.service';
+
+@Component({ template: '' })
+class PrintServiceHostComponent {
+  readonly printService = inject(PrintService);
+}
 
 describe('PrintService', () => {
   afterEach(() => {
@@ -7,7 +14,12 @@ describe('PrintService', () => {
   });
 
   it('prints through an isolated document and blocks overlapping preparation', async () => {
-    const service = new PrintService();
+    await TestBed.configureTestingModule({
+      imports: [PrintServiceHostComponent],
+    }).compileComponents();
+    const fixture = TestBed.createComponent(PrintServiceHostComponent);
+    fixture.detectChanges();
+    const service = fixture.componentInstance.printService;
     const firstPrint = service.printDocument(
       'Statement <Amina>',
       '<main class="print-template">Statement body</main>',

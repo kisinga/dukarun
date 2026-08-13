@@ -9,12 +9,12 @@ import { PoweredByDukarunComponent } from './powered-by-dukarun.component';
   imports: [PoweredByDukarunComponent],
   template: `
     <main class="min-h-screen bg-base-200 p-4 py-8 print:bg-white print:p-0">
-      <div class="mx-auto max-w-2xl">
+      <div class="mx-auto max-w-2xl print:max-w-none">
         @if (loading()) {
           <p class="py-16 text-center text-sm text-base-content/60">Loading document…</p>
         } @else if (document(); as d) {
-          <section class="card bg-base-100 shadow-sm print:shadow-none">
-            <div class="card-body p-5 sm:p-8">
+          <section class="card bg-base-100 shadow-sm print:border-0 print:shadow-none">
+            <div class="card-body p-5 sm:p-8 print:p-0">
               <div class="flex items-start justify-between gap-4">
                 <div class="flex items-center gap-3">
                   @if (logoUrl(d.company_logo_path); as logo) {
@@ -68,7 +68,7 @@ import { PoweredByDukarunComponent } from './powered-by-dukarun.component';
                 </span>
               </div>
 
-              <div class="mt-5 overflow-x-auto">
+              <div class="mt-5 overflow-x-auto print:overflow-visible">
                 <table class="table table-sm">
                   <thead>
                     <tr>
@@ -111,7 +111,7 @@ import { PoweredByDukarunComponent } from './powered-by-dukarun.component';
                   <p class="mt-1 whitespace-pre-wrap text-base-content/70">{{ d.notes }}</p>
                 </div>
               }
-              <p class="mt-6 text-xs text-base-content/50">
+              <p class="mt-6 text-xs text-base-content/50 print:hidden">
                 Read-only snapshot · secure link expires {{ date(d.expires_at) }}
               </p>
             </div>
@@ -124,7 +124,7 @@ import { PoweredByDukarunComponent } from './powered-by-dukarun.component';
             </p>
           </section>
         }
-        <p class="mt-6 text-center text-xs text-base-content/50">
+        <p class="mt-6 text-center text-xs text-base-content/50 print:hidden">
           <app-powered-by-dukarun />
           <span aria-hidden="true"> · </span>
           <a [href]="legalUrl('privacy')" class="link link-hover">Privacy</a>
@@ -133,6 +133,28 @@ import { PoweredByDukarunComponent } from './powered-by-dukarun.component';
         </p>
       </div>
     </main>
+  `,
+  styles: `
+    @page {
+      size: A4 portrait;
+      margin: 14mm;
+    }
+
+    @media print {
+      :host {
+        color: #111;
+      }
+
+      .rounded-box {
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+
+      th,
+      td {
+        overflow-wrap: anywhere;
+      }
+    }
   `,
 })
 export class DocumentComponent implements OnInit {

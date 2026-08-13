@@ -159,9 +159,27 @@ export class PrintService {
                         }
                         ${styles}
                         @media print {
+                            html,
                             body {
                                 margin: 0;
                                 padding: 0;
+                                background: #fff;
+                                color: #000;
+                            }
+                            .print-template {
+                                print-color-adjust: exact;
+                                -webkit-print-color-adjust: exact;
+                            }
+                            thead {
+                                display: table-header-group;
+                            }
+                            tfoot {
+                                display: table-footer-group;
+                            }
+                            tr,
+                            img {
+                                break-inside: avoid;
+                                page-break-inside: avoid;
                             }
                             .no-print {
                                 display: none !important;
