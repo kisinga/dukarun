@@ -4,26 +4,13 @@ import '@fontsource/outfit/600.css';
 import '@fontsource/outfit/700.css';
 import { Composition } from 'remotion';
 import creditScriptJson from '../projects/credit-communications/script.json';
-import creditVoiceJson from '../projects/credit-communications/voice.json';
 import overviewScriptJson from '../projects/product-overview/script.json';
-import overviewVoiceJson from '../projects/product-overview/voice.json';
 import saleRecordsScriptJson from '../projects/sale-records/script.json';
-import saleRecordsVoiceJson from '../projects/sale-records/voice.json';
 import stockDecisionsScriptJson from '../projects/stock-decisions/script.json';
-import stockDecisionsVoiceJson from '../projects/stock-decisions/voice.json';
 import { FORMAT_CONFIG } from './brand';
 import { PilotVideo } from './pilot-video';
-import { CompositionPropsSchema, ScriptManifestSchema, VoiceRuntimeSchema, type RenderTarget } from './schema';
+import { CompositionPropsSchema, ScriptManifestSchema, type RenderTarget } from './schema';
 import './styles.css';
-
-const voices = new Map(
-  [overviewVoiceJson, saleRecordsVoiceJson, creditVoiceJson, stockDecisionsVoiceJson].map(
-    voice => {
-      const parsed = VoiceRuntimeSchema.parse(voice);
-      return [parsed.projectId, parsed];
-    }
-  )
-);
 
 const manifests = [
   overviewScriptJson,
@@ -58,7 +45,7 @@ export function VideoRoot() {
                 manifest,
                 target,
                 review: false,
-                voice: voices.get(manifest.projectId) ?? null,
+                voice: null,
               }}
             />
           );

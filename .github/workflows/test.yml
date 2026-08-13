@@ -111,6 +111,12 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - name: Start local Supabase
-        run: supabase start
+        run: |
+          supabase start -o json > "$RUNNER_TEMP/supabase.json"
+          jq -r '
+            "SUPABASE_URL=\(.API_URL)",
+            "SUPABASE_ANON_KEY=\(.ANON_KEY)",
+            "SUPABASE_SERVICE_ROLE_KEY=\(.SERVICE_ROLE_KEY)"
+          ' "$RUNNER_TEMP/supabase.json" >> "$GITHUB_ENV"
       - run: npm run test:api
       - run: npm run test:e2e:critical
