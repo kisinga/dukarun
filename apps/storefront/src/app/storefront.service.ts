@@ -28,8 +28,24 @@ export interface CustomerStatement {
   payment_instructions: string | null;
   customer_first_name: string;
   outstanding_total: number;
+  amount_due: number;
+  downpayment_available: number;
+  account_balance: number;
   expires_at: string;
   orders: Array<{ code: string; sale_date: string; due_date: string; balance: number }>;
+  activities: Array<{
+    id: string;
+    date: string;
+    kind: string;
+    description?: string;
+    reference: string;
+    debit?: number;
+    credit?: number;
+    balance?: number;
+    amount: number;
+    direction: 'charge' | 'payment';
+  }>;
+  activity_has_more?: boolean;
 }
 export interface ExternalDocumentLine {
   description: string;
@@ -344,10 +360,16 @@ export class StorefrontService {
     return `${environment.sitePublicUrl.replace(/\/$/, '')}/${path}`;
   }
 
-  async customerStatement(token: string): Promise<CustomerStatement | null> {
+  async customerStatement(
+    token: string,
+    cursor?: { date: string; id: string }
+  ): Promise<CustomerStatement | null> {
     return this.track(async () => {
       const { data, error } = await this.client.rpc('public_customer_statement', {
         p_token: token,
+        p_before_date: cursor?.date,
+        p_before_id: cursor?.id,
+        p_limit: 25,
       });
       if (error) throw error;
       return data as unknown as CustomerStatement | null;

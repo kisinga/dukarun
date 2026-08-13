@@ -101,8 +101,19 @@ export interface EnabledPaymentMethod {
 
 /** post_sale_at_location result (jsonb since migration 0054). */
 export type PostSaleResult =
-  | { status: 'completed' | 'parked'; orderId: string }
-  | { status: 'approval_required'; orderId: string; approvalId: string };
+  | {
+      status: 'completed' | 'parked';
+      orderId: string;
+      downpaymentApplied?: number;
+      creditAmount?: number;
+    }
+  | {
+      status: 'approval_required';
+      orderId: string;
+      approvalId: string;
+      downpaymentApplied?: number;
+      creditAmount?: number;
+    };
 
 export type VoidResult = ActionOutcome;
 
@@ -779,6 +790,43 @@ export class PosService {
     return result.status === 'approval_required'
       ? { status: 'approval_required', orderId: result.order_id, approvalId: result.approval_id! }
       : { status: 'completed', orderId: result.order_id };
+  }
+
+  async postCreditSale(
+    customerId: string,
+    lines: SaleLineInput[],
+    clientRef: string,
+    draftId?: string,
+    approvalReason?: string
+  ): Promise<PostSaleResult> {
+    const { data, error } = await this.client.rpc('post_credit_sale_at_location', {
+      p_location_id: this.locations.requireActiveId(),
+      p_customer_id: customerId,
+      p_lines: lines as unknown as Json,
+      p_client_ref: clientRef,
+      ...(draftId ? { p_draft_id: draftId } : {}),
+      ...(approvalReason ? { p_approval_reason: approvalReason } : {}),
+    });
+    if (error) throw rpcError(error);
+    const result = data as unknown as {
+      status: string;
+      order_id: string;
+      approval_id?: string;
+      downpayment_applied: number;
+      credit_amount: number;
+    };
+    const split = {
+      downpaymentApplied: Number(result.downpayment_applied ?? 0),
+      creditAmount: Number(result.credit_amount ?? 0),
+    };
+    return result.status === 'approval_required'
+      ? {
+          status: 'approval_required',
+          orderId: result.order_id,
+          approvalId: result.approval_id!,
+          ...split,
+        }
+      : { status: 'completed', orderId: result.order_id, ...split };
   }
 
   private async withLocationStock(rows: Variant[]): Promise<Variant[]> {

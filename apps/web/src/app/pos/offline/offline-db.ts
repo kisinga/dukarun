@@ -18,6 +18,8 @@ type Customer = Database['public']['Tables']['customers']['Row'];
 
 export type CachedCustomer = Customer & {
   ar_balance: number;
+  downpayment_balance: number;
+  net_balance: number;
   days_outstanding: number | null;
   bucket: string | null;
 };

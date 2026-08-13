@@ -984,7 +984,7 @@ type CatalogView = 'grid' | 'list' | 'categories';
               <div class="min-w-0 flex-1">
                 <h2 id="credit-confirm-heading" class="type-title">Confirm credit sale</h2>
                 <p class="type-caption mt-0.5">
-                  The amount will be added to this customer's balance.
+                  Available downpayment is applied first. Only the remainder becomes credit.
                 </p>
               </div>
               <button
@@ -1023,7 +1023,7 @@ type CatalogView = 'grid' | 'list' | 'categories';
                         class="mt-0.5 font-semibold tabular-nums"
                         [class.text-warning]="creditExceedsLimit()"
                       >
-                        <app-money [amount]="customer.ar_balance + cart.total()" />
+                        <app-money [amount]="customer.ar_balance + automaticCreditAmount()" />
                       </dd>
                     </div>
                     <div class="text-right">
@@ -1034,6 +1034,23 @@ type CatalogView = 'grid' | 'list' | 'categories';
                     </div>
                   </dl>
                 }
+
+                <dl
+                  class="mt-3 grid grid-cols-2 gap-3 rounded-field border border-info/25 bg-info/5 p-3 text-sm"
+                >
+                  <div>
+                    <dt class="type-caption">Downpayment applied</dt>
+                    <dd class="mt-0.5 font-semibold tabular-nums text-info">
+                      <app-money [amount]="automaticDownpayment()" />
+                    </dd>
+                  </div>
+                  <div class="text-right">
+                    <dt class="type-caption">Added to amount due</dt>
+                    <dd class="mt-0.5 font-semibold tabular-nums">
+                      <app-money [amount]="automaticCreditAmount()" />
+                    </dd>
+                  </div>
+                </dl>
 
                 @if (creditApprovalRequired()) {
                   <div role="status" class="alert alert-warning mt-3 text-sm">
@@ -1286,17 +1303,24 @@ export class SellComponent implements OnInit {
   protected readonly brokenImages = signal<Set<string>>(new Set());
   protected readonly creditAllowed = computed(() => {
     const customer = this.selectedCustomer();
-    if (!customer?.is_credit_approved) return false;
+    if (!customer || (!customer.is_credit_approved && this.automaticCreditAmount() > 0))
+      return false;
     return (
       !this.creditExceedsLimit() || this.perms.actionMode('sale.credit_over_limit') !== 'blocked'
     );
   });
+  protected readonly automaticDownpayment = computed(() =>
+    Math.min(this.customerDepositBalance(), this.cart.total())
+  );
+  protected readonly automaticCreditAmount = computed(() =>
+    Math.max(this.cart.total() - this.automaticDownpayment(), 0)
+  );
   protected readonly creditExceedsLimit = computed(() => {
     const customer = this.selectedCustomer();
     return (
       !!customer &&
       customer.credit_limit > 0 &&
-      customer.ar_balance + this.cart.total() > customer.credit_limit
+      customer.ar_balance + this.automaticCreditAmount() > customer.credit_limit
     );
   });
   protected readonly creditApprovalRequired = computed(
@@ -1932,10 +1956,61 @@ export class SellComponent implements OnInit {
     const reason = this.creditApprovalReason.value.trim();
     if (this.creditApprovalRequired() && !reason) return;
     this.creditConfirmOpen.set(false);
-    // Credit sale: no tenders — the backend books it against the customer's
-    // credit (the same payload the old credit tab emitted).
-    void this.completeSale([], reason || undefined);
+    void this.completeCreditSale(reason || undefined);
     this.creditApprovalReason.setValue('');
+  }
+
+  private async completeCreditSale(approvalReason?: string): Promise<void> {
+    const customerId = this.cart.customerId();
+    if (!customerId) return;
+    this.error.set(null);
+    this.notice.set(null);
+    this.success.set(null);
+    if (!this.connectivity.online()) {
+      this.error.set('Credit sales require an online balance check.');
+      return;
+    }
+    try {
+      await this.cashierSession.assertOpen('completing a credit sale');
+    } catch (error) {
+      this.error.set(error instanceof Error ? error.message : 'Open a cashier session first');
+      return;
+    }
+    const lines = this.cart.toSaleLines();
+    const fingerprint = JSON.stringify({ customerId, lines, kind: 'automatic-credit' });
+    if (this.saleAttempt?.fingerprint !== fingerprint) {
+      this.saleAttempt = { fingerprint, clientRef: crypto.randomUUID() };
+    }
+    this.busy.set(true);
+    try {
+      const result = await this.pos.postCreditSale(
+        customerId,
+        lines,
+        this.saleAttempt.clientRef,
+        this.cart.draftId() ?? undefined,
+        approvalReason
+      );
+      this.cart.clear();
+      this.saleAttempt = null;
+      this.selectedCustomer.set(null);
+      this.customerDepositBalance.set(0);
+      if (result.status === 'approval_required') {
+        this.showApprovalSent();
+      } else {
+        const split = result.downpaymentApplied
+          ? ` · ${result.downpaymentApplied.toLocaleString('en-KE')} downpayment applied`
+          : '';
+        this.success.set({
+          text: `Sale completed${split}`,
+          tone: 'success',
+          orderId: result.orderId,
+        });
+      }
+    } catch (error) {
+      this.error.set(error instanceof Error ? error.message : 'Credit sale could not complete');
+    } finally {
+      this.busy.set(false);
+    }
   }
 
   /** Timed toast for approval-held orders (mirrors the price-floor toast). */
