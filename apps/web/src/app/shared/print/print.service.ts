@@ -28,6 +28,7 @@ export class PrintService {
   ]);
 
   private readonly a4PurchaseTemplate = new A4PurchaseTemplate();
+  private preparingDocument = false;
 
   readonly format = signal<PrintFormat>(this.loadFormat());
 
@@ -105,11 +106,30 @@ export class PrintService {
   }
 
   /** Shared hidden-iframe print orchestration for receipts, documents, and labels. */
-  printDocument(title: string, html: string, styles: string): Promise<void> {
+  async printDocument(title: string, html: string, styles: string): Promise<void> {
+    if (this.preparingDocument) {
+      throw new Error('Another document is already being prepared for printing.');
+    }
+    this.preparingDocument = true;
+
+    try {
+      await this.prepareAndPrintDocument(title, html, styles);
+    } finally {
+      this.preparingDocument = false;
+    }
+  }
+
+  private async prepareAndPrintDocument(
+    title: string,
+    html: string,
+    styles: string
+  ): Promise<void> {
     let printFrame = document.getElementById('print-frame') as HTMLIFrameElement;
     if (!printFrame) {
       printFrame = document.createElement('iframe');
       printFrame.id = 'print-frame';
+      printFrame.setAttribute('aria-hidden', 'true');
+      printFrame.tabIndex = -1;
       printFrame.style.position = 'absolute';
       printFrame.style.width = '0';
       printFrame.style.height = '0';
@@ -118,31 +138,11 @@ export class PrintService {
       document.body.appendChild(printFrame);
     }
 
-    return new Promise<void>((resolve, reject) => {
-      let printed = false;
-      const doPrint = () => {
-        if (printed) return;
-        printed = true;
-        try {
-          const win = printFrame.contentWindow;
-          if (win) {
-            win.focus();
-            win.print();
-          }
-          resolve();
-        } catch (error) {
-          reject(error);
-        }
-      };
+    const iframeDoc = printFrame.contentDocument || printFrame.contentWindow?.document;
+    if (!iframeDoc) throw new Error('Failed to access iframe document');
 
-      const iframeDoc = printFrame.contentDocument || printFrame.contentWindow?.document;
-      if (!iframeDoc) {
-        reject(new Error('Failed to access iframe document'));
-        return;
-      }
-
-      iframeDoc.open();
-      iframeDoc.write(`
+    iframeDoc.open();
+    iframeDoc.write(`
                 <!DOCTYPE html>
                 <html>
                 <head>
@@ -183,20 +183,58 @@ export class PrintService {
                 </body>
                 </html>
             `);
-      iframeDoc.close();
+    iframeDoc.close();
 
-      const printWindow = printFrame.contentWindow;
-      if (!printWindow) {
-        reject(new Error('Failed to access iframe window'));
-        return;
-      }
+    const printWindow = printFrame.contentWindow;
+    if (!printWindow) throw new Error('Failed to access iframe window');
 
-      printWindow.onload = () => setTimeout(doPrint, 250);
-      setTimeout(() => {
-        if (!printed && printWindow.document.readyState === 'complete') {
-          doPrint();
+    await this.waitForDocument(printWindow);
+    await this.waitForAssets(printWindow.document);
+    await new Promise<void>(resolve => printWindow.setTimeout(resolve, 0));
+    printWindow.focus();
+    printWindow.print();
+  }
+
+  private async waitForDocument(printWindow: Window): Promise<void> {
+    if (printWindow.document.readyState === 'complete') return;
+    await this.withTimeout(
+      new Promise<void>(resolve => {
+        printWindow.addEventListener('load', () => resolve(), { once: true });
+      }),
+      2_000
+    );
+  }
+
+  private async waitForAssets(printDocument: Document): Promise<void> {
+    const imagePromises = Array.from(printDocument.images)
+      .filter(image => !image.complete)
+      .map(
+        image =>
+          new Promise<void>(resolve => {
+            image.addEventListener('load', () => resolve(), { once: true });
+            image.addEventListener('error', () => resolve(), { once: true });
+          })
+      );
+    const fontsPromise = printDocument.fonts?.ready.then(() => undefined).catch(() => undefined);
+    await this.withTimeout(
+      Promise.all([fontsPromise ?? Promise.resolve(), ...imagePromises]).then(() => undefined),
+      3_000
+    );
+  }
+
+  private withTimeout(task: Promise<void>, timeoutMs: number): Promise<void> {
+    return new Promise<void>(resolve => {
+      const timeout = setTimeout(resolve, timeoutMs);
+      void task.then(
+        () => {
+          clearTimeout(timeout);
+          resolve();
+        },
+        () => {
+          clearTimeout(timeout);
+          resolve();
         }
-      }, 500);
+      );
     });
   }
 
