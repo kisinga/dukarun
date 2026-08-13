@@ -101,3 +101,25 @@ a {
   outline: 3px solid rgb(223 91 50 / 35%);
   outline-offset: 2px;
 }
+
+/* Public document routes print the page itself; keep pagination behavior consistent. */
+@media print {
+  html,
+  body {
+    background: #fff;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  tfoot {
+    display: table-footer-group;
+  }
+
+  tr,
+  img {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}

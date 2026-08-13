@@ -1552,6 +1552,64 @@ interface ParsedPurchaseLine {
                       </form>
                     }
                   </section>
+
+                  @if (perms.has('ViewFinancials')) {
+                    <section class="border-t border-base-300/60 pt-3">
+                      <h3 class="section-title mb-1">Adjust supplier balance</h3>
+                      <p class="type-caption">
+                        Correct what we owe without recording a purchase or moving money.
+                      </p>
+                      <form
+                        (submit)="$event.preventDefault(); adjustSupplierBalance(s)"
+                        class="mt-2 grid gap-2 sm:grid-cols-2"
+                      >
+                        <app-form-field label="Adjustment">
+                          <select
+                            class="select select-bordered select-sm w-full"
+                            [formControl]="supplierAdjustmentDirection"
+                          >
+                            <option value="increase">Increase what we owe</option>
+                            <option value="decrease">Reduce what we owe</option>
+                          </select>
+                        </app-form-field>
+                        <app-form-field label="Amount (KES)">
+                          <input
+                            type="text"
+                            inputmode="numeric"
+                            class="input input-bordered input-sm w-full"
+                            [formControl]="supplierAdjustmentAmount"
+                          />
+                        </app-form-field>
+                        <app-form-field label="Reason" [required]="true">
+                          <input
+                            type="text"
+                            maxlength="500"
+                            class="input input-bordered input-sm w-full"
+                            placeholder="Why is this correction needed?"
+                            [formControl]="supplierAdjustmentReason"
+                          />
+                        </app-form-field>
+                        <div class="flex flex-col items-start justify-end gap-1">
+                          @let adjustmentPreview = supplierAdjustmentPreview(s);
+                          @if (adjustmentPreview !== null) {
+                            <p class="type-caption">
+                              Balance after adjustment:
+                              <strong>{{ fmt(adjustmentPreview) }}</strong>
+                            </p>
+                          }
+                          <button
+                            appButton
+                            variant="outline"
+                            type="submit"
+                            [loading]="busy()"
+                            [disabled]="busy()"
+                          >
+                            Post adjustment
+                          </button>
+                        </div>
+                      </form>
+                    </section>
+                  }
                 }
 
                 @if (perms.has('ViewFinancials') && advanceActivity().length > 0) {
@@ -2401,6 +2459,12 @@ export class SuppliersComponent implements OnInit, OnDestroy {
   protected readonly paySupplierId = new FormControl('', { nonNullable: true });
   protected readonly payAmount = new FormControl('', { nonNullable: true });
   protected readonly payAccount = new FormControl('', { nonNullable: true });
+  protected readonly supplierAdjustmentDirection = new FormControl<'increase' | 'decrease'>(
+    'increase',
+    { nonNullable: true }
+  );
+  protected readonly supplierAdjustmentAmount = new FormControl('', { nonNullable: true });
+  protected readonly supplierAdjustmentReason = new FormControl('', { nonNullable: true });
   protected readonly payPurchaseId = signal<string | null>(null);
   protected readonly selectedPayAmount = new FormControl('', { nonNullable: true });
   protected readonly selectedPayAccount = new FormControl('', { nonNullable: true });
@@ -3482,6 +3546,48 @@ export class SuppliersComponent implements OnInit, OnDestroy {
     }
   }
 
+  protected supplierAdjustmentPreview(supplier: SupplierWithAp): number | null {
+    const amount = parseKes(this.supplierAdjustmentAmount.value);
+    if (amount === null || amount <= 0) return null;
+    if (this.supplierAdjustmentDirection.value === 'decrease' && amount > supplier.ap_balance) {
+      return null;
+    }
+    return (
+      supplier.ap_balance +
+      (this.supplierAdjustmentDirection.value === 'increase' ? amount : -amount)
+    );
+  }
+
+  protected async adjustSupplierBalance(supplier: SupplierWithAp): Promise<void> {
+    const amount = parseKes(this.supplierAdjustmentAmount.value);
+    const reason = this.supplierAdjustmentReason.value.trim();
+    if (amount === null || amount <= 0 || !reason) {
+      this.error.set('Enter a positive adjustment amount and a reason');
+      return;
+    }
+    if (this.supplierAdjustmentDirection.value === 'decrease' && amount > supplier.ap_balance) {
+      this.error.set('The reduction cannot exceed the amount owed to this supplier');
+      return;
+    }
+
+    this.busy.set(true);
+    this.error.set(null);
+    this.notice.set(null);
+    try {
+      const signedAmount = this.supplierAdjustmentDirection.value === 'increase' ? amount : -amount;
+      await this.money.adjustSupplierBalance(supplier.id, signedAmount, reason);
+      this.supplierAdjustmentDirection.setValue('increase');
+      this.supplierAdjustmentAmount.setValue('');
+      this.supplierAdjustmentReason.setValue('');
+      this.notice.set(`Supplier balance adjusted by ${this.fmt(amount)}.`);
+      await this.load();
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Adjustment failed');
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
   protected supplierNetPosition(supplier: SupplierWithAp): string {
     if (!this.perms.has('ViewFinancials')) return 'Financials hidden';
     const net = supplier.ap_balance - this.supplierAdvanceBalance();
@@ -3622,6 +3728,9 @@ export class SuppliersComponent implements OnInit, OnDestroy {
     this.payPurchaseId.set(null);
     this.paySupplierId.setValue(supplier.id);
     this.payAmount.setValue('');
+    this.supplierAdjustmentDirection.setValue('increase');
+    this.supplierAdjustmentAmount.setValue('');
+    this.supplierAdjustmentReason.setValue('');
     this.supplierCreditLimit.setValue(formatKesInput(supplier.supplier_credit_limit));
     this.supplierTermsDays.setValue(supplier.supplier_credit_terms_days ?? 0);
     this.drawerPurchases.set([]);
@@ -3708,6 +3817,9 @@ export class SuppliersComponent implements OnInit, OnDestroy {
     this.payPurchaseId.set(null);
     this.supplierAdvanceBalance.set(0);
     this.advanceActivity.set([]);
+    this.supplierAdjustmentDirection.setValue('increase');
+    this.supplierAdjustmentAmount.setValue('');
+    this.supplierAdjustmentReason.setValue('');
     this.supplierCreating.set(false);
     this.drawerEditing.set(false);
     this.editingSupplier.set(null);

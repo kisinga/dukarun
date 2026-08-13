@@ -863,9 +863,9 @@ export class MoneyService {
     return data;
   }
 
-  async adjustSupplierBalance(customerId: string, amount: number, reason: string): Promise<string> {
+  async adjustSupplierBalance(supplierId: string, amount: number, reason: string): Promise<string> {
     const { data, error } = await this.db.rpc('post_supplier_balance_adjustment', {
-      p_supplier_id: customerId,
+      p_supplier_id: supplierId,
       p_amount: amount,
       p_reason: reason,
     });

@@ -1,5 +1,5 @@
 begin;
-select plan(31);
+select plan(35);
 
 select testkit.create_user(
   '91000000-0000-4000-8000-000000000001',
@@ -231,6 +231,40 @@ select is(
      and jl.meta->>'supplierId'='91000000-0000-4000-8000-000000000004'),
   100::bigint,
   'authorized supplier adjustment changes AP'
+);
+
+select throws_ok(
+  $$select public.post_supplier_balance_adjustment(
+    '91000000-0000-4000-8000-000000000004',10,'   '
+  )$$,
+  'P0001','invalid_reason',
+  'supplier adjustment requires a non-blank reason'
+);
+
+select ok(
+  public.post_supplier_balance_adjustment(
+    '91000000-0000-4000-8000-000000000004',-40,'reduce correction'
+  ) is not null,
+  'supplier-credit manager may reduce supplier AP'
+);
+
+select is(
+  (select coalesce(sum(jl.credit)-sum(jl.debit),0)::bigint
+   from public.ledger_journal_lines jl
+   join public.ledger_accounts a on a.id=jl.account_id
+   where jl.company_id=(select company_id from hardening_fixture)
+     and a.code='ACCOUNTS_PAYABLE'
+     and jl.meta->>'supplierId'='91000000-0000-4000-8000-000000000004'),
+  60::bigint,
+  'negative supplier adjustment reduces AP'
+);
+
+select throws_ok(
+  $$select public.post_supplier_balance_adjustment(
+    '91000000-0000-4000-8000-000000000004',-61,'excessive reduction'
+  )$$,
+  'P0001','adjustment_exceeds_supplier_balance: reduction 61 exceeds balance 60',
+  'supplier adjustment cannot create an implicit advance'
 );
 
 reset role;

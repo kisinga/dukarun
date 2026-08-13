@@ -43,6 +43,8 @@ import {
 } from '../shared/ui/status-badge.component';
 import { CashierSessionService } from '../core/cashier-session.service';
 import { CompanyPrintInfo, ReceiptDataService } from '../shared/print/receipt-data.service';
+import { PrintService } from '../shared/print/print.service';
+import { renderCustomerStatement } from '../shared/print/customer-statement.renderer';
 import { SessionRequiredNoticeComponent } from '../shared/ui/session-required-notice.component';
 import { DataTableShellComponent } from '../shared/ui/data-table-shell.component';
 import { DrawerComponent } from '../shared/ui/drawer.component';
@@ -970,22 +972,7 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
                   </section>
 
                   @if (perms.has('ViewFinancials')) {
-                    <section class="border-t border-base-300/60 pt-3 print:mt-0 print:border-0">
-                      @if (companyInfo(); as company) {
-                        <div class="mb-3 hidden text-center print:block">
-                          @if (company.logoUrl) {
-                            <img
-                              [src]="company.logoUrl"
-                              alt="Company logo"
-                              class="mx-auto mb-1 max-h-16 object-contain"
-                            />
-                          }
-                          <p class="font-bold">{{ company.name }}</p>
-                          @if (company.address) {
-                            <p class="text-sm">{{ company.address }}</p>
-                          }
-                        </div>
-                      }
+                    <section class="border-t border-base-300/60 pt-3">
                       <div class="mb-2 flex items-center justify-between gap-2">
                         <div>
                           <h3 class="section-title">Customer statement</h3>
@@ -996,7 +983,6 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
                           variant="ghost"
                           size="sm"
                           type="button"
-                          class="print:hidden"
                           [disabled]="statementBusy() || statement().length === 0"
                           (click)="printStatement()"
                         >
@@ -1020,9 +1006,7 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
                           title="No statement activity"
                         />
                       } @else {
-                        <ul
-                          class="max-h-80 divide-y divide-base-200 overflow-y-auto print:max-h-none print:overflow-visible"
-                        >
+                        <ul class="max-h-80 divide-y divide-base-200 overflow-y-auto">
                           @for (row of statement(); track row.id) {
                             <li class="py-2">
                               <div class="flex items-center gap-3">
@@ -1049,7 +1033,7 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
                               </div>
                               @if (row.receipt_id && row.details; as receipt) {
                                 <details
-                                  class="mt-2 rounded-field border border-base-300/70 bg-base-200/40 p-2 print:hidden"
+                                  class="mt-2 rounded-field border border-base-300/70 bg-base-200/40 p-2"
                                 >
                                   <summary class="cursor-pointer text-xs font-medium">
                                     Receipt allocation
@@ -1124,7 +1108,7 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
                           }
                         </ul>
                         @if (statementHasMore()) {
-                          <div class="mt-2 flex justify-center print:hidden">
+                          <div class="mt-2 flex justify-center">
                             <button
                               appButton
                               variant="ghost"
@@ -1141,7 +1125,7 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
                       @if (perms.has('OverrideCustomerBalance')) {
                         <form
                           (submit)="$event.preventDefault(); adjustBalance(c.id)"
-                          class="mt-3 flex flex-wrap items-end gap-2 print:hidden"
+                          class="mt-3 flex flex-wrap items-end gap-2"
                         >
                           <app-form-field label="Balance adjustment (KES)"
                             ><input
@@ -1204,6 +1188,7 @@ export class CustomersComponent implements OnInit {
   protected readonly partyCache = inject(PartyCacheService);
   private readonly pos = inject(PosService);
   private readonly receiptData = inject(ReceiptDataService);
+  private readonly print = inject(PrintService);
   protected readonly perms = inject(PermissionsService);
   private readonly approvals = inject(ApprovalsService);
   private readonly route = inject(ActivatedRoute);
@@ -1967,30 +1952,51 @@ export class CustomersComponent implements OnInit {
 
   protected async printStatement(): Promise<void> {
     const customerId = this.selectedCustomerId();
-    if (!customerId || !this.perms.has('ViewFinancials') || this.statementBusy()) return;
+    const customer = this.selectedCustomer();
+    if (!customerId || !customer || !this.perms.has('ViewFinancials') || this.statementBusy())
+      return;
     const sequence = ++this.statementSequence;
     this.statementBusy.set(true);
     this.error.set(null);
     try {
       const rows = [...this.statement()];
       let hasMore = this.statementHasMore();
+      const visitedCursors = new Set<string>();
       while (hasMore) {
         const cursor = rows[rows.length - 1];
         if (!cursor) break;
+        const cursorKey = `${cursor.date}:${cursor.id}`;
+        if (visitedCursors.has(cursorKey)) {
+          throw new Error('Statement preparation stopped because pagination did not advance.');
+        }
+        visitedCursors.add(cursorKey);
         const page = await this.money.customerStatement(
           customerId,
           { id: cursor.id, date: cursor.date },
           CUSTOMER_STATEMENT_PRINT_PAGE_SIZE
         );
         if (this.selectedCustomerId() !== customerId || sequence !== this.statementSequence) return;
-        if (page.rows.length === 0) break;
+        if (page.rows.length === 0) {
+          if (page.hasMore) throw new Error('The complete statement could not be loaded.');
+          break;
+        }
         rows.push(...page.rows);
         hasMore = page.hasMore;
       }
-      this.statement.set(rows);
-      this.statementHasMore.set(false);
-      await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
-      window.print();
+      const company = this.companyInfo() ?? (await this.receiptData.companyPrintInfo());
+      if (this.selectedCustomerId() !== customerId || sequence !== this.statementSequence) return;
+      const rendered = renderCustomerStatement({
+        company: {
+          name: company.name,
+          address: company.address,
+          logoUrl: company.logoUrl,
+        },
+        customerName: this.name(customer),
+        currency: 'KES',
+        generatedAt: new Date().toISOString(),
+        rows,
+      });
+      await this.print.printDocument(rendered.title, rendered.html, rendered.styles);
     } catch (error) {
       this.error.set(error instanceof Error ? error.message : 'Failed to prepare statement');
     } finally {
