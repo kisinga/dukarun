@@ -1,9 +1,9 @@
 {
-  "{apps,packages,scripts,supabase/functions}/**/*.{ts,js,mjs,json,html,scss,css,md}": [
+  "{apps,packages,scripts,tests,tools,supabase/functions,supabase/tests}/**/*.{ts,js,mjs,json,html,scss,css,md}": [
     "prettier --write"
   ],
-  "{*.md,*.json,docs/**/*.md,.github/**/*.md}": ["prettier --write"],
+  "{*.ts,*.js,*.mjs,*.md,*.json,docs/**/*.md,.github/**/*.md}": ["prettier --write"],
   "apps/web/src/app/**/*.ts": [
-    "sh -c 'files=\"\"; for f in \"$@\"; do files=\"$files ${f#apps/web/}\"; done; cd apps/web && node scripts/design-guard.mjs $files' _"
+    "sh -c 'files=\"\"; for f in \"$@\"; do files=\"$files ${f#apps/web/}\"; done; cd apps/web && node scripts/design.check.mjs $files' _"
   ]
 }

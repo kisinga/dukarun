@@ -10,6 +10,7 @@ import { FormFieldComponent } from '../../shared/ui/form-field.component';
 import { IconComponent } from '../../shared/ui/icon.component';
 import { MoneyComponent } from '../../shared/ui/money.component';
 import { CompanyPreferencesService } from '../../core/company-preferences.service';
+import { runIndependentLoads } from '../../core/independent-load';
 import {
   CashierAccount,
   CashierSession,
@@ -321,26 +322,35 @@ export class CashierSessionModalComponent {
 
   private async load(): Promise<void> {
     this.loading.set(true);
-    try {
-      const [accounts, open, sessions, printerEnabled] = await Promise.all([
-        this.money.cashierAccounts(),
-        this.money.openSession(),
-        this.money.recentSessions(10),
-        this.receiptData.printerEnabled(),
-      ]);
-      const reconAccounts = await this.money.sessionReconAccounts(
-        sessions.map(session => session.id)
-      );
-      this.accounts.set(accounts);
-      this.openSession.set(open);
-      this.reconAccounts.set(reconAccounts);
-      this.printerEnabled.set(printerEnabled);
-      for (const account of accounts) this.declared[account.account_code] ??= '0';
-    } catch (error) {
-      this.error.set(error instanceof Error ? error.message : 'Failed to load till accounts');
-    } finally {
-      this.loading.set(false);
-    }
+    const errors = await runIndependentLoads([
+      {
+        fallback: 'Failed to load till accounts',
+        run: async () => {
+          const accounts = await this.money.cashierAccounts();
+          this.accounts.set(accounts);
+          for (const account of accounts) this.declared[account.account_code] ??= '0';
+        },
+      },
+      {
+        fallback: 'Failed to load the open cashier session',
+        run: async () => this.openSession.set(await this.money.openSession()),
+      },
+      {
+        fallback: 'Failed to load recent cashier sessions',
+        run: async () => {
+          const sessions = await this.money.recentSessions(10);
+          this.reconAccounts.set(
+            await this.money.sessionReconAccounts(sessions.map(session => session.id))
+          );
+        },
+      },
+      {
+        fallback: 'Failed to load printer settings',
+        run: async () => this.printerEnabled.set(await this.receiptData.printerEnabled()),
+      },
+    ]);
+    this.error.set(errors.length > 0 ? errors.join('. ') : null);
+    this.loading.set(false);
   }
 
   protected close(): void {

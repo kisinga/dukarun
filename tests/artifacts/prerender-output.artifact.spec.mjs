@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-const root = resolve(import.meta.dirname, '..');
+const root = resolve(import.meta.dirname, '../..');
 const site = resolve(root, 'apps/site/dist/site/browser');
 const storefront = resolve(root, 'apps/storefront/dist/storefront/browser');
 const web = resolve(root, 'apps/web/dist/web/browser');
@@ -116,8 +116,15 @@ if (!directory.includes('<title>') || !sitemap.includes('<urlset')) {
 for (const marker of ['<html lang="en-KE"', 'rel="icon"', 'noindex, nofollow']) {
   if (!directory.includes(marker)) throw new Error(`Storefront directory is missing ${marker}`);
 }
-const storefrontOrigin = new URL(process.env.STOREFRONT_PUBLIC_URL || 'http://localhost:4204')
-  .origin;
+const storefrontSitemapUrl = sitemap.match(/<loc>([^<]+)<\/loc>/)?.[1];
+if (!storefrontSitemapUrl) throw new Error('Storefront sitemap has no canonical URL.');
+const storefrontOrigin = new URL(storefrontSitemapUrl).origin;
+if (
+  (process.env.CI === 'true' || process.env.PUBLIC_DATA_MODE === 'live') &&
+  !storefrontOrigin.startsWith('https://')
+) {
+  throw new Error(`Production storefront sitemap must use HTTPS: ${storefrontOrigin}`);
+}
 if (!storefrontRobots.includes(`Sitemap: ${storefrontOrigin}/sitemap.xml`)) {
   throw new Error('Storefront robots.txt sitemap origin differs from its canonical origin.');
 }

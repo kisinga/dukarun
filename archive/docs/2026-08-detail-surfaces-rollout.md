@@ -1,11 +1,14 @@
-# Detail Surfaces — Rollout Scope
+# Detail Surfaces — Completed Rollout (archived 2026-08)
+
+Historical implementation record. The durable rules now live in `docs/DESIGN_SYSTEM.md`;
+this file is not active planning guidance.
 
 Companion to `DESIGN_SYSTEM.md` → "Detail & edit surfaces (the three surfaces)". This doc
 scopes where the drawer / drawer-edit / modal-route rule applies across `apps/web`, so each
 area can be implemented independently. Status legend: ✅ done · 📋 scoped · ⛔ explicitly out.
 
 Each phase is independently shippable and must end green on:
-`npm run design-guard -w @dukarun/web`, `npm run offline-safety-guard -w @dukarun/web`,
+`npm run check:design -w @dukarun/web`, `npm run check:offline-architecture -w @dukarun/web`,
 `npm run build:web`.
 
 ## ✅ Phase 0 — Foundation (done)

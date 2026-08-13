@@ -2,6 +2,7 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormControl, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { parseKes } from '../../core/money';
 import { PermissionsService } from '../../core/permissions.service';
+import { runIndependentLoads } from '../../core/independent-load';
 import { ButtonComponent } from '../../shared/ui/button.component';
 import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
 import { FormFieldComponent } from '../../shared/ui/form-field.component';
@@ -323,26 +324,34 @@ export class MoneyPeriodsComponent implements OnInit {
 
   protected async load(): Promise<void> {
     this.loading.set(true);
-    try {
-      const [accounts, periods, lock, recons, latestReconciliationId] = await Promise.all([
-        this.money.cashierAccounts(),
-        this.money.periods(),
-        this.money.periodLock(),
-        this.money.recentReconciliations(),
-        this.money.latestReconciliationId(),
-      ]);
-      this.accounts.set(accounts);
-      this.periods.set(periods);
-      this.lock.set(lock);
-      this.recons.set(recons);
-      this.latestReconciliationId.set(latestReconciliationId);
-      for (const a of accounts) this.declared[a.account_code] ??= '';
-      this.error.set(null);
-    } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Failed to load');
-    } finally {
-      this.loading.set(false);
-    }
+    const errors = await runIndependentLoads([
+      {
+        fallback: 'Failed to load reconciliation accounts',
+        run: async () => {
+          const accounts = await this.money.cashierAccounts();
+          this.accounts.set(accounts);
+          for (const account of accounts) this.declared[account.account_code] ??= '';
+        },
+      },
+      {
+        fallback: 'Failed to load accounting periods',
+        run: async () => this.periods.set(await this.money.periods()),
+      },
+      {
+        fallback: 'Failed to load the period lock',
+        run: async () => this.lock.set(await this.money.periodLock()),
+      },
+      {
+        fallback: 'Failed to load reconciliations',
+        run: async () => this.recons.set(await this.money.recentReconciliations()),
+      },
+      {
+        fallback: 'Failed to load the latest reconciliation',
+        run: async () => this.latestReconciliationId.set(await this.money.latestReconciliationId()),
+      },
+    ]);
+    this.error.set(errors.length > 0 ? errors.join('. ') : null);
+    this.loading.set(false);
   }
 
   protected async reconcile(): Promise<void> {

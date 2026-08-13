@@ -3,6 +3,7 @@ import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { CashierSessionDialogService } from '../../core/cashier-session-dialog.service';
 import { CashierSessionService } from '../../core/cashier-session.service';
 import { PermissionsService } from '../../core/permissions.service';
+import { runIndependentLoads } from '../../core/independent-load';
 import { ButtonComponent } from '../../shared/ui/button.component';
 import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
 import { IconComponent } from '../../shared/ui/icon.component';
@@ -263,27 +264,32 @@ export class MoneyCashierComponent implements OnInit {
 
   protected async load(): Promise<void> {
     this.loading.set(true);
-    try {
-      const [accounts, open, sessions] = await Promise.all([
-        this.money.cashierAccounts(),
-        this.money.openSession(),
-        this.money.recentSessions(),
-      ]);
-      const [reconAccounts, latestReconciliationId] = await Promise.all([
-        this.money.sessionReconAccounts(sessions.map(session => session.id)),
-        this.money.latestReconciliationId(),
-      ]);
-      this.accounts.set(accounts);
-      this.openSession.set(open);
-      this.sessions.set(sessions);
-      this.reconAccounts.set(reconAccounts);
-      this.latestReconciliationId.set(latestReconciliationId);
-      this.error.set(null);
-    } catch (error) {
-      this.error.set(error instanceof Error ? error.message : 'Failed to load sessions');
-    } finally {
-      this.loading.set(false);
-    }
+    const errors = await runIndependentLoads([
+      {
+        fallback: 'Failed to load cashier accounts',
+        run: async () => this.accounts.set(await this.money.cashierAccounts()),
+      },
+      {
+        fallback: 'Failed to load the open cashier session',
+        run: async () => this.openSession.set(await this.money.openSession()),
+      },
+      {
+        fallback: 'Failed to load recent cashier sessions',
+        run: async () => {
+          const sessions = await this.money.recentSessions();
+          this.sessions.set(sessions);
+          this.reconAccounts.set(
+            await this.money.sessionReconAccounts(sessions.map(session => session.id))
+          );
+        },
+      },
+      {
+        fallback: 'Failed to load the latest reconciliation',
+        run: async () => this.latestReconciliationId.set(await this.money.latestReconciliationId()),
+      },
+    ]);
+    this.error.set(errors.length > 0 ? errors.join('. ') : null);
+    this.loading.set(false);
   }
 
   protected reconFor(sessionId: string): ReconAccountWithParent[] {

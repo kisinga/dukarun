@@ -18,6 +18,7 @@ import { PermissionsService } from '../core/permissions.service';
 import { CatalogSearchService } from '../core/catalog-search.service';
 import { PosService, Variant, variantLabel } from '../pos/pos.service';
 import { LocationContextService } from '../core/location-context.service';
+import { runIndependentLoads } from '../core/independent-load';
 import { PrintService } from '../shared/print/print.service';
 import { ReceiptDataService } from '../shared/print/receipt-data.service';
 import { ButtonComponent } from '../shared/ui/button.component';
@@ -173,6 +174,15 @@ interface ParsedPurchaseLine {
         <div role="alert" class="alert alert-error mb-3 text-sm">
           <app-icon name="heroExclamationTriangle" />
           <span>{{ error() }}</span>
+        </div>
+      }
+      @if (accountsError()) {
+        <div role="alert" class="alert alert-error mb-3 text-sm">
+          <app-icon name="heroExclamationTriangle" />
+          <span>{{ accountsError() }}</span>
+          <button appButton variant="ghost" size="sm" type="button" (click)="load()">
+            Retry accounts
+          </button>
         </div>
       }
       @if (notice()) {
@@ -661,7 +671,7 @@ interface ParsedPurchaseLine {
                             [formControl]="purchaseAmountPaid"
                           />
                         </app-form-field>
-                        <app-form-field label="Paid from">
+                        <app-form-field label="Paid from" [error]="accountSelectionError()">
                           <select
                             class="select select-bordered h-14 w-full"
                             [formControl]="purchaseAccount"
@@ -678,7 +688,7 @@ interface ParsedPurchaseLine {
                       </div>
                     } @else if (purchasePaymentMode.value === 'paid') {
                       <div>
-                        <app-form-field label="Paid from">
+                        <app-form-field label="Paid from" [error]="accountSelectionError()">
                           <select
                             class="select select-bordered h-14 w-full"
                             [formControl]="purchaseAccount"
@@ -1419,7 +1429,7 @@ interface ParsedPurchaseLine {
                           [formControl]="advanceAmount"
                         />
                       </app-form-field>
-                      <app-form-field label="Pay from">
+                      <app-form-field label="Pay from" [error]="accountSelectionError()">
                         <select
                           class="select select-bordered select-sm"
                           [formControl]="advanceAccount"
@@ -1460,7 +1470,7 @@ interface ParsedPurchaseLine {
                               [formControl]="advanceReturnAmount"
                             />
                           </app-form-field>
-                          <app-form-field label="Received into">
+                          <app-form-field label="Received into" [error]="accountSelectionError()">
                             <select
                               class="select select-bordered select-sm"
                               [formControl]="advanceReturnAccount"
@@ -1520,7 +1530,7 @@ interface ParsedPurchaseLine {
                             [formControl]="payAmount"
                           />
                         </app-form-field>
-                        <app-form-field label="Pay from">
+                        <app-form-field label="Pay from" [error]="accountSelectionError()">
                           <select
                             class="select select-bordered select-sm w-full"
                             [formControl]="payAccount"
@@ -1702,7 +1712,7 @@ interface ParsedPurchaseLine {
                                 ><input
                                   class="input input-bordered input-sm w-32"
                                   [formControl]="selectedPayAmount" /></app-form-field
-                              ><app-form-field label="Pay from"
+                              ><app-form-field label="Pay from" [error]="accountSelectionError()"
                                 ><select
                                   class="select select-bordered select-sm"
                                   [formControl]="selectedPayAccount"
@@ -2206,7 +2216,7 @@ interface ParsedPurchaseLine {
                                 [formControl]="selectedPayAmount"
                               />
                             </app-form-field>
-                            <app-form-field label="Pay from">
+                            <app-form-field label="Pay from" [error]="accountSelectionError()">
                               <select
                                 class="select select-bordered select-sm w-full"
                                 [formControl]="selectedPayAccount"
@@ -2289,6 +2299,12 @@ export class SuppliersComponent implements OnInit, OnDestroy {
     }))
   );
   protected readonly accounts = signal<LedgerAccount[]>([]);
+  protected readonly accountsError = signal<string | null>(null);
+  protected readonly accountSelectionError = computed(() =>
+    this.accounts().length > 0 || this.loading()
+      ? null
+      : (this.accountsError() ?? 'No payment accounts are configured.')
+  );
   protected readonly variants = signal<Variant[]>([]);
   protected readonly label = variantLabel;
   protected readonly purchases = signal<PurchaseRow[]>([]);
@@ -2609,74 +2625,98 @@ export class SuppliersComponent implements OnInit, OnDestroy {
       return;
     }
     if (!silent) this.loading.set(true);
-    try {
-      const purchaseRequest = this.isPurchasePage()
-        ? this.money.purchasesPage(this.purchasePageInput())
-        : Promise.resolve([]);
-      const [suppliers, accounts, variants, purchaseResult, drafts, performance, metrics] =
-        await Promise.all([
-          this.partyCache.ensureLoaded().then(() => this.partyCache.suppliers()),
-          this.money.transactableAccounts(),
-          this.catalogSearch.activeCatalog(),
-          purchaseRequest,
-          this.money.purchaseDrafts(),
-          this.money.supplierVariantPerformance(),
-          this.money.supplierPurchaseMetrics(),
-        ]);
-      const purchases = Array.isArray(purchaseResult) ? purchaseResult : purchaseResult.rows;
-      this.accounts.set(accounts);
-      // Purchases stock goods only (services are rejected server-side).
-      this.variants.set(variants.filter(v => v.kind !== 'service'));
-      this.purchases.set(purchases as PurchaseRow[]);
-      this.purchaseHistoryTotal.set(
-        Array.isArray(purchaseResult) ? purchases.length : purchaseResult.count
-      );
-      this.drafts.set(drafts);
-      this.performance.set(performance);
-      this.purchaseMetrics.set(metrics);
-      const activeSuppliers = suppliers.filter(supplier => supplier.supplier_active);
-      if (
-        activeSuppliers.length > 0 &&
-        !activeSuppliers.some(supplier => supplier.id === this.purchaseSupplier.value)
-      ) {
-        this.purchaseSupplier.setValue(activeSuppliers[0].id);
-      }
-      const suppliersWithBalance = suppliers.filter(s => s.ap_balance > 0);
-      if (
-        suppliersWithBalance.length > 0 &&
-        !suppliersWithBalance.some(s => s.id === this.paySupplierId.value)
-      ) {
-        this.paySupplierId.setValue(suppliersWithBalance[0].id);
-      }
-      if (!this.purchaseAccount.value && accounts.length > 0)
-        this.purchaseAccount.setValue(accounts[0].code);
-      if (!this.payAccount.value && accounts.length > 0) this.payAccount.setValue(accounts[0].code);
-      if (!this.selectedPayAccount.value && accounts.length > 0)
-        this.selectedPayAccount.setValue(accounts[0].code);
-      if (!this.advanceAccount.value && accounts.length > 0)
-        this.advanceAccount.setValue(accounts[0].code);
-      if (!this.advanceReturnAccount.value && accounts.length > 0)
-        this.advanceReturnAccount.setValue(accounts[0].code);
-      const locations = this.locations();
-      if (!this.purchaseLocation.value && locations.length > 0) {
-        this.purchaseLocation.setValue(this.locationContext.activeId() ?? locations[0].id);
-      }
-      // Realtime: keep an open purchase drawer's payment history in sync.
-      const openPurchaseId = this.drawerPurchaseId();
-      if (openPurchaseId && purchases.some(p => p.id === openPurchaseId)) {
-        void this.money.purchasePayments(openPurchaseId).then(pp => {
-          if (this.drawerPurchaseId() === openPurchaseId) this.drawerPurchasePayments.set(pp);
-        });
-      }
-      this.error.set(null);
-    } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Failed to load');
-    } finally {
-      this.loading.set(false);
-      if (this.loadQueued) {
-        this.loadQueued = false;
-        void this.load();
-      }
+    const purchaseRequest = this.isPurchasePage()
+      ? this.money.purchasesPage(this.purchasePageInput())
+      : Promise.resolve([]);
+    const errors = await runIndependentLoads([
+      {
+        fallback: 'Failed to load suppliers',
+        run: async () => {
+          await this.partyCache.ensureLoaded();
+          const suppliers = this.partyCache.suppliers();
+          const activeSuppliers = suppliers.filter(supplier => supplier.supplier_active);
+          if (
+            activeSuppliers.length > 0 &&
+            !activeSuppliers.some(supplier => supplier.id === this.purchaseSupplier.value)
+          ) {
+            this.purchaseSupplier.setValue(activeSuppliers[0].id);
+          }
+          const suppliersWithBalance = suppliers.filter(supplier => supplier.ap_balance > 0);
+          if (
+            suppliersWithBalance.length > 0 &&
+            !suppliersWithBalance.some(supplier => supplier.id === this.paySupplierId.value)
+          ) {
+            this.paySupplierId.setValue(suppliersWithBalance[0].id);
+          }
+        },
+      },
+      {
+        fallback: 'Failed to load payment accounts',
+        run: async () => {
+          const accounts = await this.money.transactableAccounts();
+          this.accounts.set(accounts);
+          this.accountsError.set(null);
+          if (!this.purchaseAccount.value && accounts.length > 0)
+            this.purchaseAccount.setValue(accounts[0].code);
+          if (!this.payAccount.value && accounts.length > 0)
+            this.payAccount.setValue(accounts[0].code);
+          if (!this.selectedPayAccount.value && accounts.length > 0)
+            this.selectedPayAccount.setValue(accounts[0].code);
+          if (!this.advanceAccount.value && accounts.length > 0)
+            this.advanceAccount.setValue(accounts[0].code);
+          if (!this.advanceReturnAccount.value && accounts.length > 0)
+            this.advanceReturnAccount.setValue(accounts[0].code);
+        },
+        onError: message => this.accountsError.set(message),
+      },
+      {
+        fallback: 'Failed to load the product catalogue',
+        run: async () =>
+          this.variants.set(
+            (await this.catalogSearch.activeCatalog()).filter(variant => variant.kind !== 'service')
+          ),
+      },
+      {
+        fallback: 'Failed to load purchase history',
+        run: async () => {
+          const purchaseResult = await purchaseRequest;
+          const purchases = Array.isArray(purchaseResult) ? purchaseResult : purchaseResult.rows;
+          this.purchases.set(purchases as PurchaseRow[]);
+          this.purchaseHistoryTotal.set(
+            Array.isArray(purchaseResult) ? purchases.length : purchaseResult.count
+          );
+          const openPurchaseId = this.drawerPurchaseId();
+          if (openPurchaseId && purchases.some(purchase => purchase.id === openPurchaseId)) {
+            void this.money.purchasePayments(openPurchaseId).then(payments => {
+              if (this.drawerPurchaseId() === openPurchaseId)
+                this.drawerPurchasePayments.set(payments);
+            });
+          }
+        },
+      },
+      {
+        fallback: 'Failed to load purchase drafts',
+        run: async () => this.drafts.set(await this.money.purchaseDrafts()),
+      },
+      {
+        fallback: 'Failed to load supplier purchase history',
+        run: async () => this.performance.set(await this.money.supplierVariantPerformance()),
+      },
+      {
+        fallback: 'Failed to load supplier purchase metrics',
+        run: async () => this.purchaseMetrics.set(await this.money.supplierPurchaseMetrics()),
+      },
+    ]);
+    const locations = this.locations();
+    if (!this.purchaseLocation.value && locations.length > 0) {
+      this.purchaseLocation.setValue(this.locationContext.activeId() ?? locations[0].id);
+    }
+    const pageErrors = errors.filter(message => message !== this.accountsError());
+    this.error.set(pageErrors.length > 0 ? pageErrors.join('. ') : null);
+    this.loading.set(false);
+    if (this.loadQueued) {
+      this.loadQueued = false;
+      void this.load();
     }
   }
 

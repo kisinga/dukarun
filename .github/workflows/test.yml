@@ -10,42 +10,120 @@ concurrency:
   group: active-apps-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  CI: true
+  HUSKY: 0
+  SUPABASE_URL: http://127.0.0.1:54321
+  SUPABASE_ANON_KEY: local-ci-placeholder
+  SITE_PUBLIC_URL: https://dukarun.com
+  APP_PUBLIC_URL: https://app.dukarun.com
+  STOREFRONT_PUBLIC_URL: https://store.dukarun.com
+  PUBLIC_DATA_MODE: fixture
+
 jobs:
-  build:
-    name: Build + design guard
+  static:
+    name: Static architecture checks
     runs-on: ubuntu-latest
-    env:
-      CI: true
-      HUSKY: 0
-      SUPABASE_URL: http://127.0.0.1:54321
-      SUPABASE_ANON_KEY: local-ci-placeholder
-      SITE_PUBLIC_URL: https://dukarun.com
-      APP_PUBLIC_URL: https://app.dukarun.com
-      STOREFRONT_PUBLIC_URL: https://store.dukarun.com
-      PUBLIC_DATA_MODE: fixture
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '22.23.1'
           cache: npm
-          cache-dependency-path: package-lock.json
+      - run: npm ci
+      - run: npm run check:static
 
-      - name: Install dependencies
-        run: npm ci
+  unit:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.23.1'
+          cache: npm
+      - run: npm ci
+      - run: npm run test:unit
 
-      - name: Enforce The Counter design system
-        run: npm run design-guard -w @dukarun/web
+  component:
+    name: Component tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.23.1'
+          cache: npm
+      - run: npm ci
+      - run: npm run test:component
 
-      - name: Enforce offline data safety
-        run: npm run offline-safety-guard -w @dukarun/web
+  contract:
+    name: Cross-runtime contracts + video
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.23.1'
+          cache: npm
+      - run: npm ci
+      - run: npm run test:contract
+      - run: npm run test:video
 
-      - name: Enforce public design rules
-        run: npm run public-design-guard
+  artifact:
+    name: Production build artifacts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.23.1'
+          cache: npm
+      - run: npm ci
+      - run: npm run build:active
+      - run: npm run test:artifact
 
-      - name: Build active Angular applications
-        run: npm run build:active
+  browser:
+    name: Mocked browser journeys
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.23.1'
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e:mocked
+
+  critical:
+    name: Local Supabase API + critical browser
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.23.1'
+          cache: npm
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.111.0
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Start local Supabase
+        run: |
+          supabase_raw="$RUNNER_TEMP/supabase-start.env"
+          supabase_env="$RUNNER_TEMP/supabase-github.env"
+          supabase start
+          supabase status -o env > "$supabase_raw"
+          sed -nE \
+            -e 's/^API_URL="(.*)"$/SUPABASE_URL=\1/p' \
+            -e 's/^ANON_KEY="(.*)"$/SUPABASE_ANON_KEY=\1/p' \
+            -e 's/^SERVICE_ROLE_KEY="(.*)"$/SUPABASE_SERVICE_ROLE_KEY=\1/p' \
+            "$supabase_raw" > "$supabase_env"
+          grep -q '^SUPABASE_URL=.' "$supabase_env"
+          grep -q '^SUPABASE_ANON_KEY=.' "$supabase_env"
+          grep -q '^SUPABASE_SERVICE_ROLE_KEY=.' "$supabase_env"
+          sed -n 'p' "$supabase_env" >> "$GITHUB_ENV"
+      - run: npm run test:api
+      - run: npm run test:e2e:critical

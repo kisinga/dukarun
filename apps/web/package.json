@@ -7,8 +7,10 @@
     "prebuild": "node ../../scripts/generate-environment.mjs web",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
-    "design-guard": "node scripts/design-guard.mjs",
-    "offline-safety-guard": "node scripts/offline-safety-guard.mjs"
+    "test:unit": "vitest run --root ../.. --config vitest.unit.config.ts apps/web/src",
+    "test:component": "ng run web:test-component",
+    "check:design": "node scripts/design.check.mjs",
+    "check:offline-architecture": "node scripts/offline-architecture.check.mjs"
   },
   "private": true,
   "dependencies": {

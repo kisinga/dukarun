@@ -8,6 +8,7 @@ import { formatKes, formatKesInput, parseKes } from '../core/money';
 import { PartyCacheService } from '../core/party-cache.service';
 import { PermissionsService } from '../core/permissions.service';
 import { LocationContextService } from '../core/location-context.service';
+import { runIndependentLoads } from '../core/independent-load';
 import {
   LedgerAccount,
   MoneyService,
@@ -437,7 +438,8 @@ interface ExpenseForm {
                                 class="xl:col-span-2"
                                 [error]="
                                   accountOptions().length === 0
-                                    ? 'No cash, bank, or M-Pesa account is available.'
+                                    ? accountsError() ||
+                                      'No cash, bank, or M-Pesa account is configured.'
                                     : null
                                 "
                               >
@@ -628,7 +630,7 @@ interface ExpenseForm {
                     [required]="true"
                     [error]="
                       accountOptions().length === 0
-                        ? 'No cash, bank, or M-Pesa account is available.'
+                        ? accountsError() || 'No cash, bank, or M-Pesa account is configured.'
                         : null
                     "
                   >
@@ -783,6 +785,7 @@ export class PurchaseEditorComponent implements OnInit {
   protected readonly savingDraft = signal(false);
   protected readonly dirty = signal(false);
   protected readonly error = signal<string | null>(null);
+  protected readonly accountsError = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
   protected readonly draftId = signal<string | null>(null);
   protected readonly label = variantLabel;
@@ -826,27 +829,45 @@ export class PurchaseEditorComponent implements OnInit {
   );
 
   async ngOnInit(): Promise<void> {
-    try {
-      await this.parties.ensureLoaded();
-      const [accounts, variants, drafts, performance] = await Promise.all([
-        this.money.transactableAccounts(),
-        this.catalog.activeCatalog(),
-        this.money.purchaseDrafts(),
-        this.money.supplierVariantPerformance(),
-      ]);
-      this.accounts.set(accounts);
-      this.variants.set(variants.filter(item => item.kind !== 'service'));
-      this.performance.set(performance);
-      this.account.setValue(accounts[0]?.code ?? '');
-      this.location.setValue(this.locationContext.activeId() ?? this.locations()[0]?.id ?? '');
-      const requestedDraft = this.route.snapshot.paramMap.get('id');
-      if (requestedDraft) this.restoreDraft(drafts.find(item => item.id === requestedDraft));
-      this.dirty.set(false);
-    } catch (error) {
-      this.error.set(error instanceof Error ? error.message : 'Could not prepare purchase entry');
-    } finally {
-      this.loading.set(false);
-    }
+    const errors = await runIndependentLoads([
+      {
+        fallback: 'Failed to load suppliers',
+        run: () => this.parties.ensureLoaded(),
+      },
+      {
+        fallback: 'Failed to load payment accounts',
+        run: async () => {
+          const accounts = await this.money.transactableAccounts();
+          this.accounts.set(accounts);
+          this.accountsError.set(null);
+          this.account.setValue(accounts[0]?.code ?? '');
+        },
+        onError: message => this.accountsError.set(message),
+      },
+      {
+        fallback: 'Failed to load the product catalogue',
+        run: async () =>
+          this.variants.set(
+            (await this.catalog.activeCatalog()).filter(item => item.kind !== 'service')
+          ),
+      },
+      {
+        fallback: 'Failed to load purchase drafts',
+        run: async () => {
+          const drafts = await this.money.purchaseDrafts();
+          const requestedDraft = this.route.snapshot.paramMap.get('id');
+          if (requestedDraft) this.restoreDraft(drafts.find(item => item.id === requestedDraft));
+        },
+      },
+      {
+        fallback: 'Failed to load supplier purchase history',
+        run: async () => this.performance.set(await this.money.supplierVariantPerformance()),
+      },
+    ]);
+    this.location.setValue(this.locationContext.activeId() ?? this.locations()[0]?.id ?? '');
+    this.error.set(errors.length > 0 ? errors.join('. ') : null);
+    this.dirty.set(false);
+    this.loading.set(false);
   }
 
   canDeactivate(): boolean {

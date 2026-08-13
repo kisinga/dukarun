@@ -83,6 +83,16 @@
             }
           },
           "defaultConfiguration": "development"
+        },
+        "test-component": {
+          "builder": "@angular/build:unit-test",
+          "options": {
+            "buildTarget": "web:build:development",
+            "tsConfig": "tsconfig.spec.json",
+            "include": ["src/**/*.component.spec.ts"],
+            "setupFiles": ["src/test-setup.ts"],
+            "watch": false
+          }
         }
       }
     }

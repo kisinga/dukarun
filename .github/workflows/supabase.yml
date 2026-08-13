@@ -3,9 +3,24 @@ name: Supabase
 on:
   push:
     branches: [pilot/supabase, main]
-    paths: ['supabase/**', 'packages/shared-types/**', '.github/workflows/supabase.yml']
+    paths:
+      [
+        'supabase/**',
+        'tests/api/**',
+        'packages/shared-types/**',
+        'package.json',
+        'package-lock.json',
+        '.github/workflows/supabase.yml',
+      ]
   pull_request:
-    paths: ['supabase/**', 'packages/shared-types/**']
+    paths:
+      [
+        'supabase/**',
+        'tests/api/**',
+        'packages/shared-types/**',
+        'package.json',
+        'package-lock.json',
+      ]
 
 concurrency:
   group: supabase-${{ github.ref }}
@@ -18,19 +33,45 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.23.1'
+          cache: npm
+
       - uses: supabase/setup-cli@v1
         with:
           version: 2.111.0
 
+      - run: npm ci
+
       - name: Start ephemeral local stack
-        run: supabase db start
+        run: |
+          supabase_raw="$RUNNER_TEMP/supabase-start.env"
+          supabase_env="$RUNNER_TEMP/supabase-github.env"
+          supabase start
+          supabase status -o env > "$supabase_raw"
+          sed -nE \
+            -e 's/^API_URL="(.*)"$/SUPABASE_URL=\1/p' \
+            -e 's/^ANON_KEY="(.*)"$/SUPABASE_ANON_KEY=\1/p' \
+            -e 's/^SERVICE_ROLE_KEY="(.*)"$/SUPABASE_SERVICE_ROLE_KEY=\1/p' \
+            "$supabase_raw" > "$supabase_env"
+          grep -q '^SUPABASE_URL=.' "$supabase_env"
+          grep -q '^SUPABASE_ANON_KEY=.' "$supabase_env"
+          grep -q '^SUPABASE_SERVICE_ROLE_KEY=.' "$supabase_env"
+          sed -n 'p' "$supabase_env" >> "$GITHUB_ENV"
 
       - name: Lint migrations
         # pgtap's own extension functions produce false positives; lint our schema only.
         run: supabase db lint --schema public
 
       - name: Run pgTAP tests
-        run: supabase test db
+        run: npm run test:db
+
+      - name: Run PostgREST API contracts
+        run: npm run test:api
+
+      - name: Run transaction concurrency tests
+        run: npm run test:db:concurrency
 
       - name: Verify generated types are checked in
         run: |

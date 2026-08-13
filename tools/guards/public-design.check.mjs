@@ -22,6 +22,7 @@ function* files(dir) {
 let failures = 0;
 for (const root of roots) {
   for (const file of files(root)) {
+    if (/\.(?:spec|test)\.[cm]?[jt]sx?$/.test(file)) continue;
     const source = readFileSync(file, 'utf8');
     for (const [label, pattern] of rules) {
       if (
@@ -39,4 +40,4 @@ for (const root of roots) {
 }
 
 if (failures) process.exit(1);
-console.log('public-design-guard: clean.');
+console.log('public-design: clean.');
