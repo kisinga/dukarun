@@ -40,8 +40,6 @@ import { PermissionsService } from '../core/permissions.service';
 import { CatalogCacheService } from '../core/catalog-cache.service';
 import { LocationContextService } from '../core/location-context.service';
 import { ConnectivityService } from '../pos/offline/connectivity.service';
-import { ProductImportDialogComponent } from './product-import-dialog.component';
-import { ProductTransferService, type CatalogImportResult } from './product-transfer.service';
 import { BarcodeScannerComponent } from '../shared/ui/barcode-scanner.component';
 import { BarcodeLabelDialogComponent } from './barcode-label-dialog.component';
 import { BatchProductCategoriesDialogComponent } from './batch-product-categories-dialog.component';
@@ -119,7 +117,6 @@ interface PendingProductImage {
     IconComponent,
     MoneyComponent,
     StatBarComponent,
-    ProductImportDialogComponent,
     BarcodeScannerComponent,
     BarcodeLabelDialogComponent,
     SearchableFilterComponent,
@@ -156,29 +153,6 @@ interface PendingProductImage {
         >
           <app-icon name="heroPrinter" /> Print labels
         </button>
-        @if (perms.has('ManageCatalog')) {
-          <button
-            overflowAction
-            appButton
-            variant="secondary"
-            [loading]="transferBusy()"
-            type="button"
-            (click)="exportProducts()"
-          >
-            <app-icon name="heroArrowDownTray" /> Export
-          </button>
-        }
-        @if (perms.has('ManageCatalog')) {
-          <button
-            overflowAction
-            appButton
-            variant="secondary"
-            type="button"
-            (click)="importOpen.set(true)"
-          >
-            <app-icon name="heroArrowUpTray" /> Import
-          </button>
-        }
         <button
           overflowAction
           appButton
@@ -1810,10 +1784,6 @@ interface PendingProductImage {
           (applied)="batchCategoriesApplied($event)"
         />
       }
-      <app-product-import-dialog
-        [(open)]="importOpen"
-        (imported)="productImportCompleted($event)"
-      />
       @if (editorScannerTarget() !== null) {
         <app-barcode-scanner
           (scanned)="editorBarcodeScanned($event)"
@@ -1881,7 +1851,6 @@ export class ProductsComponent implements OnInit {
   private readonly catalogCache = inject(CatalogCacheService);
   private readonly locationContext = inject(LocationContextService);
   protected readonly connectivity = inject(ConnectivityService);
-  private readonly productTransfer = inject(ProductTransferService);
   private readonly publicProductLinks = inject(PublicProductLinkService);
   protected readonly preferences = inject(CompanyPreferencesService);
   protected readonly perms = inject(PermissionsService);
@@ -1931,8 +1900,6 @@ export class ProductsComponent implements OnInit {
   protected readonly notice = signal<string | null>(null);
   protected readonly shareBusy = signal(false);
   protected readonly shareFeedback = signal<ShareFeedback | null>(null);
-  protected readonly transferBusy = signal(false);
-  protected readonly importOpen = signal(false);
   protected readonly page = signal(1);
   protected readonly pageSize = signal(25);
   private readonly serverGroups = signal<ProductGroup[]>([]);
@@ -2411,26 +2378,6 @@ export class ProductsComponent implements OnInit {
     } finally {
       this.loading.set(false);
     }
-  }
-
-  protected async exportProducts(): Promise<void> {
-    this.transferBusy.set(true);
-    this.error.set(null);
-    try {
-      await this.productTransfer.exportCatalog();
-      this.notice.set('Product export downloaded');
-    } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Export failed');
-    } finally {
-      this.transferBusy.set(false);
-    }
-  }
-
-  protected async productImportCompleted(result: CatalogImportResult): Promise<void> {
-    this.notice.set(
-      `Import complete: ${result.created ?? 0} created, ${result.updated ?? 0} updated, ${result.deactivated_products ?? 0} deactivated`
-    );
-    await this.load();
   }
 
   // --- Images ---
