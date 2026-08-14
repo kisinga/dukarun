@@ -1,6 +1,7 @@
-import { Component, OnInit, computed, inject, signal, viewChild } from '@angular/core';
+import { Component, DestroyRef, OnInit, computed, inject, signal, viewChild } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { formatKesInput, parseKes } from '../core/money';
 import { reconciliationLabel } from '../core/payment-methods';
 import { PageLayoutComponent } from '../shared/ui/page-layout.component';
@@ -22,8 +23,18 @@ import { CashierSessionService } from '../core/cashier-session.service';
 import { ReceiptDataService } from '../shared/print/receipt-data.service';
 import { imageExtension, resizeImage } from '../shared/ui/image.util';
 import { MobileListComponent } from '../shared/ui/mobile-list.component';
+import { CatalogCacheService } from '../core/catalog-cache.service';
+import { PartyCacheService } from '../core/party-cache.service';
+import { RecentSalesCacheService } from '../core/recent-sales-cache.service';
+import { ProductImportDialogComponent } from '../products/product-import-dialog.component';
+import {
+  ProductTransferService,
+  type CatalogImportResult,
+} from '../products/product-transfer.service';
+import { CachedDataExportService, type CachedExportKind } from './cached-data-export.service';
 
 type SectionKey = 'profile' | 'pos' | 'inventory' | 'cash';
+type SettingsTab = 'business' | 'operations' | 'money' | 'communications' | 'data';
 type ReminderDraft = {
   stageDays: number;
   enabled: boolean;
@@ -31,6 +42,13 @@ type ReminderDraft = {
 };
 
 const PUBLIC_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const SETTINGS_TABS: ReadonlyArray<{ key: SettingsTab; label: string }> = [
+  { key: 'business', label: 'Business' },
+  { key: 'operations', label: 'Operations' },
+  { key: 'money', label: 'Money' },
+  { key: 'communications', label: 'Messages' },
+  { key: 'data', label: 'Data' },
+];
 
 @Component({
   selector: 'app-settings',
@@ -44,6 +62,7 @@ const PUBLIC_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
     FormFieldComponent,
     MoneyComponent,
     MobileListComponent,
+    ProductImportDialogComponent,
   ],
   template: `
     <app-page title="Settings">
@@ -51,579 +70,609 @@ const PUBLIC_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
         <p class="mb-2 text-sm text-error">{{ loadError() }}</p>
       }
 
-      @if (perms.has('ViewAuditTrail')) {
-        <a
-          routerLink="/settings/audit-trail"
-          class="card mb-6 flex min-h-11 flex-row items-center gap-3 bg-base-100 p-4 transition-colors hover:border-primary/40 hover:bg-primary/5"
-        >
-          <span
-            class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-base-200 text-base-content/60"
-          >
-            <app-icon name="heroClipboardDocumentList" size="lg" />
-          </span>
-          <span class="min-w-0 flex-1">
-            <span class="block font-semibold">Audit trail</span>
-            <span class="block text-sm text-base-content/60"
-              >See who changed sales, stock, team access, cash control, and settings.</span
-            >
-          </span>
-          <app-icon name="heroChevronRight" class="text-base-content/40" />
-        </a>
-      }
-
       @if (settings(); as s) {
         <div class="space-y-6">
-          <!-- Profile -->
-          <div class="card bg-base-100">
-            <div class="card-body p-4">
-              <h2 class="section-title">Profile</h2>
-
-              <!-- Company logo -->
-              <div class="mt-2 flex items-center gap-3">
-                @if (s.logo_path) {
-                  <img
-                    [src]="logoUrl(s.logo_path)"
-                    alt="Company logo"
-                    class="h-14 w-14 rounded-box border border-base-300 object-contain"
-                  />
-                }
-                <div class="flex flex-wrap items-center gap-2">
-                  <button
-                    appButton
-                    variant="outline"
-                    size="sm"
-                    type="button"
-                    [loading]="logoBusy()"
-                    (click)="logoInput.click()"
-                  >
-                    {{ s.logo_path ? 'Change logo' : 'Upload logo' }}
-                  </button>
-                  @if (s.logo_path) {
-                    <button
-                      appButton
-                      variant="ghost"
-                      size="sm"
-                      type="button"
-                      [disabled]="logoBusy()"
-                      (click)="removeLogo()"
-                    >
-                      Remove logo
-                    </button>
-                  }
-                  <input
-                    #logoInput
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp,image/svg+xml"
-                    class="hidden"
-                    (change)="onLogoSelected($event)"
-                  />
-                </div>
-              </div>
-              <p class="type-caption mt-1">
-                JPEG, PNG, WebP or SVG up to 2 MB. Shown on receipts and invoices.
-              </p>
-              @if (logoMsg(); as m) {
-                <p class="mt-1 text-sm" [class.text-success]="m.ok" [class.text-error]="!m.ok">
-                  {{ m.text }}
-                </p>
-              }
-
-              <form
-                (submit)="$event.preventDefault(); saveSection('profile')"
-                class="mt-2 grid gap-3 sm:grid-cols-2"
-              >
-                <app-form-field label="Company name" [required]="true">
-                  <input
-                    type="text"
-                    class="input input-bordered input-sm w-full"
-                    [formControl]="name"
-                  />
-                </app-form-field>
-                <app-form-field
-                  label="Public slug"
-                  hint="Lowercase letters, numbers, and single hyphens only."
-                  [error]="slug.invalid && slug.touched ? 'Enter a valid public slug.' : null"
+          <div class="overflow-x-auto" aria-label="Settings sections">
+            <div role="tablist" class="tabs tabs-box w-max min-w-full">
+              @for (tab of settingsTabs(); track tab.key) {
+                <button
+                  role="tab"
+                  type="button"
+                  class="tab min-h-11 px-4"
+                  [class.tab-active]="activeTab() === tab.key"
+                  [attr.aria-selected]="activeTab() === tab.key"
+                  (click)="selectTab(tab.key)"
                 >
-                  <input
-                    type="text"
-                    class="input input-bordered input-sm w-full"
-                    [formControl]="slug"
-                    maxlength="63"
-                    autocapitalize="none"
-                    autocomplete="off"
-                    spellcheck="false"
-                  />
-                </app-form-field>
-                <app-form-field label="Business email">
-                  <input
-                    type="email"
-                    class="input input-bordered input-sm w-full"
-                    [formControl]="email"
-                  />
-                </app-form-field>
-                <app-form-field label="Business address" class="sm:col-span-2">
-                  <textarea
-                    rows="2"
-                    class="textarea textarea-bordered textarea-sm w-full"
-                    [formControl]="address"
-                  ></textarea>
-                </app-form-field>
-                <p class="type-caption sm:col-span-2">Shown on A4 invoices and receipts headers.</p>
-                <p class="type-caption sm:col-span-2">
-                  Storefront fields are used by your public storefront (launching separately).
-                </p>
-                <app-form-field label="WhatsApp number (storefront)">
-                  <input
-                    type="text"
-                    class="input input-bordered input-sm w-full"
-                    placeholder="+254…"
-                    [formControl]="whatsapp"
-                  />
-                </app-form-field>
-                <label class="label cursor-pointer justify-start gap-2 self-end">
-                  <input
-                    type="checkbox"
-                    class="checkbox checkbox-sm"
-                    [formControl]="storefrontEnabled"
-                    [attr.disabled]="!entitlements.enabled('storefront') ? '' : null"
-                  />
-                  <span class="label-text">Public storefront enabled</span>
-                </label>
-                @if (!entitlements.enabled('storefront')) {
-                  <p class="type-caption text-warning sm:col-span-2">
-                    Storefront publishing is unavailable on this plan.
-                    <a routerLink="/billing" class="link">View plans</a>
-                  </p>
-                }
-                <div class="sm:col-span-2">
-                  @if (msg('profile'); as m) {
-                    <p class="mb-2 text-sm" [class.text-success]="m.ok" [class.text-error]="!m.ok">
-                      {{ m.text }}
-                    </p>
-                  }
-                  <button appButton type="submit" [loading]="busy()">Save profile</button>
-                </div>
-              </form>
+                  {{ tab.label }}
+                </button>
+              }
+              @if (perms.has('ViewAuditTrail')) {
+                <a role="tab" routerLink="/settings/audit-trail" class="tab min-h-11 px-4">
+                  Audit
+                </a>
+              }
             </div>
           </div>
 
-          <!-- POS & cash control -->
-          <div class="card bg-base-100">
-            <div class="card-body p-4">
-              <h2 class="section-title">POS &amp; cash control</h2>
-              <form (submit)="$event.preventDefault(); saveSection('pos')" class="mt-1">
-                <div class="divide-y divide-base-300">
-                  <!-- Receipt printing -->
-                  <label class="flex cursor-pointer items-center justify-between gap-4 py-3">
-                    <span>
-                      <span class="block text-sm font-medium">Enable receipt printing</span>
-                      <span class="block text-xs text-base-content/60">
-                        Print a receipt after each completed sale.
-                      </span>
-                    </span>
+          @if (activeTab() === 'business') {
+            <!-- Profile -->
+            <div class="card bg-base-100">
+              <div class="card-body p-4">
+                <h2 class="section-title">Profile</h2>
+
+                <!-- Company logo -->
+                <div class="mt-2 flex items-center gap-3">
+                  @if (s.logo_path) {
+                    <img
+                      [src]="logoUrl(s.logo_path)"
+                      alt="Company logo"
+                      class="h-14 w-14 rounded-box border border-base-300 object-contain"
+                    />
+                  }
+                  <div class="flex flex-wrap items-center gap-2">
+                    <button
+                      appButton
+                      variant="outline"
+                      size="sm"
+                      type="button"
+                      [loading]="logoBusy()"
+                      (click)="logoInput.click()"
+                    >
+                      {{ s.logo_path ? 'Change logo' : 'Upload logo' }}
+                    </button>
+                    @if (s.logo_path) {
+                      <button
+                        appButton
+                        variant="ghost"
+                        size="sm"
+                        type="button"
+                        [disabled]="logoBusy()"
+                        (click)="removeLogo()"
+                      >
+                        Remove logo
+                      </button>
+                    }
+                    <input
+                      #logoInput
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/svg+xml"
+                      class="hidden"
+                      (change)="onLogoSelected($event)"
+                    />
+                  </div>
+                </div>
+                <p class="type-caption mt-1">
+                  JPEG, PNG, WebP or SVG up to 2 MB. Shown on receipts and invoices.
+                </p>
+                @if (logoMsg(); as m) {
+                  <p class="mt-1 text-sm" [class.text-success]="m.ok" [class.text-error]="!m.ok">
+                    {{ m.text }}
+                  </p>
+                }
+
+                <form
+                  (submit)="$event.preventDefault(); saveSection('profile')"
+                  class="mt-2 grid gap-3 sm:grid-cols-2"
+                >
+                  <app-form-field label="Company name" [required]="true">
+                    <input
+                      type="text"
+                      class="input input-bordered input-sm w-full"
+                      [formControl]="name"
+                    />
+                  </app-form-field>
+                  <app-form-field
+                    label="Public slug"
+                    hint="Lowercase letters, numbers, and single hyphens only."
+                    [error]="slug.invalid && slug.touched ? 'Enter a valid public slug.' : null"
+                  >
+                    <input
+                      type="text"
+                      class="input input-bordered input-sm w-full"
+                      [formControl]="slug"
+                      maxlength="63"
+                      autocapitalize="none"
+                      autocomplete="off"
+                      spellcheck="false"
+                    />
+                  </app-form-field>
+                  <app-form-field label="Business email">
+                    <input
+                      type="email"
+                      class="input input-bordered input-sm w-full"
+                      [formControl]="email"
+                    />
+                  </app-form-field>
+                  <app-form-field label="Business address" class="sm:col-span-2">
+                    <textarea
+                      rows="2"
+                      class="textarea textarea-bordered textarea-sm w-full"
+                      [formControl]="address"
+                    ></textarea>
+                  </app-form-field>
+                  <p class="type-caption sm:col-span-2">
+                    Shown on A4 invoices and receipts headers.
+                  </p>
+                  <p class="type-caption sm:col-span-2">
+                    Storefront fields are used by your public storefront (launching separately).
+                  </p>
+                  <app-form-field label="WhatsApp number (storefront)">
+                    <input
+                      type="text"
+                      class="input input-bordered input-sm w-full"
+                      placeholder="+254…"
+                      [formControl]="whatsapp"
+                    />
+                  </app-form-field>
+                  <label class="label cursor-pointer justify-start gap-2 self-end">
                     <input
                       type="checkbox"
-                      class="toggle toggle-primary"
-                      [formControl]="enablePrinter"
+                      class="checkbox checkbox-sm"
+                      [formControl]="storefrontEnabled"
+                      [attr.disabled]="!entitlements.enabled('storefront') ? '' : null"
                     />
+                    <span class="label-text">Public storefront enabled</span>
                   </label>
-
-                  <!-- Cashier queue -->
-                  <div class="py-3">
-                    <label class="flex cursor-pointer items-center justify-between gap-4">
-                      <span>
-                        <span class="block text-sm font-medium">Use a separate cashier queue</span>
-                        <span class="block text-xs text-base-content/60">
-                          When off, sellers take payment and complete orders directly on the Sell
-                          screen.
-                        </span>
-                      </span>
-                      <input
-                        type="checkbox"
-                        class="toggle toggle-primary"
-                        [formControl]="cashierFlow"
-                      />
-                    </label>
-                    @if (!cashierFlow.value) {
-                      <p class="mt-1.5 flex items-center gap-1 text-xs text-info">
-                        <app-icon name="heroInformationCircle" size="sm" />
-                        Direct checkout will be used. New orders will not enter a cashier queue.
+                  @if (!entitlements.enabled('storefront')) {
+                    <p class="type-caption text-warning sm:col-span-2">
+                      Storefront publishing is unavailable on this plan.
+                      <a routerLink="/billing" class="link">View plans</a>
+                    </p>
+                  }
+                  <div class="sm:col-span-2">
+                    @if (msg('profile'); as m) {
+                      <p
+                        class="mb-2 text-sm"
+                        [class.text-success]="m.ok"
+                        [class.text-error]="!m.ok"
+                      >
+                        {{ m.text }}
                       </p>
                     }
+                    <button appButton type="submit" [loading]="busy()">Save profile</button>
                   </div>
+                </form>
+              </div>
+            </div>
+          }
 
-                  <!-- Till sessions -->
-                  <div class="py-3">
-                    <label class="flex cursor-pointer items-center justify-between gap-4">
+          @if (activeTab() === 'operations') {
+            <!-- POS & cash control -->
+            <div class="card bg-base-100">
+              <div class="card-body p-4">
+                <h2 class="section-title">POS &amp; cash control</h2>
+                <form (submit)="$event.preventDefault(); saveSection('pos')" class="mt-1">
+                  <div class="divide-y divide-base-300">
+                    <!-- Receipt printing -->
+                    <label class="flex cursor-pointer items-center justify-between gap-4 py-3">
                       <span>
-                        <span class="block text-sm font-medium">Track till sessions</span>
+                        <span class="block text-sm font-medium">Enable receipt printing</span>
                         <span class="block text-xs text-base-content/60">
-                          Require an open till for payments and keep opening, closing, and variance
-                          counts.
+                          Print a receipt after each completed sale.
                         </span>
                       </span>
                       <input
                         type="checkbox"
                         class="toggle toggle-primary"
-                        [formControl]="cashControl"
+                        [formControl]="enablePrinter"
                       />
                     </label>
-                    <div
-                      class="ml-4 mt-1 border-l-2 border-base-300 pl-4"
-                      [class.opacity-40]="!cashControl.value"
-                    >
-                      <label
-                        class="flex items-center justify-between gap-4 py-2"
-                        [class.cursor-pointer]="cashControl.value"
-                      >
+
+                    <!-- Cashier queue -->
+                    <div class="py-3">
+                      <label class="flex cursor-pointer items-center justify-between gap-4">
                         <span>
-                          <span class="block text-sm font-medium">Require opening count</span>
+                          <span class="block text-sm font-medium"
+                            >Use a separate cashier queue</span
+                          >
                           <span class="block text-xs text-base-content/60">
-                            Count cash in the drawer before a till can be used.
+                            When off, sellers take payment and complete orders directly on the Sell
+                            screen.
                           </span>
                         </span>
                         <input
                           type="checkbox"
                           class="toggle toggle-primary"
-                          [formControl]="requireOpening"
-                          [attr.disabled]="!cashControl.value ? '' : null"
+                          [formControl]="cashierFlow"
                         />
                       </label>
-                      @if (cashControl.value && !requireOpening.value) {
-                        <p class="flex items-center gap-1 pb-1 text-xs text-info">
+                      @if (!cashierFlow.value) {
+                        <p class="mt-1.5 flex items-center gap-1 text-xs text-info">
                           <app-icon name="heroInformationCircle" size="sm" />
-                          Tills will open immediately using current balances; closing counts still
-                          apply.
+                          Direct checkout will be used. New orders will not enter a cashier queue.
                         </p>
                       }
                     </div>
-                  </div>
 
-                  <!-- Proforma validity -->
-                  <div class="flex items-center justify-between gap-4 py-3">
-                    <span>
-                      <span class="block text-sm font-medium">Proforma validity</span>
-                      <span class="block text-xs text-base-content/60">
-                        Applies to newly created proformas. Default: 30 days.
-                      </span>
-                    </span>
-                    <label class="flex items-center gap-2">
-                      <input
-                        type="number"
-                        min="1"
-                        max="3650"
-                        class="input input-bordered input-sm w-20 text-right"
-                        [formControl]="proformaValidityDays"
-                      />
-                      <span class="text-xs text-base-content/60">days</span>
-                    </label>
-                  </div>
-                </div>
-
-                <div class="mt-3">
-                  @if (msg('pos'); as m) {
-                    <p class="mb-2 text-sm" [class.text-success]="m.ok" [class.text-error]="!m.ok">
-                      {{ m.text }}
-                    </p>
-                  }
-                  <button appButton type="submit" [loading]="busy()">Save POS settings</button>
-                </div>
-              </form>
-            </div>
-          </div>
-
-          <!-- Inventory -->
-          <div class="card bg-base-100">
-            <div class="card-body p-4">
-              <h2 class="section-title">Inventory</h2>
-              <form (submit)="$event.preventDefault(); saveSection('inventory')" class="mt-1">
-                <div class="divide-y divide-base-300">
-                  <div class="flex items-center justify-between gap-4 py-3">
-                    <span>
-                      <span class="block text-sm font-medium">Low-stock threshold</span>
-                      <span class="block text-xs text-base-content/60">
-                        Warn when available stock falls to this level.
-                      </span>
-                    </span>
-                    <input
-                      type="number"
-                      min="0"
-                      class="input input-bordered input-sm w-20 text-right"
-                      [formControl]="lowStock"
-                    />
-                  </div>
-                  <label class="flex cursor-pointer items-center justify-between gap-4 py-3">
-                    <span>
-                      <span class="block text-sm font-medium">Track expiry dates</span>
-                      <span class="block text-xs text-base-content/60">
-                        Show expiry fields on stock intake and warn about batches nearing expiry.
-                      </span>
-                    </span>
-                    <input
-                      type="checkbox"
-                      class="toggle toggle-primary"
-                      [formControl]="batchExpiry"
-                    />
-                  </label>
-                </div>
-                @if (!batchExpiry.value) {
-                  <div class="alert alert-info mt-2 py-2 text-sm">
-                    <app-icon name="heroInformationCircle" />
-                    <span
-                      >Expiry fields and alerts are hidden. Existing expiry history is
-                      retained.</span
-                    >
-                  </div>
-                }
-                <div class="mt-3">
-                  @if (msg('inventory'); as m) {
-                    <p class="mb-2 text-sm" [class.text-success]="m.ok" [class.text-error]="!m.ok">
-                      {{ m.text }}
-                    </p>
-                  }
-                  <button appButton type="submit" [loading]="busy()">Save inventory</button>
-                </div>
-              </form>
-            </div>
-          </div>
-
-          <!-- Locations -->
-          <div class="card bg-base-100">
-            <div class="card-body p-4">
-              <div class="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <div class="flex flex-wrap items-center gap-2">
-                    <h2 class="section-title">Stock locations</h2>
-                    @if (entitlements.snapshot(); as plan) {
-                      <span class="badge badge-outline badge-sm">{{
-                        plan.tierName ?? 'No plan'
-                      }}</span>
-                    }
-                  </div>
-                  <p class="type-caption mt-1">
-                    Locations separate where purchases are received and stock is held.
-                    @if (locationLimit(); as limit) {
-                      {{ locations().length }} of {{ limit }} used.
-                    }
-                  </p>
-                </div>
-                @if (perms.has('ManageStockAdjustments')) {
-                  <button
-                    appButton
-                    variant="outline"
-                    [disabled]="!canAddLocation()"
-                    (click)="startLocationCreate()"
-                  >
-                    <app-icon name="heroPlus" />
-                    Add location
-                  </button>
-                }
-              </div>
-
-              @if (!entitlements.enabled('multipleLocations') && locations().length > 0) {
-                <div class="alert alert-info mt-3 text-sm">
-                  <app-icon name="heroInformationCircle" />
-                  <span class="flex-1">
-                    Multiple locations are not included in your current plan. You can still rename
-                    and maintain the default location.
-                  </span>
-                  <a routerLink="/billing" class="link whitespace-nowrap font-semibold"
-                    >View plans</a
-                  >
-                </div>
-              } @else if (!canAddLocation() && locationLimit() !== null) {
-                <div class="alert alert-warning mt-3 text-sm">
-                  <app-icon name="heroExclamationTriangle" />
-                  <span class="flex-1">Your plan's stock-location limit has been reached.</span>
-                  <a routerLink="/billing" class="link whitespace-nowrap font-semibold">Upgrade</a>
-                </div>
-              }
-
-              @if (locationFormOpen()) {
-                <form
-                  (submit)="$event.preventDefault(); saveLocation()"
-                  class="mt-3 grid gap-3 border-t border-base-300 pt-3 sm:grid-cols-2"
-                >
-                  <app-form-field label="Location name" [required]="true">
-                    <input
-                      class="input input-bordered input-sm w-full"
-                      [formControl]="locationName"
-                    />
-                  </app-form-field>
-                  <app-form-field
-                    label="Code"
-                    [required]="true"
-                    hint="Short uppercase code, e.g. WESTLANDS"
-                  >
-                    <input
-                      class="input input-bordered input-sm w-full uppercase"
-                      placeholder="e.g. WESTLANDS"
-                      [formControl]="locationCode"
-                    />
-                  </app-form-field>
-                  <label class="label cursor-pointer justify-start gap-2 py-0 sm:col-span-2">
-                    <input
-                      type="checkbox"
-                      class="checkbox checkbox-sm"
-                      [formControl]="locationDefault"
-                    />
-                    <span class="label-text">Use as the default receiving location</span>
-                  </label>
-                  <div class="flex gap-2 sm:col-span-2">
-                    <button
-                      appButton
-                      type="submit"
-                      [loading]="locationBusy()"
-                      [disabled]="
-                        locationName.value.trim().length === 0 ||
-                        locationCode.value.trim().length === 0
-                      "
-                    >
-                      {{ editingLocation() ? 'Save location' : 'Create location' }}
-                    </button>
-                    <button appButton variant="ghost" type="button" (click)="closeLocationForm()">
-                      Cancel
-                    </button>
-                  </div>
-                </form>
-              }
-
-              @if (locationMessage(); as message) {
-                <p
-                  class="mt-2 text-sm"
-                  [class.text-success]="message.ok"
-                  [class.text-error]="!message.ok"
-                >
-                  {{ message.text }}
-                </p>
-              }
-
-              <app-mobile-list class="mt-3">
-                @for (location of locations(); track location.id) {
-                  <div mobileListRow class="p-3">
-                    <div class="flex items-center gap-3">
-                      <div class="min-w-0 flex-1">
-                        <div class="flex items-center gap-2">
-                          <p class="truncate font-semibold">{{ location.name }}</p>
-                          @if (location.is_default) {
-                            <span class="badge badge-primary badge-xs">Default</span>
-                          }
-                        </div>
-                        <p class="type-caption mt-1 font-mono">{{ location.code }}</p>
-                      </div>
-                      @if (perms.has('ManageStockAdjustments')) {
-                        <button
-                          appButton
-                          variant="ghost"
-                          size="sm"
-                          (click)="startLocationEdit(location)"
+                    <!-- Till sessions -->
+                    <div class="py-3">
+                      <label class="flex cursor-pointer items-center justify-between gap-4">
+                        <span>
+                          <span class="block text-sm font-medium">Track till sessions</span>
+                          <span class="block text-xs text-base-content/60">
+                            Require an open till for payments and keep opening, closing, and
+                            variance counts.
+                          </span>
+                        </span>
+                        <input
+                          type="checkbox"
+                          class="toggle toggle-primary"
+                          [formControl]="cashControl"
+                        />
+                      </label>
+                      <div
+                        class="ml-4 mt-1 border-l-2 border-base-300 pl-4"
+                        [class.opacity-40]="!cashControl.value"
+                      >
+                        <label
+                          class="flex items-center justify-between gap-4 py-2"
+                          [class.cursor-pointer]="cashControl.value"
                         >
-                          Edit
-                        </button>
-                        @if (!location.is_default) {
-                          <button
-                            appButton
-                            variant="error"
-                            size="sm"
-                            (click)="startLocationDelete(location)"
-                          >
-                            Delete
-                          </button>
+                          <span>
+                            <span class="block text-sm font-medium">Require opening count</span>
+                            <span class="block text-xs text-base-content/60">
+                              Count cash in the drawer before a till can be used.
+                            </span>
+                          </span>
+                          <input
+                            type="checkbox"
+                            class="toggle toggle-primary"
+                            [formControl]="requireOpening"
+                            [attr.disabled]="!cashControl.value ? '' : null"
+                          />
+                        </label>
+                        @if (cashControl.value && !requireOpening.value) {
+                          <p class="flex items-center gap-1 pb-1 text-xs text-info">
+                            <app-icon name="heroInformationCircle" size="sm" />
+                            Tills will open immediately using current balances; closing counts still
+                            apply.
+                          </p>
                         }
-                      }
+                      </div>
+                    </div>
+
+                    <!-- Proforma validity -->
+                    <div class="flex items-center justify-between gap-4 py-3">
+                      <span>
+                        <span class="block text-sm font-medium">Proforma validity</span>
+                        <span class="block text-xs text-base-content/60">
+                          Applies to newly created proformas. Default: 30 days.
+                        </span>
+                      </span>
+                      <label class="flex items-center gap-2">
+                        <input
+                          type="number"
+                          min="1"
+                          max="3650"
+                          class="input input-bordered input-sm w-20 text-right"
+                          [formControl]="proformaValidityDays"
+                        />
+                        <span class="text-xs text-base-content/60">days</span>
+                      </label>
                     </div>
                   </div>
-                }
-              </app-mobile-list>
-              <div class="mt-3 hidden lg:block">
-                <table class="table table-sm">
-                  <thead>
-                    <tr>
-                      <th>Location</th>
-                      <th>Code</th>
-                      <th>Status</th>
-                      <th class="text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    @for (location of locations(); track location.id) {
-                      <tr>
-                        <td class="font-medium">{{ location.name }}</td>
-                        <td class="font-mono text-xs">{{ location.code }}</td>
-                        <td>
-                          @if (location.is_default) {
-                            <span class="badge badge-primary badge-sm">Default</span>
-                          } @else {
-                            <span class="badge badge-ghost badge-sm">Additional</span>
-                          }
-                        </td>
-                        <td class="whitespace-nowrap text-right">
-                          @if (perms.has('ManageStockAdjustments')) {
-                            <button
-                              appButton
-                              variant="ghost"
-                              size="sm"
-                              (click)="startLocationEdit(location)"
-                            >
-                              Edit
-                            </button>
-                            @if (!location.is_default) {
-                              <button
-                                appButton
-                                variant="error"
-                                size="sm"
-                                (click)="startLocationDelete(location)"
-                              >
-                                Delete
-                              </button>
-                            }
-                          }
-                        </td>
-                      </tr>
+
+                  <div class="mt-3">
+                    @if (msg('pos'); as m) {
+                      <p
+                        class="mb-2 text-sm"
+                        [class.text-success]="m.ok"
+                        [class.text-error]="!m.ok"
+                      >
+                        {{ m.text }}
+                      </p>
                     }
-                  </tbody>
-                </table>
+                    <button appButton type="submit" [loading]="busy()">Save POS settings</button>
+                  </div>
+                </form>
               </div>
             </div>
-          </div>
 
-          <!-- Cash control threshold -->
-          <div class="card bg-base-100">
-            <div class="card-body p-4">
-              <h2 class="section-title">Variance notifications</h2>
-              <p class="type-caption mt-1">
-                Flag drawer variances at or above
-                <app-money [amount]="s.variance_notification_threshold" [showCurrency]="true" />.
-              </p>
-              @if (!cashControl.value) {
-                <div class="alert alert-info mt-2 py-2 text-sm">
-                  <app-icon name="heroInformationCircle" />
-                  <span>This threshold applies when till-session cash control is enabled.</span>
+            <!-- Inventory -->
+            <div class="card bg-base-100">
+              <div class="card-body p-4">
+                <h2 class="section-title">Inventory</h2>
+                <form (submit)="$event.preventDefault(); saveSection('inventory')" class="mt-1">
+                  <div class="divide-y divide-base-300">
+                    <div class="flex items-center justify-between gap-4 py-3">
+                      <span>
+                        <span class="block text-sm font-medium">Low-stock threshold</span>
+                        <span class="block text-xs text-base-content/60">
+                          Warn when available stock falls to this level.
+                        </span>
+                      </span>
+                      <input
+                        type="number"
+                        min="0"
+                        class="input input-bordered input-sm w-20 text-right"
+                        [formControl]="lowStock"
+                      />
+                    </div>
+                    <label class="flex cursor-pointer items-center justify-between gap-4 py-3">
+                      <span>
+                        <span class="block text-sm font-medium">Track expiry dates</span>
+                        <span class="block text-xs text-base-content/60">
+                          Show expiry fields on stock intake and warn about batches nearing expiry.
+                        </span>
+                      </span>
+                      <input
+                        type="checkbox"
+                        class="toggle toggle-primary"
+                        [formControl]="batchExpiry"
+                      />
+                    </label>
+                  </div>
+                  @if (!batchExpiry.value) {
+                    <div class="alert alert-info mt-2 py-2 text-sm">
+                      <app-icon name="heroInformationCircle" />
+                      <span
+                        >Expiry fields and alerts are hidden. Existing expiry history is
+                        retained.</span
+                      >
+                    </div>
+                  }
+                  <div class="mt-3">
+                    @if (msg('inventory'); as m) {
+                      <p
+                        class="mb-2 text-sm"
+                        [class.text-success]="m.ok"
+                        [class.text-error]="!m.ok"
+                      >
+                        {{ m.text }}
+                      </p>
+                    }
+                    <button appButton type="submit" [loading]="busy()">Save inventory</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+
+            <!-- Locations -->
+            <div class="card bg-base-100">
+              <div class="card-body p-4">
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <div class="flex flex-wrap items-center gap-2">
+                      <h2 class="section-title">Stock locations</h2>
+                      @if (entitlements.snapshot(); as plan) {
+                        <span class="badge badge-outline badge-sm">{{
+                          plan.tierName ?? 'No plan'
+                        }}</span>
+                      }
+                    </div>
+                    <p class="type-caption mt-1">
+                      Locations separate where purchases are received and stock is held.
+                      @if (locationLimit(); as limit) {
+                        {{ locations().length }} of {{ limit }} used.
+                      }
+                    </p>
+                  </div>
+                  @if (perms.has('ManageStockAdjustments')) {
+                    <button
+                      appButton
+                      variant="outline"
+                      [disabled]="!canAddLocation()"
+                      (click)="startLocationCreate()"
+                    >
+                      <app-icon name="heroPlus" />
+                      Add location
+                    </button>
+                  }
                 </div>
-              }
-              <form (submit)="$event.preventDefault(); saveSection('cash')" class="mt-2 max-w-40">
-                <app-form-field label="Threshold (KES)">
-                  <input
-                    type="text"
-                    inputmode="numeric"
-                    class="input input-bordered input-sm w-full"
-                    [formControl]="varianceThreshold"
-                  />
-                </app-form-field>
-                @if (msg('cash'); as m) {
-                  <p class="mt-2 text-sm" [class.text-success]="m.ok" [class.text-error]="!m.ok">
-                    {{ m.text }}
+
+                @if (!entitlements.enabled('multipleLocations') && locations().length > 0) {
+                  <div class="alert alert-info mt-3 text-sm">
+                    <app-icon name="heroInformationCircle" />
+                    <span class="flex-1">
+                      Multiple locations are not included in your current plan. You can still rename
+                      and maintain the default location.
+                    </span>
+                    <a routerLink="/billing" class="link whitespace-nowrap font-semibold"
+                      >View plans</a
+                    >
+                  </div>
+                } @else if (!canAddLocation() && locationLimit() !== null) {
+                  <div class="alert alert-warning mt-3 text-sm">
+                    <app-icon name="heroExclamationTriangle" />
+                    <span class="flex-1">Your plan's stock-location limit has been reached.</span>
+                    <a routerLink="/billing" class="link whitespace-nowrap font-semibold"
+                      >Upgrade</a
+                    >
+                  </div>
+                }
+
+                @if (locationFormOpen()) {
+                  <form
+                    (submit)="$event.preventDefault(); saveLocation()"
+                    class="mt-3 grid gap-3 border-t border-base-300 pt-3 sm:grid-cols-2"
+                  >
+                    <app-form-field label="Location name" [required]="true">
+                      <input
+                        class="input input-bordered input-sm w-full"
+                        [formControl]="locationName"
+                      />
+                    </app-form-field>
+                    <app-form-field
+                      label="Code"
+                      [required]="true"
+                      hint="Short uppercase code, e.g. WESTLANDS"
+                    >
+                      <input
+                        class="input input-bordered input-sm w-full uppercase"
+                        placeholder="e.g. WESTLANDS"
+                        [formControl]="locationCode"
+                      />
+                    </app-form-field>
+                    <label class="label cursor-pointer justify-start gap-2 py-0 sm:col-span-2">
+                      <input
+                        type="checkbox"
+                        class="checkbox checkbox-sm"
+                        [formControl]="locationDefault"
+                      />
+                      <span class="label-text">Use as the default receiving location</span>
+                    </label>
+                    <div class="flex gap-2 sm:col-span-2">
+                      <button
+                        appButton
+                        type="submit"
+                        [loading]="locationBusy()"
+                        [disabled]="
+                          locationName.value.trim().length === 0 ||
+                          locationCode.value.trim().length === 0
+                        "
+                      >
+                        {{ editingLocation() ? 'Save location' : 'Create location' }}
+                      </button>
+                      <button appButton variant="ghost" type="button" (click)="closeLocationForm()">
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                }
+
+                @if (locationMessage(); as message) {
+                  <p
+                    class="mt-2 text-sm"
+                    [class.text-success]="message.ok"
+                    [class.text-error]="!message.ok"
+                  >
+                    {{ message.text }}
                   </p>
                 }
-                <button appButton type="submit" class="mt-3" [loading]="busy()">
-                  Save threshold
-                </button>
-              </form>
+
+                <app-mobile-list class="mt-3">
+                  @for (location of locations(); track location.id) {
+                    <div mobileListRow class="p-3">
+                      <div class="flex items-center gap-3">
+                        <div class="min-w-0 flex-1">
+                          <div class="flex items-center gap-2">
+                            <p class="truncate font-semibold">{{ location.name }}</p>
+                            @if (location.is_default) {
+                              <span class="badge badge-primary badge-xs">Default</span>
+                            }
+                          </div>
+                          <p class="type-caption mt-1 font-mono">{{ location.code }}</p>
+                        </div>
+                        @if (perms.has('ManageStockAdjustments')) {
+                          <button
+                            appButton
+                            variant="ghost"
+                            size="sm"
+                            (click)="startLocationEdit(location)"
+                          >
+                            Edit
+                          </button>
+                          @if (!location.is_default) {
+                            <button
+                              appButton
+                              variant="error"
+                              size="sm"
+                              (click)="startLocationDelete(location)"
+                            >
+                              Delete
+                            </button>
+                          }
+                        }
+                      </div>
+                    </div>
+                  }
+                </app-mobile-list>
+                <div class="mt-3 hidden lg:block">
+                  <table class="table table-sm">
+                    <thead>
+                      <tr>
+                        <th>Location</th>
+                        <th>Code</th>
+                        <th>Status</th>
+                        <th class="text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (location of locations(); track location.id) {
+                        <tr>
+                          <td class="font-medium">{{ location.name }}</td>
+                          <td class="font-mono text-xs">{{ location.code }}</td>
+                          <td>
+                            @if (location.is_default) {
+                              <span class="badge badge-primary badge-sm">Default</span>
+                            } @else {
+                              <span class="badge badge-ghost badge-sm">Additional</span>
+                            }
+                          </td>
+                          <td class="whitespace-nowrap text-right">
+                            @if (perms.has('ManageStockAdjustments')) {
+                              <button
+                                appButton
+                                variant="ghost"
+                                size="sm"
+                                (click)="startLocationEdit(location)"
+                              >
+                                Edit
+                              </button>
+                              @if (!location.is_default) {
+                                <button
+                                  appButton
+                                  variant="error"
+                                  size="sm"
+                                  (click)="startLocationDelete(location)"
+                                >
+                                  Delete
+                                </button>
+                              }
+                            }
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
-          </div>
+          }
+
+          @if (activeTab() === 'money') {
+            <!-- Cash control threshold -->
+            <div class="card bg-base-100">
+              <div class="card-body p-4">
+                <h2 class="section-title">Variance notifications</h2>
+                <p class="type-caption mt-1">
+                  Flag drawer variances at or above
+                  <app-money [amount]="s.variance_notification_threshold" [showCurrency]="true" />.
+                </p>
+                @if (!cashControl.value) {
+                  <div class="alert alert-info mt-2 py-2 text-sm">
+                    <app-icon name="heroInformationCircle" />
+                    <span>This threshold applies when till-session cash control is enabled.</span>
+                  </div>
+                }
+                <form (submit)="$event.preventDefault(); saveSection('cash')" class="mt-2 max-w-40">
+                  <app-form-field label="Threshold (KES)">
+                    <input
+                      type="text"
+                      inputmode="numeric"
+                      class="input input-bordered input-sm w-full"
+                      [formControl]="varianceThreshold"
+                    />
+                  </app-form-field>
+                  @if (msg('cash'); as m) {
+                    <p class="mt-2 text-sm" [class.text-success]="m.ok" [class.text-error]="!m.ok">
+                      {{ m.text }}
+                    </p>
+                  }
+                  <button appButton type="submit" class="mt-3" [loading]="busy()">
+                    Save threshold
+                  </button>
+                </form>
+              </div>
+            </div>
+          }
 
           <!-- Commissions -->
-          @if (entitlements.enabled('commissions') && perms.has('ManageCommissions')) {
+          @if (
+            activeTab() === 'money' &&
+            entitlements.enabled('commissions') &&
+            perms.has('ManageCommissions')
+          ) {
             <div class="card bg-base-100">
               <div class="card-body p-4">
                 <div class="flex flex-wrap items-center justify-between gap-3">
@@ -653,7 +702,7 @@ const PUBLIC_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
             </div>
           }
 
-          @if (perms.has('ManageCommunications')) {
+          @if (activeTab() === 'communications' && perms.has('ManageCommunications')) {
             <div class="card bg-base-100">
               <div class="card-body p-4">
                 <div
@@ -767,7 +816,7 @@ const PUBLIC_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
             </div>
           }
 
-          @if (perms.has('ManageReconciliation')) {
+          @if (activeTab() === 'money' && perms.has('ManageReconciliation')) {
             <div class="card bg-base-100">
               <div class="card-body p-4">
                 <div class="flex items-center justify-between">
@@ -944,6 +993,229 @@ const PUBLIC_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
               </div>
             </div>
           }
+
+          @if (activeTab() === 'communications' && !perms.has('ManageCommunications')) {
+            <div class="card bg-base-100">
+              <div class="card-body p-4">
+                <h2 class="section-title">Messages</h2>
+                <p class="type-caption mt-1">
+                  Your role does not include access to communication settings.
+                </p>
+              </div>
+            </div>
+          }
+
+          @if (activeTab() === 'data') {
+            <div class="card border border-warning/30 bg-base-100">
+              <div class="card-body gap-4 p-4">
+                <div>
+                  <h2 class="section-title">Data import &amp; export</h2>
+                  <p class="type-caption mt-1">
+                    These files can contain private business and customer information. Store and
+                    share them carefully.
+                  </p>
+                </div>
+
+                <div class="alert alert-info text-sm">
+                  <app-icon name="heroInformationCircle" />
+                  <span>
+                    Exports read from the app's existing device cache instead of running a separate
+                    full-data query. Refresh the related screen first when you need the latest
+                    snapshot.
+                  </span>
+                </div>
+
+                @if (dataMessage(); as message) {
+                  <div
+                    role="status"
+                    class="alert text-sm"
+                    [class.alert-success]="message.ok"
+                    [class.alert-error]="!message.ok"
+                  >
+                    <span>{{ message.text }}</span>
+                  </div>
+                }
+
+                <div class="grid gap-3 md:grid-cols-2">
+                  @if (perms.has('ManageCatalog')) {
+                    <section class="rounded-box border border-base-300 p-4">
+                      <div class="flex items-start gap-3">
+                        <span
+                          class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary"
+                        >
+                          <app-icon name="heroArchiveBox" />
+                        </span>
+                        <div class="min-w-0 flex-1">
+                          <h3 class="font-semibold">Product catalog</h3>
+                          <p class="type-caption mt-1">
+                            {{ catalogCache.families().length }} products ·
+                            {{ catalogCache.catalog().length }} variants
+                            @if (!catalogCache.loaded()) {
+                              · not cached yet
+                            } @else if (catalogCache.catalogTruncated()) {
+                              · limited cache
+                            }
+                          </p>
+                          <p class="mt-2 text-xs text-base-content/60">
+                            Excel export. Product import supports previewed merge updates; replace
+                            is not offered for cache snapshots.
+                          </p>
+                        </div>
+                      </div>
+                      <div class="mt-4 flex flex-wrap gap-2">
+                        <button
+                          appButton
+                          variant="outline"
+                          size="sm"
+                          type="button"
+                          [loading]="dataExportBusy() === 'catalog'"
+                          [disabled]="dataExportBusy() !== null"
+                          (click)="exportCatalog()"
+                        >
+                          <app-icon name="heroArrowDownTray" /> Export
+                        </button>
+                        <button
+                          appButton
+                          variant="secondary"
+                          size="sm"
+                          type="button"
+                          [disabled]="dataExportBusy() !== null"
+                          (click)="importOpen.set(true)"
+                        >
+                          <app-icon name="heroArrowUpTray" /> Import
+                        </button>
+                      </div>
+                    </section>
+
+                    <section class="rounded-box border border-base-300 p-4">
+                      <div class="flex items-start gap-3">
+                        <span
+                          class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary"
+                        >
+                          <app-icon name="heroCube" />
+                        </span>
+                        <div class="min-w-0 flex-1">
+                          <h3 class="font-semibold">Inventory snapshot</h3>
+                          <p class="type-caption mt-1">
+                            {{ catalogCache.catalog().length }} variants · current location
+                          </p>
+                          <p class="mt-2 text-xs text-base-content/60">
+                            Excel with cached quantities, values, prices, SKUs and barcodes. Export
+                            only—stock changes belong in stock adjustments.
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        appButton
+                        variant="outline"
+                        size="sm"
+                        class="mt-4"
+                        type="button"
+                        [loading]="dataExportBusy() === 'inventory'"
+                        [disabled]="dataExportBusy() !== null"
+                        (click)="exportCached('inventory')"
+                      >
+                        <app-icon name="heroArrowDownTray" /> Export Excel
+                      </button>
+                    </section>
+                  }
+
+                  @if (perms.has('ManageCustomers')) {
+                    <section class="rounded-box border border-base-300 p-4">
+                      <h3 class="font-semibold">Customers</h3>
+                      <p class="type-caption mt-1">
+                        {{ partyCache.customerRows().length }} cached customers
+                        @if (!partyCache.loaded()) {
+                          · not cached yet
+                        } @else if (!partyCache.complete()) {
+                          · partial cache
+                        }
+                      </p>
+                      <p class="mt-2 text-xs text-base-content/60">
+                        Excel with contact, credit and balance fields. Export only while a validated
+                        customer import workflow is not available.
+                      </p>
+                      <button
+                        appButton
+                        variant="outline"
+                        size="sm"
+                        class="mt-4"
+                        type="button"
+                        [loading]="dataExportBusy() === 'customers'"
+                        [disabled]="dataExportBusy() !== null"
+                        (click)="exportCached('customers')"
+                      >
+                        <app-icon name="heroArrowDownTray" /> Export Excel
+                      </button>
+                    </section>
+                  }
+
+                  @if (perms.has('ManageSupplierCreditPurchases')) {
+                    <section class="rounded-box border border-base-300 p-4">
+                      <h3 class="font-semibold">Suppliers</h3>
+                      <p class="type-caption mt-1">
+                        {{ partyCache.suppliers().length }} cached suppliers
+                        @if (!partyCache.loaded()) {
+                          · not cached yet
+                        } @else if (!partyCache.complete()) {
+                          · partial cache
+                        }
+                      </p>
+                      <p class="mt-2 text-xs text-base-content/60">
+                        Excel with contacts, payment terms and payable balances. Export only.
+                      </p>
+                      <button
+                        appButton
+                        variant="outline"
+                        size="sm"
+                        class="mt-4"
+                        type="button"
+                        [loading]="dataExportBusy() === 'suppliers'"
+                        [disabled]="dataExportBusy() !== null"
+                        (click)="exportCached('suppliers')"
+                      >
+                        <app-icon name="heroArrowDownTray" /> Export Excel
+                      </button>
+                    </section>
+                  }
+
+                  @if (perms.has('ViewFinancials')) {
+                    <section class="rounded-box border border-base-300 p-4">
+                      <h3 class="font-semibold">Recent sales</h3>
+                      <p class="type-caption mt-1">
+                        {{ recentSales.orders().length }} cached sales · current location
+                        @if (!recentSales.loaded()) {
+                          · not cached yet
+                        }
+                      </p>
+                      <p class="mt-2 text-xs text-base-content/60">
+                        Excel of the latest cached sales (up to 100). Export only; this is a
+                        snapshot, not a complete accounting archive.
+                      </p>
+                      <button
+                        appButton
+                        variant="outline"
+                        size="sm"
+                        class="mt-4"
+                        type="button"
+                        [loading]="dataExportBusy() === 'recent-sales'"
+                        [disabled]="dataExportBusy() !== null"
+                        (click)="exportCached('recent-sales')"
+                      >
+                        <app-icon name="heroArrowDownTray" /> Export Excel
+                      </button>
+                    </section>
+                  }
+                </div>
+
+                @if (!canTransferData()) {
+                  <p class="type-caption">
+                    Your role does not include access to any available data exports.
+                  </p>
+                }
+              </div>
+            </div>
+          }
         </div>
       } @else {
         @if (loadError()) {
@@ -958,6 +1230,11 @@ const PUBLIC_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
           <p class="text-sm text-base-content/60">Loading…</p>
         }
       }
+
+      <app-product-import-dialog
+        [(open)]="importOpen"
+        (imported)="productImportCompleted($event)"
+      />
 
       <app-delete-confirmation-modal
         [data]="locationDeleteData()"
@@ -975,8 +1252,33 @@ export class SettingsComponent implements OnInit {
   private readonly settingsService = inject(SettingsService);
   private readonly cashierSession = inject(CashierSessionService);
   private readonly receiptData = inject(ReceiptDataService);
+  private readonly productTransfer = inject(ProductTransferService);
+  private readonly cachedDataExport = inject(CachedDataExportService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
+  private readonly destroyRef = inject(DestroyRef);
   protected readonly entitlements = inject(EntitlementsService);
   protected readonly perms = inject(PermissionsService);
+  protected readonly catalogCache = inject(CatalogCacheService);
+  protected readonly partyCache = inject(PartyCacheService);
+  protected readonly recentSales = inject(RecentSalesCacheService);
+
+  protected readonly settingsTabs = computed(() =>
+    SETTINGS_TABS.filter(
+      tab => tab.key !== 'communications' || this.perms.has('ManageCommunications')
+    )
+  );
+  protected readonly activeTab = signal<SettingsTab>('business');
+  protected readonly dataExportBusy = signal<'catalog' | CachedExportKind | null>(null);
+  protected readonly dataMessage = signal<{ ok: boolean; text: string } | null>(null);
+  protected readonly importOpen = signal(false);
+  protected readonly canTransferData = computed(
+    () =>
+      this.perms.has('ManageCatalog') ||
+      this.perms.has('ManageCustomers') ||
+      this.perms.has('ManageSupplierCreditPurchases') ||
+      this.perms.has('ViewFinancials')
+  );
 
   protected readonly settings = signal<CompanySettings | null>(null);
   protected readonly paymentMethods = signal<PaymentMethodRow[]>([]);
@@ -1042,8 +1344,69 @@ export class SettingsComponent implements OnInit {
   protected readonly locationCode = new FormControl('', { nonNullable: true });
   protected readonly locationDefault = new FormControl(false, { nonNullable: true });
 
+  constructor() {
+    this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(params => {
+      const requested = params.get('tab') as SettingsTab | null;
+      this.activeTab.set(
+        requested && SETTINGS_TABS.some(tab => tab.key === requested) ? requested : 'business'
+      );
+    });
+  }
+
   async ngOnInit(): Promise<void> {
     await this.load();
+  }
+
+  protected selectTab(tab: SettingsTab): void {
+    this.activeTab.set(tab);
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { tab: tab === 'business' ? null : tab },
+      queryParamsHandling: 'merge',
+    });
+  }
+
+  protected async exportCatalog(): Promise<void> {
+    this.dataExportBusy.set('catalog');
+    this.dataMessage.set(null);
+    try {
+      await this.productTransfer.exportCatalog();
+      this.dataMessage.set({ ok: true, text: 'Product catalog downloaded.' });
+    } catch (err) {
+      this.dataMessage.set({
+        ok: false,
+        text: err instanceof Error ? err.message : 'Product export failed.',
+      });
+    } finally {
+      this.dataExportBusy.set(null);
+    }
+  }
+
+  protected async exportCached(kind: CachedExportKind): Promise<void> {
+    this.dataExportBusy.set(kind);
+    this.dataMessage.set(null);
+    try {
+      const result = await this.cachedDataExport.export(kind);
+      this.dataMessage.set({
+        ok: true,
+        text: `${result.rows} row${result.rows === 1 ? '' : 's'} exported to ${result.filename}.`,
+      });
+    } catch (err) {
+      this.dataMessage.set({
+        ok: false,
+        text: err instanceof Error ? err.message : 'Export failed.',
+      });
+    } finally {
+      this.dataExportBusy.set(null);
+    }
+  }
+
+  protected async productImportCompleted(result: CatalogImportResult): Promise<void> {
+    this.dataMessage.set({
+      ok: true,
+      text: `Import complete: ${result.created ?? 0} created, ${result.updated ?? 0} updated, ${result.deactivated_products ?? 0} deactivated.`,
+    });
+    await this.catalogCache.refresh();
   }
 
   protected async load(): Promise<void> {

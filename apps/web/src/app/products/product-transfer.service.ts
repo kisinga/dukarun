@@ -1,5 +1,8 @@
 import { Injectable, inject } from '@angular/core';
 import type { Cell, Workbook, Worksheet } from 'exceljs';
+import { CatalogCacheService } from '../core/catalog-cache.service';
+import { LocationContextService } from '../core/location-context.service';
+import { createExcelWorkbook } from '../shared/excel-workbook';
 import { SupabaseService } from '../core/supabase.service';
 
 export type ProductImportMode = 'merge' | 'replace';
@@ -116,18 +119,20 @@ const MAX_FILE_BYTES = 10 * 1024 * 1024;
 @Injectable({ providedIn: 'root' })
 export class ProductTransferService {
   private readonly supabase = inject(SupabaseService);
+  private readonly catalogCache = inject(CatalogCacheService);
+  private readonly locationContext = inject(LocationContextService);
 
   async exportCatalog(): Promise<void> {
-    const marker = await this.startCatalogExport();
-    const [products, variants, manufacturers, locations] = await Promise.all([
-      this.allProducts(),
-      this.allVariants(),
-      this.allManufacturers(),
-      this.allLocations(),
-    ]);
-    const manufacturerNames = new Map(manufacturers.map(item => [item.id, item.name]));
-    const exportedAt = marker.exportedAt;
-    const workbook = await this.baseWorkbook(locations.map(item => item.code));
+    await this.catalogCache.ensureLoaded();
+    if (!this.catalogCache.loaded()) {
+      throw new Error('No cached product catalog is available on this device yet.');
+    }
+    const products = this.catalogCache.families();
+    const variants = this.catalogCache.catalog();
+    const exportedAt = this.catalogCache.fetchedAt() ?? new Date().toISOString();
+    const workbook = await this.baseWorkbook(
+      this.locationContext.locations().map(item => item.code)
+    );
     const sheet = workbook.getWorksheet('Products')!;
 
     for (const product of products) {
@@ -136,20 +141,20 @@ export class ProductTransferService {
         sheet.addRow([
           product.id,
           product.id,
-          variant.id,
+          variant.variant_id,
           product.name,
-          product.manufacturer_id ? (manufacturerNames.get(product.manufacturer_id) ?? '') : '',
+          variant.manufacturer_name ?? '',
           product.barcode ?? '',
           product.active,
-          variant.name === 'Default' ? '' : variant.name,
-          variant.sku,
+          variant.variant_name === 'Default' ? '' : (variant.variant_name ?? ''),
+          variant.sku ?? '',
           variant.barcode ?? '',
-          variant.kind,
-          variant.price,
+          variant.kind ?? 'good',
+          variant.price ?? 0,
           variant.wholesale_price ?? '',
-          variant.track_inventory,
-          variant.allow_fractional,
-          variant.active,
+          variant.track_inventory ?? true,
+          variant.allow_fractional ?? false,
+          variant.variant_active ?? true,
           '',
           '',
           '',
@@ -159,7 +164,7 @@ export class ProductTransferService {
       }
     }
 
-    this.addMetadata(workbook, exportedAt, 'full', marker.exportId);
+    this.addMetadata(workbook, exportedAt, 'cached');
     this.finishProductsSheet(sheet);
     await this.download(workbook, `dukarun-products-${exportedAt.slice(0, 10)}.xlsx`);
   }
@@ -198,8 +203,7 @@ export class ProductTransferService {
 
   async preview(file: File): Promise<CatalogImportPreview> {
     if (file.size > MAX_FILE_BYTES) throw new Error('Workbook must be 10 MB or smaller.');
-    const { Workbook } = await import('exceljs');
-    const workbook = new Workbook();
+    const workbook = await createExcelWorkbook();
     await workbook.xlsx.load(await file.arrayBuffer());
     const sheet = workbook.getWorksheet('Products');
     if (!sheet) throw new Error('Workbook needs a Products sheet.');
@@ -485,8 +489,7 @@ export class ProductTransferService {
   }
 
   private async baseWorkbook(locationCodes: string[]): Promise<Workbook> {
-    const { Workbook } = await import('exceljs');
-    const workbook = new Workbook();
+    const workbook = await createExcelWorkbook();
     workbook.creator = 'DukaRun';
     workbook.created = new Date();
     const products = workbook.addWorksheet('Products', {
@@ -578,7 +581,7 @@ export class ProductTransferService {
   private addMetadata(
     workbook: Workbook,
     exportedAt: string,
-    exportType: 'full' | 'template',
+    exportType: 'cached' | 'full' | 'template',
     exportId = ''
   ): void {
     const metadata = workbook.addWorksheet('_DukaRun Metadata', { state: 'veryHidden' });
@@ -686,18 +689,6 @@ export class ProductTransferService {
     ) as Promise<ProductRow[]>;
   }
 
-  private async startCatalogExport(): Promise<{ exportId: string; exportedAt: string }> {
-    const { data, error } = await this.supabase.client.rpc('start_catalog_export');
-    if (error) throw error;
-    const marker = data as { export_id?: unknown; exported_at?: unknown } | null;
-    const exportId = String(marker?.export_id ?? '');
-    const exportedAt = String(marker?.exported_at ?? '');
-    if (!UUID.test(exportId) || Number.isNaN(Date.parse(exportedAt))) {
-      throw new Error('Server returned an invalid catalog export marker.');
-    }
-    return { exportId, exportedAt };
-  }
-
   private locationId(locations: Map<string, string>, code: string): string {
     const id = locations.get(code);
     if (!id) throw new Error(`Unknown stock location code: ${code}`);
@@ -712,16 +703,6 @@ export class ProductTransferService {
         .order('id')
         .range(offset, offset + 999)
     ) as Promise<VariantRow[]>;
-  }
-
-  private async allManufacturers(): Promise<Array<{ id: string; name: string }>> {
-    return this.allPages(offset =>
-      this.supabase.client
-        .from('manufacturers')
-        .select('id,name')
-        .order('id')
-        .range(offset, offset + 999)
-    ) as Promise<Array<{ id: string; name: string }>>;
   }
 
   private async allLocations(): Promise<Array<{ id: string; code: string }>> {
