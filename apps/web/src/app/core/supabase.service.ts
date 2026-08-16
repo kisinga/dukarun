@@ -15,6 +15,11 @@ export interface AppIdentity {
   userId: string;
 }
 
+export interface TeamInvitationClaimResult {
+  claimed_count: number;
+  company_id: string | null;
+}
+
 export type Company = Pick<
   Database['public']['Tables']['companies']['Row'],
   'id' | 'name' | 'code'
@@ -57,9 +62,12 @@ export class SupabaseService {
       if (error) throw error;
       let session = data.session;
 
-      // Sessions issued before the multi-company token hook may still be
-      // valid but lack the tenant claim required by RLS. Refresh only those.
+      // A verified phone may have a team invitation waiting for it. Claim it
+      // before refreshing so the token hook can issue the tenant claim in the
+      // same session restoration pass. This also supports auth users created
+      // before the invitation existed.
       if (session && !this.decodeClaims(session.access_token)?.company_id) {
+        await this.claimTeamInvitations();
         const refreshed = await this.client.auth.refreshSession();
         if (refreshed.error) throw refreshed.error;
         session = refreshed.data.session;
@@ -101,6 +109,16 @@ export class SupabaseService {
   claims(): AppJwtClaims | null {
     const token = this.session()?.access_token;
     return token ? this.decodeClaims(token) : null;
+  }
+
+  async claimTeamInvitations(): Promise<TeamInvitationClaimResult> {
+    const { data, error } = await this.client.rpc('claim_team_invitations');
+    if (error) throw error;
+    const result = data as unknown as Partial<TeamInvitationClaimResult> | null;
+    return {
+      claimed_count: typeof result?.claimed_count === 'number' ? result.claimed_count : 0,
+      company_id: typeof result?.company_id === 'string' ? result.company_id : null,
+    };
   }
 
   private decodeClaims(token: string): AppJwtClaims | null {

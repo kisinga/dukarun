@@ -5,6 +5,7 @@ import { SupabaseService } from '../../core/supabase.service';
 import { normalizeKenyanPhone } from '../../core/phone';
 import { LegalService } from '../../legal/legal.service';
 import { siteUrl } from '../../core/public-url';
+import { hasRegistrationIntent } from '../../core/registration-intent';
 
 const RESEND_COOLDOWN_SECONDS = 60;
 
@@ -99,6 +100,7 @@ export class LoginComponent {
   private cooldownTimer: ReturnType<typeof setInterval> | null = null;
   private readonly requestedPlanCode = this.route.snapshot.queryParamMap.get('plan');
   private readonly requestedBlogRef = this.route.snapshot.queryParamMap.get('blog_ref');
+  private readonly registrationIntent = hasRegistrationIntent(this.route.snapshot.queryParamMap);
 
   constructor() {
     this.destroyRef.onDestroy(() => this.clearCooldownTimer());
@@ -135,24 +137,27 @@ export class LoginComponent {
         type: 'sms',
       });
       if (error) throw error;
+      // Claim a phone invitation before issuing the refreshed token. The RPC
+      // verifies the authenticated user's confirmed phone and never trusts a
+      // company or phone supplied by the browser.
+      await this.supabase.claimTeamInvitations();
       // OTP-issued tokens lack the custom claims (company_id, user_role);
       // refresh so permission-gated RPCs (settle/void/override) work.
-      await this.supabase.client.auth.refreshSession();
+      const { error: refreshError } = await this.supabase.client.auth.refreshSession();
+      if (refreshError) throw refreshError;
       const hasCompanyClaim = Boolean(this.supabase.claims()?.company_id);
       if (hasCompanyClaim) {
         await this.router.navigate(['/dashboard']);
         return;
       }
 
-      let target = '/register';
+      let target = this.registrationIntent ? '/register' : '/access-required';
       try {
         const legalStatus = await this.legal.refresh();
         if (legalStatus.company_status === 'unapproved') target = '/company/pending';
       } catch {
-        await this.router.navigate(['/company/pending'], {
-          queryParams: { returnUrl: '/register' },
-        });
-        return;
+        // Registration and invitation claiming remain explicit even if the
+        // optional legal-status lookup is temporarily unavailable.
       }
       await this.router.navigate([target], {
         queryParams:

@@ -144,12 +144,12 @@ const MEMBER_SORT_OPTIONS: readonly ListSortOption[] = [
           <app-drawer
             [open]="true"
             title="Add member"
-            subtitle="Assign their initial access role"
+            subtitle="Invite their verified phone number"
             [dirty]="memberFormDirty()"
             (closed)="resetMemberForm()"
           >
             <p class="type-caption">
-              The person must have logged in at least once before they can be added.
+              They will join this company automatically after signing in with the same phone number.
             </p>
             @if (!canAddMember()) {
               <div class="alert mt-2 border border-warning/20 bg-warning/5 text-sm">
@@ -224,6 +224,41 @@ const MEMBER_SORT_OPTIONS: readonly ListSortOption[] = [
         >
           <app-stat-bar summary [stats]="teamStats()" />
         </app-list-search-bar>
+
+        @if (invitations().length > 0) {
+          <section class="mb-3 rounded-box border border-warning/25 bg-warning/5 p-3">
+            <div class="mb-2">
+              <h2 class="text-sm font-semibold">Pending invitations</h2>
+              <p class="type-caption">
+                Reserved until the phone owner signs in or the invite expires.
+              </p>
+            </div>
+            <div class="grid gap-2">
+              @for (invitation of invitations(); track invitation.id) {
+                <div
+                  class="flex flex-wrap items-center justify-between gap-3 rounded-box bg-base-100 px-3 py-2"
+                >
+                  <div>
+                    <p class="table-primary">{{ invitation.display_name }}</p>
+                    <p class="table-secondary">
+                      {{ invitation.phone }} · {{ invitation.role_name }} · expires
+                      {{ date(invitation.expires_at) }}
+                    </p>
+                  </div>
+                  <button
+                    appButton
+                    variant="ghost"
+                    type="button"
+                    [disabled]="busy()"
+                    (click)="cancelInvitation(invitation.id, invitation.display_name)"
+                  >
+                    Cancel invite
+                  </button>
+                </div>
+              }
+            </div>
+          </section>
+        }
 
         @if (!loading() && filteredMembers().length === 0) {
           <app-empty-state
@@ -811,6 +846,7 @@ export class TeamComponent implements OnInit {
     },
   ] as const;
   protected readonly members = this.team.members;
+  protected readonly invitations = this.team.invitations;
   protected readonly roles = this.team.roles;
   protected readonly locations = this.team.locations;
   protected readonly membershipLocations = this.team.membershipLocations;
@@ -927,7 +963,9 @@ export class TeamComponent implements OnInit {
     },
     {
       label: 'Pending',
-      value: this.members().filter(member => member.authorization_status === 'pending').length,
+      value:
+        this.members().filter(member => member.authorization_status === 'pending').length +
+        this.invitations().length,
       tone: 'warning' as const,
       mobilePriority: 'secondary' as const,
     },
@@ -935,7 +973,7 @@ export class TeamComponent implements OnInit {
   ]);
   protected readonly canAddMember = computed(() => {
     const limit = this.memberLimit();
-    return limit === null || this.activeMemberCount() < limit;
+    return limit === null || this.activeMemberCount() + this.invitations().length < limit;
   });
 
   protected setTab(tab: 'members' | 'roles'): void {
@@ -1012,8 +1050,12 @@ export class TeamComponent implements OnInit {
         this.error.set('Enter the team member name');
         return;
       }
-      await this.team.addTeamMember(phone, this.memberRole.value, displayName);
-      this.notice.set(`Added ${displayName}`);
+      const result = await this.team.addTeamMember(phone, this.memberRole.value, displayName);
+      this.notice.set(
+        result.status === 'updated'
+          ? `Updated ${displayName}`
+          : `Invited ${displayName}. They can now sign in with ${phone}.`
+      );
       this.memberPhone.setValue('');
       this.memberName.setValue('');
       this.memberFormOpen.set(false);
@@ -1021,6 +1063,21 @@ export class TeamComponent implements OnInit {
     } catch (err) {
       // user_not_registered is the common one — show verbatim.
       this.error.set(err instanceof Error ? err.message : 'Add failed');
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected async cancelInvitation(invitationId: string, displayName: string): Promise<void> {
+    this.busy.set(true);
+    this.error.set(null);
+    this.notice.set(null);
+    try {
+      await this.team.cancelInvitation(invitationId);
+      this.notice.set(`Cancelled the invitation for ${displayName}`);
+      await this.load();
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Cancel failed');
     } finally {
       this.busy.set(false);
     }
