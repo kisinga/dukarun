@@ -6684,6 +6684,73 @@ export type Database = {
           },
         ]
       }
+      team_invitations: {
+        Row: {
+          accepted_at: string | null
+          accepted_by: string | null
+          company_id: string
+          created_at: string
+          display_name: string
+          expires_at: string
+          id: string
+          invited_by: string
+          phone: string
+          role_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          company_id: string
+          created_at?: string
+          display_name: string
+          expires_at?: string
+          id?: string
+          invited_by: string
+          phone: string
+          role_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          company_id?: string
+          created_at?: string
+          display_name?: string
+          expires_at?: string
+          id?: string
+          invited_by?: string
+          phone?: string
+          role_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_invitations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "team_invitations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "team_invitations_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "roles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_preferences: {
         Row: {
           active_company_id: string | null
@@ -7987,6 +8054,10 @@ export type Database = {
         Returns: undefined
       }
       assert_platform_admin: { Args: never; Returns: undefined }
+      assert_team_invitation_capacity: {
+        Args: { p_company_id: string; p_exclude_phone?: string }
+        Returns: undefined
+      }
       assign_commission_plan: {
         Args: {
           p_assignment_id?: string
@@ -8034,6 +8105,10 @@ export type Database = {
         Returns: number
       }
       cancel_purchase_draft: { Args: { p_draft_id: string }; Returns: string }
+      cancel_team_invitation: {
+        Args: { p_invitation_id: string }
+        Returns: string
+      }
       cashier_kes: { Args: { p_amount: number }; Returns: string }
       cashier_session_required_for_source: {
         Args: { p_source_type: string }
@@ -8112,6 +8187,7 @@ export type Database = {
         Returns: Json
       }
       claim_public_site_deployment: { Args: never; Returns: Json }
+      claim_team_invitations: { Args: never; Returns: Json }
       cleanup_abandoned_catalog_imports: { Args: never; Returns: number }
       close_accounting_period: { Args: { p_end_date: string }; Returns: string }
       close_cashier_session: {
@@ -8454,6 +8530,10 @@ export type Database = {
         Args: { p_company_id: string }
         Returns: undefined
       }
+      invite_team_member: {
+        Args: { p_display_name: string; p_phone: string; p_role_id: string }
+        Returns: Json
+      }
       is_approved_member: {
         Args: { p_company_id: string; p_user_id: string }
         Returns: boolean
@@ -8599,6 +8679,7 @@ export type Database = {
         Returns: string
       }
       normalize_legal_markdown: { Args: { p_content: string }; Returns: string }
+      normalize_team_phone: { Args: { p_phone: string }; Returns: string }
       notify: {
         Args: {
           p_body?: string

@@ -1,6 +1,7 @@
 import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
 import { SupabaseService } from './supabase.service';
+import { hasRegistrationIntent } from './registration-intent';
 
 export const authGuard: CanActivateFn = async route => {
   const supabase = inject(SupabaseService);
@@ -11,6 +12,7 @@ export const authGuard: CanActivateFn = async route => {
       ? true
       : router.createUrlTree(['/login'], {
           queryParams: {
+            register: route.routeConfig?.path === 'register' ? '1' : undefined,
             plan: route.queryParamMap.get('plan') ?? undefined,
             blog_ref: route.queryParamMap.get('blog_ref') ?? undefined,
           },
@@ -19,6 +21,7 @@ export const authGuard: CanActivateFn = async route => {
     // A stale or unreachable persisted session must not freeze navigation.
     return router.createUrlTree(['/login'], {
       queryParams: {
+        register: route.routeConfig?.path === 'register' ? '1' : undefined,
         plan: route.queryParamMap.get('plan') ?? undefined,
         blog_ref: route.queryParamMap.get('blog_ref') ?? undefined,
       },
@@ -26,12 +29,21 @@ export const authGuard: CanActivateFn = async route => {
   }
 };
 
-export const guestGuard: CanActivateFn = async () => {
+export const guestGuard: CanActivateFn = async route => {
   const supabase = inject(SupabaseService);
   const router = inject(Router);
   try {
     const session = await supabase.initializeSession();
-    return session ? router.createUrlTree(['/dashboard']) : true;
+    if (!session) return true;
+    if (supabase.claims()?.company_id) return router.createUrlTree(['/dashboard']);
+    return hasRegistrationIntent(route.queryParamMap)
+      ? router.createUrlTree(['/register'], {
+          queryParams: {
+            plan: route.queryParamMap.get('plan') ?? undefined,
+            blog_ref: route.queryParamMap.get('blog_ref') ?? undefined,
+          },
+        })
+      : router.createUrlTree(['/access-required']);
   } catch {
     // Keep login available so the user can replace an unusable stored session.
     return true;

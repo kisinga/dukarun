@@ -23,6 +23,23 @@ export type MembershipLocation =
   Database['public']['Tables']['company_membership_locations']['Row'];
 export type TeamLocation = Database['public']['Tables']['stock_locations']['Row'];
 
+export interface TeamInvitation {
+  id: string;
+  phone: string;
+  display_name: string;
+  role_id: string;
+  role_name: string;
+  created_at: string;
+  expires_at: string;
+}
+
+export interface InviteTeamMemberResult {
+  status: 'invited' | 'updated';
+  invitation_id?: string;
+  membership_id?: string;
+  expires_at?: string;
+}
+
 export type MembershipWithRole = Membership & {
   roles: Pick<Role, 'name' | 'permissions'> | null;
   staff_profile: Pick<StaffProfile, 'display_name' | 'last_role_name' | 'avatar_path'> | null;
@@ -32,6 +49,7 @@ interface TeamManagementSnapshot {
   company_id: string;
   primary_contact_user_id: string | null;
   members: MembershipWithRole[];
+  invitations: TeamInvitation[];
   roles: Role[];
   locations: TeamLocation[];
   membership_locations: MembershipLocation[];
@@ -55,6 +73,7 @@ export class TeamService {
   private readonly journal = inject(CacheJournalService);
 
   readonly members = signal<MembershipWithRole[]>([]);
+  readonly invitations = signal<TeamInvitation[]>([]);
   readonly roles = signal<Role[]>([]);
   readonly locations = signal<TeamLocation[]>([]);
   readonly membershipLocations = signal<MembershipLocation[]>([]);
@@ -225,6 +244,7 @@ export class TeamService {
 
   private commit(snapshot: TeamManagementSnapshot): void {
     this.members.set(snapshot.members);
+    this.invitations.set(snapshot.invitations);
     this.roles.set(snapshot.roles);
     this.locations.set(snapshot.locations);
     this.membershipLocations.set(snapshot.membership_locations);
@@ -269,6 +289,7 @@ export class TeamService {
 
   private clearLive(): void {
     this.members.set([]);
+    this.invitations.set([]);
     this.roles.set([]);
     this.locations.set([]);
     this.membershipLocations.set([]);
@@ -313,21 +334,26 @@ export class TeamService {
     return data;
   }
 
-  /** Person must have logged in once (user_not_registered otherwise). */
-  async addTeamMember(phone: string, roleId: string, displayName?: string): Promise<string> {
-    const { data, error } = await this.db.rpc('add_team_member', {
+  /** Invite a new phone, or update a person who is already a company member. */
+  async addTeamMember(
+    phone: string,
+    roleId: string,
+    displayName: string
+  ): Promise<InviteTeamMemberResult> {
+    const { data, error } = await this.db.rpc('invite_team_member', {
       p_phone: phone,
       p_role_id: roleId,
+      p_display_name: displayName.trim(),
     });
     if (error) throw rpcError(error);
-    if (displayName?.trim()) {
-      try {
-        await this.updateStaffDisplayName(data, displayName);
-      } catch (renameError) {
-        const detail = renameError instanceof Error ? renameError.message : 'unknown error';
-        throw new Error(`Member added, but setting the name failed: ${detail}`);
-      }
-    }
+    return data as unknown as InviteTeamMemberResult;
+  }
+
+  async cancelInvitation(invitationId: string): Promise<string> {
+    const { data, error } = await this.db.rpc('cancel_team_invitation', {
+      p_invitation_id: invitationId,
+    });
+    if (error) throw rpcError(error);
     return data;
   }
 
@@ -384,6 +410,7 @@ function validSnapshot(
     (snapshot.primary_contact_user_id === null ||
       typeof snapshot.primary_contact_user_id === 'string') &&
     Array.isArray(snapshot.members) &&
+    Array.isArray(snapshot.invitations) &&
     Array.isArray(snapshot.roles) &&
     Array.isArray(snapshot.locations) &&
     Array.isArray(snapshot.membership_locations)

@@ -25,6 +25,14 @@ export const routes: Routes = [
       import('./pages/register/register.component').then(m => m.RegisterComponent),
   },
   {
+    path: 'access-required',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./pages/access-required/access-required.component').then(
+        m => m.AccessRequiredComponent
+      ),
+  },
+  {
     path: 'legal/accept',
     canActivate: [authGuard],
     loadComponent: () => import('./legal/legal-accept.component').then(m => m.LegalAcceptComponent),
