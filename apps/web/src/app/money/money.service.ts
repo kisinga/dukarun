@@ -1320,9 +1320,8 @@ export class MoneyService {
     accountCode: string,
     clientRef: string
   ): Promise<string> {
-    const { data, error } = await this.db.rpc('post_supplier_payment', {
+    const { data, error } = await this.db.rpc('post_supplier_fifo_payment', {
       p_supplier_id: supplierId,
-      p_purchase_id: null,
       p_amount: amount,
       p_account_code: accountCode,
       p_client_ref: clientRef,

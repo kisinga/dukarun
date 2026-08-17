@@ -1,10 +1,12 @@
 begin;
-select plan(20);
+select plan(21);
 
 select has_table('public','supplier_payments',
   'supplier payments have a reversible business-event header');
 select has_function('public','post_supplier_payment',array['uuid','uuid','bigint','text','text'],
   'canonical supplier payment RPC exists');
+select has_function('public','post_supplier_fifo_payment',array['uuid','bigint','text','text'],
+  'typed supplier-wide FIFO payment RPC exists');
 select has_function('public','reverse_supplier_payment',array['uuid','text'],
   'supplier payment reversal RPC exists');
 
@@ -60,8 +62,8 @@ where id=(select purchase_id from integrity_purchase_two);
 select testkit.as_user((select company_id from integrity_fixture),
   '97000000-0000-4000-8000-000000000001','Admin');
 
-create temp table integrity_payment as select public.post_supplier_payment(
-  '97000000-0000-4000-8000-000000000004',null,750,'CASH_ON_HAND','integrity-pay-1'
+create temp table integrity_payment as select public.post_supplier_fifo_payment(
+  '97000000-0000-4000-8000-000000000004',750,'CASH_ON_HAND','integrity-pay-1'
 ) payment_id;
 grant select on pg_temp.integrity_payment to authenticated;
 
