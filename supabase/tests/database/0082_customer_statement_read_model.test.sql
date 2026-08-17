@@ -29,6 +29,12 @@ insert into public.product_variants(
 select '82000000-0000-4000-8000-000000000003',
   '82000000-0000-4000-8000-000000000002',company_id,'Default','STATEMENT-SERVICE',
   10000,6000,'service',false from statement_company;
+insert into public.product_variants(
+  id,product_id,company_id,name,sku,price,wholesale_price,kind,track_inventory
+)
+select '82000000-0000-4000-8000-000000000006',
+  '82000000-0000-4000-8000-000000000002',company_id,'Correction','STATEMENT-CORRECTION',
+  1000,600,'service',false from statement_company;
 insert into public.customers(
   id,company_id,first_name,is_credit_approved,credit_limit
 )
@@ -45,8 +51,10 @@ create temp table statement_sale as select public.post_sale(
   '[]') order_id;
 create temp table statement_payment as select public.post_payment_allocation(
   (select order_id from statement_sale),4000,'cash','STATEMENT-PAY') payment_id;
-select public.post_balance_adjustment(
-  '82000000-0000-4000-8000-000000000004',1000,'Statement correction');
+create temp table statement_second_sale as select public.post_sale(
+  '82000000-0000-4000-8000-000000000004',
+  '[{"variant_id":"82000000-0000-4000-8000-000000000006","quantity":1,"unit_price":1000}]',
+  '[]') order_id;
 create temp table reversible_payment as select public.post_payment_allocation(
   (select order_id from statement_sale),1000,'cash','STATEMENT-REVERSIBLE') payment_id;
 select public.post_payment_reversal(
@@ -69,8 +77,9 @@ select is((select credit from public.customer_statement(
   '82000000-0000-4000-8000-000000000004') where reference='STATEMENT-PAY'),4000::bigint,
   'payment allocation reduces the running account');
 select is((select debit from public.customer_statement(
-  '82000000-0000-4000-8000-000000000004') where description='Statement correction'),1000::bigint,
-  'balance adjustment is included');
+  '82000000-0000-4000-8000-000000000004')
+  where reference=(select code from public.orders where id=(select order_id from statement_second_sale))),
+  1000::bigint,'a second source-backed credit sale is included');
 select is((select debit from public.customer_statement(
   '82000000-0000-4000-8000-000000000004') where description='Reversed payment'),1000::bigint,
   'payment reversal restores the customer balance');

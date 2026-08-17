@@ -134,6 +134,13 @@ export const routes: Routes = [
               import('./money/periods/money-periods.component').then(m => m.MoneyPeriodsComponent),
           },
           {
+            path: 'reconcile',
+            loadComponent: () =>
+              import('./money/reconciliation/money-reconciliation.component').then(
+                m => m.MoneyReconciliationComponent
+              ),
+          },
+          {
             path: 'stock',
             redirectTo: '/stock-adjustments',
           },

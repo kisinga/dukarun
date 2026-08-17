@@ -1,5 +1,5 @@
 import { Component, OnInit, effect, inject, signal } from '@angular/core';
-import { FormControl, ReactiveFormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { CashierSessionDialogService } from '../../core/cashier-session-dialog.service';
 import { CashierSessionService } from '../../core/cashier-session.service';
 import { PermissionsService } from '../../core/permissions.service';
@@ -20,7 +20,7 @@ import {
 @Component({
   selector: 'app-money-cashier',
   imports: [
-    ReactiveFormsModule,
+    RouterLink,
     ButtonComponent,
     MoneyComponent,
     EmptyStateComponent,
@@ -51,12 +51,6 @@ import {
       <div role="alert" class="alert alert-error mb-3 text-sm">
         <app-icon name="heroExclamationTriangle" />
         <span>{{ error() }}</span>
-      </div>
-    }
-    @if (notice()) {
-      <div role="status" class="alert alert-success mb-3 text-sm">
-        <app-icon name="heroCheckCircle" />
-        <span>{{ notice() }}</span>
       </div>
     }
     @if (cashierSession.configurationLoaded() && !cashierSession.cashControlEnabled()) {
@@ -116,9 +110,7 @@ import {
     }
 
     <h2 class="section-title mb-2">Recent sessions</h2>
-    <p class="type-caption mb-3">
-      A variance can only be reverted before the next opening, closing, or reconciliation.
-    </p>
+    <p class="type-caption mb-3">Review account variances from the dedicated Reconcile section.</p>
     @if (!loading() && sessions().length === 0) {
       <app-empty-state
         icon="heroBanknotes"
@@ -186,40 +178,10 @@ import {
                         } @else if (ra.variance !== 0) {
                           @if (!perms.has('ManageReconciliation')) {
                             <span class="type-caption">Manager review</span>
-                          } @else if (!canRevert(ra)) {
-                            <span
-                              class="type-caption"
-                              title="A newer opening, closing, or reconciliation has occurred"
-                            >
-                              Review window closed
-                            </span>
-                          } @else if (revertingFor() === ra.id) {
-                            <div class="flex items-center justify-end gap-1">
-                              <input
-                                type="text"
-                                class="input input-bordered input-xs w-36"
-                                placeholder="Reason (optional)"
-                                [formControl]="revertReason"
-                              />
-                              <button
-                                class="btn btn-warning btn-xs"
-                                [disabled]="busy()"
-                                (click)="confirmRevert(ra.id)"
-                              >
-                                Confirm
-                              </button>
-                              <button class="btn btn-ghost btn-xs" (click)="revertingFor.set(null)">
-                                Cancel
-                              </button>
-                            </div>
                           } @else {
-                            <button
-                              class="btn btn-warning btn-outline btn-xs"
-                              [disabled]="busy()"
-                              (click)="startRevert(ra.id)"
-                            >
-                              Revert
-                            </button>
+                            <a routerLink="/money/reconcile" class="link link-primary text-xs">
+                              Review in Reconcile
+                            </a>
                           }
                         }
                       </div>
@@ -244,13 +206,8 @@ export class MoneyCashierComponent implements OnInit {
   protected readonly openSession = signal<CashierSession | null>(null);
   protected readonly sessions = signal<SessionWithCounts[]>([]);
   protected readonly reconAccounts = signal<ReconAccountWithParent[]>([]);
-  protected readonly latestReconciliationId = signal<string | null>(null);
-  protected readonly revertingFor = signal<string | null>(null);
-  protected readonly revertReason = new FormControl('', { nonNullable: true });
-  protected readonly busy = signal(false);
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
-  protected readonly notice = signal<string | null>(null);
 
   constructor() {
     effect(() => {
@@ -283,10 +240,6 @@ export class MoneyCashierComponent implements OnInit {
           );
         },
       },
-      {
-        fallback: 'Failed to load the latest reconciliation',
-        run: async () => this.latestReconciliationId.set(await this.money.latestReconciliationId()),
-      },
     ]);
     this.error.set(errors.length > 0 ? errors.join('. ') : null);
     this.loading.set(false);
@@ -296,31 +249,6 @@ export class MoneyCashierComponent implements OnInit {
     return this.reconAccounts().filter(account =>
       account.reconciliations?.scope_ref_id.startsWith(`${sessionId}:`)
     );
-  }
-
-  protected canRevert(account: ReconAccountWithParent): boolean {
-    return account.reconciliations?.id === this.latestReconciliationId();
-  }
-
-  protected startRevert(reconAccountId: string): void {
-    this.revertingFor.set(reconAccountId);
-    this.revertReason.setValue('');
-  }
-
-  protected async confirmRevert(reconAccountId: string): Promise<void> {
-    this.busy.set(true);
-    this.error.set(null);
-    this.notice.set(null);
-    try {
-      await this.money.revertVariance(reconAccountId, this.revertReason.value.trim() || undefined);
-      this.notice.set('Variance reverted and marked reviewed');
-      this.revertingFor.set(null);
-      await this.load();
-    } catch (error) {
-      this.error.set(error instanceof Error ? error.message : 'Revert failed');
-    } finally {
-      this.busy.set(false);
-    }
   }
 
   protected shortId(userId: string | null): string {

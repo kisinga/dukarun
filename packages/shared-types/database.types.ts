@@ -3430,34 +3430,40 @@ export type Database = {
           account_id: string
           company_id: string
           credit: number
+          customer_id: string | null
           debit: number
           entry_id: string
           id: string
           location_id: string | null
           meta: Json
           order_id: string | null
+          supplier_id: string | null
         }
         Insert: {
           account_id: string
           company_id: string
           credit?: number
+          customer_id?: string | null
           debit?: number
           entry_id: string
           id?: string
           location_id?: string | null
           meta?: Json
           order_id?: string | null
+          supplier_id?: string | null
         }
         Update: {
           account_id?: string
           company_id?: string
           credit?: number
+          customer_id?: string | null
           debit?: number
           entry_id?: string
           id?: string
           location_id?: string | null
           meta?: Json
           order_id?: string | null
+          supplier_id?: string | null
         }
         Relationships: [
           {
@@ -5462,6 +5468,7 @@ export type Database = {
           settlement_kind: string
           status: string
           supplier_advance_application_id: string | null
+          supplier_payment_id: string | null
         }
         Insert: {
           account_code: string
@@ -5474,6 +5481,7 @@ export type Database = {
           settlement_kind?: string
           status?: string
           supplier_advance_application_id?: string | null
+          supplier_payment_id?: string | null
         }
         Update: {
           account_code?: string
@@ -5486,6 +5494,7 @@ export type Database = {
           settlement_kind?: string
           status?: string
           supplier_advance_application_id?: string | null
+          supplier_payment_id?: string | null
         }
         Relationships: [
           {
@@ -5523,6 +5532,13 @@ export type Database = {
             referencedRelation: "supplier_advance_applications"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "purchase_payments_supplier_payment_id_fkey"
+            columns: ["supplier_payment_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_payments"
+            referencedColumns: ["id"]
+          },
         ]
       }
       purchases: {
@@ -5538,6 +5554,10 @@ export type Database = {
           notes: string | null
           purchase_date: string
           reference: string | null
+          reversal_reason: string | null
+          reversed_at: string | null
+          reversed_by: string | null
+          status: string
           stock_location_id: string
           supplier_id: string
           total_cost: number
@@ -5554,6 +5574,10 @@ export type Database = {
           notes?: string | null
           purchase_date?: string
           reference?: string | null
+          reversal_reason?: string | null
+          reversed_at?: string | null
+          reversed_by?: string | null
+          status?: string
           stock_location_id: string
           supplier_id: string
           total_cost: number
@@ -5570,6 +5594,10 @@ export type Database = {
           notes?: string | null
           purchase_date?: string
           reference?: string | null
+          reversal_reason?: string | null
+          reversed_at?: string | null
+          reversed_by?: string | null
+          status?: string
           stock_location_id?: string
           supplier_id?: string
           total_cost?: number
@@ -5653,6 +5681,7 @@ export type Database = {
           declared: number
           expected: number
           id: string
+          reason: string | null
           reconciliation_id: string
           reviewed_at: string | null
           reviewed_by: string | null
@@ -5663,6 +5692,7 @@ export type Database = {
           declared: number
           expected: number
           id?: string
+          reason?: string | null
           reconciliation_id: string
           reviewed_at?: string | null
           reviewed_by?: string | null
@@ -5673,6 +5703,7 @@ export type Database = {
           declared?: number
           expected?: number
           id?: string
+          reason?: string | null
           reconciliation_id?: string
           reviewed_at?: string | null
           reviewed_by?: string | null
@@ -6684,6 +6715,89 @@ export type Database = {
           },
         ]
       }
+      supplier_payments: {
+        Row: {
+          account_code: string
+          amount: number
+          cashier_session_id: string
+          client_ref: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          location_id: string
+          purchase_id: string | null
+          reversal_reason: string | null
+          reversed_at: string | null
+          reversed_by: string | null
+          status: string
+          supplier_id: string
+        }
+        Insert: {
+          account_code: string
+          amount: number
+          cashier_session_id: string
+          client_ref?: string | null
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          location_id: string
+          purchase_id?: string | null
+          reversal_reason?: string | null
+          reversed_at?: string | null
+          reversed_by?: string | null
+          status?: string
+          supplier_id: string
+        }
+        Update: {
+          account_code?: string
+          amount?: number
+          cashier_session_id?: string
+          client_ref?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          location_id?: string
+          purchase_id?: string | null
+          reversal_reason?: string | null
+          reversed_at?: string | null
+          reversed_by?: string | null
+          status?: string
+          supplier_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_payments_cashier_session_id_fkey"
+            columns: ["cashier_session_id"]
+            isOneToOne: false
+            referencedRelation: "cashier_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_payments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_payments_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "stock_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_payments_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       team_invitations: {
         Row: {
           accepted_at: string | null
@@ -7337,7 +7451,11 @@ export type Database = {
           payment_status: string | null
           purchase_date: string | null
           reference: string | null
+          reversal_reason: string | null
+          reversed_at: string | null
+          reversed_by: string | null
           separate_expense_total: number | null
+          status: string | null
           stock_location_id: string | null
           supplier_id: string | null
           total_cost: number | null
@@ -8639,6 +8757,16 @@ export type Database = {
           status: string
         }[]
       }
+      list_reconcilable_accounts: {
+        Args: never
+        Returns: {
+          account_code: string
+          account_name: string
+          balance: number
+          last_reconciled_at: string
+          requires_reconciliation: boolean
+        }[]
+      }
       location_account_balance: {
         Args: { p_code: string; p_company_id: string; p_location_id: string }
         Returns: number
@@ -9165,6 +9293,16 @@ export type Database = {
         }
         Returns: string
       }
+      post_supplier_payment: {
+        Args: {
+          p_account_code: string
+          p_amount: number
+          p_client_ref?: string
+          p_purchase_id: string | null
+          p_supplier_id: string
+        }
+        Returns: string
+      }
       post_supplier_balance_adjustment: {
         Args: { p_amount: number; p_reason: string; p_supplier_id: string }
         Returns: string
@@ -9391,7 +9529,7 @@ export type Database = {
         Returns: string
       }
       record_manual_reconciliation: {
-        Args: { p_declarations: Json }
+        Args: { p_declarations: Json; p_location_id?: string }
         Returns: string
       }
       record_mpesa_verification: {
@@ -9599,6 +9737,14 @@ export type Database = {
       }
       reverse_supplier_advance_application: {
         Args: { p_application_id: string; p_reason: string }
+        Returns: string
+      }
+      reverse_supplier_payment: {
+        Args: { p_reason: string; p_supplier_payment_id: string }
+        Returns: string
+      }
+      reverse_credit_purchase: {
+        Args: { p_purchase_id: string; p_reason: string }
         Returns: string
       }
       revert_variance: {
@@ -9902,6 +10048,24 @@ export type Database = {
       supplier_advance_available: {
         Args: { p_supplier_id: string }
         Returns: number
+      }
+      customer_account_status: {
+        Args: { p_customer_id: string }
+        Returns: {
+          difference: number
+          document_balance: number
+          is_consistent: boolean
+          ledger_balance: number
+        }[]
+      }
+      supplier_account_status: {
+        Args: { p_supplier_id: string }
+        Returns: {
+          difference: number
+          document_balance: number
+          is_consistent: boolean
+          ledger_balance: number
+        }[]
       }
       sync_cache_stream: {
         Args: { p_after_sequence?: number; p_limit?: number; p_stream: string }
@@ -10261,4 +10425,3 @@ export const Constants = {
     Enums: {},
   },
 } as const
-

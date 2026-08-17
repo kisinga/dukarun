@@ -17,6 +17,7 @@ export type AccountingPeriod = Database['public']['Tables']['accounting_periods'
 export type PeriodLock = Database['public']['Tables']['period_locks']['Row'];
 export type Purchase = Database['public']['Tables']['purchases']['Row'];
 export type PurchasePayment = Database['public']['Tables']['purchase_payments']['Row'];
+export type SupplierPayment = Database['public']['Tables']['supplier_payments']['Row'];
 export type PurchaseDraft = Database['public']['Tables']['purchase_drafts']['Row'];
 export type PurchaseLine = Database['public']['Tables']['purchase_lines']['Row'];
 export type PurchaseExpense = Database['public']['Tables']['purchase_expenses']['Row'];
@@ -105,6 +106,13 @@ export type ReconAccountWithParent = ReconAccount & {
 export type AgingInfo = {
   days_outstanding: number | null;
   bucket: string | null;
+};
+
+export type SupplierAccountStatus = {
+  ledger_balance: number;
+  document_balance: number;
+  difference: number;
+  is_consistent: boolean;
 };
 
 export type CreditHealthSide = 'receivables' | 'payables';
@@ -196,6 +204,15 @@ export interface CashierAccount {
   label: string;
 }
 
+/** Active real-money account whose book balance may be manually reconciled. */
+export interface ReconcilableAccount {
+  account_code: string;
+  account_name: string;
+  balance: number;
+  requires_reconciliation: boolean;
+  last_reconciled_at: string | null;
+}
+
 export interface PurchaseLineInput {
   variant_id: string;
   quantity: number;
@@ -271,6 +288,13 @@ export class MoneyService {
       }
     }
     return [...accounts.values()];
+  }
+
+  /** Company-wide real-money balances available to privileged reconciliation. */
+  async reconcilableAccounts(): Promise<ReconcilableAccount[]> {
+    const { data, error } = await this.db.rpc('list_reconcilable_accounts');
+    if (error) throw rpcError(error);
+    return data as ReconcilableAccount[];
   }
 
   /** Enabled non-credit payment method codes (for repayment/allocation selects). */
@@ -512,20 +536,7 @@ export class MoneyService {
     return data;
   }
 
-  /** Only variance lines from this reconciliation remain reversible. */
-  async latestReconciliationId(): Promise<string | null> {
-    const { data, error } = await this.db
-      .from('reconciliations')
-      .select('id')
-      .order('created_at', { ascending: false })
-      .order('id', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (error) throw error;
-    return data?.id ?? null;
-  }
-
-  /** Recent reconciliations with their account rows (periods screen variance review). */
+  /** Recent reconciliations with account rows for the reconciliation workspace. */
   async recentReconciliations(
     limit = 10
   ): Promise<(Reconciliation & { reconciliation_accounts: ReconAccount[] })[]> {
@@ -615,7 +626,10 @@ export class MoneyService {
     sortBy?: 'created_at' | 'purchase_date' | 'total_cost' | 'reference';
     sortDirection?: 'asc' | 'desc';
   }): Promise<{ rows: PurchaseHistoryRow[]; count: number }> {
-    let query = this.db.from('purchase_history').select('*', { count: 'exact' });
+    let query = this.db
+      .from('purchase_history')
+      .select('*', { count: 'exact' })
+      .eq('status', 'posted');
     if (!input.allLocations) {
       query = query.eq('stock_location_id', input.locationId ?? this.locations.requireActiveId());
     }
@@ -683,6 +697,38 @@ export class MoneyService {
       .order('created_at');
     if (error) throw error;
     return data;
+  }
+
+  async supplierPayments(supplierId: string, limit = 20): Promise<SupplierPayment[]> {
+    const { data, error } = await this.db
+      .from('supplier_payments')
+      .select('*')
+      .eq('supplier_id', supplierId)
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
+      .limit(limit);
+    if (error) throw error;
+    return data;
+  }
+
+  async supplierAccountStatus(supplierId: string): Promise<SupplierAccountStatus> {
+    const { data, error } = await this.db.rpc('supplier_account_status', {
+      p_supplier_id: supplierId,
+    });
+    if (error) throw rpcError(error);
+    const status = data?.[0];
+    if (!status) throw new Error('Supplier account status was not returned');
+    return status;
+  }
+
+  async customerAccountStatus(customerId: string): Promise<SupplierAccountStatus> {
+    const { data, error } = await this.db.rpc('customer_account_status', {
+      p_customer_id: customerId,
+    });
+    if (error) throw rpcError(error);
+    const status = data?.[0];
+    if (!status) throw new Error('Customer account status was not returned');
+    return status;
   }
 
   async supplierVariantPerformance(): Promise<SupplierVariantPerformance[]> {
@@ -760,6 +806,7 @@ export class MoneyService {
   async recordManualReconciliation(declarations: Declaration[]): Promise<string> {
     const { data, error } = await this.db.rpc('record_manual_reconciliation', {
       p_declarations: declarations as never,
+      p_location_id: this.locations.requireActiveId(),
     });
     if (error) throw rpcError(error);
     return data;
@@ -850,28 +897,6 @@ export class MoneyService {
     });
     if (outcome.status === 'completed') this.parties.invalidateFinancials();
     return outcome;
-  }
-
-  async adjustCustomerBalance(customerId: string, amount: number, reason: string): Promise<string> {
-    const { data, error } = await this.db.rpc('post_balance_adjustment', {
-      p_customer_id: customerId,
-      p_amount: amount,
-      p_reason: reason,
-    });
-    if (error) throw rpcError(error);
-    this.parties.invalidateFinancials();
-    return data;
-  }
-
-  async adjustSupplierBalance(supplierId: string, amount: number, reason: string): Promise<string> {
-    const { data, error } = await this.db.rpc('post_supplier_balance_adjustment', {
-      p_supplier_id: supplierId,
-      p_amount: amount,
-      p_reason: reason,
-    });
-    if (error) throw rpcError(error);
-    this.parties.invalidateFinancials();
-    return data;
   }
 
   async updateCustomerCredit(
@@ -1270,22 +1295,57 @@ export class MoneyService {
     if (error) throw rpcError(error);
   }
 
-  async payPurchase(purchaseId: string, amount: number, accountCode: string): Promise<string> {
-    const { data, error } = await this.db.rpc('pay_purchase', {
+  async payPurchase(
+    supplierId: string,
+    purchaseId: string,
+    amount: number,
+    accountCode: string,
+    clientRef: string
+  ): Promise<string> {
+    const { data, error } = await this.db.rpc('post_supplier_payment', {
+      p_supplier_id: supplierId,
       p_purchase_id: purchaseId,
       p_amount: amount,
       p_account_code: accountCode,
+      p_client_ref: clientRef,
     });
     if (error) throw rpcError(error);
     this.parties.invalidateFinancials();
     return data;
   }
 
-  async paySupplier(supplierId: string, amount: number, accountCode: string): Promise<string> {
-    const { data, error } = await this.db.rpc('pay_supplier', {
+  async paySupplier(
+    supplierId: string,
+    amount: number,
+    accountCode: string,
+    clientRef: string
+  ): Promise<string> {
+    const { data, error } = await this.db.rpc('post_supplier_payment', {
       p_supplier_id: supplierId,
+      p_purchase_id: null,
       p_amount: amount,
       p_account_code: accountCode,
+      p_client_ref: clientRef,
+    });
+    if (error) throw rpcError(error);
+    this.parties.invalidateFinancials();
+    return data;
+  }
+
+  async reverseSupplierPayment(paymentId: string, reason: string): Promise<string> {
+    const { data, error } = await this.db.rpc('reverse_supplier_payment', {
+      p_supplier_payment_id: paymentId,
+      p_reason: reason,
+    });
+    if (error) throw rpcError(error);
+    this.parties.invalidateFinancials();
+    return data;
+  }
+
+  async reverseCreditPurchase(purchaseId: string, reason: string): Promise<string> {
+    const { data, error } = await this.db.rpc('reverse_credit_purchase', {
+      p_purchase_id: purchaseId,
+      p_reason: reason,
     });
     if (error) throw rpcError(error);
     this.parties.invalidateFinancials();

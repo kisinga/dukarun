@@ -215,11 +215,12 @@ select testkit.as_user(
   'Admin'
 );
 
-select ok(
-  public.post_supplier_balance_adjustment(
+select throws_ok(
+  $$select public.post_supplier_balance_adjustment(
     '91000000-0000-4000-8000-000000000004',100,'authorized correction'
-  ) is not null,
-  'supplier-credit manager may adjust supplier AP'
+  )$$,
+  'P0001','manual_balance_adjustment_removed: use a purchase, supplier payment reversal, or supplier credit',
+  'supplier-credit manager must correct a source document instead of AP directly'
 );
 
 select is(
@@ -229,23 +230,24 @@ select is(
    where jl.company_id=(select company_id from hardening_fixture)
      and a.code='ACCOUNTS_PAYABLE'
      and jl.meta->>'supplierId'='91000000-0000-4000-8000-000000000004'),
-  100::bigint,
-  'authorized supplier adjustment changes AP'
+  0::bigint,
+  'retired supplier adjustment leaves AP unchanged'
 );
 
 select throws_ok(
   $$select public.post_supplier_balance_adjustment(
     '91000000-0000-4000-8000-000000000004',10,'   '
   )$$,
-  'P0001','invalid_reason',
-  'supplier adjustment requires a non-blank reason'
+  'P0001','manual_balance_adjustment_removed: use a purchase, supplier payment reversal, or supplier credit',
+  'retired supplier adjustment cannot be reached through blank input'
 );
 
-select ok(
-  public.post_supplier_balance_adjustment(
+select throws_ok(
+  $$select public.post_supplier_balance_adjustment(
     '91000000-0000-4000-8000-000000000004',-40,'reduce correction'
-  ) is not null,
-  'supplier-credit manager may reduce supplier AP'
+  )$$,
+  'P0001','manual_balance_adjustment_removed: use a purchase, supplier payment reversal, or supplier credit',
+  'supplier-credit manager cannot reduce AP without a source reversal or credit'
 );
 
 select is(
@@ -255,15 +257,15 @@ select is(
    where jl.company_id=(select company_id from hardening_fixture)
      and a.code='ACCOUNTS_PAYABLE'
      and jl.meta->>'supplierId'='91000000-0000-4000-8000-000000000004'),
-  60::bigint,
-  'negative supplier adjustment reduces AP'
+  0::bigint,
+  'rejected supplier reduction leaves AP unchanged'
 );
 
 select throws_ok(
   $$select public.post_supplier_balance_adjustment(
     '91000000-0000-4000-8000-000000000004',-61,'excessive reduction'
   )$$,
-  'P0001','adjustment_exceeds_supplier_balance: reduction 61 exceeds balance 60',
+  'P0001','manual_balance_adjustment_removed: use a purchase, supplier payment reversal, or supplier credit',
   'supplier adjustment cannot create an implicit advance'
 );
 
@@ -278,7 +280,7 @@ select has_column('public','ledger_journal_entries','payload_hash',
 create temp table hash_entry as
 select public.post_journal_entry(
   (select company_id from hardening_fixture),'HashTest','stable-source','Stable memo',
-  '[{"account_code":"ACCOUNTS_RECEIVABLE","debit":100},{"account_code":"BALANCE_ADJUSTMENT","credit":100}]',
+  '[{"account_code":"EXPENSES","debit":100},{"account_code":"CASH_ON_HAND","credit":100}]',
   current_date
 ) as entry_id;
 
@@ -294,7 +296,7 @@ select ok(
 select is(
   public.post_journal_entry(
     (select company_id from hardening_fixture),'HashTest','stable-source','Stable memo',
-    '[{"account_code":"ACCOUNTS_RECEIVABLE","debit":100},{"account_code":"BALANCE_ADJUSTMENT","credit":100}]',
+    '[{"account_code":"EXPENSES","debit":100},{"account_code":"CASH_ON_HAND","credit":100}]',
     current_date
   ),
   (select entry_id from hash_entry),
@@ -304,7 +306,7 @@ select is(
 select is(
   public.post_journal_entry(
     (select company_id from hardening_fixture),'HashTest','stable-source','Stable memo',
-    '[{"account_code":"BALANCE_ADJUSTMENT","credit":100},{"account_code":"ACCOUNTS_RECEIVABLE","debit":100}]',
+    '[{"account_code":"CASH_ON_HAND","credit":100},{"account_code":"EXPENSES","debit":100}]',
     current_date
   ),
   (select entry_id from hash_entry),
@@ -314,7 +316,7 @@ select is(
 select throws_ok(
   $$select public.post_journal_entry(
     (select company_id from hardening_fixture),'HashTest','stable-source','Changed memo',
-    '[{"account_code":"ACCOUNTS_RECEIVABLE","debit":100},{"account_code":"BALANCE_ADJUSTMENT","credit":100}]',
+    '[{"account_code":"EXPENSES","debit":100},{"account_code":"CASH_ON_HAND","credit":100}]',
     current_date
   )$$,
   'P0001','journal_idempotency_conflict: source HashTest/stable-source was already posted with a different payload',
@@ -324,7 +326,7 @@ select throws_ok(
 select throws_ok(
   $$select public.post_journal_entry(
     (select company_id from hardening_fixture),'HashTest','stable-source','Stable memo',
-    '[{"account_code":"ACCOUNTS_RECEIVABLE","debit":100},{"account_code":"BALANCE_ADJUSTMENT","credit":100}]',
+    '[{"account_code":"EXPENSES","debit":100},{"account_code":"CASH_ON_HAND","credit":100}]',
     current_date - 1
   )$$,
   'P0001','journal_idempotency_conflict: source HashTest/stable-source was already posted with a different payload',
@@ -334,7 +336,7 @@ select throws_ok(
 select throws_ok(
   $$select public.post_journal_entry(
     (select company_id from hardening_fixture),'HashTest','stable-source','Stable memo',
-    '[{"account_code":"ACCOUNTS_RECEIVABLE","debit":100},{"account_code":"ACCOUNTS_PAYABLE","credit":100}]',
+    '[{"account_code":"EXPENSES","debit":100},{"account_code":"BANK_MAIN","credit":100}]',
     current_date
   )$$,
   'P0001','journal_idempotency_conflict: source HashTest/stable-source was already posted with a different payload',
@@ -344,7 +346,7 @@ select throws_ok(
 select throws_ok(
   $$select public.post_journal_entry(
     (select company_id from hardening_fixture),'HashTest','stable-source','Stable memo',
-    '[{"account_code":"ACCOUNTS_RECEIVABLE","debit":101},{"account_code":"BALANCE_ADJUSTMENT","credit":101}]',
+    '[{"account_code":"EXPENSES","debit":101},{"account_code":"CASH_ON_HAND","credit":101}]',
     current_date
   )$$,
   'P0001','journal_idempotency_conflict: source HashTest/stable-source was already posted with a different payload',

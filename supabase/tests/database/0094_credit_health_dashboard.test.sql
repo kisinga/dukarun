@@ -28,6 +28,11 @@ select '94000000-0000-4000-8000-000000000004',
   '94000000-0000-4000-8000-000000000003',company_id,
   'Default','CREDIT-TEA',10000,4000,false
 from credit_health_fixture;
+insert into public.product_variants(id,product_id,company_id,name,sku,price,wholesale_price,track_inventory)
+select '94000000-0000-4000-8000-000000000007',
+  '94000000-0000-4000-8000-000000000003',company_id,
+  'Correction','CREDIT-TEA-CORRECTION',1000,400,false
+from credit_health_fixture;
 insert into public.customers(
   id,company_id,first_name,is_credit_approved,credit_limit,credit_terms_days
 )
@@ -104,19 +109,21 @@ select is((select value->'pay_soon'->0->>'party_name' from health_dashboard),'Pa
   'payment queue includes the supplier due soon');
 
 select public.post_payment_allocation((select order_id from health_sale),4000,'cash',null);
-select public.post_balance_adjustment(
-  '94000000-0000-4000-8000-000000000005',1000,'Unscheduled opening correction');
+select public.post_sale(
+  '94000000-0000-4000-8000-000000000005',
+  '[{"variant_id":"94000000-0000-4000-8000-000000000007","quantity":1,"unit_price":1000}]',
+  '[]');
 
 create temp table adjusted_dashboard as
 select public.credit_health_dashboard(30) value;
 grant select on pg_temp.adjusted_dashboard to authenticated;
 
 select is((select (value->'metrics'->>'receivables')::bigint from adjusted_dashboard),7000::bigint,
-  'repayments and manual corrections update the total');
+  'repayments and a new source-backed sale update the total');
 select is((select (item->>'amount')::bigint from adjusted_dashboard,
   jsonb_array_elements(value->'aging') item
-  where item->>'side'='receivables' and item->>'bucket'='unscheduled'),1000::bigint,
-  'manual exposure is disclosed as unscheduled instead of given a fake due date');
+  where item->>'side'='receivables' and item->>'bucket'='current'),1000::bigint,
+  'new exposure is scheduled from its source document');
 
 select testkit.as_user(
   (select company_id from credit_health_fixture),

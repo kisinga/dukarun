@@ -52,6 +52,8 @@ import {
   PurchaseHistoryRow,
   PurchaseLine,
   PurchasePayment,
+  SupplierAccountStatus,
+  SupplierPayment,
   SupplierPurchaseMetric,
   SupplierVariantPerformance,
 } from '../money/money.service';
@@ -1545,69 +1547,163 @@ interface ParsedPurchaseLine {
                           type="submit"
                           class="self-start"
                           [loading]="busy()"
-                          [disabled]="!cashierSession.canTakePayment()"
+                          [disabled]="
+                            !cashierSession.canTakePayment() ||
+                            supplierPaymentsLoading() ||
+                            supplierAccountStatus()?.is_consistent !== true
+                          "
                         >
                           Record supplier payment
                         </button>
+                        @if (supplierPaymentsLoading()) {
+                          <p class="type-caption">Checking supplier account integrity…</p>
+                        } @else if (supplierAccountStatus()?.is_consistent === false) {
+                          <p class="type-caption text-error">
+                            Payment unavailable until Finance reconciles this account.
+                          </p>
+                        }
                       </form>
                     }
                   </section>
 
                   @if (perms.has('ViewFinancials')) {
                     <section class="border-t border-base-300/60 pt-3">
-                      <h3 class="section-title mb-1">Adjust supplier balance</h3>
+                      <h3 class="section-title mb-1">Correct this account</h3>
                       <p class="type-caption">
-                        Correct what we owe without recording a purchase or moving money.
+                        Fix the source transaction so purchases, payments, and the ledger stay in
+                        agreement.
                       </p>
-                      <form
-                        (submit)="$event.preventDefault(); adjustSupplierBalance(s)"
-                        class="mt-2 grid gap-2 sm:grid-cols-2"
-                      >
-                        <app-form-field label="Adjustment">
-                          <select
-                            class="select select-bordered select-sm w-full"
-                            [formControl]="supplierAdjustmentDirection"
-                          >
-                            <option value="increase">Increase what we owe</option>
-                            <option value="decrease">Reduce what we owe</option>
-                          </select>
-                        </app-form-field>
-                        <app-form-field label="Amount (KES)">
-                          <input
-                            type="text"
-                            inputmode="numeric"
-                            class="input input-bordered input-sm w-full"
-                            [formControl]="supplierAdjustmentAmount"
-                          />
-                        </app-form-field>
-                        <app-form-field label="Reason" [required]="true">
-                          <input
-                            type="text"
-                            maxlength="500"
-                            class="input input-bordered input-sm w-full"
-                            placeholder="Why is this correction needed?"
-                            [formControl]="supplierAdjustmentReason"
-                          />
-                        </app-form-field>
-                        <div class="flex flex-col items-start justify-end gap-1">
-                          @let adjustmentPreview = supplierAdjustmentPreview(s);
-                          @if (adjustmentPreview !== null) {
-                            <p class="type-caption">
-                              Balance after adjustment:
-                              <strong>{{ fmt(adjustmentPreview) }}</strong>
-                            </p>
-                          }
-                          <button
-                            appButton
-                            variant="outline"
-                            type="submit"
-                            [loading]="busy()"
-                            [disabled]="busy()"
-                          >
-                            Post adjustment
-                          </button>
-                        </div>
-                      </form>
+
+                      @if (supplierAccountStatus(); as status) {
+                        @if (!status.is_consistent) {
+                          <div role="alert" class="alert alert-error mt-3 text-sm">
+                            <app-icon name="heroExclamationTriangle" />
+                            <div>
+                              <p class="font-semibold">Payments are paused for this supplier</p>
+                              <p class="text-xs">
+                                Ledger {{ fmt(status.ledger_balance) }} · purchases
+                                {{ fmt(status.document_balance) }}. Finance must reconcile the
+                                source records first.
+                              </p>
+                            </div>
+                          </div>
+                        }
+                      }
+
+                      <div class="mt-3 grid gap-2 sm:grid-cols-2">
+                        <a
+                          appButton
+                          variant="outline"
+                          routerLink="/purchases/new"
+                          [queryParams]="{ supplier: s.id }"
+                        >
+                          <app-icon name="heroDocumentText" /> Missing purchase
+                        </a>
+                        <a
+                          appButton
+                          variant="ghost"
+                          routerLink="/purchases"
+                          [queryParams]="{ supplier: s.id, range: 'all' }"
+                        >
+                          <app-icon name="heroShoppingCart" /> Wrong purchase
+                        </a>
+                      </div>
+                      <p class="type-caption mt-2">
+                        Missing amount owed? Record its purchase. Wrong invoice? Open that purchase
+                        and correct the source. Wrong payment? Reverse it below.
+                      </p>
+
+                      <details class="mt-3 rounded-field border border-base-300 p-3">
+                        <summary class="cursor-pointer text-sm font-medium">
+                          Recent payments and reversals
+                        </summary>
+                        @if (supplierPaymentsLoading()) {
+                          <div class="flex justify-center py-4">
+                            <span class="loading loading-spinner loading-sm"></span>
+                          </div>
+                        } @else if (supplierPayments().length === 0) {
+                          <p class="type-caption mt-3">
+                            No reversible payments recorded with the new payment workflow.
+                          </p>
+                        } @else {
+                          <ul class="mt-2 divide-y divide-base-300/60">
+                            @for (payment of supplierPayments(); track payment.id) {
+                              <li class="py-3">
+                                <div class="flex items-center justify-between gap-3">
+                                  <div class="min-w-0">
+                                    <p class="text-sm font-medium">{{ payment.account_code }}</p>
+                                    <p class="type-caption">
+                                      {{ time(payment.created_at) }} · {{ payment.status }}
+                                    </p>
+                                  </div>
+                                  <strong class="tabular-nums">{{ fmt(payment.amount) }}</strong>
+                                </div>
+                                @if (
+                                  payment.status === 'posted' &&
+                                  perms.has('ManageSupplierCreditPurchases') &&
+                                  perms.has('ReverseOrder')
+                                ) {
+                                  @if (reversingSupplierPaymentId() === payment.id) {
+                                    <form
+                                      (submit)="
+                                        $event.preventDefault(); reverseSupplierPayment(payment)
+                                      "
+                                      class="mt-2 rounded-field bg-base-200/60 p-3"
+                                    >
+                                      <app-form-field
+                                        label="Why is this payment wrong?"
+                                        hint="Reversal restores both the supplier balance and the source account."
+                                        [required]="true"
+                                      >
+                                        <input
+                                          class="input input-bordered input-sm w-full"
+                                          maxlength="500"
+                                          [formControl]="supplierPaymentReversalReason"
+                                        />
+                                      </app-form-field>
+                                      <div class="mt-2 flex flex-wrap gap-2">
+                                        <button
+                                          appButton
+                                          size="sm"
+                                          type="submit"
+                                          [loading]="busy()"
+                                          [disabled]="
+                                            busy() ||
+                                            !cashierSession.canTakePayment() ||
+                                            !supplierPaymentReversalReason.value.trim()
+                                          "
+                                        >
+                                          Reverse payment
+                                        </button>
+                                        <button
+                                          appButton
+                                          variant="ghost"
+                                          size="sm"
+                                          type="button"
+                                          (click)="cancelSupplierPaymentReversal()"
+                                        >
+                                          Cancel
+                                        </button>
+                                      </div>
+                                    </form>
+                                  } @else {
+                                    <button
+                                      appButton
+                                      variant="ghost"
+                                      size="sm"
+                                      type="button"
+                                      class="mt-1"
+                                      (click)="startSupplierPaymentReversal(payment.id)"
+                                    >
+                                      Entered incorrectly? Reverse
+                                    </button>
+                                  }
+                                }
+                              </li>
+                            }
+                          </ul>
+                        }
+                      </details>
                     </section>
                   }
                 }
@@ -2307,6 +2403,55 @@ interface ParsedPurchaseLine {
                         }
                       </section>
                     }
+
+                    @if (
+                      p.is_credit &&
+                      p.paid === 0 &&
+                      perms.has('ManageSupplierCreditPurchases') &&
+                      perms.has('ReverseOrder')
+                    ) {
+                      <section class="border-t border-base-300/60 pt-3">
+                        <details class="rounded-field border border-base-300 p-3">
+                          <summary class="cursor-pointer text-sm font-medium">
+                            Purchase entered incorrectly?
+                          </summary>
+                          <p class="type-caption mt-2">
+                            Reverse only if none of this stock has been sold, adjusted, or moved.
+                            Reverse any supplier payment first.
+                          </p>
+                          <form
+                            (submit)="$event.preventDefault(); reverseCreditPurchase(p)"
+                            class="mt-3"
+                          >
+                            <app-form-field
+                              label="Why is this purchase being reversed?"
+                              [required]="true"
+                            >
+                              <input
+                                class="input input-bordered input-sm w-full"
+                                maxlength="500"
+                                [formControl]="purchaseReversalReason"
+                              />
+                            </app-form-field>
+                            <button
+                              appButton
+                              variant="outline"
+                              size="sm"
+                              type="submit"
+                              class="mt-2"
+                              [loading]="reversingPurchaseId() === p.id"
+                              [disabled]="
+                                busy() ||
+                                !cashierSession.canTakePayment() ||
+                                !purchaseReversalReason.value.trim()
+                              "
+                            >
+                              Reverse purchase
+                            </button>
+                          </form>
+                        </details>
+                      </section>
+                    }
                   </div>
                 }
               </app-drawer>
@@ -2459,13 +2604,15 @@ export class SuppliersComponent implements OnInit, OnDestroy {
   protected readonly paySupplierId = new FormControl('', { nonNullable: true });
   protected readonly payAmount = new FormControl('', { nonNullable: true });
   protected readonly payAccount = new FormControl('', { nonNullable: true });
-  protected readonly supplierAdjustmentDirection = new FormControl<'increase' | 'decrease'>(
-    'increase',
-    { nonNullable: true }
-  );
-  protected readonly supplierAdjustmentAmount = new FormControl('', { nonNullable: true });
-  protected readonly supplierAdjustmentReason = new FormControl('', { nonNullable: true });
+  protected readonly supplierPayments = signal<SupplierPayment[]>([]);
+  protected readonly supplierPaymentsLoading = signal(false);
+  protected readonly supplierAccountStatus = signal<SupplierAccountStatus | null>(null);
+  protected readonly reversingSupplierPaymentId = signal<string | null>(null);
+  protected readonly supplierPaymentReversalReason = new FormControl('', { nonNullable: true });
+  private supplierPaymentAttempt: { fingerprint: string; clientRef: string } | null = null;
   protected readonly payPurchaseId = signal<string | null>(null);
+  protected readonly reversingPurchaseId = signal<string | null>(null);
+  protected readonly purchaseReversalReason = new FormControl('', { nonNullable: true });
   protected readonly selectedPayAmount = new FormControl('', { nonNullable: true });
   protected readonly selectedPayAccount = new FormControl('', { nonNullable: true });
   protected readonly supplierAdvanceBalance = signal(0);
@@ -2671,7 +2818,12 @@ export class SuppliersComponent implements OnInit, OnDestroy {
     ]);
     this.printerEnabled.set(printerEnabled);
     await this.load();
-    if (!this.isPurchasePage()) {
+    if (this.isPurchasePage()) {
+      const supplierId = params.get('supplier');
+      if (supplierId && this.activeSuppliers().some(row => row.id === supplierId)) {
+        this.purchaseSupplier.setValue(supplierId);
+      }
+    } else {
       const supplierId = params.get('supplier');
       const supplier = supplierId ? this.suppliers().find(row => row.id === supplierId) : null;
       if (supplier) this.openSupplierDrawer(supplier, false);
@@ -3440,6 +3592,8 @@ export class SuppliersComponent implements OnInit, OnDestroy {
     this.drawerPurchaseLines.set([]);
     this.drawerPurchaseExpenses.set([]);
     this.drawerPurchasePayments.set([]);
+    this.purchaseReversalReason.setValue('');
+    this.reversingPurchaseId.set(null);
   }
 
   protected purchaseLineLabel(variantId: string): string {
@@ -3465,16 +3619,70 @@ export class SuppliersComponent implements OnInit, OnDestroy {
       this.error.set('Enter a valid payment amount');
       return;
     }
+    const purchase = this.purchases().find(row => row.id === id) ?? this.drawerPurchase();
+    if (!purchase || purchase.id !== id) {
+      this.error.set(
+        'Purchase details are no longer available. Reopen the purchase and try again.'
+      );
+      return;
+    }
+    const fingerprint = [purchase.supplier_id, id, amount, this.selectedPayAccount.value].join(':');
+    if (this.supplierPaymentAttempt?.fingerprint !== fingerprint) {
+      this.supplierPaymentAttempt = { fingerprint, clientRef: crypto.randomUUID() };
+    }
     try {
       await this.cashierSession.assertOpen('paying a supplier');
       this.busy.set(true);
-      await this.money.payPurchase(id, amount, this.selectedPayAccount.value);
+      await this.money.payPurchase(
+        purchase.supplier_id,
+        id,
+        amount,
+        this.selectedPayAccount.value,
+        this.supplierPaymentAttempt.clientRef
+      );
+      this.supplierPaymentAttempt = null;
       this.payPurchaseId.set(null);
       this.notice.set('Purchase payment recorded');
       await this.refreshPaymentSurfaces();
     } catch (error) {
       this.error.set(error instanceof Error ? error.message : 'Payment failed');
     } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected async reverseCreditPurchase(purchase: PurchaseRow): Promise<void> {
+    const reason = this.purchaseReversalReason.value.trim();
+    if (!reason) {
+      this.error.set('Explain why this purchase is being reversed');
+      return;
+    }
+    try {
+      await this.cashierSession.assertOpen('reversing a purchase');
+      this.busy.set(true);
+      this.reversingPurchaseId.set(purchase.id);
+      this.error.set(null);
+      this.notice.set(null);
+      await this.money.reverseCreditPurchase(purchase.id, reason);
+      this.purchaseReversalReason.setValue('');
+      this.closePurchaseDrawer();
+      this.notice.set('Purchase reversed. Stock, supplier balance, and ledger were restored.');
+      await this.refreshPaymentSurfaces();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Purchase could not be reversed';
+      if (message.includes('purchase_stock_already_moved')) {
+        this.error.set(
+          'This purchase cannot be reversed because some stock was sold, adjusted, or moved.'
+        );
+      } else if (message.includes('purchase_has_payments')) {
+        this.error.set('Reverse this purchase’s supplier payments first.');
+      } else if (message.includes('purchase_has_separate_expenses')) {
+        this.error.set('Finance must reverse this purchase’s separately paid expenses first.');
+      } else {
+        this.error.set(message);
+      }
+    } finally {
+      this.reversingPurchaseId.set(null);
       this.busy.set(false);
     }
   }
@@ -3535,7 +3743,17 @@ export class SuppliersComponent implements OnInit, OnDestroy {
     try {
       const supplierId = this.paySupplierId.value;
       const supplierName = this.supplierName(supplierId);
-      await this.money.paySupplier(supplierId, amount, this.payAccount.value);
+      const fingerprint = [supplierId, amount, this.payAccount.value].join(':');
+      if (this.supplierPaymentAttempt?.fingerprint !== fingerprint) {
+        this.supplierPaymentAttempt = { fingerprint, clientRef: crypto.randomUUID() };
+      }
+      await this.money.paySupplier(
+        supplierId,
+        amount,
+        this.payAccount.value,
+        this.supplierPaymentAttempt.clientRef
+      );
+      this.supplierPaymentAttempt = null;
       this.payAmount.setValue('');
       this.notice.set(`${this.fmt(amount)} payment recorded for ${supplierName}.`);
       await this.refreshPaymentSurfaces();
@@ -3546,43 +3764,35 @@ export class SuppliersComponent implements OnInit, OnDestroy {
     }
   }
 
-  protected supplierAdjustmentPreview(supplier: SupplierWithAp): number | null {
-    const amount = parseKes(this.supplierAdjustmentAmount.value);
-    if (amount === null || amount <= 0) return null;
-    if (this.supplierAdjustmentDirection.value === 'decrease' && amount > supplier.ap_balance) {
-      return null;
-    }
-    return (
-      supplier.ap_balance +
-      (this.supplierAdjustmentDirection.value === 'increase' ? amount : -amount)
-    );
+  protected startSupplierPaymentReversal(paymentId: string): void {
+    this.reversingSupplierPaymentId.set(paymentId);
+    this.supplierPaymentReversalReason.setValue('');
   }
 
-  protected async adjustSupplierBalance(supplier: SupplierWithAp): Promise<void> {
-    const amount = parseKes(this.supplierAdjustmentAmount.value);
-    const reason = this.supplierAdjustmentReason.value.trim();
-    if (amount === null || amount <= 0 || !reason) {
-      this.error.set('Enter a positive adjustment amount and a reason');
-      return;
-    }
-    if (this.supplierAdjustmentDirection.value === 'decrease' && amount > supplier.ap_balance) {
-      this.error.set('The reduction cannot exceed the amount owed to this supplier');
-      return;
-    }
+  protected cancelSupplierPaymentReversal(): void {
+    this.reversingSupplierPaymentId.set(null);
+    this.supplierPaymentReversalReason.setValue('');
+  }
 
-    this.busy.set(true);
-    this.error.set(null);
-    this.notice.set(null);
+  protected async reverseSupplierPayment(payment: SupplierPayment): Promise<void> {
+    const reason = this.supplierPaymentReversalReason.value.trim();
+    if (!reason) {
+      this.error.set('Explain why this supplier payment is being reversed');
+      return;
+    }
     try {
-      const signedAmount = this.supplierAdjustmentDirection.value === 'increase' ? amount : -amount;
-      await this.money.adjustSupplierBalance(supplier.id, signedAmount, reason);
-      this.supplierAdjustmentDirection.setValue('increase');
-      this.supplierAdjustmentAmount.setValue('');
-      this.supplierAdjustmentReason.setValue('');
-      this.notice.set(`Supplier balance adjusted by ${this.fmt(amount)}.`);
-      await this.load();
-    } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Adjustment failed');
+      await this.cashierSession.assertOpen('reversing a supplier payment');
+      this.busy.set(true);
+      this.error.set(null);
+      this.notice.set(null);
+      await this.money.reverseSupplierPayment(payment.id, reason);
+      this.cancelSupplierPaymentReversal();
+      this.notice.set('Supplier payment reversed. The payable and source account were restored.');
+      await this.refreshPaymentSurfaces();
+    } catch (error) {
+      this.error.set(
+        error instanceof Error ? error.message : 'Supplier payment could not be reversed'
+      );
     } finally {
       this.busy.set(false);
     }
@@ -3728,9 +3938,10 @@ export class SuppliersComponent implements OnInit, OnDestroy {
     this.payPurchaseId.set(null);
     this.paySupplierId.setValue(supplier.id);
     this.payAmount.setValue('');
-    this.supplierAdjustmentDirection.setValue('increase');
-    this.supplierAdjustmentAmount.setValue('');
-    this.supplierAdjustmentReason.setValue('');
+    this.supplierPayments.set([]);
+    this.supplierAccountStatus.set(null);
+    this.cancelSupplierPaymentReversal();
+    this.supplierPaymentAttempt = null;
     this.supplierCreditLimit.setValue(formatKesInput(supplier.supplier_credit_limit));
     this.supplierTermsDays.setValue(supplier.supplier_credit_terms_days ?? 0);
     this.drawerPurchases.set([]);
@@ -3743,6 +3954,9 @@ export class SuppliersComponent implements OnInit, OnDestroy {
     this.advanceApplicationAttempt = null;
     this.advanceReturnClientRef = null;
     void this.loadDrawerPurchases(supplier.id);
+    if (this.perms.has('ViewFinancials') || this.perms.has('ManageSupplierCreditPurchases')) {
+      void this.loadSupplierAccount(supplier.id);
+    }
     if (this.perms.has('ManageSupplierCreditPurchases') || this.perms.has('ViewFinancials')) {
       void this.refreshSupplierAdvance(supplier.id).catch(error => {
         this.error.set(error instanceof Error ? error.message : 'Could not load supplier advance');
@@ -3755,6 +3969,30 @@ export class SuppliersComponent implements OnInit, OnDestroy {
         queryParamsHandling: 'merge',
         replaceUrl: true,
       });
+    }
+  }
+
+  private async loadSupplierAccount(supplierId: string): Promise<void> {
+    this.supplierPaymentsLoading.set(true);
+    try {
+      const [status, payments] = await Promise.all([
+        this.money.supplierAccountStatus(supplierId),
+        this.perms.has('ViewFinancials')
+          ? this.money.supplierPayments(supplierId)
+          : Promise.resolve([]),
+      ]);
+      if (this.drawerSupplierId() === supplierId) {
+        this.supplierAccountStatus.set(status);
+        this.supplierPayments.set(payments);
+      }
+    } catch (error) {
+      if (this.drawerSupplierId() === supplierId) {
+        this.error.set(
+          error instanceof Error ? error.message : 'Could not load supplier account checks'
+        );
+      }
+    } finally {
+      if (this.drawerSupplierId() === supplierId) this.supplierPaymentsLoading.set(false);
     }
   }
 
@@ -3802,6 +4040,12 @@ export class SuppliersComponent implements OnInit, OnDestroy {
     }
     if (openSupplierId) refreshes.push(this.loadDrawerPurchases(openSupplierId));
     if (openSupplierId) refreshes.push(this.refreshSupplierAdvance(openSupplierId));
+    if (
+      openSupplierId &&
+      (this.perms.has('ViewFinancials') || this.perms.has('ManageSupplierCreditPurchases'))
+    ) {
+      refreshes.push(this.loadSupplierAccount(openSupplierId));
+    }
     const results = await Promise.allSettled(refreshes);
     if (results.some(result => result.status === 'rejected')) {
       this.error.set(
@@ -3817,9 +4061,11 @@ export class SuppliersComponent implements OnInit, OnDestroy {
     this.payPurchaseId.set(null);
     this.supplierAdvanceBalance.set(0);
     this.advanceActivity.set([]);
-    this.supplierAdjustmentDirection.setValue('increase');
-    this.supplierAdjustmentAmount.setValue('');
-    this.supplierAdjustmentReason.setValue('');
+    this.supplierPayments.set([]);
+    this.supplierAccountStatus.set(null);
+    this.supplierPaymentsLoading.set(false);
+    this.cancelSupplierPaymentReversal();
+    this.supplierPaymentAttempt = null;
     this.supplierCreating.set(false);
     this.drawerEditing.set(false);
     this.editingSupplier.set(null);
