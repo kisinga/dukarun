@@ -3488,6 +3488,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "ledger_journal_lines_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_account_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "ledger_journal_lines_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_ar_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "ledger_journal_lines_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_deposit_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "ledger_journal_lines_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ledger_journal_lines_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_advance_balances"
+            referencedColumns: ["supplier_id"]
+          },
+          {
+            foreignKeyName: "ledger_journal_lines_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_ap_balances"
+            referencedColumns: ["supplier_id"]
+          },
+          {
             foreignKeyName: "ledger_journal_lines_entry_company_fkey"
             columns: ["entry_id", "company_id"]
             isOneToOne: false
@@ -3521,6 +3563,48 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "orders"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ledger_journal_lines_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "customer_account_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "ledger_journal_lines_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "customer_ar_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "ledger_journal_lines_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "customer_deposit_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "ledger_journal_lines_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ledger_journal_lines_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_advance_balances"
+            referencedColumns: ["supplier_id"]
+          },
+          {
+            foreignKeyName: "ledger_journal_lines_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_ap_balances"
+            referencedColumns: ["supplier_id"]
           },
         ]
       }
@@ -6783,6 +6867,20 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "supplier_payments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_payments_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "low_stock_variants_by_location"
+            referencedColumns: ["location_id"]
+          },
+          {
             foreignKeyName: "supplier_payments_location_id_fkey"
             columns: ["location_id"]
             isOneToOne: false
@@ -6790,11 +6888,60 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "supplier_payments_purchase_id_fkey"
+            columns: ["purchase_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_history"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_payments_purchase_id_fkey"
+            columns: ["purchase_id"]
+            isOneToOne: false
+            referencedRelation: "purchases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_payments_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "customer_account_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "supplier_payments_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "customer_ar_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "supplier_payments_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "customer_deposit_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
             foreignKeyName: "supplier_payments_supplier_id_fkey"
             columns: ["supplier_id"]
             isOneToOne: false
             referencedRelation: "customers"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_payments_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_advance_balances"
+            referencedColumns: ["supplier_id"]
+          },
+          {
+            foreignKeyName: "supplier_payments_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_ap_balances"
+            referencedColumns: ["supplier_id"]
           },
         ]
       }
@@ -7442,6 +7589,7 @@ export type Database = {
           company_id: string | null
           created_at: string | null
           created_by: string | null
+          credit_due_at: string | null
           expense_total: number | null
           goods_subtotal: number | null
           id: string | null
@@ -8159,6 +8307,10 @@ export type Database = {
         Args: { p_type: string }
         Returns: undefined
       }
+      assert_customer_account_consistent: {
+        Args: { p_company_id: string; p_customer_id: string }
+        Returns: undefined
+      }
       assert_effective_barcode_available: {
         Args: {
           p_barcode: string
@@ -8172,6 +8324,10 @@ export type Database = {
         Returns: undefined
       }
       assert_platform_admin: { Args: never; Returns: undefined }
+      assert_supplier_account_consistent: {
+        Args: { p_company_id: string; p_supplier_id: string }
+        Returns: undefined
+      }
       assert_team_invitation_capacity: {
         Args: { p_company_id: string; p_exclude_phone?: string }
         Returns: undefined
@@ -8498,12 +8654,29 @@ export type Database = {
         Returns: boolean
       }
       custom_access_token_hook: { Args: { event: Json }; Returns: Json }
+      customer_account_status: {
+        Args: { p_customer_id: string }
+        Returns: {
+          difference: number
+          document_balance: number
+          is_consistent: boolean
+          ledger_balance: number
+        }[]
+      }
       customer_deposit_activity: {
         Args: { p_customer_id: string; p_limit?: number }
         Returns: Json
       }
       customer_deposit_available: {
         Args: { p_customer_id: string }
+        Returns: number
+      }
+      customer_document_balance: {
+        Args: { p_company_id: string; p_customer_id: string }
+        Returns: number
+      }
+      customer_ledger_balance: {
+        Args: { p_company_id: string; p_customer_id: string }
         Returns: number
       }
       customer_receipt_preview: {
@@ -9293,18 +9466,18 @@ export type Database = {
         }
         Returns: string
       }
+      post_supplier_balance_adjustment: {
+        Args: { p_amount: number; p_reason: string; p_supplier_id: string }
+        Returns: string
+      }
       post_supplier_payment: {
         Args: {
           p_account_code: string
           p_amount: number
           p_client_ref?: string
-          p_purchase_id: string | null
+          p_purchase_id: string
           p_supplier_id: string
         }
-        Returns: string
-      }
-      post_supplier_balance_adjustment: {
-        Args: { p_amount: number; p_reason: string; p_supplier_id: string }
         Returns: string
       }
       post_transfer: {
@@ -9731,6 +9904,10 @@ export type Database = {
         Args: { p_company_id: string }
         Returns: Json
       }
+      reverse_credit_purchase: {
+        Args: { p_purchase_id: string; p_reason: string }
+        Returns: string
+      }
       reverse_customer_deposit_application: {
         Args: { p_application_id: string; p_reason: string }
         Returns: string
@@ -9741,10 +9918,6 @@ export type Database = {
       }
       reverse_supplier_payment: {
         Args: { p_reason: string; p_supplier_payment_id: string }
-        Returns: string
-      }
-      reverse_credit_purchase: {
-        Args: { p_purchase_id: string; p_reason: string }
         Returns: string
       }
       revert_variance: {
@@ -10041,23 +10214,6 @@ export type Database = {
         }[]
       }
       subscription_expiry_scan: { Args: never; Returns: number }
-      supplier_advance_activity: {
-        Args: { p_limit?: number; p_supplier_id: string }
-        Returns: Json
-      }
-      supplier_advance_available: {
-        Args: { p_supplier_id: string }
-        Returns: number
-      }
-      customer_account_status: {
-        Args: { p_customer_id: string }
-        Returns: {
-          difference: number
-          document_balance: number
-          is_consistent: boolean
-          ledger_balance: number
-        }[]
-      }
       supplier_account_status: {
         Args: { p_supplier_id: string }
         Returns: {
@@ -10066,6 +10222,22 @@ export type Database = {
           is_consistent: boolean
           ledger_balance: number
         }[]
+      }
+      supplier_advance_activity: {
+        Args: { p_limit?: number; p_supplier_id: string }
+        Returns: Json
+      }
+      supplier_advance_available: {
+        Args: { p_supplier_id: string }
+        Returns: number
+      }
+      supplier_document_balance: {
+        Args: { p_company_id: string; p_supplier_id: string }
+        Returns: number
+      }
+      supplier_ledger_balance: {
+        Args: { p_company_id: string; p_supplier_id: string }
+        Returns: number
       }
       sync_cache_stream: {
         Args: { p_after_sequence?: number; p_limit?: number; p_stream: string }
@@ -10425,3 +10597,4 @@ export const Constants = {
     Enums: {},
   },
 } as const
+
