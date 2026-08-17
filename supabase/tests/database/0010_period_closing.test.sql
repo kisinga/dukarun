@@ -63,8 +63,11 @@ select public.record_manual_reconciliation((
            'declared', public.account_balance((select company_id from pc_company), pm.ledger_account_code)
          )), '[]'::jsonb)
   from public.payment_methods pm
+  join public.ledger_accounts a
+    on a.company_id = pm.company_id and a.code = pm.ledger_account_code
   where pm.company_id = (select company_id from pc_company)
     and pm.requires_reconciliation and pm.enabled
+    and a.is_active and not a.is_parent and a.type = 'asset' and a.allow_manual_posting
 )) as recon_id;
 
 select ok((select recon_id from recon1) is not null, 'manual reconciliation recorded');

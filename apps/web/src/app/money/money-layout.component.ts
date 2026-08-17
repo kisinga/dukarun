@@ -44,7 +44,7 @@ interface MoneyTab {
       <div
         role="tablist"
         aria-label="Money sections"
-        class="tabs tabs-boxed mb-4 hidden w-full gap-1 border border-base-300/70 bg-base-100 p-1 md:flex"
+        class="tabs tabs-boxed mb-4 hidden w-full gap-1 overflow-x-auto border border-base-300/70 bg-base-100 p-1 md:flex"
       >
         @for (tab of tabs; track tab.route) {
           <a
@@ -74,6 +74,7 @@ export class MoneyLayoutComponent {
     { route: '/money/credit', label: 'Credit', icon: 'heroCreditCard' },
     { route: '/money/expenses', label: 'Expenses', icon: 'heroReceiptRefund' },
     { route: '/money/transfers', label: 'Transfers', icon: 'heroArrowsRightLeft' },
+    { route: '/money/reconcile', label: 'Reconcile', icon: 'heroCheckBadge' },
     { route: '/money/periods', label: 'Periods', icon: 'heroCalendarDays' },
   ];
   protected readonly activeRoute = computed(() => {

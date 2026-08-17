@@ -1,32 +1,21 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
-import { FormControl, FormsModule, ReactiveFormsModule } from '@angular/forms';
-import { parseKes } from '../../core/money';
+import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { PermissionsService } from '../../core/permissions.service';
 import { runIndependentLoads } from '../../core/independent-load';
 import { ButtonComponent } from '../../shared/ui/button.component';
 import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
 import { FormFieldComponent } from '../../shared/ui/form-field.component';
-import { MoneyComponent } from '../../shared/ui/money.component';
 import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
 import { IconComponent } from '../../shared/ui/icon.component';
 import { MobileListComponent } from '../../shared/ui/mobile-list.component';
-import {
-  AccountingPeriod,
-  CashierAccount,
-  MoneyService,
-  PeriodLock,
-  ReconAccount,
-  Reconciliation,
-} from '../money.service';
+import { AccountingPeriod, MoneyService, PeriodLock } from '../money.service';
 
 @Component({
   selector: 'app-money-periods',
   imports: [
-    FormsModule,
     ReactiveFormsModule,
     FormFieldComponent,
     ButtonComponent,
-    MoneyComponent,
     EmptyStateComponent,
     StatusBadgeComponent,
     IconComponent,
@@ -36,9 +25,7 @@ import {
     <div class="mb-3 flex items-start gap-3">
       <div>
         <h2 class="section-title">Accounting periods</h2>
-        <p class="type-caption mt-1">
-          Reconcile controlled accounts, review variances, and lock completed periods.
-        </p>
+        <p class="type-caption mt-1">Review period locks and close completed accounting periods.</p>
       </div>
       <button
         appButton
@@ -78,53 +65,6 @@ import {
       </div>
     }
 
-    <!-- Manual reconciliation -->
-    @if (perms.has('ManageReconciliation')) {
-      <div class="card mb-4 bg-base-100">
-        <div class="card-body p-4">
-          <h2 class="section-title mb-2">Manual reconciliation</h2>
-          <p class="text-xs text-base-content/60">
-            Declare actual balances per cashier-controlled account (e.g. after checking the M-Pesa
-            statement or the bank). A reason is required for accounts with variance.
-          </p>
-          <div class="mt-2 flex flex-col gap-2">
-            @for (account of accounts(); track account.account_code) {
-              <div class="flex flex-wrap items-end gap-2">
-                <app-form-field
-                  class="w-48"
-                  [label]="account.label + ' (' + account.account_code + ')'"
-                >
-                  <input
-                    type="text"
-                    inputmode="numeric"
-                    class="input input-bordered input-sm w-full"
-                    placeholder="0"
-                    [(ngModel)]="declared[account.account_code]"
-                  />
-                </app-form-field>
-                <app-form-field label="Reason (optional)" class="flex-1">
-                  <input
-                    type="text"
-                    class="input input-bordered input-sm w-full"
-                    [(ngModel)]="reasons[account.account_code]"
-                  />
-                </app-form-field>
-              </div>
-            }
-            <button
-              appButton
-              class="mt-2 self-start"
-              [loading]="busy()"
-              [disabled]="accounts().length === 0"
-              (click)="reconcile()"
-            >
-              Record reconciliation
-            </button>
-          </div>
-        </div>
-      </div>
-    }
-
     <!-- Close period -->
     @if (perms.has('CloseAccountingPeriod')) {
       <div class="card mb-4 bg-base-100">
@@ -157,95 +97,6 @@ import {
             }
           </form>
         </div>
-      </div>
-    }
-
-    <!-- Recent reconciliations (variance review) -->
-    <h2 class="section-title mb-2">Reconciliation history</h2>
-    <p class="type-caption mb-3">
-      A variance can only be reverted before the next opening, closing, or reconciliation.
-    </p>
-    @if (recons().length === 0) {
-      <p class="mb-4 text-sm text-base-content/60">No reconciliations recorded yet.</p>
-    } @else {
-      <div class="mb-4 flex flex-col gap-2">
-        @for (recon of recons(); track recon.id) {
-          <div class="card bg-base-100">
-            <div class="card-body p-4">
-              <div class="flex items-center gap-3">
-                <span class="badge badge-outline">{{ recon.scope }}</span>
-                <span class="type-caption">{{ time(recon.created_at) }}</span>
-              </div>
-              <div class="mt-2 divide-y divide-base-200 rounded-box border border-base-300/60">
-                @for (ra of recon.reconciliation_accounts; track ra.id) {
-                  <div class="p-3">
-                    <div class="flex items-center gap-3">
-                      <div class="min-w-0 flex-1">
-                        <p class="font-mono text-sm font-semibold">{{ ra.account_code }}</p>
-                        <p class="type-caption mt-1">
-                          Declared <app-money [amount]="ra.declared" /> · expected
-                          <app-money [amount]="ra.expected" />
-                        </p>
-                      </div>
-                      <p
-                        class="shrink-0 font-semibold"
-                        [class.text-error]="ra.variance !== 0 && !ra.reviewed_at"
-                      >
-                        <app-money [amount]="ra.variance" />
-                      </p>
-                    </div>
-                    <div class="mt-2 text-right">
-                      @if (ra.reviewed_at) {
-                        <span class="type-caption">
-                          Reviewed · User …{{ shortId(ra.reviewed_by) }} ·
-                          {{ date(ra.reviewed_at) }}
-                        </span>
-                      } @else if (ra.variance !== 0) {
-                        @if (!perms.has('ManageReconciliation')) {
-                          <span class="type-caption">Manager review</span>
-                        } @else if (!canRevert(recon.id)) {
-                          <span
-                            class="type-caption"
-                            title="A newer opening, closing, or reconciliation has occurred"
-                          >
-                            Review window closed
-                          </span>
-                        } @else if (revertingFor() === ra.id) {
-                          <div class="flex items-center justify-end gap-1">
-                            <input
-                              type="text"
-                              class="input input-bordered input-xs w-36"
-                              placeholder="Reason (optional)"
-                              [formControl]="revertReason"
-                            />
-                            <button
-                              class="btn btn-warning btn-xs"
-                              [disabled]="busy()"
-                              (click)="confirmRevert(ra.id)"
-                            >
-                              Confirm
-                            </button>
-                            <button class="btn btn-ghost btn-xs" (click)="revertingFor.set(null)">
-                              Cancel
-                            </button>
-                          </div>
-                        } @else {
-                          <button
-                            class="btn btn-warning btn-outline btn-xs"
-                            [disabled]="busy()"
-                            (click)="startRevert(ra.id)"
-                          >
-                            Revert
-                          </button>
-                        }
-                      }
-                    </div>
-                  </div>
-                }
-              </div>
-            </div>
-          </div>
-        }
       </div>
     }
 
@@ -300,19 +151,10 @@ export class MoneyPeriodsComponent implements OnInit {
   private readonly money = inject(MoneyService);
   protected readonly perms = inject(PermissionsService);
 
-  protected readonly accounts = signal<CashierAccount[]>([]);
   protected readonly periods = signal<AccountingPeriod[]>([]);
   protected readonly lock = signal<PeriodLock | null>(null);
-  protected readonly declared: Record<string, string> = {};
-  protected readonly reasons: Record<string, string> = {};
   protected readonly endDate = new FormControl(this.yesterday(), { nonNullable: true });
   protected readonly confirmClose = signal(false);
-  protected readonly recons = signal<
-    (Reconciliation & { reconciliation_accounts: ReconAccount[] })[]
-  >([]);
-  protected readonly latestReconciliationId = signal<string | null>(null);
-  protected readonly revertingFor = signal<string | null>(null);
-  protected readonly revertReason = new FormControl('', { nonNullable: true });
   protected readonly busy = signal(false);
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
@@ -326,14 +168,6 @@ export class MoneyPeriodsComponent implements OnInit {
     this.loading.set(true);
     const errors = await runIndependentLoads([
       {
-        fallback: 'Failed to load reconciliation accounts',
-        run: async () => {
-          const accounts = await this.money.cashierAccounts();
-          this.accounts.set(accounts);
-          for (const account of accounts) this.declared[account.account_code] ??= '';
-        },
-      },
-      {
         fallback: 'Failed to load accounting periods',
         run: async () => this.periods.set(await this.money.periods()),
       },
@@ -341,57 +175,9 @@ export class MoneyPeriodsComponent implements OnInit {
         fallback: 'Failed to load the period lock',
         run: async () => this.lock.set(await this.money.periodLock()),
       },
-      {
-        fallback: 'Failed to load reconciliations',
-        run: async () => this.recons.set(await this.money.recentReconciliations()),
-      },
-      {
-        fallback: 'Failed to load the latest reconciliation',
-        run: async () => this.latestReconciliationId.set(await this.money.latestReconciliationId()),
-      },
     ]);
     this.error.set(errors.length > 0 ? errors.join('. ') : null);
     this.loading.set(false);
-  }
-
-  protected async reconcile(): Promise<void> {
-    const decls: { account_code: string; declared: number; reason?: string }[] = [];
-    for (const account of this.accounts()) {
-      const raw = this.declared[account.account_code]?.trim();
-      if (!raw) continue; // skip untouched accounts
-      const amount = parseKes(raw);
-      if (amount === null) {
-        this.error.set(`Enter a valid amount for ${account.label}`);
-        return;
-      }
-      const reason = this.reasons[account.account_code]?.trim();
-      decls.push({
-        account_code: account.account_code,
-        declared: amount,
-        ...(reason ? { reason } : {}),
-      });
-    }
-    if (decls.length === 0) {
-      this.error.set('Declare at least one account balance');
-      return;
-    }
-    this.busy.set(true);
-    this.error.set(null);
-    this.notice.set(null);
-    try {
-      await this.money.recordManualReconciliation(decls);
-      this.notice.set('Reconciliation recorded');
-      // Clear stale declarations so a second click can't resubmit them.
-      for (const d of decls) {
-        this.declared[d.account_code] = '';
-        this.reasons[d.account_code] = '';
-      }
-      await this.load();
-    } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Reconciliation failed');
-    } finally {
-      this.busy.set(false);
-    }
   }
 
   protected async askClose(): Promise<void> {
@@ -414,48 +200,6 @@ export class MoneyPeriodsComponent implements OnInit {
     } finally {
       this.busy.set(false);
     }
-  }
-
-  protected startRevert(reconAccountId: string): void {
-    this.revertingFor.set(reconAccountId);
-    this.revertReason.setValue('');
-  }
-
-  protected canRevert(reconciliationId: string): boolean {
-    return reconciliationId === this.latestReconciliationId();
-  }
-
-  protected async confirmRevert(reconAccountId: string): Promise<void> {
-    this.busy.set(true);
-    this.error.set(null);
-    this.notice.set(null);
-    try {
-      await this.money.revertVariance(reconAccountId, this.revertReason.value.trim() || undefined);
-      this.notice.set('Variance reverted and marked reviewed');
-      this.revertingFor.set(null);
-      await this.load();
-    } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Revert failed');
-    } finally {
-      this.busy.set(false);
-    }
-  }
-
-  protected shortId(userId: string | null): string {
-    return userId ? userId.slice(-4) : '????';
-  }
-
-  protected date(iso: string): string {
-    return new Date(iso).toLocaleDateString('en-KE', { month: 'short', day: 'numeric' });
-  }
-
-  protected time(iso: string): string {
-    return new Date(iso).toLocaleString('en-KE', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
   }
 
   private yesterday(): string {

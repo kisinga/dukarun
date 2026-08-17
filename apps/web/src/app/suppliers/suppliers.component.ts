@@ -52,6 +52,8 @@ import {
   PurchaseHistoryRow,
   PurchaseLine,
   PurchasePayment,
+  SupplierAccountStatus,
+  SupplierPayment,
   SupplierPurchaseMetric,
   SupplierVariantPerformance,
 } from '../money/money.service';
@@ -1545,69 +1547,160 @@ interface ParsedPurchaseLine {
                           type="submit"
                           class="self-start"
                           [loading]="busy()"
-                          [disabled]="!cashierSession.canTakePayment()"
+                          [disabled]="
+                            !cashierSession.canTakePayment() ||
+                            supplierAccountStatus()?.is_consistent === false
+                          "
                         >
                           Record supplier payment
                         </button>
+                        @if (supplierAccountStatus()?.is_consistent === false) {
+                          <p class="type-caption text-error">
+                            Payment unavailable until Finance reconciles this account.
+                          </p>
+                        }
                       </form>
                     }
                   </section>
 
                   @if (perms.has('ViewFinancials')) {
                     <section class="border-t border-base-300/60 pt-3">
-                      <h3 class="section-title mb-1">Adjust supplier balance</h3>
+                      <h3 class="section-title mb-1">Correct this account</h3>
                       <p class="type-caption">
-                        Correct what we owe without recording a purchase or moving money.
+                        Fix the source transaction so purchases, payments, and the ledger stay in
+                        agreement.
                       </p>
-                      <form
-                        (submit)="$event.preventDefault(); adjustSupplierBalance(s)"
-                        class="mt-2 grid gap-2 sm:grid-cols-2"
-                      >
-                        <app-form-field label="Adjustment">
-                          <select
-                            class="select select-bordered select-sm w-full"
-                            [formControl]="supplierAdjustmentDirection"
-                          >
-                            <option value="increase">Increase what we owe</option>
-                            <option value="decrease">Reduce what we owe</option>
-                          </select>
-                        </app-form-field>
-                        <app-form-field label="Amount (KES)">
-                          <input
-                            type="text"
-                            inputmode="numeric"
-                            class="input input-bordered input-sm w-full"
-                            [formControl]="supplierAdjustmentAmount"
-                          />
-                        </app-form-field>
-                        <app-form-field label="Reason" [required]="true">
-                          <input
-                            type="text"
-                            maxlength="500"
-                            class="input input-bordered input-sm w-full"
-                            placeholder="Why is this correction needed?"
-                            [formControl]="supplierAdjustmentReason"
-                          />
-                        </app-form-field>
-                        <div class="flex flex-col items-start justify-end gap-1">
-                          @let adjustmentPreview = supplierAdjustmentPreview(s);
-                          @if (adjustmentPreview !== null) {
-                            <p class="type-caption">
-                              Balance after adjustment:
-                              <strong>{{ fmt(adjustmentPreview) }}</strong>
-                            </p>
-                          }
-                          <button
-                            appButton
-                            variant="outline"
-                            type="submit"
-                            [loading]="busy()"
-                            [disabled]="busy()"
-                          >
-                            Post adjustment
-                          </button>
-                        </div>
-                      </form>
+
+                      @if (supplierAccountStatus(); as status) {
+                        @if (!status.is_consistent) {
+                          <div role="alert" class="alert alert-error mt-3 text-sm">
+                            <app-icon name="heroExclamationTriangle" />
+                            <div>
+                              <p class="font-semibold">Payments are paused for this supplier</p>
+                              <p class="text-xs">
+                                Ledger {{ fmt(status.ledger_balance) }} · purchases
+                                {{ fmt(status.document_balance) }}. Finance must reconcile the
+                                source records first.
+                              </p>
+                            </div>
+                          </div>
+                        }
+                      }
+
+                      <div class="mt-3 grid gap-2 sm:grid-cols-2">
+                        <a
+                          appButton
+                          variant="outline"
+                          routerLink="/purchases/new"
+                          [queryParams]="{ supplier: s.id }"
+                        >
+                          <app-icon name="heroDocumentText" /> Missing purchase
+                        </a>
+                        <a
+                          appButton
+                          variant="ghost"
+                          routerLink="/purchases"
+                          [queryParams]="{ supplier: s.id, range: 'all' }"
+                        >
+                          <app-icon name="heroShoppingCart" /> Wrong purchase
+                        </a>
+                      </div>
+                      <p class="type-caption mt-2">
+                        Missing amount owed? Record its purchase. Wrong invoice? Open that purchase
+                        and correct the source. Wrong payment? Reverse it below.
+                      </p>
+
+                      <details class="mt-3 rounded-field border border-base-300 p-3">
+                        <summary class="cursor-pointer text-sm font-medium">
+                          Recent payments and reversals
+                        </summary>
+                        @if (supplierPaymentsLoading()) {
+                          <div class="flex justify-center py-4">
+                            <span class="loading loading-spinner loading-sm"></span>
+                          </div>
+                        } @else if (supplierPayments().length === 0) {
+                          <p class="type-caption mt-3">
+                            No reversible payments recorded with the new payment workflow.
+                          </p>
+                        } @else {
+                          <ul class="mt-2 divide-y divide-base-300/60">
+                            @for (payment of supplierPayments(); track payment.id) {
+                              <li class="py-3">
+                                <div class="flex items-center justify-between gap-3">
+                                  <div class="min-w-0">
+                                    <p class="text-sm font-medium">{{ payment.account_code }}</p>
+                                    <p class="type-caption">
+                                      {{ time(payment.created_at) }} · {{ payment.status }}
+                                    </p>
+                                  </div>
+                                  <strong class="tabular-nums">{{ fmt(payment.amount) }}</strong>
+                                </div>
+                                @if (
+                                  payment.status === 'posted' &&
+                                  perms.has('ManageSupplierCreditPurchases') &&
+                                  perms.has('ReverseOrder')
+                                ) {
+                                  @if (reversingSupplierPaymentId() === payment.id) {
+                                    <form
+                                      (submit)="
+                                        $event.preventDefault(); reverseSupplierPayment(payment)
+                                      "
+                                      class="mt-2 rounded-field bg-base-200/60 p-3"
+                                    >
+                                      <app-form-field
+                                        label="Why is this payment wrong?"
+                                        hint="Reversal restores both the supplier balance and the source account."
+                                        [required]="true"
+                                      >
+                                        <input
+                                          class="input input-bordered input-sm w-full"
+                                          maxlength="500"
+                                          [formControl]="supplierPaymentReversalReason"
+                                        />
+                                      </app-form-field>
+                                      <div class="mt-2 flex flex-wrap gap-2">
+                                        <button
+                                          appButton
+                                          size="sm"
+                                          type="submit"
+                                          [loading]="busy()"
+                                          [disabled]="
+                                            busy() ||
+                                            !cashierSession.canTakePayment() ||
+                                            !supplierPaymentReversalReason.value.trim()
+                                          "
+                                        >
+                                          Reverse payment
+                                        </button>
+                                        <button
+                                          appButton
+                                          variant="ghost"
+                                          size="sm"
+                                          type="button"
+                                          (click)="cancelSupplierPaymentReversal()"
+                                        >
+                                          Cancel
+                                        </button>
+                                      </div>
+                                    </form>
+                                  } @else {
+                                    <button
+                                      appButton
+                                      variant="ghost"
+                                      size="sm"
+                                      type="button"
+                                      class="mt-1"
+                                      (click)="startSupplierPaymentReversal(payment.id)"
+                                    >
+                                      Entered incorrectly? Reverse
+                                    </button>
+                                  }
+                                }
+                              </li>
+                            }
+                          </ul>
+                        }
+                      </details>
                     </section>
                   }
                 }
@@ -2459,12 +2552,12 @@ export class SuppliersComponent implements OnInit, OnDestroy {
   protected readonly paySupplierId = new FormControl('', { nonNullable: true });
   protected readonly payAmount = new FormControl('', { nonNullable: true });
   protected readonly payAccount = new FormControl('', { nonNullable: true });
-  protected readonly supplierAdjustmentDirection = new FormControl<'increase' | 'decrease'>(
-    'increase',
-    { nonNullable: true }
-  );
-  protected readonly supplierAdjustmentAmount = new FormControl('', { nonNullable: true });
-  protected readonly supplierAdjustmentReason = new FormControl('', { nonNullable: true });
+  protected readonly supplierPayments = signal<SupplierPayment[]>([]);
+  protected readonly supplierPaymentsLoading = signal(false);
+  protected readonly supplierAccountStatus = signal<SupplierAccountStatus | null>(null);
+  protected readonly reversingSupplierPaymentId = signal<string | null>(null);
+  protected readonly supplierPaymentReversalReason = new FormControl('', { nonNullable: true });
+  private supplierPaymentAttempt: { fingerprint: string; clientRef: string } | null = null;
   protected readonly payPurchaseId = signal<string | null>(null);
   protected readonly selectedPayAmount = new FormControl('', { nonNullable: true });
   protected readonly selectedPayAccount = new FormControl('', { nonNullable: true });
