@@ -9475,7 +9475,7 @@ export type Database = {
           p_account_code: string
           p_amount: number
           p_client_ref?: string
-          p_purchase_id: string
+          p_purchase_id: string | null
           p_supplier_id: string
         }
         Returns: string
@@ -10597,4 +10597,3 @@ export const Constants = {
     Enums: {},
   },
 } as const
-
