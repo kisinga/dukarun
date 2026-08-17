@@ -104,6 +104,11 @@ alter table public.ledger_journal_lines
   add column customer_id uuid references public.customers(id),
   add column supplier_id uuid references public.customers(id);
 
+-- Historical journal lines are immutable to application traffic. This
+-- transaction-local maintenance flag permits only the schema backfill below;
+-- it is disabled again before any new posting trigger is installed.
+select set_config('app.allow_ledger_mutation','on',true);
+
 update public.ledger_journal_lines l
 set customer_id=coalesce(
   case when l.meta->>'customerId' ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
@@ -120,6 +125,8 @@ set supplier_id=case
 end
 from public.ledger_accounts a
 where a.id=l.account_id and a.company_id=l.company_id and a.code='ACCOUNTS_PAYABLE';
+
+select set_config('app.allow_ledger_mutation','off',true);
 
 create index ledger_lines_customer_control_idx
   on public.ledger_journal_lines(company_id,customer_id) where customer_id is not null;

@@ -9470,12 +9470,21 @@ export type Database = {
         Args: { p_amount: number; p_reason: string; p_supplier_id: string }
         Returns: string
       }
+      post_supplier_fifo_payment: {
+        Args: {
+          p_account_code: string
+          p_amount: number
+          p_client_ref: string
+          p_supplier_id: string
+        }
+        Returns: string
+      }
       post_supplier_payment: {
         Args: {
           p_account_code: string
           p_amount: number
           p_client_ref?: string
-          p_purchase_id: string | null
+          p_purchase_id: string
           p_supplier_id: string
         }
         Returns: string
@@ -10597,3 +10606,4 @@ export const Constants = {
     Enums: {},
   },
 } as const
+
