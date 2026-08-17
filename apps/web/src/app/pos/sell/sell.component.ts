@@ -1376,16 +1376,24 @@ export class SellComponent implements OnInit {
       .topVariants(8)
       .then(variants => this.topVariants.set(variants))
       .catch(() => undefined);
-    const draftId = this.route.snapshot.queryParamMap.get('draft');
+    const params = this.route.snapshot.queryParamMap;
+    const draftId = params.get('draft');
     if (draftId) await this.loadDraft(draftId);
-    const customerId = this.cart.customerId();
+    const routedCustomerId = params.get('customer');
+    const customerId = routedCustomerId ?? this.cart.customerId();
     if (customerId) {
       try {
-        this.selectedCustomer.set(await this.pos.customerWithCredit(customerId));
+        const customer = await this.pos.customerWithCredit(customerId);
+        if (!customer) throw new Error('Customer not found');
+        this.selectedCustomer.set(customer);
+        if (routedCustomerId) {
+          this.cart.setCustomer(customer.id, this.customerName(customer));
+        }
         await this.refreshCustomerDeposit(customerId);
       } catch {
         this.selectedCustomer.set(null);
         this.customerDepositBalance.set(0);
+        if (routedCustomerId) this.cart.setCustomer(null, 'Walk-in');
       }
     }
   }

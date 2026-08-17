@@ -153,41 +153,25 @@ select is(
   'reversal + original nets to zero per account totals'
 );
 
--- 13-15. Customer balance adjustments.
+-- 13-15. Naked customer balance adjustments are retired.
 reset role;
 insert into public.customers (id, company_id, first_name)
 select 'c0000000-0000-0000-0000-0000000000bb', company_id, 'Credit Jane' from mops_company;
 
 select testkit.as_user((select company_id from mops_company), '11111111-1111-1111-1111-111111111111', 'Admin');
 
-create temp table badj as
-select public.post_balance_adjustment('c0000000-0000-0000-0000-0000000000bb', 15000, 'correction') as entry_id;
-
-select results_eq(
-  $$select a.code::text, l.debit, l.credit
-    from public.ledger_journal_lines l
-    join public.ledger_accounts a on a.id = l.account_id
-    where l.entry_id = (select entry_id from badj)
-    order by a.code$$,
-  $$values
-    ('ACCOUNTS_RECEIVABLE', 15000::bigint, 0::bigint),
-    ('BALANCE_ADJUSTMENT', 0::bigint, 15000::bigint)$$,
-  'positive adjustment: DR AR / CR BALANCE_ADJUSTMENT'
+select throws_ok(
+  $$select public.post_balance_adjustment(
+    'c0000000-0000-0000-0000-0000000000bb',15000,'correction')$$,
+  'P0001','manual_balance_adjustment_removed: use a sale, receipt reversal, or credit note',
+  'customer balances can no longer be increased without a source document'
 );
 
-create temp table badj2 as
-select public.post_balance_adjustment('c0000000-0000-0000-0000-0000000000bb', -5000, 'forgive') as entry_id;
-
-select results_eq(
-  $$select a.code::text, l.debit, l.credit
-    from public.ledger_journal_lines l
-    join public.ledger_accounts a on a.id = l.account_id
-    where l.entry_id = (select entry_id from badj2)
-    order by a.code$$,
-  $$values
-    ('ACCOUNTS_RECEIVABLE', 0::bigint, 5000::bigint),
-    ('BALANCE_ADJUSTMENT', 5000::bigint, 0::bigint)$$,
-  'negative adjustment (forgive): DR BALANCE_ADJUSTMENT / CR AR'
+select throws_ok(
+  $$select public.post_balance_adjustment(
+    'c0000000-0000-0000-0000-0000000000bb',-5000,'forgive')$$,
+  'P0001','manual_balance_adjustment_removed: use a sale, receipt reversal, or credit note',
+  'customer balances can no longer be reduced without reversing a source or issuing credit'
 );
 
 select testkit.as_user((select company_id from mops_company), '22222222-2222-2222-2222-222222222222', 'Cashier');

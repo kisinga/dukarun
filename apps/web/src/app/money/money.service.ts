@@ -626,7 +626,10 @@ export class MoneyService {
     sortBy?: 'created_at' | 'purchase_date' | 'total_cost' | 'reference';
     sortDirection?: 'asc' | 'desc';
   }): Promise<{ rows: PurchaseHistoryRow[]; count: number }> {
-    let query = this.db.from('purchase_history').select('*', { count: 'exact' });
+    let query = this.db
+      .from('purchase_history')
+      .select('*', { count: 'exact' })
+      .eq('status', 'posted');
     if (!input.allLocations) {
       query = query.eq('stock_location_id', input.locationId ?? this.locations.requireActiveId());
     }
@@ -715,6 +718,16 @@ export class MoneyService {
     if (error) throw rpcError(error);
     const status = data?.[0];
     if (!status) throw new Error('Supplier account status was not returned');
+    return status;
+  }
+
+  async customerAccountStatus(customerId: string): Promise<SupplierAccountStatus> {
+    const { data, error } = await this.db.rpc('customer_account_status', {
+      p_customer_id: customerId,
+    });
+    if (error) throw rpcError(error);
+    const status = data?.[0];
+    if (!status) throw new Error('Customer account status was not returned');
     return status;
   }
 
@@ -1322,6 +1335,16 @@ export class MoneyService {
   async reverseSupplierPayment(paymentId: string, reason: string): Promise<string> {
     const { data, error } = await this.db.rpc('reverse_supplier_payment', {
       p_supplier_payment_id: paymentId,
+      p_reason: reason,
+    });
+    if (error) throw rpcError(error);
+    this.parties.invalidateFinancials();
+    return data;
+  }
+
+  async reverseCreditPurchase(purchaseId: string, reason: string): Promise<string> {
+    const { data, error } = await this.db.rpc('reverse_credit_purchase', {
+      p_purchase_id: purchaseId,
       p_reason: reason,
     });
     if (error) throw rpcError(error);

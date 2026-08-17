@@ -3430,34 +3430,40 @@ export type Database = {
           account_id: string
           company_id: string
           credit: number
+          customer_id: string | null
           debit: number
           entry_id: string
           id: string
           location_id: string | null
           meta: Json
           order_id: string | null
+          supplier_id: string | null
         }
         Insert: {
           account_id: string
           company_id: string
           credit?: number
+          customer_id?: string | null
           debit?: number
           entry_id: string
           id?: string
           location_id?: string | null
           meta?: Json
           order_id?: string | null
+          supplier_id?: string | null
         }
         Update: {
           account_id?: string
           company_id?: string
           credit?: number
+          customer_id?: string | null
           debit?: number
           entry_id?: string
           id?: string
           location_id?: string | null
           meta?: Json
           order_id?: string | null
+          supplier_id?: string | null
         }
         Relationships: [
           {
@@ -5548,6 +5554,10 @@ export type Database = {
           notes: string | null
           purchase_date: string
           reference: string | null
+          reversal_reason: string | null
+          reversed_at: string | null
+          reversed_by: string | null
+          status: string
           stock_location_id: string
           supplier_id: string
           total_cost: number
@@ -5564,6 +5574,10 @@ export type Database = {
           notes?: string | null
           purchase_date?: string
           reference?: string | null
+          reversal_reason?: string | null
+          reversed_at?: string | null
+          reversed_by?: string | null
+          status?: string
           stock_location_id: string
           supplier_id: string
           total_cost: number
@@ -5580,6 +5594,10 @@ export type Database = {
           notes?: string | null
           purchase_date?: string
           reference?: string | null
+          reversal_reason?: string | null
+          reversed_at?: string | null
+          reversed_by?: string | null
+          status?: string
           stock_location_id?: string
           supplier_id?: string
           total_cost?: number
@@ -6708,6 +6726,7 @@ export type Database = {
           created_by: string | null
           id: string
           location_id: string
+          purchase_id: string | null
           reversal_reason: string | null
           reversed_at: string | null
           reversed_by: string | null
@@ -6724,6 +6743,7 @@ export type Database = {
           created_by?: string | null
           id?: string
           location_id: string
+          purchase_id?: string | null
           reversal_reason?: string | null
           reversed_at?: string | null
           reversed_by?: string | null
@@ -6740,6 +6760,7 @@ export type Database = {
           created_by?: string | null
           id?: string
           location_id?: string
+          purchase_id?: string | null
           reversal_reason?: string | null
           reversed_at?: string | null
           reversed_by?: string | null
@@ -7430,7 +7451,11 @@ export type Database = {
           payment_status: string | null
           purchase_date: string | null
           reference: string | null
+          reversal_reason: string | null
+          reversed_at: string | null
+          reversed_by: string | null
           separate_expense_total: number | null
+          status: string | null
           stock_location_id: string | null
           supplier_id: string | null
           total_cost: number | null
@@ -9718,6 +9743,10 @@ export type Database = {
         Args: { p_reason: string; p_supplier_payment_id: string }
         Returns: string
       }
+      reverse_credit_purchase: {
+        Args: { p_purchase_id: string; p_reason: string }
+        Returns: string
+      }
       revert_variance: {
         Args: { p_reason?: string; p_recon_account_id: string }
         Returns: string
@@ -10019,6 +10048,15 @@ export type Database = {
       supplier_advance_available: {
         Args: { p_supplier_id: string }
         Returns: number
+      }
+      customer_account_status: {
+        Args: { p_customer_id: string }
+        Returns: {
+          difference: number
+          document_balance: number
+          is_consistent: boolean
+          ledger_balance: number
+        }[]
       }
       supplier_account_status: {
         Args: { p_supplier_id: string }

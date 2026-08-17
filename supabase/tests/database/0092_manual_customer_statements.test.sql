@@ -9,9 +9,19 @@ grant select on pg_temp.statement_send_fixture to authenticated,anon;
 select testkit.add_member((select company_id from statement_send_fixture),
   '92000000-0000-4000-8000-000000000002','Communications only',array['ManageCommunications']);
 insert into public.customers(id,company_id,first_name,last_name,phone,notifications_enabled,
-  sms_notifications_enabled,whatsapp_notifications_enabled)
-select '92000000-0000-4000-8000-000000000010',company_id,'Amina','Buyer','+254700000010',true,true,true
+  sms_notifications_enabled,whatsapp_notifications_enabled,is_credit_approved,credit_limit)
+select '92000000-0000-4000-8000-000000000010',company_id,'Amina','Buyer','+254700000010',
+  true,true,true,true,1000
 from statement_send_fixture;
+insert into public.products(id,company_id,name)
+select '92000000-0000-4000-8000-000000000011',company_id,'Statement item'
+from statement_send_fixture;
+insert into public.product_variants(
+  id,product_id,company_id,name,sku,price,wholesale_price,kind,track_inventory
+)
+select '92000000-0000-4000-8000-000000000012',
+  '92000000-0000-4000-8000-000000000011',company_id,'Default','STATEMENT-ITEM',1,1,
+  'service',false from statement_send_fixture;
 
 select ok(position('recipient' in pg_get_function_arguments(
   'public.send_customer_statement(uuid,text,boolean)'::regprocedure))=0,
@@ -19,10 +29,18 @@ select ok(position('recipient' in pg_get_function_arguments(
 
 select testkit.as_user((select company_id from statement_send_fixture),
   '92000000-0000-4000-8000-000000000001','Admin');
-select public.post_balance_adjustment('92000000-0000-4000-8000-000000000010',100,'Opening balance');
+select testkit.ensure_open_session();
 do $$ begin
-  for i in 1..26 loop
-    perform public.post_balance_adjustment('92000000-0000-4000-8000-000000000010',1,'Activity '||i);
+  for i in 1..27 loop
+    perform public.post_sale(
+      '92000000-0000-4000-8000-000000000010',
+      jsonb_build_array(jsonb_build_object(
+        'variant_id','92000000-0000-4000-8000-000000000012',
+        'quantity',case when i=1 then 100 else 1 end,
+        'unit_price',1
+      )),
+      '[]'::jsonb
+    );
   end loop;
 end $$;
 
