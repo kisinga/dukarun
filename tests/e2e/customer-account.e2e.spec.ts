@@ -154,6 +154,16 @@ async function authenticateAccountUser(page: Page): Promise<{ creditRequest: () 
       return json([{ variant_id: variantId, stock: 999, stock_value: 0 }]);
     }
     if (path.endsWith('/rest/v1/rpc/customer_deposit_available')) return json(300);
+    if (path.endsWith('/rest/v1/rpc/customer_account_status')) {
+      return json([
+        {
+          ledger_balance: 300,
+          document_balance: 300,
+          difference: 0,
+          is_consistent: true,
+        },
+      ]);
+    }
     if (path.endsWith('/rest/v1/rpc/customer_statement')) return json([]);
     if (path.endsWith('/rest/v1/rpc/post_credit_sale_at_location')) {
       postedCreditRequest = request.postDataJSON();
