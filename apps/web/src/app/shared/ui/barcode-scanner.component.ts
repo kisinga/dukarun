@@ -15,40 +15,46 @@ type DetectorConstructor = new (options?: { formats?: string[] }) => Detector;
 @Component({
   selector: 'app-barcode-scanner',
   template: `
-    <div
-      class="fixed inset-0 z-[80] flex items-end bg-black/75 sm:items-center sm:justify-center"
+    <dialog
+      #dialog
+      class="m-0 h-full max-h-none w-full max-w-none border-0 bg-transparent p-0 backdrop:bg-black/75"
       role="dialog"
-      aria-modal="true"
       aria-label="Scan barcode"
+      (cancel)="closeScanner($event)"
     >
-      <section class="w-full overflow-hidden rounded-t-box bg-base-100 sm:max-w-lg sm:rounded-box">
-        <header class="flex items-center gap-2 border-b border-base-300 px-4 py-3">
-          <div>
-            <h2 class="font-semibold">Scan barcode</h2>
-            <p class="text-xs text-base-content/60">Hold the code inside the frame.</p>
+      <div class="flex h-full w-full items-end sm:items-center sm:justify-center">
+        <section
+          class="w-full overflow-hidden rounded-t-box bg-base-100 sm:max-w-lg sm:rounded-box"
+        >
+          <header class="flex items-center gap-2 border-b border-base-300 px-4 py-3">
+            <div>
+              <h2 class="font-semibold">Scan barcode</h2>
+              <p class="text-xs text-base-content/60">Hold the code inside the frame.</p>
+            </div>
+            <button class="btn btn-ghost btn-sm ml-auto" (click)="close.emit()">Close</button>
+          </header>
+          <div class="relative aspect-[4/3] bg-black">
+            <video #video class="h-full w-full object-cover" autoplay muted playsinline></video>
+            <div
+              class="pointer-events-none absolute inset-x-[12%] top-1/2 h-28 -translate-y-1/2 rounded-box border-2 border-primary shadow-[0_0_0_999px_rgba(0,0,0,.25)]"
+            ></div>
           </div>
-          <button class="btn btn-ghost btn-sm ml-auto" (click)="close.emit()">Close</button>
-        </header>
-        <div class="relative aspect-[4/3] bg-black">
-          <video #video class="h-full w-full object-cover" autoplay muted playsinline></video>
-          <div
-            class="pointer-events-none absolute inset-x-[12%] top-1/2 h-28 -translate-y-1/2 rounded-box border-2 border-primary shadow-[0_0_0_999px_rgba(0,0,0,.25)]"
-          ></div>
-        </div>
-        <div class="px-4 py-3 text-sm">
-          @if (error()) {
-            <span class="text-error">{{ error() }}</span>
-          } @else {
-            <span class="text-base-content/60">{{ status() }}</span>
-          }
-        </div>
-      </section>
-    </div>
+          <div class="px-4 py-3 text-sm">
+            @if (error()) {
+              <span class="text-error">{{ error() }}</span>
+            } @else {
+              <span class="text-base-content/60">{{ status() }}</span>
+            }
+          </div>
+        </section>
+      </div>
+    </dialog>
   `,
 })
 export class BarcodeScannerComponent implements AfterViewInit, OnDestroy {
   readonly scanned = output<string>();
   readonly close = output<void>();
+  private readonly dialog = viewChild.required<ElementRef<HTMLDialogElement>>('dialog');
   private readonly video = viewChild.required<ElementRef<HTMLVideoElement>>('video');
   protected readonly error = signal<string | null>(null);
   protected readonly status = signal('Starting camera…');
@@ -57,6 +63,8 @@ export class BarcodeScannerComponent implements AfterViewInit, OnDestroy {
   private frame = 0;
   private stopped = false;
   async ngAfterViewInit(): Promise<void> {
+    // A native modal is placed in the browser's top layer, above the product editor dialog.
+    this.dialog().nativeElement.showModal();
     const DetectorClass = (globalThis as unknown as { BarcodeDetector?: DetectorConstructor })
       .BarcodeDetector;
     try {
@@ -92,6 +100,11 @@ export class BarcodeScannerComponent implements AfterViewInit, OnDestroy {
     } catch (error) {
       this.error.set(error instanceof Error ? error.message : 'Camera permission was denied.');
     }
+  }
+
+  protected closeScanner(event: Event): void {
+    event.preventDefault();
+    this.close.emit();
   }
 
   private async startFallback(video: HTMLVideoElement): Promise<void> {
