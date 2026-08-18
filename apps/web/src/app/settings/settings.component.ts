@@ -34,6 +34,7 @@ import {
   type CatalogImportResult,
 } from '../products/product-transfer.service';
 import { CachedDataExportService, type CachedExportKind } from './cached-data-export.service';
+import { TaxSettingsComponent } from './tax-settings.component';
 
 type SectionKey = 'profile' | 'pos' | 'inventory' | 'cash';
 type SettingsTab = 'business' | 'operations' | 'money' | 'communications' | 'data';
@@ -48,7 +49,7 @@ const SETTINGS_TABS: ReadonlyArray<{ key: SettingsTab; label: string }> = [
   { key: 'business', label: 'Business' },
   { key: 'operations', label: 'Operations' },
   { key: 'money', label: 'Money' },
-  { key: 'communications', label: 'Messages' },
+  { key: 'communications', label: 'Notifications' },
   { key: 'data', label: 'Data' },
 ];
 
@@ -65,6 +66,7 @@ const SETTINGS_TABS: ReadonlyArray<{ key: SettingsTab; label: string }> = [
     MoneyComponent,
     MobileListComponent,
     ProductImportDialogComponent,
+    TaxSettingsComponent,
   ],
   template: `
     <app-page title="Settings">
@@ -74,27 +76,42 @@ const SETTINGS_TABS: ReadonlyArray<{ key: SettingsTab; label: string }> = [
 
       @if (settings(); as s) {
         <div class="space-y-6">
-          <div class="overflow-x-auto" aria-label="Settings sections">
-            <div role="tablist" class="tabs tabs-box w-max min-w-full">
+          <label class="form-control md:hidden">
+            <span
+              class="label-text mb-1 text-xs font-semibold uppercase tracking-wide text-base-content/60"
+            >
+              Settings section
+            </span>
+            <select
+              class="select select-bordered min-h-11 w-full"
+              aria-label="Settings section"
+              [value]="activeTab()"
+              (change)="selectTabFromEvent($event)"
+            >
+              @for (tab of settingsTabs(); track tab.key) {
+                <option [value]="tab.key">{{ tab.label }}</option>
+              }
+            </select>
+          </label>
+          <nav class="hidden border-b border-base-300/70 md:block" aria-label="Settings sections">
+            <div role="tablist" class="-mb-px flex gap-1 overflow-x-auto">
               @for (tab of settingsTabs(); track tab.key) {
                 <button
                   role="tab"
                   type="button"
-                  class="tab min-h-11 px-4"
-                  [class.tab-active]="activeTab() === tab.key"
+                  class="flex min-h-11 shrink-0 items-center border-b-2 px-3 text-sm font-medium transition-colors hover:text-base-content"
+                  [class.border-primary]="activeTab() === tab.key"
+                  [class.border-transparent]="activeTab() !== tab.key"
+                  [class.text-base-content]="activeTab() === tab.key"
+                  [class.text-base-content/60]="activeTab() !== tab.key"
                   [attr.aria-selected]="activeTab() === tab.key"
                   (click)="selectTab(tab.key)"
                 >
                   {{ tab.label }}
                 </button>
               }
-              @if (perms.has('ViewAuditTrail')) {
-                <a role="tab" routerLink="/settings/audit-trail" class="tab min-h-11 px-4">
-                  Audit
-                </a>
-              }
             </div>
-          </div>
+          </nav>
 
           @if (activeTab() === 'business') {
             <!-- Profile -->
@@ -633,6 +650,8 @@ const SETTINGS_TABS: ReadonlyArray<{ key: SettingsTab; label: string }> = [
           }
 
           @if (activeTab() === 'money') {
+            <app-tax-settings />
+
             <!-- Cash control threshold -->
             <div class="card bg-base-100">
               <div class="card-body p-4">
@@ -684,16 +703,23 @@ const SETTINGS_TABS: ReadonlyArray<{ key: SettingsTab; label: string }> = [
                       Optional staff commission plans and reviewable statements.
                     </p>
                   </div>
-                  <label class="label cursor-pointer gap-3">
-                    <span class="label-text font-medium">Enable commissions</span>
-                    <input
-                      type="checkbox"
-                      class="toggle toggle-primary"
-                      [checked]="s.commissions_enabled"
-                      [disabled]="busy()"
-                      (change)="toggleCommissions($event)"
-                    />
-                  </label>
+                  <div class="flex flex-wrap items-center justify-end gap-2">
+                    @if (s.commissions_enabled) {
+                      <a appButton variant="ghost" size="sm" routerLink="/team/commissions">
+                        Manage commissions
+                      </a>
+                    }
+                    <label class="label cursor-pointer gap-3">
+                      <span class="label-text font-medium">Enable commissions</span>
+                      <input
+                        type="checkbox"
+                        class="toggle toggle-primary"
+                        [checked]="s.commissions_enabled"
+                        [disabled]="busy()"
+                        (change)="toggleCommissions($event)"
+                      />
+                    </label>
+                  </div>
                 </div>
                 @if (msg('commissions'); as m) {
                   <p class="mt-2 text-sm" [class.text-success]="m.ok" [class.text-error]="!m.ok">
@@ -948,8 +974,8 @@ const SETTINGS_TABS: ReadonlyArray<{ key: SettingsTab; label: string }> = [
                   <p class="type-caption">
                     Campaigns and manually reviewed documents keep their send-time channel and
                     recipient choices.
-                    <a routerLink="/communications" class="link font-semibold">
-                      Open Communications
+                    <a routerLink="/activity/messages" class="link font-semibold">
+                      View message activity
                     </a>
                   </p>
                 </div>
@@ -1142,7 +1168,7 @@ const SETTINGS_TABS: ReadonlyArray<{ key: SettingsTab; label: string }> = [
           ) {
             <div class="card bg-base-100">
               <div class="card-body p-4">
-                <h2 class="section-title">Messages</h2>
+                <h2 class="section-title">Notifications</h2>
                 <p class="type-caption mt-1">
                   Your role does not include access to communication settings.
                 </p>
@@ -1523,6 +1549,12 @@ export class SettingsComponent implements OnInit {
       queryParams: { tab: tab === 'business' ? null : tab },
       queryParamsHandling: 'merge',
     });
+  }
+
+  protected selectTabFromEvent(event: Event): void {
+    const value = (event.target as HTMLSelectElement).value;
+    const tab = SETTINGS_TABS.find(item => item.key === value);
+    if (tab) this.selectTab(tab.key);
   }
 
   protected async exportCatalog(): Promise<void> {

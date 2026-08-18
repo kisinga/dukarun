@@ -14,11 +14,13 @@ async function mockSupabase(page: import('@playwright/test').Page): Promise<void
   });
 }
 
-async function authenticateFinancialUser(page: import('@playwright/test').Page): Promise<void> {
+async function authenticateFinancialUser(
+  page: import('@playwright/test').Page,
+  permissions = ['ViewFinancials', 'CreateInterAccountTransfer']
+): Promise<void> {
   const companyId = '00000000-0000-4000-8000-000000000001';
   const userId = '00000000-0000-4000-8000-000000000002';
   const locationId = '00000000-0000-4000-8000-000000000003';
-  const permissions = ['ViewFinancials', 'CreateInterAccountTransfer'];
   const payload = {
     aud: 'authenticated',
     role: 'authenticated',
@@ -84,6 +86,37 @@ async function authenticateFinancialUser(page: import('@playwright/test').Page):
           'payment.reverse': 'execute',
           'sale.credit_over_limit': 'execute',
           'customer.credit.update': 'execute',
+        },
+      });
+    }
+    if (path.endsWith('/rest/v1/rpc/current_entitlements')) {
+      return json({
+        companyId,
+        status: 'active',
+        tierCode: 'pro',
+        tierName: 'Pro',
+        features: {
+          multipleLocations: true,
+          staffPerformance: true,
+          commissions: true,
+          storefront: true,
+          paymentReminders: true,
+        },
+        settings: {
+          commissionsEnabled: true,
+          paymentRemindersEnabled: true,
+          paymentReminderChannel: 'whatsapp',
+          paymentReminderSmsFallback: true,
+        },
+        limits: {},
+        usage: {
+          stockLocations: 1,
+          products: 0,
+          ordersThisMonth: 0,
+          teamMembers: 1,
+          sms: { used: 0, reserved: 0, remaining: null },
+          whatsapp: { used: 0, reserved: 0, remaining: null },
+          periodEnd: null,
         },
       });
     }
@@ -200,6 +233,59 @@ test('financial forms keep account choices when history fails', async ({ page })
   await expect(transferAccounts.nth(0).locator('option')).toHaveCount(2);
   await expect(transferAccounts.nth(1).locator('option')).toHaveCount(2);
   await expect(page.getByRole('button', { name: 'Post transfer' })).toBeVisible();
+});
+
+test('operations navigation consolidates workspaces and preserves progressive disclosure', async ({
+  page,
+  isMobile,
+}) => {
+  await authenticateFinancialUser(page, [
+    'ManageStockAdjustments',
+    'ManageTeam',
+    'ViewStaffPerformance',
+    'ManageCommissions',
+    'ManageCommunications',
+    'ViewAuditTrail',
+  ]);
+  await page.goto('http://127.0.0.1:4203/inventory/products');
+  await expect(page.getByRole('heading', { name: 'Inventory', exact: true })).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'Transfers', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('option', { name: 'Transfers', exact: true })).toHaveCount(0);
+
+  const sidebar = page.locator('aside');
+  if (isMobile) await page.getByLabel('Open menu').click();
+  const inventoryLink = sidebar.getByRole('link', { name: 'Inventory', exact: true });
+  await expect(inventoryLink).toBeVisible();
+  await expect(inventoryLink).toHaveClass(/nav-item-active/);
+  await expect(sidebar.getByRole('link', { name: 'Activity', exact: true })).toBeVisible();
+  await expect(sidebar.getByRole('link', { name: 'Team', exact: true })).toBeVisible();
+  await expect(sidebar.getByRole('link', { name: 'Products', exact: true })).toHaveCount(0);
+  await expect(sidebar.getByRole('link', { name: 'Audit trail', exact: true })).toHaveCount(0);
+  await expect(sidebar.getByRole('link', { name: 'Communications', exact: true })).toHaveCount(0);
+  await expect(sidebar.getByRole('link', { name: 'Staff Performance', exact: true })).toHaveCount(
+    0
+  );
+  await expect(sidebar.getByRole('link', { name: 'Commissions', exact: true })).toHaveCount(0);
+
+  await sidebar.getByRole('link', { name: 'Activity', exact: true }).click();
+  await expect(page).toHaveURL(/\/activity\/messages$/);
+  await expect(page.getByRole('heading', { name: 'Activity', exact: true })).toBeVisible();
+  if (isMobile) {
+    const activitySection = page.getByRole('combobox', { name: 'Activity view' });
+    await expect(activitySection).toBeVisible();
+    await activitySection.selectOption('/activity/audit');
+  } else {
+    await page.getByRole('tab', { name: 'Audit trail', exact: true }).click();
+  }
+  await expect(page).toHaveURL(/\/activity\/audit$/);
+  await expect(page.getByRole('heading', { name: 'Activity', exact: true })).toBeVisible();
+
+  await page.goto('http://127.0.0.1:4203/communications?customer=customer-1');
+  await expect(page).toHaveURL(/\/activity\/messages\?customer=customer-1$/);
+  await page.goto('http://127.0.0.1:4203/stock-adjustments?variant=variant-1');
+  await expect(page).toHaveURL(/\/inventory\/adjustments\?variant=variant-1$/);
+  await page.goto('http://127.0.0.1:4203/team?tab=roles');
+  await expect(page).toHaveURL(/\/team\/roles$/);
 });
 
 test('@critical local Supabase serves real financial form options', async ({ page, request }) => {

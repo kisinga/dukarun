@@ -28,7 +28,6 @@ import { PermissionsService } from '../core/permissions.service';
 import { SupabaseService } from '../core/supabase.service';
 import { ProfileService } from '../profile/profile.service';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { toSignal } from '@angular/core/rxjs-interop';
 import { ButtonComponent } from '../shared/ui/button.component';
 import { IconComponent } from '../shared/ui/icon.component';
 import { DataTableShellComponent } from '../shared/ui/data-table-shell.component';
@@ -44,6 +43,7 @@ import { EmptyStateComponent } from '../shared/ui/empty-state.component';
 import { DrawerComponent } from '../shared/ui/drawer.component';
 import { MobileListComponent } from '../shared/ui/mobile-list.component';
 import { PageActionsComponent } from '../shared/ui/page-actions.component';
+import { WorkspaceNavigationComponent } from '../shared/ui/workspace-navigation.component';
 import {
   canResendInvitation,
   invitationDeliveryHint,
@@ -88,6 +88,7 @@ const MEMBER_SORT_OPTIONS: readonly ListSortOption[] = [
     DrawerComponent,
     MobileListComponent,
     PageActionsComponent,
+    WorkspaceNavigationComponent,
   ],
   template: `
     <app-page
@@ -121,6 +122,8 @@ const MEMBER_SORT_OPTIONS: readonly ListSortOption[] = [
         }
       </app-page-actions>
 
+      <app-workspace-navigation workspace="team" label="Team" />
+
       @if (error()) {
         <div role="alert" class="alert alert-error mb-3 text-sm">
           <app-icon name="heroExclamationTriangle" />
@@ -139,29 +142,6 @@ const MEMBER_SORT_OPTIONS: readonly ListSortOption[] = [
           <span>{{ warning() }}</span>
         </div>
       }
-
-      <div role="tablist" aria-label="Team section" class="tabs tabs-box mb-3 w-fit">
-        <button
-          role="tab"
-          type="button"
-          class="tab min-h-11"
-          [class.tab-active]="activeTab() === 'members'"
-          [attr.aria-selected]="activeTab() === 'members'"
-          (click)="setTab('members')"
-        >
-          Members
-        </button>
-        <button
-          role="tab"
-          type="button"
-          class="tab min-h-11"
-          [class.tab-active]="activeTab() === 'roles'"
-          [attr.aria-selected]="activeTab() === 'roles'"
-          (click)="setTab('roles')"
-        >
-          Roles
-        </button>
-      </div>
 
       @if (activeTab() === 'members') {
         <!-- Add member -->
@@ -857,12 +837,9 @@ export class TeamComponent implements OnInit {
   private readonly permissions = inject(PermissionsService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
-  private readonly routeParams = toSignal(this.route.queryParamMap, {
-    initialValue: this.route.snapshot.queryParamMap,
-  });
   protected readonly entitlements = inject(EntitlementsService);
-  protected readonly activeTab = computed<'members' | 'roles'>(() =>
-    this.routeParams().get('tab') === 'roles' ? 'roles' : 'members'
+  protected readonly activeTab = signal<'members' | 'roles'>(
+    this.route.snapshot.data['teamView'] === 'roles' ? 'roles' : 'members'
   );
 
   protected readonly currentUserId = computed(() => this.supabase.session()?.user.id ?? null);
@@ -1048,15 +1025,6 @@ export class TeamComponent implements OnInit {
     const limit = this.memberLimit();
     return limit === null || this.activeMemberCount() + this.activeInvitations().length < limit;
   });
-
-  protected setTab(tab: 'members' | 'roles'): void {
-    void this.router.navigate([], {
-      relativeTo: this.route,
-      queryParams: { tab },
-      queryParamsHandling: 'merge',
-      replaceUrl: true,
-    });
-  }
 
   async ngOnInit(): Promise<void> {
     try {

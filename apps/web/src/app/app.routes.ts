@@ -3,6 +3,9 @@ import { authGuard, guestGuard } from './core/auth.guard';
 import { locationGuard } from './core/location.guard';
 import { permissionGuard } from './core/permission.guard';
 import { featureGuard } from './core/feature.guard';
+import { workspaceLandingRedirect } from './core/workspace-landing.redirect';
+import { multiLocationGuard } from './core/multi-location.guard';
+import { preserveQueryRedirect } from './core/route-redirect';
 import { legalAcceptanceGuard } from './legal/legal.guard';
 
 interface UnsavedChangesComponent {
@@ -134,6 +137,13 @@ export const routes: Routes = [
               import('./money/periods/money-periods.component').then(m => m.MoneyPeriodsComponent),
           },
           {
+            path: 'vat',
+            canActivate: [permissionGuard],
+            data: { permission: 'ViewFinancials' },
+            loadComponent: () =>
+              import('./money/vat/money-vat.component').then(m => m.MoneyVatComponent),
+          },
+          {
             path: 'reconcile',
             loadComponent: () =>
               import('./money/reconciliation/money-reconciliation.component').then(
@@ -142,15 +152,47 @@ export const routes: Routes = [
           },
           {
             path: 'stock',
-            redirectTo: '/stock-adjustments',
+            redirectTo: preserveQueryRedirect('/inventory/adjustments'),
           },
           { path: '', pathMatch: 'full', redirectTo: 'cashier' },
         ],
       },
       {
+        path: 'inventory',
+        children: [
+          {
+            path: 'products',
+            data: { preload: true },
+            loadComponent: () =>
+              import('./products/products.component').then(m => m.ProductsComponent),
+          },
+          {
+            path: 'adjustments',
+            canActivate: [permissionGuard],
+            data: { permission: 'ManageStockAdjustments' },
+            loadComponent: () =>
+              import('./stock-adjustments/stock-adjustments.component').then(
+                m => m.StockAdjustmentsComponent
+              ),
+          },
+          {
+            path: 'transfers',
+            canActivate: [permissionGuard, multiLocationGuard],
+            data: { permission: 'ManageStockAdjustments' },
+            loadComponent: () =>
+              import('./inventory/stock-transfers.component').then(m => m.StockTransfersComponent),
+          },
+          {
+            path: '',
+            pathMatch: 'full',
+            redirectTo: preserveQueryRedirect('/inventory/products'),
+          },
+        ],
+      },
+      {
         path: 'products',
-        data: { preload: true },
-        loadComponent: () => import('./products/products.component').then(m => m.ProductsComponent),
+        pathMatch: 'full',
+        redirectTo: preserveQueryRedirect('/inventory/products'),
       },
       {
         path: 'customers',
@@ -187,25 +229,56 @@ export const routes: Routes = [
       },
       {
         path: 'stock-adjustments',
-        canActivate: [permissionGuard],
-        data: { permission: 'ManageStockAdjustments' },
-        loadComponent: () =>
-          import('./stock-adjustments/stock-adjustments.component').then(
-            m => m.StockAdjustmentsComponent
-          ),
+        pathMatch: 'full',
+        redirectTo: preserveQueryRedirect('/inventory/adjustments'),
       },
       {
         path: 'stock-transfers',
-        canActivate: [permissionGuard],
-        data: { permission: 'ManageStockAdjustments' },
-        loadComponent: () =>
-          import('./inventory/stock-transfers.component').then(m => m.StockTransfersComponent),
+        pathMatch: 'full',
+        redirectTo: preserveQueryRedirect('/inventory/transfers'),
       },
       {
         path: 'team',
-        canActivate: [permissionGuard],
-        data: { permission: 'ManageTeam', preload: true },
-        loadComponent: () => import('./team/team.component').then(m => m.TeamComponent),
+        children: [
+          {
+            path: 'members',
+            canActivate: [permissionGuard],
+            data: { permission: 'ManageTeam', teamView: 'members', preload: true },
+            loadComponent: () => import('./team/team.component').then(m => m.TeamComponent),
+          },
+          {
+            path: 'roles',
+            canActivate: [permissionGuard],
+            data: { permission: 'ManageTeam', teamView: 'roles' },
+            loadComponent: () => import('./team/team.component').then(m => m.TeamComponent),
+          },
+          {
+            path: 'performance',
+            canActivate: [featureGuard, permissionGuard],
+            data: { feature: 'staffPerformance', permission: 'ViewStaffPerformance' },
+            loadComponent: () =>
+              import('./performance/staff-performance.component').then(
+                m => m.StaffPerformanceComponent
+              ),
+          },
+          {
+            path: 'commissions',
+            canActivate: [featureGuard, permissionGuard],
+            data: {
+              feature: 'commissions',
+              requiresCommissionOptIn: true,
+              permission: 'ManageCommissions',
+            },
+            loadComponent: () =>
+              import('./commissions/commissions.component').then(m => m.CommissionsComponent),
+          },
+          {
+            path: '',
+            pathMatch: 'full',
+            redirectTo: workspaceLandingRedirect,
+            data: { workspace: 'team' },
+          },
+        ],
       },
       {
         path: 'profile',
@@ -213,23 +286,13 @@ export const routes: Routes = [
       },
       {
         path: 'staff-performance',
-        canActivate: [featureGuard, permissionGuard],
-        data: { feature: 'staffPerformance', permission: 'ViewStaffPerformance' },
-        loadComponent: () =>
-          import('./performance/staff-performance.component').then(
-            m => m.StaffPerformanceComponent
-          ),
+        pathMatch: 'full',
+        redirectTo: preserveQueryRedirect('/team/performance'),
       },
       {
         path: 'commissions',
-        canActivate: [featureGuard, permissionGuard],
-        data: {
-          feature: 'commissions',
-          requiresCommissionOptIn: true,
-          permission: 'ManageCommissions',
-        },
-        loadComponent: () =>
-          import('./commissions/commissions.component').then(m => m.CommissionsComponent),
+        pathMatch: 'full',
+        redirectTo: preserveQueryRedirect('/team/commissions'),
       },
       {
         path: 'sales',
@@ -251,10 +314,33 @@ export const routes: Routes = [
           import('./approvals/approvals.component').then(m => m.ApprovalsComponent),
       },
       {
+        path: 'activity',
+        children: [
+          {
+            path: 'messages',
+            canActivate: [permissionGuard],
+            data: { permission: 'ManageCommunications' },
+            loadComponent: () =>
+              import('./messaging/messaging.component').then(m => m.CommunicationsComponent),
+          },
+          {
+            path: 'audit',
+            canActivate: [permissionGuard],
+            data: { permission: 'ViewAuditTrail' },
+            loadComponent: () => import('./audit/audit.component').then(m => m.AuditComponent),
+          },
+          {
+            path: '',
+            pathMatch: 'full',
+            redirectTo: workspaceLandingRedirect,
+            data: { workspace: 'activity' },
+          },
+        ],
+      },
+      {
         path: 'settings/audit-trail',
-        canActivate: [permissionGuard],
-        data: { permission: 'ViewAuditTrail' },
-        loadComponent: () => import('./audit/audit.component').then(m => m.AuditComponent),
+        pathMatch: 'full',
+        redirectTo: preserveQueryRedirect('/activity/audit'),
       },
       {
         path: 'settings',
@@ -271,12 +357,14 @@ export const routes: Routes = [
       },
       {
         path: 'communications',
-        canActivate: [permissionGuard],
-        data: { permission: 'ManageCommunications' },
-        loadComponent: () =>
-          import('./messaging/messaging.component').then(m => m.CommunicationsComponent),
+        pathMatch: 'full',
+        redirectTo: preserveQueryRedirect('/activity/messages'),
       },
-      { path: 'messaging', redirectTo: 'communications' },
+      {
+        path: 'messaging',
+        pathMatch: 'full',
+        redirectTo: preserveQueryRedirect('/activity/messages'),
+      },
       { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
     ],
   },

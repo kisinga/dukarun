@@ -9,6 +9,7 @@ import { PosService, Variant, variantLabel } from '../pos/pos.service';
 import { ButtonComponent } from '../shared/ui/button.component';
 import { FormFieldComponent } from '../shared/ui/form-field.component';
 import { PageLayoutComponent } from '../shared/ui/page-layout.component';
+import { WorkspaceNavigationComponent } from '../shared/ui/workspace-navigation.component';
 import { IconComponent } from '../shared/ui/icon.component';
 import { EmptyStateComponent } from '../shared/ui/empty-state.component';
 import { PaginationComponent } from '../shared/ui/pagination.component';
@@ -41,16 +42,19 @@ type StockAdjustmentHistoryDisplay = StockAdjustmentHistoryRow & {
     FormFieldComponent,
     ButtonComponent,
     PageLayoutComponent,
+    WorkspaceNavigationComponent,
     IconComponent,
     EmptyStateComponent,
     PaginationComponent,
   ],
   template: `
     <app-page
-      title="Adjust stock"
+      title="Inventory"
       subtitle="Correct inventory from a physical count. Selling prices are never changed here."
       [wide]="true"
     >
+      <app-workspace-navigation workspace="inventory" label="Inventory" />
+
       <div class="space-y-3">
         @if (error()) {
           <div role="alert" class="alert alert-error text-sm">

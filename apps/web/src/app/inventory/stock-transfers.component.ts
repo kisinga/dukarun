@@ -16,6 +16,7 @@ import { PageLayoutComponent } from '../shared/ui/page-layout.component';
 import { StockTransferListRow, StockTransfersService } from './stock-transfers.service';
 import { PaginationComponent } from '../shared/ui/pagination.component';
 import { PageActionsComponent } from '../shared/ui/page-actions.component';
+import { WorkspaceNavigationComponent } from '../shared/ui/workspace-navigation.component';
 
 interface TransferLine {
   variant: Variant;
@@ -35,10 +36,11 @@ interface TransferLine {
     PageLayoutComponent,
     PaginationComponent,
     PageActionsComponent,
+    WorkspaceNavigationComponent,
   ],
   template: `
     <app-page
-      title="Stock transfers"
+      title="Inventory"
       subtitle="Move stock between business locations without changing company inventory value."
       [wide]="true"
     >
@@ -55,6 +57,8 @@ interface TransferLine {
           </button>
         </app-page-actions>
       }
+      <app-workspace-navigation workspace="inventory" label="Inventory" />
+
       @if (!locations.isMultiLocation()) {
         <app-empty-state
           icon="heroArrowsRightLeft"

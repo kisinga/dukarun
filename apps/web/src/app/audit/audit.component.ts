@@ -16,6 +16,7 @@ import { ButtonComponent } from '../shared/ui/button.component';
 import { FormFieldComponent } from '../shared/ui/form-field.component';
 import { MobileListComponent } from '../shared/ui/mobile-list.component';
 import { PageActionsComponent } from '../shared/ui/page-actions.component';
+import { WorkspaceNavigationComponent } from '../shared/ui/workspace-navigation.component';
 
 interface ChangeItem {
   field: string;
@@ -92,13 +93,12 @@ const REASON_FIELDS = new Set(['decision_reason', 'void_reason', 'reason', 'note
     FormFieldComponent,
     MobileListComponent,
     PageActionsComponent,
+    WorkspaceNavigationComponent,
   ],
   template: `
     <app-page
-      title="Audit trail"
+      title="Activity"
       subtitle="A clear record of who changed what and when."
-      backLink="/settings"
-      backLabel="Settings"
       [wide]="true"
     >
       <app-page-actions actions>
@@ -116,6 +116,8 @@ const REASON_FIELDS = new Set(['decision_reason', 'void_reason', 'reason', 'note
           <app-icon name="heroArrowPath" />
         </button>
       </app-page-actions>
+
+      <app-workspace-navigation workspace="activity" label="Activity" />
 
       <app-list-search-bar
         placeholder="Search activity, record, reason, or person…"
@@ -664,7 +666,7 @@ export class AuditComponent implements OnInit, OnDestroy {
       (
         {
           sales: '/sales',
-          inventory: '/products',
+          inventory: '/inventory/products',
           cash: '/money/cashier',
           people: '/customers',
           team: '/team',

@@ -16,6 +16,7 @@ import { ListSearchBarComponent } from '../shared/ui/list-search-bar.component';
 import { MobileListComponent } from '../shared/ui/mobile-list.component';
 import { StatBarComponent } from '../shared/ui/stat-bar.component';
 import { PageActionsComponent } from '../shared/ui/page-actions.component';
+import { WorkspaceNavigationComponent } from '../shared/ui/workspace-navigation.component';
 
 @Component({
   selector: 'app-staff-performance',
@@ -35,10 +36,11 @@ import { PageActionsComponent } from '../shared/ui/page-actions.component';
     MobileListComponent,
     StatBarComponent,
     PageActionsComponent,
+    WorkspaceNavigationComponent,
   ],
   template: `
     <app-page
-      title="Staff performance"
+      title="Team"
       subtitle="Sales value, volume, collections, refunds, voids, margin, and held (unpaid) sales by salesperson."
       [wide]="true"
     >
@@ -57,6 +59,8 @@ import { PageActionsComponent } from '../shared/ui/page-actions.component';
           <app-icon name="heroArrowPath" />
         </button>
       </app-page-actions>
+
+      <app-workspace-navigation workspace="team" label="Team" />
 
       <app-list-search-bar
         placeholder="Search name, role, or status…"
