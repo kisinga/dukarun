@@ -85,8 +85,8 @@ select is(
     (select role_id from invite_role),
     'Renamed Invite'
   )->>'status',
-  'invited',
-  're-inviting the same phone refreshes the invitation'
+  'updated_invitation',
+  'editing a pending invitation does not implicitly resend it'
 );
 
 select throws_ok(

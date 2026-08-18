@@ -11,6 +11,8 @@ import {
   CompanySettings,
   PaymentMethodRow,
   LocationPaymentMethodRow,
+  PrimaryContactNotificationChannel,
+  PrimaryContactNotificationSettings,
   SettingsService,
   StockLocationRow,
 } from './settings.service';
@@ -702,6 +704,136 @@ const SETTINGS_TABS: ReadonlyArray<{ key: SettingsTab; label: string }> = [
             </div>
           }
 
+          @if (activeTab() === 'communications' && perms.has('ManageTeam')) {
+            <div class="card bg-base-100">
+              <div class="card-body p-4">
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h2 class="section-title">Primary contact alerts</h2>
+                    <p class="type-caption mt-1">
+                      Choose how operational alerts reach the company’s primary contact. Every alert
+                      also stays in their Dukarun inbox.
+                    </p>
+                  </div>
+                  <a appButton variant="ghost" size="sm" routerLink="/team">
+                    Manage primary contact
+                  </a>
+                </div>
+
+                @if (primaryContactSettings(); as primary) {
+                  @if (primary.primary_contact_user_id) {
+                    <div
+                      class="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-box border border-base-300 bg-base-200/40 px-3 py-2"
+                    >
+                      <div>
+                        <p class="text-sm font-semibold">
+                          {{ primary.primary_contact_name || 'Primary administrator' }}
+                        </p>
+                        <p class="type-caption">
+                          {{ primary.primary_contact_phone || 'No verified phone available' }}
+                        </p>
+                      </div>
+                      <span class="badge badge-primary badge-sm">Primary contact</span>
+                    </div>
+
+                    <div class="mt-4 grid gap-4 sm:grid-cols-2">
+                      <app-form-field
+                        label="External channel"
+                        hint="SMS fallback is used only after WhatsApp permanently fails."
+                      >
+                        <select
+                          class="select select-bordered select-sm w-full"
+                          [formControl]="primaryContactChannel"
+                        >
+                          <option value="whatsapp_sms_fallback">WhatsApp, then SMS fallback</option>
+                          <option value="whatsapp">WhatsApp only</option>
+                          <option value="sms">SMS only</option>
+                          <option value="none">In-app only</option>
+                        </select>
+                      </app-form-field>
+                      <div class="grid gap-2">
+                        <label
+                          class="flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-box border border-base-300 px-3 py-2"
+                        >
+                          <span>
+                            <span class="block text-sm font-medium">Team invitations</span>
+                            <span class="type-caption">Invited and joined events</span>
+                          </span>
+                          <input
+                            type="checkbox"
+                            class="toggle toggle-sm toggle-primary"
+                            [formControl]="primaryTeamNotifications"
+                          />
+                        </label>
+                        <label
+                          class="flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-box border border-base-300 px-3 py-2"
+                        >
+                          <span>
+                            <span class="block text-sm font-medium">Cashier sessions</span>
+                            <span class="type-caption">Day opened and closed summaries</span>
+                          </span>
+                          <input
+                            type="checkbox"
+                            class="toggle toggle-sm toggle-primary"
+                            [formControl]="primaryCashierNotifications"
+                          />
+                        </label>
+                      </div>
+                    </div>
+                    @if (msg('primary-contact-notifications'); as m) {
+                      <p
+                        class="mt-2 text-sm"
+                        [class.text-success]="m.ok"
+                        [class.text-error]="!m.ok"
+                      >
+                        {{ m.text }}
+                      </p>
+                    }
+                    <button
+                      appButton
+                      type="button"
+                      class="mt-3"
+                      [loading]="busy()"
+                      (click)="savePrimaryContactNotifications()"
+                    >
+                      Save admin alerts
+                    </button>
+                  } @else {
+                    <div class="alert alert-warning mt-4 text-sm">
+                      <app-icon name="heroExclamationTriangle" />
+                      <span>
+                        Select an approved administrator as primary contact before enabling external
+                        alerts.
+                      </span>
+                      <a routerLink="/team" class="link whitespace-nowrap font-semibold">
+                        Choose contact
+                      </a>
+                    </div>
+                  }
+                } @else if (primaryContactLoading()) {
+                  <div class="mt-4 grid gap-2" aria-label="Loading primary contact alerts">
+                    <div class="skeleton h-14 w-full"></div>
+                    <div class="skeleton h-10 w-full"></div>
+                  </div>
+                } @else if (primaryContactLoadError()) {
+                  <div class="alert alert-error mt-4 text-sm">
+                    <app-icon name="heroExclamationTriangle" />
+                    <span>{{ primaryContactLoadError() }}</span>
+                    <button
+                      appButton
+                      variant="ghost"
+                      size="sm"
+                      type="button"
+                      (click)="reloadPrimaryContactSettings()"
+                    >
+                      Try again
+                    </button>
+                  </div>
+                }
+              </div>
+            </div>
+          }
+
           @if (activeTab() === 'communications' && perms.has('ManageCommunications')) {
             <div class="card bg-base-100">
               <div class="card-body p-4">
@@ -812,6 +944,15 @@ const SETTINGS_TABS: ReadonlyArray<{ key: SettingsTab; label: string }> = [
                     Save reminders
                   </button>
                 }
+                <div class="mt-4 border-t border-base-300/60 pt-4">
+                  <p class="type-caption">
+                    Campaigns and manually reviewed documents keep their send-time channel and
+                    recipient choices.
+                    <a routerLink="/communications" class="link font-semibold">
+                      Open Communications
+                    </a>
+                  </p>
+                </div>
               </div>
             </div>
           }
@@ -994,7 +1135,11 @@ const SETTINGS_TABS: ReadonlyArray<{ key: SettingsTab; label: string }> = [
             </div>
           }
 
-          @if (activeTab() === 'communications' && !perms.has('ManageCommunications')) {
+          @if (
+            activeTab() === 'communications' &&
+            !perms.has('ManageCommunications') &&
+            !perms.has('ManageTeam')
+          ) {
             <div class="card bg-base-100">
               <div class="card-body p-4">
                 <h2 class="section-title">Messages</h2>
@@ -1265,7 +1410,10 @@ export class SettingsComponent implements OnInit {
 
   protected readonly settingsTabs = computed(() =>
     SETTINGS_TABS.filter(
-      tab => tab.key !== 'communications' || this.perms.has('ManageCommunications')
+      tab =>
+        tab.key !== 'communications' ||
+        this.perms.has('ManageCommunications') ||
+        this.perms.has('ManageTeam')
     )
   );
   protected readonly activeTab = signal<SettingsTab>('business');
@@ -1281,6 +1429,11 @@ export class SettingsComponent implements OnInit {
   );
 
   protected readonly settings = signal<CompanySettings | null>(null);
+  protected readonly primaryContactSettings = signal<PrimaryContactNotificationSettings | null>(
+    null
+  );
+  protected readonly primaryContactLoading = signal(false);
+  protected readonly primaryContactLoadError = signal<string | null>(null);
   protected readonly paymentMethods = signal<PaymentMethodRow[]>([]);
   protected readonly paymentMethodAssignments = signal<LocationPaymentMethodRow[]>([]);
   protected readonly locations = signal<StockLocationRow[]>([]);
@@ -1339,6 +1492,12 @@ export class SettingsComponent implements OnInit {
     nonNullable: true,
   });
   protected readonly reminderSmsFallback = new FormControl(true, { nonNullable: true });
+  protected readonly primaryContactChannel = new FormControl<PrimaryContactNotificationChannel>(
+    'whatsapp',
+    { nonNullable: true }
+  );
+  protected readonly primaryTeamNotifications = new FormControl(true, { nonNullable: true });
+  protected readonly primaryCashierNotifications = new FormControl(true, { nonNullable: true });
   protected readonly reminderDrafts = signal<ReminderDraft[]>([]);
   protected readonly locationName = new FormControl('', { nonNullable: true });
   protected readonly locationCode = new FormControl('', { nonNullable: true });
@@ -1412,16 +1571,28 @@ export class SettingsComponent implements OnInit {
   protected async load(): Promise<void> {
     this.loadError.set(null);
     try {
-      const [settings, methods, locations, paymentAssignments, reminderConfiguration] =
-        await Promise.all([
-          this.settingsService.getSettings(),
-          this.settingsService.paymentMethods(),
-          this.settingsService.stockLocations(),
-          this.settingsService.paymentMethodLocations(),
-          this.settingsService.reminderConfiguration(),
-          this.entitlements.refresh(),
-        ]);
+      await this.perms.ensureLoaded();
+      const primarySettings = this.perms.has('ManageTeam')
+        ? this.fetchPrimaryContactSettings()
+        : Promise.resolve(null);
+      const [
+        settings,
+        methods,
+        locations,
+        paymentAssignments,
+        reminderConfiguration,
+        primaryContactSettings,
+      ] = await Promise.all([
+        this.settingsService.getSettings(),
+        this.settingsService.paymentMethods(),
+        this.settingsService.stockLocations(),
+        this.settingsService.paymentMethodLocations(),
+        this.settingsService.reminderConfiguration(),
+        primarySettings,
+        this.entitlements.refresh(),
+      ]);
       this.settings.set(settings);
+      this.primaryContactSettings.set(primaryContactSettings);
       this.paymentMethods.set(methods);
       this.locations.set(locations);
       this.paymentMethodAssignments.set(paymentAssignments);
@@ -1446,6 +1617,13 @@ export class SettingsComponent implements OnInit {
       );
       this.reminderChannel.setValue(settings.payment_reminder_channel);
       this.reminderSmsFallback.setValue(settings.payment_reminder_sms_fallback);
+      if (primaryContactSettings) {
+        this.primaryContactChannel.setValue(primaryContactSettings.preferences.channel);
+        this.primaryTeamNotifications.setValue(primaryContactSettings.preferences.team);
+        this.primaryCashierNotifications.setValue(
+          primaryContactSettings.preferences.cashierSessions
+        );
+      }
       this.reminderDrafts.set(
         reminderConfiguration.map(rule =>
           this.reminderDraft(rule.stage_days, rule.enabled, rule.template_key)
@@ -1453,6 +1631,33 @@ export class SettingsComponent implements OnInit {
       );
     } catch (err) {
       this.loadError.set(err instanceof Error ? err.message : 'Failed to load settings');
+    }
+  }
+
+  protected async reloadPrimaryContactSettings(): Promise<void> {
+    const settings = await this.fetchPrimaryContactSettings();
+    if (!settings) return;
+    this.primaryContactSettings.set(settings);
+    this.primaryContactChannel.setValue(settings.preferences.channel);
+    this.primaryTeamNotifications.setValue(settings.preferences.team);
+    this.primaryCashierNotifications.setValue(settings.preferences.cashierSessions);
+  }
+
+  private async fetchPrimaryContactSettings(): Promise<PrimaryContactNotificationSettings | null> {
+    this.primaryContactLoading.set(true);
+    this.primaryContactLoadError.set(null);
+    try {
+      const settings = await this.settingsService.getPrimaryContactNotificationSettings();
+      this.primaryContactSettings.set(settings);
+      return settings;
+    } catch (err) {
+      this.primaryContactSettings.set(null);
+      this.primaryContactLoadError.set(
+        err instanceof Error ? err.message : 'Primary contact alerts could not be loaded.'
+      );
+      return null;
+    } finally {
+      this.primaryContactLoading.set(false);
     }
   }
 
@@ -1751,6 +1956,34 @@ export class SettingsComponent implements OnInit {
       this.flash('communications', true, 'Reminder settings saved');
     } catch (err) {
       this.flash('communications', false, err instanceof Error ? err.message : 'Save failed');
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected async savePrimaryContactNotifications(): Promise<void> {
+    const current = this.primaryContactSettings();
+    if (!current?.primary_contact_user_id) return;
+    this.busy.set(true);
+    try {
+      const preferences = await this.settingsService.setPrimaryContactNotificationPreferences({
+        channel: this.primaryContactChannel.value,
+        team: this.primaryTeamNotifications.value,
+        cashierSessions: this.primaryCashierNotifications.value,
+      });
+      this.primaryContactSettings.set({ ...current, preferences });
+      this.flash('primary-contact-notifications', true, 'Admin alert preferences saved');
+    } catch (err) {
+      this.primaryContactChannel.setValue(current.preferences.channel, { emitEvent: false });
+      this.primaryTeamNotifications.setValue(current.preferences.team, { emitEvent: false });
+      this.primaryCashierNotifications.setValue(current.preferences.cashierSessions, {
+        emitEvent: false,
+      });
+      this.flash(
+        'primary-contact-notifications',
+        false,
+        err instanceof Error ? err.message : 'Save failed'
+      );
     } finally {
       this.busy.set(false);
     }

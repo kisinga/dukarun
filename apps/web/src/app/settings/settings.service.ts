@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import type { Database } from '@dukarun/shared-types';
+import type { Database, Json } from '@dukarun/shared-types';
 import { SupabaseService } from '../core/supabase.service';
 import { rpcError } from '../pos/pos.service';
 
@@ -8,6 +8,19 @@ export type StockLocationRow = Database['public']['Tables']['stock_locations']['
 export type LocationPaymentMethodRow =
   Database['public']['Tables']['location_payment_methods']['Row'];
 export type ReminderRule = Database['public']['Tables']['payment_reminder_rules']['Row'];
+export type PrimaryContactNotificationChannel =
+  'whatsapp_sms_fallback' | 'whatsapp' | 'sms' | 'none';
+export interface PrimaryContactNotificationPreferences {
+  channel: PrimaryContactNotificationChannel;
+  team: boolean;
+  cashierSessions: boolean;
+}
+export interface PrimaryContactNotificationSettings {
+  primary_contact_user_id: string | null;
+  primary_contact_name: string | null;
+  primary_contact_phone: string | null;
+  preferences: PrimaryContactNotificationPreferences;
+}
 
 /**
  * Company settings. The companies table has a COLUMN-LIMITED update grant:
@@ -23,7 +36,7 @@ export interface CompanySettings {
   public_storefront_enabled: boolean;
   public_slug: string | null;
   public_whatsapp_number: string | null;
-  notification_category_preferences: Record<string, boolean> | null;
+  notification_category_preferences: Json | null;
   enable_printer: boolean;
   proforma_validity_days: number;
   low_stock_threshold: number;
@@ -204,6 +217,24 @@ export class SettingsService {
     });
     if (error) throw rpcError(error);
     return data;
+  }
+
+  async getPrimaryContactNotificationSettings(): Promise<PrimaryContactNotificationSettings> {
+    const { data, error } = await this.db.rpc('primary_contact_notification_settings');
+    if (error) throw rpcError(error);
+    return data as unknown as PrimaryContactNotificationSettings;
+  }
+
+  async setPrimaryContactNotificationPreferences(
+    preferences: PrimaryContactNotificationPreferences
+  ): Promise<PrimaryContactNotificationPreferences> {
+    const { data, error } = await this.db.rpc('set_primary_contact_notification_preferences', {
+      p_channel: preferences.channel,
+      p_team_enabled: preferences.team,
+      p_cashier_enabled: preferences.cashierSessions,
+    });
+    if (error) throw rpcError(error);
+    return data as unknown as PrimaryContactNotificationPreferences;
   }
 
   async reminderConfiguration(): Promise<ReminderRule[]> {

@@ -4032,6 +4032,7 @@ export type Database = {
           clicked_at: string | null
           company_id: string
           created_at: string
+          dedupe_key: string | null
           id: string
           link: string | null
           read_at: string | null
@@ -4047,6 +4048,7 @@ export type Database = {
           clicked_at?: string | null
           company_id: string
           created_at?: string
+          dedupe_key?: string | null
           id?: string
           link?: string | null
           read_at?: string | null
@@ -4062,6 +4064,7 @@ export type Database = {
           clicked_at?: string | null
           company_id?: string
           created_at?: string
+          dedupe_key?: string | null
           id?: string
           link?: string | null
           read_at?: string | null
@@ -4355,6 +4358,7 @@ export type Database = {
           created_at: string
           customer_id: string | null
           customer_statement_link_id: string | null
+          dedupe_key: string | null
           document_copy_role: string | null
           document_subject_id: string | null
           document_type: string | null
@@ -4373,6 +4377,7 @@ export type Database = {
           source: string
           status: string
           subject: string | null
+          team_invitation_id: string | null
           template_key: string | null
           template_version: number | null
         }
@@ -4388,6 +4393,7 @@ export type Database = {
           created_at?: string
           customer_id?: string | null
           customer_statement_link_id?: string | null
+          dedupe_key?: string | null
           document_copy_role?: string | null
           document_subject_id?: string | null
           document_type?: string | null
@@ -4406,6 +4412,7 @@ export type Database = {
           source?: string
           status?: string
           subject?: string | null
+          team_invitation_id?: string | null
           template_key?: string | null
           template_version?: number | null
         }
@@ -4421,6 +4428,7 @@ export type Database = {
           created_at?: string
           customer_id?: string | null
           customer_statement_link_id?: string | null
+          dedupe_key?: string | null
           document_copy_role?: string | null
           document_subject_id?: string | null
           document_type?: string | null
@@ -4439,6 +4447,7 @@ export type Database = {
           source?: string
           status?: string
           subject?: string | null
+          team_invitation_id?: string | null
           template_key?: string | null
           template_version?: number | null
         }
@@ -4539,6 +4548,13 @@ export type Database = {
             columns: ["fallback_for_outbox_id"]
             isOneToOne: false
             referencedRelation: "outbox"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "outbox_team_invitation_id_fkey"
+            columns: ["team_invitation_id"]
+            isOneToOne: false
+            referencedRelation: "team_invitations"
             referencedColumns: ["id"]
           },
         ]
@@ -6958,6 +6974,9 @@ export type Database = {
           expires_at: string
           id: string
           invited_by: string
+          last_delivery_error: string | null
+          last_notified_at: string | null
+          notification_version: number
           phone: string
           role_id: string
           status: string
@@ -6972,6 +6991,9 @@ export type Database = {
           expires_at?: string
           id?: string
           invited_by: string
+          last_delivery_error?: string | null
+          last_notified_at?: string | null
+          notification_version?: number
           phone: string
           role_id: string
           status?: string
@@ -6986,6 +7008,9 @@ export type Database = {
           expires_at?: string
           id?: string
           invited_by?: string
+          last_delivery_error?: string | null
+          last_notified_at?: string | null
+          notification_version?: number
           phone?: string
           role_id?: string
           status?: string
@@ -8751,6 +8776,10 @@ export type Database = {
         Args: { p_company_id: string; p_stream: string }
         Returns: number
       }
+      emit_team_invitation_event: {
+        Args: { p_event: string; p_invitation_id: string; p_version: number }
+        Returns: Json
+      }
       execute_customer_receipt: {
         Args: { p_receipt_id: string }
         Returns: string
@@ -9007,6 +9036,18 @@ export type Database = {
       notify_approval_requester: {
         Args: { p_approval_id: string }
         Returns: undefined
+      }
+      notify_once: {
+        Args: {
+          p_body: string
+          p_company_id: string
+          p_dedupe_key: string
+          p_link: string
+          p_title: string
+          p_type: string
+          p_user_id: string
+        }
+        Returns: string
       }
       open_cashier_session: { Args: { p_declarations: Json }; Returns: string }
       open_cashier_session_at_location: {
@@ -9563,6 +9604,11 @@ export type Database = {
         }
         Returns: Json
       }
+      primary_contact_notification_preferences: {
+        Args: { p_company_id: string }
+        Returns: Json
+      }
+      primary_contact_notification_settings: { Args: never; Returns: Json }
       provision_company: {
         Args: {
           p_address?: string
@@ -9691,12 +9737,30 @@ export type Database = {
         Returns: string
       }
       queue_sms_fallback: { Args: { p_outbox_id: string }; Returns: string }
+      queue_team_outbox: {
+        Args: {
+          p_body: string
+          p_channel: string
+          p_company_id: string
+          p_dedupe_key: string
+          p_fallback_body?: string
+          p_invitation_id: string
+          p_recipient: string
+          p_subject: string
+          p_template_key: string
+        }
+        Returns: string
+      }
       reconcile_all_company_usage: { Args: never; Returns: number }
       reconcile_company_usage: {
         Args: { p_company_id?: string }
         Returns: number
       }
       reconcile_platform_campaign_deliveries: { Args: never; Returns: number }
+      reconcile_runtime_sms_quota: {
+        Args: { p_final_body: string; p_outbox_id: string }
+        Returns: number
+      }
       record_auth_otp_delivery_request: {
         Args: {
           p_phone_hash: string
@@ -9892,6 +9956,10 @@ export type Database = {
       require_open_cashier_session: {
         Args: { p_company_id: string }
         Returns: string
+      }
+      resend_team_invitation: {
+        Args: { p_invitation_id: string }
+        Returns: Json
       }
       reserve_message_quota: {
         Args: { p_channel: string; p_company_id: string; p_units: number }
@@ -10099,6 +10167,14 @@ export type Database = {
         }
         Returns: string
       }
+      set_primary_contact_notification_preferences: {
+        Args: {
+          p_cashier_enabled: boolean
+          p_channel: string
+          p_team_enabled: boolean
+        }
+        Returns: Json
+      }
       set_product_categories: {
         Args: { p_category_ids: string[]; p_product_id: string }
         Returns: string
@@ -10269,6 +10345,11 @@ export type Database = {
       }
       sync_cache_stream: {
         Args: { p_after_sequence?: number; p_limit?: number; p_stream: string }
+        Returns: Json
+      }
+      team_delivery_error_code: { Args: { p_error: string }; Returns: string }
+      team_invitation_delivery_status: {
+        Args: { p_invitation_id: string; p_version: number }
         Returns: Json
       }
       team_management_snapshot: { Args: never; Returns: Json }
