@@ -13,7 +13,11 @@ import { environment } from '../../../environments/environment';
 import { BlogPostSummary, BlogService } from '../../blog/blog.service';
 import { IconComponent } from '../../shared/ui/icon.component';
 import { MarketingVideoComponent } from '../marketing-video.component';
-import { PublicPricingService, PublicSubscriptionPlan } from '../public-pricing.service';
+import {
+  PublicBillingConfig,
+  PublicPricingService,
+  PublicSubscriptionPlan,
+} from '../public-pricing.service';
 import { appUrl } from '../../core/public-url';
 import { dukarunWhatsAppUrl } from '../../core/public-contact';
 
@@ -448,17 +452,27 @@ interface Testimonial {
           <div class="mx-auto mt-10 grid max-w-6xl gap-4 md:grid-cols-2 xl:grid-cols-3">
             @for (plan of pricingPlans(); track plan.id) {
               <article class="mkt-card flex flex-col p-6 sm:p-7">
-                <h3 class="text-xl font-semibold">{{ plan.name }}</h3>
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                  <h3 class="text-xl font-semibold">{{ plan.name }}</h3>
+                  @if (isIntroOfferPlan(plan)) {
+                    <span class="badge badge-primary">{{ introOfferWording() }}</span>
+                  }
+                </div>
                 <div class="mt-4 flex items-end gap-2">
                   <strong class="mkt-h2 tabular-nums">{{ kes(plan.price_monthly) }}</strong>
                   <span class="pb-1 text-sm text-base-content/60">/ month</span>
                 </div>
                 <p class="mt-2 mb-0 min-h-10 text-sm text-base-content/70">
-                  {{ kes(plan.price_yearly) }} per year
-                  @if (yearlySaving(plan) > 0) {
-                    <span class="font-semibold text-primary">
-                      Save {{ kes(yearlySaving(plan)) }}
-                    </span>
+                  @if (isIntroOfferPlan(plan)) {
+                    {{ introOfferAccessMonths() }} months of access for
+                    <span class="font-semibold text-primary">{{ kes(introOfferPrice()) }}</span>
+                  } @else {
+                    {{ kes(plan.price_yearly) }} per year
+                    @if (yearlySaving(plan) > 0) {
+                      <span class="font-semibold text-primary">
+                        Save {{ kes(yearlySaving(plan)) }}
+                      </span>
+                    }
                   }
                 </p>
 
@@ -481,7 +495,11 @@ interface Testimonial {
                   [href]="appUrl('/register', { plan: plan.code })"
                   class="btn btn-primary mt-6 min-h-11 w-full"
                 >
-                  Start with {{ plan.name }}
+                  @if (isIntroOfferPlan(plan)) {
+                    Get {{ introOfferAccessMonths() }} months for {{ kes(introOfferPrice()) }}
+                  } @else {
+                    Start with {{ plan.name }}
+                  }
                   <app-icon name="heroArrowRight" size="md" />
                 </a>
               </article>
@@ -489,7 +507,9 @@ interface Testimonial {
           </div>
           <p class="mt-5 mb-0 text-center text-xs text-base-content/60">
             No card or special hardware required.
-            @if (trialDays(); as days) {
+            @if (billingConfig()?.introOfferEnabled) {
+              {{ introOfferWording() }} on {{ billingConfig()?.introOfferTierName }}.
+            } @else if (billingConfig()?.trialDays; as days) {
               Your {{ days }}-day free trial starts when your company is approved.
             } @else {
               Your free trial starts when your company is approved.
@@ -651,7 +671,7 @@ export class HomeComponent implements OnInit {
   private readonly initialConfig = this.publicPricing.transferredBillingConfig();
 
   protected readonly pricingPlans = signal<PublicSubscriptionPlan[]>(this.initialPlans ?? []);
-  protected readonly trialDays = signal<number | null>(this.initialConfig?.trialDays ?? null);
+  protected readonly billingConfig = signal<PublicBillingConfig | null>(this.initialConfig ?? null);
   protected readonly pricingLoading = signal(this.initialPlans === null);
   protected readonly featuredPost = signal<BlogPostSummary | null>(null);
   protected readonly marketingVideoBaseUrl = environment.marketingVideoBaseUrl.replace(/\/+$/, '');
@@ -667,7 +687,7 @@ export class HomeComponent implements OnInit {
       this.blog.featuredPost(isPlatformBrowser(this.platformId)),
     ]);
     if (plans.status === 'fulfilled') this.pricingPlans.set(plans.value);
-    if (config.status === 'fulfilled') this.trialDays.set(config.value?.trialDays ?? null);
+    if (config.status === 'fulfilled') this.billingConfig.set(config.value);
     if (featured.status === 'fulfilled') this.featuredPost.set(featured.value);
     this.pricingLoading.set(false);
   }
@@ -710,6 +730,30 @@ export class HomeComponent implements OnInit {
 
   protected yearlySaving(plan: PublicSubscriptionPlan): number {
     return Math.max(0, plan.price_monthly * 12 - plan.price_yearly);
+  }
+
+  protected isIntroOfferPlan(plan: PublicSubscriptionPlan): boolean {
+    const config = this.billingConfig();
+    return config?.introOfferEnabled === true && config.introOfferTierCode === plan.code;
+  }
+
+  protected introOfferPrice(): number {
+    return this.billingConfig()?.introOfferPrice ?? 0;
+  }
+
+  protected introOfferAccessMonths(): number {
+    const config = this.billingConfig();
+    return (config?.introOfferPaidMonths ?? 0) + (config?.introOfferBonusMonths ?? 0);
+  }
+
+  protected introOfferWording(): string {
+    const config = this.billingConfig();
+    if (!config) return 'Introductory offer';
+    const paid = `${config.introOfferPaidMonths} ${config.introOfferPaidMonths === 1 ? 'month' : 'months'}`;
+    const bonus = `${config.introOfferBonusMonths} ${config.introOfferBonusMonths === 1 ? 'month' : 'months'}`;
+    return config.introOfferBonusMonths > 0
+      ? `Pay for ${paid}, get ${bonus} free`
+      : `Pay for ${paid}`;
   }
 
   protected planFeatures(plan: PublicSubscriptionPlan): string[] {

@@ -42,6 +42,8 @@ We work to provide a reliable service, but we do not promise uninterrupted opera
 
 Trial length, plan limits, prices and billing periods are shown before purchase. The business must keep payment and contact details current and pay applicable charges and taxes.
 
+An introductory offer may add bonus access after a qualifying upfront payment. The assigned plan, amount charged, paid period, bonus period and later renewal price are shown before payment. Bonus access has no cash value and does not renew the subscription automatically.
+
 We may suspend paid features for overdue charges after reasonable notice. Price changes affecting an active subscription will be communicated before they take effect.
 
 ## Communications

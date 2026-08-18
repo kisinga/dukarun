@@ -2,7 +2,7 @@ import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { SupabaseService } from '../../core/supabase.service';
-import { BillingConfigService } from '../../core/billing-config.service';
+import { BillingConfigService, PublicBillingConfig } from '../../core/billing-config.service';
 import { siteUrl } from '../../core/public-url';
 import { LegalService, PublishedLegalDocument } from '../../legal/legal.service';
 
@@ -21,7 +21,12 @@ import { LegalService, PublishedLegalDocument } from '../../legal/legal.service'
               This creates your company workspace. Ledger, locations, and payment methods are set up
               automatically.
             </p>
-            @if (trialDays(); as days) {
+            @if (billingConfig()?.introOfferEnabled) {
+              <p class="mt-2 text-sm font-medium text-primary">
+                {{ introOfferWording() }} on {{ billingConfig()?.introOfferTierName }}. Pay after
+                approval to unlock your workspace.
+              </p>
+            } @else if (billingConfig()?.trialDays; as days) {
               <p class="mt-2 text-sm font-medium text-primary">
                 Your {{ days }}-day free trial starts when the company is approved.
               </p>
@@ -43,7 +48,13 @@ import { LegalService, PublishedLegalDocument } from '../../legal/legal.service'
                 [disabled]="saving()"
                 (click)="continueToWorkspace()"
               >
-                {{ saving() ? 'Opening…' : 'Continue to dashboard' }}
+                {{
+                  saving()
+                    ? 'Opening…'
+                    : billingConfig()?.introOfferEnabled
+                      ? 'Continue to payment'
+                      : 'Continue to dashboard'
+                }}
               </button>
             </div>
           }
@@ -185,7 +196,7 @@ import { LegalService, PublishedLegalDocument } from '../../legal/legal.service'
 export class RegisterComponent implements OnInit {
   private readonly supabase = inject(SupabaseService);
   private readonly route = inject(ActivatedRoute);
-  private readonly billingConfig = inject(BillingConfigService);
+  private readonly billingConfigService = inject(BillingConfigService);
   private readonly legal = inject(LegalService);
 
   protected readonly saving = signal(false);
@@ -196,7 +207,7 @@ export class RegisterComponent implements OnInit {
   private readonly createdCompanyId = signal<string | null>(null);
   /** True when the user already belongs to a company and is adding another. */
   protected readonly hasCompany = signal(false);
-  protected readonly trialDays = signal<number | null>(null);
+  protected readonly billingConfig = signal<PublicBillingConfig | null>(null);
   protected readonly currentTerms = signal<PublishedLegalDocument | null>(null);
   protected readonly legalLoading = signal(true);
   protected readonly legalLoadError = signal(false);
@@ -226,9 +237,9 @@ export class RegisterComponent implements OnInit {
   async ngOnInit(): Promise<void> {
     this.hasCompany.set(Boolean(this.supabase.claims()?.company_id));
     await Promise.all([
-      this.billingConfig
+      this.billingConfigService
         .load()
-        .then(config => this.trialDays.set(config?.trialDays ?? null))
+        .then(config => this.billingConfig.set(config))
         .catch(() => undefined),
       this.loadTerms(),
     ]);
@@ -306,7 +317,7 @@ export class RegisterComponent implements OnInit {
         throw new Error('Your workspace is ready. Select Continue again to refresh access.');
       }
       // Reload all tenant-scoped stores under the newly selected company.
-      window.location.assign('/dashboard');
+      window.location.assign(this.billingConfig()?.introOfferEnabled ? '/billing' : '/dashboard');
     } catch (err) {
       this.error.set(
         err instanceof Error ? err.message : 'Workspace access could not be refreshed'
@@ -314,6 +325,16 @@ export class RegisterComponent implements OnInit {
     } finally {
       this.saving.set(false);
     }
+  }
+
+  protected introOfferWording(): string {
+    const config = this.billingConfig();
+    if (!config) return 'Introductory offer';
+    const paid = `${config.introOfferPaidMonths} ${config.introOfferPaidMonths === 1 ? 'month' : 'months'}`;
+    const bonus = `${config.introOfferBonusMonths} ${config.introOfferBonusMonths === 1 ? 'month' : 'months'}`;
+    return config.introOfferBonusMonths > 0
+      ? `Pay for ${paid}, get ${bonus} free`
+      : `Pay for ${paid}`;
   }
 
   private validUuid(value: string | null): string | null {

@@ -46,7 +46,10 @@ Deno.serve(async req => {
     }
 
     // Company + tier, RLS-scoped to the caller.
-    const { data: companies } = await supabase.from('companies').select('id, name').limit(1);
+    const { data: companies } = await supabase
+      .from('companies')
+      .select('id, name, status, subscription_status, last_payment_reference')
+      .limit(1);
     const company = companies?.[0];
     if (!company) {
       return Response.json({ error: 'no_company' }, { status: 400, headers: cors });
@@ -68,7 +71,28 @@ Deno.serve(async req => {
       return Response.json({ error: 'tier_not_found' }, { status: 404, headers: cors });
     }
 
-    const amount = billing_cycle === 'yearly' ? tier.price_yearly : tier.price_monthly;
+    const { data: billingPolicy } = await serviceClient
+      .from('platform_billing_settings')
+      .select(
+        'intro_offer_enabled, intro_offer_tier_id, intro_offer_paid_months, intro_offer_bonus_months'
+      )
+      .eq('singleton', true)
+      .single();
+
+    const introOffer =
+      billing_cycle === 'monthly' &&
+      billingPolicy?.intro_offer_enabled === true &&
+      billingPolicy.intro_offer_tier_id === tier.id &&
+      company.status === 'approved' &&
+      company.subscription_status === null &&
+      company.last_payment_reference === null;
+    const paidMonths = introOffer ? billingPolicy.intro_offer_paid_months : 1;
+    const bonusMonths = introOffer ? billingPolicy.intro_offer_bonus_months : 0;
+    const amount = introOffer
+      ? tier.price_monthly * paidMonths
+      : billing_cycle === 'yearly'
+        ? tier.price_yearly
+        : tier.price_monthly;
     const normalizedPhone = phone.replace(/[^\d]/g, '').replace(/^0/, '254');
 
     const res = await fetch('https://api.paystack.co/charge', {
@@ -83,10 +107,17 @@ Deno.serve(async req => {
         currency: 'KES',
         mobile_money: { phone: `+${normalizedPhone}`, provider: 'mpesa' },
         metadata: {
-          type: 'subscription',
+          type: introOffer ? 'subscription_intro_offer' : 'subscription',
           company_id: company.id,
           tier_id: tier.id,
           billing_cycle,
+          ...(introOffer
+            ? {
+                unit_price: tier.price_monthly,
+                paid_months: paidMonths,
+                bonus_months: bonusMonths,
+              }
+            : {}),
         },
       }),
     });

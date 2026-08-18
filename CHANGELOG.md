@@ -20,6 +20,8 @@
   stock changes, and payment events.
 - Standardized the dashboard design language as “The Counter,” including shared page, money,
   field, icon, status, and button primitives.
+- Added configurable new-company offers: Super Admin selects a plan, paid months, and free bonus
+  months; verified payment assigns the plan and grants the combined access period.
 
 ### Migration
 

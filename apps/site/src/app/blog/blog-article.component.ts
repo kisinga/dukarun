@@ -123,7 +123,7 @@ import { BlogService, PublishedBlogPost } from './blog.service';
                   class="btn btn-primary mt-7 min-h-12 px-6"
                   (click)="trackCta($event)"
                 >
-                  Start your free trial
+                  Get started with Dukarun
                   <app-icon name="heroArrowRight" size="sm" />
                 </a>
               </div>

@@ -36,6 +36,12 @@ export interface OperationsSnapshot {
 export interface BillingConfig {
   trialDays: number;
   defaultTrialTierCode: string;
+  introOfferEnabled: boolean;
+  introOfferTierCode: string;
+  introOfferTierName: string;
+  introOfferPrice: number;
+  introOfferPaidMonths: number;
+  introOfferBonusMonths: number;
 }
 export interface PlatformCampaignPreview {
   total: number;
@@ -602,10 +608,21 @@ export class PlatformService {
     return data as unknown as BillingConfig | null;
   }
 
-  async updateBillingConfig(trialDays: number, defaultTrialTierId: string): Promise<void> {
-    const { error } = await this.db.rpc('platform_update_billing_config', {
-      p_trial_duration_days: trialDays,
-      p_default_trial_tier_id: defaultTrialTierId,
+  async updateBillingPolicy(input: {
+    trialDays: number;
+    defaultTrialTierId: string;
+    introOfferEnabled: boolean;
+    introOfferTierId: string;
+    introOfferPaidMonths: number;
+    introOfferBonusMonths: number;
+  }): Promise<void> {
+    const { error } = await this.db.rpc('platform_update_billing_policy', {
+      p_trial_duration_days: input.trialDays,
+      p_default_trial_tier_id: input.defaultTrialTierId,
+      p_intro_offer_enabled: input.introOfferEnabled,
+      p_intro_offer_tier_id: input.introOfferTierId,
+      p_intro_offer_paid_months: input.introOfferPaidMonths,
+      p_intro_offer_bonus_months: input.introOfferBonusMonths,
     });
     if (error) throw rpcError(error);
   }

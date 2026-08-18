@@ -7,6 +7,7 @@ import { PageLayoutComponent } from '../shared/ui/page-layout.component';
 import { StatusBadgeComponent } from '../shared/ui/status-badge.component';
 import { BillingCycle, BillingService, CompanyBilling, Tier } from './billing.service';
 import { EntitlementsService } from '../core/entitlements.service';
+import { BillingConfigService, PublicBillingConfig } from '../core/billing-config.service';
 
 type BadgeType = 'success' | 'info' | 'warning' | 'error' | 'neutral';
 
@@ -37,7 +38,7 @@ const POLL_TIMEOUT_MS = 60_000;
               <h2 class="type-title">{{ b.subscription_tiers?.name ?? 'No plan' }}</h2>
               <app-status-badge
                 [type]="statusType(b.subscription_status)"
-                [label]="b.subscription_status ?? 'unknown'"
+                [label]="statusLabel(b.subscription_status)"
               />
               @if (b.billing_cycle) {
                 <span class="type-caption">{{ b.billing_cycle }}</span>
@@ -84,6 +85,17 @@ const POLL_TIMEOUT_MS = 60_000;
               </p>
             }
           </div>
+        </div>
+      }
+
+      @if (introOfferAvailable()) {
+        <div class="alert alert-info mb-4">
+          <span class="text-sm">
+            <strong>{{ introOfferWording() }}.</strong>
+            Get {{ introOfferAccessMonths() }} months of
+            {{ billingConfig()?.introOfferTierName }} for
+            {{ fmt(billingConfig()?.introOfferPrice ?? 0) }}.
+          </span>
         </div>
       }
 
@@ -165,7 +177,13 @@ const POLL_TIMEOUT_MS = 60_000;
                   }
                 </div>
                 <p class="type-hero mt-1">{{ fmt(priceFor(tier)) }}</p>
-                <p class="type-caption">per {{ cycle() === 'monthly' ? 'month' : 'year' }}</p>
+                <p class="type-caption">
+                  @if (isIntroOffer(tier)) {
+                    for {{ introOfferAccessMonths() }} months
+                  } @else {
+                    per {{ cycle() === 'monthly' ? 'month' : 'year' }}
+                  }
+                </p>
                 <ul class="mt-2 space-y-0.5 text-sm">
                   @for (line of limitLines(tier); track line) {
                     <li>{{ line }}</li>
@@ -192,7 +210,7 @@ const POLL_TIMEOUT_MS = 60_000;
                         class="btn btn-primary btn-sm min-h-11"
                         [disabled]="busy()"
                       >
-                        {{ busy() ? 'Sending…' : 'Pay with M-Pesa' }}
+                        {{ busy() ? 'Sending…' : 'Pay ' + fmt(priceFor(tier)) + ' with M-Pesa' }}
                       </button>
                       <button
                         type="button"
@@ -226,11 +244,13 @@ const POLL_TIMEOUT_MS = 60_000;
 })
 export class BillingComponent implements OnInit, OnDestroy {
   private readonly billingService = inject(BillingService);
+  private readonly billingConfigService = inject(BillingConfigService);
   private readonly entitlements = inject(EntitlementsService);
 
   protected readonly fmt = formatKes;
   protected readonly billing = signal<CompanyBilling | null>(null);
   protected readonly tiers = signal<Tier[]>([]);
+  protected readonly billingConfig = signal<PublicBillingConfig | null>(null);
   protected readonly cycle = signal<BillingCycle>('monthly');
   protected readonly choosing = signal<string | null>(null);
   protected readonly phone = new FormControl('', { nonNullable: true });
@@ -245,12 +265,14 @@ export class BillingComponent implements OnInit, OnDestroy {
 
   async ngOnInit(): Promise<void> {
     try {
-      const [billing, tiers] = await Promise.all([
+      const [billing, tiers, config] = await Promise.all([
         this.billingService.companyBilling(),
         this.billingService.tiers(),
+        this.billingConfigService.load(),
       ]);
       this.billing.set(billing);
       this.tiers.set(tiers);
+      this.billingConfig.set(config);
       if (billing.billing_cycle === 'yearly') this.cycle.set('yearly');
     } catch (err) {
       this.loadError.set(err instanceof Error ? err.message : 'Failed to load billing');
@@ -263,6 +285,10 @@ export class BillingComponent implements OnInit, OnDestroy {
 
   protected statusType(status: string | null): BadgeType {
     return STATUS_TYPE[status ?? ''] ?? 'neutral';
+  }
+
+  protected statusLabel(status: string | null): string {
+    return status ?? (this.introOfferAvailable() ? 'awaiting payment' : 'unknown');
   }
 
   protected date(iso: string | null): string {
@@ -293,6 +319,9 @@ export class BillingComponent implements OnInit, OnDestroy {
   }
 
   protected purchaseLabel(tier: Tier): string {
+    if (this.isIntroOffer(tier)) {
+      return `Get ${this.introOfferAccessMonths()} months for ${this.fmt(this.priceFor(tier))}`;
+    }
     const status = this.billing()?.subscription_status;
     if (this.isCurrent(tier) && (status === 'expired' || status === 'cancelled')) {
       return `Renew ${tier.name}`;
@@ -301,7 +330,39 @@ export class BillingComponent implements OnInit, OnDestroy {
   }
 
   protected priceFor(tier: Tier): number {
+    if (this.isIntroOffer(tier)) return this.billingConfig()?.introOfferPrice ?? tier.price_monthly;
     return this.cycle() === 'monthly' ? tier.price_monthly : tier.price_yearly;
+  }
+
+  protected introOfferAvailable(): boolean {
+    return (
+      this.billing()?.subscription_status === null &&
+      this.billingConfig()?.introOfferEnabled === true
+    );
+  }
+
+  protected isIntroOffer(tier: Tier): boolean {
+    const config = this.billingConfig();
+    return (
+      this.introOfferAvailable() &&
+      this.cycle() === 'monthly' &&
+      config?.introOfferTierCode === tier.code
+    );
+  }
+
+  protected introOfferAccessMonths(): number {
+    const config = this.billingConfig();
+    return (config?.introOfferPaidMonths ?? 0) + (config?.introOfferBonusMonths ?? 0);
+  }
+
+  protected introOfferWording(): string {
+    const config = this.billingConfig();
+    if (!config) return 'Introductory offer';
+    const paid = `${config.introOfferPaidMonths} ${config.introOfferPaidMonths === 1 ? 'month' : 'months'}`;
+    const bonus = `${config.introOfferBonusMonths} ${config.introOfferBonusMonths === 1 ? 'month' : 'months'}`;
+    return config.introOfferBonusMonths > 0
+      ? `Pay for ${paid}, get ${bonus} free`
+      : `Pay for ${paid}`;
   }
 
   /** Human-readable tier limits: "500 sales/mo", "5 team members", "50 SMS/mo". */

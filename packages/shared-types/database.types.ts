@@ -4807,18 +4807,30 @@ export type Database = {
       platform_billing_settings: {
         Row: {
           default_trial_tier_id: string
+          intro_offer_bonus_months: number
+          intro_offer_enabled: boolean
+          intro_offer_paid_months: number
+          intro_offer_tier_id: string
           singleton: boolean
           trial_duration_days: number
           updated_at: string
         }
         Insert: {
           default_trial_tier_id: string
+          intro_offer_bonus_months?: number
+          intro_offer_enabled?: boolean
+          intro_offer_paid_months?: number
+          intro_offer_tier_id: string
           singleton?: boolean
           trial_duration_days?: number
           updated_at?: string
         }
         Update: {
           default_trial_tier_id?: string
+          intro_offer_bonus_months?: number
+          intro_offer_enabled?: boolean
+          intro_offer_paid_months?: number
+          intro_offer_tier_id?: string
           singleton?: boolean
           trial_duration_days?: number
           updated_at?: string
@@ -4827,6 +4839,13 @@ export type Database = {
           {
             foreignKeyName: "platform_billing_settings_default_trial_tier_id_fkey"
             columns: ["default_trial_tier_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_tiers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "platform_billing_settings_intro_offer_tier_id_fkey"
+            columns: ["intro_offer_tier_id"]
             isOneToOne: false
             referencedRelation: "subscription_tiers"
             referencedColumns: ["id"]
@@ -6245,6 +6264,64 @@ export type Database = {
             columns: ["to_location_id"]
             isOneToOne: false
             referencedRelation: "stock_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      subscription_intro_offer_redemptions: {
+        Row: {
+          amount: number
+          bonus_applied: boolean
+          bonus_months: number
+          company_id: string
+          id: string
+          paid_months: number
+          payment_reference: string
+          redeemed_at: string
+          tier_id: string
+        }
+        Insert: {
+          amount: number
+          bonus_applied?: boolean
+          bonus_months: number
+          company_id: string
+          id?: string
+          paid_months: number
+          payment_reference: string
+          redeemed_at?: string
+          tier_id: string
+        }
+        Update: {
+          amount?: number
+          bonus_applied?: boolean
+          bonus_months?: number
+          company_id?: string
+          id?: string
+          paid_months?: number
+          payment_reference?: string
+          redeemed_at?: string
+          tier_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscription_intro_offer_redemptions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscription_intro_offer_redemptions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscription_intro_offer_redemptions_tier_id_fkey"
+            columns: ["tier_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_tiers"
             referencedColumns: ["id"]
           },
         ]
@@ -8287,6 +8364,18 @@ export type Database = {
         Args: { p_code: string; p_company_id: string }
         Returns: number
       }
+      activate_intro_offer: {
+        Args: {
+          p_amount: number
+          p_bonus_months: number
+          p_company_id: string
+          p_paid_months: number
+          p_reference: string
+          p_tier_id: string
+          p_unit_price: number
+        }
+        Returns: string
+      }
       activate_subscription: {
         Args: {
           p_amount: number
@@ -9276,6 +9365,17 @@ export type Database = {
       platform_stats: { Args: never; Returns: Json }
       platform_update_billing_config: {
         Args: { p_default_trial_tier_id: string; p_trial_duration_days: number }
+        Returns: Json
+      }
+      platform_update_billing_policy: {
+        Args: {
+          p_default_trial_tier_id: string
+          p_intro_offer_bonus_months: number
+          p_intro_offer_enabled: boolean
+          p_intro_offer_paid_months: number
+          p_intro_offer_tier_id: string
+          p_trial_duration_days: number
+        }
         Returns: Json
       }
       platform_update_registration_config: {
