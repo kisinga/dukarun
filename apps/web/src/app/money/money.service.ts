@@ -211,6 +211,11 @@ export interface ReconcilableAccount {
   balance: number;
   requires_reconciliation: boolean;
   last_reconciled_at: string | null;
+  balance_scope: 'company' | 'location';
+  location_id: string | null;
+  location_name: string | null;
+  can_adjust: boolean;
+  blocked_reason: string | null;
 }
 
 export interface PurchaseLineInput {
@@ -290,9 +295,11 @@ export class MoneyService {
     return [...accounts.values()];
   }
 
-  /** Company-wide real-money balances available to privileged reconciliation. */
+  /** Real-money balances, scoped to company or active location as accounting requires. */
   async reconcilableAccounts(): Promise<ReconcilableAccount[]> {
-    const { data, error } = await this.db.rpc('list_reconcilable_accounts');
+    const { data, error } = await this.db.rpc('list_reconcilable_accounts', {
+      p_location_id: this.locations.requireActiveId(),
+    });
     if (error) throw rpcError(error);
     return data as ReconcilableAccount[];
   }
@@ -540,6 +547,7 @@ export class MoneyService {
   async recentReconciliations(
     limit = 10
   ): Promise<(Reconciliation & { reconciliation_accounts: ReconAccount[] })[]> {
+    const locationId = this.locations.requireActiveId();
     const { data, error } = await this.db
       .from('reconciliations')
       .select('*, reconciliation_accounts(*)')
@@ -547,7 +555,15 @@ export class MoneyService {
       .order('id', { ascending: false })
       .limit(limit);
     if (error) throw error;
-    return data;
+    return data
+      .map(reconciliation => ({
+        ...reconciliation,
+        reconciliation_accounts: reconciliation.reconciliation_accounts.filter(
+          account =>
+            account.balance_scope === 'company' || reconciliation.location_id === locationId
+        ),
+      }))
+      .filter(reconciliation => reconciliation.reconciliation_accounts.length > 0);
   }
 
   /** ManageReconciliation-gated: post the reversal and mark the row reviewed. */

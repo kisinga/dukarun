@@ -5762,6 +5762,7 @@ export type Database = {
       reconciliation_accounts: {
         Row: {
           account_code: string
+          balance_scope: string
           declared: number
           expected: number
           id: string
@@ -5773,6 +5774,7 @@ export type Database = {
         }
         Insert: {
           account_code: string
+          balance_scope: string
           declared: number
           expected: number
           id?: string
@@ -5784,6 +5786,7 @@ export type Database = {
         }
         Update: {
           account_code?: string
+          balance_scope?: string
           declared?: number
           expected?: number
           id?: string
@@ -8931,12 +8934,17 @@ export type Database = {
         }[]
       }
       list_reconcilable_accounts: {
-        Args: never
+        Args: { p_location_id?: string }
         Returns: {
           account_code: string
           account_name: string
           balance: number
+          balance_scope: string
+          blocked_reason: string
+          can_adjust: boolean
           last_reconciled_at: string
+          location_id: string
+          location_name: string
           requires_reconciliation: boolean
         }[]
       }
@@ -9372,6 +9380,17 @@ export type Database = {
           p_location_id: string
           p_reason?: string
           p_session_id: string
+        }
+        Returns: string
+      }
+      post_manual_location_variance_adjustment: {
+        Args: {
+          p_account_code: string
+          p_company_id: string
+          p_declared: number
+          p_location_id: string
+          p_reason: string
+          p_reconciliation_id: string
         }
         Returns: string
       }
