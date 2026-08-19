@@ -32,7 +32,7 @@ import { RecentSalesCacheService } from '../core/recent-sales-cache.service';
 import { ProductImportDialogComponent } from '../products/product-import-dialog.component';
 import {
   ProductTransferService,
-  type CatalogImportResult,
+  type ProductWorkbookResult,
 } from '../products/product-transfer.service';
 import { CachedDataExportService, type CachedExportKind } from './cached-data-export.service';
 import { TaxSettingsComponent } from './tax-settings.component';
@@ -1375,9 +1375,8 @@ const SETTINGS_TABS: ReadonlyArray<{ key: SettingsTab; label: string }> = [
                 <div class="alert alert-info text-sm">
                   <app-icon name="heroInformationCircle" />
                   <span>
-                    Exports read from the app's existing device cache instead of running a separate
-                    full-data query. Refresh the related screen first when you need the latest
-                    snapshot.
+                    Exports use this device's fresh synchronized cache. Refresh the related screen
+                    first if you want to force a new snapshot before downloading.
                   </span>
                 </div>
 
@@ -1413,8 +1412,8 @@ const SETTINGS_TABS: ReadonlyArray<{ key: SettingsTab; label: string }> = [
                             }
                           </p>
                           <p class="mt-2 text-xs text-base-content/60">
-                            Excel export. Product import supports previewed merge updates; replace
-                            is not offered for cache snapshots.
+                            Export current prices, edit the yellow columns in Excel, then import to
+                            preview and apply the changes. New products use a separate template.
                           </p>
                         </div>
                       </div>
@@ -1428,7 +1427,7 @@ const SETTINGS_TABS: ReadonlyArray<{ key: SettingsTab; label: string }> = [
                           [disabled]="dataExportBusy() !== null"
                           (click)="exportCatalog()"
                         >
-                          <app-icon name="heroArrowDownTray" /> Export
+                          <app-icon name="heroArrowDownTray" /> Export prices
                         </button>
                         <button
                           appButton
@@ -1438,7 +1437,7 @@ const SETTINGS_TABS: ReadonlyArray<{ key: SettingsTab; label: string }> = [
                           [disabled]="dataExportBusy() !== null"
                           (click)="importOpen.set(true)"
                         >
-                          <app-icon name="heroArrowUpTray" /> Import
+                          <app-icon name="heroArrowUpTray" /> Import workbook
                         </button>
                       </div>
                     </section>
@@ -1760,7 +1759,7 @@ export class SettingsComponent implements OnInit {
     this.dataMessage.set(null);
     try {
       await this.productTransfer.exportCatalog();
-      this.dataMessage.set({ ok: true, text: 'Product catalog downloaded.' });
+      this.dataMessage.set({ ok: true, text: 'Price update workbook downloaded.' });
     } catch (err) {
       this.dataMessage.set({
         ok: false,
@@ -1790,10 +1789,13 @@ export class SettingsComponent implements OnInit {
     }
   }
 
-  protected async productImportCompleted(result: CatalogImportResult): Promise<void> {
+  protected async productImportCompleted(result: ProductWorkbookResult): Promise<void> {
     this.dataMessage.set({
       ok: true,
-      text: `Import complete: ${result.created ?? 0} created, ${result.updated ?? 0} updated, ${result.deactivated_products ?? 0} deactivated.`,
+      text:
+        result.kind === 'price_update'
+          ? `Price update complete: ${result.updated_variants} variants updated · ${result.retail_changes} retail · ${result.wholesale_changes} wholesale.`
+          : `Import complete: ${result.created ?? 0} products created.`,
     });
     await this.catalogCache.refresh();
   }

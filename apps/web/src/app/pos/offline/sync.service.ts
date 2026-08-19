@@ -180,7 +180,7 @@ export class SyncService {
       const queued = (await db.getAllFromIndex('outbox', 'by-queued-at')).filter(
         e => belongsToIdentity(e, identity) && e.status === 'queued'
       );
-      for (const entry of queued) {
+      for (const [index, entry] of queued.entries()) {
         const currentIdentity = this.supabase.offlineIdentity();
         if (!currentIdentity || offlineScopeKey(currentIdentity) !== identityKey) break;
         try {
@@ -191,7 +191,7 @@ export class SyncService {
             clientRef: entry.client_ref,
             occurredAt: entry.occurred_at ?? entry.queued_at,
             deviceKey: entry.device_key ?? this.deviceKey,
-            pendingCount: queued.length,
+            pendingCount: queued.length - index,
             locationId: entry.location_id ?? this.locations.requireActiveId(),
             draftId: entry.draft_id ?? undefined,
           });

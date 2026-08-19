@@ -1,14 +1,10 @@
 import { Injectable, inject } from '@angular/core';
 import type { Cell, Workbook, Worksheet } from 'exceljs';
 import { CatalogCacheService } from '../core/catalog-cache.service';
-import { LocationContextService } from '../core/location-context.service';
 import { createExcelWorkbook } from '../shared/excel-workbook';
 import { SupabaseService } from '../core/supabase.service';
 
-export type ProductImportMode = 'merge' | 'replace';
-
 export interface CatalogImportVariant {
-  variant_id?: string;
   name?: string;
   sku?: string;
   barcode?: string | null;
@@ -27,41 +23,67 @@ export interface CatalogImportVariant {
 
 export interface CatalogImportProduct {
   product_key: string;
-  product_id?: string;
   name: string;
   manufacturer_name?: string;
   barcode?: string | null;
   active: boolean;
-  /** Omitted by legacy workbooks; null selects the shop default. */
+  /** Null selects the shop default. */
   tax_category_code?: string | null;
   variants: CatalogImportVariant[];
 }
 
 export interface CatalogImportPreview {
+  kind: 'product_create';
   idempotencyKey: string;
   fileName: string;
   products: CatalogImportProduct[];
   rows: number;
   creates: number;
-  updates: number;
-  replaceEligible: boolean;
-  exportId: string | null;
-  exportedAt: string | null;
-  missingProducts: number;
-  missingVariants: number;
   errors: string[];
 }
 
+export interface CatalogPriceChange {
+  variantId: string;
+  expectedUpdatedAt: string;
+  productName: string;
+  variantName: string;
+  currentRetailPrice: number;
+  newRetailPrice?: number;
+  currentWholesalePrice: number | null;
+  newWholesalePrice?: number | null;
+}
+
+export interface CatalogPriceUpdatePreview {
+  kind: 'price_update';
+  fileName: string;
+  rows: number;
+  unchangedRows: number;
+  retailChanges: number;
+  wholesaleChanges: number;
+  changes: CatalogPriceChange[];
+  errors: string[];
+  conflicts: string[];
+}
+
+export type ProductWorkbookPreview = CatalogImportPreview | CatalogPriceUpdatePreview;
+
 export interface CatalogImportResult {
+  kind: 'product_create';
   status: 'completed' | 'failed';
   import_id: string;
-  mode: ProductImportMode;
+  mode: 'merge';
   created?: number;
-  updated?: number;
-  deactivated_products?: number;
-  deactivated_variants?: number;
   error?: string;
 }
+
+export interface CatalogPriceUpdateResult {
+  kind: 'price_update';
+  updated_variants: number;
+  retail_changes: number;
+  wholesale_changes: number;
+}
+
+export type ProductWorkbookResult = CatalogImportResult | CatalogPriceUpdateResult;
 
 const HEADERS = [
   'product_key',
@@ -88,7 +110,22 @@ const HEADERS = [
   'tax_category_code',
 ] as const;
 
+const PRICE_UPDATE_HEADERS = [
+  'variant_id',
+  'variant_updated_at',
+  'product_name',
+  'variant_name',
+  'sku',
+  'product_active',
+  'variant_active',
+  'current_retail_price_kes',
+  'new_retail_price_kes',
+  'current_wholesale_price_kes',
+  'new_wholesale_price_kes',
+] as const;
+
 type Header = (typeof HEADERS)[number];
+type PriceUpdateHeader = (typeof PRICE_UPDATE_HEADERS)[number];
 type RowValues = Record<Header, unknown>;
 type ProductRow = {
   id: string;
@@ -112,73 +149,68 @@ type VariantRow = {
   allow_fractional: boolean;
   active: boolean;
   created_at: string;
+  updated_at: string;
 };
 
-// PostgreSQL's uuid type accepts any canonical 8-4-4-4-12 hexadecimal value,
-// including legacy IDs without RFC version/variant bits.
+// PostgreSQL accepts canonical UUIDs without requiring particular version bits.
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX_ROWS = 10_000;
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
+
+type PriceExportRow = {
+  variant_id: string;
+  variant_updated_at: string;
+  product_id: string;
+  product_name: string;
+  variant_name: string;
+  sku: string;
+  product_active: boolean;
+  variant_active: boolean;
+  retail_price: number;
+  wholesale_price: number | null;
+};
 
 @Injectable({ providedIn: 'root' })
 export class ProductTransferService {
   private readonly supabase = inject(SupabaseService);
   private readonly catalogCache = inject(CatalogCacheService);
-  private readonly locationContext = inject(LocationContextService);
 
   async exportCatalog(): Promise<void> {
     await this.catalogCache.ensureLoaded();
     if (!this.catalogCache.loaded()) {
       throw new Error('No cached product catalog is available on this device yet.');
     }
-    const products = this.catalogCache.families();
-    const variants = this.catalogCache.catalog();
-    const exportedAt = this.catalogCache.fetchedAt() ?? new Date().toISOString();
-    const workbook = await this.baseWorkbook(
-      this.locationContext.locations().map(item => item.code)
-    );
-    const sheet = workbook.getWorksheet('Products')!;
-    const { data: taxSettings } = await this.supabase.client.rpc('company_tax_settings');
-    const taxCodeById = new Map(
-      (
-        (taxSettings as { categories?: Array<{ id: string; code: string }> } | null)?.categories ??
-        []
-      ).map(category => [category.id, category.code])
-    );
-
-    for (const product of products) {
-      const familyVariants = variants.filter(variant => variant.product_id === product.id);
-      for (const variant of familyVariants) {
-        sheet.addRow([
-          product.id,
-          product.id,
-          variant.variant_id,
-          product.name,
-          variant.manufacturer_name ?? '',
-          product.barcode ?? '',
-          product.active,
-          variant.variant_name === 'Default' ? '' : (variant.variant_name ?? ''),
-          variant.sku ?? '',
-          variant.barcode ?? '',
-          variant.kind ?? 'good',
-          variant.price ?? 0,
-          variant.wholesale_price ?? '',
-          variant.track_inventory ?? true,
-          variant.allow_fractional ?? false,
-          variant.variant_active ?? true,
-          '',
-          '',
-          '',
-          '',
-          '',
-          product.tax_category_id ? (taxCodeById.get(product.tax_category_id) ?? '') : '',
-        ]);
-      }
+    if (this.catalogCache.catalogTruncated()) {
+      throw new Error(`Price workbooks support at most ${MAX_ROWS} variants.`);
     }
 
-    this.addMetadata(workbook, exportedAt, 'cached');
-    this.finishProductsSheet(sheet);
-    await this.download(workbook, `dukarun-products-${exportedAt.slice(0, 10)}.xlsx`);
+    let variants = this.cachedPriceVariants();
+    if (variants.some(variant => !variant.variant_updated_at)) {
+      await this.catalogCache.refresh();
+      variants = this.cachedPriceVariants();
+    }
+    if (variants.some(variant => !variant.variant_updated_at)) {
+      throw new Error('Refresh the catalog cache before exporting prices.');
+    }
+
+    const rows: PriceExportRow[] = variants.map(variant => ({
+      variant_id: variant.variant_id!,
+      variant_updated_at: variant.variant_updated_at!,
+      product_id: variant.product_id!,
+      product_name: variant.product_name ?? 'Product',
+      variant_name: variant.variant_name ?? '',
+      sku: variant.sku ?? '',
+      product_active: variant.product_active ?? true,
+      variant_active: variant.variant_active ?? true,
+      retail_price: Number(variant.price ?? 0),
+      wholesale_price:
+        variant.wholesale_price === null || variant.wholesale_price === undefined
+          ? null
+          : Number(variant.wholesale_price),
+    }));
+    const exportedAt = this.catalogCache.fetchedAt() ?? new Date().toISOString();
+    const workbook = await this.priceUpdateWorkbook(rows, exportedAt);
+    await this.download(workbook, `dukarun-price-update-${exportedAt.slice(0, 10)}.xlsx`);
   }
 
   async downloadTemplate(): Promise<void> {
@@ -209,15 +241,36 @@ export class ProductTransferService {
       '',
       '',
     ]);
-    this.addMetadata(workbook, new Date().toISOString(), 'template');
+    this.addMetadata(workbook, {
+      formatVersion: '2',
+      workbookKind: 'product_create',
+      exportedAt: new Date().toISOString(),
+    });
     this.finishProductsSheet(sheet);
-    await this.download(workbook, 'dukarun-product-import-template.xlsx');
+    await this.download(workbook, 'dukarun-new-products-template.xlsx');
   }
 
-  async preview(file: File): Promise<CatalogImportPreview> {
+  async preview(file: File): Promise<ProductWorkbookPreview> {
     if (file.size > MAX_FILE_BYTES) throw new Error('Workbook must be 10 MB or smaller.');
     const workbook = await createExcelWorkbook();
     await workbook.xlsx.load(await file.arrayBuffer());
+    const metadata = this.readMetadata(workbook);
+    if (metadata['format_version'] !== '2') {
+      throw new Error('This workbook is outdated. Download a new workbook from Settings.');
+    }
+    if (metadata['workbook_kind'] === 'price_update') {
+      return this.previewPriceUpdate(workbook, file.name, metadata);
+    }
+    if (metadata['workbook_kind'] === 'product_create') {
+      return this.previewProductCreate(workbook, file.name);
+    }
+    throw new Error('Workbook type is not supported. Download a new workbook from Settings.');
+  }
+
+  private async previewProductCreate(
+    workbook: Workbook,
+    fileName: string
+  ): Promise<CatalogImportPreview> {
     const sheet = workbook.getWorksheet('Products');
     if (!sheet) throw new Error('Workbook needs a Products sheet.');
     if (sheet.actualRowCount < 2) throw new Error('Products sheet has no data rows.');
@@ -236,7 +289,6 @@ export class ProductTransferService {
     );
     const errors: string[] = [];
     const groups = new Map<string, { product: CatalogImportProduct; signature: string }>();
-    const seenVariantIds = new Set<string>();
     const seenSkus = new Set<string>();
     let parsedRows = 0;
 
@@ -253,11 +305,11 @@ export class ProductTransferService {
       try {
         const productId = this.optionalUuid(values.product_id, 'product_id');
         const variantId = this.optionalUuid(values.variant_id, 'variant_id');
-        const productKey = this.text(values.product_key) || productId;
-        if (!productKey) throw new Error('product_key required for new products');
-        if (!productId && variantId) throw new Error('variant_id cannot be set without product_id');
-        if (variantId && seenVariantIds.has(variantId)) throw new Error('duplicate variant_id');
-        if (variantId) seenVariantIds.add(variantId);
+        if (productId || variantId) {
+          throw new Error('new-product templates cannot contain product or variant IDs');
+        }
+        const productKey = this.text(values.product_key);
+        if (!productKey) throw new Error('product_key required');
 
         const name = this.requiredText(values.product_name, 'product_name');
         const manufacturer = this.text(values.manufacturer);
@@ -268,7 +320,6 @@ export class ProductTransferService {
           throw new Error(`unknown tax_category_code ${taxCategoryCode}`);
         }
         const signature = JSON.stringify({
-          productId,
           name,
           manufacturer,
           barcode,
@@ -281,7 +332,6 @@ export class ProductTransferService {
             signature,
             product: {
               product_key: productKey,
-              ...(productId ? { product_id: productId } : {}),
               name,
               ...(manufacturer ? { manufacturer_name: manufacturer } : {}),
               barcode: barcode || null,
@@ -312,8 +362,6 @@ export class ProductTransferService {
             : this.bool(values.allow_fractional, false, 'allow_fractional');
         const trackInventory =
           kind === 'service' ? false : this.bool(values.track_inventory, true, 'track_inventory');
-        if (variantId && openingQuantity)
-          throw new Error('opening stock allowed only for new variants');
         if (openingQuantity < 0) throw new Error('opening quantity cannot be negative');
         if (openingQuantity > 0 && !trackInventory)
           throw new Error('opening stock requires tracking');
@@ -325,7 +373,6 @@ export class ProductTransferService {
         }
 
         group.product.variants.push({
-          ...(variantId ? { variant_id: variantId } : {}),
           ...(this.text(values.variant_name) ? { name: this.text(values.variant_name) } : {}),
           ...(sku ? { sku } : {}),
           barcode: this.text(values.variant_barcode) || null,
@@ -365,49 +412,146 @@ export class ProductTransferService {
         errors.push(`${product.product_key}: duplicate variant names`);
       }
     }
-    const metadata = this.readMetadata(workbook);
-    const companyId = this.supabase.claims()?.company_id ?? '';
-    const replaceEligible =
-      metadata['export_type'] === 'full' &&
-      metadata['company_id'] === companyId &&
-      UUID.test(metadata['export_id'] ?? '') &&
-      !!metadata['exported_at'];
     const [currentProducts, currentVariants] = await Promise.all([
       this.allProducts(),
       this.allVariants(),
     ]);
     this.addBarcodeErrors(products, currentProducts, currentVariants, errors);
-    const productIds = new Set(
-      products.flatMap(product => (product.product_id ? [product.product_id] : []))
-    );
-    const variantIds = new Set(
-      products.flatMap(product =>
-        product.variants.flatMap(variant => (variant.variant_id ? [variant.variant_id] : []))
-      )
-    );
-    const exportedAtMs = metadata['exported_at'] ? Date.parse(metadata['exported_at']) : 0;
-    const existedAtExport = (createdAt: string) =>
-      !exportedAtMs || Date.parse(createdAt) <= exportedAtMs;
 
     return {
+      kind: 'product_create',
       idempotencyKey: crypto.randomUUID(),
-      fileName: file.name,
+      fileName,
       products,
       rows: parsedRows,
-      creates: products.filter(product => !product.product_id).length,
-      updates: products.filter(product => !!product.product_id).length,
-      replaceEligible,
-      exportId: metadata['export_id'] || null,
-      exportedAt: metadata['exported_at'] || null,
-      missingProducts: currentProducts.filter(
-        product =>
-          product.active && existedAtExport(product.created_at) && !productIds.has(product.id)
-      ).length,
-      missingVariants: currentVariants.filter(
-        variant =>
-          variant.active && existedAtExport(variant.created_at) && !variantIds.has(variant.id)
-      ).length,
+      creates: products.length,
       errors,
+    };
+  }
+
+  private async previewPriceUpdate(
+    workbook: Workbook,
+    fileName: string,
+    metadata: Record<string, string>
+  ): Promise<CatalogPriceUpdatePreview> {
+    const companyId = this.supabase.claims()?.company_id ?? '';
+    if (!companyId || metadata['company_id'] !== companyId) {
+      throw new Error('This price workbook belongs to a different company.');
+    }
+    const sheet = workbook.getWorksheet('Price Updates');
+    if (!sheet) throw new Error('Workbook needs a Price Updates sheet.');
+    if (sheet.actualRowCount < 2) throw new Error('Price Updates sheet has no product rows.');
+    if (sheet.actualRowCount - 1 > MAX_ROWS) {
+      throw new Error(`Maximum ${MAX_ROWS} rows per import.`);
+    }
+
+    const headers = this.priceHeaderMap(sheet);
+    const currentVariants = await this.allVariants();
+    const currentById = new Map(currentVariants.map(variant => [variant.id, variant]));
+    const seen = new Set<string>();
+    const changes: CatalogPriceChange[] = [];
+    const errors: string[] = [];
+    const conflicts: string[] = [];
+    let rows = 0;
+    let unchangedRows = 0;
+    let retailChanges = 0;
+    let wholesaleChanges = 0;
+
+    sheet.eachRow((row, rowNumber) => {
+      if (rowNumber === 1) return;
+      const cell = (header: PriceUpdateHeader) => row.getCell(headers.get(header)!);
+      if (
+        PRICE_UPDATE_HEADERS.every(header => {
+          const value = cell(header).value;
+          return value === null || value === undefined || value === '';
+        })
+      ) {
+        return;
+      }
+      rows++;
+      try {
+        const variantId = this.optionalUuid(this.rawCell(cell('variant_id')), 'variant_id');
+        if (!variantId) throw new Error('variant_id required');
+        if (seen.has(variantId)) throw new Error('duplicate variant_id');
+        seen.add(variantId);
+
+        const retailCell = this.rawCell(cell('new_retail_price_kes'));
+        const wholesaleCell = this.rawCell(cell('new_wholesale_price_kes'));
+        const retailSupplied = !this.blank(retailCell);
+        const wholesaleSupplied = !this.blank(wholesaleCell);
+        if (!retailSupplied && !wholesaleSupplied) {
+          unchangedRows++;
+          return;
+        }
+
+        const expectedUpdatedAt = this.requiredText(
+          this.rawCell(cell('variant_updated_at')),
+          'variant_updated_at'
+        );
+        if (Number.isNaN(Date.parse(expectedUpdatedAt))) {
+          throw new Error('variant_updated_at is invalid');
+        }
+
+        const current = currentById.get(variantId);
+        if (!current) throw new Error('variant no longer exists');
+
+        const newRetailPrice = retailSupplied
+          ? this.wholeMoney(retailCell, 'new_retail_price_kes')
+          : undefined;
+        const newWholesalePrice = wholesaleSupplied
+          ? this.wholesaleUpdateValue(wholesaleCell)
+          : undefined;
+        const retailChanged =
+          newRetailPrice !== undefined && newRetailPrice !== Number(current.price);
+        const wholesaleChanged =
+          wholesaleSupplied && newWholesalePrice !== (current.wholesale_price ?? null);
+        if (!retailChanged && !wholesaleChanged) {
+          unchangedRows++;
+          return;
+        }
+
+        const effectiveRetail = newRetailPrice ?? Number(current.price);
+        const effectiveWholesale = wholesaleSupplied
+          ? (newWholesalePrice ?? null)
+          : (current.wholesale_price ?? null);
+        if (effectiveWholesale !== null && effectiveWholesale > effectiveRetail) {
+          throw new Error('wholesale price cannot exceed retail price');
+        }
+
+        if (current.updated_at !== expectedUpdatedAt) {
+          conflicts.push(
+            `Row ${rowNumber}: ${this.priceRowLabel(row, headers)} changed after export`
+          );
+          return;
+        }
+
+        if (retailChanged) retailChanges++;
+        if (wholesaleChanged) wholesaleChanges++;
+        changes.push({
+          variantId,
+          expectedUpdatedAt,
+          productName: cell('product_name').text.trim() || 'Product',
+          variantName: cell('variant_name').text.trim(),
+          currentRetailPrice: Number(current.price),
+          ...(retailChanged ? { newRetailPrice } : {}),
+          currentWholesalePrice: current.wholesale_price ?? null,
+          ...(wholesaleChanged ? { newWholesalePrice } : {}),
+        });
+      } catch (error) {
+        errors.push(`Row ${rowNumber}: ${error instanceof Error ? error.message : 'invalid row'}`);
+      }
+    });
+
+    return {
+      kind: 'price_update',
+      fileName,
+      rows,
+      unchangedRows,
+      retailChanges,
+      wholesaleChanges,
+      changes,
+      errors,
+      conflicts,
     };
   }
 
@@ -417,17 +561,12 @@ export class ProductTransferService {
     currentVariants: VariantRow[],
     errors: string[]
   ): void {
-    const incomingVariantIds = new Set(
-      products.flatMap(product =>
-        product.variants.flatMap(variant => (variant.variant_id ? [variant.variant_id] : []))
-      )
-    );
     const currentProductById = new Map(currentProducts.map(product => [product.id, product]));
     const claimed = new Set<string>();
     for (const variant of currentVariants) {
       const product = currentProductById.get(variant.product_id);
       const barcode = variant.barcode?.trim() || product?.barcode?.trim();
-      if (barcode && variant.active && product?.active && !incomingVariantIds.has(variant.id)) {
+      if (barcode && variant.active && product?.active) {
         claimed.add(barcode);
       }
     }
@@ -447,14 +586,35 @@ export class ProductTransferService {
     }
   }
 
-  async apply(
-    preview: CatalogImportPreview,
-    mode: ProductImportMode
-  ): Promise<CatalogImportResult> {
-    if (preview.errors.length) throw new Error('Fix workbook errors before importing.');
-    if (mode === 'replace' && !preview.replaceEligible) {
-      throw new Error('Replace requires a full catalog export from this company.');
+  async apply(preview: ProductWorkbookPreview): Promise<ProductWorkbookResult> {
+    if (preview.kind === 'price_update') return this.applyPriceUpdate(preview);
+    return this.applyProductCreate(preview);
+  }
+
+  private async applyPriceUpdate(
+    preview: CatalogPriceUpdatePreview
+  ): Promise<CatalogPriceUpdateResult> {
+    if (preview.errors.length || preview.conflicts.length) {
+      throw new Error('Fix workbook errors before importing.');
     }
+    if (preview.changes.length === 0) throw new Error('Workbook has no price changes.');
+    const payload = preview.changes.map(change => ({
+      variant_id: change.variantId,
+      expected_updated_at: change.expectedUpdatedAt,
+      ...(change.newRetailPrice !== undefined ? { new_retail_price: change.newRetailPrice } : {}),
+      ...('newWholesalePrice' in change
+        ? { new_wholesale_price: change.newWholesalePrice ?? null }
+        : {}),
+    }));
+    const { data, error } = await this.supabase.client.rpc('apply_catalog_price_updates', {
+      p_changes: payload as never,
+    });
+    if (error) throw error;
+    return { kind: 'price_update', ...(data as Omit<CatalogPriceUpdateResult, 'kind'>) };
+  }
+
+  private async applyProductCreate(preview: CatalogImportPreview): Promise<CatalogImportResult> {
+    if (preview.errors.length) throw new Error('Fix workbook errors before importing.');
     const locationIds = new Map((await this.allLocations()).map(item => [item.code, item.id]));
     const products = preview.products.map(product => ({
       ...product,
@@ -466,23 +626,24 @@ export class ProductTransferService {
       })),
     }));
     const begin = await this.supabase.client.rpc('begin_catalog_import', {
-      p_mode: mode,
+      p_mode: 'merge',
       p_idempotency_key: preview.idempotencyKey,
-      p_source_export_id: mode === 'replace' ? preview.exportId! : undefined,
     });
     if (begin.error) throw begin.error;
     const started = begin.data as unknown as {
       import_id: string;
       status: CatalogImportResult['status'];
-      mode: ProductImportMode;
-      result: CatalogImportResult | null;
+      mode: string;
+      result: Omit<CatalogImportResult, 'kind'> | null;
     };
-    if (started.mode !== mode) {
+    if (started.mode !== 'merge') {
       throw new Error(
-        `This preview already started as a ${started.mode} import. Create a new preview to use ${mode} mode.`
+        `This preview already started as a ${started.mode} import. Create a new preview.`
       );
     }
-    if (started.status === 'completed' && started.result) return started.result;
+    if (started.status === 'completed' && started.result) {
+      return { kind: 'product_create', ...started.result };
+    }
     if (started.status === 'failed') {
       throw new Error(started.result?.error ?? 'This import attempt already failed');
     }
@@ -500,9 +661,9 @@ export class ProductTransferService {
       p_import_id: importId,
     });
     if (finalized.error) throw finalized.error;
-    const result = finalized.data as unknown as CatalogImportResult;
+    const result = finalized.data as unknown as Omit<CatalogImportResult, 'kind'>;
     if (result.status === 'failed') throw new Error(result.error ?? 'Import failed');
-    return result;
+    return { kind: 'product_create', ...result };
   }
 
   private importChunks(products: CatalogImportProduct[]): CatalogImportProduct[][] {
@@ -523,6 +684,93 @@ export class ProductTransferService {
     }
     if (current.length) chunks.push(current);
     return chunks;
+  }
+
+  private cachedPriceVariants(): Array<
+    ReturnType<CatalogCacheService['catalog']>[number] & { variant_updated_at?: string }
+  > {
+    return this.catalogCache.catalog() as Array<
+      ReturnType<CatalogCacheService['catalog']>[number] & { variant_updated_at?: string }
+    >;
+  }
+
+  private async priceUpdateWorkbook(rows: PriceExportRow[], exportedAt: string): Promise<Workbook> {
+    const workbook = await createExcelWorkbook();
+    workbook.creator = 'DukaRun';
+    workbook.created = new Date();
+    const sheet = workbook.addWorksheet('Price Updates', {
+      views: [{ state: 'frozen', ySplit: 1, xSplit: 3 }],
+      properties: { tabColor: { argb: '1F4E78' } },
+    });
+    sheet.addTable({
+      name: 'DukaRunPriceUpdates',
+      ref: 'A1',
+      headerRow: true,
+      totalsRow: false,
+      style: { theme: 'TableStyleMedium2', showRowStripes: true },
+      columns: PRICE_UPDATE_HEADERS.map(name => ({ name })),
+      rows: rows.map(row => [
+        row.variant_id,
+        row.variant_updated_at,
+        row.product_name,
+        row.variant_name === 'Default' ? '' : row.variant_name,
+        row.sku,
+        row.product_active,
+        row.variant_active,
+        row.retail_price,
+        '',
+        row.wholesale_price ?? '',
+        '',
+      ]),
+    });
+    const widths = [38, 30, 28, 22, 20, 15, 15, 24, 22, 27, 25];
+    widths.forEach((width, index) => (sheet.getColumn(index + 1).width = width));
+    sheet.getColumn(1).hidden = true;
+    sheet.getColumn(2).hidden = true;
+    for (const column of [8, 9, 10, 11]) sheet.getColumn(column).numFmt = '#,##0';
+    for (let row = 2; row <= Math.max(2, sheet.rowCount); row++) {
+      for (const column of [9, 11]) {
+        sheet.getCell(row, column).fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFFFF2CC' },
+        };
+      }
+    }
+
+    const instructions = workbook.addWorksheet('Instructions', {
+      properties: { tabColor: { argb: '70AD47' } },
+    });
+    instructions.columns = [{ width: 26 }, { width: 100 }];
+    [
+      ['Rule', 'Details'],
+      ['Purpose', 'Use this workbook only to update retail and wholesale prices.'],
+      ['New prices', 'Enter whole Kenyan shillings in the yellow new-price columns.'],
+      ['No change', 'Leave a new-price cell blank to keep the current value.'],
+      ['Clear wholesale', 'Enter CLEAR in new_wholesale_price_kes to remove the wholesale price.'],
+      [
+        'Formulas',
+        'You may calculate in helper columns, but paste the results as values into the yellow columns before importing.',
+      ],
+      ['Rows', 'Do not change the hidden identity columns. Sorting and filtering are safe.'],
+      [
+        'Conflicts',
+        'Re-export if DukaRun reports that a product changed after this workbook was created.',
+      ],
+    ].forEach(row => instructions.addRow(row));
+    instructions.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    instructions.getRow(1).fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FF70AD47' },
+    };
+
+    this.addMetadata(workbook, {
+      formatVersion: '2',
+      workbookKind: 'price_update',
+      exportedAt,
+    });
+    return workbook;
   }
 
   private async baseWorkbook(locationCodes: string[]): Promise<Workbook> {
@@ -548,13 +796,9 @@ export class ProductTransferService {
         'Rows',
         'Each Products row is one sellable variant. Repeat product fields for its variants.',
       ],
+      ['Purpose', 'This template creates new products. It does not update existing products.'],
       ['New products', 'Leave IDs blank and group variants with the same product_key.'],
-      ['Updates', 'Use IDs from a DukaRun export. Never invent IDs.'],
-      ['Merge', 'Creates and updates supplied rows. Omitted catalog items stay unchanged.'],
-      [
-        'Replace',
-        'Only full exports qualify. Omitted catalog items become inactive, never deleted.',
-      ],
+      ['Prices', 'Enter whole Kenyan shillings only. Formula cells are not imported.'],
       [
         'Stock',
         'Opening stock is allowed only for new variants. Adjust existing stock separately.',
@@ -569,7 +813,9 @@ export class ProductTransferService {
     const refs = workbook.addWorksheet('Reference Data', {
       properties: { tabColor: { argb: 'FFC000' } },
     });
-    const { data: taxSettings } = await this.supabase.client.rpc('company_tax_settings');
+    const { data: taxSettings, error: taxSettingsError } =
+      await this.supabase.client.rpc('company_tax_settings');
+    if (taxSettingsError) throw taxSettingsError;
     const taxCodes =
       (taxSettings as { categories?: Array<{ code: string }> } | null)?.categories?.map(
         category => category.code
@@ -615,6 +861,16 @@ export class ProductTransferService {
         allowBlank: false,
         formulae: ['"good,service"'],
       };
+      sheet.getCell(row, 19).dataValidation = {
+        type: 'list',
+        allowBlank: true,
+        formulae: ["'Reference Data'!$C$2:$C$1000"],
+      };
+      sheet.getCell(row, 22).dataValidation = {
+        type: 'list',
+        allowBlank: true,
+        formulae: ["'Reference Data'!$D$2:$D$1000"],
+      };
     }
     for (let row = 2; row <= sheet.rowCount; row++) {
       sheet.getCell(row, 12).numFmt = '#,##0';
@@ -627,18 +883,19 @@ export class ProductTransferService {
 
   private addMetadata(
     workbook: Workbook,
-    exportedAt: string,
-    exportType: 'cached' | 'full' | 'template',
-    exportId = ''
+    values: {
+      formatVersion: string;
+      workbookKind: 'price_update' | 'product_create';
+      exportedAt: string;
+    }
   ): void {
     const metadata = workbook.addWorksheet('_DukaRun Metadata', { state: 'veryHidden' });
     metadata.addRows([
-      ['format_version', '1'],
+      ['format_version', values.formatVersion],
+      ['workbook_kind', values.workbookKind],
       ['entity', 'products'],
       ['company_id', this.supabase.claims()?.company_id ?? ''],
-      ['export_id', exportId],
-      ['exported_at', exportedAt],
-      ['export_type', exportType],
+      ['exported_at', values.exportedAt],
     ]);
   }
 
@@ -663,10 +920,25 @@ export class ProductTransferService {
     );
   }
 
+  private priceHeaderMap(sheet: Worksheet): Map<PriceUpdateHeader, number> {
+    const actual = new Map<string, number>();
+    sheet.getRow(1).eachCell((cell, column) => actual.set(cell.text.trim(), column));
+    const missing = PRICE_UPDATE_HEADERS.filter(header => !actual.has(header));
+    if (missing.length) throw new Error(`Missing columns: ${missing.join(', ')}`);
+    return new Map(
+      PRICE_UPDATE_HEADERS.map(
+        header => [header, actual.get(header)!] as [PriceUpdateHeader, number]
+      )
+    );
+  }
+
   private rawCell(cell: Cell): unknown {
     const value = cell.value;
-    if (value && typeof value === 'object' && 'formula' in value) {
+    if (value && typeof value === 'object' && ('formula' in value || 'sharedFormula' in value)) {
       throw new Error(`Formulas are not allowed (${cell.address})`);
+    }
+    if (value && typeof value === 'object' && 'error' in value) {
+      throw new Error(`Excel error ${value.error} (${cell.address})`);
     }
     if (value && typeof value === 'object' && 'richText' in value) {
       return value.richText.map(part => part.text).join('');
@@ -716,8 +988,37 @@ export class ProductTransferService {
   private optionalMoney(value: unknown, name: string): number | null {
     if (value === null || value === undefined || value === '') return null;
     const result = Number(String(value).replaceAll(',', ''));
-    if (!Number.isFinite(result) || result < 0) throw new Error(`${name} must be zero or greater`);
-    return Math.round(result);
+    if (!Number.isSafeInteger(result) || result < 0) {
+      throw new Error(`${name} must be a whole amount of zero or greater`);
+    }
+    return result;
+  }
+
+  private wholeMoney(value: unknown, name: string): number {
+    const text = this.text(value).replaceAll(',', '');
+    const result = Number(text);
+    if (!text || !Number.isSafeInteger(result) || result < 0) {
+      throw new Error(`${name} must be a whole amount of zero or greater`);
+    }
+    return result;
+  }
+
+  private wholesaleUpdateValue(value: unknown): number | null {
+    if (this.text(value).toUpperCase() === 'CLEAR') return null;
+    return this.wholeMoney(value, 'new_wholesale_price_kes');
+  }
+
+  private blank(value: unknown): boolean {
+    return value === null || value === undefined || this.text(value) === '';
+  }
+
+  private priceRowLabel(
+    row: import('exceljs').Row,
+    headers: Map<PriceUpdateHeader, number>
+  ): string {
+    const product = this.text(row.getCell(headers.get('product_name')!).value) || 'Product';
+    const variant = this.text(row.getCell(headers.get('variant_name')!).value);
+    return variant ? `${product} — ${variant}` : product;
   }
 
   private date(value: unknown): string | null {
