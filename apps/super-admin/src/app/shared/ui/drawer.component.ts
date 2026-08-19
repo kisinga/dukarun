@@ -64,7 +64,10 @@ const CLOSE_MS = 150;
               </button>
             </div>
           </header>
-          <div class="min-h-0 flex-1 overflow-y-auto overscroll-contain p-5 sm:p-6">
+          <div
+            #scrollBody
+            class="min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-gutter:stable] p-5 sm:p-6"
+          >
             <ng-content />
           </div>
           <footer
@@ -86,6 +89,9 @@ export class DrawerComponent implements OnDestroy {
   protected readonly rendered = signal(false);
   protected readonly shown = signal(false);
   private readonly panel = viewChild<string, ElementRef<HTMLElement>>('panel', {
+    read: ElementRef,
+  });
+  private readonly scrollBody = viewChild<string, ElementRef<HTMLElement>>('scrollBody', {
     read: ElementRef,
   });
   private closeTimer: ReturnType<typeof setTimeout> | null = null;
@@ -116,7 +122,9 @@ export class DrawerComponent implements OnDestroy {
       }
     });
     afterRenderEffect(() => {
-      if (this.shown()) this.panel()?.nativeElement.focus({ preventScroll: true });
+      if (!this.shown()) return;
+      this.scrollBody()?.nativeElement.scrollTo({ top: 0 });
+      this.panel()?.nativeElement.focus({ preventScroll: true });
     });
   }
 

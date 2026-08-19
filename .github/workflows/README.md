@@ -14,12 +14,7 @@ evidence, not current merge gates.
 
 ## Required branch checks
 
-Protect `main` with these checks:
-
-1. `Active apps / Build + design guard`
-2. `Supabase / Lint + pgTAP`
-
-The Supabase deploy job runs only after its database checks pass and only on configured
-self-hosted production runners.
+Protect `main` with the pull-request jobs from `test.yml` and `supabase.yml`. Do not require
+`Full-stack smoke`; it runs after merge and nightly by design.
 
 All jobs use Node 22, matching the root `package.json` engine.
