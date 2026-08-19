@@ -3006,6 +3006,54 @@ export type Database = {
           },
         ]
       }
+      dashboard_snapshot_cache: {
+        Row: {
+          as_of_date: string
+          company_id: string
+          computed_at: string
+          range_days: number
+          sales_sequence: number
+          scope_key: string
+          settings_sequence: number
+          snapshot: Json
+        }
+        Insert: {
+          as_of_date: string
+          company_id: string
+          computed_at?: string
+          range_days: number
+          sales_sequence?: number
+          scope_key: string
+          settings_sequence?: number
+          snapshot: Json
+        }
+        Update: {
+          as_of_date?: string
+          company_id?: string
+          computed_at?: string
+          range_days?: number
+          sales_sequence?: number
+          scope_key?: string
+          settings_sequence?: number
+          snapshot?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dashboard_snapshot_cache_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dashboard_snapshot_cache_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       delivery_attempts: {
         Row: {
           accepted: boolean
@@ -15210,4 +15258,3 @@ export const Constants = {
     Enums: {},
   },
 } as const
-

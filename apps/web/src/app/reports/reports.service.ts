@@ -8,11 +8,30 @@ export type DailyCustomerStats = Database['public']['Views']['rpt_daily_customer
 export type LowStockVariant = Database['public']['Views']['low_stock_variants']['Row'];
 export type ExpiringBatch = Database['public']['Views']['expiring_batches']['Row'];
 
+export interface DashboardDailySummary {
+  company_id?: string | null;
+  day: string;
+  orders: number;
+  revenue: number;
+  cogs: number;
+  margin: number;
+  quantity: number;
+}
+
+export interface DashboardTopVariant {
+  variant_id: string;
+  quantity: number;
+  revenue: number;
+  cogs: number;
+  margin: number;
+}
+
 export interface DashboardSalesSnapshot {
-  summary: DailySummary[];
-  productSales: DailyProductSales[];
+  summary: DashboardDailySummary[];
+  topVariants: DashboardTopVariant[];
   locations: DashboardLocationSummary[];
   comparison: DashboardPeriodComparison;
+  refreshAfter?: string;
 }
 
 export interface DashboardLocationSummary {
@@ -59,7 +78,7 @@ export class ReportsService {
     const snapshot = data as unknown as Partial<DashboardSalesSnapshot> | null;
     return {
       summary: snapshot?.summary ?? [],
-      productSales: snapshot?.productSales ?? [],
+      topVariants: snapshot?.topVariants ?? [],
       locations: snapshot?.locations ?? [],
       comparison: snapshot?.comparison ?? {
         current_revenue: 0,
@@ -69,6 +88,7 @@ export class ReportsService {
         previous_quantity: 0,
         previous_orders: 0,
       },
+      ...(snapshot?.refreshAfter ? { refreshAfter: snapshot.refreshAfter } : {}),
     };
   }
 

@@ -241,10 +241,10 @@ select is(
 reset role;
 select public.emit_cache_change(
   (select company_id from cache_company),'catalog','product',gen_random_uuid()::text
-) from generate_series(1,520);
+) from generate_series(1,1288);
 select ok(
   (select count(*) from public.cache_change_log
-   where company_id=(select company_id from cache_company) and stream='catalog') > 512,
+   where company_id=(select company_id from cache_company) and stream='catalog') > 1280,
   'cache writes do not prune the journal inline'
 );
 select public.prune_cache_change_log();
@@ -253,13 +253,13 @@ select testkit.as_user((select company_id from cache_company),
 select is(
   (select count(*)::integer from public.cache_change_log
    where company_id=(select company_id from cache_company) and stream='catalog'),
-  512,
-  'each company stream retains exactly 512 entries'
+  1280,
+  'each company stream retains exactly 1,280 entries'
 );
 select is(
   (select head_sequence-pruned_through_sequence from public.cache_stream_heads
    where company_id=(select company_id from cache_company) and stream='catalog'),
-  512::bigint,
+  1280::bigint,
   'stream head records the retention floor'
 );
 select is(
