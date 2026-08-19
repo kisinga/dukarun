@@ -28,6 +28,14 @@ export interface PlatformStats {
   orders_today: number;
   revenue_today: number;
   mrr_estimate: number;
+  pos_devices_total: number;
+  pos_devices_recent_30d: number;
+  pos_devices_active_24h: number;
+  pos_devices_stale_30d: number;
+  pos_devices_dormant_30d: number;
+  pos_devices_with_last_reported_pending: number;
+  offline_sales_last_reported_pending: number;
+  companies_with_active_pos_30d: number;
 }
 export interface OperationsSnapshot {
   pending_companies: number;

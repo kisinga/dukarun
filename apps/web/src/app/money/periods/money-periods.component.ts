@@ -3,7 +3,7 @@ import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import type { DailyCloseStatus, PeriodClosingPack } from '@dukarun/tax-types';
 import { formatKes } from '../../core/money';
 import { PermissionsService } from '../../core/permissions.service';
-import { TaxService, type PeriodReadiness } from '../../core/tax.service';
+import { TaxService, type PeriodReadiness, type PosDeviceStatus } from '../../core/tax.service';
 import { runIndependentLoads } from '../../core/independent-load';
 import { ButtonComponent } from '../../shared/ui/button.component';
 import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
@@ -215,6 +215,64 @@ import { AccountingPeriod, MoneyService, PeriodLock } from '../money.service';
       </div>
     }
 
+    @if (perms.has('CloseAccountingPeriod')) {
+      <div class="card mb-4 bg-base-100">
+        <div class="card-body p-4">
+          <div>
+            <h2 class="section-title">POS devices</h2>
+            <p class="type-caption mt-1">
+              Retire abandoned browser devices so stale-device warnings remain actionable.
+            </p>
+          </div>
+          <div class="mt-3 divide-y divide-base-200">
+            @for (device of devices(); track device.id) {
+              <div class="flex flex-wrap items-center gap-3 py-3">
+                <div class="min-w-0 flex-1">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <p class="font-semibold">{{ deviceLabel(device) }}</p>
+                    <span class="badge badge-sm" [class.badge-warning]="isStale(device)">
+                      {{ isStale(device) ? 'Stale' : 'Active' }}
+                    </span>
+                    @if (device.pending_count > 0) {
+                      <span class="badge badge-warning badge-sm">
+                        {{ device.pending_count }} last reported pending
+                      </span>
+                    }
+                  </div>
+                  <p class="type-caption mt-0.5">
+                    Last seen {{ dateTime(device.last_seen_at) }}
+                    @if (device.last_synced_at) {
+                      · synced {{ dateTime(device.last_synced_at) }}
+                    }
+                  </p>
+                </div>
+                @if (isStale(device)) {
+                  <button
+                    appButton
+                    size="sm"
+                    variant="outline"
+                    type="button"
+                    [disabled]="device.pending_count > 0"
+                    [loading]="retiringDeviceId() === device.id"
+                    [title]="
+                      device.pending_count > 0
+                        ? 'Resolve the last-reported queue before retiring this device'
+                        : 'Retire stale device'
+                    "
+                    (click)="retireDevice(device)"
+                  >
+                    Retire
+                  </button>
+                }
+              </div>
+            } @empty {
+              <p class="type-caption py-3">No active POS devices have reported yet.</p>
+            }
+          </div>
+        </div>
+      </div>
+    }
+
     <!-- Periods list -->
     <h2 class="section-title mb-2">Periods</h2>
     @if (periods().length === 0) {
@@ -323,6 +381,7 @@ export class MoneyPeriodsComponent implements OnInit {
   protected readonly fmt = formatKes;
 
   protected readonly periods = signal<AccountingPeriod[]>([]);
+  protected readonly devices = signal<PosDeviceStatus[]>([]);
   protected readonly lock = signal<PeriodLock | null>(null);
   protected readonly endDate = new FormControl(this.yesterday(), { nonNullable: true });
   protected readonly businessDate = new FormControl(this.yesterday(), { nonNullable: true });
@@ -332,6 +391,7 @@ export class MoneyPeriodsComponent implements OnInit {
   protected readonly confirmClose = signal(false);
   protected readonly busy = signal(false);
   protected readonly dailyBusy = signal(false);
+  protected readonly retiringDeviceId = signal<string | null>(null);
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
@@ -359,6 +419,14 @@ export class MoneyPeriodsComponent implements OnInit {
       {
         fallback: 'Failed to load the period lock',
         run: async () => this.lock.set(await this.money.periodLock()),
+      },
+      {
+        fallback: 'Failed to load POS devices',
+        run: async () => {
+          if (this.perms.has('CloseAccountingPeriod')) {
+            this.devices.set(await this.tax.posDevices());
+          }
+        },
       },
     ]);
     this.error.set(errors.length > 0 ? errors.join('. ') : null);
@@ -426,6 +494,41 @@ export class MoneyPeriodsComponent implements OnInit {
 
   protected blockerLabel(key: string): string {
     return key.replaceAll('_', ' ').replace(/^./, letter => letter.toUpperCase());
+  }
+
+  protected deviceLabel(device: PosDeviceStatus): string {
+    return `Device …${device.device_key.slice(-6)}`;
+  }
+
+  protected isStale(device: PosDeviceStatus): boolean {
+    return Date.now() - new Date(device.last_seen_at).getTime() >= 24 * 60 * 60 * 1000;
+  }
+
+  protected dateTime(value: string): string {
+    return new Date(value).toLocaleString('en-KE');
+  }
+
+  protected async retireDevice(device: PosDeviceStatus): Promise<void> {
+    if (device.pending_count > 0) return;
+    const reason = window
+      .prompt(
+        'Confirm this browser has no unsynced sales, then enter a retirement reason.',
+        'Device no longer in use'
+      )
+      ?.trim();
+    if (!reason) return;
+    this.retiringDeviceId.set(device.id);
+    this.error.set(null);
+    try {
+      await this.tax.retirePosDevice(device.id, reason);
+      this.devices.update(devices => devices.filter(item => item.id !== device.id));
+      this.notice.set(`${this.deviceLabel(device)} retired`);
+      this.readiness.set(null);
+    } catch (error) {
+      this.error.set(error instanceof Error ? error.message : 'Could not retire POS device');
+    } finally {
+      this.retiringDeviceId.set(null);
+    }
   }
 
   protected async viewPack(periodId: string): Promise<void> {

@@ -69,6 +69,16 @@ export interface LateSaleReview {
   created_at: string;
 }
 
+export interface PosDeviceStatus {
+  id: string;
+  device_key: string;
+  pending_count: number;
+  last_seen_at: string;
+  last_synced_at: string | null;
+  retired_at: string | null;
+  retirement_reason: string | null;
+}
+
 @Injectable({ providedIn: 'root' })
 export class TaxService {
   private readonly supabase = inject(SupabaseService);
@@ -191,6 +201,27 @@ export class TaxService {
       p_review_id: id,
       p_approve: approve,
       ...(reason ? { p_reason: reason } : {}),
+    });
+    if (error) throw rpcError(error);
+    return data;
+  }
+
+  async posDevices(): Promise<PosDeviceStatus[]> {
+    const { data, error } = await this.db
+      .from('pos_devices')
+      .select(
+        'id,device_key,pending_count,last_seen_at,last_synced_at,retired_at,retirement_reason'
+      )
+      .is('retired_at', null)
+      .order('last_seen_at', { ascending: false });
+    if (error) throw error;
+    return data as PosDeviceStatus[];
+  }
+
+  async retirePosDevice(id: string, reason: string): Promise<string> {
+    const { data, error } = await this.db.rpc('retire_pos_device', {
+      p_device_id: id,
+      p_reason: reason,
     });
     if (error) throw rpcError(error);
     return data;

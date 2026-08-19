@@ -10959,6 +10959,7 @@ export type Database = {
         Args: { p_chunk_index: number; p_import_id: string; p_products: Json }
         Returns: Json
       }
+      apply_catalog_price_updates: { Args: { p_changes: Json }; Returns: Json }
       apply_customer_deposit: {
         Args: { p_amount: number; p_client_ref?: string; p_order_id: string }
         Returns: string
@@ -11157,6 +11158,7 @@ export type Database = {
           variant_active: boolean
           variant_id: string
           variant_name: string
+          variant_updated_at: string
           wholesale_price: number
         }[]
       }

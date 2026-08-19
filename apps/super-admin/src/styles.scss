@@ -512,7 +512,7 @@ a:focus-visible,
 
 @media (min-width: 1024px) {
   .dashboard-main > :not(router-outlet) {
-    animation: page-enter 180ms ease-out both;
+    animation: page-enter 180ms ease-out;
   }
 }
 

@@ -37,6 +37,7 @@ const ENTITY_LABELS: Record<string, string> = {
   orders: 'sale',
   payment_methods: 'payment method',
   payments: 'payment',
+  pos_devices: 'POS device',
   product_variants: 'product variant',
   products: 'product',
   purchase_payments: 'purchase payment',
@@ -58,6 +59,7 @@ const FIELD_LABELS: Record<string, string> = {
   last_name: 'Last name',
   movement_type: 'Movement',
   new_quantity: 'New quantity',
+  pending_count: 'Last-reported pending sales',
   previous_quantity: 'Previous quantity',
   public_storefront_enabled: 'Storefront',
   requires_reconciliation: 'Reconciliation required',
@@ -73,6 +75,9 @@ const HIDDEN_FIELDS = new Set([
   'updated_at',
   'created_by',
   'decided_by',
+  'device_key',
+  'last_seen_at',
+  'last_synced_at',
   'voided_by',
 ]);
 

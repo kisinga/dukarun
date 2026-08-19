@@ -3,10 +3,10 @@ import { ButtonComponent } from '../shared/ui/button.component';
 import { IconComponent } from '../shared/ui/icon.component';
 import {
   ProductTransferService,
-  type CatalogImportPreview,
-  type CatalogImportResult,
-  type ProductImportMode,
+  type ProductWorkbookPreview,
+  type ProductWorkbookResult,
 } from './product-transfer.service';
+import { formatKes } from '../core/money';
 
 @Component({
   selector: 'app-product-import-dialog',
@@ -57,98 +57,100 @@ import {
                 [disabled]="busy()"
                 (click)="downloadTemplate()"
               >
-                Download blank template
+                Download new-products template
               </button>
             </div>
 
             @if (preview(); as data) {
-              <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                <div class="rounded-field bg-base-200 p-3">
-                  <p class="type-caption">Rows</p>
-                  <p class="font-semibold">{{ data.rows }}</p>
+              @if (data.kind === 'price_update') {
+                <div class="grid grid-cols-2 gap-2 sm:grid-cols-5">
+                  <div class="rounded-field bg-base-200 p-3">
+                    <p class="type-caption">Rows</p>
+                    <p class="font-semibold">{{ data.rows }}</p>
+                  </div>
+                  <div class="rounded-field bg-base-200 p-3">
+                    <p class="type-caption">Retail</p>
+                    <p class="font-semibold">{{ data.retailChanges }}</p>
+                  </div>
+                  <div class="rounded-field bg-base-200 p-3">
+                    <p class="type-caption">Wholesale</p>
+                    <p class="font-semibold">{{ data.wholesaleChanges }}</p>
+                  </div>
+                  <div class="rounded-field bg-base-200 p-3">
+                    <p class="type-caption">Unchanged</p>
+                    <p class="font-semibold">{{ data.unchangedRows }}</p>
+                  </div>
+                  <div class="rounded-field bg-base-200 p-3">
+                    <p class="type-caption">Issues</p>
+                    <p class="font-semibold">{{ data.errors.length + data.conflicts.length }}</p>
+                  </div>
                 </div>
-                <div class="rounded-field bg-base-200 p-3">
-                  <p class="type-caption">Create</p>
-                  <p class="font-semibold">{{ data.creates }}</p>
+
+                @if (data.changes.length) {
+                  <div class="rounded-field border border-base-300 p-3">
+                    <h3 class="text-sm font-semibold">Price changes</h3>
+                    <div class="mt-2 max-h-56 space-y-2 overflow-y-auto text-xs">
+                      @for (change of data.changes; track change.variantId) {
+                        <div class="border-b border-base-200 pb-2 last:border-0">
+                          <p class="font-medium">
+                            {{ change.productName }}
+                            @if (change.variantName) {
+                              <span class="text-base-content/60">— {{ change.variantName }}</span>
+                            }
+                          </p>
+                          @if (change.newRetailPrice !== undefined) {
+                            <p>
+                              Retail: {{ fmt(change.currentRetailPrice) }} →
+                              {{ fmt(change.newRetailPrice) }}
+                            </p>
+                          }
+                          @if (change.newWholesalePrice !== undefined) {
+                            <p>
+                              Wholesale: {{ nullableMoney(change.currentWholesalePrice) }} →
+                              {{ nullableMoney(change.newWholesalePrice) }}
+                            </p>
+                          }
+                        </div>
+                      }
+                    </div>
+                  </div>
+                }
+
+                @if (data.conflicts.length) {
+                  <div class="rounded-field border border-warning/40 bg-warning/5 p-3">
+                    <h3 class="text-sm font-semibold">Re-export these changed products</h3>
+                    <ul class="mt-2 list-disc space-y-1 pl-5 text-xs">
+                      @for (message of data.conflicts; track message) {
+                        <li>{{ message }}</li>
+                      }
+                    </ul>
+                  </div>
+                }
+              } @else {
+                <div class="grid grid-cols-3 gap-2">
+                  <div class="rounded-field bg-base-200 p-3">
+                    <p class="type-caption">Rows</p>
+                    <p class="font-semibold">{{ data.rows }}</p>
+                  </div>
+                  <div class="rounded-field bg-base-200 p-3">
+                    <p class="type-caption">Create</p>
+                    <p class="font-semibold">{{ data.creates }}</p>
+                  </div>
+                  <div class="rounded-field bg-base-200 p-3">
+                    <p class="type-caption">Errors</p>
+                    <p class="font-semibold">{{ data.errors.length }}</p>
+                  </div>
                 </div>
-                <div class="rounded-field bg-base-200 p-3">
-                  <p class="type-caption">Update</p>
-                  <p class="font-semibold">{{ data.updates }}</p>
-                </div>
-                <div class="rounded-field bg-base-200 p-3">
-                  <p class="type-caption">Errors</p>
-                  <p class="font-semibold">{{ data.errors.length }}</p>
-                </div>
-              </div>
+              }
 
               @if (data.errors.length) {
                 <div class="rounded-field border border-error/40 bg-error/5 p-3">
                   <h3 class="text-sm font-semibold text-error">Fix workbook errors</h3>
                   <ul class="mt-2 list-disc space-y-1 pl-5 text-xs">
-                    @for (message of data.errors.slice(0, 20); track message) {
+                    @for (message of data.errors; track message) {
                       <li>{{ message }}</li>
                     }
                   </ul>
-                </div>
-              }
-
-              <fieldset class="space-y-2">
-                <legend class="text-sm font-semibold">Import mode</legend>
-                <label
-                  class="flex cursor-pointer items-start gap-3 rounded-field border border-base-300 p-3"
-                >
-                  <input
-                    class="radio radio-primary radio-sm mt-0.5"
-                    type="radio"
-                    name="import-mode"
-                    value="merge"
-                    [checked]="mode() === 'merge'"
-                    (change)="mode.set('merge')"
-                  />
-                  <span
-                    ><span class="block text-sm font-medium">Merge</span
-                    ><span class="type-caption"
-                      >Create and update supplied rows. Missing items stay active.</span
-                    ></span
-                  >
-                </label>
-                <label
-                  class="flex items-start gap-3 rounded-field border border-base-300 p-3"
-                  [class.opacity-50]="!data.replaceEligible"
-                >
-                  <input
-                    class="radio radio-warning radio-sm mt-0.5"
-                    type="radio"
-                    name="import-mode"
-                    value="replace"
-                    [disabled]="!data.replaceEligible"
-                    [checked]="mode() === 'replace'"
-                    (change)="mode.set('replace')"
-                  />
-                  <span
-                    ><span class="block text-sm font-medium">Replace catalog</span
-                    ><span class="type-caption"
-                      >Deactivate {{ data.missingProducts }} missing products and
-                      {{ data.missingVariants }} missing variants.</span
-                    ></span
-                  >
-                </label>
-                @if (!data.replaceEligible) {
-                  <p class="type-caption">Replace requires a full export from this company.</p>
-                }
-              </fieldset>
-
-              @if (mode() === 'replace') {
-                <div class="rounded-field border border-warning/50 bg-warning/10 p-3">
-                  <label class="text-sm font-medium" for="replace-confirmation"
-                    >Type <strong>{{ confirmationPhrase(data) }}</strong> to confirm.</label
-                  >
-                  <input
-                    id="replace-confirmation"
-                    class="input input-bordered mt-2 w-full"
-                    [value]="confirmation()"
-                    (input)="confirmation.set(inputValue($event))"
-                  />
                 </div>
               }
             }
@@ -166,7 +168,7 @@ import {
               [disabled]="!canImport()"
               (click)="apply()"
             >
-              Import products
+              {{ preview()?.kind === 'price_update' ? 'Apply price changes' : 'Create products' }}
             </button>
           </footer>
         </div>
@@ -181,10 +183,8 @@ export class ProductImportDialogComponent {
   private readonly transfer = inject(ProductTransferService);
 
   readonly open = model(false);
-  readonly imported = output<CatalogImportResult>();
-  protected readonly preview = signal<CatalogImportPreview | null>(null);
-  protected readonly mode = signal<ProductImportMode>('merge');
-  protected readonly confirmation = signal('');
+  readonly imported = output<ProductWorkbookResult>();
+  protected readonly preview = signal<ProductWorkbookPreview | null>(null);
   protected readonly busy = signal(false);
   protected readonly error = signal<string | null>(null);
 
@@ -194,8 +194,6 @@ export class ProductImportDialogComponent {
     this.busy.set(true);
     this.error.set(null);
     this.preview.set(null);
-    this.mode.set('merge');
-    this.confirmation.set('');
     try {
       this.preview.set(await this.transfer.preview(file));
     } catch (error) {
@@ -216,17 +214,12 @@ export class ProductImportDialogComponent {
     }
   }
 
-  protected confirmationPhrase(preview: CatalogImportPreview): string {
-    return `DEACTIVATE ${preview.missingProducts} PRODUCTS`;
-  }
-
   protected canImport(): boolean {
     const preview = this.preview();
     if (!preview || preview.errors.length || this.busy()) return false;
-    if (this.mode() === 'replace') {
-      return preview.replaceEligible && this.confirmation() === this.confirmationPhrase(preview);
-    }
-    return true;
+    return preview.kind === 'price_update'
+      ? preview.conflicts.length === 0 && preview.changes.length > 0
+      : preview.products.length > 0;
   }
 
   protected async apply(): Promise<void> {
@@ -235,7 +228,7 @@ export class ProductImportDialogComponent {
     this.busy.set(true);
     this.error.set(null);
     try {
-      const result = await this.transfer.apply(preview, this.mode());
+      const result = await this.transfer.apply(preview);
       this.imported.emit(result);
       this.close();
     } catch (error) {
@@ -245,8 +238,12 @@ export class ProductImportDialogComponent {
     }
   }
 
-  protected inputValue(event: Event): string {
-    return (event.target as HTMLInputElement).value;
+  protected fmt(amount: number): string {
+    return formatKes(amount);
+  }
+
+  protected nullableMoney(amount: number | null): string {
+    return amount === null ? 'Not set' : formatKes(amount);
   }
 
   protected close(): void {
@@ -254,7 +251,5 @@ export class ProductImportDialogComponent {
     this.open.set(false);
     this.preview.set(null);
     this.error.set(null);
-    this.confirmation.set('');
-    this.mode.set('merge');
   }
 }

@@ -60,6 +60,8 @@ const FEATURE_FIELDS = [
   },
 ] as const;
 
+type TierEditorSection = 'basics' | 'limits' | 'capabilities';
+
 @Component({
   selector: 'app-tiers',
   imports: [
@@ -284,102 +286,141 @@ const FEATURE_FIELDS = [
             <div class="alert alert-error text-sm" role="alert">{{ error() }}</div>
           }
 
-          <section class="space-y-4">
-            <div>
-              <h3 class="section-title">Tier identity</h3>
-              <p class="type-caption mt-1">The code is permanent after creation.</p>
-            </div>
-            <app-form-field label="Code" hint="For example: standard" [required]="!editing()">
-              <input
-                type="text"
-                class="input input-bordered w-full"
-                [disabled]="editing() !== null"
-                [formControl]="code"
-              />
-            </app-form-field>
-            <app-form-field label="Name" [required]="true">
-              <input type="text" class="input input-bordered w-full" [formControl]="name" />
-            </app-form-field>
-            @if (editing()) {
-              <label
-                class="flex min-h-11 cursor-pointer items-center gap-3 rounded-field bg-base-200 px-3"
-              >
-                <input
-                  type="checkbox"
-                  class="toggle toggle-primary toggle-sm"
-                  [formControl]="isActive"
-                />
-                <span class="text-sm font-medium">Available to companies</span>
-              </label>
-            }
-          </section>
+          <div role="tablist" aria-label="Tier editor sections" class="tabs tabs-boxed w-full">
+            <button
+              type="button"
+              role="tab"
+              class="tab flex-1"
+              [class.tab-active]="editorSection() === 'basics'"
+              [attr.aria-selected]="editorSection() === 'basics'"
+              (click)="editorSection.set('basics')"
+            >
+              Basics
+            </button>
+            <button
+              type="button"
+              role="tab"
+              class="tab flex-1"
+              [class.tab-active]="editorSection() === 'limits'"
+              [attr.aria-selected]="editorSection() === 'limits'"
+              (click)="editorSection.set('limits')"
+            >
+              Limits
+            </button>
+            <button
+              type="button"
+              role="tab"
+              class="tab flex-1"
+              [class.tab-active]="editorSection() === 'capabilities'"
+              [attr.aria-selected]="editorSection() === 'capabilities'"
+              (click)="editorSection.set('capabilities')"
+            >
+              Capabilities
+            </button>
+          </div>
 
-          <section class="space-y-4 border-t border-base-300/60 pt-6">
-            <div>
-              <h3 class="section-title">Pricing</h3>
-              <p class="type-caption mt-1">Whole Kenyan shillings.</p>
-            </div>
-            <div class="grid gap-3 sm:grid-cols-2">
-              <app-form-field label="Monthly price (KES)">
+          @if (editorSection() === 'basics') {
+            <section class="space-y-4">
+              <div>
+                <h3 class="section-title">Tier identity</h3>
+                <p class="type-caption mt-1">The code is permanent after creation.</p>
+              </div>
+              <app-form-field label="Code" hint="For example: standard" [required]="!editing()">
                 <input
                   type="text"
-                  inputmode="numeric"
                   class="input input-bordered w-full"
-                  [formControl]="priceMonthly"
+                  [disabled]="editing() !== null"
+                  [formControl]="code"
                 />
               </app-form-field>
-              <app-form-field label="Yearly price (KES)">
-                <input
-                  type="text"
-                  inputmode="numeric"
-                  class="input input-bordered w-full"
-                  [formControl]="priceYearly"
-                />
+              <app-form-field label="Name" [required]="true">
+                <input type="text" class="input input-bordered w-full" [formControl]="name" />
               </app-form-field>
-            </div>
-          </section>
-
-          <section class="space-y-4 border-t border-base-300/60 pt-6">
-            <div>
-              <h3 class="section-title">Usage limits</h3>
-              <p class="type-caption mt-1">
-                Leave blank for unlimited; use zero to block new usage.
-              </p>
-            </div>
-            <div class="grid gap-x-4 gap-y-5 sm:grid-cols-2">
-              @for (field of limitFields; track field.key) {
-                <app-form-field [label]="field.label" [hint]="field.help">
+              @if (editing()) {
+                <label
+                  class="flex min-h-11 cursor-pointer items-center gap-3 rounded-field bg-base-200 px-3"
+                >
                   <input
-                    type="number"
-                    min="0"
+                    type="checkbox"
+                    class="toggle toggle-primary toggle-sm"
+                    [formControl]="isActive"
+                  />
+                  <span class="text-sm font-medium">Available to companies</span>
+                </label>
+              }
+            </section>
+
+            <section class="space-y-4 border-t border-base-300/60 pt-6">
+              <div>
+                <h3 class="section-title">Pricing</h3>
+                <p class="type-caption mt-1">Whole Kenyan shillings.</p>
+              </div>
+              <div class="grid gap-3 sm:grid-cols-2">
+                <app-form-field label="Monthly price (KES)">
+                  <input
+                    type="text"
+                    inputmode="numeric"
                     class="input input-bordered w-full"
-                    [value]="limits()[field.key] ?? ''"
-                    (input)="setLimit(field.key, $any($event.target).value)"
+                    [formControl]="priceMonthly"
                   />
                 </app-form-field>
-              }
-            </div>
-          </section>
+                <app-form-field label="Yearly price (KES)">
+                  <input
+                    type="text"
+                    inputmode="numeric"
+                    class="input input-bordered w-full"
+                    [formControl]="priceYearly"
+                  />
+                </app-form-field>
+              </div>
+            </section>
+          }
 
-          <fieldset class="space-y-2 border-t border-base-300/60 pt-6">
-            <legend class="section-title mb-2">Capabilities</legend>
-            @for (field of featureFields; track field.key) {
-              <label
-                class="flex min-h-11 cursor-pointer items-start gap-3 rounded-field px-2 py-2 hover:bg-base-200/60"
-              >
-                <input
-                  type="checkbox"
-                  class="checkbox checkbox-primary checkbox-sm mt-0.5"
-                  [checked]="features()[field.key] === true"
-                  (change)="setFeature(field.key, $any($event.target).checked)"
-                />
-                <span>
-                  <span class="block text-sm font-medium">{{ field.label }}</span>
-                  <span class="type-caption mt-0.5 block">{{ field.help }}</span>
-                </span>
-              </label>
-            }
-          </fieldset>
+          @if (editorSection() === 'limits') {
+            <section class="space-y-4">
+              <div>
+                <h3 class="section-title">Usage limits</h3>
+                <p class="type-caption mt-1">
+                  Leave blank for unlimited; use zero to block new usage.
+                </p>
+              </div>
+              <div class="grid gap-x-4 gap-y-5 sm:grid-cols-2">
+                @for (field of limitFields; track field.key) {
+                  <app-form-field [label]="field.label" [hint]="field.help">
+                    <input
+                      type="number"
+                      min="0"
+                      class="input input-bordered w-full"
+                      [value]="limits()[field.key] ?? ''"
+                      (input)="setLimit(field.key, $any($event.target).value)"
+                    />
+                  </app-form-field>
+                }
+              </div>
+            </section>
+          }
+
+          @if (editorSection() === 'capabilities') {
+            <fieldset class="space-y-2">
+              <legend class="section-title mb-2">Capabilities</legend>
+              @for (field of featureFields; track field.key) {
+                <label
+                  class="flex min-h-11 cursor-pointer items-start gap-3 rounded-field px-2 py-2 hover:bg-base-200/60"
+                >
+                  <input
+                    type="checkbox"
+                    class="checkbox checkbox-primary checkbox-sm mt-0.5"
+                    [checked]="features()[field.key] === true"
+                    (change)="setFeature(field.key, $any($event.target).checked)"
+                  />
+                  <span>
+                    <span class="block text-sm font-medium">{{ field.label }}</span>
+                    <span class="type-caption mt-0.5 block">{{ field.help }}</span>
+                  </span>
+                </label>
+              }
+            </fieldset>
+          }
         </form>
 
         <div footer class="flex w-full flex-col-reverse gap-2 sm:flex-row sm:justify-end">
@@ -417,6 +458,7 @@ export class TiersComponent implements OnInit {
   protected readonly editorMounted = signal(false);
   protected readonly drawerOpen = signal(false);
   protected readonly editing = signal<Tier | null>(null);
+  protected readonly editorSection = signal<TierEditorSection>('basics');
 
   protected readonly code = new FormControl('', { nonNullable: true });
   protected readonly name = new FormControl('', { nonNullable: true });
@@ -588,6 +630,7 @@ export class TiersComponent implements OnInit {
 
   private openEditor(): void {
     this.error.set(null);
+    this.editorSection.set('basics');
     this.editorMounted.set(true);
     this.drawerOpen.set(true);
   }
@@ -596,15 +639,18 @@ export class TiersComponent implements OnInit {
     const monthly = parseKes(this.priceMonthly.value);
     const yearly = parseKes(this.priceYearly.value);
     if (monthly === null || yearly === null) {
+      this.editorSection.set('basics');
       this.error.set('Enter valid monthly and yearly prices');
       return;
     }
     if (!this.editing() && this.code.value.trim().length === 0) {
+      this.editorSection.set('basics');
       this.error.set('A tier code is required');
       return;
     }
     const productLimit = this.limits()['max_products'] ?? 10_000;
     if (productLimit > 10_000) {
+      this.editorSection.set('limits');
       this.error.set('Product limits above 10,000 require Enterprise');
       return;
     }

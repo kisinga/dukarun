@@ -94,6 +94,53 @@ import { PageHeaderComponent } from '../../shared/ui/page-header.component';
         </div>
       </div>
 
+      <section class="mt-4">
+        <div class="mb-2 flex items-end justify-between gap-3">
+          <div>
+            <h2 class="section-title">POS health</h2>
+            <p class="type-caption mt-0.5">Browser devices reporting offline-sale status</p>
+          </div>
+        </div>
+        <div class="grid gap-4 sm:grid-cols-3">
+          <div class="card bg-base-100">
+            <div class="card-body p-5">
+              <p class="type-caption">Active devices</p>
+              <p class="type-hero mt-1 text-success">{{ s.pos_devices_active_24h }}</p>
+              <p class="mt-0.5 type-caption">
+                of {{ s.pos_devices_recent_30d }} seen in 30d ·
+                {{ s.companies_with_active_pos_30d }} companies
+              </p>
+            </div>
+          </div>
+          <div class="card bg-base-100">
+            <div class="card-body p-5">
+              <p class="type-caption">Last-reported pending sales</p>
+              <p
+                class="type-hero mt-1"
+                [class.text-warning]="s.offline_sales_last_reported_pending > 0"
+              >
+                {{ s.offline_sales_last_reported_pending }}
+              </p>
+              <p class="mt-0.5 type-caption">
+                across {{ s.pos_devices_with_last_reported_pending }} devices · excludes unreported
+                offline queues
+              </p>
+            </div>
+          </div>
+          <div class="card bg-base-100">
+            <div class="card-body p-5">
+              <p class="type-caption">Stale devices</p>
+              <p class="type-hero mt-1" [class.text-warning]="s.pos_devices_stale_30d > 0">
+                {{ s.pos_devices_stale_30d }}
+              </p>
+              <p class="mt-0.5 type-caption">
+                No heartbeat for 24h–30d · {{ s.pos_devices_dormant_30d }} dormant
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <div class="mt-7 grid gap-4 lg:grid-cols-3">
         <section class="card bg-base-100 p-5">
           <div class="flex h-full flex-col items-start gap-5">
