@@ -55,6 +55,7 @@
     "sb:studio": "open http://127.0.0.1:54323",
     "setup": "node scripts/setup.mjs",
     "deploy": "scripts/deploy-db.sh",
+    "deploy:vault": "scripts/deploy-db.sh --vault-only",
     "deploy:functions": "scripts/deploy-db.sh --functions",
     "deploy:apps": "scripts/deploy-apps.sh all",
     "deploy:apps:rollback": "scripts/deploy-apps.sh rollback",

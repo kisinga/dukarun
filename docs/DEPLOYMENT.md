@@ -10,6 +10,7 @@ TCP/Postgres; always `?sslmode=disable`). Host address lives in the gitignored
 | Command                        | What it does                                                              |
 | ------------------------------ | ------------------------------------------------------------------------- |
 | `npm run deploy`               | Apply pending DB migrations via SSH tunnel (`scripts/deploy-db.sh`)       |
+| `npm run deploy:vault`         | Sync runtime OpenWA configuration into Database Vault without migrations  |
 | `npm run deploy:functions`     | Migrations + sync edge functions into the edge-runtime volume             |
 | `npm run deploy:apps`          | Build and ship all four frontends, keeping one rollback container per app |
 | `npm run deploy:apps:rollback` | Restore the previous app container                                        |
@@ -23,6 +24,7 @@ nothing sensitive is stored in the repo.
 - [x] GoTrue hooks + SMS provider env (send_sms → TextSMS via vault, custom_access_token)
 - [x] SMS login OTP validity set to five minutes (`GOTRUE_SMS_OTP_EXP=300`)
 - [x] Vault secrets: `TEXTSMS_API_KEY`, `TEXTSMS_PARTNER_ID`, `TEXTSMS_SHORTCODE`,
+      `OPENWA_BASE_URL`, `OPENWA_API_KEY`, `OPENWA_SESSION`,
       `SUPABASE_SERVICE_ROLE_KEY`, `NOTIFY_FLUSH_URL`, `SITE_DEPLOY_URL`
 - [x] Edge functions deployed: paystack-charge, paystack-webhook, notification-flush,
       platform-message-test, public-content-renderer, site-deploy, _shared
@@ -31,6 +33,18 @@ nothing sensitive is stored in the repo.
 - [x] Commissioning hardening migration `0023` applied (2026-08-06)
 - [x] R2 restore drill completed in a disposable Supabase Postgres container
       (11 companies, 1,516 orders, balanced ledger)
+
+### Runtime secret source of truth
+
+The Coolify Supabase service environment is the source of truth for
+`OPENWA_BASE_URL`, `OPENWA_API_KEY`, and `OPENWA_SESSION`. Edge Functions read
+those values directly for normal WhatsApp messages. The Postgres auth hook
+cannot read the Edge runtime environment, so every database deployment projects
+the same values into Database Vault for parallel WhatsApp OTP delivery.
+
+Run `npm run deploy:vault` to repair or rotate only that projection without
+applying migrations. The command fails closed if the required OpenWA runtime
+configuration is absent and never prints the secret values.
 
 ## Remaining
 
