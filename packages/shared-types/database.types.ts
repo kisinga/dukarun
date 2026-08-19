@@ -4013,6 +4013,96 @@ export type Database = {
           },
         ]
       }
+      legacy_customer_account_reconciliations: {
+        Row: {
+          amount: number
+          company_id: string
+          created_at: string
+          customer_id: string
+          id: string
+          ledger_balance: number
+          prior_document_balance: number
+          reason: string
+        }
+        Insert: {
+          amount: number
+          company_id: string
+          created_at?: string
+          customer_id: string
+          id?: string
+          ledger_balance: number
+          prior_document_balance: number
+          reason: string
+        }
+        Update: {
+          amount?: number
+          company_id?: string
+          created_at?: string
+          customer_id?: string
+          id?: string
+          ledger_balance?: number
+          prior_document_balance?: number
+          reason?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "legacy_customer_account_reconciliations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "legacy_customer_account_reconciliations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "legacy_customer_account_reconciliations_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: true
+            referencedRelation: "customer_account_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "legacy_customer_account_reconciliations_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: true
+            referencedRelation: "customer_ar_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "legacy_customer_account_reconciliations_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: true
+            referencedRelation: "customer_deposit_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "legacy_customer_account_reconciliations_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: true
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "legacy_customer_account_reconciliations_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: true
+            referencedRelation: "supplier_advance_balances"
+            referencedColumns: ["supplier_id"]
+          },
+          {
+            foreignKeyName: "legacy_customer_account_reconciliations_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: true
+            referencedRelation: "supplier_ap_balances"
+            referencedColumns: ["supplier_id"]
+          },
+        ]
+      }
       legal_document_versions: {
         Row: {
           content_markdown: string | null
@@ -5707,8 +5797,6 @@ export type Database = {
           source: string
           status: string
           subject: string | null
-          subscription_expires_at_snapshot: string | null
-          subscription_reminder_stage: number | null
           team_invitation_id: string | null
           template_key: string | null
           template_version: number | null
@@ -5744,8 +5832,6 @@ export type Database = {
           source?: string
           status?: string
           subject?: string | null
-          subscription_expires_at_snapshot?: string | null
-          subscription_reminder_stage?: number | null
           team_invitation_id?: string | null
           template_key?: string | null
           template_version?: number | null
@@ -5781,8 +5867,6 @@ export type Database = {
           source?: string
           status?: string
           subject?: string | null
-          subscription_expires_at_snapshot?: string | null
-          subscription_reminder_stage?: number | null
           team_invitation_id?: string | null
           template_key?: string | null
           template_version?: number | null
@@ -12869,21 +12953,6 @@ export type Database = {
       }
       queue_mpesa_processor: { Args: never; Returns: undefined }
       queue_sms_fallback: { Args: { p_outbox_id: string }; Returns: string }
-      queue_subscription_reminder_outbox: {
-        Args: {
-          p_body: string
-          p_channel: string
-          p_company_id: string
-          p_dedupe_key: string
-          p_expiry: string
-          p_recipient: string
-          p_sms_fallback: string
-          p_stage: number
-          p_subject: string
-          p_template_key: string
-        }
-        Returns: string
-      }
       queue_team_outbox: {
         Args: {
           p_body: string
@@ -13609,7 +13678,6 @@ export type Database = {
         }[]
       }
       subscription_expiry_scan: { Args: never; Returns: number }
-      subscription_lifecycle_scan: { Args: never; Returns: Json }
       supplier_account_status: {
         Args: { p_supplier_id: string }
         Returns: {
