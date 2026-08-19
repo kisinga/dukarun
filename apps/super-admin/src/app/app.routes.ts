@@ -26,6 +26,14 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/tiers/tiers.component').then(m => m.TiersComponent),
       },
       {
+        path: 'tax',
+        loadComponent: () => import('./pages/tax/tax.component').then(m => m.TaxComponent),
+      },
+      {
+        path: 'mpesa',
+        loadComponent: () => import('./pages/mpesa/mpesa.component').then(m => m.MpesaComponent),
+      },
+      {
         path: 'communications',
         loadComponent: () =>
           import('./pages/communications/communications.component').then(

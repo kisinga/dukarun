@@ -216,6 +216,15 @@ select ok(
   'matching zero balance can be verified without a reason'
 );
 
+select public.sign_off_business_day(d.entry_date)
+from (
+  select distinct entry_date
+  from public.ledger_journal_entries
+  where company_id=(select company_id from reconciliation_company)
+    and finalized_at is not null
+    and entry_date<=current_date
+) d;
+
 select ok(
   public.close_accounting_period(current_date) is not null,
   'system-controlled customer credit does not block period closing'

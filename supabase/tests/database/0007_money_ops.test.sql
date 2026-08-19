@@ -93,7 +93,7 @@ where company_id = (select company_id from mops_company) and status = 'completed
 limit 1;
 
 create temp table ref1 as
-select (public.post_refund((select order_id from sale_m), 20000, 'cash', 'defective')
+select (public.post_full_refund((select order_id from sale_m), 'cash', 'defective', 'write_off')
   ->> 'resource_id')::uuid as entry_id;
 
 select results_eq(
@@ -103,9 +103,9 @@ select results_eq(
     where l.entry_id = (select entry_id from ref1)
     order by a.code$$,
   $$values
-    ('CASH_ON_HAND', 0::bigint, 20000::bigint),
-    ('SALES_RETURNS', 20000::bigint, 0::bigint)$$,
-  'refund posts DR SALES_RETURNS / CR clearing'
+    ('CASH_ON_HAND', 0::bigint, 100000::bigint),
+    ('SALES_RETURNS', 100000::bigint, 0::bigint)$$,
+  'full credit note posts DR SALES_RETURNS / CR clearing'
 );
 
 select is(
@@ -141,9 +141,11 @@ select is(
 );
 
 select throws_ok(
-  $$select public.post_refund((select order_id from sale_m), 1, 'cash', 'after reversal')$$,
-  'P0001', 'refund_exceeds_collected: refundable amount is 0',
-  'a reversed payment cannot fund another cash refund'
+  $$select public.post_full_refund(
+    (select order_id from sale_m), 'cash', 'after reversal', 'write_off'
+  )$$,
+  'P0001', 'sale_already_refunded',
+  'a completed sale cannot receive a second credit note'
 );
 
 select is(

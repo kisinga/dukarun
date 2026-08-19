@@ -77,6 +77,21 @@ export interface ExternalDocument {
   lines: ExternalDocumentLine[];
   payments: ExternalDocumentPayment[];
   expires_at: string;
+  show_vat_breakdown?: boolean;
+  vat_registered?: boolean;
+  tax_registration_number?: string | null;
+  tax_document_number?: string | null;
+  gross_total?: number;
+  net_total?: number;
+  tax_total?: number;
+  tax_breakdown?: Array<{
+    code: string;
+    classification: string;
+    rate_bps: number;
+    gross: number;
+    net: number;
+    tax: number;
+  }>;
 }
 
 const DIRECTORY_KEY = makeStateKey<StorefrontInfo[]>('storefront:directory');

@@ -41,6 +41,9 @@ import { ScanFeedbackService } from '../../shared/ui/scan-feedback.service';
 import { isRapidScannerBurst, isTextEntryTarget } from '../keyboard-wedge';
 import { CatalogCacheService } from '../../core/catalog-cache.service';
 import { SupabaseService } from '../../core/supabase.service';
+import { MpesaService } from '../../core/mpesa.service';
+import { MpesaCheckoutCoordinator } from '../../core/mpesa-checkout-coordinator.service';
+import { LocationContextService } from '../../core/location-context.service';
 import {
   Customer,
   CustomerWithCredit,
@@ -959,6 +962,9 @@ type CatalogView = 'grid' | 'list' | 'categories';
           [canUseDirectAccounts]="canUseDirectAccounts()"
           [customerDepositAvailable]="customerDepositBalance()"
           [allowCredit]="mixedCreditAllowed()"
+          [mpesaStkEnabled]="mpesa.availability().active"
+          [mpesaManualFallback]="mpesa.availability().manualFallback"
+          [defaultPayerPhone]="selectedCustomer()?.phone ?? ''"
           [busy]="busy()"
           heading="Take payment"
           (confirmed)="completeSale($event)"
@@ -966,6 +972,31 @@ type CatalogView = 'grid' | 'list' | 'categories';
           (settlementConfirmed)="completeSaleWithSettlement($event)"
           (cancelled)="checkoutOpen.set(false)"
         />
+      }
+      @if (mpesaSplitReady(); as split) {
+        <dialog class="modal modal-open" aria-labelledby="mpesa-cash-heading">
+          <div class="modal-box">
+            <h2 id="mpesa-cash-heading" class="type-title">M-PESA received</h2>
+            <p class="mt-2 text-sm">Confirm the remaining cash only after you have it in hand.</p>
+            <div class="mt-4 rounded-box bg-base-200 p-3">
+              <span class="type-caption">Cash due</span>
+              <p class="text-xl font-semibold"><app-money [amount]="split.cashAmount" /></p>
+            </div>
+            <div class="modal-action">
+              <button
+                appButton
+                variant="ghost"
+                [disabled]="busy()"
+                (click)="keepMpesaSplitPending()"
+              >
+                Keep pending
+              </button>
+              <button appButton [loading]="busy()" (click)="confirmMpesaSplitCash()">
+                Confirm cash received
+              </button>
+            </div>
+          </div>
+        </dialog>
       }
       @if (creditConfirmOpen()) {
         <dialog
@@ -1161,6 +1192,9 @@ export class SellComponent implements OnInit {
   private readonly scanFeedback = inject(ScanFeedbackService);
   protected readonly catalogCache = inject(CatalogCacheService);
   private readonly supabase = inject(SupabaseService);
+  protected readonly mpesa = inject(MpesaService);
+  private readonly mpesaCheckout = inject(MpesaCheckoutCoordinator);
+  private readonly locations = inject(LocationContextService);
 
   protected readonly search = new FormControl('', { nonNullable: true });
   private readonly productSearch = viewChild<ElementRef<HTMLInputElement>>('productSearch');
@@ -1278,6 +1312,12 @@ export class SellComponent implements OnInit {
   } | null>(null);
 
   protected readonly checkoutOpen = signal(false);
+  protected readonly mpesaSplitReady = signal<{
+    intentId: string;
+    orderId: string;
+    cashPayments: PaymentInput[];
+    cashAmount: number;
+  } | null>(null);
   protected readonly customerDepositBalance = signal(0);
   protected readonly clearCartArmed = signal(false);
   protected readonly creditConfirmOpen = signal(false);
@@ -1337,7 +1377,11 @@ export class SellComponent implements OnInit {
   );
   protected readonly approvalSent = signal(false);
   private approvalSentTimer: ReturnType<typeof setTimeout> | null = null;
-  private saleAttempt: { fingerprint: string; clientRef: string } | null = null;
+  private saleAttempt: {
+    fingerprint: string;
+    clientRef: string;
+    mpesaRetryAllowed: boolean;
+  } | null = null;
   private searchSeq = 0;
   private barcodeQueue: Promise<void> = Promise.resolve();
   private searchKeystrokes: number[] = [];
@@ -1372,6 +1416,7 @@ export class SellComponent implements OnInit {
     this.restoreCatalogView();
     void this.sync.paymentMethods().then(methods => this.methods.set(methods));
     void this.receiptData.printerEnabled().then(enabled => this.printerEnabled.set(enabled));
+    void this.mpesa.refreshAvailability();
     void this.sync
       .topVariants(8)
       .then(variants => this.topVariants.set(variants))
@@ -1848,10 +1893,23 @@ export class SellComponent implements OnInit {
     // payload changes so an edited cart cannot replay an earlier completion.
     const fingerprint = JSON.stringify({ customerId, lines, payments, settlement });
     if (this.saleAttempt?.fingerprint !== fingerprint) {
-      this.saleAttempt = { fingerprint, clientRef: crypto.randomUUID() };
+      this.saleAttempt = {
+        fingerprint,
+        clientRef: crypto.randomUUID(),
+        mpesaRetryAllowed: false,
+      };
     }
     const clientRef = this.saleAttempt.clientRef;
     if (!this.connectivity.online()) {
+      if (
+        payments.some(payment => payment.method === 'mpesa') &&
+        (this.mpesa.availability().active || this.mpesa.availability().manualFallback)
+      ) {
+        this.error.set('Integrated M-PESA payment requires an internet connection.');
+        this.checkoutOpen.set(false);
+        this.busy.set(false);
+        return;
+      }
       if (settlement) {
         this.error.set('Customer deposits and mixed credit require an online connection.');
         this.checkoutOpen.set(false);
@@ -1863,6 +1921,23 @@ export class SellComponent implements OnInit {
         this.saleAttempt = null;
       } catch (err) {
         this.error.set(err instanceof Error ? err.message : 'Could not safely queue the sale');
+      } finally {
+        this.busy.set(false);
+      }
+      return;
+    }
+    const mpesaPayment = payments.find(
+      payment =>
+        payment.method === 'mpesa' &&
+        (payment.phone || (this.mpesa.availability().manualFallback && payment.reference))
+    );
+    if (mpesaPayment && !settlement) {
+      try {
+        await this.completeMpesaSale(mpesaPayment, payments, customerId, lines, clientRef);
+      } catch (err) {
+        this.error.set(
+          err instanceof Error ? err.message : 'M-PESA payment could not be completed'
+        );
       } finally {
         this.busy.set(false);
       }
@@ -1948,6 +2023,101 @@ export class SellComponent implements OnInit {
     }
   }
 
+  private async completeMpesaSale(
+    mpesaPayment: PaymentInput,
+    payments: PaymentInput[],
+    customerId: string | null,
+    lines: ReturnType<CartService['toSaleLines']>,
+    clientRef: string
+  ): Promise<void> {
+    const cashPayments = payments
+      .filter(payment => payment !== mpesaPayment)
+      .map(({ phone: _phone, ...payment }) => payment);
+    this.checkoutOpen.set(false);
+    this.notice.set(
+      mpesaPayment.phone
+        ? 'STK prompt sent. Waiting for M-PESA confirmation.'
+        : 'Checking the M-PESA receipt.'
+    );
+    const outcome = await this.mpesaCheckout.run(
+      retry =>
+        this.mpesa.initiateSale({
+          locationId: this.locations.requireActiveId(),
+          customerId,
+          lines,
+          mpesaAmount: mpesaPayment.amount,
+          cashAmount: cashPayments.reduce((sum, payment) => sum + payment.amount, 0),
+          clientRef,
+          draftId: this.cart.draftId() ?? undefined,
+          retry,
+          ...(mpesaPayment.phone
+            ? { phone: mpesaPayment.phone }
+            : { receipt: mpesaPayment.reference! }),
+        }),
+      this.saleAttempt?.mpesaRetryAllowed ?? false
+    );
+    if (outcome.kind === 'completed') {
+      this.finishMpesaSale(outcome.subjectId);
+      return;
+    }
+    if (outcome.kind === 'awaiting_cash') {
+      this.mpesaSplitReady.set({
+        intentId: outcome.intentId,
+        orderId: outcome.subjectId,
+        cashPayments,
+        cashAmount: outcome.cashAmount,
+      });
+      this.notice.set('M-PESA received. Confirm the cash side to finish the sale.');
+      return;
+    }
+    if (outcome.kind === 'manual_review') {
+      this.finishMpesaSale(outcome.subjectId, true);
+      this.error.set(outcome.message);
+      return;
+    }
+    if (outcome.kind === 'failed' && outcome.retryAllowed && this.saleAttempt) {
+      this.saleAttempt.mpesaRetryAllowed = true;
+    }
+    throw new Error(outcome.message);
+  }
+
+  protected async confirmMpesaSplitCash(): Promise<void> {
+    const split = this.mpesaSplitReady();
+    if (!split) return;
+    this.busy.set(true);
+    this.error.set(null);
+    try {
+      await this.mpesaCheckout.finalizeCash(split.intentId);
+      this.mpesaSplitReady.set(null);
+      this.finishMpesaSale(split.orderId);
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Could not finish split payment');
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected keepMpesaSplitPending(): void {
+    const split = this.mpesaSplitReady();
+    if (!split) return;
+    this.mpesaSplitReady.set(null);
+    this.finishMpesaSale(split.orderId, true);
+    this.notice.set('M-PESA is recorded. The cash balance remains in pending sales.');
+  }
+
+  private finishMpesaSale(orderId: string, warning = false): void {
+    this.checkoutOpen.set(false);
+    this.cart.clear();
+    this.saleAttempt = null;
+    this.selectedCustomer.set(null);
+    this.customerDepositBalance.set(0);
+    this.success.set({
+      text: warning ? 'Payment received — review needed' : 'Sale completed',
+      tone: warning ? 'warning' : 'success',
+      orderId,
+    });
+  }
+
   private async refreshCustomerDeposit(customerId: string): Promise<void> {
     if (!this.connectivity.online()) {
       this.customerDepositBalance.set(0);
@@ -1987,7 +2157,11 @@ export class SellComponent implements OnInit {
     const lines = this.cart.toSaleLines();
     const fingerprint = JSON.stringify({ customerId, lines, kind: 'automatic-credit' });
     if (this.saleAttempt?.fingerprint !== fingerprint) {
-      this.saleAttempt = { fingerprint, clientRef: crypto.randomUUID() };
+      this.saleAttempt = {
+        fingerprint,
+        clientRef: crypto.randomUUID(),
+        mpesaRetryAllowed: false,
+      };
     }
     this.busy.set(true);
     try {

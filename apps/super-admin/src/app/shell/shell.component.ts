@@ -136,6 +136,8 @@ export class ShellComponent {
       items: [
         { route: '/companies', label: 'Companies', icon: 'heroBuildingOffice2' },
         { route: '/tiers', label: 'Subscription tiers', icon: 'heroChartBar' },
+        { route: '/tax', label: 'VAT catalog', icon: 'heroDocumentText' },
+        { route: '/mpesa', label: 'M-PESA', icon: 'heroServerStack' },
       ],
     },
     {

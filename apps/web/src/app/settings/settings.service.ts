@@ -7,6 +7,7 @@ export type PaymentMethodRow = Database['public']['Tables']['payment_methods']['
 export type StockLocationRow = Database['public']['Tables']['stock_locations']['Row'];
 export type LocationPaymentMethodRow =
   Database['public']['Tables']['location_payment_methods']['Row'];
+export type MoneyAccountRow = Database['public']['Tables']['ledger_accounts']['Row'];
 export type ReminderRule = Database['public']['Tables']['payment_reminder_rules']['Row'];
 export type PrimaryContactNotificationChannel =
   'whatsapp_sms_fallback' | 'whatsapp' | 'sms' | 'none';
@@ -139,7 +140,7 @@ export class SettingsService {
     const { data, error } = await this.db
       .from('payment_methods')
       .select(
-        'id, code, name, enabled, requires_reconciliation, is_cashier_controlled, availability_scope'
+        'id, code, name, ledger_account_code, reconciliation_type, enabled, requires_reconciliation, is_cashier_controlled, availability_scope'
       )
       .order('code');
     if (error) throw error;
@@ -185,6 +186,51 @@ export class SettingsService {
       ...(changes.is_cashier_controlled !== undefined
         ? { p_is_cashier_controlled: changes.is_cashier_controlled }
         : {}),
+    });
+    if (error) throw rpcError(error);
+  }
+
+  async moneyAccounts(): Promise<MoneyAccountRow[]> {
+    const { data, error } = await this.db
+      .from('ledger_accounts')
+      .select('*')
+      .not('money_account_kind', 'is', null)
+      .order('money_account_kind')
+      .order('name');
+    if (error) throw error;
+    return data;
+  }
+
+  async createMoneyAccount(kind: 'bank' | 'mpesa', name: string): Promise<string> {
+    const { data, error } = await this.db.rpc('create_money_account', {
+      p_kind: kind,
+      p_name: name,
+    });
+    if (error) throw rpcError(error);
+    return data;
+  }
+
+  async updateMoneyAccount(
+    accountId: string,
+    changes: { name?: string; isActive?: boolean }
+  ): Promise<void> {
+    const { error } = await this.db.rpc('update_money_account', {
+      p_account_id: accountId,
+      p_name: changes.name,
+      p_is_active: changes.isActive,
+    });
+    if (error) throw rpcError(error);
+  }
+
+  async setLocationPaymentAccount(
+    locationId: string,
+    methodCode: 'bank' | 'mpesa',
+    accountCode: string
+  ): Promise<void> {
+    const { error } = await this.db.rpc('set_location_payment_account', {
+      p_location_id: locationId,
+      p_method_code: methodCode,
+      p_account_code: accountCode,
     });
     if (error) throw rpcError(error);
   }

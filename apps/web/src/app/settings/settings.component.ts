@@ -1,6 +1,6 @@
 import { Component, DestroyRef, OnInit, computed, inject, signal, viewChild } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormControl, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { formatKesInput, parseKes } from '../core/money';
 import { reconciliationLabel } from '../core/payment-methods';
@@ -11,6 +11,7 @@ import {
   CompanySettings,
   PaymentMethodRow,
   LocationPaymentMethodRow,
+  MoneyAccountRow,
   PrimaryContactNotificationChannel,
   PrimaryContactNotificationSettings,
   SettingsService,
@@ -35,9 +36,10 @@ import {
 } from '../products/product-transfer.service';
 import { CachedDataExportService, type CachedExportKind } from './cached-data-export.service';
 import { TaxSettingsComponent } from './tax-settings.component';
+import { MpesaSettingsComponent } from './mpesa-settings.component';
 
 type SectionKey = 'profile' | 'pos' | 'inventory' | 'cash';
-type SettingsTab = 'business' | 'operations' | 'money' | 'communications' | 'data';
+type SettingsTab = 'business' | 'operations' | 'money' | 'mpesa' | 'communications' | 'data';
 type ReminderDraft = {
   stageDays: number;
   enabled: boolean;
@@ -49,6 +51,7 @@ const SETTINGS_TABS: ReadonlyArray<{ key: SettingsTab; label: string }> = [
   { key: 'business', label: 'Business' },
   { key: 'operations', label: 'Operations' },
   { key: 'money', label: 'Money' },
+  { key: 'mpesa', label: 'M-PESA' },
   { key: 'communications', label: 'Notifications' },
   { key: 'data', label: 'Data' },
 ];
@@ -56,6 +59,7 @@ const SETTINGS_TABS: ReadonlyArray<{ key: SettingsTab; label: string }> = [
 @Component({
   selector: 'app-settings',
   imports: [
+    FormsModule,
     ReactiveFormsModule,
     RouterLink,
     PageLayoutComponent,
@@ -67,6 +71,7 @@ const SETTINGS_TABS: ReadonlyArray<{ key: SettingsTab; label: string }> = [
     MobileListComponent,
     ProductImportDialogComponent,
     TaxSettingsComponent,
+    MpesaSettingsComponent,
   ],
   template: `
     <app-page title="Settings">
@@ -649,6 +654,10 @@ const SETTINGS_TABS: ReadonlyArray<{ key: SettingsTab; label: string }> = [
             </div>
           }
 
+          @if (activeTab() === 'mpesa') {
+            <app-mpesa-settings />
+          }
+
           @if (activeTab() === 'money') {
             <app-tax-settings />
 
@@ -984,6 +993,182 @@ const SETTINGS_TABS: ReadonlyArray<{ key: SettingsTab; label: string }> = [
           }
 
           @if (activeTab() === 'money' && perms.has('ManageReconciliation')) {
+            <div class="card bg-base-100">
+              <div class="card-body p-4">
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h2 class="section-title">Payment accounts</h2>
+                    <p class="type-caption mt-1">
+                      Checkout uses each location's default automatically. Cashiers can change it
+                      when another active account is appropriate.
+                    </p>
+                  </div>
+                  <div class="flex gap-2">
+                    <button
+                      appButton
+                      variant="outline"
+                      size="sm"
+                      type="button"
+                      (click)="startMoneyAccount('mpesa')"
+                    >
+                      Add M-PESA
+                    </button>
+                    <button
+                      appButton
+                      variant="outline"
+                      size="sm"
+                      type="button"
+                      (click)="startMoneyAccount('bank')"
+                    >
+                      Add bank
+                    </button>
+                  </div>
+                </div>
+
+                @if (addingMoneyKind() || editingMoneyAccount()) {
+                  <div class="mt-4 rounded-box border border-base-300 bg-base-200/40 p-3">
+                    <p class="type-heading">
+                      {{
+                        editingMoneyAccount()
+                          ? 'Rename account'
+                          : 'Add ' + moneyKindLabel(addingMoneyKind()!) + ' account'
+                      }}
+                    </p>
+                    <div class="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
+                      <app-form-field
+                        class="flex-1"
+                        label="Account name"
+                        hint="Use a recognizable label, such as Equity Westlands or Till 123456."
+                      >
+                        <input
+                          class="input input-bordered min-h-11 w-full"
+                          [formControl]="moneyAccountName"
+                          maxlength="100"
+                        />
+                      </app-form-field>
+                      <div class="flex gap-2">
+                        <button
+                          appButton
+                          type="button"
+                          [loading]="busy()"
+                          [disabled]="moneyAccountName.invalid"
+                          (click)="saveMoneyAccount()"
+                        >
+                          Save account
+                        </button>
+                        <button
+                          appButton
+                          variant="ghost"
+                          type="button"
+                          (click)="cancelMoneyAccountEdit()"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                }
+
+                <div class="mt-4 grid gap-4 lg:grid-cols-2">
+                  @for (kind of moneyAccountKinds; track kind) {
+                    <section class="rounded-box border border-base-300/70 p-3">
+                      <div class="flex items-center justify-between gap-2">
+                        <h3 class="type-heading">{{ moneyKindLabel(kind) }}</h3>
+                        <span class="badge badge-ghost"
+                          >{{ activeMoneyAccounts(kind).length }} active</span
+                        >
+                      </div>
+                      <div class="mt-2 divide-y divide-base-300/60">
+                        @for (account of moneyAccountsFor(kind); track account.id) {
+                          <div class="flex min-h-12 items-center justify-between gap-3 py-2">
+                            <div class="min-w-0">
+                              <p
+                                class="truncate font-medium"
+                                [class.text-base-content/50]="!account.is_active"
+                              >
+                                {{ account.name }}
+                              </p>
+                              <p class="type-caption">
+                                {{
+                                  account.is_active
+                                    ? defaultLocationLabel(account.code)
+                                    : 'Archived'
+                                }}
+                              </p>
+                            </div>
+                            <div class="flex shrink-0 gap-1">
+                              <button
+                                appButton
+                                variant="ghost"
+                                size="sm"
+                                type="button"
+                                (click)="editMoneyAccount(account)"
+                              >
+                                Rename
+                              </button>
+                              <button
+                                appButton
+                                variant="ghost"
+                                size="sm"
+                                type="button"
+                                [disabled]="busy()"
+                                (click)="toggleMoneyAccount(account)"
+                              >
+                                {{ account.is_active ? 'Archive' : 'Restore' }}
+                              </button>
+                            </div>
+                          </div>
+                        } @empty {
+                          <p class="type-caption py-3">No accounts yet.</p>
+                        }
+                      </div>
+                    </section>
+                  }
+                </div>
+
+                <div class="mt-5 border-t border-base-300/60 pt-4">
+                  <h3 class="type-heading">Location defaults</h3>
+                  <p class="type-caption mt-1">
+                    These are preselected at checkout and used by automated M-PESA payments.
+                  </p>
+                  <div class="mt-3 grid gap-3">
+                    @for (location of locations(); track location.id) {
+                      <div
+                        class="grid items-center gap-3 rounded-box bg-base-200/50 p-3 sm:grid-cols-[minmax(8rem,1fr)_1fr_1fr]"
+                      >
+                        <p class="font-medium">{{ location.name }}</p>
+                        @for (kind of moneyAccountKinds; track kind) {
+                          <app-form-field [label]="moneyKindLabel(kind)">
+                            <select
+                              class="select select-bordered min-h-11 w-full"
+                              [ngModel]="locationDefaultCode(location.id, kind)"
+                              [ngModelOptions]="{ standalone: true }"
+                              [disabled]="busy() || activeMoneyAccounts(kind).length === 0"
+                              (ngModelChange)="setLocationDefault(location.id, kind, $event)"
+                            >
+                              @for (account of activeMoneyAccounts(kind); track account.id) {
+                                <option [value]="account.code">{{ account.name }}</option>
+                              }
+                            </select>
+                          </app-form-field>
+                        }
+                      </div>
+                    }
+                  </div>
+                </div>
+
+                @if (pmMsg(); as message) {
+                  <p
+                    class="mt-3 text-sm"
+                    [class.text-success]="message.ok"
+                    [class.text-error]="!message.ok"
+                  >
+                    {{ message.text }}
+                  </p>
+                }
+              </div>
+            </div>
+
             <div class="card bg-base-100">
               <div class="card-body p-4">
                 <div class="flex items-center justify-between">
@@ -1437,9 +1622,10 @@ export class SettingsComponent implements OnInit {
   protected readonly settingsTabs = computed(() =>
     SETTINGS_TABS.filter(
       tab =>
-        tab.key !== 'communications' ||
-        this.perms.has('ManageCommunications') ||
-        this.perms.has('ManageTeam')
+        (tab.key !== 'communications' ||
+          this.perms.has('ManageCommunications') ||
+          this.perms.has('ManageTeam')) &&
+        (tab.key !== 'mpesa' || this.perms.has('ManageMpesaIntegration'))
     )
   );
   protected readonly activeTab = signal<SettingsTab>('business');
@@ -1462,6 +1648,14 @@ export class SettingsComponent implements OnInit {
   protected readonly primaryContactLoadError = signal<string | null>(null);
   protected readonly paymentMethods = signal<PaymentMethodRow[]>([]);
   protected readonly paymentMethodAssignments = signal<LocationPaymentMethodRow[]>([]);
+  protected readonly moneyAccounts = signal<MoneyAccountRow[]>([]);
+  protected readonly editingMoneyAccount = signal<MoneyAccountRow | null>(null);
+  protected readonly addingMoneyKind = signal<'bank' | 'mpesa' | null>(null);
+  protected readonly moneyAccountName = new FormControl('', {
+    nonNullable: true,
+    validators: [Validators.required, Validators.minLength(2), Validators.maxLength(100)],
+  });
+  protected readonly moneyAccountKinds = ['mpesa', 'bank'] as const;
   protected readonly locations = signal<StockLocationRow[]>([]);
   protected readonly loadError = signal<string | null>(null);
   protected readonly busy = signal(false);
@@ -1533,7 +1727,11 @@ export class SettingsComponent implements OnInit {
     this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(params => {
       const requested = params.get('tab') as SettingsTab | null;
       this.activeTab.set(
-        requested && SETTINGS_TABS.some(tab => tab.key === requested) ? requested : 'business'
+        requested &&
+          SETTINGS_TABS.some(tab => tab.key === requested) &&
+          (requested !== 'mpesa' || this.perms.has('ManageMpesaIntegration'))
+          ? requested
+          : 'business'
       );
     });
   }
@@ -1614,6 +1812,7 @@ export class SettingsComponent implements OnInit {
         paymentAssignments,
         reminderConfiguration,
         primaryContactSettings,
+        moneyAccounts,
       ] = await Promise.all([
         this.settingsService.getSettings(),
         this.settingsService.paymentMethods(),
@@ -1621,11 +1820,13 @@ export class SettingsComponent implements OnInit {
         this.settingsService.paymentMethodLocations(),
         this.settingsService.reminderConfiguration(),
         primarySettings,
+        this.settingsService.moneyAccounts(),
         this.entitlements.refresh(),
       ]);
       this.settings.set(settings);
       this.primaryContactSettings.set(primaryContactSettings);
       this.paymentMethods.set(methods);
+      this.moneyAccounts.set(moneyAccounts);
       this.locations.set(locations);
       this.paymentMethodAssignments.set(paymentAssignments);
       this.name.setValue(settings.name);
@@ -2073,6 +2274,123 @@ export class SettingsComponent implements OnInit {
         assignment.location_id === locationId &&
         assignment.enabled
     );
+  }
+
+  protected moneyKindLabel(kind: 'bank' | 'mpesa'): string {
+    return kind === 'mpesa' ? 'M-PESA' : 'Bank';
+  }
+
+  protected moneyAccountsFor(kind: 'bank' | 'mpesa'): MoneyAccountRow[] {
+    return this.moneyAccounts()
+      .filter(account => account.money_account_kind === kind)
+      .sort((a, b) => Number(b.is_active) - Number(a.is_active) || a.name.localeCompare(b.name));
+  }
+
+  protected activeMoneyAccounts(kind: 'bank' | 'mpesa'): MoneyAccountRow[] {
+    return this.moneyAccountsFor(kind).filter(account => account.is_active);
+  }
+
+  protected locationDefaultCode(locationId: string, kind: 'bank' | 'mpesa'): string {
+    const method = this.paymentMethods().find(item => item.code === kind);
+    if (!method) return '';
+    return (
+      this.paymentMethodAssignments().find(
+        assignment =>
+          assignment.location_id === locationId && assignment.payment_method_id === method.id
+      )?.ledger_account_code ?? method.ledger_account_code
+    );
+  }
+
+  protected defaultLocationLabel(accountCode: string): string {
+    const defaults = this.locations().filter(location =>
+      this.moneyAccountKinds.some(
+        kind => this.locationDefaultCode(location.id, kind) === accountCode
+      )
+    );
+    if (defaults.length === 0) return 'Available at checkout';
+    if (defaults.length === this.locations().length) return 'Default at all locations';
+    return `Default at ${defaults.length} location${defaults.length === 1 ? '' : 's'}`;
+  }
+
+  protected startMoneyAccount(kind: 'bank' | 'mpesa'): void {
+    this.editingMoneyAccount.set(null);
+    this.addingMoneyKind.set(kind);
+    this.moneyAccountName.setValue('');
+  }
+
+  protected editMoneyAccount(account: MoneyAccountRow): void {
+    this.addingMoneyKind.set(null);
+    this.editingMoneyAccount.set(account);
+    this.moneyAccountName.setValue(account.name);
+  }
+
+  protected cancelMoneyAccountEdit(): void {
+    this.addingMoneyKind.set(null);
+    this.editingMoneyAccount.set(null);
+    this.moneyAccountName.setValue('');
+  }
+
+  protected async saveMoneyAccount(): Promise<void> {
+    if (this.moneyAccountName.invalid) return;
+    const name = this.moneyAccountName.value.trim();
+    const editing = this.editingMoneyAccount();
+    const kind = this.addingMoneyKind();
+    if (!editing && !kind) return;
+    this.busy.set(true);
+    this.pmMsg.set(null);
+    try {
+      if (editing) {
+        await this.settingsService.updateMoneyAccount(editing.id, { name });
+      } else {
+        await this.settingsService.createMoneyAccount(kind!, name);
+      }
+      this.moneyAccounts.set(await this.settingsService.moneyAccounts());
+      this.cancelMoneyAccountEdit();
+      this.pmMsg.set({ ok: true, text: editing ? 'Account renamed' : 'Account created' });
+    } catch (err) {
+      this.pmMsg.set({ ok: false, text: err instanceof Error ? err.message : 'Save failed' });
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected async toggleMoneyAccount(account: MoneyAccountRow): Promise<void> {
+    this.busy.set(true);
+    this.pmMsg.set(null);
+    try {
+      await this.settingsService.updateMoneyAccount(account.id, { isActive: !account.is_active });
+      this.moneyAccounts.set(await this.settingsService.moneyAccounts());
+      this.pmMsg.set({
+        ok: true,
+        text: account.is_active ? 'Account archived' : 'Account restored',
+      });
+    } catch (err) {
+      this.pmMsg.set({
+        ok: false,
+        text: err instanceof Error ? err.message : 'Account update failed',
+      });
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected async setLocationDefault(
+    locationId: string,
+    kind: 'bank' | 'mpesa',
+    accountCode: string
+  ): Promise<void> {
+    if (!accountCode || accountCode === this.locationDefaultCode(locationId, kind)) return;
+    this.busy.set(true);
+    this.pmMsg.set(null);
+    try {
+      await this.settingsService.setLocationPaymentAccount(locationId, kind, accountCode);
+      this.paymentMethodAssignments.set(await this.settingsService.paymentMethodLocations());
+      this.pmMsg.set({ ok: true, text: `${this.moneyKindLabel(kind)} default updated` });
+    } catch (err) {
+      this.pmMsg.set({ ok: false, text: err instanceof Error ? err.message : 'Update failed' });
+    } finally {
+      this.busy.set(false);
+    }
   }
 
   /** Human label for a payment method's reconciliation type (settings list). */

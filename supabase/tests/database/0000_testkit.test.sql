@@ -92,6 +92,7 @@ returns uuid language plpgsql set search_path = '' as $$
 declare
   v_company_id uuid := public.current_company_id();
   v_session_id uuid;
+  v_location_id uuid;
   v_declarations jsonb;
 begin
   select s.id into v_session_id
@@ -102,19 +103,15 @@ begin
     return v_session_id;
   end if;
 
-  select coalesce(
-    jsonb_agg(jsonb_build_object(
-      'account_code', pm.ledger_account_code,
-      'declared', public.account_balance(v_company_id, pm.ledger_account_code)
-    )),
-    '[]'::jsonb
-  ) into v_declarations
-  from public.payment_methods pm
-  where pm.company_id = v_company_id
-    and pm.is_cashier_controlled
-    and pm.enabled;
+  select l.id into v_location_id from public.stock_locations l
+  where l.company_id=v_company_id and l.is_active
+  order by l.is_default desc,l.created_at,l.id limit 1;
+  select coalesce(jsonb_agg(jsonb_build_object(
+    'account_code',b.account_code,'declared',b.expected_balance
+  )),'[]'::jsonb) into v_declarations
+  from public.cashier_expected_balances(v_location_id,null) b;
 
-  return public.open_cashier_session(v_declarations);
+  return public.open_cashier_session_at_location(v_location_id,v_declarations);
 end;
 $$;
 
@@ -123,9 +120,10 @@ returns uuid language plpgsql set search_path = '' as $$
 declare
   v_company_id uuid := public.current_company_id();
   v_session_id uuid;
+  v_location_id uuid;
   v_declarations jsonb;
 begin
-  select s.id into v_session_id
+  select s.id,s.location_id into v_session_id,v_location_id
   from public.cashier_sessions s
   where s.company_id = v_company_id and s.status = 'open';
 
@@ -133,17 +131,10 @@ begin
     return null;
   end if;
 
-  select coalesce(
-    jsonb_agg(jsonb_build_object(
-      'account_code', pm.ledger_account_code,
-      'declared', public.account_balance(v_company_id, pm.ledger_account_code)
-    )),
-    '[]'::jsonb
-  ) into v_declarations
-  from public.payment_methods pm
-  where pm.company_id = v_company_id
-    and pm.is_cashier_controlled
-    and pm.enabled;
+  select coalesce(jsonb_agg(jsonb_build_object(
+    'account_code',b.account_code,'declared',b.expected_balance
+  )),'[]'::jsonb) into v_declarations
+  from public.cashier_expected_balances(v_location_id,v_session_id) b;
 
   return public.close_cashier_session(v_session_id, v_declarations);
 end;

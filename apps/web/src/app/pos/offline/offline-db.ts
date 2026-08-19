@@ -50,6 +50,10 @@ export interface OutboxEntry extends ScopedRecord {
   payments: PaymentInput[];
   /** Proforma being converted — passed as p_draft_id on replay so it retires with the sale. */
   draft_id?: string | null;
+  /** Original tax point, captured before the browser queues the sale. */
+  occurred_at: string;
+  /** Stable browser-installation identifier used by period-close readiness. */
+  device_key: string;
   queued_at: string; // ISO
   status: 'queued' | 'failed';
   /** Server rejection message (P0001) when status is 'failed'. */
@@ -131,6 +135,8 @@ export interface CachedPaymentMethod {
   isCashierControlled: boolean;
   /** Carried through from the RPC; absent in snapshots cached before it existed. */
   reconciliationType?: string | null;
+  defaultAccountCode?: string;
+  accounts?: Array<{ code: string; name: string; isDefault: boolean }>;
 }
 
 export interface PosSettingsSnapshot extends ScopedRecord {
@@ -140,6 +146,7 @@ export interface PosSettingsSnapshot extends ScopedRecord {
   cashier_flow_enabled?: boolean;
   cash_control_enabled?: boolean;
   require_opening_count?: boolean;
+  variance_notification_threshold?: number;
   batch_expiry_enabled?: boolean;
   fetched_at: string;
 }

@@ -15,6 +15,7 @@ import {
   type ReconcilableAccount,
   type Reconciliation,
 } from '../money.service';
+import { MpesaInboundComponent } from './mpesa-inbound.component';
 
 type ReconciliationWithAccounts = Reconciliation & { reconciliation_accounts: ReconAccount[] };
 
@@ -28,6 +29,7 @@ type ReconciliationWithAccounts = Reconciliation & { reconciliation_accounts: Re
     FormFieldComponent,
     IconComponent,
     MoneyComponent,
+    MpesaInboundComponent,
   ],
   template: `
     <div class="mb-4 flex items-start gap-3">
@@ -63,6 +65,10 @@ type ReconciliationWithAccounts = Reconciliation & { reconciliation_accounts: Re
         <app-icon name="heroCheckCircle" />
         <span>{{ notice() }}</span>
       </div>
+    }
+
+    @if (perms.has('ManageReconciliation')) {
+      <app-mpesa-inbound />
     }
 
     <div class="mb-4 flex items-start gap-3 rounded-field bg-info/10 p-3 text-sm">

@@ -75,6 +75,7 @@ export class MoneyLayoutComponent {
     { route: '/money/expenses', label: 'Expenses', icon: 'heroReceiptRefund' },
     { route: '/money/transfers', label: 'Transfers', icon: 'heroArrowsRightLeft' },
     { route: '/money/reconcile', label: 'Reconcile', icon: 'heroCheckBadge' },
+    { route: '/money/vat', label: 'VAT', icon: 'heroReceiptPercent' },
     { route: '/money/periods', label: 'Periods', icon: 'heroCalendarDays' },
   ];
   protected readonly activeRoute = computed(() => {

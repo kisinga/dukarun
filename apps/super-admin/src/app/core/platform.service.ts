@@ -1,5 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import type { Database } from '@dukarun/shared-types';
+import type { TaxCategory, TaxPackageReadiness, TaxPackageStatus } from '@dukarun/tax-types';
+import type { MpesaCommissioningStatus } from '@dukarun/mpesa-types';
 import { AuthService } from '../core/auth.service';
 
 export type Company = Database['public']['Tables']['companies']['Row'];
@@ -147,6 +149,76 @@ export interface SiteDeployment {
   created_at: string;
   completed_at: string | null;
 }
+export interface PlatformTaxJurisdiction {
+  id: string;
+  country_code: string;
+  name: string;
+  currency_code: string;
+  default_timezone: string;
+  active: boolean;
+  status: TaxPackageStatus;
+  published_at: string | null;
+  retired_at: string | null;
+  readiness: TaxPackageReadiness;
+  categories: TaxCategory[];
+}
+export interface PlatformMpesaRequest {
+  id: string;
+  company_id: string;
+  company_name: string;
+  legal_name: string;
+  shortcode: string;
+  shortcode_type: 'till' | 'paybill';
+  mpesa_username: string;
+  contact_name: string;
+  contact_phone: string;
+  contact_email: string;
+  requested_location_ids: string[];
+  status: string;
+  merchant_notes: string | null;
+  operator_notes: string | null;
+  created_at: string;
+  commissioning: MpesaCommissioningStatus;
+}
+export interface PlatformMpesaConnection {
+  id: string;
+  company_id: string;
+  company_name: string;
+  display_name: string;
+  daraja_app_id: string;
+  environment: 'sandbox' | 'production';
+  shortcode_type: 'till' | 'paybill';
+  organization_shortcode: string;
+  business_shortcode: string;
+  party_b: string;
+  status: string;
+  manual_fallback_until: string | null;
+  oauth_verified: boolean;
+  c2b_registered: boolean;
+  stk_test_passed: boolean;
+  c2b_test_passed: boolean;
+  backlog: number;
+  manual_review: number;
+  c2b_test_candidates: Array<{ id: string; provider_receipt: string; occurred_at: string | null }>;
+  commissioning: MpesaCommissioningStatus;
+}
+export interface PlatformMpesaOverview {
+  settings: {
+    enabled: boolean;
+    manual_fallback_allowed: boolean;
+    pilot_company_id: string | null;
+  };
+  requests: PlatformMpesaRequest[];
+  daraja_apps: Array<{
+    id: string;
+    company_id: string;
+    app_name: string;
+    environment: 'sandbox' | 'production';
+    status: string;
+    oauth_verified: boolean;
+  }>;
+  connections: PlatformMpesaConnection[];
+}
 export type LegalDocumentType = 'privacy' | 'terms' | 'dpa' | 'subprocessors';
 export interface LegalDocumentVersion {
   id: string;
@@ -166,6 +238,29 @@ export interface LegalDocumentVersion {
 
 function rpcError(error: { message: string; code?: string }): Error {
   return new Error(error.message);
+}
+
+async function mpesaFunctionError(error: unknown): Promise<Error> {
+  let message = error instanceof Error ? error.message : 'M-PESA action failed';
+  const context = (error as { context?: unknown } | null)?.context;
+  if (context instanceof Response) {
+    const body = (await context
+      .clone()
+      .json()
+      .catch(() => null)) as { message?: string; error?: string } | null;
+    message = body?.message ?? body?.error ?? message;
+  }
+
+  const friendlyMessages: Record<string, string> = {
+    mpesa_callback_url_not_configured:
+      'Public callbacks are not configured. Deploy the M-PESA Edge Functions and set MPESA_CALLBACK_BASE_URL before registering C2B or sending a live test.',
+    invalid_mpesa_phone: 'Enter a valid Safaricom phone number, for example 0712345678.',
+    mpesa_activation_checks_incomplete: 'Complete all four production checks before going live.',
+    production_connection_required: 'Only a production connection can go live.',
+    mpesa_credentials_missing: 'The Daraja consumer credentials are missing.',
+    mpesa_connection_not_found: 'This M-PESA connection no longer exists. Refresh and try again.',
+  };
+  return new Error(friendlyMessages[message] ?? message.replaceAll('_', ' '));
 }
 
 /** Platform operations data (all RPCs raise platform_admin_required otherwise). */
@@ -765,6 +860,122 @@ export class PlatformService {
     const { data, error } = await this.db.rpc('platform_external_communication_metrics');
     if (error) throw rpcError(error);
     return data as unknown as PlatformExternalMetrics;
+  }
+
+  async taxCatalog(): Promise<PlatformTaxJurisdiction[]> {
+    const { data, error } = await this.db.rpc('platform_tax_catalog');
+    if (error) throw rpcError(error);
+    return data as unknown as PlatformTaxJurisdiction[];
+  }
+
+  async mpesaOverview(): Promise<PlatformMpesaOverview> {
+    const { data, error } = await this.db.rpc('platform_mpesa_overview');
+    if (error) throw rpcError(error);
+    return data as unknown as PlatformMpesaOverview;
+  }
+
+  async mpesaAction(input: Record<string, unknown>): Promise<Record<string, unknown>> {
+    const { data, error } = await this.db.functions.invoke('mpesa-credentials', { body: input });
+    if (error) throw await mpesaFunctionError(error);
+    return data as Record<string, unknown>;
+  }
+
+  async upsertTaxJurisdiction(input: {
+    countryCode: string;
+    name: string;
+    currencyCode: string;
+    timezone: string;
+    active?: boolean;
+  }): Promise<string> {
+    const { data, error } = await this.db.rpc('platform_upsert_tax_jurisdiction', {
+      p_country_code: input.countryCode,
+      p_name: input.name,
+      p_currency_code: input.currencyCode,
+      p_default_timezone: input.timezone,
+      p_active: input.active ?? false,
+    });
+    if (error) throw rpcError(error);
+    return data;
+  }
+
+  async publishTaxPackage(jurisdictionId: string): Promise<TaxPackageReadiness> {
+    const { data, error } = await this.db.rpc('platform_publish_tax_package', {
+      p_jurisdiction_id: jurisdictionId,
+    });
+    if (error) throw rpcError(error);
+    return data as unknown as TaxPackageReadiness;
+  }
+
+  async taxPackageReadiness(jurisdictionId: string): Promise<TaxPackageReadiness> {
+    const { data, error } = await this.db.rpc('platform_tax_package_readiness', {
+      p_jurisdiction_id: jurisdictionId,
+    });
+    if (error) throw rpcError(error);
+    return data as unknown as TaxPackageReadiness;
+  }
+
+  async retireTaxPackage(jurisdictionId: string): Promise<string> {
+    const { data, error } = await this.db.rpc('platform_retire_tax_jurisdiction', {
+      p_jurisdiction_id: jurisdictionId,
+    });
+    if (error) throw rpcError(error);
+    return data;
+  }
+
+  async advanceMpesaRequest(requestId: string, action: string, notes?: string): Promise<void> {
+    const { error } = await this.db.rpc('platform_advance_mpesa_request', {
+      p_request_id: requestId,
+      p_action: action,
+      ...(notes ? { p_notes: notes } : {}),
+    });
+    if (error) throw rpcError(error);
+  }
+
+  async upsertTaxCategory(input: {
+    jurisdictionId: string;
+    code: string;
+    name: string;
+    classification: 'standard' | 'special' | 'zero_rated' | 'exempt';
+    isDefault: boolean;
+    active?: boolean;
+  }): Promise<string> {
+    const { data, error } = await this.db.rpc('platform_upsert_tax_category', {
+      p_jurisdiction_id: input.jurisdictionId,
+      p_code: input.code,
+      p_name: input.name,
+      p_classification: input.classification,
+      p_is_default: input.isDefault,
+      p_active: input.active ?? true,
+    });
+    if (error) throw rpcError(error);
+    return data;
+  }
+
+  async publishTaxRate(input: {
+    categoryId: string;
+    rateBps: number;
+    effectiveFrom: string;
+    effectiveTo?: string;
+    notes?: string;
+  }): Promise<string> {
+    const { data, error } = await this.db.rpc('platform_publish_tax_rate_version', {
+      p_tax_category_id: input.categoryId,
+      p_rate_bps: input.rateBps,
+      p_effective_from: input.effectiveFrom,
+      ...(input.effectiveTo ? { p_effective_to: input.effectiveTo } : {}),
+      ...(input.notes ? { p_notes: input.notes } : {}),
+    });
+    if (error) throw rpcError(error);
+    return data;
+  }
+
+  async publishTaxCategory(categoryId: string, effectiveFrom: string): Promise<string> {
+    const { data, error } = await this.db.rpc('platform_publish_tax_category', {
+      p_tax_category_id: categoryId,
+      p_effective_from: effectiveFrom,
+    });
+    if (error) throw rpcError(error);
+    return data;
   }
 
   async testExternalMessage(input: {

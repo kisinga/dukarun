@@ -46,6 +46,8 @@ import { Approval, ApprovalsService } from '../../approvals/approvals.service';
 import { DocumentSendComponent } from '../../communications/document-send.component';
 import { MobileListComponent } from '../../shared/ui/mobile-list.component';
 import { PageActionsComponent } from '../../shared/ui/page-actions.component';
+import { MpesaService } from '../../core/mpesa.service';
+import { MpesaCheckoutCoordinator } from '../../core/mpesa-checkout-coordinator.service';
 
 const PROFORMA_STATUSES = ['draft', 'expired'];
 
@@ -568,12 +570,30 @@ const PROFORMA_SORT_OPTIONS: readonly ListSortOption[] = [
           [total]="draft.total"
           [methods]="panelMethods()"
           [canUseDirectAccounts]="canUseDirectAccounts()"
+          [mpesaStkEnabled]="mpesa.availability().active"
+          [mpesaManualFallback]="mpesa.availability().manualFallback"
           [busy]="busy()"
           [heading]="'Convert ' + draft.code"
           (confirmed)="convert(draft.id, $event)"
           (approvalRequested)="directAccountRequested()"
           (cancelled)="converting.set(null)"
         />
+      }
+      @if (mpesaSplitReady(); as split) {
+        <dialog class="modal modal-open">
+          <div class="modal-box">
+            <h2 class="type-title">M-PESA received</h2>
+            <p class="mt-2 text-sm">Confirm the cash side only after it is in hand.</p>
+            <p class="mt-4 text-xl font-semibold"><app-money [amount]="split.cashAmount" /></p>
+            <div class="modal-action">
+              <button appButton variant="ghost" (click)="mpesaSplitReady.set(null)">
+                Keep pending</button
+              ><button appButton [loading]="busy()" (click)="confirmMpesaCash()">
+                Confirm cash received
+              </button>
+            </div>
+          </div>
+        </dialog>
       }
       @if (directAccountNotice()) {
         <div class="toast toast-bottom toast-end z-50" aria-live="polite">
@@ -616,6 +636,8 @@ export class ProformasComponent implements OnInit, OnDestroy {
   private readonly perms = inject(PermissionsService);
   protected readonly cashierSession = inject(CashierSessionService);
   protected readonly orderQueueCounts = inject(OrderQueueCountsService);
+  protected readonly mpesa = inject(MpesaService);
+  private readonly mpesaCheckout = inject(MpesaCheckoutCoordinator);
 
   protected readonly proformas = signal<OrderWithCustomer[]>([]);
   protected readonly loading = signal(false);
@@ -630,6 +652,15 @@ export class ProformasComponent implements OnInit, OnDestroy {
   protected readonly from = new FormControl('', { nonNullable: true });
   protected readonly to = new FormControl('', { nonNullable: true });
   protected readonly converting = signal<OrderWithCustomer | null>(null);
+  protected readonly mpesaSplitReady = signal<{
+    intentId: string;
+    orderId: string;
+    code: string;
+    cashPayments: PaymentInput[];
+    cashAmount: number;
+  } | null>(null);
+  private convertClientRef: string | null = null;
+  private convertMpesaRetryAllowed = false;
   protected readonly deleting = signal<OrderWithCustomer | null>(null);
   protected readonly selectedDraftId = signal<string | null>(null);
   protected readonly highlightedApprovalId = signal<string | null>(null);
@@ -707,6 +738,7 @@ export class ProformasComponent implements OnInit, OnDestroy {
 
   async ngOnInit(): Promise<void> {
     this.printerEnabled.set(await this.receiptData.printerEnabled());
+    void this.mpesa.refreshAvailability();
     try {
       const methods = await this.pos.enabledPaymentMethods();
       this.methods.set(
@@ -715,6 +747,12 @@ export class ProformasComponent implements OnInit, OnDestroy {
           name: m.name,
           isCashierControlled: m.is_cashier_controlled,
           reconciliationType: m.reconciliation_type ?? null,
+          defaultAccountCode: m.default_account_code,
+          accounts: m.accounts.map(account => ({
+            code: account.code,
+            name: account.name,
+            isDefault: account.is_default,
+          })),
         }))
       );
     } catch {
@@ -945,8 +983,64 @@ export class ProformasComponent implements OnInit, OnDestroy {
     this.busy.set(true);
     const draft = this.converting();
     try {
+      const mpesaPayment = payments.find(
+        payment =>
+          payment.method === 'mpesa' &&
+          (payment.phone || (this.mpesa.availability().manualFallback && payment.reference))
+      );
+      if (mpesaPayment) {
+        if (!draft?.location_id) throw new Error('This proforma has no business location.');
+        const cashPayments = payments
+          .filter(payment => payment !== mpesaPayment)
+          .map(({ phone: _phone, ...payment }) => payment);
+        const outcome = await this.mpesaCheckout.run(
+          retry =>
+            this.mpesa.initiateOrder({
+              orderId,
+              locationId: draft.location_id,
+              mpesaAmount: mpesaPayment.amount,
+              cashAmount: cashPayments.reduce((sum, payment) => sum + payment.amount, 0),
+              clientRef: this.convertClientRef!,
+              retry,
+              ...(mpesaPayment.phone
+                ? { phone: mpesaPayment.phone }
+                : { receipt: mpesaPayment.reference! }),
+            }),
+          this.convertMpesaRetryAllowed
+        );
+        if (outcome.kind === 'awaiting_cash') {
+          this.converting.set(null);
+          this.mpesaSplitReady.set({
+            intentId: outcome.intentId,
+            orderId,
+            code: draft.code,
+            cashPayments,
+            cashAmount: outcome.cashAmount,
+          });
+          this.notice.set('M-PESA received. Confirm the cash side.');
+          return;
+        }
+        if (outcome.kind === 'manual_review') {
+          this.converting.set(null);
+          this.convertClientRef = null;
+          this.convertMpesaRetryAllowed = false;
+          await this.load();
+          throw new Error(outcome.message);
+        }
+        if (outcome.kind === 'failed' && outcome.retryAllowed) this.convertMpesaRetryAllowed = true;
+        if (outcome.kind !== 'completed') throw new Error(outcome.message);
+        this.converting.set(null);
+        this.convertClientRef = null;
+        this.convertMpesaRetryAllowed = false;
+        this.completedSale.set({ id: orderId, code: draft.code });
+        this.notice.set(`${draft.code} completed`);
+        await this.load();
+        return;
+      }
       const completedOrderId = await this.pos.convertDraft(orderId, payments);
       this.converting.set(null);
+      this.convertClientRef = null;
+      this.convertMpesaRetryAllowed = false;
       this.completedSale.set({ id: completedOrderId, code: draft?.code ?? 'Sale' });
       this.notice.set(`${draft?.code ?? 'Sale'} completed`);
       await this.load();
@@ -954,12 +1048,14 @@ export class ProformasComponent implements OnInit, OnDestroy {
       const message = err instanceof Error ? err.message : 'Conversion failed';
       if (message.includes('proforma_expired')) {
         this.error.set('This proforma has expired and can no longer be converted.');
+        this.converting.set(null);
         await this.load();
       } else {
         this.error.set(message);
       }
       // Below-wholesale drafts wait on an approval before they can complete.
       if (message.includes('below_wholesale_approval_required')) {
+        this.converting.set(null);
         this.notice.set('This proforma is waiting for price approval.');
         const history = await this.approvals.forOrder(orderId).catch(() => []);
         const pending = history.find(
@@ -967,7 +1063,26 @@ export class ProformasComponent implements OnInit, OnDestroy {
         );
         if (pending) this.draftApprovals.update(rows => new Map(rows).set(orderId, pending));
       }
-      this.converting.set(null);
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected async confirmMpesaCash(): Promise<void> {
+    const split = this.mpesaSplitReady();
+    if (!split) return;
+    this.busy.set(true);
+    this.error.set(null);
+    try {
+      await this.mpesaCheckout.finalizeCash(split.intentId);
+      this.mpesaSplitReady.set(null);
+      this.convertClientRef = null;
+      this.convertMpesaRetryAllowed = false;
+      this.completedSale.set({ id: split.orderId, code: split.code });
+      this.notice.set(`${split.code} completed`);
+      await this.load();
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Could not finish split payment');
     } finally {
       this.busy.set(false);
     }
@@ -983,6 +1098,8 @@ export class ProformasComponent implements OnInit, OnDestroy {
     }
     try {
       await this.cashierSession.assertOpen('converting a proforma to a sale');
+      this.convertClientRef = crypto.randomUUID();
+      this.convertMpesaRetryAllowed = false;
       this.converting.set(draft);
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Open a cashier session first');

@@ -78,6 +78,8 @@ select is(
   'matching reconciliation posts no variance'
 );
 
+select public.sign_off_business_day((now() at time zone 'Africa/Nairobi')::date);
+
 -- 5-7. Close the period (today).
 create temp table entry_count as select count(*)::int as n from public.ledger_journal_entries;
 

@@ -140,13 +140,15 @@ select is((select count(*)::int from public.notifications
 select testkit.as_user((select company_id from ca_company),
   '22222222-2222-2222-2222-222222222222','Cashier');
 create temp table ca_refund as
-select public.post_refund((select order_id from ca_sales where n=2),2000,'cash','damaged') result;
+select public.post_full_refund(
+  (select order_id from ca_sales where n=2),'cash','damaged','write_off'
+) result;
 grant select on pg_temp.ca_refund to authenticated;
 select is((select result->>'status' from ca_refund),'approval_required',
   'cashier refund creates an approval request');
 select throws_ok(
   format(
-    $$select public.post_refund('%s',3000,'cash','more damaged')$$,
+    $$select public.post_full_refund('%s','cash','more damaged','write_off')$$,
     (select order_id from ca_sales where n=2)
   ),
   'P0001',
@@ -204,7 +206,9 @@ select throws_ok(
 select testkit.as_user((select company_id from ca_company),
   '22222222-2222-2222-2222-222222222222','Cashier');
 create temp table ca_denied as
-select public.post_refund((select order_id from ca_sales where n=4),1000,'cash','test denial') result;
+select public.post_full_refund(
+  (select order_id from ca_sales where n=4),'cash','test denial','write_off'
+) result;
 grant select on pg_temp.ca_denied to authenticated;
 select testkit.as_user((select company_id from ca_company),
   '33333333-3333-3333-3333-333333333333','Approver');

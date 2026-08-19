@@ -80,6 +80,7 @@ Edge Functions are reserved for integrations that need provider secrets or webho
 
 - `paystack-charge`
 - `paystack-webhook`
+- `mpesa-initiate`, `mpesa-callback`, `mpesa-process`, `mpesa-credentials`
 - `notification-flush`
 
 SMS auth hooks and scheduled database work run from PostgreSQL where appropriate. Provider

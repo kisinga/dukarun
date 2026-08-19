@@ -396,6 +396,15 @@ deno_version = 2
 [functions.paystack-webhook]
 verify_jwt = false
 
+# Safaricom sends callbacks without a Supabase JWT. Each callback is protected
+# by an unguessable, hashed URL token and STK success is queried online.
+[functions.mpesa-callback]
+verify_jwt = false
+
+# Called by pg_net with the normal service-role bearer token.
+[functions.mpesa-process]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327

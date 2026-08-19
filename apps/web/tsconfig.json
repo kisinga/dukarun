@@ -16,6 +16,8 @@
     "baseUrl": "./",
     "paths": {
       "@dukarun/shared-types": ["../../packages/shared-types/database.types.ts"],
+      "@dukarun/tax-types": ["../../packages/shared-types/tax.types.ts"],
+      "@dukarun/mpesa-types": ["../../packages/shared-types/mpesa.types.ts"],
       "@dukarun/legal-markdown": ["../../packages/legal-markdown.ts"]
     }
   },

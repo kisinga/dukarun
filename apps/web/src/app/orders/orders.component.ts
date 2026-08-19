@@ -11,7 +11,7 @@ import {
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { formatKes, formatKesInput, parseKes } from '../core/money';
+import { formatKes } from '../core/money';
 import { reconciliationLabel, reconciliationTypeForCode } from '../core/payment-methods';
 import { OrderLineWithProduct, OrderWithCustomer, Payment, PosService } from '../pos/pos.service';
 import { PrintService } from '../shared/print/print.service';
@@ -739,7 +739,7 @@ const SALE_SORT_OPTIONS: readonly ListSortOption[] = [
                           appButton
                           variant="outline"
                           size="sm"
-                          (click)="startRefund(order.id, order.total)"
+                          (click)="startRefund(order.id)"
                         >
                           {{
                             permissions.actionMode('sale.refund') === 'execute'
@@ -752,13 +752,11 @@ const SALE_SORT_OPTIONS: readonly ListSortOption[] = [
                           (submit)="$event.preventDefault(); confirmRefund(order.id)"
                           class="flex flex-col gap-2 rounded-field border border-base-300 bg-base-200/50 p-2"
                         >
-                          <app-form-field label="Amount (KES)" [required]="true">
-                            <input
-                              class="input input-bordered input-sm w-full"
-                              inputmode="numeric"
-                              [formControl]="refundAmount"
-                            />
-                          </app-form-field>
+                          <div class="rounded-field bg-base-100 p-2 text-sm">
+                            <span class="type-caption">Full-sale credit note</span>
+                            <strong class="ml-2">{{ fmtKes(order.total) }}</strong>
+                            <p class="type-caption mt-1">Partial refunds are not available yet.</p>
+                          </div>
                           <app-form-field label="Method">
                             <select
                               class="select select-bordered select-sm w-full"
@@ -767,6 +765,15 @@ const SALE_SORT_OPTIONS: readonly ListSortOption[] = [
                               <option value="cash">{{ methodOptionLabel('cash') }}</option>
                               <option value="mpesa">{{ methodOptionLabel('mpesa') }}</option>
                               <option value="bank">{{ methodOptionLabel('bank') }}</option>
+                            </select>
+                          </app-form-field>
+                          <app-form-field label="Stock outcome" [required]="true">
+                            <select
+                              class="select select-bordered select-sm w-full"
+                              [formControl]="refundStockOutcome"
+                            >
+                              <option value="return_to_stock">Return to sellable stock</option>
+                              <option value="write_off">Write off / do not restore stock</option>
                             </select>
                           </app-form-field>
                           <app-form-field label="Reason" [required]="true">
@@ -910,8 +917,11 @@ export class OrdersComponent implements OnInit, OnDestroy {
   protected readonly voidingFor = signal<string | null>(null);
   protected readonly voidReason = new FormControl('', { nonNullable: true });
   protected readonly refundingFor = signal<string | null>(null);
-  protected readonly refundAmount = new FormControl('', { nonNullable: true });
   protected readonly refundMethod = new FormControl('cash', { nonNullable: true });
+  protected readonly refundStockOutcome = new FormControl<'return_to_stock' | 'write_off'>(
+    'return_to_stock',
+    { nonNullable: true }
+  );
   protected readonly refundReason = new FormControl('', { nonNullable: true });
   protected readonly reversingPaymentId = signal<string | null>(null);
   protected readonly paymentReversalReason = new FormControl('', { nonNullable: true });
@@ -1350,26 +1360,25 @@ export class OrdersComponent implements OnInit, OnDestroy {
     }
   }
 
-  protected startRefund(orderId: string, total: number): void {
+  protected startRefund(orderId: string): void {
     this.refundingFor.set(orderId);
-    this.refundAmount.setValue(formatKesInput(total));
+    this.refundStockOutcome.setValue('return_to_stock');
     this.refundReason.setValue('');
   }
 
   protected async confirmRefund(orderId: string): Promise<void> {
-    const amount = parseKes(this.refundAmount.value);
-    if (amount === null || amount <= 0 || !this.refundReason.value.trim()) {
-      this.error.set('Refund amount and reason are required');
+    if (!this.refundReason.value.trim()) {
+      this.error.set('A refund reason is required');
       return;
     }
     this.busy.set(true);
     this.error.set(null);
     try {
-      const result = await this.money.postRefund(
+      const result = await this.money.postFullRefund(
         orderId,
-        amount,
         this.refundMethod.value,
-        this.refundReason.value.trim()
+        this.refundReason.value.trim(),
+        this.refundStockOutcome.value
       );
       this.refundingFor.set(null);
       if (result.status === 'approval_required') {

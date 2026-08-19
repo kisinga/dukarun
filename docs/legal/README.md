@@ -38,3 +38,4 @@ but are not represented as consent.
 - [Privacy requests](PRIVACY_REQUESTS.md)
 - [Incident response](INCIDENT_RESPONSE.md)
 - [Compliance operations](COMPLIANCE_OPERATIONS.md)
+- [M-PESA compliance checklist](MPESA_COMPLIANCE_CHECKLIST.md)

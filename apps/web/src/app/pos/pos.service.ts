@@ -67,6 +67,10 @@ export interface PaymentInput {
   amount: number;
   reference?: string;
   mpesa_receipt?: string;
+  /** Explicit Bank/M-Pesa ledger destination; omitted clients use the location default. */
+  account_code?: string;
+  /** Used only to initiate STK; never stored on the payment row. */
+  phone?: string;
 }
 
 /** Explicit checkout allocation. Payment rows remain real money tenders. */
@@ -97,6 +101,14 @@ export interface EnabledPaymentMethod {
   is_cashier_controlled: boolean;
   /** blind_count | transaction_verification | statement_match (credit excluded). */
   reconciliation_type: string | null;
+  default_account_code: string;
+  accounts: PaymentAccountOption[];
+}
+
+export interface PaymentAccountOption {
+  code: string;
+  name: string;
+  is_default: boolean;
 }
 
 /** post_sale_at_location result (jsonb since migration 0054). */
@@ -114,6 +126,9 @@ export type PostSaleResult =
       downpaymentApplied?: number;
       creditAmount?: number;
     };
+
+export type OfflineSaleResult =
+  PostSaleResult | { status: 'late_review_required'; reviewId: string };
 
 export type VoidResult = ActionOutcome;
 
@@ -524,17 +539,34 @@ export class PosService {
 
   /** Enabled non-credit payment methods with display names and till-control flags. */
   async enabledPaymentMethods(): Promise<EnabledPaymentMethod[]> {
-    const { data, error } = await this.client.rpc('available_payment_methods', {
-      p_location_id: this.locations.requireActiveId(),
-    });
-    if (error) throw error;
-    return data
+    const locationId = this.locations.requireActiveId();
+    const [methodsResult, accountsResult] = await Promise.all([
+      this.client.rpc('available_payment_methods', { p_location_id: locationId }),
+      this.client.rpc('available_tender_accounts', { p_location_id: locationId }),
+    ]);
+    if (methodsResult.error) throw methodsResult.error;
+    if (accountsResult.error) throw accountsResult.error;
+    const accounts = accountsResult.data as Array<{
+      account_code: string;
+      account_name: string;
+      method_code: string;
+      is_default: boolean;
+    }>;
+    return methodsResult.data
       .filter(method => method.code !== 'credit')
       .map(method => ({
         code: method.code,
         name: method.name,
         is_cashier_controlled: method.is_cashier_controlled,
         reconciliation_type: method.reconciliation_type ?? null,
+        default_account_code: method.ledger_account_code,
+        accounts: accounts
+          .filter(account => account.method_code === method.code)
+          .map(account => ({
+            code: account.account_code,
+            name: account.account_name,
+            is_default: account.is_default,
+          })),
       }));
   }
 
@@ -758,6 +790,67 @@ export class PosService {
       status: result.status === 'parked' ? 'parked' : 'completed',
       orderId: result.order_id,
     };
+  }
+
+  async postOfflineSale(input: {
+    locationId: string;
+    customerId: string | null;
+    lines: SaleLineInput[];
+    payments: PaymentInput[];
+    clientRef: string;
+    occurredAt: string;
+    deviceKey: string;
+    pendingCount: number;
+    draftId?: string;
+  }): Promise<OfflineSaleResult> {
+    const { data, error } = await this.client.rpc('post_offline_sale_at_location', {
+      p_location_id: input.locationId,
+      p_customer_id: input.customerId!,
+      p_lines: input.lines as never,
+      p_payments: input.payments as never,
+      p_client_ref: input.clientRef,
+      p_occurred_at: input.occurredAt,
+      p_device_key: input.deviceKey,
+      p_pending_count: input.pendingCount,
+      ...(input.draftId ? { p_draft_id: input.draftId } : {}),
+    });
+    if (error) throw rpcError(error);
+    const result = data as unknown as {
+      status: string;
+      order_id?: string;
+      approval_id?: string;
+      review_id?: string;
+    };
+    if (result.status === 'late_review_required') {
+      return { status: 'late_review_required', reviewId: result.review_id! };
+    }
+    if (result.status === 'approval_required') {
+      return {
+        status: 'approval_required',
+        orderId: result.order_id!,
+        approvalId: result.approval_id!,
+      };
+    }
+    return {
+      status: result.status === 'parked' ? 'parked' : 'completed',
+      orderId: result.order_id!,
+    };
+  }
+
+  async heartbeatPosDevice(
+    deviceKey: string,
+    locationId: string,
+    pendingCount: number,
+    synced: boolean
+  ): Promise<string> {
+    const { data, error } = await this.client.rpc('pos_device_heartbeat', {
+      p_device_key: deviceKey,
+      p_location_id: locationId,
+      p_pending_count: pendingCount,
+      p_synced: synced,
+    });
+    if (error) throw rpcError(error);
+    return data;
   }
 
   async customerDepositAvailable(customerId: string): Promise<number> {

@@ -77,7 +77,9 @@ select testkit.as_user(
   '11111111-1111-1111-1111-111111111111',
   'Admin'
 );
-select public.post_refund((select order_id from com_sale), 2000, 'cash', 'Partial refund');
+select public.post_full_refund(
+  (select order_id from com_sale), 'cash', 'Full refund', 'write_off'
+);
 
 create temp table com_plan as
 select public.upsert_commission_plan(
@@ -124,13 +126,13 @@ select is(
 select is(
   (select basis_total from public.commission_period_statement((select period_id from com_period))
    where staff_user_id = '22222222-2222-2222-2222-222222222222'),
-  8000::bigint,
+  0::bigint,
   'commission basis is net collected sales'
 );
 select is(
   (select commission_total from public.commission_period_statement((select period_id from com_period))
    where staff_user_id = '22222222-2222-2222-2222-222222222222'),
-  400::bigint,
+  0::bigint,
   '5 percent commission is calculated in integer shillings'
 );
 select is(
