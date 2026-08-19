@@ -1,7 +1,9 @@
 begin;
-select plan(60);
+select plan(61);
 
 select has_table('public','tax_rate_versions','VAT rates are effective-dated');
+select has_table('public','legacy_customer_account_reconciliations',
+  'legacy UI balances have explicit document reconciliation records');
 select has_table('public','company_tax_profiles','company VAT profiles are versioned');
 select has_table('public','tax_documents','statutory document snapshots are durable');
 select has_table('public','period_closing_packs','period closing packs are durable');

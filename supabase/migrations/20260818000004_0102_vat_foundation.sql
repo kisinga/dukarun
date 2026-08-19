@@ -6,6 +6,48 @@
 -- non-VAT/legacy until a finance administrator schedules registration.
 -- ===========================================================================
 
+-- Preserve the balances already shown by the ledger-backed customer UI. A
+-- handful of migrated accounts predate document-backed integrity, so record
+-- their existing ledger/document delta explicitly before touching orders.
+create table public.legacy_customer_account_reconciliations (
+  id uuid primary key default gen_random_uuid(),
+  company_id uuid not null references public.companies(id) on delete cascade,
+  customer_id uuid not null references public.customers(id) on delete cascade,
+  amount bigint not null check(amount<>0),
+  ledger_balance bigint not null,
+  prior_document_balance bigint not null,
+  reason text not null,
+  created_at timestamptz not null default now(),
+  unique(customer_id),
+  check(amount=ledger_balance-prior_document_balance)
+);
+alter table public.legacy_customer_account_reconciliations enable row level security;
+revoke all on public.legacy_customer_account_reconciliations from public,anon,authenticated;
+grant select on public.legacy_customer_account_reconciliations to service_role;
+
+insert into public.legacy_customer_account_reconciliations(
+  company_id,customer_id,amount,ledger_balance,prior_document_balance,reason
+)
+select c.company_id,c.id,b.ledger-b.documents,b.ledger,b.documents,
+  'Preserve pre-integrity balance displayed in customer UI'
+from public.customers c
+cross join lateral(select public.customer_ledger_balance(c.company_id,c.id) ledger,
+  public.customer_document_balance(c.company_id,c.id) documents)b
+where b.ledger<>b.documents;
+
+create or replace function public.customer_document_balance(p_company_id uuid,p_customer_id uuid)
+returns bigint language sql stable security definer set search_path='' as $$
+  select (
+    coalesce((select sum(o.total-coalesce(paid.amount,0)) from public.orders o
+      left join lateral(select sum(p.amount)::bigint amount from public.payments p
+        where p.order_id=o.id and p.status='settled')paid on true
+      where o.company_id=p_company_id and o.customer_id=p_customer_id
+        and o.is_credit_sale and o.status='completed'),0)
+    +coalesce((select sum(r.amount) from public.legacy_customer_account_reconciliations r
+      where r.company_id=p_company_id and r.customer_id=p_customer_id),0)
+  )::bigint
+$$;
+
 alter table public.companies
   add column business_timezone text not null default 'Africa/Nairobi',
   add column show_vat_breakdown_on_prints boolean not null default false;
