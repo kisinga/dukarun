@@ -70,6 +70,25 @@ const POLL_TIMEOUT_MS = 60_000;
               }
             </dl>
 
+            @let daysRemaining = expiringSoon(b);
+            @if (daysRemaining !== null) {
+              <div class="alert alert-warning mt-3 items-start sm:items-center">
+                <span class="text-sm">
+                  @if (daysRemaining === 0) {
+                    Your {{ b.subscription_status === 'trial' ? 'trial' : 'subscription' }} expires
+                    today.
+                  } @else {
+                    Your {{ b.subscription_status === 'trial' ? 'trial' : 'subscription' }} expires
+                    in {{ daysRemaining }} {{ daysRemaining === 1 ? 'day' : 'days' }}.
+                  }
+                  {{ b.subscription_status === 'trial' ? 'Choose a plan' : 'Renew now' }} to keep
+                  your workspace active.
+                </span>
+                <a class="btn btn-warning btn-sm min-h-11 sm:ml-auto" href="#subscription-plans">
+                  {{ b.subscription_status === 'trial' ? 'Choose plan' : 'Renew now' }}
+                </a>
+              </div>
+            }
             @if (inGrace(b)) {
               <div class="alert alert-warning mt-3">
                 <span class="text-sm">
@@ -129,7 +148,7 @@ const POLL_TIMEOUT_MS = 60_000;
       }
 
       <!-- Subscription plans -->
-      <div class="mb-3 flex items-center justify-between">
+      <div id="subscription-plans" class="mb-3 flex scroll-mt-4 items-center justify-between">
         <h2 class="type-heading">Subscription plans</h2>
         <div role="tablist" class="tabs tabs-boxed">
           <a
@@ -309,21 +328,51 @@ export class BillingComponent implements OnInit, OnDestroy {
     return !!b.subscription_exempt_until && new Date(b.subscription_exempt_until) > new Date();
   }
 
+  protected expiringSoon(b: CompanyBilling): number | null {
+    if (!['trial', 'active'].includes(b.subscription_status ?? '') || this.exempt(b)) return null;
+    const expiry = b.subscription_status === 'trial' ? b.trial_ends_at : b.subscription_expires_at;
+    if (!expiry) return null;
+    const remaining = this.nairobiDateNumber(new Date(expiry)) - this.nairobiDateNumber(new Date());
+    return remaining >= 0 && remaining <= 7 ? remaining : null;
+  }
+
+  private nairobiDateNumber(value: Date): number {
+    const parts = new Intl.DateTimeFormat('en', {
+      timeZone: 'Africa/Nairobi',
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+    }).formatToParts(value);
+    const number = (type: Intl.DateTimeFormatPartTypes): number =>
+      Number(parts.find(part => part.type === type)?.value ?? 0);
+    return Date.UTC(number('year'), number('month') - 1, number('day')) / 86_400_000;
+  }
+
   protected isCurrent(tier: Tier): boolean {
     return this.billing()?.subscription_tier_id === tier.id;
   }
 
   protected canPurchase(tier: Tier): boolean {
     const billing = this.billing();
-    return billing?.subscription_tier_id !== tier.id || billing.subscription_status !== 'active';
+    return (
+      billing?.subscription_tier_id !== tier.id ||
+      billing.subscription_status !== 'active' ||
+      this.expiringSoon(billing) !== null
+    );
   }
 
   protected purchaseLabel(tier: Tier): string {
     if (this.isIntroOffer(tier)) {
       return `Get ${this.introOfferAccessMonths()} months for ${this.fmt(this.priceFor(tier))}`;
     }
-    const status = this.billing()?.subscription_status;
-    if (this.isCurrent(tier) && (status === 'expired' || status === 'cancelled')) {
+    const billing = this.billing();
+    const status = billing?.subscription_status;
+    if (
+      this.isCurrent(tier) &&
+      (status === 'expired' ||
+        status === 'cancelled' ||
+        (status === 'active' && billing !== null && this.expiringSoon(billing) !== null))
+    ) {
       return `Renew ${tier.name}`;
     }
     return `Subscribe to ${tier.name}`;
