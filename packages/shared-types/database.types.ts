@@ -11068,10 +11068,6 @@ export type Database = {
           created_by: string | null
           credit_due_at: string | null
           expense_total: number | null
-          external_tax_invoice_id: string | null
-          external_tax_payload: Json | null
-          external_tax_provider: string | null
-          external_tax_status: string | null
           goods_net_total: number | null
           goods_subtotal: number | null
           gross_total: number | null
@@ -15258,3 +15254,4 @@ export const Constants = {
     Enums: {},
   },
 } as const
+
