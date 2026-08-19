@@ -38,9 +38,9 @@ select results_eq(
     where e.source_type = 'InventoryPurchase' and e.source_id = (select purchase_id::text from pur1)
     order by a.code$$,
   $$values
-    ('CASH_ON_HAND', 0::bigint, 60000::bigint),
+    ('ACCOUNTS_PAYABLE', 0::bigint, 60000::bigint),
     ('INVENTORY', 60000::bigint, 0::bigint)$$,
-  'cash purchase posts DR INVENTORY / CR CASH_ON_HAND'
+  'every supplier invoice posts DR INVENTORY / CR ACCOUNTS_PAYABLE before settlement'
 );
 
 -- 4. Credit purchase beyond supplier limit (limit 100000): 40 * 3000 = 120000.

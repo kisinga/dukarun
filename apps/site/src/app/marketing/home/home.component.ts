@@ -860,9 +860,9 @@ export class HomeComponent implements OnInit {
     },
     {
       icon: 'heroClipboardDocumentList',
-      title: 'Double-entry ledger',
-      copy: 'Every transaction posts debit and credit, so your reports always balance.',
-      docId: 'ledger',
+      title: 'VAT calculations and double-entry books',
+      copy: 'Extract VAT from inclusive sales and supplier invoices, then track input and output VAT in balanced books.',
+      docId: 'vat',
     },
   ];
 
@@ -912,6 +912,11 @@ export class HomeComponent implements OnInit {
       question: 'Can my staff use it without seeing everything?',
       answer:
         'Yes. Cashiers sell; managers approve; owners see the books. Roles decide what each person can do, and sensitive actions like price overrides or stock adjustments can require approval.',
+    },
+    {
+      question: 'Does Dukarun calculate VAT?',
+      answer:
+        'Yes, for a configured VAT-registered shop in a supported jurisdiction. Dukarun extracts VAT from VAT-inclusive sales and eligible supplier invoices, posts input and output VAT to the ledger, and provides VAT breakdowns and reports. It does not submit to eTIMS and is not tax advice or a compliance guarantee.',
     },
     {
       question: 'How is the subscription billed?',

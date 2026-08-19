@@ -14,12 +14,25 @@ import { environment } from '../environments/environment';
 export type StorefrontInfo = Database['public']['Views']['public_storefronts']['Row'];
 export type CatalogRow =
   Database['public']['Functions']['storefront_catalog_page']['Returns'][number];
+export interface CatalogPageRow {
+  product_id: string;
+  product_name: string;
+  image_path: string | null;
+  manufacturer_id: string | null;
+  manufacturer_name: string | null;
+  min_price: number;
+  max_price: number;
+  variant_count: number;
+  available: boolean;
+}
 export type ShopCategory =
   Database['public']['Functions']['storefront_categories']['Returns'][number];
 export interface CatalogPage {
-  rows: CatalogRow[];
-  total: number;
+  storefront: StorefrontInfo | null;
+  categories: ShopCategory[];
+  rows: CatalogPageRow[];
   offset: number;
+  hasMore: boolean;
 }
 export interface CustomerStatement {
   store_name: string;
@@ -100,6 +113,30 @@ const catalogPageKey = (slug: string, limit: number, offset: number) =>
   makeStateKey<CatalogPage>(`storefront:catalog:${slug}:${limit}:${offset}`);
 const categoriesKey = (slug: string) =>
   makeStateKey<ShopCategory[]>(`storefront:categories:${slug}`);
+
+function summarizeCatalogRows(rows: readonly CatalogRow[]): CatalogPageRow[] {
+  const grouped = new Map<string, CatalogRow[]>();
+  for (const row of rows) {
+    const productRows = grouped.get(row.product_id) ?? [];
+    productRows.push(row);
+    grouped.set(row.product_id, productRows);
+  }
+  return [...grouped.values()].map(productRows => {
+    const first = productRows[0];
+    const prices = productRows.map(row => Number(row.price));
+    return {
+      product_id: first.product_id,
+      product_name: first.product_name ?? '',
+      image_path: first.image_path,
+      manufacturer_id: first.manufacturer_id,
+      manufacturer_name: first.manufacturer_name,
+      min_price: Math.min(...prices),
+      max_price: Math.max(...prices),
+      variant_count: productRows.length,
+      available: productRows.some(row => row.available),
+    };
+  });
+}
 
 /**
  * Anonymous read-only access to the public storefront surface.
@@ -211,7 +248,13 @@ export class StorefrontService {
   transferredCatalogPage(slug: string, limit = 12, offset = 0): CatalogPage | null {
     const key = catalogPageKey(slug, limit, offset);
     return this.transferState.hasKey(key)
-      ? this.transferState.get(key, { rows: [], total: 0, offset })
+      ? this.transferState.get(key, {
+          storefront: null,
+          categories: [],
+          rows: [],
+          offset,
+          hasMore: false,
+        })
       : null;
   }
 
@@ -276,7 +319,13 @@ export class StorefrontService {
     const key = catalogPageKey(slug, limit, requestedOffset);
     const cacheable = !options.search?.trim() && !options.categoryId;
     if (!options.force && cacheable && this.transferState.hasKey(key)) {
-      return this.transferState.get(key, { rows: [], total: 0, offset: requestedOffset });
+      return this.transferState.get(key, {
+        storefront: null,
+        categories: [],
+        rows: [],
+        offset: requestedOffset,
+        hasMore: false,
+      });
     }
     const fixtureSearch = options.search?.trim().toLowerCase();
     const fixtureRows = this.fixtureCatalog.filter(row => {
@@ -290,37 +339,47 @@ export class StorefrontService {
         this.fixtureCategoryIdsByProduct.get(row.product_id)?.includes(options.categoryId);
       return matchesSearch && matchesCategory;
     });
+    const fixtureProducts = summarizeCatalogRows(fixtureRows);
     const page =
       environment.publicDataMode === 'fixture'
         ? {
-            rows: fixtureRows.slice(requestedOffset, requestedOffset + limit),
-            total: fixtureRows.length,
+            storefront: slug === this.fixtureShop.slug ? this.fixtureShop : null,
+            categories: slug === this.fixtureShop.slug ? this.fixtureCategories : [],
+            rows:
+              slug === this.fixtureShop.slug
+                ? fixtureProducts.slice(requestedOffset, requestedOffset + limit)
+                : [],
             offset: requestedOffset,
+            hasMore:
+              slug === this.fixtureShop.slug && requestedOffset + limit < fixtureProducts.length,
           }
         : await this.track(async () => {
             const search = options.search?.trim();
             const categoryId = options.categoryId;
-            const fetchPage = async (offset: number): Promise<CatalogPage> => {
-              const { data, error } = await this.client.rpc('storefront_catalog_page', {
-                p_slug: slug,
-                p_limit: limit,
-                p_offset: offset,
-                ...(search ? { p_search: search } : {}),
-                ...(categoryId ? { p_category_id: categoryId } : {}),
-              });
-              if (error) throw error;
-              return { rows: data, total: Number(data[0]?.total_count ?? 0), offset };
+            const requestUrl = new URL(
+              `/api/storefront/${encodeURIComponent(slug)}`,
+              environment.storefrontPublicUrl
+            );
+            requestUrl.searchParams.set('limit', String(limit));
+            requestUrl.searchParams.set('offset', String(requestedOffset));
+            if (search) requestUrl.searchParams.set('search', search);
+            if (categoryId) requestUrl.searchParams.set('category', categoryId);
+            const request = await fetch(requestUrl, { headers: { Accept: 'application/json' } });
+            if (!request.ok) throw new Error(`storefront_page_failed:${request.status}`);
+            const response = (await request.json()) as Partial<CatalogPage> | null;
+            return {
+              storefront: response?.storefront ?? null,
+              categories: response?.categories ?? [],
+              rows: response?.rows ?? [],
+              offset: Number(response?.offset ?? requestedOffset),
+              hasMore: response?.hasMore === true,
             };
-
-            const requestedPage = await fetchPage(requestedOffset);
-            if (requestedPage.rows.length > 0 || requestedOffset === 0) return requestedPage;
-
-            const firstPage = await fetchPage(0);
-            if (firstPage.total === 0) return firstPage;
-            const lastOffset = Math.floor((firstPage.total - 1) / limit) * limit;
-            return lastOffset === 0 ? firstPage : fetchPage(lastOffset);
           });
-    if (isPlatformServer(this.platformId) && cacheable) this.transferState.set(key, page);
+    if (isPlatformServer(this.platformId) && cacheable) {
+      this.transferState.set(key, page);
+      this.transferState.set(shopKey(slug), page.storefront);
+      this.transferState.set(categoriesKey(slug), page.categories);
+    }
     return page;
   }
 

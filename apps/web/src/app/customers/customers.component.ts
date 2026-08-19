@@ -459,6 +459,17 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
                     [formControl]="email"
                   />
                 </app-form-field>
+                <app-form-field
+                  label="Customer tax PIN"
+                  hint="Optional. Snapshotted on future VAT invoices for business customers."
+                >
+                  <input
+                    type="text"
+                    class="input input-bordered input-sm w-full"
+                    autocomplete="off"
+                    [formControl]="taxRegistrationNumber"
+                  />
+                </app-form-field>
                 <app-form-field label="Notes">
                   <input
                     type="text"
@@ -548,6 +559,12 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
                   "
                 />
               </div>
+              @if (c.tax_registration_number) {
+                <div class="mt-3 rounded-field border border-base-300 px-3 py-2">
+                  <p class="type-caption">Customer tax PIN</p>
+                  <p class="text-sm font-medium">{{ c.tax_registration_number }}</p>
+                </div>
+              }
 
               @if (detailLoading()) {
                 <div class="flex items-center justify-center gap-2 py-8 text-base-content/60">
@@ -1329,6 +1346,7 @@ export class CustomersComponent implements OnInit {
   protected readonly lastName = new FormControl('', { nonNullable: true });
   protected readonly phone = new FormControl('', { nonNullable: true });
   protected readonly email = new FormControl('', { nonNullable: true });
+  protected readonly taxRegistrationNumber = new FormControl('', { nonNullable: true });
   protected readonly notes = new FormControl('', { nonNullable: true });
   protected readonly notificationsEnabled = new FormControl(true, { nonNullable: true });
   protected readonly smsNotificationsEnabled = new FormControl(true, { nonNullable: true });
@@ -1660,6 +1678,7 @@ export class CustomersComponent implements OnInit {
     this.lastName.setValue(c.last_name ?? '');
     this.phone.setValue(c.phone ?? '');
     this.email.setValue(c.email ?? '');
+    this.taxRegistrationNumber.setValue(c.tax_registration_number ?? '');
     this.notes.setValue(c.notes ?? '');
     this.notificationsEnabled.setValue(c.notifications_enabled);
     this.smsNotificationsEnabled.setValue(c.sms_notifications_enabled);
@@ -1673,6 +1692,7 @@ export class CustomersComponent implements OnInit {
     this.lastName.setValue('');
     this.phone.setValue('');
     this.email.setValue('');
+    this.taxRegistrationNumber.setValue('');
     this.notes.setValue('');
     this.notificationsEnabled.setValue(true);
     this.smsNotificationsEnabled.setValue(true);
@@ -1798,6 +1818,10 @@ export class CustomersComponent implements OnInit {
         savedId = customerId;
         this.notice.set(`Created ${this.firstName.value.trim()}`);
       }
+      await this.money.updateCustomerTaxRegistration(
+        savedId,
+        this.taxRegistrationNumber.value.trim()
+      );
       await this.money.updateCustomerCommunicationPreferences(
         savedId,
         this.notificationsEnabled.value,

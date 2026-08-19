@@ -51,6 +51,14 @@ const FAQ_ENTITIES = [
   },
   {
     '@type': 'Question',
+    name: 'Does Dukarun calculate VAT?',
+    acceptedAnswer: {
+      '@type': 'Answer',
+      text: 'Yes, for a configured VAT-registered shop in a supported jurisdiction. Dukarun extracts VAT from VAT-inclusive sales and eligible supplier invoices, posts input and output VAT to the ledger, and provides VAT breakdowns and reports. It does not submit to eTIMS and is not tax advice or a compliance guarantee.',
+    },
+  },
+  {
+    '@type': 'Question',
     name: 'How is the subscription billed?',
     acceptedAnswer: {
       '@type': 'Answer',
@@ -185,7 +193,7 @@ export class SiteSeoService {
         applicationCategory: 'BusinessApplication',
         operatingSystem: 'Web, Android',
         description:
-          'Point of sale, stock management, customer credit and books for Kenyan businesses.',
+          'Point of sale, stock management, VAT calculations and double-entry books for Kenyan businesses.',
         publisher: { '@id': organizationId },
       },
     ];

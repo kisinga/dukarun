@@ -32,12 +32,7 @@ import { MoneyComponent } from '../../shared/ui/money.component';
 import { PageLayoutComponent } from '../../shared/ui/page-layout.component';
 import { StatCardComponent } from '../../shared/ui/stat-card.component';
 import { CompanyPreferencesService } from '../../core/company-preferences.service';
-import {
-  offlineDb,
-  offlineScopeKey,
-  type CacheStream,
-  type NamedSnapshot,
-} from '../../pos/offline/offline-db';
+import { offlineDb, offlineScopeKey, type NamedSnapshot } from '../../pos/offline/offline-db';
 import { CacheJournalService, type CacheStreamHandler } from '../../core/cache-journal.service';
 import { PageActionsComponent } from '../../shared/ui/page-actions.component';
 
@@ -52,6 +47,7 @@ type TopVariant = {
 type LowStockDisplay = LowStockVariant & { manufacturer_name: string | null };
 type ExpiringDisplay = ExpiringBatch & { manufacturer_name: string | null };
 type SalesChartPoint = DailySummary & { day: string; revenue: number; heightPercent: number };
+type DashboardSection = 'sales' | 'attention';
 
 @Component({
   selector: 'app-dashboard',
@@ -689,17 +685,13 @@ export class DashboardComponent implements OnInit, OnDestroy {
   protected readonly initialLoading = computed(() => this.loading() && !this.lastUpdated());
 
   private liveChannels: RealtimeChannel[] = [];
-  private loadQueued = false;
+  private readonly queuedSections = new Set<DashboardSection>();
   private readonly loadWaiters: Array<() => void> = [];
   private lastLoadSucceeded = false;
-  private cacheHandler: CacheStreamHandler | null = null;
+  private salesCacheHandler: CacheStreamHandler | null = null;
+  private catalogCacheHandler: CacheStreamHandler | null = null;
   private journalScope: string | null = null;
   private readonly connectedConsumers = new Set<string>();
-  private readonly journalConsumers: ReadonlyArray<readonly [CacheStream, string]> = [
-    ['sales', 'dashboard-sales'],
-    ['catalog', 'dashboard-catalog'],
-    ['parties', 'dashboard-parties'],
-  ];
   private serverLoadVersion = 0;
 
   constructor() {
@@ -733,10 +725,21 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     for (const channel of this.liveChannels) void this.supabase.client.removeChannel(channel);
-    if (this.journalScope && this.cacheHandler) {
-      for (const [stream, consumer] of this.journalConsumers) {
-        this.journal.unsubscribe(stream, this.journalScope, this.cacheHandler, consumer);
-      }
+    if (this.journalScope && this.salesCacheHandler) {
+      this.journal.unsubscribe(
+        'sales',
+        this.journalScope,
+        this.salesCacheHandler,
+        'dashboard-sales'
+      );
+    }
+    if (this.journalScope && this.catalogCacheHandler) {
+      this.journal.unsubscribe(
+        'catalog',
+        this.journalScope,
+        this.catalogCacheHandler,
+        'dashboard-catalog'
+      );
     }
     this.journalScope = null;
     this.connectedConsumers.clear();
@@ -772,80 +775,102 @@ export class DashboardComponent implements OnInit, OnDestroy {
     return `${value >= 0 ? '+' : ''}${value.toFixed(1)}%`;
   }
 
-  private async loadReports(): Promise<void> {
+  private async loadReports(
+    sections: readonly DashboardSection[] = ['sales', 'attention']
+  ): Promise<void> {
+    for (const section of sections) this.queuedSections.add(section);
     if (this.loading()) {
-      this.loadQueued = true;
       return new Promise(resolve => this.loadWaiters.push(resolve));
     }
 
-    ++this.serverLoadVersion;
     this.loading.set(true);
+    this.lastLoadSucceeded = true;
     try {
-      const requestedLocationId = this.dashboardLocationId();
-      const since = this.daysAgoIso(6);
-      const canView = this.canViewFinancials();
-      if (!canView) this.clearFinancials();
-      const [sales, lowStockResult, expiring] = await Promise.all([
-        canView ? this.reports.dashboardSales(since, requestedLocationId) : Promise.resolve(null),
-        this.reports.lowStock(requestedLocationId),
-        this.preferences.batchExpiryEnabled()
-          ? this.reports.expiringBatches()
-          : Promise.resolve([]),
-      ]);
-      const lowStock = lowStockResult.rows;
-      if (requestedLocationId !== this.dashboardLocationId()) {
-        this.loadQueued = true;
-        return;
+      while (this.queuedSections.size > 0) {
+        const requestedSections = new Set(this.queuedSections);
+        this.queuedSections.clear();
+        ++this.serverLoadVersion;
+        const requestedLocationId = this.dashboardLocationId();
+        const canView = this.canViewFinancials();
+        if (!canView) this.clearFinancials();
+
+        const salesPromise =
+          requestedSections.has('sales') && canView
+            ? this.reports.dashboardSales(this.daysAgoIso(6), requestedLocationId)
+            : Promise.resolve(null);
+        const attentionPromise = requestedSections.has('attention')
+          ? Promise.all([
+              this.reports.lowStock(requestedLocationId),
+              this.preferences.batchExpiryEnabled()
+                ? this.reports.expiringBatches()
+                : Promise.resolve([]),
+            ])
+          : Promise.resolve(null);
+        const [sales, attention] = await Promise.all([salesPromise, attentionPromise]);
+
+        if (requestedLocationId !== this.dashboardLocationId()) {
+          for (const section of requestedSections) this.queuedSections.add(section);
+          continue;
+        }
+
+        await Promise.all([
+          sales && this.canViewFinancials() ? this.applySalesReport(sales) : Promise.resolve(),
+          attention ? this.applyAttentionReport(attention[0], attention[1]) : Promise.resolve(),
+        ]);
+        // A role update can land while report data is in flight. Never let an
+        // old authorization decision restore financial data afterward.
+        if (!this.canViewFinancials()) this.clearFinancials();
+        this.lastUpdated.set(new Date());
+        this.loadError.set(null);
+        await this.persistDashboard(requestedLocationId);
       }
-      if (sales && this.canViewFinancials()) {
-        this.summary.set(sales.summary);
-        this.productSales.set(sales.productSales);
-        this.locationRows.set(sales.locations);
-        this.comparison.set(sales.comparison);
-        await this.computeTopVariants(sales.productSales);
-      }
-      if (!this.canViewFinancials()) this.clearFinancials();
-      const attentionIds = [
-        ...new Set(
-          [...lowStock, ...expiring].map(item => item.variant_id).filter((id): id is string => !!id)
-        ),
-      ];
-      const attentionVariants = await this.pos.variantsByIds(attentionIds);
-      const manufacturerByVariant = new Map(
-        attentionVariants.map(variant => [variant.variant_id, variant.manufacturer_name])
-      );
-      this.lowStock.set(
-        lowStock.map(item => ({
-          ...item,
-          manufacturer_name: manufacturerByVariant.get(item.variant_id) ?? null,
-        }))
-      );
-      this.lowStockTotal.set(lowStockResult.total);
-      this.expiring.set(
-        expiring.map(item => ({
-          ...item,
-          manufacturer_name: manufacturerByVariant.get(item.variant_id) ?? null,
-        }))
-      );
-      // A role update can land while the report RPCs or variant projection are
-      // in flight. Never let their old authorization decision win afterward.
-      if (!this.canViewFinancials()) this.clearFinancials();
-      this.lastUpdated.set(new Date());
-      this.loadError.set(null);
-      await this.persistDashboard(requestedLocationId);
-      this.lastLoadSucceeded = true;
     } catch (err) {
       this.lastLoadSucceeded = false;
+      this.queuedSections.clear();
       this.loadError.set(err instanceof Error ? err.message : 'Failed to load dashboard');
     } finally {
       this.loading.set(false);
-      if (this.loadQueued) {
-        this.loadQueued = false;
-        void this.loadReports();
-      } else {
-        for (const resolve of this.loadWaiters.splice(0)) resolve();
-      }
+      for (const resolve of this.loadWaiters.splice(0)) resolve();
     }
+  }
+
+  private async applySalesReport(
+    sales: Awaited<ReturnType<ReportsService['dashboardSales']>>
+  ): Promise<void> {
+    this.summary.set(sales.summary);
+    this.productSales.set(sales.productSales);
+    this.locationRows.set(sales.locations);
+    this.comparison.set(sales.comparison);
+    await this.computeTopVariants(sales.productSales);
+  }
+
+  private async applyAttentionReport(
+    lowStockResult: Awaited<ReturnType<ReportsService['lowStock']>>,
+    expiring: ExpiringBatch[]
+  ): Promise<void> {
+    const lowStock = lowStockResult.rows;
+    const attentionIds = [
+      ...new Set(
+        [...lowStock, ...expiring].map(item => item.variant_id).filter((id): id is string => !!id)
+      ),
+    ];
+    const attentionVariants = await this.pos.variantsByIds(attentionIds);
+    const manufacturerByVariant = new Map(
+      attentionVariants.map(variant => [variant.variant_id, variant.manufacturer_name])
+    );
+    this.lowStock.set(
+      lowStock.map(item => ({
+        ...item,
+        manufacturer_name: manufacturerByVariant.get(item.variant_id) ?? null,
+      }))
+    );
+    this.lowStockTotal.set(lowStockResult.total);
+    this.expiring.set(
+      expiring.map(item => ({
+        ...item,
+        manufacturer_name: manufacturerByVariant.get(item.variant_id) ?? null,
+      }))
+    );
   }
 
   private connectLiveUpdates(companyId: string): void {
@@ -855,13 +880,13 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.journalScope = scope;
     this.connectedConsumers.clear();
     this.liveConnected.set(false);
-    this.cacheHandler = {
+    this.salesCacheHandler = {
       apply: async () => {
-        await this.loadReports();
+        await this.loadReports(['sales']);
         if (!this.lastLoadSucceeded) throw new Error('dashboard_refresh_failed');
       },
       reset: async () => {
-        await this.loadReports();
+        await this.loadReports(['sales']);
         return this.lastLoadSucceeded;
       },
       purge: () => {
@@ -869,12 +894,32 @@ export class DashboardComponent implements OnInit, OnDestroy {
         this.lastUpdated.set(null);
       },
     };
-    this.liveChannels = this.journalConsumers.map(([stream, consumer]) =>
-      this.journal.subscribe(stream, scope, companyId, this.cacheHandler!, consumer, status => {
+    this.catalogCacheHandler = {
+      apply: async () => {
+        await this.refreshTopVariantLabels();
+        await this.loadReports(['attention']);
+        if (!this.lastLoadSucceeded) throw new Error('dashboard_refresh_failed');
+      },
+      reset: async () => {
+        await this.refreshTopVariantLabels();
+        await this.loadReports(['attention']);
+        return this.lastLoadSucceeded;
+      },
+    };
+    const subscriptions = [
+      { stream: 'sales' as const, consumer: 'dashboard-sales', handler: this.salesCacheHandler },
+      {
+        stream: 'catalog' as const,
+        consumer: 'dashboard-catalog',
+        handler: this.catalogCacheHandler,
+      },
+    ];
+    this.liveChannels = subscriptions.map(({ stream, consumer, handler }) =>
+      this.journal.subscribe(stream, scope, companyId, handler, consumer, status => {
         if (scope !== this.journalScope) return;
         if (status === 'SUBSCRIBED') this.connectedConsumers.add(consumer);
         else this.connectedConsumers.delete(consumer);
-        this.liveConnected.set(this.connectedConsumers.size === this.journalConsumers.length);
+        this.liveConnected.set(this.connectedConsumers.size === subscriptions.length);
       })
     );
   }
@@ -999,6 +1044,25 @@ export class DashboardComponent implements OnInit, OnDestroy {
         revenue: totals.revenue,
         margin: totals.margin,
       }))
+    );
+  }
+
+  private async refreshTopVariantLabels(): Promise<void> {
+    const current = this.topVariants();
+    if (current.length === 0) return;
+    const variants = await this.pos.variantsByIds(current.map(row => row.variantId));
+    const byId = new Map(variants.map(variant => [variant.variant_id, variant]));
+    this.topVariants.set(
+      current.map(row => {
+        const variant = byId.get(row.variantId);
+        return variant
+          ? {
+              ...row,
+              label: variantLabel(variant),
+              manufacturer: variant.manufacturer_name || 'Manufacturer not set',
+            }
+          : row;
+      })
     );
   }
 

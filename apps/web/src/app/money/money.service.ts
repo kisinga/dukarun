@@ -1,5 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import type { Database, Json } from '@dukarun/shared-types';
+import type { PurchaseTaxEstimate } from '@dukarun/tax-types';
 import { SupabaseService } from '../core/supabase.service';
 import { rpcError } from '../pos/pos.service';
 import { LocationContextService } from '../core/location-context.service';
@@ -1054,6 +1055,19 @@ export class MoneyService {
     return data;
   }
 
+  async updateCustomerTaxRegistration(
+    customerId: string,
+    taxRegistrationNumber: string
+  ): Promise<string> {
+    const { data, error } = await this.db.rpc('update_customer_tax_registration', {
+      p_customer_id: customerId,
+      p_tax_registration_number: taxRegistrationNumber,
+    });
+    if (error) throw rpcError(error);
+    this.parties.invalidate();
+    return data;
+  }
+
   async updateCustomerCommunicationPreferences(
     customerId: string,
     enabled: boolean,
@@ -1193,6 +1207,33 @@ export class MoneyService {
     return data;
   }
 
+  async estimatePurchaseInputVat(input: {
+    lines: PurchaseLineInput[];
+    expenses: PurchaseExpenseInput[];
+    taxInvoiceDate: string;
+  }): Promise<PurchaseTaxEstimate> {
+    const { data, error } = await this.db.rpc('estimate_purchase_input_vat', {
+      p_lines: input.lines as unknown as Json,
+      p_expenses: input.expenses as unknown as Json,
+      p_tax_invoice_date: input.taxInvoiceDate,
+    });
+    if (error) throw rpcError(error);
+    return data as unknown as PurchaseTaxEstimate;
+  }
+
+  async updateSupplierTaxRegistration(
+    supplierId: string,
+    taxRegistrationNumber: string
+  ): Promise<string> {
+    const { data, error } = await this.db.rpc('update_supplier_tax_registration', {
+      p_supplier_id: supplierId,
+      p_tax_registration_number: taxRegistrationNumber,
+    });
+    if (error) throw rpcError(error);
+    this.parties.invalidate();
+    return data;
+  }
+
   async recordPurchaseWithAdvance(input: {
     supplierId: string;
     lines: PurchaseLineInput[];
@@ -1206,6 +1247,8 @@ export class MoneyService {
     purchaseDate?: string;
     stockLocationId?: string;
     clientRef: string;
+    claimInputVat?: boolean;
+    taxInvoiceDate?: string;
   }): Promise<string> {
     const { data, error } = await this.db.rpc('record_purchase_with_advance', {
       p_supplier_id: input.supplierId,
@@ -1220,6 +1263,8 @@ export class MoneyService {
       ...(input.notes ? { p_notes: input.notes } : {}),
       ...(input.purchaseDate ? { p_purchase_date: input.purchaseDate } : {}),
       ...(input.stockLocationId ? { p_stock_location_id: input.stockLocationId } : {}),
+      p_claim_input_vat: input.claimInputVat ?? false,
+      ...(input.taxInvoiceDate ? { p_tax_invoice_date: input.taxInvoiceDate } : {}),
     });
     if (error) throw rpcError(error);
     this.parties.invalidateFinancials();
@@ -1238,8 +1283,10 @@ export class MoneyService {
     paymentMode?: 'paid' | 'partial' | 'later';
     paymentAmount?: number;
     accountCode?: string;
+    claimInputVat?: boolean;
+    taxInvoiceDate?: string;
   }): Promise<string> {
-    const { data, error } = await this.db.rpc('save_purchase_draft_complete', {
+    const { data, error } = await this.db.rpc('save_purchase_draft_complete_with_tax', {
       p_supplier_id: input.supplierId,
       p_lines: input.lines as never,
       p_expenses: input.expenses as never,
@@ -1251,9 +1298,58 @@ export class MoneyService {
       ...(input.paymentMode ? { p_payment_mode: input.paymentMode } : {}),
       ...(input.paymentAmount !== undefined ? { p_payment_amount: input.paymentAmount } : {}),
       ...(input.accountCode ? { p_account_code: input.accountCode } : {}),
+      p_claim_input_vat: input.claimInputVat ?? false,
+      ...(input.taxInvoiceDate ? { p_tax_invoice_date: input.taxInvoiceDate } : {}),
     });
     if (error) throw rpcError(error);
     return data;
+  }
+
+  async savePurchaseWorkspaceDraft(input: {
+    draftId?: string;
+    supplierId: string;
+    lines: PurchaseLineInput[];
+    expenses: PurchaseExpenseInput[];
+    reference?: string;
+    notes?: string;
+    purchaseDate: string;
+    stockLocationId: string;
+    paymentMode: 'paid' | 'partial' | 'later';
+    paymentAmount: number;
+    advanceAmount: number;
+    accountCode?: string;
+    clientRef: string;
+    claimInputVat: boolean;
+    taxInvoiceDate?: string;
+  }): Promise<string> {
+    const { data, error } = await this.db.rpc('save_purchase_workspace_draft', {
+      p_supplier_id: input.supplierId,
+      p_lines: input.lines as unknown as Json,
+      p_expenses: input.expenses as unknown as Json,
+      p_purchase_date: input.purchaseDate,
+      p_stock_location_id: input.stockLocationId,
+      p_payment_mode: input.paymentMode,
+      p_payment_amount: input.paymentAmount,
+      p_advance_amount: input.advanceAmount,
+      p_client_ref: input.clientRef,
+      p_claim_input_vat: input.claimInputVat,
+      ...(input.draftId ? { p_draft_id: input.draftId } : {}),
+      ...(input.reference ? { p_reference: input.reference } : {}),
+      ...(input.notes ? { p_notes: input.notes } : {}),
+      ...(input.accountCode ? { p_account_code: input.accountCode } : {}),
+      ...(input.taxInvoiceDate ? { p_tax_invoice_date: input.taxInvoiceDate } : {}),
+    });
+    if (error) throw rpcError(error);
+    return data as unknown as string;
+  }
+
+  async finalizePurchaseDraft(draftId: string): Promise<string> {
+    const { data, error } = await this.db.rpc('finalize_purchase_draft', {
+      p_draft_id: draftId,
+    });
+    if (error) throw rpcError(error);
+    this.parties.invalidateFinancials();
+    return data as unknown as string;
   }
 
   async savePurchaseDraftWithAdvance(input: {
@@ -1269,8 +1365,10 @@ export class MoneyService {
     advanceAmount: number;
     accountCode?: string;
     clientRef: string;
+    claimInputVat?: boolean;
+    taxInvoiceDate?: string;
   }): Promise<string> {
-    const { data, error } = await this.db.rpc('save_purchase_draft_with_advance', {
+    const { data, error } = await this.db.rpc('save_purchase_draft_with_advance_tax', {
       p_supplier_id: input.supplierId,
       p_lines: input.lines as unknown as Json,
       p_expenses: input.expenses as unknown as Json,
@@ -1283,6 +1381,8 @@ export class MoneyService {
       ...(input.notes ? { p_notes: input.notes } : {}),
       ...(input.stockLocationId ? { p_stock_location_id: input.stockLocationId } : {}),
       ...(input.accountCode ? { p_account_code: input.accountCode } : {}),
+      p_claim_input_vat: input.claimInputVat ?? false,
+      ...(input.taxInvoiceDate ? { p_tax_invoice_date: input.taxInvoiceDate } : {}),
     });
     if (error) throw rpcError(error);
     return data as unknown as string;

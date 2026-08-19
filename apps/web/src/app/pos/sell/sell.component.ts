@@ -17,7 +17,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { parseKes } from '../../core/money';
 import { PermissionsService } from '../../core/permissions.service';
 import { CashierSessionService } from '../../core/cashier-session.service';
-import { CartService, type CartLine } from '../cart.service';
+import { CartService, MAX_SALE_LINES, type CartLine } from '../cart.service';
 import {
   CheckoutPanelComponent,
   type PaymentMethodOption,
@@ -1651,8 +1651,7 @@ export class SellComponent implements OnInit {
         this.error.set(`${this.label(result.variant)} is out of stock at this location.`);
         return;
       }
-      this.addVariant(result.variant);
-      this.scanFeedback.playSuccess();
+      if (this.addVariant(result.variant)) this.scanFeedback.playSuccess();
     } catch (error) {
       this.error.set(error instanceof Error ? error.message : 'Barcode lookup failed.');
     } finally {
@@ -1661,9 +1660,13 @@ export class SellComponent implements OnInit {
     }
   }
 
-  protected addVariant(variant: Variant): void {
-    if (this.unavailable(variant)) return;
-    this.cart.addVariant(variant);
+  protected addVariant(variant: Variant): boolean {
+    if (this.unavailable(variant)) return false;
+    if (this.cart.addVariant(variant)) return true;
+    this.error.set(
+      `An order can contain at most ${MAX_SALE_LINES} different items. Complete this order, then start another.`
+    );
+    return false;
   }
 
   protected label(variant: Variant): string {
@@ -2306,6 +2309,12 @@ export class SellComponent implements OnInit {
         return;
       }
       const lines = await this.pos.orderLines(orderId);
+      if (lines.length > MAX_SALE_LINES) {
+        this.error.set(
+          `${order.code} contains ${lines.length} lines. Orders are now limited to ${MAX_SALE_LINES}; split it before checkout.`
+        );
+        return;
+      }
       // Location-resolved stock so the shortfall flags match what the server
       // will enforce at completion.
       const variants = await this.pos.variantsByIdsWithStock(lines.map(line => line.variant_id));

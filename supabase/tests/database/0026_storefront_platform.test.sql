@@ -1,6 +1,6 @@
 -- Storefront + platform tests (migration 0026).
 begin;
-select plan(15);
+select plan(23);
 
 select testkit.create_user('11111111-1111-1111-1111-111111111111', 'admin@sf.local');
 select testkit.create_user('99999999-9999-9999-9999-999999999999', 'root@sf.local');
@@ -15,6 +15,12 @@ insert into public.products (id, company_id, name)
 select 'a0000000-0000-0000-0000-0000000000aa', company_id, 'Tea' from sf_company;
 insert into public.product_variants (id, product_id, company_id, name, sku, price)
 select 'aa000000-0000-0000-0000-0000000000aa', 'a0000000-0000-0000-0000-0000000000aa', company_id, 'Box', 'TEA1', 10000 from sf_company;
+insert into public.product_variants (id, product_id, company_id, name, sku, price)
+select 'aa000000-0000-0000-0000-0000000000ac', 'a0000000-0000-0000-0000-0000000000aa', company_id, 'Case', 'TEA2', 15000 from sf_company;
+insert into public.products (id, company_id, name)
+select 'a0000000-0000-0000-0000-0000000000ab', company_id, 'Coffee' from sf_company;
+insert into public.product_variants (id, product_id, company_id, name, sku, price)
+select 'aa000000-0000-0000-0000-0000000000ab', 'a0000000-0000-0000-0000-0000000000ab', company_id, 'Bag', 'COFFEE1', 20000 from sf_company;
 
 -- Company starts unapproved: invisible in the directory.
 update public.companies
@@ -73,6 +79,47 @@ select throws_ok(
   $$select * from public.storefront_catalog_page('sf-co', null, null, null, 0)$$,
   'P0001', 'invalid_storefront_page_size',
   'storefront page size cannot bypass bounds with null'
+);
+
+select is(
+  public.storefront_page('sf-co', null, null, 1, 0) #>> '{storefront,slug}',
+  'sf-co',
+  'page-shaped storefront read includes shop identity'
+);
+select is(
+  jsonb_array_length(public.storefront_page('sf-co', null, null, 1, 0) -> 'rows'),
+  1,
+  'page-shaped storefront read returns one bounded product family'
+);
+select is(
+  (public.storefront_page('sf-co', null, null, 1, 0) ->> 'hasMore')::boolean,
+  true,
+  'storefront pagination detects a next page without an exact count'
+);
+select is(
+  public.storefront_page('sf-co', 'TEA1', null, 12, 0) #>> '{rows,0,product_name}',
+  'Tea',
+  'storefront search uses the catalog search projection'
+);
+select is(
+  (public.storefront_page('sf-co', 'TEA1', null, 12, 0) #>> '{rows,0,variant_count}')::integer,
+  2,
+  'storefront list returns one product summary with its option count'
+);
+select is(
+  (public.storefront_page('sf-co', 'TEA1', null, 12, 0) #>> '{rows,0,max_price}')::bigint,
+  15000::bigint,
+  'storefront product summary retains the full variant price range'
+);
+select throws_ok(
+  $$select public.storefront_page('sf-co', null, null, 49, 0)$$,
+  'P0001', 'invalid_storefront_page_size',
+  'page-shaped storefront reads remain bounded'
+);
+select ok(
+  exists(select 1 from pg_indexes where schemaname='public'
+    and indexname='products_storefront_page_idx'),
+  'storefront product ordering has a supporting index'
 );
 
 -- 4. Lapsed subscription: identity stays, catalogue hides.

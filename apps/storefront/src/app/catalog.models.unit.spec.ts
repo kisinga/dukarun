@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { catalogLabel, groupCatalog } from './catalog.models';
-import type { CatalogRow } from './storefront.service';
+import { catalogLabel, catalogProductsFromPage, groupCatalog } from './catalog.models';
+import type { CatalogPageRow, CatalogRow } from './storefront.service';
 
 describe('catalog model', () => {
   it('groups variants and derives the price range', () => {
@@ -42,5 +42,29 @@ describe('catalog model', () => {
       available: true,
     });
     expect(catalogLabel(rows[0])).toBe('Cable · 1 metre');
+  });
+
+  it('uses bounded product summaries for catalogue pages', () => {
+    const rows = [
+      {
+        product_id: 'product-1',
+        product_name: 'Cable',
+        manufacturer_name: 'Acme',
+        manufacturer_id: 'manufacturer-1',
+        image_path: '',
+        min_price: 100,
+        max_price: 180,
+        variant_count: 2,
+        available: true,
+      },
+    ] satisfies CatalogPageRow[];
+
+    expect(catalogProductsFromPage(rows)[0]).toMatchObject({
+      name: 'Cable',
+      minPrice: 100,
+      maxPrice: 180,
+      variantCount: 2,
+      variants: [],
+    });
   });
 });

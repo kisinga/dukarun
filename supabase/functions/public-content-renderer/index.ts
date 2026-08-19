@@ -33,6 +33,12 @@ const HTML_HEADERS = {
   'X-Content-Type-Options': 'nosniff',
   'Content-Security-Policy': "default-src 'none'; img-src 'self' https:; style-src 'unsafe-inline'",
 };
+const STOREFRONT_API_HEADERS = {
+  'Content-Type': 'application/json; charset=utf-8',
+  'Cache-Control': 'public, max-age=30',
+  'CDN-Cache-Control': 'public, max-age=120, stale-while-revalidate=600, stale-if-error=600',
+  'X-Content-Type-Options': 'nosniff',
+};
 
 function response(body: string, contentType: string, status = 200): Response {
   return new Response(body, {
@@ -46,6 +52,25 @@ function response(body: string, contentType: string, status = 200): Response {
 
 function html(body: string, status = 200): Response {
   return response(body, 'text/html; charset=utf-8', status);
+}
+
+function storefrontApiResponse(
+  request: Request,
+  body: unknown,
+  status = 200,
+  cacheable = true
+): Response {
+  return new Response(request.method === 'HEAD' ? null : JSON.stringify(body), {
+    status,
+    headers:
+      status === 200 && cacheable
+        ? STOREFRONT_API_HEADERS
+        : {
+            ...STOREFRONT_API_HEADERS,
+            'Cache-Control': 'no-store',
+            'CDN-Cache-Control': 'no-store',
+          },
+  });
 }
 
 function publicRequest(request: Request): {
@@ -104,6 +129,48 @@ Deno.serve(async request => {
   if (!['GET', 'HEAD'].includes(request.method)) return html('Method not allowed', 405);
   const context = publicRequest(request);
   if (!context || !supabaseUrl || !anonKey) return html('Not found', 404);
+  const requestUrl = new URL(context.requestUri, context.origin);
+  const storefrontApiMatch =
+    context.app === 'storefront'
+      ? requestUrl.pathname.match(/^\/api\/storefront\/([a-z0-9]+(?:-[a-z0-9]+)*)\/?$/)
+      : null;
+  if (storefrontApiMatch) {
+    const limit = Number(requestUrl.searchParams.get('limit') ?? '12');
+    const offset = Number(requestUrl.searchParams.get('offset') ?? '0');
+    const search = requestUrl.searchParams.get('search')?.trim() || undefined;
+    const categoryId = requestUrl.searchParams.get('category')?.trim() || undefined;
+    if (
+      !Number.isInteger(limit) ||
+      limit < 1 ||
+      limit > 48 ||
+      !Number.isInteger(offset) ||
+      offset < 0 ||
+      offset > 10000 ||
+      (search?.length ?? 0) > 120 ||
+      (categoryId &&
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+          categoryId
+        ))
+    ) {
+      return storefrontApiResponse(request, { error: 'invalid_request' }, 400);
+    }
+    try {
+      const { data, error } = await db.rpc('storefront_page', {
+        p_slug: storefrontApiMatch[1],
+        p_limit: limit,
+        p_offset: offset,
+        ...(search ? { p_search: search } : {}),
+        ...(categoryId ? { p_category_id: categoryId } : {}),
+      });
+      if (error) throw error;
+      // Free-form searches create an unbounded cache key space. Category and
+      // browse pages are finite and safe for the shared edge cache.
+      return storefrontApiResponse(request, data, 200, !search);
+    } catch (error) {
+      console.error('storefront API failed', storefrontApiMatch[1], error);
+      return storefrontApiResponse(request, { error: 'temporarily_unavailable' }, 503);
+    }
+  }
   const route = parsePublicContentRoute(context.app, context.requestUri);
   if (!route) return html(renderNotFound(context.origin), 404);
 
@@ -138,22 +205,17 @@ Deno.serve(async request => {
     }
 
     if (route.kind === 'shop') {
-      const [{ data: shops, error: shopError }, { data: rows, error: catalogError }] =
-        await Promise.all([
-          db
-            .from('public_storefronts')
-            .select('name,slug,logo_path,catalogue_visible')
-            .eq('slug', route.slug)
-            .limit(1),
-          db.rpc('storefront_catalog_page', {
-            p_slug: route.slug,
-            p_limit: 48,
-            p_offset: 0,
-          }),
-        ]);
-      if (shopError) throw shopError;
-      if (catalogError) throw catalogError;
-      const shop = shops?.[0] as PublicStorefront | undefined;
+      const { data, error } = await db.rpc('storefront_page', {
+        p_slug: route.slug,
+        p_limit: 48,
+        p_offset: 0,
+      });
+      if (error) throw error;
+      const page = data as unknown as {
+        storefront: PublicStorefront | null;
+        rows: PublicProductRow[];
+      } | null;
+      const shop = page?.storefront ?? undefined;
       if (!shop) return html(renderNotFound(context.origin), 404);
       const image =
         storageObjectUrl(context.storageOrigin, 'company-logos', shop.logo_path) ??
@@ -161,9 +223,7 @@ Deno.serve(async request => {
           '/media/video/product-overview/product-overview-full-wide.png',
           'https://dukarun.com/'
         ).toString();
-      return html(
-        renderShop(shop, (rows ?? []) as unknown as PublicProductRow[], context.origin, image)
-      );
+      return html(renderShop(shop, page?.rows ?? [], context.origin, image));
     }
 
     const [{ data: shops, error: shopError }, { data: rows, error: productError }] =
