@@ -5707,6 +5707,8 @@ export type Database = {
           source: string
           status: string
           subject: string | null
+          subscription_expires_at_snapshot: string | null
+          subscription_reminder_stage: number | null
           team_invitation_id: string | null
           template_key: string | null
           template_version: number | null
@@ -5742,6 +5744,8 @@ export type Database = {
           source?: string
           status?: string
           subject?: string | null
+          subscription_expires_at_snapshot?: string | null
+          subscription_reminder_stage?: number | null
           team_invitation_id?: string | null
           template_key?: string | null
           template_version?: number | null
@@ -5777,6 +5781,8 @@ export type Database = {
           source?: string
           status?: string
           subject?: string | null
+          subscription_expires_at_snapshot?: string | null
+          subscription_reminder_stage?: number | null
           team_invitation_id?: string | null
           template_key?: string | null
           template_version?: number | null
@@ -12863,6 +12869,21 @@ export type Database = {
       }
       queue_mpesa_processor: { Args: never; Returns: undefined }
       queue_sms_fallback: { Args: { p_outbox_id: string }; Returns: string }
+      queue_subscription_reminder_outbox: {
+        Args: {
+          p_body: string
+          p_channel: string
+          p_company_id: string
+          p_dedupe_key: string
+          p_expiry: string
+          p_recipient: string
+          p_sms_fallback: string
+          p_stage: number
+          p_subject: string
+          p_template_key: string
+        }
+        Returns: string
+      }
       queue_team_outbox: {
         Args: {
           p_body: string
@@ -13588,6 +13609,7 @@ export type Database = {
         }[]
       }
       subscription_expiry_scan: { Args: never; Returns: number }
+      subscription_lifecycle_scan: { Args: never; Returns: Json }
       supplier_account_status: {
         Args: { p_supplier_id: string }
         Returns: {
@@ -14017,3 +14039,4 @@ export const Constants = {
     Enums: {},
   },
 } as const
+
