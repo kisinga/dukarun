@@ -31,7 +31,7 @@ import { CashierCountGuidance, cashierCountGuidance } from './cashier-count-guid
         aria-labelledby="cashier-session-dialog-title"
         (cancel)="$event.preventDefault(); close()"
       >
-        <div class="modal-box max-w-3xl p-0">
+        <div class="modal-box modal-box-task p-0 md:w-full md:max-w-3xl">
           <header class="flex items-start justify-between gap-3 border-b border-base-300 p-4">
             <div>
               <h2 id="cashier-session-dialog-title" class="type-title">
@@ -60,7 +60,7 @@ import { CashierCountGuidance, cashierCountGuidance } from './cashier-count-guid
             </button>
           </header>
 
-          <div class="max-h-[min(70vh,44rem)] overflow-y-auto p-4">
+          <div class="modal-body p-4">
             @if (loading()) {
               <div class="flex min-h-40 items-center justify-center gap-2 text-base-content/60">
                 <span class="loading loading-spinner loading-sm"></span>

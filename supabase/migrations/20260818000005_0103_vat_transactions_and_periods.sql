@@ -40,14 +40,16 @@ alter table public.purchase_expenses
   add column net_total bigint not null default 0 check (net_total>=0),
   add column tax_total bigint not null default 0 check (tax_total>=0);
 
+-- Build table indexes before backfills queue deferred purchase-integrity
+-- triggers; PostgreSQL rejects CREATE INDEX while those events are pending.
+create unique index purchases_supplier_tax_invoice_idx
+  on public.purchases(company_id,supplier_id,tax_invoice_number)
+  where tax_invoice_number is not null and status='posted';
+
 update public.purchases set gross_total=total_cost,net_total=total_cost,
   goods_net_total=goods_subtotal,input_tax_total=0;
 update public.purchase_lines set gross_total=line_total,net_total=line_total,tax_total=0;
 update public.purchase_expenses set gross_total=amount,net_total=amount,tax_total=0;
-
-create unique index purchases_supplier_tax_invoice_idx
-  on public.purchases(company_id,supplier_id,tax_invoice_number)
-  where tax_invoice_number is not null and status='posted';
 
 create table public.expense_documents (
   id uuid primary key default gen_random_uuid(),

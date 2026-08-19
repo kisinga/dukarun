@@ -975,7 +975,7 @@ type CatalogView = 'grid' | 'list' | 'categories';
       }
       @if (mpesaSplitReady(); as split) {
         <dialog class="modal modal-open" aria-labelledby="mpesa-cash-heading">
-          <div class="modal-box">
+          <div class="modal-box modal-box-scroll">
             <h2 id="mpesa-cash-heading" class="type-title">M-PESA received</h2>
             <p class="mt-2 text-sm">Confirm the remaining cash only after you have it in hand.</p>
             <div class="mt-4 rounded-box bg-base-200 p-3">
@@ -1004,7 +1004,9 @@ type CatalogView = 'grid' | 'list' | 'categories';
           aria-labelledby="credit-confirm-heading"
           (cancel)="$event.preventDefault(); creditConfirmOpen.set(false)"
         >
-          <div class="modal-box modal-box-compact border border-base-300/60 bg-base-100 p-0">
+          <div
+            class="modal-box modal-box-compact modal-box-task border border-base-300/60 bg-base-100 p-0"
+          >
             <header class="flex items-start gap-3 border-b border-base-300/70 px-4 py-3">
               <span
                 class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary"
@@ -1031,7 +1033,7 @@ type CatalogView = 'grid' | 'list' | 'categories';
               </button>
             </header>
 
-            <div class="max-h-[65dvh] overflow-y-auto px-4 py-4">
+            <div class="modal-body px-4 py-4">
               @if (selectedCustomer(); as customer) {
                 <div
                   class="flex items-center justify-between gap-4 border-b border-base-300/70 pb-3"

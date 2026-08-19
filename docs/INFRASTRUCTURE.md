@@ -45,10 +45,11 @@ npm run sb:start
 npm run sb:reset        # local only: rebuild from migrations + seed
 npm run sb:lint
 npm run sb:test
-npm run sb:types
+npm run sb:types        # resets local DB, then regenerates checked-in types
 ```
 
-Never run `sb:reset` against production. Add behavior and permission tests in
+Never run `sb:reset` against production. `sb:types` also resets the local database so its output
+comes only from committed migrations; local data is replaced by seed data. Add behavior and permission tests in
 `supabase/tests/database` with every financial or tenant-boundary change. Regenerate
 `packages/shared-types/database.types.ts` after schema changes.
 
@@ -164,8 +165,8 @@ Pages cache, and rebuild.
 
 ### Generated database types are stale
 
-Start the local stack, run `npm run sb:types`, and commit the generated type change with the
-migration.
+Run `npm run sb:types` and commit the generated type change with the migration. The command resets
+the local database first so local-only schema changes cannot enter the generated contract.
 
 ### Dashboard does not update immediately
 

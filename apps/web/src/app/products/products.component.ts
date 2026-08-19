@@ -389,792 +389,786 @@ interface PendingProductImage {
       <!-- Coupled product editor: details and every variant save together. -->
       @if (editorMode(); as mode) {
         <dialog class="modal modal-open" (cancel)="$event.preventDefault(); closeProductEditor()">
-          <div class="modal-box product-editor p-0">
-            <form
-              class="flex h-full flex-col md:h-auto"
-              (submit)="$event.preventDefault(); saveProductEditor()"
+          <form
+            class="modal-box modal-box-task p-0 md:w-full md:max-w-3xl"
+            (submit)="$event.preventDefault(); saveProductEditor()"
+          >
+            <header
+              class="flex shrink-0 items-start justify-between gap-3 border-b border-base-300 px-4 py-3 sm:px-6 sm:py-4"
             >
-              <header
-                class="product-editor-header flex shrink-0 items-start justify-between gap-3 border-b border-base-300 px-4 py-3 sm:px-6 sm:py-4"
+              <div class="min-w-0">
+                <h2 class="type-title truncate">
+                  {{ mode === 'create' ? 'New product' : 'Edit ' + editingFamily()!.name }}
+                </h2>
+                <p class="type-caption mt-0.5">Details and variants save together.</p>
+              </div>
+              <button
+                appButton
+                type="button"
+                variant="ghost"
+                [iconOnly]="true"
+                aria-label="Close product editor"
+                (click)="closeProductEditor()"
               >
-                <div class="min-w-0">
-                  <h2 class="type-title truncate">
-                    {{ mode === 'create' ? 'New product' : 'Edit ' + editingFamily()!.name }}
-                  </h2>
-                  <p class="type-caption mt-0.5">Details and variants save together.</p>
+                <app-icon name="heroXMark" />
+              </button>
+            </header>
+
+            <nav
+              class="grid shrink-0 grid-cols-2 border-b border-base-300 px-4 sm:px-6"
+              aria-label="Product editor steps"
+            >
+              <button
+                type="button"
+                class="flex min-h-11 items-center justify-center gap-2 border-b-2 px-2 text-sm font-semibold transition-colors"
+                [class.border-primary]="editorStep() === 1"
+                [class.text-primary]="editorStep() === 1"
+                [class.border-transparent]="editorStep() !== 1"
+                [attr.aria-current]="editorStep() === 1 ? 'step' : null"
+                (click)="editorStep.set(1)"
+              >
+                <span
+                  class="flex h-6 w-6 items-center justify-center rounded-full text-xs"
+                  [class.bg-primary]="editorStep() === 1"
+                  [class.text-primary-content]="editorStep() === 1"
+                  [class.bg-base-200]="editorStep() !== 1"
+                  >1</span
+                >
+                Details
+              </button>
+              <button
+                type="button"
+                class="flex min-h-11 items-center justify-center gap-2 border-b-2 px-2 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+                [class.border-primary]="editorStep() === 2"
+                [class.text-primary]="editorStep() === 2"
+                [class.border-transparent]="editorStep() !== 2"
+                [disabled]="familyName.value.trim().length === 0"
+                [attr.aria-current]="editorStep() === 2 ? 'step' : null"
+                (click)="editorStep.set(2)"
+              >
+                <span
+                  class="flex h-6 w-6 items-center justify-center rounded-full text-xs"
+                  [class.bg-primary]="editorStep() === 2"
+                  [class.text-primary-content]="editorStep() === 2"
+                  [class.bg-base-200]="editorStep() !== 2"
+                  >2</span
+                >
+                Variants
+                <span class="type-caption">{{ editorRows.length }}</span>
+              </button>
+            </nav>
+
+            <div class="modal-body product-editor-body p-4 pb-6 sm:p-6">
+              @if (error()) {
+                <div role="alert" class="alert alert-error mb-4 py-2 text-sm">
+                  <app-icon name="heroExclamationTriangle" />
+                  <span>{{ error() }}</span>
                 </div>
-                <button
-                  appButton
-                  type="button"
-                  variant="ghost"
-                  [iconOnly]="true"
-                  aria-label="Close product editor"
-                  (click)="closeProductEditor()"
-                >
-                  <app-icon name="heroXMark" />
-                </button>
-              </header>
+              }
 
-              <nav
-                class="grid shrink-0 grid-cols-2 border-b border-base-300 px-4 sm:px-6"
-                aria-label="Product editor steps"
-              >
-                <button
-                  type="button"
-                  class="flex min-h-11 items-center justify-center gap-2 border-b-2 px-2 text-sm font-semibold transition-colors"
-                  [class.border-primary]="editorStep() === 1"
-                  [class.text-primary]="editorStep() === 1"
-                  [class.border-transparent]="editorStep() !== 1"
-                  [attr.aria-current]="editorStep() === 1 ? 'step' : null"
-                  (click)="editorStep.set(1)"
-                >
-                  <span
-                    class="flex h-6 w-6 items-center justify-center rounded-full text-xs"
-                    [class.bg-primary]="editorStep() === 1"
-                    [class.text-primary-content]="editorStep() === 1"
-                    [class.bg-base-200]="editorStep() !== 1"
-                    >1</span
+              @if (editorStep() === 1) {
+                <section class="grid gap-5 sm:grid-cols-2">
+                  <app-form-field label="Product name" [required]="true">
+                    <input
+                      type="text"
+                      class="input input-bordered w-full"
+                      autocomplete="off"
+                      [formControl]="familyName"
+                    />
+                  </app-form-field>
+                  <app-form-field
+                    label="Manufacturer"
+                    hint="Optional. Select an existing manufacturer or type a new one."
                   >
-                  Details
-                </button>
-                <button
-                  type="button"
-                  class="flex min-h-11 items-center justify-center gap-2 border-b-2 px-2 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40"
-                  [class.border-primary]="editorStep() === 2"
-                  [class.text-primary]="editorStep() === 2"
-                  [class.border-transparent]="editorStep() !== 2"
-                  [disabled]="familyName.value.trim().length === 0"
-                  [attr.aria-current]="editorStep() === 2 ? 'step' : null"
-                  (click)="editorStep.set(2)"
-                >
-                  <span
-                    class="flex h-6 w-6 items-center justify-center rounded-full text-xs"
-                    [class.bg-primary]="editorStep() === 2"
-                    [class.text-primary-content]="editorStep() === 2"
-                    [class.bg-base-200]="editorStep() !== 2"
-                    >2</span
+                    <input
+                      type="text"
+                      class="input input-bordered w-full"
+                      autocomplete="off"
+                      list="manufacturer-options"
+                      placeholder="Optional"
+                      [formControl]="familyManufacturer"
+                    />
+                    <datalist id="manufacturer-options">
+                      @for (manufacturer of manufacturers(); track manufacturer.id) {
+                        <option [value]="manufacturer.name"></option>
+                      }
+                    </datalist>
+                  </app-form-field>
+                  <app-form-field
+                    label="Shared barcode"
+                    hint="Scan the package barcode or enter it manually. Only suitable for products with one variant."
                   >
-                  Variants
-                  <span class="type-caption">{{ editorRows.length }}</span>
-                </button>
-              </nav>
+                    <div class="flex gap-2">
+                      <input
+                        type="text"
+                        class="input input-bordered min-w-0 flex-1 font-mono"
+                        autocomplete="off"
+                        placeholder="Scan or enter barcode"
+                        [maxLength]="barcodeMaxLength"
+                        [formControl]="familyBarcode"
+                        (keydown.enter)="$event.preventDefault()"
+                      />
+                      <button
+                        appButton
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        class="shrink-0"
+                        title="Scan barcode with camera"
+                        aria-label="Scan shared product barcode"
+                        (click)="scanFamilyBarcode()"
+                      >
+                        <app-icon name="heroCamera" />
+                        Scan
+                      </button>
+                    </div>
+                  </app-form-field>
+                  <app-form-field
+                    label="VAT treatment"
+                    hint="Use the shop default unless this product is zero-rated, exempt, or uses a special rate."
+                  >
+                    <select
+                      class="select select-bordered w-full"
+                      [formControl]="familyTaxCategory"
+                      [disabled]="!perms.has('ManageCatalog')"
+                    >
+                      <option value="">Use shop default</option>
+                      @for (category of taxCategories(); track category.id) {
+                        <option [value]="category.id">{{ category.name }}</option>
+                      }
+                    </select>
+                  </app-form-field>
+                </section>
 
-              <div class="product-editor-body min-h-0 flex-1 overflow-y-auto p-4 pb-6 sm:p-6">
-                @if (error()) {
-                  <div role="alert" class="alert alert-error mb-4 py-2 text-sm">
-                    <app-icon name="heroExclamationTriangle" />
-                    <span>{{ error() }}</span>
+                @if (pendingFamilyBarcode(); as replacement) {
+                  <div class="mt-4 rounded-field border border-warning/50 bg-warning/5 p-3">
+                    <p class="text-sm font-medium">Replace the shared barcode?</p>
+                    <p class="mt-1 break-all text-xs">
+                      <span class="font-mono">{{ familyBarcode.value.trim() }}</span>
+                      <span class="mx-1.5">→</span>
+                      <span class="font-mono">{{ replacement }}</span>
+                    </p>
+                    <div class="mt-2 flex gap-2">
+                      <button
+                        appButton
+                        type="button"
+                        variant="primary"
+                        size="sm"
+                        (click)="confirmFamilyBarcode()"
+                      >
+                        Replace
+                      </button>
+                      <button
+                        appButton
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        (click)="cancelFamilyBarcode()"
+                      >
+                        Cancel
+                      </button>
+                    </div>
                   </div>
                 }
 
-                @if (editorStep() === 1) {
-                  <section class="grid gap-5 sm:grid-cols-2">
-                    <app-form-field label="Product name" [required]="true">
-                      <input
-                        type="text"
-                        class="input input-bordered w-full"
-                        autocomplete="off"
-                        [formControl]="familyName"
-                      />
-                    </app-form-field>
-                    <app-form-field
-                      label="Manufacturer"
-                      hint="Optional. Select an existing manufacturer or type a new one."
+                @if (familyBarcode.value.trim() && editorRows.length > 1) {
+                  <div class="alert alert-warning mt-4 text-sm">
+                    <app-icon name="heroExclamationTriangle" />
+                    <span>
+                      A shared barcode can be ambiguous across multiple variants. Assign a barcode
+                      to each variant instead.
+                    </span>
+                  </div>
+                }
+
+                <section class="mt-5 border-t border-base-300 pt-4">
+                  <div>
+                    <h3 class="section-title">Product photo</h3>
+                    <p id="product-photo-help" class="type-caption mt-0.5">
+                      A clear, well-lit photo makes the product easier to find while selling.
+                    </p>
+                  </div>
+
+                  <div
+                    class="mt-3 rounded-box border border-base-300 bg-base-200/40 p-3 sm:flex sm:items-center sm:gap-4"
+                  >
+                    <div
+                      class="mx-auto flex h-36 w-36 shrink-0 items-center justify-center overflow-hidden rounded-box border border-base-300 bg-base-100 sm:mx-0 sm:h-28 sm:w-28"
                     >
-                      <input
-                        type="text"
-                        class="input input-bordered w-full"
-                        autocomplete="off"
-                        list="manufacturer-options"
-                        placeholder="Optional"
-                        [formControl]="familyManufacturer"
-                      />
-                      <datalist id="manufacturer-options">
-                        @for (manufacturer of manufacturers(); track manufacturer.id) {
-                          <option [value]="manufacturer.name"></option>
-                        }
-                      </datalist>
-                    </app-form-field>
-                    <app-form-field
-                      label="Shared barcode"
-                      hint="Scan the package barcode or enter it manually. Only suitable for products with one variant."
-                    >
-                      <div class="flex gap-2">
-                        <input
-                          type="text"
-                          class="input input-bordered min-w-0 flex-1 font-mono"
-                          autocomplete="off"
-                          placeholder="Scan or enter barcode"
-                          [maxLength]="barcodeMaxLength"
-                          [formControl]="familyBarcode"
-                          (keydown.enter)="$event.preventDefault()"
+                      @if (productImagePreview(); as preview) {
+                        <img
+                          [src]="preview"
+                          [alt]="familyName.value.trim() || 'Product photo preview'"
+                          class="h-full w-full object-cover"
+                          (error)="markCurrentProductImageBroken()"
                         />
+                      } @else {
+                        <div class="px-3 text-center text-base-content/45">
+                          <app-icon name="heroCamera" size="xl" />
+                          <p class="mt-1 text-xs">No photo yet</p>
+                        </div>
+                      }
+                    </div>
+
+                    <div class="mt-3 min-w-0 flex-1 sm:mt-0">
+                      <input
+                        #productCameraInput
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        class="hidden"
+                        aria-describedby="product-photo-help"
+                        [disabled]="imageBusy() || busy()"
+                        (change)="selectProductImage($event)"
+                      />
+                      <input
+                        #productPhotoInput
+                        type="file"
+                        accept="image/*"
+                        class="hidden"
+                        aria-describedby="product-photo-help"
+                        [disabled]="imageBusy() || busy()"
+                        (change)="selectProductImage($event)"
+                      />
+
+                      <div class="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+                        <button
+                          appButton
+                          type="button"
+                          variant="soft"
+                          class="w-full sm:w-auto"
+                          [disabled]="imageBusy() || busy()"
+                          (click)="productCameraInput.click()"
+                        >
+                          <app-icon name="heroCamera" />
+                          Take photo
+                        </button>
                         <button
                           appButton
                           type="button"
                           variant="outline"
-                          size="sm"
-                          class="shrink-0"
-                          title="Scan barcode with camera"
-                          aria-label="Scan shared product barcode"
-                          (click)="scanFamilyBarcode()"
+                          class="w-full sm:w-auto"
+                          [disabled]="imageBusy() || busy()"
+                          (click)="productPhotoInput.click()"
                         >
-                          <app-icon name="heroCamera" />
-                          Scan
+                          <app-icon name="heroArrowUpTray" />
+                          Choose photo
                         </button>
                       </div>
-                    </app-form-field>
-                    <app-form-field
-                      label="VAT treatment"
-                      hint="Use the shop default unless this product is zero-rated, exempt, or uses a special rate."
-                    >
-                      <select
-                        class="select select-bordered w-full"
-                        [formControl]="familyTaxCategory"
-                        [disabled]="!perms.has('ManageCatalog')"
-                      >
-                        <option value="">Use shop default</option>
-                        @for (category of taxCategories(); track category.id) {
-                          <option [value]="category.id">{{ category.name }}</option>
-                        }
-                      </select>
-                    </app-form-field>
-                  </section>
 
-                  @if (pendingFamilyBarcode(); as replacement) {
-                    <div class="mt-4 rounded-field border border-warning/50 bg-warning/5 p-3">
-                      <p class="text-sm font-medium">Replace the shared barcode?</p>
-                      <p class="mt-1 break-all text-xs">
-                        <span class="font-mono">{{ familyBarcode.value.trim() }}</span>
-                        <span class="mx-1.5">→</span>
-                        <span class="font-mono">{{ replacement }}</span>
-                      </p>
-                      <div class="mt-2 flex gap-2">
+                      @if (pendingProductImage() && mode === 'edit' && !imageBusy()) {
                         <button
                           appButton
                           type="button"
-                          variant="primary"
-                          size="sm"
-                          (click)="confirmFamilyBarcode()"
+                          variant="outline"
+                          class="mt-2 w-full sm:w-auto"
+                          (click)="retryProductImageUpload()"
                         >
-                          Replace
+                          Retry upload
                         </button>
+                      }
+
+                      @if (productImagePreview()) {
                         <button
                           appButton
                           type="button"
                           variant="ghost"
-                          size="sm"
-                          (click)="cancelFamilyBarcode()"
+                          class="mt-2 w-full text-error sm:w-auto"
+                          [disabled]="imageBusy() || busy()"
+                          (click)="removeImage()"
                         >
-                          Cancel
+                          <app-icon name="heroXMark" />
+                          Remove photo
                         </button>
-                      </div>
-                    </div>
-                  }
+                      }
 
-                  @if (familyBarcode.value.trim() && editorRows.length > 1) {
-                    <div class="alert alert-warning mt-4 text-sm">
-                      <app-icon name="heroExclamationTriangle" />
-                      <span>
-                        A shared barcode can be ambiguous across multiple variants. Assign a barcode
-                        to each variant instead.
-                      </span>
-                    </div>
-                  }
-
-                  <section class="mt-5 border-t border-base-300 pt-4">
-                    <div>
-                      <h3 class="section-title">Product photo</h3>
-                      <p id="product-photo-help" class="type-caption mt-0.5">
-                        A clear, well-lit photo makes the product easier to find while selling.
+                      <p class="type-caption mt-2" aria-live="polite">
+                        @if (imageBusy()) {
+                          {{ mode === 'create' ? 'Preparing photo…' : 'Uploading photo…' }}
+                        } @else if (pendingProductImage() && mode === 'create') {
+                          Ready — the photo will upload when you create the product.
+                        } @else if (pendingProductImage()) {
+                          Upload paused. Check your connection and retry.
+                        } @else {
+                          Photos are resized for faster uploads. You can replace them anytime.
+                        }
                       </p>
                     </div>
+                  </div>
+                </section>
 
-                    <div
-                      class="mt-3 rounded-box border border-base-300 bg-base-200/40 p-3 sm:flex sm:items-center sm:gap-4"
+                @if (mode === 'create') {
+                  <div
+                    class="mt-5 flex items-start gap-3 rounded-field border border-base-300/70 bg-base-200/60 p-3"
+                  >
+                    <span
+                      class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-base-100 text-primary"
+                      aria-hidden="true"
                     >
-                      <div
-                        class="mx-auto flex h-36 w-36 shrink-0 items-center justify-center overflow-hidden rounded-box border border-base-300 bg-base-100 sm:mx-0 sm:h-28 sm:w-28"
-                      >
-                        @if (productImagePreview(); as preview) {
-                          <img
-                            [src]="preview"
-                            [alt]="familyName.value.trim() || 'Product photo preview'"
-                            class="h-full w-full object-cover"
-                            (error)="markCurrentProductImageBroken()"
-                          />
-                        } @else {
-                          <div class="px-3 text-center text-base-content/45">
-                            <app-icon name="heroCamera" size="xl" />
-                            <p class="mt-1 text-xs">No photo yet</p>
-                          </div>
-                        }
-                      </div>
-
-                      <div class="mt-3 min-w-0 flex-1 sm:mt-0">
-                        <input
-                          #productCameraInput
-                          type="file"
-                          accept="image/*"
-                          capture="environment"
-                          class="hidden"
-                          aria-describedby="product-photo-help"
-                          [disabled]="imageBusy() || busy()"
-                          (change)="selectProductImage($event)"
-                        />
-                        <input
-                          #productPhotoInput
-                          type="file"
-                          accept="image/*"
-                          class="hidden"
-                          aria-describedby="product-photo-help"
-                          [disabled]="imageBusy() || busy()"
-                          (change)="selectProductImage($event)"
-                        />
-
-                        <div class="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-                          <button
-                            appButton
-                            type="button"
-                            variant="soft"
-                            class="w-full sm:w-auto"
-                            [disabled]="imageBusy() || busy()"
-                            (click)="productCameraInput.click()"
-                          >
-                            <app-icon name="heroCamera" />
-                            Take photo
-                          </button>
-                          <button
-                            appButton
-                            type="button"
-                            variant="outline"
-                            class="w-full sm:w-auto"
-                            [disabled]="imageBusy() || busy()"
-                            (click)="productPhotoInput.click()"
-                          >
-                            <app-icon name="heroArrowUpTray" />
-                            Choose photo
-                          </button>
-                        </div>
-
-                        @if (pendingProductImage() && mode === 'edit' && !imageBusy()) {
-                          <button
-                            appButton
-                            type="button"
-                            variant="outline"
-                            class="mt-2 w-full sm:w-auto"
-                            (click)="retryProductImageUpload()"
-                          >
-                            Retry upload
-                          </button>
-                        }
-
-                        @if (productImagePreview()) {
-                          <button
-                            appButton
-                            type="button"
-                            variant="ghost"
-                            class="mt-2 w-full text-error sm:w-auto"
-                            [disabled]="imageBusy() || busy()"
-                            (click)="removeImage()"
-                          >
-                            <app-icon name="heroXMark" />
-                            Remove photo
-                          </button>
-                        }
-
-                        <p class="type-caption mt-2" aria-live="polite">
-                          @if (imageBusy()) {
-                            {{ mode === 'create' ? 'Preparing photo…' : 'Uploading photo…' }}
-                          } @else if (pendingProductImage() && mode === 'create') {
-                            Ready — the photo will upload when you create the product.
-                          } @else if (pendingProductImage()) {
-                            Upload paused. Check your connection and retry.
-                          } @else {
-                            Photos are resized for faster uploads. You can replace them anytime.
-                          }
-                        </p>
-                      </div>
+                      <app-icon name="heroQueueList" />
+                    </span>
+                    <div>
+                      <p class="text-sm font-semibold">Next: pricing and stock</p>
+                      <p class="type-caption mt-0.5">
+                        Add a selling price, SKU, and opening stock for the first variant.
+                      </p>
                     </div>
+                  </div>
+                }
+
+                @if (mode === 'edit') {
+                  <section class="mt-5 border-t border-base-300 pt-4">
+                    <label class="flex min-h-11 cursor-pointer items-center justify-between gap-4">
+                      <span>
+                        <span class="type-heading block">Product available for sale</span>
+                        <span class="type-caption block"
+                          >Turn this off to hide every variant from Sell.</span
+                        >
+                      </span>
+                      <input
+                        type="checkbox"
+                        class="toggle toggle-primary"
+                        [formControl]="familyActive"
+                      />
+                    </label>
                   </section>
 
-                  @if (mode === 'create') {
-                    <div
-                      class="mt-5 flex items-start gap-3 rounded-field border border-base-300/70 bg-base-200/60 p-3"
-                    >
-                      <span
-                        class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-base-100 text-primary"
-                        aria-hidden="true"
-                      >
-                        <app-icon name="heroQueueList" />
-                      </span>
-                      <div>
-                        <p class="text-sm font-semibold">Next: pricing and stock</p>
-                        <p class="type-caption mt-0.5">
-                          Add a selling price, SKU, and opening stock for the first variant.
-                        </p>
-                      </div>
-                    </div>
-                  }
-
-                  @if (mode === 'edit') {
-                    <section class="mt-5 border-t border-base-300 pt-4">
-                      <label
-                        class="flex min-h-11 cursor-pointer items-center justify-between gap-4"
-                      >
-                        <span>
-                          <span class="type-heading block">Product available for sale</span>
-                          <span class="type-caption block"
-                            >Turn this off to hide every variant from Sell.</span
-                          >
-                        </span>
+                  <section class="mt-5 border-t border-base-300 pt-4">
+                    <h3 class="section-title">Categories</h3>
+                    @if (
+                      perms.has('ManageCatalog') &&
+                      connectivity.online() &&
+                      categoryMembershipsComplete()
+                    ) {
+                      <label class="input input-bordered input-sm mt-3 flex items-center gap-2">
+                        <app-icon name="heroMagnifyingGlass" class="text-base-content/50" />
                         <input
-                          type="checkbox"
-                          class="toggle toggle-primary"
-                          [formControl]="familyActive"
+                          type="search"
+                          class="min-w-0 grow"
+                          placeholder="Search categories…"
+                          [value]="familyCategoryQuery()"
+                          (input)="familyCategoryQuery.set($any($event.target).value)"
                         />
                       </label>
-                    </section>
-
-                    <section class="mt-5 border-t border-base-300 pt-4">
-                      <h3 class="section-title">Categories</h3>
-                      @if (
-                        perms.has('ManageCatalog') &&
-                        connectivity.online() &&
-                        categoryMembershipsComplete()
-                      ) {
-                        <label class="input input-bordered input-sm mt-3 flex items-center gap-2">
-                          <app-icon name="heroMagnifyingGlass" class="text-base-content/50" />
-                          <input
-                            type="search"
-                            class="min-w-0 grow"
-                            placeholder="Search categories…"
-                            [value]="familyCategoryQuery()"
-                            (input)="familyCategoryQuery.set($any($event.target).value)"
-                          />
-                        </label>
-                        <div
-                          class="mt-2 max-h-56 overflow-y-auto rounded-box border border-base-300"
-                        >
-                          @for (c of visibleFamilyCategories(); track c.id) {
-                            <label
-                              class="flex min-h-11 cursor-pointer items-center gap-3 border-b border-base-200 px-3 last:border-0 hover:bg-base-200"
-                            >
-                              <input
-                                type="checkbox"
-                                class="checkbox checkbox-sm"
-                                [checked]="familyCategories().has(c.id)"
-                                (change)="toggleFamilyCategory(c.id)"
-                              />
-                              <span class="min-w-0 flex-1 truncate text-sm">{{ c.name }}</span>
-                            </label>
-                          } @empty {
-                            <p class="p-4 text-center text-sm text-base-content/60">
-                              No categories match.
-                            </p>
-                          }
-                        </div>
-                        @if (matchingFamilyCategories().length > visibleFamilyCategories().length) {
-                          <p class="type-caption mt-2">
-                            Keep typing to narrow
-                            {{ matchingFamilyCategories().length }} categories.
+                      <div class="mt-2 max-h-56 overflow-y-auto rounded-box border border-base-300">
+                        @for (c of visibleFamilyCategories(); track c.id) {
+                          <label
+                            class="flex min-h-11 cursor-pointer items-center gap-3 border-b border-base-200 px-3 last:border-0 hover:bg-base-200"
+                          >
+                            <input
+                              type="checkbox"
+                              class="checkbox checkbox-sm"
+                              [checked]="familyCategories().has(c.id)"
+                              (change)="toggleFamilyCategory(c.id)"
+                            />
+                            <span class="min-w-0 flex-1 truncate text-sm">{{ c.name }}</span>
+                          </label>
+                        } @empty {
+                          <p class="p-4 text-center text-sm text-base-content/60">
+                            No categories match.
                           </p>
                         }
-                      } @else if (categoryMembershipsComplete()) {
-                        <div class="mt-2 flex flex-wrap gap-1.5">
-                          @for (name of productCategoryNames(editingFamily()!.id); track name) {
-                            <span class="badge badge-ghost">{{ name }}</span>
-                          } @empty {
-                            <p class="type-caption">Uncategorized</p>
-                          }
-                        </div>
-                        @if (perms.has('ManageCatalog') && !connectivity.online()) {
-                          <p class="type-caption mt-2">Reconnect to change categories.</p>
-                        }
-                      } @else {
-                        <p class="type-caption mt-2">{{ categoryDataStatusLabel() }}</p>
-                      }
-                    </section>
-                  }
-                } @else {
-                  <section>
-                    <div class="mb-4">
-                      <h3 class="section-title">Sellable variants</h3>
-                      <p class="type-caption mt-1">
-                        Use one variant for a simple item, or add sizes and pack options.
-                      </p>
-                    </div>
-
-                    @if (editorLoading()) {
-                      <div
-                        class="flex min-h-32 items-center justify-center gap-2 text-sm text-base-content/60"
-                      >
-                        <span class="loading loading-spinner loading-sm"></span>
-                        Loading variants…
                       </div>
+                      @if (matchingFamilyCategories().length > visibleFamilyCategories().length) {
+                        <p class="type-caption mt-2">
+                          Keep typing to narrow
+                          {{ matchingFamilyCategories().length }} categories.
+                        </p>
+                      }
+                    } @else if (categoryMembershipsComplete()) {
+                      <div class="mt-2 flex flex-wrap gap-1.5">
+                        @for (name of productCategoryNames(editingFamily()!.id); track name) {
+                          <span class="badge badge-ghost">{{ name }}</span>
+                        } @empty {
+                          <p class="type-caption">Uncategorized</p>
+                        }
+                      </div>
+                      @if (perms.has('ManageCatalog') && !connectivity.online()) {
+                        <p class="type-caption mt-2">Reconnect to change categories.</p>
+                      }
                     } @else {
-                      <div class="space-y-2">
-                        @for (row of editorRows; track row.key; let index = $index) {
-                          <section class="rounded-box bg-base-200/60 p-3">
-                            <div class="mb-3 flex min-h-11 items-center justify-between gap-3">
-                              <h4 class="type-heading">
-                                {{
-                                  row.name.trim() ||
-                                    (editorRows.length === 1
-                                      ? 'Default variant'
-                                      : 'Variant ' + (index + 1))
-                                }}
-                              </h4>
-                              @if (row.variantId) {
-                                <label class="flex cursor-pointer items-center gap-2">
-                                  <span class="type-caption">
-                                    {{ row.active ? 'Available' : 'Hidden' }}
-                                  </span>
-                                  <input
-                                    type="checkbox"
-                                    class="toggle toggle-primary toggle-sm"
-                                    [(ngModel)]="row.active"
-                                    [ngModelOptions]="{ standalone: true }"
-                                  />
-                                </label>
-                              } @else {
-                                <button
-                                  appButton
-                                  type="button"
-                                  variant="ghost"
-                                  [iconOnly]="true"
-                                  [disabled]="editorRows.length === 1"
-                                  aria-label="Remove variant"
-                                  (click)="removeEditorRow(index)"
-                                >
-                                  <app-icon name="heroXMark" />
-                                </button>
-                              }
-                            </div>
+                      <p class="type-caption mt-2">{{ categoryDataStatusLabel() }}</p>
+                    }
+                  </section>
+                }
+              } @else {
+                <section>
+                  <div class="mb-4">
+                    <h3 class="section-title">Sellable variants</h3>
+                    <p class="type-caption mt-1">
+                      Use one variant for a simple item, or add sizes and pack options.
+                    </p>
+                  </div>
 
-                            <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                              <app-form-field label="Variant label">
+                  @if (editorLoading()) {
+                    <div
+                      class="flex min-h-32 items-center justify-center gap-2 text-sm text-base-content/60"
+                    >
+                      <span class="loading loading-spinner loading-sm"></span>
+                      Loading variants…
+                    </div>
+                  } @else {
+                    <div class="space-y-2">
+                      @for (row of editorRows; track row.key; let index = $index) {
+                        <section class="rounded-box bg-base-200/60 p-3">
+                          <div class="mb-3 flex min-h-11 items-center justify-between gap-3">
+                            <h4 class="type-heading">
+                              {{
+                                row.name.trim() ||
+                                  (editorRows.length === 1
+                                    ? 'Default variant'
+                                    : 'Variant ' + (index + 1))
+                              }}
+                            </h4>
+                            @if (row.variantId) {
+                              <label class="flex cursor-pointer items-center gap-2">
+                                <span class="type-caption">
+                                  {{ row.active ? 'Available' : 'Hidden' }}
+                                </span>
+                                <input
+                                  type="checkbox"
+                                  class="toggle toggle-primary toggle-sm"
+                                  [(ngModel)]="row.active"
+                                  [ngModelOptions]="{ standalone: true }"
+                                />
+                              </label>
+                            } @else {
+                              <button
+                                appButton
+                                type="button"
+                                variant="ghost"
+                                [iconOnly]="true"
+                                [disabled]="editorRows.length === 1"
+                                aria-label="Remove variant"
+                                (click)="removeEditorRow(index)"
+                              >
+                                <app-icon name="heroXMark" />
+                              </button>
+                            }
+                          </div>
+
+                          <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                            <app-form-field label="Variant label">
+                              <input
+                                type="text"
+                                class="input input-bordered w-full"
+                                placeholder="{{
+                                  editorRows.length === 1 ? 'Default' : 'e.g. 1 kg'
+                                }}"
+                                [(ngModel)]="row.name"
+                                [ngModelOptions]="{ standalone: true }"
+                              />
+                            </app-form-field>
+                            <app-form-field label="Retail price (KES)" [required]="true">
+                              <input
+                                type="text"
+                                inputmode="numeric"
+                                class="input input-bordered w-full"
+                                placeholder="0"
+                                [(ngModel)]="row.price"
+                                [ngModelOptions]="{ standalone: true }"
+                              />
+                            </app-form-field>
+                            <app-form-field label="Item type">
+                              <select
+                                class="select select-bordered w-full"
+                                [(ngModel)]="row.kind"
+                                [ngModelOptions]="{ standalone: true }"
+                              >
+                                <option value="good">Physical good</option>
+                                <option value="service">Service</option>
+                              </select>
+                            </app-form-field>
+                          </div>
+
+                          <details class="mt-3 border-t border-base-300/70">
+                            <summary
+                              class="flex min-h-11 cursor-pointer flex-wrap items-center gap-2 py-2 text-sm font-medium"
+                            >
+                              More options
+                              <span class="type-caption font-mono">
+                                SKU {{ row.sku || 'auto' }}
+                                @if (row.barcode) {
+                                  · barcode set
+                                }
+                                @if (row.wholesale) {
+                                  · wholesale set
+                                }
+                              </span>
+                            </summary>
+                            <div class="grid gap-3 pb-3 sm:grid-cols-2 lg:grid-cols-3">
+                              <app-form-field label="SKU" hint="Leave blank to generate one.">
                                 <input
                                   type="text"
-                                  class="input input-bordered w-full"
-                                  placeholder="{{
-                                    editorRows.length === 1 ? 'Default' : 'e.g. 1 kg'
-                                  }}"
-                                  [(ngModel)]="row.name"
+                                  class="input input-bordered w-full font-mono"
+                                  placeholder="Auto"
+                                  [(ngModel)]="row.sku"
                                   [ngModelOptions]="{ standalone: true }"
                                 />
                               </app-form-field>
-                              <app-form-field label="Retail price (KES)" [required]="true">
+                              <app-form-field
+                                label="Variant barcode"
+                                hint="Overrides the shared barcode."
+                              >
+                                <div class="flex gap-1.5">
+                                  <input
+                                    type="text"
+                                    class="input input-bordered min-w-0 flex-1 font-mono"
+                                    placeholder="Optional"
+                                    [maxLength]="barcodeMaxLength"
+                                    [(ngModel)]="row.barcode"
+                                    [ngModelOptions]="{ standalone: true }"
+                                    (keydown.enter)="$event.preventDefault()"
+                                  />
+                                  <button
+                                    appButton
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    title="Scan barcode"
+                                    aria-label="Scan variant barcode"
+                                    (click)="scanEditorBarcode(index)"
+                                  >
+                                    <app-icon name="heroCamera" />
+                                  </button>
+                                  <button
+                                    appButton
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    (click)="generateEditorBarcode(index)"
+                                  >
+                                    Generate
+                                  </button>
+                                </div>
+                              </app-form-field>
+                              <app-form-field label="Wholesale price (KES)" hint="Optional">
                                 <input
                                   type="text"
                                   inputmode="numeric"
                                   class="input input-bordered w-full"
                                   placeholder="0"
-                                  [(ngModel)]="row.price"
+                                  [(ngModel)]="row.wholesale"
                                   [ngModelOptions]="{ standalone: true }"
                                 />
                               </app-form-field>
-                              <app-form-field label="Item type">
-                                <select
-                                  class="select select-bordered w-full"
-                                  [(ngModel)]="row.kind"
-                                  [ngModelOptions]="{ standalone: true }"
-                                >
-                                  <option value="good">Physical good</option>
-                                  <option value="service">Service</option>
-                                </select>
-                              </app-form-field>
                             </div>
-
-                            <details class="mt-3 border-t border-base-300/70">
-                              <summary
-                                class="flex min-h-11 cursor-pointer flex-wrap items-center gap-2 py-2 text-sm font-medium"
+                            @if (row.pendingBarcode; as replacement) {
+                              <div
+                                class="mt-2 rounded-field border border-warning/50 bg-warning/5 p-3"
                               >
-                                More options
-                                <span class="type-caption font-mono">
-                                  SKU {{ row.sku || 'auto' }}
-                                  @if (row.barcode) {
-                                    · barcode set
-                                  }
-                                  @if (row.wholesale) {
-                                    · wholesale set
-                                  }
+                                <p class="text-sm font-medium">Replace this variant's barcode?</p>
+                                <p class="mt-1 break-all text-xs">
+                                  <span class="font-mono">{{ effectiveEditorBarcode(row) }}</span>
+                                  <span class="mx-1.5">→</span>
+                                  <span class="font-mono">{{ replacement }}</span>
+                                </p>
+                                <div class="mt-2 flex gap-2">
+                                  <button
+                                    appButton
+                                    type="button"
+                                    variant="primary"
+                                    size="sm"
+                                    (click)="confirmEditorBarcode(index)"
+                                  >
+                                    Replace
+                                  </button>
+                                  <button
+                                    appButton
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    (click)="cancelEditorBarcode(index)"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              </div>
+                            }
+                          </details>
+
+                          @if (row.kind !== 'service') {
+                            <div
+                              class="flex flex-wrap gap-x-6 gap-y-1 border-t border-base-300/70 pt-2"
+                            >
+                              <label class="flex min-h-11 cursor-pointer items-center gap-2">
+                                <input
+                                  type="checkbox"
+                                  class="checkbox checkbox-sm"
+                                  [(ngModel)]="row.trackInventory"
+                                  [ngModelOptions]="{ standalone: true }"
+                                />
+                                <span class="text-sm">Track stock</span>
+                              </label>
+                              <label class="flex min-h-11 cursor-pointer items-center gap-2">
+                                <input
+                                  type="checkbox"
+                                  class="checkbox checkbox-sm"
+                                  [(ngModel)]="row.allowFractional"
+                                  [ngModelOptions]="{ standalone: true }"
+                                />
+                                <span class="text-sm">Allow fractional quantities</span>
+                              </label>
+                              @if (row.variantId && row.trackInventory) {
+                                <span class="ml-auto self-center text-sm text-base-content/60">
+                                  Current stock {{ stockOf(row.variantId)?.stock ?? 0 }}
                                 </span>
+                              }
+                            </div>
+                          }
+
+                          @if (!row.variantId && row.kind !== 'service' && row.trackInventory) {
+                            <details class="mt-3 border-t border-base-300 pt-3">
+                              <summary class="min-h-11 cursor-pointer py-3 text-sm font-medium">
+                                Opening stock
+                                <span class="font-normal text-base-content/60">(optional)</span>
                               </summary>
-                              <div class="grid gap-3 pb-3 sm:grid-cols-2 lg:grid-cols-3">
-                                <app-form-field label="SKU" hint="Leave blank to generate one.">
+                              <div class="grid gap-4 pt-2 sm:grid-cols-2 lg:grid-cols-3">
+                                <app-form-field label="Quantity">
                                   <input
                                     type="text"
-                                    class="input input-bordered w-full font-mono"
-                                    placeholder="Auto"
-                                    [(ngModel)]="row.sku"
+                                    inputmode="decimal"
+                                    class="input input-bordered w-full"
+                                    placeholder="0"
+                                    [(ngModel)]="row.openingQuantity"
                                     [ngModelOptions]="{ standalone: true }"
                                   />
                                 </app-form-field>
-                                <app-form-field
-                                  label="Variant barcode"
-                                  hint="Overrides the shared barcode."
-                                >
-                                  <div class="flex gap-1.5">
-                                    <input
-                                      type="text"
-                                      class="input input-bordered min-w-0 flex-1 font-mono"
-                                      placeholder="Optional"
-                                      [maxLength]="barcodeMaxLength"
-                                      [(ngModel)]="row.barcode"
-                                      [ngModelOptions]="{ standalone: true }"
-                                      (keydown.enter)="$event.preventDefault()"
-                                    />
-                                    <button
-                                      appButton
-                                      type="button"
-                                      variant="outline"
-                                      size="sm"
-                                      title="Scan barcode"
-                                      aria-label="Scan variant barcode"
-                                      (click)="scanEditorBarcode(index)"
-                                    >
-                                      <app-icon name="heroCamera" />
-                                    </button>
-                                    <button
-                                      appButton
-                                      type="button"
-                                      variant="outline"
-                                      size="sm"
-                                      (click)="generateEditorBarcode(index)"
-                                    >
-                                      Generate
-                                    </button>
-                                  </div>
-                                </app-form-field>
-                                <app-form-field label="Wholesale price (KES)" hint="Optional">
+                                <app-form-field label="Unit cost (KES)">
                                   <input
                                     type="text"
                                     inputmode="numeric"
                                     class="input input-bordered w-full"
                                     placeholder="0"
-                                    [(ngModel)]="row.wholesale"
+                                    [(ngModel)]="row.openingUnitCost"
                                     [ngModelOptions]="{ standalone: true }"
                                   />
                                 </app-form-field>
-                              </div>
-                              @if (row.pendingBarcode; as replacement) {
-                                <div
-                                  class="mt-2 rounded-field border border-warning/50 bg-warning/5 p-3"
-                                >
-                                  <p class="text-sm font-medium">Replace this variant's barcode?</p>
-                                  <p class="mt-1 break-all text-xs">
-                                    <span class="font-mono">{{ effectiveEditorBarcode(row) }}</span>
-                                    <span class="mx-1.5">→</span>
-                                    <span class="font-mono">{{ replacement }}</span>
-                                  </p>
-                                  <div class="mt-2 flex gap-2">
-                                    <button
-                                      appButton
-                                      type="button"
-                                      variant="primary"
-                                      size="sm"
-                                      (click)="confirmEditorBarcode(index)"
-                                    >
-                                      Replace
-                                    </button>
-                                    <button
-                                      appButton
-                                      type="button"
-                                      variant="ghost"
-                                      size="sm"
-                                      (click)="cancelEditorBarcode(index)"
-                                    >
-                                      Cancel
-                                    </button>
+                                <app-form-field label="Stock location">
+                                  <select
+                                    class="select select-bordered w-full"
+                                    [(ngModel)]="row.openingLocationId"
+                                    [ngModelOptions]="{ standalone: true }"
+                                  >
+                                    @for (location of stockLocations(); track location.id) {
+                                      <option [value]="location.id">{{ location.name }}</option>
+                                    }
+                                  </select>
+                                </app-form-field>
+                                <app-form-field label="Batch number" hint="Optional">
+                                  <input
+                                    type="text"
+                                    class="input input-bordered w-full"
+                                    [(ngModel)]="row.batchNumber"
+                                    [ngModelOptions]="{ standalone: true }"
+                                  />
+                                </app-form-field>
+                                @if (preferences.batchExpiryEnabled()) {
+                                  <app-form-field label="Expiry date" hint="Optional">
+                                    <input
+                                      type="date"
+                                      class="input input-bordered w-full"
+                                      [(ngModel)]="row.expiryDate"
+                                      [ngModelOptions]="{ standalone: true }"
+                                    />
+                                  </app-form-field>
+                                }
+                                @if (row.openingQuantity && row.openingUnitCost) {
+                                  <div class="self-end pb-3 text-sm text-base-content/60">
+                                    Opening value
+                                    <strong class="ml-1 text-base-content">
+                                      <app-money
+                                        [amount]="
+                                          +row.openingQuantity *
+                                          (parseAmount(row.openingUnitCost) ?? 0)
+                                        "
+                                      />
+                                    </strong>
                                   </div>
-                                </div>
-                              }
-                            </details>
-
-                            @if (row.kind !== 'service') {
-                              <div
-                                class="flex flex-wrap gap-x-6 gap-y-1 border-t border-base-300/70 pt-2"
-                              >
-                                <label class="flex min-h-11 cursor-pointer items-center gap-2">
-                                  <input
-                                    type="checkbox"
-                                    class="checkbox checkbox-sm"
-                                    [(ngModel)]="row.trackInventory"
-                                    [ngModelOptions]="{ standalone: true }"
-                                  />
-                                  <span class="text-sm">Track stock</span>
-                                </label>
-                                <label class="flex min-h-11 cursor-pointer items-center gap-2">
-                                  <input
-                                    type="checkbox"
-                                    class="checkbox checkbox-sm"
-                                    [(ngModel)]="row.allowFractional"
-                                    [ngModelOptions]="{ standalone: true }"
-                                  />
-                                  <span class="text-sm">Allow fractional quantities</span>
-                                </label>
-                                @if (row.variantId && row.trackInventory) {
-                                  <span class="ml-auto self-center text-sm text-base-content/60">
-                                    Current stock {{ stockOf(row.variantId)?.stock ?? 0 }}
-                                  </span>
                                 }
                               </div>
-                            }
-
-                            @if (!row.variantId && row.kind !== 'service' && row.trackInventory) {
-                              <details class="mt-3 border-t border-base-300 pt-3">
-                                <summary class="min-h-11 cursor-pointer py-3 text-sm font-medium">
-                                  Opening stock
-                                  <span class="font-normal text-base-content/60">(optional)</span>
-                                </summary>
-                                <div class="grid gap-4 pt-2 sm:grid-cols-2 lg:grid-cols-3">
-                                  <app-form-field label="Quantity">
-                                    <input
-                                      type="text"
-                                      inputmode="decimal"
-                                      class="input input-bordered w-full"
-                                      placeholder="0"
-                                      [(ngModel)]="row.openingQuantity"
-                                      [ngModelOptions]="{ standalone: true }"
-                                    />
-                                  </app-form-field>
-                                  <app-form-field label="Unit cost (KES)">
-                                    <input
-                                      type="text"
-                                      inputmode="numeric"
-                                      class="input input-bordered w-full"
-                                      placeholder="0"
-                                      [(ngModel)]="row.openingUnitCost"
-                                      [ngModelOptions]="{ standalone: true }"
-                                    />
-                                  </app-form-field>
-                                  <app-form-field label="Stock location">
-                                    <select
-                                      class="select select-bordered w-full"
-                                      [(ngModel)]="row.openingLocationId"
-                                      [ngModelOptions]="{ standalone: true }"
-                                    >
-                                      @for (location of stockLocations(); track location.id) {
-                                        <option [value]="location.id">{{ location.name }}</option>
-                                      }
-                                    </select>
-                                  </app-form-field>
-                                  <app-form-field label="Batch number" hint="Optional">
-                                    <input
-                                      type="text"
-                                      class="input input-bordered w-full"
-                                      [(ngModel)]="row.batchNumber"
-                                      [ngModelOptions]="{ standalone: true }"
-                                    />
-                                  </app-form-field>
-                                  @if (preferences.batchExpiryEnabled()) {
-                                    <app-form-field label="Expiry date" hint="Optional">
-                                      <input
-                                        type="date"
-                                        class="input input-bordered w-full"
-                                        [(ngModel)]="row.expiryDate"
-                                        [ngModelOptions]="{ standalone: true }"
-                                      />
-                                    </app-form-field>
-                                  }
-                                  @if (row.openingQuantity && row.openingUnitCost) {
-                                    <div class="self-end pb-3 text-sm text-base-content/60">
-                                      Opening value
-                                      <strong class="ml-1 text-base-content">
-                                        <app-money
-                                          [amount]="
-                                            +row.openingQuantity *
-                                            (parseAmount(row.openingUnitCost) ?? 0)
-                                          "
-                                        />
-                                      </strong>
-                                    </div>
-                                  }
-                                </div>
-                              </details>
-                            }
-                          </section>
-                        }
-                      </div>
-                      <button
-                        appButton
-                        type="button"
-                        variant="outline"
-                        class="mt-3 w-full"
-                        [disabled]="editorLoading()"
-                        (click)="addEditorRow()"
-                      >
-                        <app-icon name="heroPlus" /> Add variant
-                      </button>
-                      @if (duplicateLabels()) {
-                        <p class="mt-3 text-sm text-warning">Variant labels must be unique.</p>
+                            </details>
+                          }
+                        </section>
                       }
-                      @if (effectiveBarcodeConflict()) {
-                        <p class="mt-3 text-sm text-warning">
-                          Each variant needs a unique effective barcode. Clear the shared barcode or
-                          assign individual variant barcodes before saving.
-                        </p>
-                      }
+                    </div>
+                    <button
+                      appButton
+                      type="button"
+                      variant="outline"
+                      class="mt-3 w-full"
+                      [disabled]="editorLoading()"
+                      (click)="addEditorRow()"
+                    >
+                      <app-icon name="heroPlus" /> Add variant
+                    </button>
+                    @if (duplicateLabels()) {
+                      <p class="mt-3 text-sm text-warning">Variant labels must be unique.</p>
                     }
-                  </section>
-                }
-              </div>
+                    @if (effectiveBarcodeConflict()) {
+                      <p class="mt-3 text-sm text-warning">
+                        Each variant needs a unique effective barcode. Clear the shared barcode or
+                        assign individual variant barcodes before saving.
+                      </p>
+                    }
+                  }
+                </section>
+              }
+            </div>
 
-              <footer
-                class="grid shrink-0 grid-cols-[minmax(0,.75fr)_minmax(0,1.25fr)] gap-2 border-t border-base-300 bg-base-100 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:flex sm:items-center sm:justify-between sm:px-6 sm:py-4"
-              >
-                @if (editorStep() === 1) {
-                  <button
-                    appButton
-                    type="button"
-                    variant="outline"
-                    class="w-full sm:w-auto"
-                    (click)="closeProductEditor()"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    appButton
-                    type="button"
-                    variant="primary"
-                    class="w-full sm:w-auto"
-                    [disabled]="familyName.value.trim().length === 0"
-                    (click)="editorStep.set(2)"
-                  >
-                    <span class="sm:hidden">Next: variants</span>
-                    <span class="hidden sm:inline">Continue to variants</span>
-                  </button>
-                } @else {
-                  <button
-                    appButton
-                    type="button"
-                    variant="outline"
-                    class="w-full sm:w-auto"
-                    (click)="editorStep.set(1)"
-                  >
-                    <span class="sm:hidden">Details</span>
-                    <span class="hidden sm:inline">Back to details</span>
-                  </button>
-                  <button
-                    appButton
-                    type="submit"
-                    variant="primary"
-                    class="w-full sm:w-auto"
-                    [loading]="busy()"
-                    [disabled]="
-                      editorLoading() ||
-                      duplicateLabels() ||
-                      familyName.value.trim().length === 0 ||
-                      effectiveBarcodeConflict()
-                    "
-                  >
-                    {{ mode === 'create' ? 'Create product' : 'Save product' }}
-                  </button>
-                }
-              </footer>
-            </form>
-          </div>
+            <footer
+              class="grid shrink-0 grid-cols-[minmax(0,.75fr)_minmax(0,1.25fr)] gap-2 border-t border-base-300 bg-base-100 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:flex sm:items-center sm:justify-between sm:px-6 sm:py-4"
+            >
+              @if (editorStep() === 1) {
+                <button
+                  appButton
+                  type="button"
+                  variant="outline"
+                  class="w-full sm:w-auto"
+                  (click)="closeProductEditor()"
+                >
+                  Cancel
+                </button>
+                <button
+                  appButton
+                  type="button"
+                  variant="primary"
+                  class="w-full sm:w-auto"
+                  [disabled]="familyName.value.trim().length === 0"
+                  (click)="editorStep.set(2)"
+                >
+                  <span class="sm:hidden">Next: variants</span>
+                  <span class="hidden sm:inline">Continue to variants</span>
+                </button>
+              } @else {
+                <button
+                  appButton
+                  type="button"
+                  variant="outline"
+                  class="w-full sm:w-auto"
+                  (click)="editorStep.set(1)"
+                >
+                  <span class="sm:hidden">Details</span>
+                  <span class="hidden sm:inline">Back to details</span>
+                </button>
+                <button
+                  appButton
+                  type="submit"
+                  variant="primary"
+                  class="w-full sm:w-auto"
+                  [loading]="busy()"
+                  [disabled]="
+                    editorLoading() ||
+                    duplicateLabels() ||
+                    familyName.value.trim().length === 0 ||
+                    effectiveBarcodeConflict()
+                  "
+                >
+                  {{ mode === 'create' ? 'Create product' : 'Save product' }}
+                </button>
+              }
+            </footer>
+          </form>
           <form method="dialog" class="modal-backdrop">
             <button type="button" aria-label="Close" (click)="closeProductEditor()">close</button>
           </form>
@@ -1830,16 +1824,6 @@ interface PendingProductImage {
     </app-page>
   `,
   styles: `
-    .product-editor {
-      width: 100dvw;
-      max-width: 100%;
-      height: 100dvh;
-      max-height: 100dvh;
-      border: 0;
-      border-radius: 0;
-      overflow: hidden;
-    }
-
     .product-editor-body {
       scrollbar-width: thin;
       scrollbar-color: color-mix(in oklab, var(--color-base-content) 22%, transparent) transparent;
@@ -1852,23 +1836,6 @@ interface PendingProductImage {
     .product-editor-body::-webkit-scrollbar-thumb {
       border-radius: var(--radius-selector);
       background: color-mix(in oklab, var(--color-base-content) 22%, transparent);
-    }
-
-    @media (max-width: 767px) {
-      .product-editor-header {
-        padding-top: max(0.75rem, env(safe-area-inset-top));
-      }
-    }
-
-    @media (min-width: 768px) {
-      .product-editor {
-        width: min(48rem, calc(100vw - 3rem));
-        max-width: 48rem;
-        height: auto;
-        max-height: 90dvh;
-        border: 1px solid color-mix(in oklab, var(--color-base-300) 60%, transparent);
-        border-radius: var(--radius-box);
-      }
     }
   `,
 })

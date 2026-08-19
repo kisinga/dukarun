@@ -214,7 +214,7 @@ export interface PurchaseLinePriceContext {
         [attr.aria-labelledby]="'purchase-line-dialog-heading-' + line().key"
         (cancel)="$event.preventDefault(); expandedChange.emit(false)"
       >
-        <section class="modal-box flex h-full flex-col p-0 md:h-auto md:max-w-3xl">
+        <section class="modal-box modal-box-task p-0 md:w-full md:max-w-3xl">
           <header class="flex items-start justify-between gap-3 border-b border-base-300 p-4">
             <div class="min-w-0">
               <h2 class="type-title truncate" [id]="'purchase-line-dialog-heading-' + line().key">
@@ -241,7 +241,7 @@ export interface PurchaseLinePriceContext {
             </button>
           </header>
 
-          <div class="min-h-0 flex-1 overflow-y-auto p-4">
+          <div class="modal-body p-4">
             <section>
               <h3 class="section-title">Stock details</h3>
               <div class="mt-3 grid gap-3" [class.md:grid-cols-2]="trackExpiry()">

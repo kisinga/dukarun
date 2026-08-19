@@ -82,6 +82,24 @@ The authenticated app is usable without horizontal page scrolling at every width
 The first useful list record should be visible in a 390×844 viewport unless a critical warning
 must precede it.
 
+### Viewport containment
+
+Meaningful content and required actions must remain reachable within the current visual viewport
+at short desktop heights, from 320 CSS pixels wide, and with text enlarged to 200%. Clipping
+interactive content is a design-language violation.
+
+- Pages use document scrolling. Do not place meaningful page content behind a fixed-height
+  `overflow-hidden` ancestor.
+- Task modals use `.modal-box-task` with exactly one `.modal-body`. The shell owns viewport
+  sizing and outer overflow; the body is the only vertical scroll owner, while the header, close
+  affordance, step navigation, and footer actions remain visible.
+- Short confirmations and read-only dialogs use `.modal-box-scroll`. Their whole surface may
+  scroll because they do not contain a persistent task footer.
+- Modal consumers may choose width only. They must not add `vh`/`dvh`, height, max-height, or
+  overflow utilities and must not recreate those rules in component CSS.
+- Full-screen capture surfaces, such as the barcode scanner, are explicit shared-component
+  exceptions. If persistent modal chrome cannot fit in the viewport, use a dedicated route.
+
 - The shell header is 56px. Phone page gutters are 16px, tablet gutters 24px, and desktop
   gutters 32px. Phone pages start 12px below their header and use 16px between major sections.
 - The phone bottom navigation is Home, Sell, Products. The menu remains the complete navigation.
@@ -434,4 +452,5 @@ vocabulary — same meaning, same shape; different data, different cells:
 - [ ] Icons via `<app-icon>`; zero inline `<svg>`; zero emoji.
 - [ ] Pages composed via `<app-page>`; forms via `<app-form-field>`; actions via `appButton`; money via `<app-money>`.
 - [ ] Modals via the shared shell (`.modal-box`, full-screen on mobile).
+- [ ] Task modals use `.modal-box-task` + one `.modal-body`; short/read-only dialogs use `.modal-box-scroll`; no consumer-owned viewport sizing or overflow.
 - [ ] Loading, empty, and error states present; touch targets ≥ 44px; phone layout first.

@@ -315,102 +315,111 @@ import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
     </div>
 
     <dialog #reviewDialog class="modal">
-      <div class="modal-box max-w-2xl">
-        <h2 class="text-lg font-semibold">Review campaign</h2>
-        @if (preview(); as p) {
-          <div class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <div class="stat rounded-box bg-base-200 p-3">
-              <span class="type-caption">Eligible</span
-              ><strong class="text-xl">{{ p.eligible }}</strong>
+      <div class="modal-box modal-box-task p-0 md:w-full md:max-w-2xl">
+        <header class="border-b border-base-300 p-4">
+          <h2 class="text-lg font-semibold">Review campaign</h2>
+        </header>
+        <div class="modal-body p-4">
+          @if (preview(); as p) {
+            <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div class="stat rounded-box bg-base-200 p-3">
+                <span class="type-caption">Eligible</span
+                ><strong class="text-xl">{{ p.eligible }}</strong>
+              </div>
+              <div class="stat rounded-box bg-base-200 p-3">
+                <span class="type-caption">Skipped</span
+                ><strong class="text-xl">{{ p.skipped }}</strong>
+              </div>
+              <div class="stat rounded-box bg-base-200 p-3">
+                <span class="type-caption">No primary contact</span
+                ><strong class="text-xl">{{ p.missing_primary }}</strong>
+              </div>
+              <div class="stat rounded-box bg-base-200 p-3">
+                <span class="type-caption">No phone</span
+                ><strong class="text-xl">{{ p.missing_phone }}</strong>
+              </div>
             </div>
-            <div class="stat rounded-box bg-base-200 p-3">
-              <span class="type-caption">Skipped</span
-              ><strong class="text-xl">{{ p.skipped }}</strong>
-            </div>
-            <div class="stat rounded-box bg-base-200 p-3">
-              <span class="type-caption">No primary contact</span
-              ><strong class="text-xl">{{ p.missing_primary }}</strong>
-            </div>
-            <div class="stat rounded-box bg-base-200 p-3">
-              <span class="type-caption">No phone</span
-              ><strong class="text-xl">{{ p.missing_phone }}</strong>
-            </div>
-          </div>
-          <p class="type-caption mt-3">
-            One selected primary contact per company. Scheduled audience resolves at dispatch.
-          </p>
-          <div class="mt-4 rounded-box border border-base-300 p-4">
-            <p class="type-caption">
-              Rendered sample · {{ p.sample?.merchant_name || 'No eligible merchant' }}
+            <p class="type-caption mt-3">
+              One selected primary contact per company. Scheduled audience resolves at dispatch.
             </p>
-            <strong class="mt-2 block">{{ renderedTitle() }}</strong>
-            <p class="mt-2 whitespace-pre-wrap text-sm">{{ renderedBody() }}</p>
-            @if (ctaLabel.value && ctaLink.value) {
-              <span class="btn btn-primary btn-sm mt-3">{{ ctaLabel.value }}</span>
-            }
-          </div>
-        }
-        @if (channel.value !== 'in_app') {
-          <div class="mt-4 rounded-box border border-base-300 p-3">
-            <p class="font-medium">Optional real test</p>
-            <div class="mt-2 flex gap-2">
-              <input
-                class="input input-bordered flex-1"
-                placeholder="+254…"
-                [formControl]="testPhone"
-              /><button
-                class="btn btn-outline"
-                [disabled]="busy() || !testPhone.value.trim()"
-                (click)="sendTest()"
-              >
-                Send test
-              </button>
+            <div class="mt-4 rounded-box border border-base-300 p-4">
+              <p class="type-caption">
+                Rendered sample · {{ p.sample?.merchant_name || 'No eligible merchant' }}
+              </p>
+              <strong class="mt-2 block">{{ renderedTitle() }}</strong>
+              <p class="mt-2 whitespace-pre-wrap text-sm">{{ renderedBody() }}</p>
+              @if (ctaLabel.value && ctaLink.value) {
+                <span class="btn btn-primary btn-sm mt-3">{{ ctaLabel.value }}</span>
+              }
             </div>
-          </div>
-        }
-        <app-form-field label="Schedule in EAT" hint="Leave empty to send now"
-          ><input
-            type="datetime-local"
-            class="input input-bordered w-full"
-            [formControl]="scheduledFor"
-        /></app-form-field>
-        <div class="modal-action">
+          }
+          @if (channel.value !== 'in_app') {
+            <div class="mt-4 rounded-box border border-base-300 p-3">
+              <p class="font-medium">Optional real test</p>
+              <div class="mt-2 flex gap-2">
+                <input
+                  class="input input-bordered min-w-0 flex-1"
+                  placeholder="+254…"
+                  [formControl]="testPhone"
+                /><button
+                  class="btn btn-outline"
+                  [disabled]="busy() || !testPhone.value.trim()"
+                  (click)="sendTest()"
+                >
+                  Send test
+                </button>
+              </div>
+            </div>
+          }
+          <app-form-field class="mt-4 block" label="Schedule in EAT" hint="Leave empty to send now"
+            ><input
+              type="datetime-local"
+              class="input input-bordered w-full"
+              [formControl]="scheduledFor"
+          /></app-form-field>
+        </div>
+        <footer class="flex justify-end gap-2 border-t border-base-300 p-4">
           <button class="btn btn-ghost" (click)="reviewDialog.close()">Back</button
           ><button class="btn btn-primary" [disabled]="busy() || !preview()" (click)="launch()">
             {{ scheduledFor.value ? 'Schedule campaign' : 'Send now' }}
           </button>
-        </div>
+        </footer>
       </div>
       <form method="dialog" class="modal-backdrop"><button>Close</button></form>
     </dialog>
 
     <dialog #detailDialog class="modal">
-      <div class="modal-box max-w-2xl">
+      <div class="modal-box modal-box-task p-0 md:w-full md:max-w-2xl">
         @if (selectedCampaign(); as campaign) {
-          <h2 class="text-lg font-semibold">{{ campaign.name }}</h2>
-          <p class="type-caption">
-            {{ channelLabel(campaign.channel) }} · {{ campaign.audience }} · {{ campaign.status }}
-          </p>
-          <div class="mt-4 rounded-box bg-base-200 p-4">
-            <strong>{{ campaign.title }}</strong>
-            <p class="mt-2 whitespace-pre-wrap text-sm">{{ campaign.body }}</p>
-            @if (campaign.cta_label) {
-              <p class="mt-2 text-sm text-primary">
-                {{ campaign.cta_label }} → {{ campaign.cta_link }}
-              </p>
-            }
-          </div>
-          @if (selectedMetrics(); as metrics) {
-            <div class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              @for (metric of metricRows(metrics); track metric.label) {
-                <div class="rounded-box border border-base-300 p-3">
-                  <span class="type-caption">{{ metric.label }}</span
-                  ><strong class="block text-xl">{{ metric.value }}</strong>
-                </div>
+          <header class="border-b border-base-300 p-4">
+            <h2 class="text-lg font-semibold">{{ campaign.name }}</h2>
+            <p class="type-caption">
+              {{ channelLabel(campaign.channel) }} · {{ campaign.audience }} ·
+              {{ campaign.status }}
+            </p>
+          </header>
+          <div class="modal-body p-4">
+            <div class="rounded-box bg-base-200 p-4">
+              <strong>{{ campaign.title }}</strong>
+              <p class="mt-2 whitespace-pre-wrap text-sm">{{ campaign.body }}</p>
+              @if (campaign.cta_label) {
+                <p class="mt-2 text-sm text-primary">
+                  {{ campaign.cta_label }} → {{ campaign.cta_link }}
+                </p>
               }
             </div>
-          }
-          <div class="modal-action">
+            @if (selectedMetrics(); as metrics) {
+              <div class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                @for (metric of metricRows(metrics); track metric.label) {
+                  <div class="rounded-box border border-base-300 p-3">
+                    <span class="type-caption">{{ metric.label }}</span
+                    ><strong class="block text-xl">{{ metric.value }}</strong>
+                  </div>
+                }
+              </div>
+            }
+          </div>
+          <footer class="flex flex-wrap justify-end gap-2 border-t border-base-300 p-4">
             @if (campaign.status === 'draft') {
               <button class="btn btn-primary" (click)="editSelected()">Edit draft</button>
             }
@@ -419,7 +428,7 @@ import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
             }
             <button class="btn btn-outline" (click)="duplicateSelected()">Duplicate</button
             ><button class="btn" (click)="detailDialog.close()">Close</button>
-          </div>
+          </footer>
         }
       </div>
       <form method="dialog" class="modal-backdrop"><button>Close</button></form>

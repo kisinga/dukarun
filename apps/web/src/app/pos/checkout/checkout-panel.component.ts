@@ -52,7 +52,7 @@ interface Tender {
       (cancel)="$event.preventDefault(); cancelled.emit()"
     >
       <div
-        class="modal-box flex flex-col overflow-hidden border border-base-300/60 bg-base-100 p-0 md:w-full md:max-w-xl"
+        class="modal-box modal-box-task border border-base-300/60 bg-base-100 p-0 md:w-full md:max-w-xl"
       >
         <header
           class="flex items-center justify-between gap-3 border-b border-base-300/60 px-4 py-3 md:px-6"
@@ -75,7 +75,7 @@ interface Tender {
           </button>
         </header>
 
-        <div class="flex-1 overflow-y-auto p-3 md:p-6">
+        <div class="modal-body p-3 md:p-6">
           @if (customerDepositAvailable() > 0 || allowCredit()) {
             <section class="mb-4 rounded-box border border-base-300/60 bg-base-200/50 p-3">
               <div class="flex items-start justify-between gap-3">

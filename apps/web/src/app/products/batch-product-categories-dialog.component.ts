@@ -14,7 +14,7 @@ type StagedChange = 'add' | 'remove';
   imports: [ReactiveFormsModule, ButtonComponent, IconComponent],
   template: `
     <dialog class="modal modal-open" aria-labelledby="batch-category-title">
-      <div class="modal-box flex max-w-xl flex-col p-0">
+      <div class="modal-box modal-box-task p-0 md:w-full md:max-w-xl">
         <header class="border-b border-base-300 px-5 py-4">
           <h2 id="batch-category-title" class="text-lg font-semibold">
             Categorize {{ productIds().length }} products
@@ -22,7 +22,7 @@ type StagedChange = 'add' | 'remove';
           <p class="type-caption mt-1">Only categories changed here will be updated.</p>
         </header>
 
-        <div class="min-h-0 flex-1 overflow-y-auto p-5">
+        <div class="modal-body p-5">
           @if (!connectivity.online()) {
             <div role="alert" class="alert alert-warning mb-4 text-sm">
               <app-icon name="heroExclamationTriangle" />

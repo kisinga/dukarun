@@ -30,7 +30,8 @@ The anon key is public. The service-role key is not and must never be configured
 
 - Applied migrations are immutable; add a new migration to correct behavior.
 - Run `npm run sb:lint`, `npm run sb:test`, and `npm run sb:types` after schema/RPC changes.
-- If CI reports stale types, regenerate against a reset local stack and commit the result.
+- `npm run sb:types` resets the local database before generation. Local data is replaced by seed
+  data, and the resulting types match committed migrations.
 
 ## POS and dashboard freshness
 

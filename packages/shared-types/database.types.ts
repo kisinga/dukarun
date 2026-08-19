@@ -4013,6 +4013,96 @@ export type Database = {
           },
         ]
       }
+      legacy_customer_account_reconciliations: {
+        Row: {
+          amount: number
+          company_id: string
+          created_at: string
+          customer_id: string
+          id: string
+          ledger_balance: number
+          prior_document_balance: number
+          reason: string
+        }
+        Insert: {
+          amount: number
+          company_id: string
+          created_at?: string
+          customer_id: string
+          id?: string
+          ledger_balance: number
+          prior_document_balance: number
+          reason: string
+        }
+        Update: {
+          amount?: number
+          company_id?: string
+          created_at?: string
+          customer_id?: string
+          id?: string
+          ledger_balance?: number
+          prior_document_balance?: number
+          reason?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "legacy_customer_account_reconciliations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "legacy_customer_account_reconciliations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "legacy_customer_account_reconciliations_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: true
+            referencedRelation: "customer_account_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "legacy_customer_account_reconciliations_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: true
+            referencedRelation: "customer_ar_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "legacy_customer_account_reconciliations_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: true
+            referencedRelation: "customer_deposit_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "legacy_customer_account_reconciliations_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: true
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "legacy_customer_account_reconciliations_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: true
+            referencedRelation: "supplier_advance_balances"
+            referencedColumns: ["supplier_id"]
+          },
+          {
+            foreignKeyName: "legacy_customer_account_reconciliations_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: true
+            referencedRelation: "supplier_ap_balances"
+            referencedColumns: ["supplier_id"]
+          },
+        ]
+      }
       legal_document_versions: {
         Row: {
           content_markdown: string | null

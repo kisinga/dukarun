@@ -48,7 +48,7 @@ jobs:
         run: |
           supabase_raw="$RUNNER_TEMP/supabase-start.env"
           supabase_env="$RUNNER_TEMP/supabase-github.env"
-          supabase start
+          supabase start -x studio,imgproxy,storage-api,realtime,mailpit,edge-runtime,logflare,vector,supavisor,postgres-meta
           supabase status -o env > "$supabase_raw"
           sed -nE \
             -e 's/^API_URL="(.*)"$/SUPABASE_URL=\1/p' \
@@ -78,7 +78,7 @@ jobs:
           if [ -f packages/shared-types/database.types.ts ]; then
             supabase gen types typescript --local > /tmp/database.types.ts
             diff /tmp/database.types.ts packages/shared-types/database.types.ts \
-              || (echo "::error::packages/shared-types/database.types.ts is stale. Run: npm run sb:types" && exit 1)
+              || (echo "::error::packages/shared-types/database.types.ts does not match committed migrations. Run npm run sb:types (this resets the local database)." && exit 1)
           else
             echo "No generated types file yet; skipping check."
           fi

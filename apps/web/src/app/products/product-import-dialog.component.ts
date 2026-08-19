@@ -14,7 +14,7 @@ import {
   template: `
     @if (open()) {
       <dialog class="modal modal-open" (cancel)="$event.preventDefault(); close()">
-        <div class="modal-box max-w-3xl p-0">
+        <div class="modal-box modal-box-task p-0 md:w-full md:max-w-3xl">
           <header class="flex items-start justify-between gap-3 border-b border-base-300 p-4">
             <div>
               <h2 class="type-title">Import products</h2>
@@ -32,7 +32,7 @@ import {
             </button>
           </header>
 
-          <div class="max-h-[70vh] space-y-4 overflow-y-auto p-4">
+          <div class="modal-body space-y-4 p-4">
             @if (error()) {
               <div role="alert" class="alert alert-error text-sm">
                 <app-icon name="heroExclamationTriangle" /><span>{{ error() }}</span>

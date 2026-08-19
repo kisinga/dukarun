@@ -80,6 +80,41 @@
     }
   }
 
+  /* Viewport-safe task shell: fixed chrome with one shrinking, scrollable body. */
+  .modal-box.modal-box-task {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden !important;
+  }
+
+  .modal-box-task > header,
+  .modal-box-task > footer {
+    flex: 0 0 auto;
+  }
+
+  .modal-body {
+    min-height: 0;
+    flex: 1 1 auto;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  /* Short/read-only overlays intentionally scroll as one surface. */
+  .modal-box.modal-box-scroll {
+    overflow-y: auto !important;
+    overscroll-behavior: contain;
+  }
+
+  @media (max-width: 767px) {
+    .modal-box-task > header:first-child {
+      padding-top: max(1rem, env(safe-area-inset-top)) !important;
+    }
+
+    .modal-box-task > footer:last-child {
+      padding-bottom: max(1rem, env(safe-area-inset-bottom)) !important;
+    }
+  }
+
   /* Table language: calm uppercase headers, middle-aligned cells,
      tabular-nums on right-aligned (amount) cells. */
   .dashboard-main .table {
