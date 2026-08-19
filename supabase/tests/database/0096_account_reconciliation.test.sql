@@ -1,5 +1,5 @@
 begin;
-select plan(16);
+select plan(22);
 
 select testkit.create_user(
   '96000000-0000-4000-8000-000000000001',
@@ -26,9 +26,9 @@ select is(
 );
 
 select results_eq(
-  $$select account_code::text from public.list_reconcilable_accounts() order by account_code$$,
-  $$values ('BANK_MAIN'), ('CASH_ON_HAND'), ('MPESA')$$,
-  'bank appears even though it is not cashier controlled'
+  $$select account_code::text, balance_scope from public.list_reconcilable_accounts() order by account_code$$,
+  $$values ('BANK_MAIN', 'company'), ('CASH_ON_HAND', 'location'), ('MPESA', 'location')$$,
+  'bank is company-wide while cashier-controlled accounts use the active location'
 );
 
 create temp table bank_first as
@@ -141,12 +141,89 @@ select throws_ok(
   'newer activity on the same account expires reversal'
 );
 
+create temp table active_reconciliation_location as
+select id as location_id
+from public.stock_locations
+where company_id = (select company_id from reconciliation_company)
+  and is_default;
+grant select on pg_temp.active_reconciliation_location to authenticated;
+
+create temp table open_reconciliation_session as
+select public.open_cashier_session_at_location(
+  (select location_id from active_reconciliation_location),
+  '[{"account_code":"CASH_ON_HAND","declared":700},{"account_code":"MPESA","declared":0}]'
+) as session_id;
+
+select ok(
+  (select session_id from open_reconciliation_session) is not null,
+  'cashier session opens from the location-scoped reconciled balance'
+);
+
+select is(
+  (
+    select can_adjust
+    from public.list_reconcilable_accounts((select location_id from active_reconciliation_location))
+    where account_code = 'CASH_ON_HAND'
+  ),
+  false,
+  'the manual workspace disables a location balance during an open session'
+);
+
+select ok(
+  public.record_manual_reconciliation(
+    '[{"account_code":"BANK_MAIN","declared":2000}]',
+    (select location_id from active_reconciliation_location)
+  ) is not null,
+  'company-wide bank verification remains available during a cashier session'
+);
+
+select throws_ok(
+  format(
+    $$select public.record_manual_reconciliation(
+      '[{"account_code":"CASH_ON_HAND","declared":700}]', '%s'
+    )$$,
+    (select location_id from active_reconciliation_location)
+  ),
+  'P0001',
+  'cashier_session_open: close the session before adjusting CASH_ON_HAND',
+  'manual adjustment cannot alter a balance that the open cashier session will close'
+);
+
+select is(
+  public.close_cashier_session_at_location(
+    (select location_id from active_reconciliation_location),
+    (select session_id from open_reconciliation_session),
+    '[{"account_code":"CASH_ON_HAND","declared":700},{"account_code":"MPESA","declared":0}]'
+  ),
+  (select session_id from open_reconciliation_session),
+  'cashier session closes without duplicating the earlier manual adjustment'
+);
+
+select is(
+  (
+    select can_adjust
+    from public.list_reconcilable_accounts((select location_id from active_reconciliation_location))
+    where account_code = 'CASH_ON_HAND'
+  ),
+  true,
+  'location balance becomes adjustable after cashier close'
+);
+
 select ok(
   public.record_manual_reconciliation(
     '[{"account_code":"MPESA","declared":0}]'
   ) is not null,
   'matching zero balance can be verified without a reason'
 );
+
+select public.sign_off_business_day(d.entry_date)
+from (
+  select distinct entry_date
+  from public.ledger_journal_entries
+  where company_id=(select company_id from reconciliation_company)
+    and finalized_at is not null
+    and entry_date<=current_date
+) d;
 
 select ok(
   public.close_accounting_period(current_date) is not null,

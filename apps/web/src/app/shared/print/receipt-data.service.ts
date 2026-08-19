@@ -10,6 +10,9 @@ export interface CompanyPrintInfo {
   logoUrl: string | null;
   address: string | null;
   printerEnabled: boolean;
+  showVatBreakdown: boolean;
+  vatRegistered: boolean;
+  taxRegistrationNumber: string | null;
 }
 
 const METHOD_LABELS: Record<string, string> = {
@@ -51,12 +54,24 @@ export class ReceiptDataService {
   /** Company branding + printer flag (cached per app run). */
   async companyPrintInfo(): Promise<CompanyPrintInfo> {
     if (this.settings) return this.settings;
-    const { data, error } = await this.db
-      .from('companies')
-      .select('name, code, address, logo_path, enable_printer')
-      .limit(1)
-      .single();
+    const [{ data, error }, { data: taxSettings, error: taxError }] = await Promise.all([
+      this.db
+        .from('companies')
+        .select('name, code, address, logo_path, enable_printer, show_vat_breakdown_on_prints')
+        .limit(1)
+        .single(),
+      this.db.rpc('company_tax_settings'),
+    ]);
     if (error) throw error;
+    if (taxError) throw taxError;
+    const activeProfile = (
+      taxSettings as {
+        active_profile?: {
+          vat_registered?: boolean;
+          tax_registration_number?: string | null;
+        } | null;
+      } | null
+    )?.active_profile;
     const logoPath = data.logo_path;
     this.settings = {
       name: data.name,
@@ -68,6 +83,9 @@ export class ReceiptDataService {
         : null,
       address: data.address,
       printerEnabled: data.enable_printer,
+      showVatBreakdown: data.show_vat_breakdown_on_prints,
+      vatRegistered: activeProfile?.vat_registered ?? false,
+      taxRegistrationNumber: activeProfile?.tax_registration_number ?? null,
     };
     return this.settings;
   }
@@ -100,19 +118,73 @@ export class ReceiptDataService {
     orderId: string,
     documentType: 'receipt' | 'proforma'
   ): Promise<{ order: OrderData; meta: PrintMeta }> {
-    const [order, lines, payments] = await Promise.all([
+    const [order, lines, payments, company, taxDocument] = await Promise.all([
       this.pos.getOrder(orderId),
       this.pos.orderLines(orderId),
       this.pos.orderPayments(orderId),
+      this.companyPrintInfo(),
+      this.db
+        .from('tax_documents')
+        .select('document_number')
+        .eq('source_order_id', orderId)
+        .eq('document_kind', 'invoice')
+        .maybeSingle(),
     ]);
+    if (taxDocument.error) throw taxDocument.error;
     if (documentType === 'receipt' && order.status !== 'completed') {
       throw new Error('Receipt unavailable — complete payment before printing.');
     }
     if (documentType === 'proforma' && order.status !== 'draft') {
       throw new Error('This order is no longer a draft, so its proforma cannot be printed.');
     }
+    const estimate =
+      order.tax_snapshot_status === 'pending'
+        ? await this.db.rpc('estimate_order_tax', { p_order_id: orderId })
+        : null;
+    if (estimate?.error) throw estimate.error;
+    const estimatedTax = estimate?.data as unknown as
+      | {
+          gross_total: number;
+          net_total: number;
+          tax_total: number;
+          lines: Array<{
+            line_id: string;
+            gross_total: number;
+            net_total: number;
+            tax_total: number;
+            tax_category_code: string;
+            tax_classification: string;
+            tax_rate_bps: number;
+          }>;
+        }
+      | undefined;
+    const estimatedByLine = new Map((estimatedTax?.lines ?? []).map(line => [line.line_id, line]));
     const variants = await this.pos.variantsByIds(lines.map(l => l.variant_id));
     const byId = new Map(variants.map(v => [v.variant_id, v]));
+
+    const taxGroups = new Map<string, NonNullable<OrderData['taxBreakdown']>[number]>();
+    for (const line of lines) {
+      const snapshot = estimatedByLine.get(line.id);
+      const code = snapshot?.tax_category_code ?? line.tax_category_code;
+      const rate = snapshot?.tax_rate_bps ?? line.tax_rate_bps;
+      if (!code) continue;
+      const key = `${code}:${rate}`;
+      const existing = taxGroups.get(key);
+      if (existing) {
+        existing.gross += snapshot?.gross_total ?? line.gross_total;
+        existing.net += snapshot?.net_total ?? line.net_total;
+        existing.tax += snapshot?.tax_total ?? line.tax_total;
+      } else {
+        taxGroups.set(key, {
+          code,
+          classification: snapshot?.tax_classification ?? line.tax_classification ?? 'standard',
+          rateBps: rate,
+          gross: snapshot?.gross_total ?? line.gross_total,
+          net: snapshot?.net_total ?? line.net_total,
+          tax: snapshot?.tax_total ?? line.tax_total,
+        });
+      }
+    }
 
     const orderData: OrderData = {
       id: order.id,
@@ -123,7 +195,11 @@ export class ReceiptDataService {
       expiresAt: order.expires_at,
       orderPlacedAt: order.created_at,
       total: order.total,
-      totalWithTax: order.total, // prices are tax-inclusive; no split (as the old app)
+      totalWithTax: order.total,
+      netTotal: estimatedTax?.net_total ?? order.net_total,
+      taxTotal: estimatedTax?.tax_total ?? order.tax_total,
+      taxDocumentNumber: taxDocument.data?.document_number ?? null,
+      taxBreakdown: [...taxGroups.values()],
       currencyCode: 'KES',
       customer: order.customers
         ? {
@@ -134,11 +210,17 @@ export class ReceiptDataService {
         : null,
       lines: lines.map(l => {
         const v = byId.get(l.variant_id);
+        const estimateLine = estimatedByLine.get(l.id);
         return {
           id: l.id,
           quantity: Number(l.quantity),
           linePrice: l.line_total,
           linePriceWithTax: l.line_total,
+          netAmount: estimateLine?.net_total ?? l.net_total,
+          taxAmount: estimateLine?.tax_total ?? l.tax_total,
+          taxCategoryCode: estimateLine?.tax_category_code ?? l.tax_category_code,
+          taxClassification: estimateLine?.tax_classification ?? l.tax_classification,
+          taxRateBps: estimateLine?.tax_rate_bps ?? l.tax_rate_bps,
           productVariant: {
             id: l.variant_id,
             name: v?.variant_name ?? l.label,
@@ -165,6 +247,9 @@ export class ReceiptDataService {
 
     const meta: PrintMeta = {
       documentType,
+      showVatBreakdown: company.showVatBreakdown,
+      vatRegistered: company.vatRegistered,
+      taxRegistrationNumber: company.taxRegistrationNumber,
       paymentMethodName:
         payments.length > 0
           ? [...new Set(payments.map(p => METHOD_LABELS[p.method_code] ?? p.method_code))].join(

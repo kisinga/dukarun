@@ -204,6 +204,12 @@ export interface CashierAccount {
   label: string;
 }
 
+/** Current location-scoped book balance for one cashier-controlled account. */
+export interface CashierExpectedBalance {
+  account_code: string;
+  expected_balance: number;
+}
+
 /** Active real-money account whose book balance may be manually reconciled. */
 export interface ReconcilableAccount {
   account_code: string;
@@ -211,6 +217,11 @@ export interface ReconcilableAccount {
   balance: number;
   requires_reconciliation: boolean;
   last_reconciled_at: string | null;
+  balance_scope: 'company' | 'location';
+  location_id: string | null;
+  location_name: string | null;
+  can_adjust: boolean;
+  blocked_reason: string | null;
 }
 
 export interface PurchaseLineInput {
@@ -269,30 +280,34 @@ export class MoneyService {
     return data;
   }
 
-  /** Cashier-controlled accounts from enabled payment methods (cash→CASH_ON_HAND, mpesa→MPESA). */
-  async cashierAccounts(): Promise<CashierAccount[]> {
-    const { data, error } = await this.db.rpc('available_payment_methods', {
+  /** Default controlled accounts plus non-default accounts used by this session. */
+  async cashierAccounts(sessionId?: string | null): Promise<CashierAccount[]> {
+    const { data, error } = await this.db.rpc('cashier_count_accounts', {
       p_location_id: this.locations.requireActiveId(),
+      p_session_id: sessionId ?? undefined,
     });
     if (error) throw error;
-    const accounts = new Map<string, CashierAccount>();
-    for (const method of data.filter(method => method.is_cashier_controlled)) {
-      const existing = accounts.get(method.ledger_account_code);
-      if (existing) {
-        existing.label = `${existing.label} / ${method.name}`;
-      } else {
-        accounts.set(method.ledger_account_code, {
-          account_code: method.ledger_account_code,
-          label: method.name,
-        });
-      }
-    }
-    return [...accounts.values()];
+    return data.map(account => ({
+      account_code: account.account_code,
+      label: account.account_name,
+    }));
   }
 
-  /** Company-wide real-money balances available to privileged reconciliation. */
+  /** SettleOrder-scoped expected balances for the active location's controlled accounts. */
+  async cashierExpectedBalances(sessionId?: string | null): Promise<CashierExpectedBalance[]> {
+    const { data, error } = await this.db.rpc('cashier_expected_balances', {
+      p_location_id: this.locations.requireActiveId(),
+      p_session_id: sessionId ?? undefined,
+    });
+    if (error) throw rpcError(error);
+    return data;
+  }
+
+  /** Real-money balances, scoped to company or active location as accounting requires. */
   async reconcilableAccounts(): Promise<ReconcilableAccount[]> {
-    const { data, error } = await this.db.rpc('list_reconcilable_accounts');
+    const { data, error } = await this.db.rpc('list_reconcilable_accounts', {
+      p_location_id: this.locations.requireActiveId(),
+    });
     if (error) throw rpcError(error);
     return data as ReconcilableAccount[];
   }
@@ -540,6 +555,7 @@ export class MoneyService {
   async recentReconciliations(
     limit = 10
   ): Promise<(Reconciliation & { reconciliation_accounts: ReconAccount[] })[]> {
+    const locationId = this.locations.requireActiveId();
     const { data, error } = await this.db
       .from('reconciliations')
       .select('*, reconciliation_accounts(*)')
@@ -547,7 +563,15 @@ export class MoneyService {
       .order('id', { ascending: false })
       .limit(limit);
     if (error) throw error;
-    return data;
+    return data
+      .map(reconciliation => ({
+        ...reconciliation,
+        reconciliation_accounts: reconciliation.reconciliation_accounts.filter(
+          account =>
+            account.balance_scope === 'company' || reconciliation.location_id === locationId
+        ),
+      }))
+      .filter(reconciliation => reconciliation.reconciliation_accounts.length > 0);
   }
 
   /** ManageReconciliation-gated: post the reversal and mark the row reviewed. */
@@ -752,13 +776,27 @@ export class MoneyService {
     amount: number,
     sourceAccountCode: string,
     category?: string,
-    memo?: string
+    memo?: string,
+    tax?: {
+      expenseDate: string;
+      claimInputVat: boolean;
+      supplierTaxPin?: string;
+      taxInvoiceNumber?: string;
+      taxInvoiceDate?: string;
+      taxCategoryId?: string;
+    }
   ): Promise<string> {
-    const { data, error } = await this.db.rpc('post_expense', {
+    const { data, error } = await this.db.rpc('post_expense_with_tax', {
       p_amount: amount,
       p_source_account_code: sourceAccountCode,
       ...(category ? { p_category: category } : {}),
       ...(memo ? { p_memo: memo } : {}),
+      ...(tax?.expenseDate ? { p_expense_date: tax.expenseDate } : {}),
+      p_claim_input_vat: tax?.claimInputVat ?? false,
+      ...(tax?.supplierTaxPin ? { p_supplier_tax_pin: tax.supplierTaxPin } : {}),
+      ...(tax?.taxInvoiceNumber ? { p_tax_invoice_number: tax.taxInvoiceNumber } : {}),
+      ...(tax?.taxInvoiceDate ? { p_tax_invoice_date: tax.taxInvoiceDate } : {}),
+      ...(tax?.taxCategoryId ? { p_tax_category_id: tax.taxCategoryId } : {}),
     });
     if (error) throw rpcError(error);
     return data;
@@ -878,6 +916,26 @@ export class MoneyService {
         p_amount: amount,
         p_method_code: methodCode,
         p_reason: reason,
+      });
+      if (error) throw rpcError(error);
+      return data;
+    });
+    if (outcome.status === 'completed') this.parties.invalidateFinancials();
+    return outcome;
+  }
+
+  async postFullRefund(
+    orderId: string,
+    methodCode: string,
+    reason: string,
+    stockOutcome: 'return_to_stock' | 'write_off'
+  ): Promise<ActionOutcome> {
+    const outcome = await this.actions.run(async () => {
+      const { data, error } = await this.db.rpc('post_full_refund', {
+        p_order_id: orderId,
+        p_method_code: methodCode,
+        p_reason: reason,
+        p_stock_outcome: stockOutcome,
       });
       if (error) throw rpcError(error);
       return data;
@@ -1071,21 +1129,33 @@ export class MoneyService {
     accountCode?: string,
     notes?: string,
     purchaseDate?: string,
-    stockLocationId?: string
+    stockLocationId?: string,
+    tax?: {
+      claimInputVat: boolean;
+      supplierTaxPin?: string;
+      taxInvoiceNumber?: string;
+      taxInvoiceDate?: string;
+    }
   ): Promise<string> {
-    const { data, error } = await this.db.rpc('record_purchase_with_payment', {
-      p_supplier_id: supplierId,
-      p_lines: lines as never,
-      p_payment_amount: paymentAmount,
-      ...(reference ? { p_reference: reference } : {}),
-      ...(accountCode ? { p_account_code: accountCode } : {}),
-      ...(notes ? { p_notes: notes } : {}),
-      ...(purchaseDate ? { p_purchase_date: purchaseDate } : {}),
-      ...(stockLocationId ? { p_stock_location_id: stockLocationId } : {}),
+    return this.recordPurchaseComplete({
+      supplierId,
+      lines: lines.map(line => ({
+        ...line,
+        line_total: Math.round(line.quantity * line.unit_cost),
+        value_source: 'unit' as const,
+      })),
+      expenses: [],
+      paymentAmount,
+      reference,
+      accountCode,
+      notes,
+      purchaseDate,
+      stockLocationId,
+      claimInputVat: tax?.claimInputVat ?? false,
+      supplierTaxPin: tax?.supplierTaxPin,
+      taxInvoiceNumber: tax?.taxInvoiceNumber,
+      taxInvoiceDate: tax?.taxInvoiceDate,
     });
-    if (error) throw rpcError(error);
-    this.parties.invalidateFinancials();
-    return data;
   }
 
   async recordPurchaseComplete(input: {
@@ -1098,8 +1168,12 @@ export class MoneyService {
     notes?: string;
     purchaseDate?: string;
     stockLocationId?: string;
+    claimInputVat?: boolean;
+    supplierTaxPin?: string;
+    taxInvoiceNumber?: string;
+    taxInvoiceDate?: string;
   }): Promise<string> {
-    const { data, error } = await this.db.rpc('record_purchase_complete', {
+    const { data, error } = await this.db.rpc('record_purchase_complete_with_tax', {
       p_supplier_id: input.supplierId,
       p_lines: input.lines as never,
       p_expenses: input.expenses as never,
@@ -1109,6 +1183,10 @@ export class MoneyService {
       ...(input.notes ? { p_notes: input.notes } : {}),
       ...(input.purchaseDate ? { p_purchase_date: input.purchaseDate } : {}),
       ...(input.stockLocationId ? { p_stock_location_id: input.stockLocationId } : {}),
+      p_claim_input_vat: input.claimInputVat ?? false,
+      ...(input.supplierTaxPin ? { p_supplier_tax_pin: input.supplierTaxPin } : {}),
+      ...(input.taxInvoiceNumber ? { p_tax_invoice_number: input.taxInvoiceNumber } : {}),
+      ...(input.taxInvoiceDate ? { p_tax_invoice_date: input.taxInvoiceDate } : {}),
     });
     if (error) throw rpcError(error);
     this.parties.invalidateFinancials();

@@ -569,6 +569,55 @@ interface ParsedPurchaseLine {
                       [formControl]="purchaseNotes"
                     />
                   </app-form-field>
+                  <label
+                    class="flex min-h-14 cursor-pointer items-center gap-3 rounded-field border border-base-300 px-3 lg:col-span-3 xl:col-span-2"
+                  >
+                    <input
+                      type="checkbox"
+                      class="toggle toggle-primary"
+                      [formControl]="purchaseClaimInputVat"
+                      [disabled]="!!activeDraftId()"
+                    />
+                    <span>
+                      <span class="block text-sm font-semibold">Claim input VAT</span>
+                      <span class="type-caption">Costs entered above are VAT-inclusive.</span>
+                    </span>
+                  </label>
+                  @if (purchaseClaimInputVat.value) {
+                    <app-form-field
+                      label="Supplier tax PIN"
+                      class="lg:col-span-3 xl:col-span-2"
+                      [required]="true"
+                    >
+                      <input
+                        class="input input-bordered h-14 w-full"
+                        autocomplete="off"
+                        [formControl]="purchaseSupplierTaxPin"
+                      />
+                    </app-form-field>
+                    <app-form-field
+                      label="Tax invoice number"
+                      class="lg:col-span-3 xl:col-span-2"
+                      [required]="true"
+                    >
+                      <input
+                        class="input input-bordered h-14 w-full"
+                        autocomplete="off"
+                        [formControl]="purchaseTaxInvoiceNumber"
+                      />
+                    </app-form-field>
+                    <app-form-field
+                      label="Tax invoice date"
+                      class="lg:col-span-3 xl:col-span-2"
+                      [required]="true"
+                    >
+                      <input
+                        type="date"
+                        class="input input-bordered h-14 w-full"
+                        [formControl]="purchaseTaxInvoiceDate"
+                      />
+                    </app-form-field>
+                  }
                 </div>
 
                 <section class="rounded-box border border-base-300 bg-base-200/30 p-4">
@@ -2567,6 +2616,15 @@ export class SuppliersComponent implements OnInit, OnDestroy {
     nonNullable: true,
   });
   protected readonly purchaseLocation = new FormControl('', { nonNullable: true });
+  protected readonly purchaseClaimInputVat = new FormControl(false, { nonNullable: true });
+  protected readonly purchaseSupplierTaxPin = new FormControl('', { nonNullable: true });
+  protected readonly purchaseTaxInvoiceNumber = new FormControl('', { nonNullable: true });
+  protected readonly purchaseTaxInvoiceDate = new FormControl(
+    new Date().toISOString().slice(0, 10),
+    {
+      nonNullable: true,
+    }
+  );
   protected readonly purchasePaymentMode = new FormControl<PurchasePaymentMode>('paid', {
     nonNullable: true,
   });
@@ -3384,6 +3442,17 @@ export class SuppliersComponent implements OnInit, OnDestroy {
   }
 
   protected async recordPurchase(): Promise<void> {
+    if (
+      this.purchaseClaimInputVat.value &&
+      (!this.purchaseSupplierTaxPin.value.trim() ||
+        !this.purchaseTaxInvoiceNumber.value.trim() ||
+        !this.purchaseTaxInvoiceDate.value)
+    ) {
+      this.error.set(
+        'Supplier PIN, invoice number, and invoice date are required to claim input VAT'
+      );
+      return;
+    }
     if (!this.partialPaymentValid()) {
       this.error.set(this.partialPaymentError() ?? 'Enter the amount paid');
       return;
@@ -3434,7 +3503,13 @@ export class SuppliersComponent implements OnInit, OnDestroy {
           mode === 'later' ? undefined : this.purchaseAccount.value,
           this.purchaseNotes.value.trim() || undefined,
           this.purchaseDate.value,
-          this.purchaseLocation.value || undefined
+          this.purchaseLocation.value || undefined,
+          {
+            claimInputVat: this.purchaseClaimInputVat.value,
+            supplierTaxPin: this.purchaseSupplierTaxPin.value.trim() || undefined,
+            taxInvoiceNumber: this.purchaseTaxInvoiceNumber.value.trim() || undefined,
+            taxInvoiceDate: this.purchaseTaxInvoiceDate.value || undefined,
+          }
         );
       }
       this.clearPurchaseForm();
@@ -3486,6 +3561,7 @@ export class SuppliersComponent implements OnInit, OnDestroy {
     this.purchaseReference.setValue(draft.reference ?? '');
     this.purchaseNotes.setValue(draft.notes ?? '');
     this.purchaseDate.setValue(draft.purchase_date);
+    this.purchaseClaimInputVat.setValue(false);
     const lines = Array.isArray(draft.lines)
       ? (draft.lines as unknown as Array<Record<string, unknown>>)
       : [];
@@ -3531,6 +3607,10 @@ export class SuppliersComponent implements OnInit, OnDestroy {
     this.purchaseReference.setValue('');
     this.purchaseNotes.setValue('');
     this.purchaseDate.setValue(new Date().toISOString().slice(0, 10));
+    this.purchaseClaimInputVat.setValue(false);
+    this.purchaseSupplierTaxPin.setValue('');
+    this.purchaseTaxInvoiceNumber.setValue('');
+    this.purchaseTaxInvoiceDate.setValue(new Date().toISOString().slice(0, 10));
     this.purchasePaymentMode.setValue('paid');
     this.purchaseAmountPaid.setValue('');
     this.lines = [this.emptyLine()];

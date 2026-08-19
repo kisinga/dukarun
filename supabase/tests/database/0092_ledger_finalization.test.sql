@@ -227,14 +227,23 @@ select testkit.as_user(
   'Admin'
 );
 
+select public.sign_off_business_day(d.entry_date)
+from (
+  select distinct entry_date
+  from public.ledger_journal_entries
+  where company_id=(select company_id from finalization_fixture)
+    and finalized_at is not null
+    and entry_date<=current_date
+) d;
+
 create temp table closed_period as
 select public.close_accounting_period(current_date) as period_id;
 grant select on pg_temp.closed_period to authenticated;
 select ok((select period_id from closed_period) is not null,
   'first accounting period closes');
 select is((select start_date from public.accounting_periods
-  where id=(select period_id from closed_period)),current_date-2,
-  'first period starts at the earliest finalized journal date');
+  where id=(select period_id from closed_period)),date_trunc('month',current_date)::date,
+  'first rolling period starts at the calendar-month boundary');
 reset role;
 
 select is(public.post_journal_entry(

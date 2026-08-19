@@ -67,6 +67,7 @@ export class SyncService {
   private settingsScope: string | null = null;
   private settingsChannel: RealtimeChannel | null = null;
   private settingsHandler: CacheStreamHandler | null = null;
+  private readonly deviceKey = this.loadDeviceKey();
 
   constructor() {
     // App start, account change, reconnect, and resume-from-suspension triggers.
@@ -89,7 +90,11 @@ export class SyncService {
           if (identity && locationId && scope) {
             this.settingsHandler = {
               apply: async changes => {
-                if (changes.some(change => change.entityType === 'payment_method')) {
+                if (
+                  changes.some(change =>
+                    ['payment_method', 'payment_account'].includes(change.entityType)
+                  )
+                ) {
                   await this.refreshPaymentMethods(identity, locationId, scope);
                 }
               },
@@ -133,7 +138,16 @@ export class SyncService {
 
   /** Persist a locally-completed sale and surface it in the queue. */
   async enqueue(
-    entry: Omit<OutboxEntry, 'client_ref' | 'queued_at' | 'status' | 'company_id' | 'user_id'>,
+    entry: Omit<
+      OutboxEntry,
+      | 'client_ref'
+      | 'occurred_at'
+      | 'device_key'
+      | 'queued_at'
+      | 'status'
+      | 'company_id'
+      | 'user_id'
+    >,
     clientRef: string = crypto.randomUUID()
   ): Promise<string> {
     const identity = this.requireIdentity();
@@ -143,6 +157,8 @@ export class SyncService {
       user_id: identity.userId,
       location_id: this.locations.requireActiveId(),
       client_ref: clientRef,
+      occurred_at: new Date().toISOString(),
+      device_key: this.deviceKey,
       queued_at: new Date().toISOString(),
       status: 'queued',
     };
@@ -168,15 +184,17 @@ export class SyncService {
         const currentIdentity = this.supabase.offlineIdentity();
         if (!currentIdentity || offlineScopeKey(currentIdentity) !== identityKey) break;
         try {
-          await this.pos.postSale(
-            entry.customer_id,
-            entry.lines,
-            entry.payments,
-            false,
-            entry.client_ref,
-            entry.location_id,
-            entry.draft_id ?? undefined
-          );
+          await this.pos.postOfflineSale({
+            customerId: entry.customer_id,
+            lines: entry.lines,
+            payments: entry.payments,
+            clientRef: entry.client_ref,
+            occurredAt: entry.occurred_at ?? entry.queued_at,
+            deviceKey: entry.device_key ?? this.deviceKey,
+            pendingCount: queued.length,
+            locationId: entry.location_id ?? this.locations.requireActiveId(),
+            draftId: entry.draft_id ?? undefined,
+          });
           await db.delete('outbox', entry.client_ref);
           posted++;
         } catch (err) {
@@ -191,6 +209,15 @@ export class SyncService {
           }
         }
       }
+      const remaining = (await db.getAllFromIndex('outbox', 'by-queued-at')).filter(
+        entry => belongsToIdentity(entry, identity) && entry.status === 'queued'
+      ).length;
+      await this.pos.heartbeatPosDevice(
+        this.deviceKey,
+        this.locations.requireActiveId(),
+        remaining,
+        remaining === 0
+      );
       if (posted > 0) this.lastPostedAt.set(new Date().toISOString());
     } finally {
       this.syncing.set(false);
@@ -224,6 +251,19 @@ export class SyncService {
     const all = await db.getAllFromIndex('outbox', 'by-queued-at');
     this.entries.set(identity ? all.filter(entry => belongsToIdentity(entry, identity)) : []);
     this.legacyEntryCount.set(all.filter(entry => !entry.company_id || !entry.user_id).length);
+  }
+
+  private loadDeviceKey(): string {
+    const storageKey = 'dukarun-pos-device-key';
+    try {
+      const existing = localStorage.getItem(storageKey);
+      if (existing) return existing;
+      const created = crypto.randomUUID();
+      localStorage.setItem(storageKey, created);
+      return created;
+    } catch {
+      return crypto.randomUUID();
+    }
   }
 
   // --- Product snapshot (offline search on the Sell screen) ---
@@ -332,6 +372,12 @@ export class SyncService {
       name: method.name,
       isCashierControlled: method.is_cashier_controlled,
       reconciliationType: method.reconciliation_type ?? null,
+      defaultAccountCode: method.default_account_code,
+      accounts: method.accounts.map(account => ({
+        code: account.code,
+        name: account.name,
+        isDefault: account.is_default,
+      })),
     }));
     const currentIdentity = this.supabase.offlineIdentity();
     const currentLocationId = this.locations.activeId();

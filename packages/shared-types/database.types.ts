@@ -36,6 +36,8 @@ export type Database = {
     Tables: {
       accounting_periods: {
         Row: {
+          closed_at: string | null
+          closed_by: string | null
           company_id: string
           created_at: string
           created_by: string | null
@@ -45,6 +47,8 @@ export type Database = {
           status: string
         }
         Insert: {
+          closed_at?: string | null
+          closed_by?: string | null
           company_id: string
           created_at?: string
           created_by?: string | null
@@ -54,6 +58,8 @@ export type Database = {
           status?: string
         }
         Update: {
+          closed_at?: string | null
+          closed_by?: string | null
           company_id?: string
           created_at?: string
           created_by?: string | null
@@ -1418,6 +1424,7 @@ export type Database = {
           automated_customer_notifications_override: boolean | null
           batch_expiry_enabled: boolean
           billing_cycle: string | null
+          business_timezone: string
           cash_control_enabled: boolean
           cashier_flow_enabled: boolean
           code: string
@@ -1447,6 +1454,7 @@ export type Database = {
           public_storefront_enabled: boolean
           public_whatsapp_number: string | null
           require_opening_count: boolean
+          show_vat_breakdown_on_prints: boolean
           sms_period_end: string | null
           sms_reserved_this_period: number
           sms_usage_by_category: Json | null
@@ -1474,6 +1482,7 @@ export type Database = {
           automated_customer_notifications_override?: boolean | null
           batch_expiry_enabled?: boolean
           billing_cycle?: string | null
+          business_timezone?: string
           cash_control_enabled?: boolean
           cashier_flow_enabled?: boolean
           code: string
@@ -1503,6 +1512,7 @@ export type Database = {
           public_storefront_enabled?: boolean
           public_whatsapp_number?: string | null
           require_opening_count?: boolean
+          show_vat_breakdown_on_prints?: boolean
           sms_period_end?: string | null
           sms_reserved_this_period?: number
           sms_usage_by_category?: Json | null
@@ -1530,6 +1540,7 @@ export type Database = {
           automated_customer_notifications_override?: boolean | null
           batch_expiry_enabled?: boolean
           billing_cycle?: string | null
+          business_timezone?: string
           cash_control_enabled?: boolean
           cashier_flow_enabled?: boolean
           code?: string
@@ -1559,6 +1570,7 @@ export type Database = {
           public_storefront_enabled?: boolean
           public_whatsapp_number?: string | null
           require_opening_count?: boolean
+          show_vat_breakdown_on_prints?: boolean
           sms_period_end?: string | null
           sms_reserved_this_period?: number
           sms_usage_by_category?: Json | null
@@ -1887,6 +1899,77 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      company_tax_profiles: {
+        Row: {
+          business_timezone: string
+          company_id: string
+          created_at: string
+          created_by: string | null
+          default_tax_category_id: string | null
+          effective_from: string
+          effective_to: string | null
+          id: string
+          jurisdiction_id: string
+          tax_registration_number: string | null
+          vat_registered: boolean
+        }
+        Insert: {
+          business_timezone: string
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          default_tax_category_id?: string | null
+          effective_from: string
+          effective_to?: string | null
+          id?: string
+          jurisdiction_id: string
+          tax_registration_number?: string | null
+          vat_registered?: boolean
+        }
+        Update: {
+          business_timezone?: string
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          default_tax_category_id?: string | null
+          effective_from?: string
+          effective_to?: string | null
+          id?: string
+          jurisdiction_id?: string
+          tax_registration_number?: string | null
+          vat_registered?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_tax_profiles_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_tax_profiles_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_tax_profiles_default_tax_category_id_fkey"
+            columns: ["default_tax_category_id"]
+            isOneToOne: false
+            referencedRelation: "tax_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_tax_profiles_jurisdiction_id_fkey"
+            columns: ["jurisdiction_id"]
+            isOneToOne: false
+            referencedRelation: "tax_jurisdictions"
             referencedColumns: ["id"]
           },
         ]
@@ -2517,6 +2600,7 @@ export type Database = {
           applied_amount: number
           cashier_session_id: string | null
           client_ref: string
+          collection_allocation_id: string | null
           company_id: string
           created_at: string
           created_by: string | null
@@ -2538,6 +2622,7 @@ export type Database = {
           applied_amount?: number
           cashier_session_id?: string | null
           client_ref: string
+          collection_allocation_id?: string | null
           company_id: string
           created_at?: string
           created_by?: string | null
@@ -2559,6 +2644,7 @@ export type Database = {
           applied_amount?: number
           cashier_session_id?: string | null
           client_ref?: string
+          collection_allocation_id?: string | null
           company_id?: string
           created_at?: string
           created_by?: string | null
@@ -2581,6 +2667,13 @@ export type Database = {
             columns: ["cashier_session_id"]
             isOneToOne: false
             referencedRelation: "cashier_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_receipts_collection_allocation_id_fkey"
+            columns: ["collection_allocation_id"]
+            isOneToOne: false
+            referencedRelation: "payment_collection_allocations"
             referencedColumns: ["id"]
           },
           {
@@ -2856,6 +2949,57 @@ export type Database = {
           },
         ]
       }
+      daily_business_closes: {
+        Row: {
+          business_date: string
+          company_id: string
+          id: string
+          invalidated_at: string | null
+          invalidation_reason: string | null
+          signed_off_at: string
+          signed_off_by: string
+          status: string
+          summary: Json
+        }
+        Insert: {
+          business_date: string
+          company_id: string
+          id?: string
+          invalidated_at?: string | null
+          invalidation_reason?: string | null
+          signed_off_at?: string
+          signed_off_by: string
+          status?: string
+          summary: Json
+        }
+        Update: {
+          business_date?: string
+          company_id?: string
+          id?: string
+          invalidated_at?: string | null
+          invalidation_reason?: string | null
+          signed_off_at?: string
+          signed_off_by?: string
+          status?: string
+          summary?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_business_closes_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_business_closes_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       delivery_attempts: {
         Row: {
           accepted: boolean
@@ -2893,6 +3037,127 @@ export type Database = {
             columns: ["outbox_id"]
             isOneToOne: false
             referencedRelation: "outbox"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      expense_documents: {
+        Row: {
+          category: string
+          claim_input_vat: boolean
+          company_id: string
+          created_at: string
+          created_by: string | null
+          expense_date: string
+          gross_total: number
+          id: string
+          input_tax_total: number
+          journal_entry_id: string | null
+          memo: string | null
+          net_total: number
+          source_account_code: string
+          supplier_tax_pin: string | null
+          tax_category_code: string
+          tax_category_id: string | null
+          tax_classification: string
+          tax_invoice_date: string | null
+          tax_invoice_number: string | null
+          tax_point_at: string | null
+          tax_profile_id: string | null
+          tax_rate_bps: number
+          tax_rate_version_id: string | null
+        }
+        Insert: {
+          category: string
+          claim_input_vat?: boolean
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          expense_date: string
+          gross_total: number
+          id?: string
+          input_tax_total: number
+          journal_entry_id?: string | null
+          memo?: string | null
+          net_total: number
+          source_account_code: string
+          supplier_tax_pin?: string | null
+          tax_category_code: string
+          tax_category_id?: string | null
+          tax_classification: string
+          tax_invoice_date?: string | null
+          tax_invoice_number?: string | null
+          tax_point_at?: string | null
+          tax_profile_id?: string | null
+          tax_rate_bps?: number
+          tax_rate_version_id?: string | null
+        }
+        Update: {
+          category?: string
+          claim_input_vat?: boolean
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          expense_date?: string
+          gross_total?: number
+          id?: string
+          input_tax_total?: number
+          journal_entry_id?: string | null
+          memo?: string | null
+          net_total?: number
+          source_account_code?: string
+          supplier_tax_pin?: string | null
+          tax_category_code?: string
+          tax_category_id?: string | null
+          tax_classification?: string
+          tax_invoice_date?: string | null
+          tax_invoice_number?: string | null
+          tax_point_at?: string | null
+          tax_profile_id?: string | null
+          tax_rate_bps?: number
+          tax_rate_version_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expense_documents_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expense_documents_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expense_documents_journal_entry_id_fkey"
+            columns: ["journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "ledger_journal_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expense_documents_tax_category_id_fkey"
+            columns: ["tax_category_id"]
+            isOneToOne: false
+            referencedRelation: "tax_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expense_documents_tax_profile_id_fkey"
+            columns: ["tax_profile_id"]
+            isOneToOne: false
+            referencedRelation: "company_tax_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expense_documents_tax_rate_version_id_fkey"
+            columns: ["tax_rate_version_id"]
+            isOneToOne: false
+            referencedRelation: "tax_rate_versions"
             referencedColumns: ["id"]
           },
         ]
@@ -3294,6 +3559,107 @@ export type Database = {
           },
         ]
       }
+      late_sale_reviews: {
+        Row: {
+          client_ref: string
+          company_id: string
+          created_at: string
+          device_id: string | null
+          id: string
+          location_id: string
+          occurred_at: string
+          original_period_id: string | null
+          payload: Json
+          posted_order_id: string | null
+          review_reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+        }
+        Insert: {
+          client_ref: string
+          company_id: string
+          created_at?: string
+          device_id?: string | null
+          id?: string
+          location_id: string
+          occurred_at: string
+          original_period_id?: string | null
+          payload: Json
+          posted_order_id?: string | null
+          review_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+        }
+        Update: {
+          client_ref?: string
+          company_id?: string
+          created_at?: string
+          device_id?: string | null
+          id?: string
+          location_id?: string
+          occurred_at?: string
+          original_period_id?: string | null
+          payload?: Json
+          posted_order_id?: string | null
+          review_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "late_sale_reviews_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "late_sale_reviews_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "late_sale_reviews_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "pos_devices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "late_sale_reviews_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "low_stock_variants_by_location"
+            referencedColumns: ["location_id"]
+          },
+          {
+            foreignKeyName: "late_sale_reviews_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "stock_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "late_sale_reviews_original_period_id_fkey"
+            columns: ["original_period_id"]
+            isOneToOne: false
+            referencedRelation: "accounting_periods"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "late_sale_reviews_posted_order_id_fkey"
+            columns: ["posted_order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ledger_accounts: {
         Row: {
           allow_manual_posting: boolean
@@ -3304,6 +3670,7 @@ export type Database = {
           is_active: boolean
           is_parent: boolean
           is_system: boolean
+          money_account_kind: string | null
           name: string
           parent_id: string | null
           type: string
@@ -3318,6 +3685,7 @@ export type Database = {
           is_active?: boolean
           is_parent?: boolean
           is_system?: boolean
+          money_account_kind?: string | null
           name: string
           parent_id?: string | null
           type: string
@@ -3332,6 +3700,7 @@ export type Database = {
           is_active?: boolean
           is_parent?: boolean
           is_system?: boolean
+          money_account_kind?: string | null
           name?: string
           parent_id?: string | null
           type?: string
@@ -3363,45 +3732,67 @@ export type Database = {
       }
       ledger_journal_entries: {
         Row: {
+          cashier_session_id: string | null
           company_id: string
           created_at: string
           entry_date: string
           finalized_at: string | null
           id: string
+          late_posting_reason: string | null
           memo: string | null
+          occurred_at: string | null
           payload_hash: string | null
           posted_at: string
+          posting_location_id: string | null
+          posting_source: string | null
           reversal_of: string | null
           source_id: string
           source_type: string
         }
         Insert: {
+          cashier_session_id?: string | null
           company_id: string
           created_at?: string
           entry_date: string
           finalized_at?: string | null
           id?: string
+          late_posting_reason?: string | null
           memo?: string | null
+          occurred_at?: string | null
           payload_hash?: string | null
           posted_at?: string
+          posting_location_id?: string | null
+          posting_source?: string | null
           reversal_of?: string | null
           source_id: string
           source_type: string
         }
         Update: {
+          cashier_session_id?: string | null
           company_id?: string
           created_at?: string
           entry_date?: string
           finalized_at?: string | null
           id?: string
+          late_posting_reason?: string | null
           memo?: string | null
+          occurred_at?: string | null
           payload_hash?: string | null
           posted_at?: string
+          posting_location_id?: string | null
+          posting_source?: string | null
           reversal_of?: string | null
           source_id?: string
           source_type?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "ledger_journal_entries_cashier_session_id_fkey"
+            columns: ["cashier_session_id"]
+            isOneToOne: false
+            referencedRelation: "cashier_sessions"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "ledger_journal_entries_company_id_fkey"
             columns: ["company_id"]
@@ -3414,6 +3805,20 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ledger_journal_entries_posting_location_id_fkey"
+            columns: ["posting_location_id"]
+            isOneToOne: false
+            referencedRelation: "low_stock_variants_by_location"
+            referencedColumns: ["location_id"]
+          },
+          {
+            foreignKeyName: "ledger_journal_entries_posting_location_id_fkey"
+            columns: ["posting_location_id"]
+            isOneToOne: false
+            referencedRelation: "stock_locations"
             referencedColumns: ["id"]
           },
           {
@@ -3734,6 +4139,66 @@ export type Database = {
           },
         ]
       }
+      location_payment_provider_accounts: {
+        Row: {
+          company_id: string
+          created_at: string
+          location_id: string
+          provider: string
+          provider_account_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          location_id: string
+          provider: string
+          provider_account_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          location_id?: string
+          provider?: string
+          provider_account_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "location_payment_provider_accounts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "location_payment_provider_accounts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "location_payment_provider_accounts_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "low_stock_variants_by_location"
+            referencedColumns: ["location_id"]
+          },
+          {
+            foreignKeyName: "location_payment_provider_accounts_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "stock_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "location_payment_provider_accounts_provider_account_id_fkey"
+            columns: ["provider_account_id"]
+            isOneToOne: false
+            referencedRelation: "payment_provider_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       manufacturers: {
         Row: {
           active: boolean
@@ -3951,6 +4416,789 @@ export type Database = {
           },
         ]
       }
+      mpesa_callback_tokens: {
+        Row: {
+          activated_at: string | null
+          attempt_id: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          expires_at: string | null
+          id: string
+          kind: string
+          provider_account_id: string
+          retire_after: string | null
+          status: string
+          token_hash: string
+        }
+        Insert: {
+          activated_at?: string | null
+          attempt_id?: string | null
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string | null
+          id?: string
+          kind: string
+          provider_account_id: string
+          retire_after?: string | null
+          status?: string
+          token_hash: string
+        }
+        Update: {
+          activated_at?: string | null
+          attempt_id?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string | null
+          id?: string
+          kind?: string
+          provider_account_id?: string
+          retire_after?: string | null
+          status?: string
+          token_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mpesa_callback_tokens_attempt_id_fkey"
+            columns: ["attempt_id"]
+            isOneToOne: false
+            referencedRelation: "mpesa_payment_attempts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mpesa_callback_tokens_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mpesa_callback_tokens_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mpesa_callback_tokens_provider_account_id_fkey"
+            columns: ["provider_account_id"]
+            isOneToOne: false
+            referencedRelation: "payment_provider_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mpesa_connections: {
+        Row: {
+          business_shortcode: string
+          c2b_callback_seen_at: string | null
+          c2b_registered_at: string | null
+          c2b_test_collection_id: string | null
+          company_id: string
+          created_at: string
+          daraja_app_id: string
+          onboarding_request_id: string | null
+          organization_shortcode: string
+          party_b: string
+          passkey_secret_id: string
+          provider_account_id: string
+          shortcode_type: string
+          stk_test_collection_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          business_shortcode: string
+          c2b_callback_seen_at?: string | null
+          c2b_registered_at?: string | null
+          c2b_test_collection_id?: string | null
+          company_id: string
+          created_at?: string
+          daraja_app_id: string
+          onboarding_request_id?: string | null
+          organization_shortcode: string
+          party_b: string
+          passkey_secret_id: string
+          provider_account_id: string
+          shortcode_type: string
+          stk_test_collection_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          business_shortcode?: string
+          c2b_callback_seen_at?: string | null
+          c2b_registered_at?: string | null
+          c2b_test_collection_id?: string | null
+          company_id?: string
+          created_at?: string
+          daraja_app_id?: string
+          onboarding_request_id?: string | null
+          organization_shortcode?: string
+          party_b?: string
+          passkey_secret_id?: string
+          provider_account_id?: string
+          shortcode_type?: string
+          stk_test_collection_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mpesa_c2b_test_collection_fk"
+            columns: ["c2b_test_collection_id"]
+            isOneToOne: false
+            referencedRelation: "payment_collections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mpesa_connections_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mpesa_connections_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mpesa_connections_daraja_app_id_fkey"
+            columns: ["daraja_app_id"]
+            isOneToOne: false
+            referencedRelation: "mpesa_daraja_apps"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mpesa_connections_onboarding_request_id_fkey"
+            columns: ["onboarding_request_id"]
+            isOneToOne: false
+            referencedRelation: "mpesa_onboarding_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mpesa_connections_provider_account_id_fkey"
+            columns: ["provider_account_id"]
+            isOneToOne: true
+            referencedRelation: "payment_provider_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mpesa_stk_test_collection_fk"
+            columns: ["stk_test_collection_id"]
+            isOneToOne: false
+            referencedRelation: "payment_collections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mpesa_daraja_apps: {
+        Row: {
+          app_name: string
+          company_id: string
+          consumer_key_secret_id: string
+          consumer_secret_secret_id: string
+          created_at: string
+          created_by: string | null
+          environment: string
+          id: string
+          oauth_verified_at: string | null
+          status: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          app_name: string
+          company_id: string
+          consumer_key_secret_id: string
+          consumer_secret_secret_id: string
+          created_at?: string
+          created_by?: string | null
+          environment: string
+          id?: string
+          oauth_verified_at?: string | null
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          app_name?: string
+          company_id?: string
+          consumer_key_secret_id?: string
+          consumer_secret_secret_id?: string
+          created_at?: string
+          created_by?: string | null
+          environment?: string
+          id?: string
+          oauth_verified_at?: string | null
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mpesa_daraja_apps_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mpesa_daraja_apps_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mpesa_late_posting_reviews: {
+        Row: {
+          allocation_id: string
+          collection_id: string
+          company_id: string
+          created_at: string
+          id: string
+          intent_id: string | null
+          original_business_date: string
+          reason: string
+          review_notes: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+        }
+        Insert: {
+          allocation_id: string
+          collection_id: string
+          company_id: string
+          created_at?: string
+          id?: string
+          intent_id?: string | null
+          original_business_date: string
+          reason?: string
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+        }
+        Update: {
+          allocation_id?: string
+          collection_id?: string
+          company_id?: string
+          created_at?: string
+          id?: string
+          intent_id?: string | null
+          original_business_date?: string
+          reason?: string
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mpesa_late_posting_reviews_allocation_id_fkey"
+            columns: ["allocation_id"]
+            isOneToOne: false
+            referencedRelation: "payment_collection_allocations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mpesa_late_posting_reviews_collection_id_fkey"
+            columns: ["collection_id"]
+            isOneToOne: false
+            referencedRelation: "payment_collections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mpesa_late_posting_reviews_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mpesa_late_posting_reviews_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mpesa_late_posting_reviews_intent_id_fkey"
+            columns: ["intent_id"]
+            isOneToOne: false
+            referencedRelation: "mpesa_payment_intents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mpesa_onboarding_requests: {
+        Row: {
+          company_id: string
+          contact_email: string
+          contact_name: string
+          contact_phone: string
+          created_at: string
+          handled_by: string | null
+          id: string
+          legal_name: string
+          merchant_notes: string | null
+          mpesa_username: string
+          operator_notes: string | null
+          requested_by: string
+          requested_location_ids: string[]
+          shortcode: string
+          shortcode_type: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          contact_email: string
+          contact_name: string
+          contact_phone: string
+          created_at?: string
+          handled_by?: string | null
+          id?: string
+          legal_name: string
+          merchant_notes?: string | null
+          mpesa_username: string
+          operator_notes?: string | null
+          requested_by: string
+          requested_location_ids?: string[]
+          shortcode: string
+          shortcode_type: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          contact_email?: string
+          contact_name?: string
+          contact_phone?: string
+          created_at?: string
+          handled_by?: string | null
+          id?: string
+          legal_name?: string
+          merchant_notes?: string | null
+          mpesa_username?: string
+          operator_notes?: string | null
+          requested_by?: string
+          requested_location_ids?: string[]
+          shortcode?: string
+          shortcode_type?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mpesa_onboarding_requests_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mpesa_onboarding_requests_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mpesa_payment_attempts: {
+        Row: {
+          attempt_number: number
+          checkout_request_id: string | null
+          company_id: string
+          created_at: string
+          customer_message: string | null
+          id: string
+          intent_id: string
+          last_queried_at: string | null
+          merchant_request_id: string | null
+          next_query_at: string | null
+          query_attempts: number
+          query_lease_until: string | null
+          response_code: string | null
+          response_description: string | null
+          result_code: string | null
+          result_description: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          attempt_number: number
+          checkout_request_id?: string | null
+          company_id: string
+          created_at?: string
+          customer_message?: string | null
+          id?: string
+          intent_id: string
+          last_queried_at?: string | null
+          merchant_request_id?: string | null
+          next_query_at?: string | null
+          query_attempts?: number
+          query_lease_until?: string | null
+          response_code?: string | null
+          response_description?: string | null
+          result_code?: string | null
+          result_description?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          attempt_number?: number
+          checkout_request_id?: string | null
+          company_id?: string
+          created_at?: string
+          customer_message?: string | null
+          id?: string
+          intent_id?: string
+          last_queried_at?: string | null
+          merchant_request_id?: string | null
+          next_query_at?: string | null
+          query_attempts?: number
+          query_lease_until?: string | null
+          response_code?: string | null
+          response_description?: string | null
+          result_code?: string | null
+          result_description?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mpesa_payment_attempts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mpesa_payment_attempts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mpesa_payment_attempts_intent_id_fkey"
+            columns: ["intent_id"]
+            isOneToOne: false
+            referencedRelation: "mpesa_payment_intents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mpesa_payment_intents: {
+        Row: {
+          amount: number
+          cash_amount: number
+          client_ref: string
+          company_id: string
+          completed_at: string | null
+          created_at: string
+          created_by: string
+          created_by_role: string | null
+          current_attempt_id: string | null
+          expires_at: string
+          fulfilled_collection_id: string | null
+          id: string
+          initiating_cashier_session_id: string | null
+          location_id: string
+          payer_phone: string | null
+          provider_account_id: string
+          request_fingerprint: string
+          result_code: string | null
+          result_description: string | null
+          review_reason: string | null
+          state_version: number
+          status: string
+          subject_id: string
+          subject_type: string
+          updated_at: string
+          workflow: string
+        }
+        Insert: {
+          amount: number
+          cash_amount?: number
+          client_ref: string
+          company_id: string
+          completed_at?: string | null
+          created_at?: string
+          created_by: string
+          created_by_role?: string | null
+          current_attempt_id?: string | null
+          expires_at?: string
+          fulfilled_collection_id?: string | null
+          id?: string
+          initiating_cashier_session_id?: string | null
+          location_id: string
+          payer_phone?: string | null
+          provider_account_id: string
+          request_fingerprint: string
+          result_code?: string | null
+          result_description?: string | null
+          review_reason?: string | null
+          state_version?: number
+          status?: string
+          subject_id: string
+          subject_type: string
+          updated_at?: string
+          workflow: string
+        }
+        Update: {
+          amount?: number
+          cash_amount?: number
+          client_ref?: string
+          company_id?: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string
+          created_by_role?: string | null
+          current_attempt_id?: string | null
+          expires_at?: string
+          fulfilled_collection_id?: string | null
+          id?: string
+          initiating_cashier_session_id?: string | null
+          location_id?: string
+          payer_phone?: string | null
+          provider_account_id?: string
+          request_fingerprint?: string
+          result_code?: string | null
+          result_description?: string | null
+          review_reason?: string | null
+          state_version?: number
+          status?: string
+          subject_id?: string
+          subject_type?: string
+          updated_at?: string
+          workflow?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mpesa_intent_current_attempt_fk"
+            columns: ["current_attempt_id"]
+            isOneToOne: false
+            referencedRelation: "mpesa_payment_attempts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mpesa_payment_intents_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mpesa_payment_intents_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mpesa_payment_intents_fulfilled_collection_id_fkey"
+            columns: ["fulfilled_collection_id"]
+            isOneToOne: false
+            referencedRelation: "payment_collections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mpesa_payment_intents_initiating_cashier_session_id_fkey"
+            columns: ["initiating_cashier_session_id"]
+            isOneToOne: false
+            referencedRelation: "cashier_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mpesa_payment_intents_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "low_stock_variants_by_location"
+            referencedColumns: ["location_id"]
+          },
+          {
+            foreignKeyName: "mpesa_payment_intents_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "stock_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mpesa_payment_intents_provider_account_id_fkey"
+            columns: ["provider_account_id"]
+            isOneToOne: false
+            referencedRelation: "payment_provider_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mpesa_platform_settings: {
+        Row: {
+          enabled: boolean
+          manual_fallback_allowed: boolean
+          pilot_company_id: string | null
+          singleton: boolean
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          enabled?: boolean
+          manual_fallback_allowed?: boolean
+          pilot_company_id?: string | null
+          singleton?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          enabled?: boolean
+          manual_fallback_allowed?: boolean
+          pilot_company_id?: string | null
+          singleton?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mpesa_platform_settings_pilot_company_id_fkey"
+            columns: ["pilot_company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mpesa_platform_settings_pilot_company_id_fkey"
+            columns: ["pilot_company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mpesa_provider_events: {
+        Row: {
+          attempt_id: string | null
+          callback_token_id: string
+          collection_id: string | null
+          company_id: string
+          error: string | null
+          event_type: string
+          id: string
+          lease_until: string | null
+          next_attempt_at: string
+          payload: Json | null
+          payload_purged_at: string | null
+          payload_sha256: string
+          processed_at: string | null
+          processing_attempts: number
+          provider_account_id: string
+          provider_event_key: string
+          received_at: string
+          result_code: string | null
+          review_notes: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+        }
+        Insert: {
+          attempt_id?: string | null
+          callback_token_id: string
+          collection_id?: string | null
+          company_id: string
+          error?: string | null
+          event_type: string
+          id?: string
+          lease_until?: string | null
+          next_attempt_at?: string
+          payload?: Json | null
+          payload_purged_at?: string | null
+          payload_sha256: string
+          processed_at?: string | null
+          processing_attempts?: number
+          provider_account_id: string
+          provider_event_key: string
+          received_at?: string
+          result_code?: string | null
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+        }
+        Update: {
+          attempt_id?: string | null
+          callback_token_id?: string
+          collection_id?: string | null
+          company_id?: string
+          error?: string | null
+          event_type?: string
+          id?: string
+          lease_until?: string | null
+          next_attempt_at?: string
+          payload?: Json | null
+          payload_purged_at?: string | null
+          payload_sha256?: string
+          processed_at?: string | null
+          processing_attempts?: number
+          provider_account_id?: string
+          provider_event_key?: string
+          received_at?: string
+          result_code?: string | null
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mpesa_provider_events_attempt_id_fkey"
+            columns: ["attempt_id"]
+            isOneToOne: false
+            referencedRelation: "mpesa_payment_attempts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mpesa_provider_events_callback_token_id_fkey"
+            columns: ["callback_token_id"]
+            isOneToOne: false
+            referencedRelation: "mpesa_callback_tokens"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mpesa_provider_events_collection_id_fkey"
+            columns: ["collection_id"]
+            isOneToOne: false
+            referencedRelation: "payment_collections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mpesa_provider_events_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mpesa_provider_events_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mpesa_provider_events_provider_account_id_fkey"
+            columns: ["provider_account_id"]
+            isOneToOne: false
+            referencedRelation: "payment_provider_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       mpesa_verifications: {
         Row: {
           all_confirmed: boolean
@@ -4032,6 +5280,7 @@ export type Database = {
           clicked_at: string | null
           company_id: string
           created_at: string
+          dedupe_key: string | null
           id: string
           link: string | null
           read_at: string | null
@@ -4047,6 +5296,7 @@ export type Database = {
           clicked_at?: string | null
           company_id: string
           created_at?: string
+          dedupe_key?: string | null
           id?: string
           link?: string | null
           read_at?: string | null
@@ -4062,6 +5312,7 @@ export type Database = {
           clicked_at?: string | null
           company_id?: string
           created_at?: string
+          dedupe_key?: string | null
           id?: string
           link?: string | null
           read_at?: string | null
@@ -4105,11 +5356,19 @@ export type Database = {
           company_id: string
           created_at: string
           custom_price: number | null
+          gross_total: number
           id: string
           line_total: number
+          net_total: number
           order_id: string
           price_override_reason: string | null
           quantity: number
+          tax_category_code: string | null
+          tax_category_id: string | null
+          tax_classification: string | null
+          tax_rate_bps: number
+          tax_rate_version_id: string | null
+          tax_total: number
           unit_price: number
           variant_id: string
         }
@@ -4117,11 +5376,19 @@ export type Database = {
           company_id: string
           created_at?: string
           custom_price?: number | null
+          gross_total?: number
           id?: string
           line_total: number
+          net_total?: number
           order_id: string
           price_override_reason?: string | null
           quantity: number
+          tax_category_code?: string | null
+          tax_category_id?: string | null
+          tax_classification?: string | null
+          tax_rate_bps?: number
+          tax_rate_version_id?: string | null
+          tax_total?: number
           unit_price: number
           variant_id: string
         }
@@ -4129,11 +5396,19 @@ export type Database = {
           company_id?: string
           created_at?: string
           custom_price?: number | null
+          gross_total?: number
           id?: string
           line_total?: number
+          net_total?: number
           order_id?: string
           price_override_reason?: string | null
           quantity?: number
+          tax_category_code?: string | null
+          tax_category_id?: string | null
+          tax_classification?: string | null
+          tax_rate_bps?: number
+          tax_rate_version_id?: string | null
+          tax_total?: number
           unit_price?: number
           variant_id?: string
         }
@@ -4157,6 +5432,20 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_lines_tax_category_id_fkey"
+            columns: ["tax_category_id"]
+            isOneToOne: false
+            referencedRelation: "tax_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_lines_tax_rate_version_id_fkey"
+            columns: ["tax_rate_version_id"]
+            isOneToOne: false
+            referencedRelation: "tax_rate_versions"
             referencedColumns: ["id"]
           },
           {
@@ -4199,6 +5488,7 @@ export type Database = {
       orders: {
         Row: {
           account_sale_request_fingerprint: string | null
+          accounting_posting_date: string | null
           cashier_pending_at: string | null
           cashier_session_id: string | null
           client_ref: string | null
@@ -4211,10 +5501,19 @@ export type Database = {
           credit_due_at: string | null
           customer_id: string | null
           expires_at: string
+          gross_total: number
           id: string
           is_credit_sale: boolean
+          late_posting_reason: string | null
           location_id: string
+          net_total: number
+          posting_source: string | null
           status: string
+          tax_document_id: string | null
+          tax_point_at: string | null
+          tax_profile_id: string | null
+          tax_snapshot_status: string
+          tax_total: number
           total: number
           updated_at: string
           void_reason: string | null
@@ -4223,6 +5522,7 @@ export type Database = {
         }
         Insert: {
           account_sale_request_fingerprint?: string | null
+          accounting_posting_date?: string | null
           cashier_pending_at?: string | null
           cashier_session_id?: string | null
           client_ref?: string | null
@@ -4235,10 +5535,19 @@ export type Database = {
           credit_due_at?: string | null
           customer_id?: string | null
           expires_at: string
+          gross_total?: number
           id?: string
           is_credit_sale?: boolean
+          late_posting_reason?: string | null
           location_id: string
+          net_total?: number
+          posting_source?: string | null
           status?: string
+          tax_document_id?: string | null
+          tax_point_at?: string | null
+          tax_profile_id?: string | null
+          tax_snapshot_status?: string
+          tax_total?: number
           total?: number
           updated_at?: string
           void_reason?: string | null
@@ -4247,6 +5556,7 @@ export type Database = {
         }
         Update: {
           account_sale_request_fingerprint?: string | null
+          accounting_posting_date?: string | null
           cashier_pending_at?: string | null
           cashier_session_id?: string | null
           client_ref?: string | null
@@ -4259,10 +5569,19 @@ export type Database = {
           credit_due_at?: string | null
           customer_id?: string | null
           expires_at?: string
+          gross_total?: number
           id?: string
           is_credit_sale?: boolean
+          late_posting_reason?: string | null
           location_id?: string
+          net_total?: number
+          posting_source?: string | null
           status?: string
+          tax_document_id?: string | null
+          tax_point_at?: string | null
+          tax_profile_id?: string | null
+          tax_snapshot_status?: string
+          tax_total?: number
           total?: number
           updated_at?: string
           void_reason?: string | null
@@ -4340,6 +5659,20 @@ export type Database = {
             referencedRelation: "stock_locations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "orders_tax_document_id_fkey"
+            columns: ["tax_document_id"]
+            isOneToOne: false
+            referencedRelation: "tax_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_tax_profile_id_fkey"
+            columns: ["tax_profile_id"]
+            isOneToOne: false
+            referencedRelation: "company_tax_profiles"
+            referencedColumns: ["id"]
+          },
         ]
       }
       outbox: {
@@ -4355,6 +5688,7 @@ export type Database = {
           created_at: string
           customer_id: string | null
           customer_statement_link_id: string | null
+          dedupe_key: string | null
           document_copy_role: string | null
           document_subject_id: string | null
           document_type: string | null
@@ -4373,6 +5707,7 @@ export type Database = {
           source: string
           status: string
           subject: string | null
+          team_invitation_id: string | null
           template_key: string | null
           template_version: number | null
         }
@@ -4388,6 +5723,7 @@ export type Database = {
           created_at?: string
           customer_id?: string | null
           customer_statement_link_id?: string | null
+          dedupe_key?: string | null
           document_copy_role?: string | null
           document_subject_id?: string | null
           document_type?: string | null
@@ -4406,6 +5742,7 @@ export type Database = {
           source?: string
           status?: string
           subject?: string | null
+          team_invitation_id?: string | null
           template_key?: string | null
           template_version?: number | null
         }
@@ -4421,6 +5758,7 @@ export type Database = {
           created_at?: string
           customer_id?: string | null
           customer_statement_link_id?: string | null
+          dedupe_key?: string | null
           document_copy_role?: string | null
           document_subject_id?: string | null
           document_type?: string | null
@@ -4439,6 +5777,7 @@ export type Database = {
           source?: string
           status?: string
           subject?: string | null
+          team_invitation_id?: string | null
           template_key?: string | null
           template_version?: number | null
         }
@@ -4541,6 +5880,294 @@ export type Database = {
             referencedRelation: "outbox"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "outbox_team_invitation_id_fkey"
+            columns: ["team_invitation_id"]
+            isOneToOne: false
+            referencedRelation: "team_invitations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payment_collection_allocations: {
+        Row: {
+          allocated_by: string | null
+          amount: number
+          cashier_session_id: string | null
+          collection_id: string
+          company_id: string
+          created_at: string
+          customer_receipt_id: string | null
+          id: string
+          notes: string | null
+          order_id: string | null
+          posted_after_session_close: boolean
+          posted_at: string | null
+          posting_date: string | null
+          released_at: string | null
+          reversed_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          allocated_by?: string | null
+          amount: number
+          cashier_session_id?: string | null
+          collection_id: string
+          company_id: string
+          created_at?: string
+          customer_receipt_id?: string | null
+          id?: string
+          notes?: string | null
+          order_id?: string | null
+          posted_after_session_close?: boolean
+          posted_at?: string | null
+          posting_date?: string | null
+          released_at?: string | null
+          reversed_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          allocated_by?: string | null
+          amount?: number
+          cashier_session_id?: string | null
+          collection_id?: string
+          company_id?: string
+          created_at?: string
+          customer_receipt_id?: string | null
+          id?: string
+          notes?: string | null
+          order_id?: string | null
+          posted_after_session_close?: boolean
+          posted_at?: string | null
+          posting_date?: string | null
+          released_at?: string | null
+          reversed_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_collection_allocations_cashier_session_id_fkey"
+            columns: ["cashier_session_id"]
+            isOneToOne: false
+            referencedRelation: "cashier_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_collection_allocations_collection_id_fkey"
+            columns: ["collection_id"]
+            isOneToOne: false
+            referencedRelation: "payment_collections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_collection_allocations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_collection_allocations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_collection_allocations_customer_receipt_id_fkey"
+            columns: ["customer_receipt_id"]
+            isOneToOne: false
+            referencedRelation: "customer_receipts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_collection_allocations_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payment_collection_reversals: {
+        Row: {
+          accounting_resource_id: string | null
+          allocation_id: string | null
+          collection_id: string
+          company_id: string
+          completed_at: string | null
+          created_at: string
+          id: string
+          provider_reference: string
+          provider_reversed_at: string
+          reason: string
+          recorded_by: string
+          status: string
+        }
+        Insert: {
+          accounting_resource_id?: string | null
+          allocation_id?: string | null
+          collection_id: string
+          company_id: string
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          provider_reference: string
+          provider_reversed_at: string
+          reason: string
+          recorded_by: string
+          status?: string
+        }
+        Update: {
+          accounting_resource_id?: string | null
+          allocation_id?: string | null
+          collection_id?: string
+          company_id?: string
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          provider_reference?: string
+          provider_reversed_at?: string
+          reason?: string
+          recorded_by?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_collection_reversals_allocation_id_fkey"
+            columns: ["allocation_id"]
+            isOneToOne: false
+            referencedRelation: "payment_collection_allocations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_collection_reversals_collection_id_fkey"
+            columns: ["collection_id"]
+            isOneToOne: false
+            referencedRelation: "payment_collections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_collection_reversals_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_collection_reversals_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payment_collections: {
+        Row: {
+          account_reference: string | null
+          allocation_status: string
+          amount: number
+          classification: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          currency: string
+          environment: string
+          id: string
+          mpesa_intent_id: string | null
+          notes: string | null
+          occurred_at: string
+          payer_name: string | null
+          payer_phone: string | null
+          provider: string
+          provider_account_id: string
+          provider_receipt: string
+          provider_status: string
+          source: string
+          updated_at: string
+          verification_status: string
+        }
+        Insert: {
+          account_reference?: string | null
+          allocation_status?: string
+          amount: number
+          classification?: string | null
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          environment: string
+          id?: string
+          mpesa_intent_id?: string | null
+          notes?: string | null
+          occurred_at: string
+          payer_name?: string | null
+          payer_phone?: string | null
+          provider: string
+          provider_account_id: string
+          provider_receipt: string
+          provider_status?: string
+          source: string
+          updated_at?: string
+          verification_status: string
+        }
+        Update: {
+          account_reference?: string | null
+          allocation_status?: string
+          amount?: number
+          classification?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          environment?: string
+          id?: string
+          mpesa_intent_id?: string | null
+          notes?: string | null
+          occurred_at?: string
+          payer_name?: string | null
+          payer_phone?: string | null
+          provider?: string
+          provider_account_id?: string
+          provider_receipt?: string
+          provider_status?: string
+          source?: string
+          updated_at?: string
+          verification_status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_collections_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_collections_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_collections_mpesa_intent_id_fkey"
+            columns: ["mpesa_intent_id"]
+            isOneToOne: false
+            referencedRelation: "mpesa_payment_intents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_collections_provider_account_id_fkey"
+            columns: ["provider_account_id"]
+            isOneToOne: false
+            referencedRelation: "payment_provider_accounts"
+            referencedColumns: ["id"]
+          },
         ]
       }
       payment_methods: {
@@ -4603,6 +6230,72 @@ export type Database = {
           },
         ]
       }
+      payment_provider_accounts: {
+        Row: {
+          activated_at: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          disabled_at: string | null
+          display_name: string
+          environment: string
+          id: string
+          manual_fallback_until: string | null
+          method_code: string
+          provider: string
+          status: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          activated_at?: string | null
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          disabled_at?: string | null
+          display_name: string
+          environment: string
+          id?: string
+          manual_fallback_until?: string | null
+          method_code?: string
+          provider: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          activated_at?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          disabled_at?: string | null
+          display_name?: string
+          environment?: string
+          id?: string
+          manual_fallback_until?: string | null
+          method_code?: string
+          provider?: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_provider_accounts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_provider_accounts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payment_reminder_rules: {
         Row: {
           company_id: string
@@ -4645,11 +6338,14 @@ export type Database = {
       payments: {
         Row: {
           amount: number
+          cashier_session_id: string | null
+          collection_allocation_id: string | null
           company_id: string
           created_at: string
           customer_deposit_application_id: string | null
           customer_receipt_id: string | null
           id: string
+          ledger_account_code: string | null
           location_id: string
           method_code: string
           mpesa_receipt: string | null
@@ -4660,11 +6356,14 @@ export type Database = {
         }
         Insert: {
           amount: number
+          cashier_session_id?: string | null
+          collection_allocation_id?: string | null
           company_id: string
           created_at?: string
           customer_deposit_application_id?: string | null
           customer_receipt_id?: string | null
           id?: string
+          ledger_account_code?: string | null
           location_id: string
           method_code: string
           mpesa_receipt?: string | null
@@ -4675,11 +6374,14 @@ export type Database = {
         }
         Update: {
           amount?: number
+          cashier_session_id?: string | null
+          collection_allocation_id?: string | null
           company_id?: string
           created_at?: string
           customer_deposit_application_id?: string | null
           customer_receipt_id?: string | null
           id?: string
+          ledger_account_code?: string | null
           location_id?: string
           method_code?: string
           mpesa_receipt?: string | null
@@ -4689,6 +6391,20 @@ export type Database = {
           status?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "payments_cashier_session_id_fkey"
+            columns: ["cashier_session_id"]
+            isOneToOne: false
+            referencedRelation: "cashier_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_collection_allocation_id_fkey"
+            columns: ["collection_allocation_id"]
+            isOneToOne: false
+            referencedRelation: "payment_collection_allocations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "payments_company_id_fkey"
             columns: ["company_id"]
@@ -4736,6 +6452,55 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      period_closing_packs: {
+        Row: {
+          accounting_period_id: string
+          company_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          snapshot: Json
+        }
+        Insert: {
+          accounting_period_id: string
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          snapshot: Json
+        }
+        Update: {
+          accounting_period_id?: string
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          snapshot?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "period_closing_packs_accounting_period_id_fkey"
+            columns: ["accounting_period_id"]
+            isOneToOne: true
+            referencedRelation: "accounting_periods"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "period_closing_packs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "period_closing_packs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
             referencedColumns: ["id"]
           },
         ]
@@ -4791,18 +6556,30 @@ export type Database = {
       platform_billing_settings: {
         Row: {
           default_trial_tier_id: string
+          intro_offer_bonus_months: number
+          intro_offer_enabled: boolean
+          intro_offer_paid_months: number
+          intro_offer_tier_id: string
           singleton: boolean
           trial_duration_days: number
           updated_at: string
         }
         Insert: {
           default_trial_tier_id: string
+          intro_offer_bonus_months?: number
+          intro_offer_enabled?: boolean
+          intro_offer_paid_months?: number
+          intro_offer_tier_id: string
           singleton?: boolean
           trial_duration_days?: number
           updated_at?: string
         }
         Update: {
           default_trial_tier_id?: string
+          intro_offer_bonus_months?: number
+          intro_offer_enabled?: boolean
+          intro_offer_paid_months?: number
+          intro_offer_tier_id?: string
           singleton?: boolean
           trial_duration_days?: number
           updated_at?: string
@@ -4811,6 +6588,13 @@ export type Database = {
           {
             foreignKeyName: "platform_billing_settings_default_trial_tier_id_fkey"
             columns: ["default_trial_tier_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_tiers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "platform_billing_settings_intro_offer_tier_id_fkey"
+            columns: ["intro_offer_tier_id"]
             isOneToOne: false
             referencedRelation: "subscription_tiers"
             referencedColumns: ["id"]
@@ -4898,6 +6682,77 @@ export type Database = {
         }
         Relationships: []
       }
+      pos_devices: {
+        Row: {
+          company_id: string
+          device_key: string
+          id: string
+          last_seen_at: string
+          last_synced_at: string | null
+          location_id: string | null
+          pending_count: number
+          retired_at: string | null
+          retired_by: string | null
+          retirement_reason: string | null
+          user_id: string | null
+        }
+        Insert: {
+          company_id: string
+          device_key: string
+          id?: string
+          last_seen_at?: string
+          last_synced_at?: string | null
+          location_id?: string | null
+          pending_count?: number
+          retired_at?: string | null
+          retired_by?: string | null
+          retirement_reason?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          company_id?: string
+          device_key?: string
+          id?: string
+          last_seen_at?: string
+          last_synced_at?: string | null
+          location_id?: string | null
+          pending_count?: number
+          retired_at?: string | null
+          retired_by?: string | null
+          retirement_reason?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pos_devices_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pos_devices_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pos_devices_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "low_stock_variants_by_location"
+            referencedColumns: ["location_id"]
+          },
+          {
+            foreignKeyName: "pos_devices_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "stock_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_categories: {
         Row: {
           category_id: string
@@ -4952,6 +6807,75 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "variant_catalog"
             referencedColumns: ["product_id"]
+          },
+        ]
+      }
+      product_tax_treatment_versions: {
+        Row: {
+          changed_by: string | null
+          company_id: string
+          created_at: string
+          effective_from: string
+          effective_to: string | null
+          id: string
+          product_id: string
+          tax_category_id: string | null
+        }
+        Insert: {
+          changed_by?: string | null
+          company_id: string
+          created_at?: string
+          effective_from: string
+          effective_to?: string | null
+          id?: string
+          product_id: string
+          tax_category_id?: string | null
+        }
+        Update: {
+          changed_by?: string | null
+          company_id?: string
+          created_at?: string
+          effective_from?: string
+          effective_to?: string | null
+          id?: string
+          product_id?: string
+          tax_category_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_tax_treatment_versions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_tax_treatment_versions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_tax_treatment_versions_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_tax_treatment_versions_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "variant_catalog"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "product_tax_treatment_versions_tax_category_id_fkey"
+            columns: ["tax_category_id"]
+            isOneToOne: false
+            referencedRelation: "tax_categories"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -5045,6 +6969,7 @@ export type Database = {
           image_path: string | null
           manufacturer_id: string | null
           name: string
+          tax_category_id: string | null
           updated_at: string
         }
         Insert: {
@@ -5056,6 +6981,7 @@ export type Database = {
           image_path?: string | null
           manufacturer_id?: string | null
           name: string
+          tax_category_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -5067,6 +6993,7 @@ export type Database = {
           image_path?: string | null
           manufacturer_id?: string | null
           name?: string
+          tax_category_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -5090,6 +7017,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "manufacturers"
             referencedColumns: ["company_id", "id"]
+          },
+          {
+            foreignKeyName: "products_tax_category_id_fkey"
+            columns: ["tax_category_id"]
+            isOneToOne: false
+            referencedRelation: "tax_categories"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -5355,10 +7289,18 @@ export type Database = {
           created_at: string
           created_by: string | null
           custom_label: string | null
+          gross_total: number
           id: string
           memo: string | null
+          net_total: number
           purchase_id: string
           settlement: string
+          tax_category_code: string | null
+          tax_category_id: string | null
+          tax_classification: string | null
+          tax_rate_bps: number
+          tax_rate_version_id: string | null
+          tax_total: number
         }
         Insert: {
           account_code?: string | null
@@ -5368,10 +7310,18 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           custom_label?: string | null
+          gross_total?: number
           id?: string
           memo?: string | null
+          net_total?: number
           purchase_id: string
           settlement: string
+          tax_category_code?: string | null
+          tax_category_id?: string | null
+          tax_classification?: string | null
+          tax_rate_bps?: number
+          tax_rate_version_id?: string | null
+          tax_total?: number
         }
         Update: {
           account_code?: string | null
@@ -5381,10 +7331,18 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           custom_label?: string | null
+          gross_total?: number
           id?: string
           memo?: string | null
+          net_total?: number
           purchase_id?: string
           settlement?: string
+          tax_category_code?: string | null
+          tax_category_id?: string | null
+          tax_classification?: string | null
+          tax_rate_bps?: number
+          tax_rate_version_id?: string | null
+          tax_total?: number
         }
         Relationships: [
           {
@@ -5415,6 +7373,20 @@ export type Database = {
             referencedRelation: "purchases"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "purchase_expenses_tax_category_id_fkey"
+            columns: ["tax_category_id"]
+            isOneToOne: false
+            referencedRelation: "tax_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_expenses_tax_rate_version_id_fkey"
+            columns: ["tax_rate_version_id"]
+            isOneToOne: false
+            referencedRelation: "tax_rate_versions"
+            referencedColumns: ["id"]
+          },
         ]
       }
       purchase_lines: {
@@ -5423,11 +7395,19 @@ export type Database = {
           company_id: string
           created_at: string
           expiry_date: string | null
+          gross_total: number
           id: string
           inventory_batch_id: string | null
           line_total: number
+          net_total: number
           purchase_id: string
           quantity: number
+          tax_category_code: string | null
+          tax_category_id: string | null
+          tax_classification: string | null
+          tax_rate_bps: number
+          tax_rate_version_id: string | null
+          tax_total: number
           unit_cost: number
           value_source: string
           variant_id: string
@@ -5437,11 +7417,19 @@ export type Database = {
           company_id: string
           created_at?: string
           expiry_date?: string | null
+          gross_total?: number
           id?: string
           inventory_batch_id?: string | null
           line_total: number
+          net_total?: number
           purchase_id: string
           quantity: number
+          tax_category_code?: string | null
+          tax_category_id?: string | null
+          tax_classification?: string | null
+          tax_rate_bps?: number
+          tax_rate_version_id?: string | null
+          tax_total?: number
           unit_cost: number
           value_source?: string
           variant_id: string
@@ -5451,11 +7439,19 @@ export type Database = {
           company_id?: string
           created_at?: string
           expiry_date?: string | null
+          gross_total?: number
           id?: string
           inventory_batch_id?: string | null
           line_total?: number
+          net_total?: number
           purchase_id?: string
           quantity?: number
+          tax_category_code?: string | null
+          tax_category_id?: string | null
+          tax_classification?: string | null
+          tax_rate_bps?: number
+          tax_rate_version_id?: string | null
+          tax_total?: number
           unit_cost?: number
           value_source?: string
           variant_id?: string
@@ -5501,6 +7497,20 @@ export type Database = {
             columns: ["purchase_id"]
             isOneToOne: false
             referencedRelation: "purchases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_lines_tax_category_id_fkey"
+            columns: ["tax_category_id"]
+            isOneToOne: false
+            referencedRelation: "tax_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_lines_tax_rate_version_id_fkey"
+            columns: ["tax_rate_version_id"]
+            isOneToOne: false
+            referencedRelation: "tax_rate_versions"
             referencedColumns: ["id"]
           },
           {
@@ -5627,14 +7637,19 @@ export type Database = {
       }
       purchases: {
         Row: {
+          claim_input_vat: boolean
           client_ref: string | null
           company_id: string
           created_at: string
           created_by: string | null
           credit_due_at: string | null
+          goods_net_total: number
           goods_subtotal: number
+          gross_total: number
           id: string
+          input_tax_total: number
           is_credit: boolean
+          net_total: number
           notes: string | null
           purchase_date: string
           reference: string | null
@@ -5644,17 +7659,28 @@ export type Database = {
           status: string
           stock_location_id: string
           supplier_id: string
+          supplier_tax_pin: string | null
+          tax_invoice_date: string | null
+          tax_invoice_number: string | null
+          tax_point_at: string | null
+          tax_profile_id: string | null
+          tax_snapshot_status: string
           total_cost: number
         }
         Insert: {
+          claim_input_vat?: boolean
           client_ref?: string | null
           company_id: string
           created_at?: string
           created_by?: string | null
           credit_due_at?: string | null
+          goods_net_total?: number
           goods_subtotal?: number
+          gross_total?: number
           id?: string
+          input_tax_total?: number
           is_credit?: boolean
+          net_total?: number
           notes?: string | null
           purchase_date?: string
           reference?: string | null
@@ -5664,17 +7690,28 @@ export type Database = {
           status?: string
           stock_location_id: string
           supplier_id: string
+          supplier_tax_pin?: string | null
+          tax_invoice_date?: string | null
+          tax_invoice_number?: string | null
+          tax_point_at?: string | null
+          tax_profile_id?: string | null
+          tax_snapshot_status?: string
           total_cost: number
         }
         Update: {
+          claim_input_vat?: boolean
           client_ref?: string | null
           company_id?: string
           created_at?: string
           created_by?: string | null
           credit_due_at?: string | null
+          goods_net_total?: number
           goods_subtotal?: number
+          gross_total?: number
           id?: string
+          input_tax_total?: number
           is_credit?: boolean
+          net_total?: number
           notes?: string | null
           purchase_date?: string
           reference?: string | null
@@ -5684,6 +7721,12 @@ export type Database = {
           status?: string
           stock_location_id?: string
           supplier_id?: string
+          supplier_tax_pin?: string | null
+          tax_invoice_date?: string | null
+          tax_invoice_number?: string | null
+          tax_point_at?: string | null
+          tax_profile_id?: string | null
+          tax_snapshot_status?: string
           total_cost?: number
         }
         Relationships: [
@@ -5757,11 +7800,19 @@ export type Database = {
             referencedRelation: "supplier_ap_balances"
             referencedColumns: ["supplier_id"]
           },
+          {
+            foreignKeyName: "purchases_tax_profile_id_fkey"
+            columns: ["tax_profile_id"]
+            isOneToOne: false
+            referencedRelation: "company_tax_profiles"
+            referencedColumns: ["id"]
+          },
         ]
       }
       reconciliation_accounts: {
         Row: {
           account_code: string
+          balance_scope: string
           declared: number
           expected: number
           id: string
@@ -5773,6 +7824,7 @@ export type Database = {
         }
         Insert: {
           account_code: string
+          balance_scope: string
           declared: number
           expected: number
           id?: string
@@ -5784,6 +7836,7 @@ export type Database = {
         }
         Update: {
           account_code?: string
+          balance_scope?: string
           declared?: number
           expected?: number
           id?: string
@@ -5871,33 +7924,54 @@ export type Database = {
           company_id: string
           created_at: string
           created_by: string | null
+          gross_total: number
           id: string
+          ledger_account_code: string | null
           location_id: string
           method_code: string
+          net_total: number
           order_id: string
+          original_tax_document_id: string | null
           reason: string | null
+          stock_outcome: string
+          tax_document_id: string | null
+          tax_total: number
         }
         Insert: {
           amount: number
           company_id: string
           created_at?: string
           created_by?: string | null
+          gross_total?: number
           id?: string
+          ledger_account_code?: string | null
           location_id: string
           method_code: string
+          net_total?: number
           order_id: string
+          original_tax_document_id?: string | null
           reason?: string | null
+          stock_outcome?: string
+          tax_document_id?: string | null
+          tax_total?: number
         }
         Update: {
           amount?: number
           company_id?: string
           created_at?: string
           created_by?: string | null
+          gross_total?: number
           id?: string
+          ledger_account_code?: string | null
           location_id?: string
           method_code?: string
+          net_total?: number
           order_id?: string
+          original_tax_document_id?: string | null
           reason?: string | null
+          stock_outcome?: string
+          tax_document_id?: string | null
+          tax_total?: number
         }
         Relationships: [
           {
@@ -5933,6 +8007,20 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "refunds_original_tax_document_id_fkey"
+            columns: ["original_tax_document_id"]
+            isOneToOne: false
+            referencedRelation: "tax_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "refunds_tax_document_id_fkey"
+            columns: ["tax_document_id"]
+            isOneToOne: false
+            referencedRelation: "tax_documents"
             referencedColumns: ["id"]
           },
         ]
@@ -6226,6 +8314,64 @@ export type Database = {
             columns: ["to_location_id"]
             isOneToOne: false
             referencedRelation: "stock_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      subscription_intro_offer_redemptions: {
+        Row: {
+          amount: number
+          bonus_applied: boolean
+          bonus_months: number
+          company_id: string
+          id: string
+          paid_months: number
+          payment_reference: string
+          redeemed_at: string
+          tier_id: string
+        }
+        Insert: {
+          amount: number
+          bonus_applied?: boolean
+          bonus_months: number
+          company_id: string
+          id?: string
+          paid_months: number
+          payment_reference: string
+          redeemed_at?: string
+          tier_id: string
+        }
+        Update: {
+          amount?: number
+          bonus_applied?: boolean
+          bonus_months?: number
+          company_id?: string
+          id?: string
+          paid_months?: number
+          payment_reference?: string
+          redeemed_at?: string
+          tier_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscription_intro_offer_redemptions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscription_intro_offer_redemptions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscription_intro_offer_redemptions_tier_id_fkey"
+            columns: ["tier_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_tiers"
             referencedColumns: ["id"]
           },
         ]
@@ -6945,6 +9091,412 @@ export type Database = {
           },
         ]
       }
+      tax_categories: {
+        Row: {
+          active: boolean
+          classification: string
+          code: string
+          created_at: string
+          effective_from: string
+          effective_to: string | null
+          id: string
+          is_default: boolean
+          jurisdiction_id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          classification: string
+          code: string
+          created_at?: string
+          effective_from?: string
+          effective_to?: string | null
+          id?: string
+          is_default?: boolean
+          jurisdiction_id: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          classification?: string
+          code?: string
+          created_at?: string
+          effective_from?: string
+          effective_to?: string | null
+          id?: string
+          is_default?: boolean
+          jurisdiction_id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tax_categories_jurisdiction_id_fkey"
+            columns: ["jurisdiction_id"]
+            isOneToOne: false
+            referencedRelation: "tax_jurisdictions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tax_document_lines: {
+        Row: {
+          company_id: string
+          created_at: string
+          description: string
+          gross_total: number
+          id: string
+          net_total: number
+          quantity: number
+          source_order_line_id: string | null
+          tax_category_code: string
+          tax_category_id: string | null
+          tax_classification: string
+          tax_document_id: string
+          tax_rate_bps: number
+          tax_rate_version_id: string | null
+          tax_total: number
+          variant_id: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          description: string
+          gross_total: number
+          id?: string
+          net_total: number
+          quantity: number
+          source_order_line_id?: string | null
+          tax_category_code: string
+          tax_category_id?: string | null
+          tax_classification: string
+          tax_document_id: string
+          tax_rate_bps: number
+          tax_rate_version_id?: string | null
+          tax_total: number
+          variant_id?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          description?: string
+          gross_total?: number
+          id?: string
+          net_total?: number
+          quantity?: number
+          source_order_line_id?: string | null
+          tax_category_code?: string
+          tax_category_id?: string | null
+          tax_classification?: string
+          tax_document_id?: string
+          tax_rate_bps?: number
+          tax_rate_version_id?: string | null
+          tax_total?: number
+          variant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tax_document_lines_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tax_document_lines_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tax_document_lines_source_order_line_id_fkey"
+            columns: ["source_order_line_id"]
+            isOneToOne: false
+            referencedRelation: "order_lines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tax_document_lines_tax_category_id_fkey"
+            columns: ["tax_category_id"]
+            isOneToOne: false
+            referencedRelation: "tax_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tax_document_lines_tax_document_id_fkey"
+            columns: ["tax_document_id"]
+            isOneToOne: false
+            referencedRelation: "tax_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tax_document_lines_tax_rate_version_id_fkey"
+            columns: ["tax_rate_version_id"]
+            isOneToOne: false
+            referencedRelation: "tax_rate_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tax_document_lines_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "low_stock_variants"
+            referencedColumns: ["variant_id"]
+          },
+          {
+            foreignKeyName: "tax_document_lines_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "low_stock_variants_by_location"
+            referencedColumns: ["variant_id"]
+          },
+          {
+            foreignKeyName: "tax_document_lines_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "product_stock"
+            referencedColumns: ["variant_id"]
+          },
+          {
+            foreignKeyName: "tax_document_lines_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "product_variants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tax_document_lines_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "variant_catalog"
+            referencedColumns: ["variant_id"]
+          },
+        ]
+      }
+      tax_document_sequences: {
+        Row: {
+          company_id: string
+          document_kind: string
+          last_value: number
+          sequence_year: number
+        }
+        Insert: {
+          company_id: string
+          document_kind: string
+          last_value?: number
+          sequence_year: number
+        }
+        Update: {
+          company_id?: string
+          document_kind?: string
+          last_value?: number
+          sequence_year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tax_document_sequences_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tax_document_sequences_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tax_documents: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string | null
+          document_kind: string
+          document_number: string
+          external_payload: Json | null
+          external_reference: string | null
+          external_status: string
+          gross_total: number
+          id: string
+          net_total: number
+          original_document_id: string | null
+          source_order_id: string | null
+          tax_point_at: string
+          tax_profile_id: string
+          tax_total: number
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          document_kind: string
+          document_number: string
+          external_payload?: Json | null
+          external_reference?: string | null
+          external_status?: string
+          gross_total: number
+          id?: string
+          net_total: number
+          original_document_id?: string | null
+          source_order_id?: string | null
+          tax_point_at: string
+          tax_profile_id: string
+          tax_total: number
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          document_kind?: string
+          document_number?: string
+          external_payload?: Json | null
+          external_reference?: string | null
+          external_status?: string
+          gross_total?: number
+          id?: string
+          net_total?: number
+          original_document_id?: string | null
+          source_order_id?: string | null
+          tax_point_at?: string
+          tax_profile_id?: string
+          tax_total?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tax_documents_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tax_documents_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tax_documents_original_document_id_fkey"
+            columns: ["original_document_id"]
+            isOneToOne: false
+            referencedRelation: "tax_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tax_documents_source_order_id_fkey"
+            columns: ["source_order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tax_documents_tax_profile_id_fkey"
+            columns: ["tax_profile_id"]
+            isOneToOne: false
+            referencedRelation: "company_tax_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tax_jurisdictions: {
+        Row: {
+          active: boolean | null
+          country_code: string
+          created_at: string
+          currency_code: string
+          default_timezone: string
+          id: string
+          name: string
+          published_at: string | null
+          published_by: string | null
+          retired_at: string | null
+          retired_by: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean | null
+          country_code: string
+          created_at?: string
+          currency_code: string
+          default_timezone: string
+          id?: string
+          name: string
+          published_at?: string | null
+          published_by?: string | null
+          retired_at?: string | null
+          retired_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean | null
+          country_code?: string
+          created_at?: string
+          currency_code?: string
+          default_timezone?: string
+          id?: string
+          name?: string
+          published_at?: string | null
+          published_by?: string | null
+          retired_at?: string | null
+          retired_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      tax_rate_versions: {
+        Row: {
+          created_at: string
+          effective_from: string
+          effective_to: string | null
+          id: string
+          notes: string | null
+          published_at: string
+          published_by: string | null
+          rate_bps: number
+          tax_category_id: string
+        }
+        Insert: {
+          created_at?: string
+          effective_from: string
+          effective_to?: string | null
+          id?: string
+          notes?: string | null
+          published_at?: string
+          published_by?: string | null
+          rate_bps: number
+          tax_category_id: string
+        }
+        Update: {
+          created_at?: string
+          effective_from?: string
+          effective_to?: string | null
+          id?: string
+          notes?: string | null
+          published_at?: string
+          published_by?: string | null
+          rate_bps?: number
+          tax_category_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tax_rate_versions_tax_category_id_fkey"
+            columns: ["tax_category_id"]
+            isOneToOne: false
+            referencedRelation: "tax_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       team_invitations: {
         Row: {
           accepted_at: string | null
@@ -6955,6 +9507,9 @@ export type Database = {
           expires_at: string
           id: string
           invited_by: string
+          last_delivery_error: string | null
+          last_notified_at: string | null
+          notification_version: number
           phone: string
           role_id: string
           status: string
@@ -6969,6 +9524,9 @@ export type Database = {
           expires_at?: string
           id?: string
           invited_by: string
+          last_delivery_error?: string | null
+          last_notified_at?: string | null
+          notification_version?: number
           phone: string
           role_id: string
           status?: string
@@ -6983,6 +9541,9 @@ export type Database = {
           expires_at?: string
           id?: string
           invited_by?: string
+          last_delivery_error?: string | null
+          last_notified_at?: string | null
+          notification_version?: number
           phone?: string
           role_id?: string
           status?: string
@@ -8259,6 +10820,18 @@ export type Database = {
         Args: { p_code: string; p_company_id: string }
         Returns: number
       }
+      activate_intro_offer: {
+        Args: {
+          p_amount: number
+          p_bonus_months: number
+          p_company_id: string
+          p_paid_months: number
+          p_reference: string
+          p_tier_id: string
+          p_unit_price: number
+        }
+        Returns: string
+      }
       activate_subscription: {
         Args: {
           p_amount: number
@@ -8281,6 +10854,16 @@ export type Database = {
       add_team_member: {
         Args: { p_phone: string; p_role_id: string }
         Returns: string
+      }
+      allocate_mpesa_collection: {
+        Args: {
+          p_collection_id: string
+          p_customer_id?: string
+          p_location_id?: string
+          p_notes?: string
+          p_order_id?: string
+        }
+        Returns: Json
       }
       append_catalog_import_chunk: {
         Args: { p_chunk_index: number; p_import_id: string; p_products: Json }
@@ -8328,6 +10911,15 @@ export type Database = {
         Args: { p_company_id: string; p_supplier_id: string }
         Returns: undefined
       }
+      assert_tax_rate_window_available: {
+        Args: {
+          p_effective_from: string
+          p_effective_to: string
+          p_exclude_id?: string
+          p_tax_category_id: string
+        }
+        Returns: undefined
+      }
       assert_team_invitation_capacity: {
         Args: { p_company_id: string; p_exclude_phone?: string }
         Returns: undefined
@@ -8361,12 +10953,25 @@ export type Database = {
           requires_reconciliation: boolean
         }[]
       }
+      available_tender_accounts: {
+        Args: { p_location_id?: string }
+        Returns: {
+          account_code: string
+          account_name: string
+          is_default: boolean
+          method_code: string
+        }[]
+      }
       begin_catalog_import: {
         Args: {
           p_idempotency_key?: string
           p_mode?: string
           p_source_export_id?: string
         }
+        Returns: Json
+      }
+      build_period_closing_pack: {
+        Args: { p_end_date: string; p_period_id: string; p_start_date: string }
         Returns: Json
       }
       can_approve_request_type: { Args: { p_type: string }; Returns: boolean }
@@ -8379,9 +10984,38 @@ export type Database = {
         Returns: number
       }
       cancel_purchase_draft: { Args: { p_draft_id: string }; Returns: string }
+      cancel_scheduled_company_tax_profile: {
+        Args: { p_profile_id: string }
+        Returns: string
+      }
       cancel_team_invitation: {
         Args: { p_invitation_id: string }
         Returns: string
+      }
+      cashier_controlled_accounts: {
+        Args: {
+          p_company_id: string
+          p_location_id: string
+          p_session_id?: string
+        }
+        Returns: {
+          account_code: string
+          account_name: string
+        }[]
+      }
+      cashier_count_accounts: {
+        Args: { p_location_id: string; p_session_id?: string }
+        Returns: {
+          account_code: string
+          account_name: string
+        }[]
+      }
+      cashier_expected_balances: {
+        Args: { p_location_id: string; p_session_id?: string }
+        Returns: {
+          account_code: string
+          expected_balance: number
+        }[]
       }
       cashier_kes: { Args: { p_amount: number }; Returns: string }
       cashier_session_required_for_source: {
@@ -8403,6 +11037,7 @@ export type Database = {
           image_path: string | null
           manufacturer_id: string | null
           name: string
+          tax_category_id: string | null
           updated_at: string
         }[]
         SetofOptions: {
@@ -8462,8 +11097,20 @@ export type Database = {
       }
       claim_public_site_deployment: { Args: never; Returns: Json }
       claim_team_invitations: { Args: never; Returns: Json }
+      classify_mpesa_collection: {
+        Args: {
+          p_classification: string
+          p_collection_id: string
+          p_notes: string
+        }
+        Returns: undefined
+      }
       cleanup_abandoned_catalog_imports: { Args: never; Returns: number }
       close_accounting_period: { Args: { p_end_date: string }; Returns: string }
+      close_accounting_period_legacy: {
+        Args: { p_end_date: string }
+        Returns: string
+      }
       close_cashier_session: {
         Args: { p_declarations: Json; p_session_id: string }
         Returns: string
@@ -8476,6 +11123,7 @@ export type Database = {
         }
         Returns: string
       }
+      closed_period_pack: { Args: { p_period_id: string }; Returns: Json }
       commission_period_statement: {
         Args: { p_period_id: string }
         Returns: {
@@ -8498,6 +11146,7 @@ export type Database = {
         Args: { p_company_id: string }
         Returns: boolean
       }
+      company_tax_settings: { Args: never; Returns: Json }
       company_terms_access_allowed: {
         Args: { p_company_id: string }
         Returns: boolean
@@ -8506,9 +11155,28 @@ export type Database = {
         Args: { p_actor: string; p_order_id: string; p_payments: Json }
         Returns: string
       }
+      complete_order_core: {
+        Args: {
+          p_context: Database["public"]["CompositeTypes"]["posting_context"]
+          p_order_id: string
+          p_payments: Json
+        }
+        Returns: string
+      }
       complete_order_with_prepayment: {
         Args: {
           p_client_ref?: string
+          p_credit_amount: number
+          p_deposit_amount: number
+          p_order_id: string
+          p_payments: Json
+        }
+        Returns: string
+      }
+      complete_order_with_prepayment_core: {
+        Args: {
+          p_client_ref: string
+          p_context: Database["public"]["CompositeTypes"]["posting_context"]
           p_credit_amount: number
           p_deposit_amount: number
           p_order_id: string
@@ -8592,6 +11260,29 @@ export type Database = {
           p_is_supplier?: boolean
           p_last_name?: string
           p_phone?: string
+        }
+        Returns: string
+      }
+      create_money_account: {
+        Args: { p_kind: string; p_name: string }
+        Returns: string
+      }
+      create_mpesa_payment_attempt: {
+        Args: { p_callback_token_hash: string; p_intent_id: string }
+        Returns: string
+      }
+      create_mpesa_payment_intent: {
+        Args: {
+          p_amount: number
+          p_cash_amount: number
+          p_client_ref: string
+          p_customer_id?: string
+          p_draft_id?: string
+          p_lines?: Json
+          p_location_id: string
+          p_order_id?: string
+          p_phone: string
+          p_workflow: string
         }
         Returns: string
       }
@@ -8709,11 +11400,16 @@ export type Database = {
         Args: { p_channel: string; p_customer_id: string }
         Returns: Json
       }
+      daily_close_status: { Args: { p_business_date?: string }; Returns: Json }
       dashboard_location_snapshot: {
         Args: { p_location_id?: string; p_since?: string }
         Returns: Json
       }
       dashboard_sales_snapshot: { Args: { p_since?: string }; Returns: Json }
+      declare_mpesa_manual_fallback: {
+        Args: { p_intent_id: string; p_provider_receipt: string }
+        Returns: Json
+      }
       delete_proforma: { Args: { p_order_id: string }; Returns: string }
       delete_stock_location: {
         Args: { p_location_id: string }
@@ -8748,12 +11444,33 @@ export type Database = {
         Args: { p_company_id: string; p_stream: string }
         Returns: number
       }
+      emit_team_invitation_event: {
+        Args: { p_event: string; p_invitation_id: string; p_version: number }
+        Returns: Json
+      }
+      estimate_order_tax: { Args: { p_order_id: string }; Returns: Json }
       execute_customer_receipt: {
         Args: { p_receipt_id: string }
         Returns: string
       }
+      execute_customer_receipt_core: {
+        Args: {
+          p_context: Database["public"]["CompositeTypes"]["posting_context"]
+          p_receipt_id: string
+        }
+        Returns: string
+      }
       execute_customer_receipt_reversal: {
         Args: { p_reason: string; p_receipt_id: string }
+        Returns: string
+      }
+      execute_full_credit_note: {
+        Args: {
+          p_method_code: string
+          p_order_id: string
+          p_reason: string
+          p_stock_outcome: string
+        }
         Returns: string
       }
       execute_payment_reversal: {
@@ -8803,6 +11520,10 @@ export type Database = {
       finalize_message_quota: {
         Args: { p_accepted: boolean; p_outbox_id: string }
         Returns: undefined
+      }
+      finalize_mpesa_cash_split: {
+        Args: { p_intent_id: string }
+        Returns: string
       }
       finalize_public_site_deployment: {
         Args: {
@@ -8930,14 +11651,74 @@ export type Database = {
           status: string
         }[]
       }
+      list_mpesa_provider_event_reviews: {
+        Args: { p_limit?: number }
+        Returns: {
+          allowed_actions: string[]
+          attempt_id: string
+          collection_id: string
+          error: string
+          event_type: string
+          id: string
+          intent_id: string
+          processing_attempts: number
+          provider_account_id: string
+          provider_account_name: string
+          provider_event_key: string
+          received_at: string
+          result_code: string
+        }[]
+      }
       list_reconcilable_accounts: {
-        Args: never
+        Args: { p_location_id?: string }
         Returns: {
           account_code: string
           account_name: string
           balance: number
+          balance_scope: string
+          blocked_reason: string
+          can_adjust: boolean
           last_reconciled_at: string
+          location_id: string
+          location_name: string
           requires_reconciliation: boolean
+        }[]
+      }
+      list_reversible_mpesa_collections: {
+        Args: { p_limit?: number }
+        Returns: {
+          allocation_id: string
+          amount: number
+          collection_id: string
+          customer_receipt_id: string
+          occurred_at: string
+          order_code: string
+          provider_receipt: string
+        }[]
+      }
+      list_unallocated_mpesa_collections: {
+        Args: { p_before?: string; p_limit?: number }
+        Returns: {
+          account_reference: string
+          allocation_status: string
+          allowed_actions: string[]
+          amount: number
+          classification: string
+          created_at: string
+          id: string
+          intent_id: string
+          late_review_id: string
+          notes: string
+          occurred_at: string
+          payer_name: string
+          payer_phone: string
+          provider_account_id: string
+          provider_receipt: string
+          provider_status: string
+          queue_reason: string
+          review_reason: string
+          source: string
+          verification_status: string
         }[]
       }
       location_account_balance: {
@@ -8964,6 +11745,166 @@ export type Database = {
         Args: { p_company_id: string; p_customer_id: string }
         Returns: undefined
       }
+      mpesa_apply_collection_to_intent: {
+        Args: {
+          p_attempt_id: string
+          p_collection_id: string
+          p_intent_id: string
+        }
+        Returns: Json
+      }
+      mpesa_availability: { Args: { p_location_id: string }; Returns: Json }
+      mpesa_claim_provider_events: {
+        Args: { p_limit?: number }
+        Returns: {
+          attempt_id: string
+          event_type: string
+          id: string
+          payload: Json
+          processing_attempts: number
+          provider_account_id: string
+        }[]
+      }
+      mpesa_claim_status_queries: {
+        Args: { p_limit?: number }
+        Returns: {
+          attempt_id: string
+          checkout_request_id: string
+        }[]
+      }
+      mpesa_commissioning_state: {
+        Args: { p_request_id: string }
+        Returns: Json
+      }
+      mpesa_complete_provider_event: {
+        Args: {
+          p_collection_id?: string
+          p_event_id: string
+          p_result_code?: string
+        }
+        Returns: undefined
+      }
+      mpesa_finalize_stk_success: {
+        Args: {
+          p_amount: number
+          p_attempt_id: string
+          p_occurred_at: string
+          p_payer_name?: string
+          p_payer_phone: string
+          p_provider_receipt: string
+        }
+        Returns: Json
+      }
+      mpesa_finalize_stk_terminal: {
+        Args: {
+          p_attempt_id: string
+          p_description: string
+          p_result_code: string
+        }
+        Returns: undefined
+      }
+      mpesa_ingest_provider_event: {
+        Args: {
+          p_event_key: string
+          p_event_type: string
+          p_payload: Json
+          p_payload_sha256: string
+          p_token_hash: string
+        }
+        Returns: string
+      }
+      mpesa_intent_status: { Args: { p_intent_id: string }; Returns: Json }
+      mpesa_latest_trusted_callback_payload: {
+        Args: { p_attempt_id: string }
+        Returns: Json
+      }
+      mpesa_post_reserved_allocation: {
+        Args: {
+          p_additional_payments?: Json
+          p_allocation_id: string
+          p_collection_id: string
+          p_context: Database["public"]["CompositeTypes"]["posting_context"]
+        }
+        Returns: undefined
+      }
+      mpesa_private_connection: {
+        Args: { p_connection_id: string }
+        Returns: Json
+      }
+      mpesa_private_for_attempt: {
+        Args: { p_attempt_id: string }
+        Returns: Json
+      }
+      mpesa_record_c2b_collection: {
+        Args: {
+          p_account_reference: string
+          p_amount: number
+          p_occurred_at: string
+          p_payer_name: string
+          p_payer_phone: string
+          p_provider_account_id: string
+          p_provider_receipt: string
+        }
+        Returns: Json
+      }
+      mpesa_record_query_pending: {
+        Args: {
+          p_attempt_id: string
+          p_description: string
+          p_result_code: string
+        }
+        Returns: undefined
+      }
+      mpesa_record_request_unknown: {
+        Args: { p_attempt_id: string; p_description: string }
+        Returns: undefined
+      }
+      mpesa_record_stk_request: {
+        Args: {
+          p_attempt_id: string
+          p_checkout_request_id: string
+          p_customer_message: string
+          p_merchant_request_id: string
+          p_response_code: string
+          p_response_description: string
+        }
+        Returns: undefined
+      }
+      mpesa_retry_provider_event: {
+        Args: { p_error: string; p_event_id: string; p_terminal?: boolean }
+        Returns: undefined
+      }
+      mpesa_setup_status: { Args: never; Returns: Json }
+      mpesa_transition_intent: {
+        Args: {
+          p_attempt_id: string
+          p_collection_id?: string
+          p_expected_version: number
+          p_from: string[]
+          p_intent_id: string
+          p_result_code?: string
+          p_result_description?: string
+          p_review_reason?: string
+          p_to: string
+        }
+        Returns: number
+      }
+      mpesa_upsert_collection: {
+        Args: {
+          p_account_reference: string
+          p_amount: number
+          p_created_by?: string
+          p_intent_id?: string
+          p_occurred_at: string
+          p_payer_name: string
+          p_payer_phone: string
+          p_provider_account_id: string
+          p_provider_receipt: string
+          p_source: string
+          p_verification_status: string
+        }
+        Returns: Json
+      }
       my_companies: {
         Args: never
         Returns: {
@@ -8977,6 +11918,14 @@ export type Database = {
       }
       next_monthly_anniversary: {
         Args: { p_after?: string; p_anchor: string }
+        Returns: string
+      }
+      next_tax_document_number: {
+        Args: {
+          p_company_id: string
+          p_document_kind: string
+          p_tax_point: string
+        }
         Returns: string
       }
       normalize_legal_markdown: { Args: { p_content: string }; Returns: string }
@@ -9000,9 +11949,35 @@ export type Database = {
         Args: { p_approval_id: string }
         Returns: undefined
       }
+      notify_once: {
+        Args: {
+          p_body: string
+          p_company_id: string
+          p_dedupe_key: string
+          p_link: string
+          p_title: string
+          p_type: string
+          p_user_id: string
+        }
+        Returns: string
+      }
       open_cashier_session: { Args: { p_declarations: Json }; Returns: string }
       open_cashier_session_at_location: {
         Args: { p_declarations: Json; p_location_id: string }
+        Returns: string
+      }
+      order_posting_context: {
+        Args: { p_order_id: string; p_source?: string }
+        Returns: Database["public"]["CompositeTypes"]["posting_context"]
+        SetofOptions: {
+          from: "*"
+          to: "posting_context"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      order_vat_reporting_date: {
+        Args: { p_order_id: string; p_tax_point: string; p_timezone: string }
         Returns: string
       }
       patch_product_categories: {
@@ -9029,9 +12004,18 @@ export type Database = {
         }
         Returns: string
       }
+      period_close_readiness: { Args: { p_end_date?: string }; Returns: Json }
       platform_acknowledge_registration_alert: {
         Args: { p_alert_id: string }
         Returns: boolean
+      }
+      platform_activate_mpesa_c2b_token: {
+        Args: { p_token_id: string }
+        Returns: undefined
+      }
+      platform_advance_mpesa_request: {
+        Args: { p_action: string; p_notes?: string; p_request_id: string }
+        Returns: undefined
       }
       platform_archive_blog_post: {
         Args: { p_post_id: string }
@@ -9061,6 +12045,10 @@ export type Database = {
         Args: { p_campaign_id: string }
         Returns: boolean
       }
+      platform_cancel_mpesa_c2b_token: {
+        Args: { p_token_id: string }
+        Returns: undefined
+      }
       platform_cancel_scheduled_blog_post: {
         Args: { p_post_id: string }
         Returns: boolean
@@ -9075,6 +12063,31 @@ export type Database = {
           legal_status: string
           terms_version: string
         }[]
+      }
+      platform_configure_mpesa_connection: {
+        Args: {
+          p_app_name: string
+          p_business_shortcode: string
+          p_consumer_key: string
+          p_consumer_secret: string
+          p_daraja_app_id?: string
+          p_environment: string
+          p_location_ids?: string[]
+          p_organization_shortcode: string
+          p_party_b: string
+          p_passkey: string
+          p_request_id: string
+        }
+        Returns: string
+      }
+      platform_create_mpesa_test_attempt: {
+        Args: {
+          p_amount: number
+          p_callback_token_hash: string
+          p_connection_id: string
+          p_phone: string
+        }
+        Returns: string
       }
       platform_delete_blog_post: {
         Args: { p_post_id: string }
@@ -9125,17 +12138,48 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      platform_mpesa_overview: { Args: never; Returns: Json }
       platform_operations_snapshot: { Args: never; Returns: Json }
+      platform_prepare_mpesa_c2b_token: {
+        Args: { p_callback_token_hash: string; p_connection_id: string }
+        Returns: string
+      }
       platform_publish_blog_post: { Args: { p_post_id: string }; Returns: Json }
       platform_publish_legal_document: {
         Args: { p_expected_sha256: string; p_id: string }
         Returns: Json
+      }
+      platform_publish_tax_category: {
+        Args: { p_effective_from: string; p_tax_category_id: string }
+        Returns: string
+      }
+      platform_publish_tax_package: {
+        Args: { p_jurisdiction_id: string }
+        Returns: Json
+      }
+      platform_publish_tax_rate_version: {
+        Args: {
+          p_effective_from: string
+          p_effective_to?: string
+          p_notes?: string
+          p_rate_bps: number
+          p_tax_category_id: string
+        }
+        Returns: string
       }
       platform_registration_alerts: {
         Args: { p_limit?: number }
         Returns: Json
       }
       platform_registration_config: { Args: never; Returns: Json }
+      platform_retire_tax_category: {
+        Args: { p_effective_to: string; p_tax_category_id: string }
+        Returns: string
+      }
+      platform_retire_tax_jurisdiction: {
+        Args: { p_jurisdiction_id: string }
+        Returns: string
+      }
       platform_review_campaign: {
         Args: { p_campaign_id: string }
         Returns: Json
@@ -9223,11 +12267,45 @@ export type Database = {
         Args: { p_enabled: boolean }
         Returns: number
       }
+      platform_set_mpesa_settings: {
+        Args: {
+          p_enabled: boolean
+          p_manual_fallback_allowed: boolean
+          p_pilot_company_id?: string
+        }
+        Returns: undefined
+      }
       platform_site_deployments: { Args: never; Returns: Json }
       platform_stats: { Args: never; Returns: Json }
+      platform_tax_catalog: { Args: never; Returns: Json }
+      platform_tax_package_readiness: {
+        Args: { p_jurisdiction_id: string }
+        Returns: Json
+      }
       platform_update_billing_config: {
         Args: { p_default_trial_tier_id: string; p_trial_duration_days: number }
         Returns: Json
+      }
+      platform_update_billing_policy: {
+        Args: {
+          p_default_trial_tier_id: string
+          p_intro_offer_bonus_months: number
+          p_intro_offer_enabled: boolean
+          p_intro_offer_paid_months: number
+          p_intro_offer_tier_id: string
+          p_trial_duration_days: number
+        }
+        Returns: Json
+      }
+      platform_update_mpesa_connection: {
+        Args: {
+          p_action: string
+          p_collection_id?: string
+          p_connection_id: string
+          p_fallback_until?: string
+          p_notes?: string
+        }
+        Returns: undefined
       }
       platform_update_registration_config: {
         Args: {
@@ -9269,6 +12347,27 @@ export type Database = {
         }
         Returns: string
       }
+      platform_upsert_tax_category: {
+        Args: {
+          p_active?: boolean
+          p_classification: string
+          p_code: string
+          p_is_default?: boolean
+          p_jurisdiction_id: string
+          p_name: string
+        }
+        Returns: string
+      }
+      platform_upsert_tax_jurisdiction: {
+        Args: {
+          p_active?: boolean
+          p_country_code: string
+          p_currency_code: string
+          p_default_timezone: string
+          p_name: string
+        }
+        Returns: string
+      }
       platform_upsert_tier: {
         Args: {
           p_code: string
@@ -9285,6 +12384,15 @@ export type Database = {
           p_sms_per_period?: number
           p_staff_performance_enabled: boolean
           p_tier_id?: string
+        }
+        Returns: string
+      }
+      pos_device_heartbeat: {
+        Args: {
+          p_device_key: string
+          p_location_id: string
+          p_pending_count: number
+          p_synced?: boolean
         }
         Returns: string
       }
@@ -9348,6 +12456,30 @@ export type Database = {
         }
         Returns: string
       }
+      post_expense_with_tax: {
+        Args: {
+          p_amount: number
+          p_category?: string
+          p_claim_input_vat?: boolean
+          p_expense_date?: string
+          p_memo?: string
+          p_source_account_code: string
+          p_supplier_tax_pin?: string
+          p_tax_category_id?: string
+          p_tax_invoice_date?: string
+          p_tax_invoice_number?: string
+        }
+        Returns: string
+      }
+      post_full_refund: {
+        Args: {
+          p_method_code: string
+          p_order_id: string
+          p_reason: string
+          p_stock_outcome: string
+        }
+        Returns: Json
+      }
       post_inventory_write_off: {
         Args: { p_quantity: number; p_reason: string; p_variant_id: string }
         Returns: string
@@ -9356,6 +12488,17 @@ export type Database = {
         Args: {
           p_company_id: string
           p_entry_date?: string
+          p_lines: Json
+          p_memo: string
+          p_source_id: string
+          p_source_type: string
+        }
+        Returns: string
+      }
+      post_journal_entry_with_context: {
+        Args: {
+          p_company_id: string
+          p_context: Database["public"]["CompositeTypes"]["posting_context"]
           p_lines: Json
           p_memo: string
           p_source_id: string
@@ -9374,6 +12517,31 @@ export type Database = {
           p_session_id: string
         }
         Returns: string
+      }
+      post_manual_location_variance_adjustment: {
+        Args: {
+          p_account_code: string
+          p_company_id: string
+          p_declared: number
+          p_location_id: string
+          p_reason: string
+          p_reconciliation_id: string
+        }
+        Returns: string
+      }
+      post_offline_sale_at_location: {
+        Args: {
+          p_client_ref: string
+          p_customer_id: string
+          p_device_key: string
+          p_draft_id?: string
+          p_lines: Json
+          p_location_id: string
+          p_occurred_at: string
+          p_payments: Json
+          p_pending_count?: number
+        }
+        Returns: Json
       }
       post_payment_allocation: {
         Args: {
@@ -9515,6 +12683,22 @@ export type Database = {
         Args: { p_outbox_id: string }
         Returns: boolean
       }
+      prepare_mpesa_checkout: {
+        Args: {
+          p_amount: number
+          p_cash_amount: number
+          p_client_ref: string
+          p_customer_id?: string
+          p_draft_id?: string
+          p_lines?: Json
+          p_location_id: string
+          p_order_id?: string
+          p_phone: string
+          p_retry?: boolean
+          p_workflow: string
+        }
+        Returns: Json
+      }
       prepayment_money_account: {
         Args: {
           p_account_code: string
@@ -9544,6 +12728,11 @@ export type Database = {
         }
         Returns: Json
       }
+      primary_contact_notification_preferences: {
+        Args: { p_company_id: string }
+        Returns: Json
+      }
+      primary_contact_notification_settings: { Args: never; Returns: Json }
       provision_company: {
         Args: {
           p_address?: string
@@ -9646,6 +12835,7 @@ export type Database = {
         Args: { p_document_type: string; p_version: string }
         Returns: Json
       }
+      purge_mpesa_raw_payloads: { Args: never; Returns: number }
       queue_cashier_session_notification: {
         Args: { p_event: string; p_session_id: string }
         Returns: string
@@ -9671,13 +12861,32 @@ export type Database = {
         }
         Returns: string
       }
+      queue_mpesa_processor: { Args: never; Returns: undefined }
       queue_sms_fallback: { Args: { p_outbox_id: string }; Returns: string }
+      queue_team_outbox: {
+        Args: {
+          p_body: string
+          p_channel: string
+          p_company_id: string
+          p_dedupe_key: string
+          p_fallback_body?: string
+          p_invitation_id: string
+          p_recipient: string
+          p_subject: string
+          p_template_key: string
+        }
+        Returns: string
+      }
       reconcile_all_company_usage: { Args: never; Returns: number }
       reconcile_company_usage: {
         Args: { p_company_id?: string }
         Returns: number
       }
       reconcile_platform_campaign_deliveries: { Args: never; Returns: number }
+      reconcile_runtime_sms_quota: {
+        Args: { p_final_body: string; p_outbox_id: string }
+        Returns: number
+      }
       record_auth_otp_delivery_request: {
         Args: {
           p_phone_hash: string
@@ -9751,6 +12960,24 @@ export type Database = {
           p_reference?: string
           p_stock_location_id?: string
           p_supplier_id: string
+        }
+        Returns: string
+      }
+      record_purchase_complete_with_tax: {
+        Args: {
+          p_account_code?: string
+          p_claim_input_vat?: boolean
+          p_expenses?: Json
+          p_lines: Json
+          p_notes?: string
+          p_payment_amount?: number
+          p_purchase_date?: string
+          p_reference?: string
+          p_stock_location_id?: string
+          p_supplier_id: string
+          p_supplier_tax_pin?: string
+          p_tax_invoice_date?: string
+          p_tax_invoice_number?: string
         }
         Returns: string
       }
@@ -9831,6 +13058,10 @@ export type Database = {
         Args: { p_variant_id: string }
         Returns: undefined
       }
+      refresh_payment_collection_status: {
+        Args: { p_collection_id: string }
+        Returns: undefined
+      }
       refund_customer_deposit: {
         Args: {
           p_amount: number
@@ -9856,6 +13087,29 @@ export type Database = {
         Args: { p_body: string; p_values: Json }
         Returns: string
       }
+      request_mpesa_onboarding: {
+        Args: {
+          p_contact_email: string
+          p_contact_name: string
+          p_contact_phone: string
+          p_legal_name: string
+          p_location_ids?: string[]
+          p_mpesa_username: string
+          p_notes?: string
+          p_shortcode: string
+          p_shortcode_type: string
+        }
+        Returns: string
+      }
+      request_mpesa_reversal: {
+        Args: {
+          p_collection_id: string
+          p_provider_reference: string
+          p_provider_reversed_at: string
+          p_reason: string
+        }
+        Returns: Json
+      }
       request_sale_approval: {
         Args: {
           p_company_id: string
@@ -9873,6 +13127,14 @@ export type Database = {
       require_open_cashier_session: {
         Args: { p_company_id: string }
         Returns: string
+      }
+      require_open_cashier_session_at_location: {
+        Args: { p_company_id: string; p_location_id: string }
+        Returns: string
+      }
+      resend_team_invitation: {
+        Args: { p_invitation_id: string }
+        Returns: Json
       }
       reserve_message_quota: {
         Args: { p_channel: string; p_company_id: string; p_units: number }
@@ -9909,8 +13171,65 @@ export type Database = {
           wholesale_price: number
         }[]
       }
+      resolve_category_inclusive_tax: {
+        Args: {
+          p_company_id: string
+          p_gross: number
+          p_tax_category_id: string
+          p_tax_point: string
+        }
+        Returns: {
+          gross_total: number
+          net_total: number
+          tax_category_code: string
+          tax_category_id: string
+          tax_classification: string
+          tax_profile_id: string
+          tax_rate_bps: number
+          tax_rate_version_id: string
+          tax_total: number
+          vat_registered: boolean
+        }[]
+      }
+      resolve_inclusive_tax: {
+        Args: {
+          p_company_id: string
+          p_gross: number
+          p_product_id: string
+          p_tax_point: string
+        }
+        Returns: {
+          gross_total: number
+          net_total: number
+          tax_category_code: string
+          tax_category_id: string
+          tax_classification: string
+          tax_profile_id: string
+          tax_rate_bps: number
+          tax_rate_version_id: string
+          tax_total: number
+          vat_registered: boolean
+        }[]
+      }
       resolve_platform_campaign_recipient: {
         Args: { p_company_id: string }
+        Returns: Json
+      }
+      resolve_tender_account: {
+        Args: {
+          p_company_id: string
+          p_location_id: string
+          p_method_code: string
+          p_requested_account_code?: string
+        }
+        Returns: string
+      }
+      retire_pos_device: {
+        Args: { p_device_id: string; p_reason: string }
+        Returns: string
+      }
+      retry_mpesa_collection_posting: {
+        Args: { p_collection_id: string }
         Returns: Json
       }
       reverse_credit_purchase: {
@@ -9932,6 +13251,18 @@ export type Database = {
       revert_variance: {
         Args: { p_reason?: string; p_recon_account_id: string }
         Returns: string
+      }
+      review_late_sale: {
+        Args: { p_approve: boolean; p_reason?: string; p_review_id: string }
+        Returns: Json
+      }
+      review_mpesa_late_posting: {
+        Args: { p_approve: boolean; p_notes?: string; p_review_id: string }
+        Returns: Json
+      }
+      review_mpesa_provider_event: {
+        Args: { p_action: string; p_event_id: string; p_notes: string }
+        Returns: Json
       }
       sales_collection_events: {
         Args: { p_company_id: string; p_from: string; p_to: string }
@@ -10002,6 +13333,16 @@ export type Database = {
         Returns: string
       }
       scan_registration_volume_alerts: { Args: never; Returns: number }
+      schedule_company_tax_profile: {
+        Args: {
+          p_default_tax_category_id: string
+          p_effective_from: string
+          p_jurisdiction_id: string
+          p_tax_registration_number: string
+          p_vat_registered: boolean
+        }
+        Returns: string
+      }
       search_catalog_variants: {
         Args: { p_limit?: number; p_location_id?: string; p_query: string }
         Returns: {
@@ -10064,6 +13405,14 @@ export type Database = {
         Args: { p_customer_id: string; p_deleted?: boolean }
         Returns: string
       }
+      set_location_payment_account: {
+        Args: {
+          p_account_code: string
+          p_location_id: string
+          p_method_code: string
+        }
+        Returns: string
+      }
       set_membership_locations: {
         Args: {
           p_location_ids: string[]
@@ -10080,8 +13429,20 @@ export type Database = {
         }
         Returns: string
       }
+      set_primary_contact_notification_preferences: {
+        Args: {
+          p_cashier_enabled: boolean
+          p_channel: string
+          p_team_enabled: boolean
+        }
+        Returns: Json
+      }
       set_product_categories: {
         Args: { p_category_ids: string[]; p_product_id: string }
+        Returns: string
+      }
+      set_product_tax_category: {
+        Args: { p_product_id: string; p_tax_category_id?: string }
         Returns: string
       }
       set_supplier_active: {
@@ -10090,6 +13451,10 @@ export type Database = {
       }
       settle_order: {
         Args: { p_client_ref?: string; p_order_id: string; p_payments: Json }
+        Returns: string
+      }
+      sign_off_business_day: {
+        Args: { p_business_date: string }
         Returns: string
       }
       sms_segment_count: { Args: { p_body: string }; Returns: number }
@@ -10248,8 +13613,14 @@ export type Database = {
         Args: { p_company_id: string; p_supplier_id: string }
         Returns: number
       }
+      sweep_mpesa_processing: { Args: never; Returns: undefined }
       sync_cache_stream: {
         Args: { p_after_sequence?: number; p_limit?: number; p_stream: string }
+        Returns: Json
+      }
+      team_delivery_error_code: { Args: { p_error: string }; Returns: string }
+      team_invitation_delivery_status: {
+        Args: { p_invitation_id: string; p_version: number }
         Returns: Json
       }
       team_management_snapshot: { Args: never; Returns: Json }
@@ -10327,6 +13698,10 @@ export type Database = {
         }
         Returns: string
       }
+      update_money_account: {
+        Args: { p_account_id: string; p_is_active?: boolean; p_name?: string }
+        Returns: string
+      }
       update_my_profile: {
         Args: { p_avatar_path?: string; p_display_name?: string }
         Returns: string
@@ -10370,6 +13745,10 @@ export type Database = {
           p_terms_days?: number
         }
         Returns: string
+      }
+      update_tax_print_settings: {
+        Args: { p_show_vat_breakdown: boolean }
+        Returns: boolean
       }
       update_team_member: {
         Args: {
@@ -10440,14 +13819,24 @@ export type Database = {
         }
         Returns: undefined
       }
-      validate_cashier_declarations: {
-        Args: {
-          p_company_id: string
-          p_declarations: Json
-          p_location_id: string
-        }
-        Returns: undefined
-      }
+      validate_cashier_declarations:
+        | {
+            Args: {
+              p_company_id: string
+              p_declarations: Json
+              p_location_id: string
+            }
+            Returns: undefined
+          }
+        | {
+            Args: {
+              p_company_id: string
+              p_declarations: Json
+              p_location_id: string
+              p_session_id: string
+            }
+            Returns: undefined
+          }
       validate_platform_campaign: {
         Args: {
           p_audience: string
@@ -10463,6 +13852,19 @@ export type Database = {
         }
         Returns: undefined
       }
+      vat_late_transaction_schedule: {
+        Args: {
+          p_company_id: string
+          p_end_date: string
+          p_start_date: string
+          p_timezone: string
+        }
+        Returns: Json
+      }
+      vat_report: {
+        Args: { p_end_date: string; p_start_date: string }
+        Returns: Json
+      }
       void_approval_held_order: {
         Args: { p_order_id: string; p_reason: string }
         Returns: undefined
@@ -10476,7 +13878,16 @@ export type Database = {
       [_ in never]: never
     }
     CompositeTypes: {
-      [_ in never]: never
+      posting_context: {
+        company_id: string | null
+        location_id: string | null
+        actor_id: string | null
+        cashier_session_id: string | null
+        occurred_at: string | null
+        posting_date: string | null
+        source: string | null
+        late_reason: string | null
+      }
     }
   }
 }

@@ -51,6 +51,14 @@ show a 200 and the company row updating).
   `EMAIL_FROM` are configured. Run one controlled delivery before commissioning;
   SMS/WhatsApp are independent.
 
+### 3. M-PESA pilot
+
+- Set Edge secret `MPESA_CALLBACK_BASE_URL=https://supa.dukarun.com/functions/v1`.
+- Set Vault secrets `MPESA_PROCESS_URL` and `SUPABASE_SERVICE_ROLE_KEY`.
+- Run `npm run deploy:functions`; this syncs all four M-PESA functions.
+- Complete OAuth, C2B URL registration, KES 1 STK and KES 1 direct-payment tests.
+- Confirm the processor backlog and manual-review queue are empty before activation.
+
 ### Frontend URLs and build data
 
 Production builds require `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SITE_PUBLIC_URL`,

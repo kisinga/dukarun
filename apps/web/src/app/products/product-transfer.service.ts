@@ -32,6 +32,8 @@ export interface CatalogImportProduct {
   manufacturer_name?: string;
   barcode?: string | null;
   active: boolean;
+  /** Omitted by legacy workbooks; null selects the shop default. */
+  tax_category_code?: string | null;
   variants: CatalogImportVariant[];
 }
 
@@ -83,6 +85,7 @@ const HEADERS = [
   'stock_location_code',
   'batch_number',
   'expiry_date',
+  'tax_category_code',
 ] as const;
 
 type Header = (typeof HEADERS)[number];
@@ -93,6 +96,7 @@ type ProductRow = {
   barcode: string | null;
   active: boolean;
   manufacturer_id: string | null;
+  tax_category_id: string | null;
   created_at: string;
 };
 type VariantRow = {
@@ -134,6 +138,13 @@ export class ProductTransferService {
       this.locationContext.locations().map(item => item.code)
     );
     const sheet = workbook.getWorksheet('Products')!;
+    const { data: taxSettings } = await this.supabase.client.rpc('company_tax_settings');
+    const taxCodeById = new Map(
+      (
+        (taxSettings as { categories?: Array<{ id: string; code: string }> } | null)?.categories ??
+        []
+      ).map(category => [category.id, category.code])
+    );
 
     for (const product of products) {
       const familyVariants = variants.filter(variant => variant.product_id === product.id);
@@ -160,6 +171,7 @@ export class ProductTransferService {
           '',
           '',
           '',
+          product.tax_category_id ? (taxCodeById.get(product.tax_category_id) ?? '') : '',
         ]);
       }
     }
@@ -195,6 +207,7 @@ export class ProductTransferService {
       locations[0]?.code ?? 'MAIN',
       '',
       '',
+      '',
     ]);
     this.addMetadata(workbook, new Date().toISOString(), 'template');
     this.finishProductsSheet(sheet);
@@ -212,6 +225,15 @@ export class ProductTransferService {
       throw new Error(`Maximum ${MAX_ROWS} rows per import.`);
 
     const headerMap = this.headerMap(sheet);
+    const hasTaxCategoryColumn = headerMap.has('tax_category_code');
+    const { data: taxSettings, error: taxSettingsError } =
+      await this.supabase.client.rpc('company_tax_settings');
+    if (taxSettingsError) throw taxSettingsError;
+    const validTaxCodes = new Set(
+      ((taxSettings as { categories?: Array<{ code: string }> } | null)?.categories ?? []).map(
+        category => category.code.toUpperCase()
+      )
+    );
     const errors: string[] = [];
     const groups = new Map<string, { product: CatalogImportProduct; signature: string }>();
     const seenVariantIds = new Set<string>();
@@ -221,7 +243,10 @@ export class ProductTransferService {
     sheet.eachRow((row, rowNumber) => {
       if (rowNumber === 1) return;
       const values = Object.fromEntries(
-        HEADERS.map(header => [header, this.rawCell(row.getCell(headerMap.get(header)!))])
+        HEADERS.map(header => {
+          const column = headerMap.get(header);
+          return [header, column ? this.rawCell(row.getCell(column)) : null];
+        })
       ) as RowValues;
       if (Object.values(values).every(value => value === null || value === '')) return;
       parsedRows++;
@@ -238,7 +263,18 @@ export class ProductTransferService {
         const manufacturer = this.text(values.manufacturer);
         const barcode = this.text(values.product_barcode);
         const active = this.bool(values.product_active, true, 'product_active');
-        const signature = JSON.stringify({ productId, name, manufacturer, barcode, active });
+        const taxCategoryCode = this.text(values.tax_category_code).toUpperCase();
+        if (taxCategoryCode && !validTaxCodes.has(taxCategoryCode)) {
+          throw new Error(`unknown tax_category_code ${taxCategoryCode}`);
+        }
+        const signature = JSON.stringify({
+          productId,
+          name,
+          manufacturer,
+          barcode,
+          active,
+          taxCategoryCode,
+        });
         let group = groups.get(productKey);
         if (!group) {
           group = {
@@ -250,6 +286,7 @@ export class ProductTransferService {
               ...(manufacturer ? { manufacturer_name: manufacturer } : {}),
               barcode: barcode || null,
               active,
+              ...(hasTaxCategoryColumn ? { tax_category_code: taxCategoryCode || null } : {}),
               variants: [],
             },
           };
@@ -523,25 +560,35 @@ export class ProductTransferService {
         'Opening stock is allowed only for new variants. Adjust existing stock separately.',
       ],
       ['Services', 'Services cannot track inventory or carry opening stock.'],
+      [
+        'VAT',
+        'tax_category_code is optional. Leave it blank to use the shop default; exceptions must match Reference Data.',
+      ],
     ].forEach(row => instructions.addRow(row));
 
     const refs = workbook.addWorksheet('Reference Data', {
       properties: { tabColor: { argb: 'FFC000' } },
     });
-    refs.addRow(['Boolean values', 'Product kinds', 'Stock location codes']);
-    const count = Math.max(2, locationCodes.length);
+    const { data: taxSettings } = await this.supabase.client.rpc('company_tax_settings');
+    const taxCodes =
+      (taxSettings as { categories?: Array<{ code: string }> } | null)?.categories?.map(
+        category => category.code
+      ) ?? [];
+    refs.addRow(['Boolean values', 'Product kinds', 'Stock location codes', 'Tax category codes']);
+    const count = Math.max(2, locationCodes.length, taxCodes.length);
     for (let index = 0; index < count; index++) {
       refs.addRow([
         ['true', 'false'][index] ?? '',
         ['good', 'service'][index] ?? '',
         locationCodes[index] ?? '',
+        taxCodes[index] ?? '',
       ]);
     }
     return workbook;
   }
 
   private finishProductsSheet(sheet: Worksheet): void {
-    sheet.autoFilter = { from: 'A1', to: `U${Math.max(2, sheet.rowCount)}` };
+    sheet.autoFilter = { from: 'A1', to: `V${Math.max(2, sheet.rowCount)}` };
     sheet.getRow(1).height = 32;
     sheet.getRow(1).eachCell(cell => {
       cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
@@ -606,9 +653,14 @@ export class ProductTransferService {
   private headerMap(sheet: Worksheet): Map<Header, number> {
     const actual = new Map<string, number>();
     sheet.getRow(1).eachCell((cell, column) => actual.set(cell.text.trim(), column));
-    const missing = HEADERS.filter(header => !actual.has(header));
+    const missing = HEADERS.filter(header => header !== 'tax_category_code' && !actual.has(header));
     if (missing.length) throw new Error(`Missing columns: ${missing.join(', ')}`);
-    return new Map(HEADERS.map(header => [header, actual.get(header)!]));
+    return new Map(
+      HEADERS.flatMap(header => {
+        const column = actual.get(header);
+        return column ? ([[header, column]] as Array<[Header, number]>) : [];
+      })
+    );
   }
 
   private rawCell(cell: Cell): unknown {
@@ -683,7 +735,7 @@ export class ProductTransferService {
     return this.allPages(offset =>
       this.supabase.client
         .from('products')
-        .select('id,name,barcode,active,manufacturer_id,created_at')
+        .select('id,name,barcode,active,manufacturer_id,tax_category_id,created_at')
         .order('id')
         .range(offset, offset + 999)
     ) as Promise<ProductRow[]>;

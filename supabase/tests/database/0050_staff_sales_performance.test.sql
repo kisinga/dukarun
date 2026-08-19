@@ -127,16 +127,18 @@ select testkit.as_user(
   'Admin'
 );
 
-select public.post_refund((select order_id from direct_sale), 2000, 'cash', 'Partial return');
+select public.post_full_refund(
+  (select order_id from direct_sale), 'cash', 'Returned service', 'write_off'
+);
 
--- 5. Cumulative refunds cannot exceed settled cash remaining.
+-- 5. A sale can receive only one full credit note.
 select throws_ok(
-  $$select public.post_refund(
-    (select order_id from direct_sale), 9000, 'cash', 'Too much'
+  $$select public.post_full_refund(
+    (select order_id from direct_sale), 'cash', 'Duplicate return', 'write_off'
   )$$,
   'P0001',
-  'refund_exceeds_collected: refundable amount is 8000',
-  'refund amount is capped by net collection'
+  'sale_already_refunded',
+  'full credit notes cannot be duplicated'
 );
 
 select public.void_sale((select order_id from parked_sale), 'Cancelled service');
@@ -163,7 +165,7 @@ select is(
     (now() at time zone 'Africa/Nairobi')::date,
     (now() at time zone 'Africa/Nairobi')::date
   ) where staff_user_id = '22222222-2222-2222-2222-222222222222'),
-  8000::bigint,
+  0::bigint,
   'net sales subtract refunds and voids'
 );
 select is(
@@ -171,7 +173,7 @@ select is(
     (now() at time zone 'Africa/Nairobi')::date,
     (now() at time zone 'Africa/Nairobi')::date
   ) where staff_user_id = '22222222-2222-2222-2222-222222222222'),
-  8000::bigint,
+  0::bigint,
   'net collected value follows immutable payment events'
 );
 select is(
@@ -187,7 +189,7 @@ select is(
     (now() at time zone 'Africa/Nairobi')::date,
     (now() at time zone 'Africa/Nairobi')::date
   ) where staff_user_id = '22222222-2222-2222-2222-222222222222'),
-  2000::bigint,
+  10000::bigint,
   'refund total is attributed to original seller'
 );
 select is(

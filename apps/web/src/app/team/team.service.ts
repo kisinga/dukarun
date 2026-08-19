@@ -15,6 +15,7 @@ import {
   type NamedSnapshot,
 } from '../pos/offline/offline-db';
 import { rpcError } from '../pos/pos.service';
+import type { InvitationDeliveryError } from './team-invitation-presentation';
 
 export type Role = Database['public']['Tables']['roles']['Row'];
 export type Membership = Database['public']['Tables']['company_memberships']['Row'];
@@ -31,13 +32,29 @@ export interface TeamInvitation {
   role_name: string;
   created_at: string;
   expires_at: string;
+  status: 'pending' | 'expired';
+  notification_version: number;
+  can_resend_at: string | null;
+  delivery_status: 'queued' | 'whatsapp_sent' | 'sms_fallback_sent' | 'failed' | 'not_queued';
+  delivery_channel: 'sms' | 'whatsapp' | null;
+  delivery_error: InvitationDeliveryError | null;
 }
 
 export interface InviteTeamMemberResult {
-  status: 'invited' | 'updated';
+  status: 'invited' | 'updated_invitation' | 'updated';
   invitation_id?: string;
   membership_id?: string;
   expires_at?: string;
+  delivery_status?: TeamInvitation['delivery_status'];
+  delivery_error?: InvitationDeliveryError | null;
+}
+
+export interface ResendTeamInvitationResult {
+  invitation_id: string;
+  expires_at: string;
+  can_resend_at: string;
+  delivery_status: TeamInvitation['delivery_status'];
+  delivery_error: InvitationDeliveryError | null;
 }
 
 export type MembershipWithRole = Membership & {
@@ -355,6 +372,14 @@ export class TeamService {
     });
     if (error) throw rpcError(error);
     return data;
+  }
+
+  async resendInvitation(invitationId: string): Promise<ResendTeamInvitationResult> {
+    const { data, error } = await this.db.rpc('resend_team_invitation', {
+      p_invitation_id: invitationId,
+    });
+    if (error) throw rpcError(error);
+    return data as unknown as ResendTeamInvitationResult;
   }
 
   async updateStaffDisplayName(membershipId: string, displayName: string): Promise<string> {

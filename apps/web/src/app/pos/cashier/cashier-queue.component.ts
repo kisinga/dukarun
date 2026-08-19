@@ -41,6 +41,8 @@ import { ConnectivityService } from '../offline/connectivity.service';
 import { SyncService } from '../offline/sync.service';
 import { MobileListComponent } from '../../shared/ui/mobile-list.component';
 import { PageActionsComponent } from '../../shared/ui/page-actions.component';
+import { MpesaService } from '../../core/mpesa.service';
+import { MpesaCheckoutCoordinator } from '../../core/mpesa-checkout-coordinator.service';
 
 const QUEUE_SORT_OPTIONS: readonly ListSortOption[] = [
   { value: 'cashier_pending_at', label: 'Time waiting' },
@@ -370,12 +372,31 @@ const QUEUE_SORT_OPTIONS: readonly ListSortOption[] = [
           [total]="order.total"
           [methods]="methods()"
           [canUseDirectAccounts]="canUseDirectAccounts()"
+          [mpesaStkEnabled]="mpesa.availability().active"
+          [mpesaManualFallback]="mpesa.availability().manualFallback"
           [busy]="busy()"
           [heading]="'Collect payment · ' + order.code"
           (confirmed)="settle(order.id, $event)"
           (approvalRequested)="directAccountRequested()"
           (cancelled)="settling.set(null)"
         />
+      }
+      @if (mpesaSplitReady(); as split) {
+        <dialog class="modal modal-open" aria-labelledby="queue-mpesa-cash-heading">
+          <div class="modal-box">
+            <h2 id="queue-mpesa-cash-heading" class="type-title">M-PESA received</h2>
+            <p class="mt-2 text-sm">Confirm cash only after it is in hand.</p>
+            <p class="mt-4 text-xl font-semibold"><app-money [amount]="split.cashAmount" /></p>
+            <div class="modal-action">
+              <button appButton variant="ghost" (click)="mpesaSplitReady.set(null)">
+                Keep pending
+              </button>
+              <button appButton [loading]="busy()" (click)="confirmMpesaCash()">
+                Confirm cash received
+              </button>
+            </div>
+          </div>
+        </dialog>
       }
       @if (directAccountNotice()) {
         <div class="toast toast-bottom toast-end z-50" aria-live="polite">
@@ -404,6 +425,8 @@ export class CashierQueueComponent implements OnInit, OnDestroy {
   private readonly sync = inject(SyncService);
   protected readonly cashierSession = inject(CashierSessionService);
   protected readonly orderQueueCounts = inject(OrderQueueCountsService);
+  protected readonly mpesa = inject(MpesaService);
+  private readonly mpesaCheckout = inject(MpesaCheckoutCoordinator);
 
   protected readonly parked = signal<OrderWithCustomer[]>([]);
   protected readonly page = signal(1);
@@ -417,8 +440,16 @@ export class CashierQueueComponent implements OnInit, OnDestroy {
   protected readonly loadingLinesFor = signal<string | null>(null);
   protected readonly lines = signal<OrderLineWithProduct[]>([]);
   protected readonly settling = signal<OrderWithCustomer | null>(null);
+  protected readonly mpesaSplitReady = signal<{
+    intentId: string;
+    orderId: string;
+    code: string;
+    cashPayments: PaymentInput[];
+    cashAmount: number;
+  } | null>(null);
   /** Idempotency key for the in-flight settlement (see startSettlement). */
   protected settleClientRef: string | null = null;
+  private settleMpesaRetryAllowed = false;
   protected readonly methods = signal<PaymentMethodOption[]>([]);
   protected readonly busy = signal(false);
   protected readonly loading = signal(false);
@@ -496,6 +527,7 @@ export class CashierQueueComponent implements OnInit, OnDestroy {
 
   async ngOnInit(): Promise<void> {
     this.printerEnabled.set(await this.receiptData.printerEnabled());
+    void this.mpesa.refreshAvailability();
     try {
       this.methods.set(await this.sync.paymentMethods());
     } catch {
@@ -625,10 +657,61 @@ export class CashierQueueComponent implements OnInit, OnDestroy {
     this.completedSale.set(null);
     const order = this.settling();
     try {
+      const mpesaPayment = payments.find(
+        payment =>
+          payment.method === 'mpesa' &&
+          (payment.phone || (this.mpesa.availability().manualFallback && payment.reference))
+      );
+      if (mpesaPayment) {
+        if (!this.connectivity.online())
+          throw new Error('Integrated M-PESA requires an internet connection.');
+        if (!order?.location_id) throw new Error('This sale has no business location.');
+        const cashPayments = payments
+          .filter(payment => payment !== mpesaPayment)
+          .map(({ phone: _phone, ...payment }) => payment);
+        const outcome = await this.mpesaCheckout.run(
+          retry =>
+            this.mpesa.initiateOrder({
+              orderId,
+              locationId: order.location_id,
+              mpesaAmount: mpesaPayment.amount,
+              cashAmount: cashPayments.reduce((sum, payment) => sum + payment.amount, 0),
+              clientRef: this.settleClientRef!,
+              retry,
+              ...(mpesaPayment.phone
+                ? { phone: mpesaPayment.phone }
+                : { receipt: mpesaPayment.reference! }),
+            }),
+          this.settleMpesaRetryAllowed
+        );
+        if (outcome.kind === 'awaiting_cash') {
+          this.settling.set(null);
+          this.mpesaSplitReady.set({
+            intentId: outcome.intentId,
+            orderId,
+            code: order.code,
+            cashPayments,
+            cashAmount: outcome.cashAmount,
+          });
+          return;
+        }
+        if (outcome.kind === 'manual_review') {
+          this.settling.set(null);
+          this.settleClientRef = null;
+          this.settleMpesaRetryAllowed = false;
+          await this.load();
+          throw new Error(outcome.message);
+        }
+        if (outcome.kind === 'failed' && outcome.retryAllowed) {
+          this.settleMpesaRetryAllowed = true;
+        }
+        if (outcome.kind !== 'completed') throw new Error(outcome.message);
+        this.completeSettlement(orderId, order.code);
+        await this.load();
+        return;
+      }
       await this.pos.settleOrder(orderId, payments, this.settleClientRef ?? undefined);
-      this.settling.set(null);
-      this.settleClientRef = null;
-      this.completedSale.set({ id: orderId, code: order?.code ?? 'Sale' });
+      this.completeSettlement(orderId, order?.code ?? 'Sale');
       await this.load();
     } catch (err) {
       // Keep the settlement (and its client ref) open: if the failure was a
@@ -640,6 +723,30 @@ export class CashierQueueComponent implements OnInit, OnDestroy {
     }
   }
 
+  protected async confirmMpesaCash(): Promise<void> {
+    const split = this.mpesaSplitReady();
+    if (!split) return;
+    this.busy.set(true);
+    this.error.set(null);
+    try {
+      await this.mpesaCheckout.finalizeCash(split.intentId);
+      this.mpesaSplitReady.set(null);
+      this.completeSettlement(split.orderId, split.code);
+      await this.load();
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Could not finish split payment');
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  private completeSettlement(orderId: string, code: string): void {
+    this.settling.set(null);
+    this.settleClientRef = null;
+    this.settleMpesaRetryAllowed = false;
+    this.completedSale.set({ id: orderId, code });
+  }
+
   protected async startSettlement(order: OrderWithCustomer): Promise<void> {
     this.error.set(null);
     this.completedSale.set(null);
@@ -648,6 +755,7 @@ export class CashierQueueComponent implements OnInit, OnDestroy {
       // One reference per settlement attempt: every retry/replay of this
       // settle reuses it, so a lost response cannot double-post the payment.
       this.settleClientRef = crypto.randomUUID();
+      this.settleMpesaRetryAllowed = false;
       this.settling.set(order);
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Open a cashier session first');

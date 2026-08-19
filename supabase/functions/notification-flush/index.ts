@@ -8,7 +8,8 @@
 //
 // Env: TEXTSMS_API_KEY / TEXTSMS_PARTNER_ID / TEXTSMS_SHORTCODE,
 //      OPENWA_BASE_URL / OPENWA_API_KEY / OPENWA_SESSION,
-//      EMAIL_API_URL / EMAIL_API_KEY / EMAIL_FROM
+//      EMAIL_API_URL / EMAIL_API_KEY / EMAIL_FROM,
+//      APP_PUBLIC_URL (used for runtime links in durable message templates)
 
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import {
@@ -23,6 +24,10 @@ const DEFAULT_MAX_ATTEMPTS = 5;
 // Claim lease: exceeds the 1-minute flush interval so an in-flight send is
 // never re-claimed; a crashed batch becomes retryable once it expires.
 const LEASE_MS = 5 * 60_000;
+const APP_PUBLIC_URL = (Deno.env.get('APP_PUBLIC_URL') ?? 'https://app.dukarun.com').replace(
+  /\/+$/,
+  ''
+);
 
 const db = createClient(
   Deno.env.get('SUPABASE_URL') ?? '',
@@ -36,6 +41,10 @@ function authorized(req: Request): boolean {
   let diff = 0;
   for (let i = 0; i < expected.length; i++) diff |= actual.charCodeAt(i) ^ expected.charCodeAt(i);
   return diff === 0;
+}
+
+function resolveRuntimePlaceholders(body: string): string {
+  return body.replaceAll('{{app_url}}', APP_PUBLIC_URL);
 }
 
 async function sendEmail(recipient: string, subject: string | null, body: string): Promise<void> {
@@ -79,12 +88,14 @@ async function queueFallback(row: {
   id: string;
   company_id: string;
   customer_id?: string | null;
+  source?: string | null;
   recipient: string;
   fallback_body?: string | null;
   fallback_channel?: string | null;
 }): Promise<void> {
   if (row.fallback_channel !== 'sms') return;
   if (!row.fallback_body) {
+    if (row.source === 'team' || row.source === 'cashier_session') return;
     await db.rpc('notify', {
       p_company_id: row.company_id,
       p_type: 'credit_reminder',
@@ -116,6 +127,7 @@ async function queueFallback(row: {
     p_outbox_id: row.id,
   });
   if (error || !outboxId) {
+    if (row.source === 'team' || row.source === 'cashier_session') return;
     await db.rpc('notify', {
       p_company_id: row.company_id,
       p_type: 'credit_reminder',
@@ -137,7 +149,7 @@ Deno.serve(async req => {
   const { data: candidates, error } = await db
     .from('outbox')
     .select(
-      'id, company_id, channel, recipient, subject, body, attempts, max_attempts, campaign_id, campaign_recipient_id, customer_id, source, template_key, template_version, quota_state, fallback_channel, fallback_body'
+      'id, company_id, channel, recipient, subject, body, attempts, max_attempts, campaign_id, campaign_recipient_id, customer_id, source, template_key, template_version, quota_units, quota_state, fallback_channel, fallback_body'
     )
     .eq('status', 'pending')
     .lte('scheduled_after', new Date().toISOString())
@@ -224,9 +236,24 @@ Deno.serve(async req => {
       continue;
     }
     try {
-      if (row.channel === 'sms') await sendSms(row.recipient, row.body);
-      else if (row.channel === 'whatsapp') await sendWhatsapp(row.recipient, row.body);
-      else await sendEmail(row.recipient, row.subject, row.body);
+      const body = resolveRuntimePlaceholders(row.body);
+      if (row.channel === 'sms') {
+        const { error: quotaError } = await db.rpc('reconcile_runtime_sms_quota', {
+          p_outbox_id: row.id,
+          p_final_body: body,
+        });
+        if (quotaError) {
+          const quotaExhausted = quotaError.message.includes('sms_limit_reached');
+          throw new DeliveryError(
+            quotaExhausted ? 'quota_exhausted' : 'sms_quota_reconciliation_failed',
+            quotaExhausted,
+            false
+          );
+        }
+      }
+      if (row.channel === 'sms') await sendSms(row.recipient, body);
+      else if (row.channel === 'whatsapp') await sendWhatsapp(row.recipient, body);
+      else await sendEmail(row.recipient, row.subject, body);
 
       await db.rpc('finalize_message_quota', { p_outbox_id: row.id, p_accepted: true });
 

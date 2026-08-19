@@ -35,6 +35,7 @@ import { StatCardComponent } from '../shared/ui/stat-card.component';
 import { DrawerComponent } from '../shared/ui/drawer.component';
 import { MobileListComponent } from '../shared/ui/mobile-list.component';
 import { PageActionsComponent } from '../shared/ui/page-actions.component';
+import { WorkspaceNavigationComponent } from '../shared/ui/workspace-navigation.component';
 import { CompanyPreferencesService } from '../core/company-preferences.service';
 import { PermissionsService } from '../core/permissions.service';
 import { CatalogCacheService } from '../core/catalog-cache.service';
@@ -49,6 +50,8 @@ import {
   type SearchableFilterOption,
 } from '../shared/ui/searchable-filter.component';
 import { PublicProductLinkService } from './public-product-link.service';
+import { TaxService } from '../core/tax.service';
+import type { TaxCategory } from '@dukarun/tax-types';
 
 type StockInfo = { stock: number; stock_value: number };
 type ProductStatusFilter = 'all' | 'active' | 'inactive';
@@ -123,10 +126,11 @@ interface PendingProductImage {
     BatchProductCategoriesDialogComponent,
     MobileListComponent,
     PageActionsComponent,
+    WorkspaceNavigationComponent,
   ],
   template: `
     <app-page
-      title="Products"
+      title="Inventory"
       subtitle="Manage the catalog, pricing, variants, and the stock available to sell."
       [wide]="true"
     >
@@ -167,6 +171,8 @@ interface PendingProductImage {
           </button>
         }
       </app-page-actions>
+
+      <app-workspace-navigation workspace="inventory" label="Inventory" />
 
       @if (error()) {
         <div role="alert" class="alert alert-error mb-3 text-sm">
@@ -517,6 +523,21 @@ interface PendingProductImage {
                           Scan
                         </button>
                       </div>
+                    </app-form-field>
+                    <app-form-field
+                      label="VAT treatment"
+                      hint="Use the shop default unless this product is zero-rated, exempt, or uses a special rate."
+                    >
+                      <select
+                        class="select select-bordered w-full"
+                        [formControl]="familyTaxCategory"
+                        [disabled]="!perms.has('ManageCatalog')"
+                      >
+                        <option value="">Use shop default</option>
+                        @for (category of taxCategories(); track category.id) {
+                          <option [value]="category.id">{{ category.name }}</option>
+                        }
+                      </select>
                     </app-form-field>
                   </section>
 
@@ -1300,6 +1321,9 @@ interface PendingProductImage {
                   }
                   <div class="min-w-0 flex-1">
                     <span class="block truncate font-semibold">{{ group.family.name }}</span>
+                    @if (taxCategoryName(group.family.tax_category_id); as taxName) {
+                      <span class="badge badge-outline badge-xs mt-1">{{ taxName }}</span>
+                    }
                     <span class="type-caption mt-0.5 block">
                       {{ manufacturerName(group.family.manufacturer_id) || 'No manufacturer' }} ·
                       {{ group.variants.length }}
@@ -1409,6 +1433,9 @@ interface PendingProductImage {
                           >
                             {{ group.family.name }}
                           </span>
+                          @if (taxCategoryName(group.family.tax_category_id); as taxName) {
+                            <span class="badge badge-outline badge-xs mt-1">{{ taxName }}</span>
+                          }
                           <p class="type-caption mt-0.5 truncate font-mono">
                             {{ group.family.barcode || 'No shared barcode' }}
                           </p>
@@ -1695,7 +1722,7 @@ interface PendingProductImage {
                             appButton
                             variant="soft"
                             size="sm"
-                            routerLink="/stock-adjustments"
+                            routerLink="/inventory/adjustments"
                             [queryParams]="{ variant: v.variant_id }"
                           >
                             <app-icon name="heroArrowsRightLeft" /> Adjust stock
@@ -1852,6 +1879,7 @@ export class ProductsComponent implements OnInit {
   private readonly locationContext = inject(LocationContextService);
   protected readonly connectivity = inject(ConnectivityService);
   private readonly publicProductLinks = inject(PublicProductLinkService);
+  private readonly tax = inject(TaxService);
   protected readonly preferences = inject(CompanyPreferencesService);
   protected readonly perms = inject(PermissionsService);
 
@@ -1882,6 +1910,8 @@ export class ProductsComponent implements OnInit {
   protected readonly familyManufacturer = new FormControl('', { nonNullable: true });
   protected readonly familyBarcode = new FormControl('', { nonNullable: true });
   protected readonly familyActive = new FormControl(true, { nonNullable: true });
+  protected readonly familyTaxCategory = new FormControl('', { nonNullable: true });
+  protected readonly taxCategories = signal<TaxCategory[]>([]);
 
   /** Coupled create/edit flow: product details and every variant share one editor. */
   protected readonly editorMode = signal<'create' | 'edit' | null>(null);
@@ -2294,9 +2324,15 @@ export class ProductsComponent implements OnInit {
     );
   }
 
+  protected taxCategoryName(id: string | null): string | null {
+    if (!id) return null;
+    return this.taxCategories().find(category => category.id === id)?.name ?? 'VAT exception';
+  }
+
   async ngOnInit(): Promise<void> {
     this.loading.set(true);
     void this.publicProductLinks.load().catch(() => undefined);
+    void this.loadTaxCategories();
     const hydrated = await this.catalogCache.ensureLoaded();
     if (hydrated) this.loading.set(false);
     void this.preferences.refresh();
@@ -2304,6 +2340,16 @@ export class ProductsComponent implements OnInit {
       const refreshed = await this.catalogCache.refresh();
       if (!refreshed) this.error.set('Could not load the catalog; check your connection.');
       this.loading.set(false);
+    }
+  }
+
+  private async loadTaxCategories(): Promise<void> {
+    try {
+      const settings = await this.tax.settings();
+      this.taxCategories.set(settings.categories);
+    } catch {
+      // VAT is optional. A catalog load must still work for shops without tax access/configuration.
+      this.taxCategories.set([]);
     }
   }
 
@@ -2732,6 +2778,7 @@ export class ProductsComponent implements OnInit {
     this.familyName.setValue('');
     this.familyManufacturer.setValue('');
     this.familyBarcode.setValue('');
+    this.familyTaxCategory.setValue('');
     this.pendingFamilyBarcode.set(null);
     this.familyActive.setValue(true);
     this.familyCategories.set(new Set());
@@ -2749,6 +2796,7 @@ export class ProductsComponent implements OnInit {
     this.familyName.setValue(family.name);
     this.familyManufacturer.setValue(this.manufacturerName(family.manufacturer_id) ?? '');
     this.familyBarcode.setValue(family.barcode ?? '');
+    this.familyTaxCategory.setValue(family.tax_category_id ?? '');
     this.pendingFamilyBarcode.set(null);
     this.familyActive.setValue(family.active);
     this.familyCategories.set(new Set());
@@ -2988,6 +3036,9 @@ export class ProductsComponent implements OnInit {
           manufacturer_id: manufacturerId,
           variants,
         });
+        if (this.perms.has('ManageCatalog') && this.familyTaxCategory.value) {
+          await this.tax.setProductCategory(productId, this.familyTaxCategory.value);
+        }
         let photoUploadFailed = false;
         if (this.pendingProductImage()) {
           try {
@@ -3012,6 +3063,9 @@ export class ProductsComponent implements OnInit {
         });
         if (this.perms.has('ManageCatalog') && this.connectivity.online()) {
           await this.pos.setProductCategories(editing.id, [...this.familyCategories()]);
+          if ((editing.tax_category_id ?? '') !== this.familyTaxCategory.value) {
+            await this.tax.setProductCategory(editing.id, this.familyTaxCategory.value || null);
+          }
         }
         let photoUploadFailed = false;
         if (this.pendingProductImage()) {

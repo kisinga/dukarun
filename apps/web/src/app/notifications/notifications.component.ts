@@ -13,6 +13,8 @@ const TYPE_ICON: Record<string, string> = {
   subscription: 'heroCreditCard',
   approval: 'heroCheckBadge',
   stock: 'heroCube',
+  team: 'heroUsers',
+  cashier_session: 'heroBanknotes',
   system: 'heroArchiveBox',
 };
 
@@ -44,7 +46,7 @@ const TYPE_ICON: Record<string, string> = {
         <app-empty-state
           icon="heroBellSlash"
           title="No notifications"
-          description="Credit reminders, approvals, and stock alerts land here."
+          description="Team, cashier, credit, approval, and stock alerts land here."
         />
       } @else {
         <app-mobile-list [desktopVisible]="true">

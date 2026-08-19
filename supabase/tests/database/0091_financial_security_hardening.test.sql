@@ -277,6 +277,11 @@ select is(public.cashier_session_required_for_source('PurchaseExpense'),true,
 select has_column('public','ledger_journal_entries','payload_hash',
   'journal entries persist a canonical payload hash');
 
+select set_config('app.business_location_id',(
+  select id::text from public.stock_locations
+  where company_id=(select company_id from hardening_fixture) and is_default limit 1
+),true);
+
 create temp table hash_entry as
 select public.post_journal_entry(
   (select company_id from hardening_fixture),'HashTest','stable-source','Stable memo',

@@ -1,5 +1,5 @@
 begin;
-select plan(21);
+select plan(24);
 
 select has_table('public','supplier_payments',
   'supplier payments have a reversible business-event header');
@@ -125,6 +125,72 @@ select is((select status from public.purchases
 select is((select document_balance from public.supplier_account_status(
   '97000000-0000-4000-8000-000000000004')),600::bigint,
   'purchase reversal removes only its source-backed payable');
+
+-- Simulate privileged import/maintenance traffic, which can write the source
+-- tables directly and can set the generic non-accounting limits bypass.
+reset role;
+
+select throws_ok($sql$
+  do $block$
+  begin
+    perform set_config('app.bypass_business_limits','on',true);
+    insert into public.purchase_payments(company_id,purchase_id,amount,account_code,created_by,
+      status,settlement_kind)
+    values((select company_id from integrity_fixture),
+      (select purchase_id from integrity_purchase_two),1,'CASH_ON_HAND',auth.uid(),
+      'settled','account');
+    set constraints purchase_payments_account_consistency immediate;
+  end
+  $block$
+$sql$,
+  'P0001','supplier_account_out_of_balance: ledger 600, documents 599',
+  'business-limit bypass cannot commit a payment allocation without its AP journal');
+
+select throws_ok($sql$
+  do $block$
+  begin
+    perform set_config('app.bypass_business_limits','on',true);
+    perform public.post_journal_entry(
+      (select company_id from integrity_fixture),'IntegrityBypassProbe','ap-only','AP-only probe',
+      jsonb_build_array(
+        jsonb_build_object('account_code','ACCOUNTS_PAYABLE','debit',1,
+          'meta',jsonb_build_object('supplierId','97000000-0000-4000-8000-000000000004')),
+        jsonb_build_object('account_code','CASH_ON_HAND','credit',1,
+          'meta',jsonb_build_object('supplierId','97000000-0000-4000-8000-000000000004'))
+      )
+    );
+    set constraints journal_lines_account_consistency immediate;
+  end
+  $block$
+$sql$,
+  'P0001','supplier_account_out_of_balance: ledger 599, documents 600',
+  'business-limit bypass cannot commit an AP journal without a source document');
+
+select throws_ok($sql$
+  do $block$
+  begin
+    perform set_config('app.bypass_business_limits','on',true);
+    insert into public.purchase_payments(company_id,purchase_id,amount,account_code,created_by,
+      status,settlement_kind)
+    values((select company_id from integrity_fixture),
+      (select purchase_id from integrity_purchase_two),601,'CASH_ON_HAND',auth.uid(),
+      'settled','account');
+    perform public.post_journal_entry(
+      (select company_id from integrity_fixture),'IntegrityBypassProbe','balanced-overallocation',
+      'Balanced over-allocation probe',jsonb_build_array(
+        jsonb_build_object('account_code','ACCOUNTS_PAYABLE','debit',601,
+          'meta',jsonb_build_object('supplierId','97000000-0000-4000-8000-000000000004')),
+        jsonb_build_object('account_code','CASH_ON_HAND','credit',601,
+          'meta',jsonb_build_object('supplierId','97000000-0000-4000-8000-000000000004'))
+      )
+    );
+    set constraints purchase_payments_not_overallocated immediate;
+  end
+  $block$
+$sql$,
+  'P0001','purchase_overallocated: payments 601 exceed total 600',
+  'business-limit bypass cannot commit a balanced purchase over-allocation');
+
 select is((select sum(debit)-sum(credit) from public.ledger_journal_lines
   where company_id=(select company_id from integrity_fixture)),0::numeric,
   'integrity workflow preserves double-entry balance');

@@ -25,6 +25,7 @@ import {
 } from '../shared/ui/searchable-filter.component';
 import { MobileListComponent } from '../shared/ui/mobile-list.component';
 import { PageActionsComponent } from '../shared/ui/page-actions.component';
+import { WorkspaceNavigationComponent } from '../shared/ui/workspace-navigation.component';
 
 const STATUS_TYPE: Record<string, 'success' | 'warning' | 'error' | 'neutral'> = {
   pending: 'warning',
@@ -61,10 +62,11 @@ const RELATED_PARTY_SEARCH_ID_LIMIT = 50;
     SearchableFilterComponent,
     MobileListComponent,
     PageActionsComponent,
+    WorkspaceNavigationComponent,
   ],
   template: `
     <app-page
-      title="Customer communications"
+      title="Activity"
       subtitle="Monitor approved transactional SMS and WhatsApp delivery."
       [wide]="true"
     >
@@ -83,6 +85,8 @@ const RELATED_PARTY_SEARCH_ID_LIMIT = 50;
           <app-icon name="heroArrowPath" />
         </button>
       </app-page-actions>
+
+      <app-workspace-navigation workspace="activity" label="Activity" />
 
       @if (error()) {
         <div role="alert" class="alert alert-error mb-3 text-sm">

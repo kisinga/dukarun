@@ -4,6 +4,12 @@ import { SupabaseService } from './supabase.service';
 export interface PublicBillingConfig {
   trialDays: number;
   defaultTrialTierCode: string;
+  introOfferEnabled: boolean;
+  introOfferTierCode: string;
+  introOfferTierName: string;
+  introOfferPrice: number;
+  introOfferPaidMonths: number;
+  introOfferBonusMonths: number;
 }
 
 @Injectable({ providedIn: 'root' })

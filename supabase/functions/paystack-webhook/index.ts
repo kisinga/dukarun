@@ -63,7 +63,7 @@ Deno.serve(async req => {
 
   const data = event.data ?? {};
   const meta = data.metadata ?? {};
-  if (meta.type !== 'subscription') {
+  if (!['subscription', 'subscription_intro_offer'].includes(meta.type)) {
     return Response.json({ received: true, skipped: 'not a subscription charge' });
   }
 
@@ -84,13 +84,26 @@ Deno.serve(async req => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
   );
 
-  const { error } = await serviceClient.rpc('activate_subscription', {
-    p_company_id: meta.company_id,
-    p_tier_id: meta.tier_id,
-    p_billing_cycle: meta.billing_cycle,
-    p_reference: data.reference,
-    p_amount: Math.round(data.amount / 100), // Paystack sends cents; we store shillings
-  });
+  const amount = Math.round(data.amount / 100); // Paystack sends cents; we store shillings
+  const activation =
+    meta.type === 'subscription_intro_offer'
+      ? await serviceClient.rpc('activate_intro_offer', {
+          p_company_id: meta.company_id,
+          p_tier_id: meta.tier_id,
+          p_reference: data.reference,
+          p_amount: amount,
+          p_unit_price: meta.unit_price,
+          p_paid_months: meta.paid_months,
+          p_bonus_months: meta.bonus_months,
+        })
+      : await serviceClient.rpc('activate_subscription', {
+          p_company_id: meta.company_id,
+          p_tier_id: meta.tier_id,
+          p_billing_cycle: meta.billing_cycle,
+          p_reference: data.reference,
+          p_amount: amount,
+        });
+  const { error } = activation;
 
   if (error) {
     console.error('activate_subscription failed', { reference: data.reference, error });

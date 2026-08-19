@@ -15,6 +15,18 @@ export interface OrderData {
   orderPlacedAt?: string | null;
   total: number;
   totalWithTax: number;
+  /** Immutable server snapshots for completed sales; estimates for proformas. */
+  netTotal?: number;
+  taxTotal?: number;
+  taxDocumentNumber?: string | null;
+  taxBreakdown?: Array<{
+    code: string;
+    classification: string;
+    rateBps: number;
+    gross: number;
+    net: number;
+    tax: number;
+  }>;
   currencyCode: string;
   customer?: {
     id: string;
@@ -28,6 +40,11 @@ export interface OrderData {
     quantity: number;
     linePrice: number;
     linePriceWithTax: number;
+    netAmount?: number;
+    taxAmount?: number;
+    taxCategoryCode?: string | null;
+    taxClassification?: string | null;
+    taxRateBps?: number;
     productVariant: {
       id: string;
       name: string;
@@ -87,6 +104,10 @@ export interface PrintMeta {
   paymentMethodName?: string;
   /** First name of the staff member who served the customer */
   servedBy?: string;
+  /** Cosmetic shop-wide visibility only; never feeds transaction calculations. */
+  showVatBreakdown?: boolean;
+  vatRegistered?: boolean;
+  taxRegistrationNumber?: string | null;
 }
 
 /**
@@ -178,6 +199,42 @@ export abstract class PrintTemplate {
     }).format(amount);
   }
 
+  protected taxDocumentTitle(documentType: DocumentType, meta?: PrintMeta): string {
+    if (documentType === 'proforma') return 'PROFORMA INVOICE';
+    if (documentType === 'cashier-slip') return 'CASHIER SLIP';
+    if (meta?.showVatBreakdown && meta.vatRegistered) return 'VAT INVOICE';
+    return documentType === 'receipt' ? 'RECEIPT' : 'INVOICE';
+  }
+
+  protected renderVatTotals(order: OrderData, meta?: PrintMeta): string {
+    if (!meta?.showVatBreakdown || !meta.vatRegistered) return '';
+    const net = order.netTotal ?? order.totalWithTax - (order.taxTotal ?? 0);
+    const tax = order.taxTotal ?? 0;
+    const categoryRows = (order.taxBreakdown ?? [])
+      .map(category => {
+        const label =
+          category.classification === 'standard'
+            ? `VAT ${this.formatRate(category.rateBps)}`
+            : category.classification === 'zero_rated'
+              ? 'Zero-rated VAT'
+              : category.classification === 'exempt'
+                ? 'VAT exempt'
+                : category.code;
+        const amount = category.classification === 'standard' ? category.tax : category.gross;
+        return `<div class="total-row"><span>${label}:</span><span>${this.formatCurrency(amount, order.currencyCode)}</span></div>`;
+      })
+      .join('');
+    return `
+      <div class="total-row"><span>Net amount:</span><span>${this.formatCurrency(net, order.currencyCode)}</span></div>
+      ${categoryRows || `<div class="total-row"><span>VAT:</span><span>${this.formatCurrency(tax, order.currencyCode)}</span></div>`}
+    `;
+  }
+
+  private formatRate(rateBps: number): string {
+    const rate = rateBps / 100;
+    return `${Number.isInteger(rate) ? rate.toFixed(0) : rate.toFixed(2)}%`;
+  }
+
   /**
    * Format date
    */
@@ -256,6 +313,7 @@ export class Receipt52mmTemplate extends PrintTemplate {
     const showPayment = docType !== 'proforma' && docType !== 'cashier-slip';
     const paymentMethod = showPayment ? (printMeta?.paymentMethodName ?? 'N/A') : '';
     const name = companyName?.trim() || 'Your Company';
+    const documentTitle = this.taxDocumentTitle(docType, printMeta);
 
     let html = `
             <div class="print-template receipt-52mm">
@@ -263,10 +321,13 @@ export class Receipt52mmTemplate extends PrintTemplate {
                     ${companyLogo ? `<img src="${companyLogo}" alt="Logo" class="company-logo" />` : ''}
                     <h1 class="company-name">${name}</h1>
                     ${companyAddress?.trim() ? `<p class="receipt-meta">${companyAddress.trim()}</p>` : ''}
+                    <p style="text-align:center;font-weight:bold;letter-spacing:1px;margin:4px 0;">${documentTitle}</p>
+                    ${printMeta?.showVatBreakdown && printMeta.taxRegistrationNumber ? `<p class="receipt-meta">Tax PIN: ${printMeta.taxRegistrationNumber}</p>` : ''}
                     ${docType === 'cashier-slip' ? '<p style="text-align:center;font-weight:bold;letter-spacing:1px;margin:4px 0;">PAY AT CASHIER</p>' : ''}
                     <p class="receipt-meta">
                         <span>Order: ${order.code}</span><br>
                         <span>Date: ${date}</span>
+                        ${order.taxDocumentNumber && printMeta?.showVatBreakdown ? `<br><span>VAT document: ${order.taxDocumentNumber}</span>` : ''}
                         ${docType === 'proforma' && validUntil ? `<br><span>Valid until: ${validUntil}</span>` : ''}
                     </p>
                 </div>
@@ -301,6 +362,7 @@ export class Receipt52mmTemplate extends PrintTemplate {
                     </table>
                 </div>
                 <div class="totals-section">
+                    ${this.renderVatTotals(order, printMeta)}
                     <div class="total-row total-row-final">
                         <span><strong>Total:</strong></span>
                         <span><strong>${this.formatCurrency(total, order.currencyCode)}</strong></span>
@@ -442,6 +504,7 @@ export class Receipt80mmTemplate extends PrintTemplate {
     const showPayment = docType !== 'proforma' && docType !== 'cashier-slip';
     const paymentMethod = showPayment ? (printMeta?.paymentMethodName ?? 'N/A') : '';
     const name = companyName?.trim() || 'Your Company';
+    const documentTitle = this.taxDocumentTitle(docType, printMeta);
 
     let html = `
             <div class="print-template receipt-80mm">
@@ -449,10 +512,13 @@ export class Receipt80mmTemplate extends PrintTemplate {
                     ${companyLogo ? `<img src="${companyLogo}" alt="Logo" class="company-logo" />` : ''}
                     <h1 class="company-name">${name}</h1>
                     ${companyAddress?.trim() ? `<p class="receipt-meta">${companyAddress.trim()}</p>` : ''}
+                    <p style="text-align:center;font-weight:bold;letter-spacing:1px;margin:4px 0;">${documentTitle}</p>
+                    ${printMeta?.showVatBreakdown && printMeta.taxRegistrationNumber ? `<p class="receipt-meta">Tax PIN: ${printMeta.taxRegistrationNumber}</p>` : ''}
                     ${docType === 'cashier-slip' ? '<p style="text-align:center;font-weight:bold;letter-spacing:1px;margin:4px 0;">PAY AT CASHIER</p>' : ''}
                     <p class="receipt-meta">
                         <span>Order: ${order.code}</span><br>
                         <span>Date: ${date}</span>
+                        ${order.taxDocumentNumber && printMeta?.showVatBreakdown ? `<br><span>VAT document: ${order.taxDocumentNumber}</span>` : ''}
                         ${docType === 'proforma' && validUntil ? `<br><span>Valid until: ${validUntil}</span>` : ''}
                     </p>
                 </div>
@@ -487,6 +553,7 @@ export class Receipt80mmTemplate extends PrintTemplate {
                     </table>
                 </div>
                 <div class="totals-section">
+                    ${this.renderVatTotals(order, printMeta)}
                     <div class="total-row total-row-final">
                         <span><strong>Total:</strong></span>
                         <span><strong>${this.formatCurrency(total, order.currencyCode)}</strong></span>
@@ -624,12 +691,7 @@ export class A4Template extends PrintTemplate {
     const total = order.totalWithTax;
     const docType = printMeta?.documentType ?? 'invoice';
     const validUntil = order.expiresAt ? this.formatDate(order.expiresAt) : null;
-    const header =
-      docType === 'proforma'
-        ? 'PROFORMA INVOICE'
-        : docType === 'cashier-slip'
-          ? 'CASHIER SLIP'
-          : 'INVOICE';
+    const header = this.taxDocumentTitle(docType, printMeta);
     const showPayment =
       docType !== 'proforma' && docType !== 'cashier-slip' && (order.payments?.length ?? 0) > 0;
     const paymentMethod = printMeta?.paymentMethodName ?? 'N/A';
@@ -648,11 +710,13 @@ export class A4Template extends PrintTemplate {
                         ${companyLogo ? `<img src="${companyLogo}" alt="Logo" class="company-logo" />` : ''}
                         <h1 class="company-name">${name}</h1>
                         ${companyAddress?.trim() ? `<p class="company-address">${companyAddress.trim()}</p>` : ''}
+                        ${printMeta?.showVatBreakdown && printMeta.taxRegistrationNumber ? `<p class="company-address">Tax PIN: ${printMeta.taxRegistrationNumber}</p>` : ''}
                     </div>
                     <div class="invoice-meta">
                         <h2>${header}</h2>
                         <p><strong>Sale #:</strong> ${order.code}</p>
                         <p><strong>Date:</strong> ${date}</p>
+                        ${order.taxDocumentNumber && printMeta?.showVatBreakdown ? `<p><strong>VAT document:</strong> ${order.taxDocumentNumber}</p>` : ''}
                         ${docType === 'proforma' && validUntil ? `<p><strong>Valid until:</strong> ${validUntil}</p>` : ''}
                         <p><strong>Status:</strong> ${this.getStatusLabel(order.state)}</p>
                     </div>
@@ -727,6 +791,7 @@ export class A4Template extends PrintTemplate {
                     </div>
                     <div class="totals-section">
                         <div class="totals-table">
+                            ${this.renderVatTotals(order, printMeta)}
                             <div class="total-row total-row-final">
                                 <span><strong>Total:</strong></span>
                                 <span><strong>${this.formatCurrency(total, order.currencyCode)}</strong></span>

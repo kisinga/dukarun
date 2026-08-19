@@ -15,6 +15,7 @@ import {
   type ReconcilableAccount,
   type Reconciliation,
 } from '../money.service';
+import { MpesaInboundComponent } from './mpesa-inbound.component';
 
 type ReconciliationWithAccounts = Reconciliation & { reconciliation_accounts: ReconAccount[] };
 
@@ -28,13 +29,14 @@ type ReconciliationWithAccounts = Reconciliation & { reconciliation_accounts: Re
     FormFieldComponent,
     IconComponent,
     MoneyComponent,
+    MpesaInboundComponent,
   ],
   template: `
     <div class="mb-4 flex items-start gap-3">
       <div>
         <h2 class="section-title">Account reconciliation</h2>
         <p class="type-caption mt-1">
-          Verify company-wide cash, bank, and mobile-money balances independently.
+          Compare each real-money account with its verified actual balance.
         </p>
       </div>
       <button
@@ -65,10 +67,16 @@ type ReconciliationWithAccounts = Reconciliation & { reconciliation_accounts: Re
       </div>
     }
 
+    @if (perms.has('ManageReconciliation')) {
+      <app-mpesa-inbound />
+    }
+
     <div class="mb-4 flex items-start gap-3 rounded-field bg-info/10 p-3 text-sm">
       <app-icon name="heroInformationCircle" class="mt-0.5 shrink-0" />
       <p>
-        These are company-wide money balances. Supplier balances stay on each supplier's account.
+        Cashier-controlled balances belong to the selected location and feed its opening and closing
+        counts. Close the location's cashier session before correcting them. Bank-style balances
+        cover the whole business. Supplier balances stay on each supplier's account.
         <a routerLink="/suppliers" class="link link-primary font-medium">Open suppliers</a>
       </p>
     </div>
@@ -94,9 +102,16 @@ type ReconciliationWithAccounts = Reconciliation & { reconciliation_accounts: Re
                   <h3 class="truncate font-semibold">{{ account.account_name }}</h3>
                   <p class="type-caption font-mono">{{ account.account_code }}</p>
                 </div>
-                @if (account.requires_reconciliation) {
-                  <span class="badge badge-warning badge-outline badge-sm">Period required</span>
-                }
+                <div class="flex flex-col items-end gap-1">
+                  <span class="badge badge-ghost badge-sm">
+                    {{
+                      account.balance_scope === 'location' ? account.location_name : 'Company-wide'
+                    }}
+                  </span>
+                  @if (account.requires_reconciliation) {
+                    <span class="badge badge-warning badge-outline badge-sm">Period required</span>
+                  }
+                </div>
               </div>
               <div>
                 <p class="type-caption">Current book balance</p>
@@ -111,8 +126,20 @@ type ReconciliationWithAccounts = Reconciliation & { reconciliation_accounts: Re
                   }}
                 </p>
               </div>
+              @if (account.blocked_reason) {
+                <p class="flex items-start gap-1.5 text-sm text-warning">
+                  <app-icon name="heroLockClosed" class="mt-0.5 shrink-0" />
+                  <span>{{ account.blocked_reason }}</span>
+                </p>
+              }
               @if (perms.has('ManageReconciliation')) {
-                <button appButton variant="outline" type="button" (click)="open(account)">
+                <button
+                  appButton
+                  variant="outline"
+                  type="button"
+                  [disabled]="!account.can_adjust"
+                  (click)="open(account)"
+                >
                   Set actual balance
                 </button>
               } @else {
@@ -148,6 +175,9 @@ type ReconciliationWithAccounts = Reconciliation & { reconciliation_accounts: Re
                     <div class="flex flex-wrap items-center gap-2">
                       <p class="font-semibold">{{ accountName(row.account_code) }}</p>
                       <span class="badge badge-ghost badge-sm">{{ scopeLabel(recon.scope) }}</span>
+                      <span class="badge badge-ghost badge-sm">
+                        {{ rowScopeLabel(row) }}
+                      </span>
                     </div>
                     <p class="type-caption mt-0.5 font-mono">{{ row.account_code }}</p>
                     <p class="type-caption mt-1">
@@ -235,7 +265,8 @@ type ReconciliationWithAccounts = Reconciliation & { reconciliation_accounts: Re
             <div>
               <h2 id="reconcile-dialog-title" class="type-title">Set actual balance</h2>
               <p class="type-caption mt-1">
-                {{ account.account_name }} · {{ account.account_code }}
+                {{ account.account_name }} ·
+                {{ account.balance_scope === 'location' ? account.location_name : 'Company-wide' }}
               </p>
             </div>
             <button
@@ -397,6 +428,7 @@ export class MoneyReconciliationComponent implements OnInit {
   }
 
   protected open(account: ReconcilableAccount): void {
+    if (!account.can_adjust) return;
     this.selected.set(account);
     this.actual.setValue(String(account.balance));
     this.reason.setValue('');
@@ -465,6 +497,14 @@ export class MoneyReconciliationComponent implements OnInit {
       if (latest) return latest.id === row.id;
     }
     return false;
+  }
+
+  protected rowScopeLabel(row: ReconAccount): string {
+    if (row.balance_scope === 'company') return 'Company-wide';
+    return (
+      this.accounts().find(account => account.account_code === row.account_code)?.location_name ??
+      'Selected location'
+    );
   }
 
   protected startRevert(id: string): void {

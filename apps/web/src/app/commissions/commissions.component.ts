@@ -13,6 +13,7 @@ import { BadgeType, StatusBadgeComponent } from '../shared/ui/status-badge.compo
 import { MobileListComponent } from '../shared/ui/mobile-list.component';
 import { DrawerComponent } from '../shared/ui/drawer.component';
 import { PageActionsComponent } from '../shared/ui/page-actions.component';
+import { WorkspaceNavigationComponent } from '../shared/ui/workspace-navigation.component';
 import {
   CommissionAssignment,
   CommissionPeriod,
@@ -38,10 +39,11 @@ import {
     MobileListComponent,
     DrawerComponent,
     PageActionsComponent,
+    WorkspaceNavigationComponent,
   ],
   template: `
     <app-page
-      title="Commissions"
+      title="Team"
       subtitle="Assign effective-dated rates and prepare reviewable commission statements from net collections."
       [wide]="true"
     >
@@ -80,6 +82,8 @@ import {
         }
       </app-page-actions>
 
+      <app-workspace-navigation workspace="team" label="Team" />
+
       @if (error()) {
         <div role="alert" class="alert alert-error mb-4 text-sm">
           <app-icon name="heroExclamationTriangle" />
@@ -93,20 +97,44 @@ import {
         </div>
       }
 
-      <div role="tablist" aria-label="Commission section" class="tabs tabs-box mb-3 w-fit">
-        @for (item of commissionTabs; track item.value) {
-          <button
-            role="tab"
-            type="button"
-            class="tab min-h-11"
-            [class.tab-active]="activeTab() === item.value"
-            [attr.aria-selected]="activeTab() === item.value"
-            (click)="activeTab.set(item.value)"
-          >
-            {{ item.label }}
-          </button>
-        }
-      </div>
+      <label class="form-control mb-4 md:hidden">
+        <span
+          class="label-text mb-1 text-xs font-semibold uppercase tracking-wide text-base-content/60"
+        >
+          Commission view
+        </span>
+        <select
+          class="select select-bordered min-h-11 w-full"
+          aria-label="Commission view"
+          [value]="activeTab()"
+          (change)="selectCommissionTab($event)"
+        >
+          @for (item of commissionTabs; track item.value) {
+            <option [value]="item.value">{{ item.label }}</option>
+          }
+        </select>
+      </label>
+      <nav class="mb-4 hidden md:block" aria-label="Commission views">
+        <p class="mb-1 text-xs font-semibold uppercase tracking-wide text-base-content/55">
+          Commission view
+        </p>
+        <div role="tablist" class="flex flex-wrap gap-1">
+          @for (item of commissionTabs; track item.value) {
+            <button
+              role="tab"
+              type="button"
+              class="flex min-h-11 shrink-0 items-center rounded-field px-3 text-sm font-medium transition-colors hover:bg-base-200 hover:text-base-content"
+              [class.bg-base-200]="activeTab() === item.value"
+              [class.text-base-content]="activeTab() === item.value"
+              [class.text-base-content/60]="activeTab() !== item.value"
+              [attr.aria-selected]="activeTab() === item.value"
+              (click)="activeTab.set(item.value)"
+            >
+              {{ item.label }}
+            </button>
+          }
+        </div>
+      </nav>
 
       <div class="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <app-stat-card
@@ -822,6 +850,12 @@ export class CommissionsComponent implements OnInit {
 
   async ngOnInit(): Promise<void> {
     await this.load();
+  }
+
+  protected selectCommissionTab(event: Event): void {
+    const value = (event.target as HTMLSelectElement).value;
+    const tab = this.commissionTabs.find(item => item.value === value);
+    if (tab) this.activeTab.set(tab.value);
   }
 
   protected async load(): Promise<void> {

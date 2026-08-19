@@ -1,4 +1,13 @@
-import { Component, OnInit, computed, effect, inject, signal, viewChild } from '@angular/core';
+import {
+  Component,
+  DestroyRef,
+  OnInit,
+  computed,
+  effect,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { PageLayoutComponent } from '../shared/ui/page-layout.component';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { normalizeKenyanPhone } from '../core/phone';
@@ -7,6 +16,7 @@ import {
   MembershipWithRole,
   PERMISSION_LABELS,
   Role,
+  TeamInvitation,
   TeamService,
 } from './team.service';
 import { StatusBadgeComponent } from '../shared/ui/status-badge.component';
@@ -18,7 +28,6 @@ import { PermissionsService } from '../core/permissions.service';
 import { SupabaseService } from '../core/supabase.service';
 import { ProfileService } from '../profile/profile.service';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { toSignal } from '@angular/core/rxjs-interop';
 import { ButtonComponent } from '../shared/ui/button.component';
 import { IconComponent } from '../shared/ui/icon.component';
 import { DataTableShellComponent } from '../shared/ui/data-table-shell.component';
@@ -34,6 +43,16 @@ import { EmptyStateComponent } from '../shared/ui/empty-state.component';
 import { DrawerComponent } from '../shared/ui/drawer.component';
 import { MobileListComponent } from '../shared/ui/mobile-list.component';
 import { PageActionsComponent } from '../shared/ui/page-actions.component';
+import { WorkspaceNavigationComponent } from '../shared/ui/workspace-navigation.component';
+import {
+  canResendInvitation,
+  invitationDeliveryHint,
+  invitationDeliveryLabel,
+  invitationDeliveryTone,
+  invitationQueueFailureMessage,
+  invitationResendTitle,
+  isInvitationExpired,
+} from './team-invitation-presentation';
 
 const MEMBER_SORT_OPTIONS: readonly ListSortOption[] = [
   { value: 'name', label: 'Member name' },
@@ -69,6 +88,7 @@ const MEMBER_SORT_OPTIONS: readonly ListSortOption[] = [
     DrawerComponent,
     MobileListComponent,
     PageActionsComponent,
+    WorkspaceNavigationComponent,
   ],
   template: `
     <app-page
@@ -102,6 +122,8 @@ const MEMBER_SORT_OPTIONS: readonly ListSortOption[] = [
         }
       </app-page-actions>
 
+      <app-workspace-navigation workspace="team" label="Team" />
+
       @if (error()) {
         <div role="alert" class="alert alert-error mb-3 text-sm">
           <app-icon name="heroExclamationTriangle" />
@@ -114,29 +136,12 @@ const MEMBER_SORT_OPTIONS: readonly ListSortOption[] = [
           <span>{{ notice() }}</span>
         </div>
       }
-
-      <div role="tablist" aria-label="Team section" class="tabs tabs-box mb-3 w-fit">
-        <button
-          role="tab"
-          type="button"
-          class="tab min-h-11"
-          [class.tab-active]="activeTab() === 'members'"
-          [attr.aria-selected]="activeTab() === 'members'"
-          (click)="setTab('members')"
-        >
-          Members
-        </button>
-        <button
-          role="tab"
-          type="button"
-          class="tab min-h-11"
-          [class.tab-active]="activeTab() === 'roles'"
-          [attr.aria-selected]="activeTab() === 'roles'"
-          (click)="setTab('roles')"
-        >
-          Roles
-        </button>
-      </div>
+      @if (warning()) {
+        <div role="status" class="alert alert-warning mb-3 text-sm">
+          <app-icon name="heroExclamationTriangle" />
+          <span>{{ warning() }}</span>
+        </div>
+      }
 
       @if (activeTab() === 'members') {
         <!-- Add member -->
@@ -228,32 +233,65 @@ const MEMBER_SORT_OPTIONS: readonly ListSortOption[] = [
         @if (invitations().length > 0) {
           <section class="mb-3 rounded-box border border-warning/25 bg-warning/5 p-3">
             <div class="mb-2">
-              <h2 class="text-sm font-semibold">Pending invitations</h2>
+              <h2 class="text-sm font-semibold">Invitations</h2>
               <p class="type-caption">
-                Reserved until the phone owner signs in or the invite expires.
+                {{ activeInvitations().length }} awaiting sign-in
+                @if (expiredInvitations().length > 0) {
+                  · {{ expiredInvitations().length }} expired
+                }
               </p>
             </div>
             <div class="grid gap-2">
-              @for (invitation of invitations(); track invitation.id) {
-                <div
-                  class="flex flex-wrap items-center justify-between gap-3 rounded-box bg-base-100 px-3 py-2"
-                >
-                  <div>
-                    <p class="table-primary">{{ invitation.display_name }}</p>
-                    <p class="table-secondary">
-                      {{ invitation.phone }} · {{ invitation.role_name }} · expires
-                      {{ date(invitation.expires_at) }}
-                    </p>
+              @for (invitation of displayedInvitations(); track invitation.id) {
+                <div class="rounded-box border border-base-200 bg-base-100 px-3 py-3">
+                  <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div class="min-w-0">
+                      <p class="table-primary">{{ invitation.display_name }}</p>
+                      <p class="table-secondary">
+                        {{ invitation.phone }} · {{ invitation.role_name }} ·
+                        @if (invitationExpired(invitation)) {
+                          expired {{ date(invitation.expires_at) }}
+                        } @else {
+                          expires {{ date(invitation.expires_at) }}
+                        }
+                      </p>
+                      <div class="mt-2 flex flex-wrap items-center gap-2">
+                        <span
+                          class="badge badge-sm"
+                          [class.badge-success]="deliveryTone(invitation) === 'success'"
+                          [class.badge-warning]="deliveryTone(invitation) === 'warning'"
+                          [class.badge-error]="deliveryTone(invitation) === 'error'"
+                          [class.badge-ghost]="deliveryTone(invitation) === 'neutral'"
+                        >
+                          {{ deliveryLabel(invitation) }}
+                        </span>
+                        <span class="type-caption">{{ deliveryHint(invitation) }}</span>
+                      </div>
+                    </div>
+                    <div class="flex items-center gap-1">
+                      <button
+                        appButton
+                        variant="ghost"
+                        size="sm"
+                        type="button"
+                        [disabled]="busy() || !canResend(invitation)"
+                        [title]="resendTitle(invitation)"
+                        (click)="resendInvitation(invitation)"
+                      >
+                        {{ invitationExpired(invitation) ? 'Renew & resend' : 'Resend' }}
+                      </button>
+                      <button
+                        appButton
+                        variant="ghost"
+                        size="sm"
+                        type="button"
+                        [disabled]="busy()"
+                        (click)="cancelInvitation(invitation.id, invitation.display_name)"
+                      >
+                        Cancel
+                      </button>
+                    </div>
                   </div>
-                  <button
-                    appButton
-                    variant="ghost"
-                    type="button"
-                    [disabled]="busy()"
-                    (click)="cancelInvitation(invitation.id, invitation.display_name)"
-                  >
-                    Cancel invite
-                  </button>
                 </div>
               }
             </div>
@@ -799,12 +837,9 @@ export class TeamComponent implements OnInit {
   private readonly permissions = inject(PermissionsService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
-  private readonly routeParams = toSignal(this.route.queryParamMap, {
-    initialValue: this.route.snapshot.queryParamMap,
-  });
   protected readonly entitlements = inject(EntitlementsService);
-  protected readonly activeTab = computed<'members' | 'roles'>(() =>
-    this.routeParams().get('tab') === 'roles' ? 'roles' : 'members'
+  protected readonly activeTab = signal<'members' | 'roles'>(
+    this.route.snapshot.data['teamView'] === 'roles' ? 'roles' : 'members'
   );
 
   protected readonly currentUserId = computed(() => this.supabase.session()?.user.id ?? null);
@@ -929,8 +964,13 @@ export class TeamComponent implements OnInit {
   protected readonly loading = this.team.loading;
   protected readonly error = this.team.error;
   protected readonly notice = signal<string | null>(null);
+  protected readonly warning = signal<string | null>(null);
+  private readonly resendClock = signal(Date.now());
+  private readonly destroyRef = inject(DestroyRef);
 
   constructor() {
+    const timer = setInterval(() => this.resendClock.set(Date.now()), 30_000);
+    this.destroyRef.onDestroy(() => clearInterval(timer));
     effect(() => {
       const roles = this.roles();
       if (!this.memberRole.value && roles.length > 0) this.memberRole.setValue(roles[0].id);
@@ -949,6 +989,16 @@ export class TeamComponent implements OnInit {
   protected readonly activeMemberCount = computed(
     () => this.members().filter(member => member.authorization_status === 'approved').length
   );
+  protected readonly activeInvitations = computed(() =>
+    this.invitations().filter(invitation => !isInvitationExpired(invitation, this.resendClock()))
+  );
+  protected readonly expiredInvitations = computed(() =>
+    this.invitations().filter(invitation => isInvitationExpired(invitation, this.resendClock()))
+  );
+  protected readonly displayedInvitations = computed(() => [
+    ...this.activeInvitations(),
+    ...this.expiredInvitations(),
+  ]);
   protected readonly teamStats = computed(() => [
     {
       label: 'Members',
@@ -965,7 +1015,7 @@ export class TeamComponent implements OnInit {
       label: 'Pending',
       value:
         this.members().filter(member => member.authorization_status === 'pending').length +
-        this.invitations().length,
+        this.activeInvitations().length,
       tone: 'warning' as const,
       mobilePriority: 'secondary' as const,
     },
@@ -973,17 +1023,8 @@ export class TeamComponent implements OnInit {
   ]);
   protected readonly canAddMember = computed(() => {
     const limit = this.memberLimit();
-    return limit === null || this.activeMemberCount() + this.invitations().length < limit;
+    return limit === null || this.activeMemberCount() + this.activeInvitations().length < limit;
   });
-
-  protected setTab(tab: 'members' | 'roles'): void {
-    void this.router.navigate([], {
-      relativeTo: this.route,
-      queryParams: { tab },
-      queryParamsHandling: 'merge',
-      replaceUrl: true,
-    });
-  }
 
   async ngOnInit(): Promise<void> {
     try {
@@ -1044,6 +1085,7 @@ export class TeamComponent implements OnInit {
     this.busy.set(true);
     this.error.set(null);
     this.notice.set(null);
+    this.warning.set(null);
     try {
       const displayName = this.memberName.value.trim();
       if (!displayName) {
@@ -1051,17 +1093,22 @@ export class TeamComponent implements OnInit {
         return;
       }
       const result = await this.team.addTeamMember(phone, this.memberRole.value, displayName);
-      this.notice.set(
-        result.status === 'updated'
-          ? `Updated ${displayName}`
-          : `Invited ${displayName}. They can now sign in with ${phone}.`
-      );
+      if (result.status === 'updated') {
+        this.notice.set(`Updated ${displayName}`);
+      } else if (result.status === 'updated_invitation') {
+        this.notice.set(`Updated ${displayName}'s pending invitation. No new message was sent.`);
+      } else if (result.delivery_status === 'queued') {
+        this.notice.set(`Invited ${displayName}. A WhatsApp message is queued for ${phone}.`);
+      } else {
+        this.warning.set(
+          `Invited ${displayName}, but the message was not queued. ${invitationQueueFailureMessage(result.delivery_error)}`
+        );
+      }
       this.memberPhone.setValue('');
       this.memberName.setValue('');
       this.memberFormOpen.set(false);
       await this.load();
     } catch (err) {
-      // user_not_registered is the common one — show verbatim.
       this.error.set(err instanceof Error ? err.message : 'Add failed');
     } finally {
       this.busy.set(false);
@@ -1072,6 +1119,7 @@ export class TeamComponent implements OnInit {
     this.busy.set(true);
     this.error.set(null);
     this.notice.set(null);
+    this.warning.set(null);
     try {
       await this.team.cancelInvitation(invitationId);
       this.notice.set(`Cancelled the invitation for ${displayName}`);
@@ -1081,6 +1129,62 @@ export class TeamComponent implements OnInit {
     } finally {
       this.busy.set(false);
     }
+  }
+
+  protected async resendInvitation(invitation: TeamInvitation): Promise<void> {
+    if (!this.canResend(invitation)) return;
+    this.busy.set(true);
+    this.error.set(null);
+    this.notice.set(null);
+    this.warning.set(null);
+    try {
+      const result = await this.team.resendInvitation(invitation.id);
+      if (result.delivery_status === 'queued') {
+        this.notice.set(
+          this.invitationExpired(invitation)
+            ? `Invitation renewed and resent to ${invitation.display_name}.`
+            : `Invitation resent to ${invitation.display_name}.`
+        );
+      } else {
+        this.warning.set(
+          `The invitation was ${this.invitationExpired(invitation) ? 'renewed' : 'resent'}, but its message was not queued. ${invitationQueueFailureMessage(result.delivery_error)}`
+        );
+      }
+      await this.load();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Resend failed';
+      this.error.set(
+        message.includes('invitation_resend_too_soon')
+          ? 'Please wait five minutes before resending this invitation.'
+          : message
+      );
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected canResend(invitation: TeamInvitation): boolean {
+    return canResendInvitation(invitation, this.resendClock());
+  }
+
+  protected resendTitle(invitation: TeamInvitation): string {
+    return invitationResendTitle(invitation, this.resendClock());
+  }
+
+  protected deliveryLabel(invitation: TeamInvitation): string {
+    return invitationDeliveryLabel(invitation);
+  }
+
+  protected deliveryTone(invitation: TeamInvitation): 'success' | 'warning' | 'error' | 'neutral' {
+    return invitationDeliveryTone(invitation);
+  }
+
+  protected deliveryHint(invitation: TeamInvitation): string {
+    return invitationDeliveryHint(invitation);
+  }
+
+  protected invitationExpired(invitation: TeamInvitation): boolean {
+    return isInvitationExpired(invitation, this.resendClock());
   }
 
   protected memberFormDirty(): boolean {

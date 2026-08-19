@@ -25,6 +25,11 @@ import { PoweredByDukarunComponent } from './powered-by-dukarun.component';
                     @if (d.company_address) {
                       <p class="text-sm text-base-content/60">{{ d.company_address }}</p>
                     }
+                    @if (d.show_vat_breakdown && d.tax_registration_number) {
+                      <p class="text-sm text-base-content/60">
+                        Tax PIN: {{ d.tax_registration_number }}
+                      </p>
+                    }
                   </div>
                 </div>
                 <button class="btn btn-outline btn-sm print:hidden" type="button" (click)="print()">
@@ -37,9 +42,11 @@ import { PoweredByDukarunComponent } from './powered-by-dukarun.component';
               >
                 <div>
                   <p class="text-xs font-semibold uppercase tracking-wide text-base-content/50">
-                    {{ title(d.document_type) }}
+                    {{ title(d) }}
                   </p>
-                  <p class="font-mono text-lg font-bold">{{ d.document_number }}</p>
+                  <p class="font-mono text-lg font-bold">
+                    {{ d.tax_document_number || d.document_number }}
+                  </p>
                 </div>
                 <div class="text-right text-sm">
                   <p>{{ date(d.issue_date) }}</p>
@@ -92,6 +99,28 @@ import { PoweredByDukarunComponent } from './powered-by-dukarun.component';
               </div>
 
               <div class="ml-auto mt-5 grid w-full max-w-xs gap-2 text-sm">
+                @if (d.show_vat_breakdown && d.vat_registered) {
+                  <div class="flex justify-between">
+                    <span>Net amount</span><span>{{ money(d.net_total ?? d.total) }}</span>
+                  </div>
+                  @for (tax of d.tax_breakdown ?? []; track tax.code + tax.rate_bps) {
+                    <div class="flex justify-between">
+                      <span>{{ taxLabel(tax) }}</span
+                      ><span>{{
+                        money(
+                          tax.classification === 'standard' || tax.classification === 'special'
+                            ? tax.tax
+                            : tax.gross
+                        )
+                      }}</span>
+                    </div>
+                  }
+                  @if ((d.tax_breakdown ?? []).length === 0) {
+                    <div class="flex justify-between">
+                      <span>VAT</span><span>{{ money(d.tax_total ?? 0) }}</span>
+                    </div>
+                  }
+                }
                 <div class="flex justify-between">
                   <span>Total</span><strong>{{ money(d.total) }}</strong>
                 </div>
@@ -174,8 +203,17 @@ export class DocumentComponent implements OnInit {
     }
   }
 
-  protected title(type: ExternalDocument['document_type']): string {
-    return type === 'purchase_order' ? 'Purchase order' : type[0].toUpperCase() + type.slice(1);
+  protected title(document: ExternalDocument): string {
+    if (document.document_type === 'purchase_order') return 'Purchase order';
+    if (document.document_type === 'proforma') return 'Proforma';
+    if (document.show_vat_breakdown && document.vat_registered) return 'VAT Invoice';
+    const type = document.document_type;
+    return type[0].toUpperCase() + type.slice(1);
+  }
+  protected taxLabel(tax: NonNullable<ExternalDocument['tax_breakdown']>[number]): string {
+    if (tax.classification === 'zero_rated') return 'Zero-rated VAT';
+    if (tax.classification === 'exempt') return 'VAT exempt';
+    return `VAT ${tax.rate_bps / 100}%`;
   }
   protected statusLabel(status: string): string {
     return status[0]?.toUpperCase() + status.slice(1);

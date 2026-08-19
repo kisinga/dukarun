@@ -127,6 +127,45 @@ import { DrawerComponent } from '../../shared/ui/drawer.component';
               [formControl]="memo"
             />
           </app-form-field>
+          <app-form-field label="Expense date">
+            <input
+              type="date"
+              class="input input-bordered input-sm w-full"
+              [formControl]="expenseDate"
+            />
+          </app-form-field>
+          <label
+            class="flex min-h-11 cursor-pointer items-center gap-3 rounded-field border border-base-300 p-2"
+          >
+            <input type="checkbox" class="toggle toggle-primary" [formControl]="claimInputVat" />
+            <span>
+              <span class="block text-sm font-medium">Claim input VAT</span>
+              <span class="type-caption">The entered amount already includes VAT.</span>
+            </span>
+          </label>
+          @if (claimInputVat.value) {
+            <app-form-field label="Supplier tax PIN" [required]="true">
+              <input
+                class="input input-bordered input-sm w-full"
+                autocomplete="off"
+                [formControl]="supplierTaxPin"
+              />
+            </app-form-field>
+            <app-form-field label="Tax invoice number" [required]="true">
+              <input
+                class="input input-bordered input-sm w-full"
+                autocomplete="off"
+                [formControl]="taxInvoiceNumber"
+              />
+            </app-form-field>
+            <app-form-field label="Tax invoice date" [required]="true">
+              <input
+                type="date"
+                class="input input-bordered input-sm w-full"
+                [formControl]="taxInvoiceDate"
+              />
+            </app-form-field>
+          }
         </form>
         @if (error()) {
           <p class="mt-2 text-sm text-error">{{ error() }}</p>
@@ -254,6 +293,11 @@ export class MoneyExpensesComponent implements OnInit, OnDestroy {
   protected readonly amount = new FormControl('', { nonNullable: true });
   protected readonly category = new FormControl('', { nonNullable: true });
   protected readonly memo = new FormControl('', { nonNullable: true });
+  protected readonly expenseDate = new FormControl(this.todayIso(), { nonNullable: true });
+  protected readonly claimInputVat = new FormControl(false, { nonNullable: true });
+  protected readonly supplierTaxPin = new FormControl('', { nonNullable: true });
+  protected readonly taxInvoiceNumber = new FormControl('', { nonNullable: true });
+  protected readonly taxInvoiceDate = new FormControl(this.todayIso(), { nonNullable: true });
   protected readonly busy = signal(false);
   protected readonly accountsLoading = signal(false);
   protected readonly historyLoading = signal(false);
@@ -387,7 +431,10 @@ export class MoneyExpensesComponent implements OnInit, OnDestroy {
   }
   protected expenseFormDirty(): boolean {
     return Boolean(
-      this.amount.value.trim() || this.category.value.trim() || this.memo.value.trim()
+      this.amount.value.trim() ||
+      this.category.value.trim() ||
+      this.memo.value.trim() ||
+      this.claimInputVat.value
     );
   }
   protected resetExpenseForm(): void {
@@ -395,6 +442,11 @@ export class MoneyExpensesComponent implements OnInit, OnDestroy {
     this.amount.setValue('');
     this.category.setValue('');
     this.memo.setValue('');
+    this.expenseDate.setValue(this.todayIso());
+    this.claimInputVat.setValue(false);
+    this.supplierTaxPin.setValue('');
+    this.taxInvoiceNumber.setValue('');
+    this.taxInvoiceDate.setValue(this.todayIso());
     this.error.set(null);
   }
   protected reloadHistory(): void {
@@ -424,6 +476,17 @@ export class MoneyExpensesComponent implements OnInit, OnDestroy {
       this.error.set('Enter a valid amount');
       return;
     }
+    if (
+      this.claimInputVat.value &&
+      (!this.supplierTaxPin.value.trim() ||
+        !this.taxInvoiceNumber.value.trim() ||
+        !this.taxInvoiceDate.value)
+    ) {
+      this.error.set(
+        'Supplier PIN, invoice number, and invoice date are required to claim input VAT'
+      );
+      return;
+    }
     this.busy.set(true);
     this.error.set(null);
     this.notice.set(null);
@@ -432,12 +495,22 @@ export class MoneyExpensesComponent implements OnInit, OnDestroy {
         amount,
         this.account.value,
         this.category.value.trim() || undefined,
-        this.memo.value.trim() || undefined
+        this.memo.value.trim() || undefined,
+        {
+          expenseDate: this.expenseDate.value,
+          claimInputVat: this.claimInputVat.value,
+          supplierTaxPin: this.supplierTaxPin.value.trim() || undefined,
+          taxInvoiceNumber: this.taxInvoiceNumber.value.trim() || undefined,
+          taxInvoiceDate: this.taxInvoiceDate.value || undefined,
+        }
       );
       this.notice.set('Expense posted');
       this.amount.setValue('');
       this.category.setValue('');
       this.memo.setValue('');
+      this.claimInputVat.setValue(false);
+      this.supplierTaxPin.setValue('');
+      this.taxInvoiceNumber.setValue('');
       this.formOpen.set(false);
       await this.load();
     } catch (err) {

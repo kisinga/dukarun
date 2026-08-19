@@ -21,6 +21,7 @@
 #   STOREFRONT_PUBLIC_URL canonical URL synchronized into Database Vault
 #                         (default: https://store.dukarun.com)
 #   SITE_DEPLOY_URL public site-deploy Edge Function URL (optional)
+#   MPESA_PROCESS_URL service-only M-PESA processor URL (optional)
 #   FUNCTIONS_VOLUME edge-runtime functions dir on the host
 #                   (default: $COOLIFY_SERVICE_DIR/volumes/functions)
 
@@ -38,6 +39,7 @@ DB_NAME="${DB_NAME:-postgres}"
 PG_PASSWORD="${PG_PASSWORD:-}"
 STOREFRONT_PUBLIC_URL="${STOREFRONT_PUBLIC_URL:-https://store.dukarun.com}"
 SITE_DEPLOY_URL="${SITE_DEPLOY_URL:-}"
+MPESA_PROCESS_URL="${MPESA_PROCESS_URL:-}"
 FUNCTIONS_VOLUME="${FUNCTIONS_VOLUME:-$COOLIFY_SERVICE_DIR/volumes/functions}"
 SYNC_FUNCTIONS=0
 
@@ -51,6 +53,12 @@ if [ -n "$SITE_DEPLOY_URL" ]; then
   case "$SITE_DEPLOY_URL" in
     https://*) ;;
     *) echo "SITE_DEPLOY_URL must be an https URL" >&2; exit 2 ;;
+  esac
+fi
+if [ -n "$MPESA_PROCESS_URL" ]; then
+  case "$MPESA_PROCESS_URL" in
+    https://*) ;;
+    *) echo "MPESA_PROCESS_URL must be an https URL" >&2; exit 2 ;;
   esac
 fi
 
@@ -144,9 +152,21 @@ from vault.secrets where name = 'SITE_DEPLOY_URL';
 SQL
 fi
 
+if [ -n "$MPESA_PROCESS_URL" ]; then
+  echo "→ syncing MPESA_PROCESS_URL into Database Vault"
+  ssh "${SSH_OPTS[@]}" "$SSH_HOST" \
+    docker exec -i "$DB_CONTAINER" psql -U postgres -d "$DB_NAME" \
+      -v ON_ERROR_STOP=1 -v "secret_value=$MPESA_PROCESS_URL" <<'SQL'
+select vault.create_secret(:'secret_value', 'MPESA_PROCESS_URL')
+where not exists (select 1 from vault.secrets where name='MPESA_PROCESS_URL');
+select vault.update_secret(id, :'secret_value')
+from vault.secrets where name='MPESA_PROCESS_URL';
+SQL
+fi
+
 if [ "$SYNC_FUNCTIONS" = "1" ]; then
   echo "→ syncing edge functions to ${SSH_HOST}:${FUNCTIONS_VOLUME}"
-  for fn in _shared paystack-charge paystack-webhook notification-flush platform-message-test public-content-renderer site-deploy; do
+  for fn in _shared paystack-charge paystack-webhook mpesa-initiate mpesa-callback mpesa-process mpesa-credentials notification-flush platform-message-test public-content-renderer site-deploy; do
     rsync -az --delete -e "ssh ${SSH_OPTS[*]}" \
       "supabase/functions/${fn}/" "${SSH_HOST}:${FUNCTIONS_VOLUME}/${fn}/"
   done

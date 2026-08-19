@@ -18,6 +18,14 @@ export interface PaymentMethodOption {
    * cached snapshots from before the RPC exposed it — callers fall back to code.
    */
   reconciliationType?: string | null;
+  defaultAccountCode?: string;
+  accounts?: PaymentAccountOption[];
+}
+
+export interface PaymentAccountOption {
+  code: string;
+  name: string;
+  isDefault?: boolean;
 }
 
 interface Tender {
@@ -26,6 +34,7 @@ interface Tender {
   /** User-typed KES amount (parsed to shillings on confirm). */
   amountText: string;
   reference: string;
+  accountCode: string;
 }
 
 /**
@@ -158,6 +167,33 @@ interface Tender {
             </div>
           }
 
+          @if (hasMpesa() && mpesaStkEnabled()) {
+            <div class="mt-3 rounded-box border border-primary/20 bg-primary/5 p-3 text-sm">
+              <div class="flex items-center justify-between gap-3">
+                <span>{{
+                  manualMpesa() ? 'Manual M-PESA confirmation' : 'Dukarun will send an STK prompt.'
+                }}</span>
+                @if (mpesaManualFallback()) {
+                  <label class="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      class="toggle toggle-sm"
+                      [ngModel]="manualMpesa()"
+                      (ngModelChange)="setManualMpesa($event)"
+                    />
+                    Manual fallback
+                  </label>
+                }
+              </div>
+            </div>
+          }
+
+          @if (usesStk() && usesHeldFunds()) {
+            <div class="alert alert-warning mt-3 py-2 text-sm">
+              STK cannot be combined with customer deposit or credit.
+            </div>
+          }
+
           <div class="mt-3 flex flex-col gap-3 md:mt-4 md:gap-4">
             @if (isSplit()) {
               <div class="flex items-start justify-between gap-3">
@@ -265,7 +301,7 @@ interface Tender {
                         <select
                           class="select select-bordered min-h-11 w-full"
                           [ngModel]="tender.method"
-                          (ngModelChange)="patchTender($index, { method: $event })"
+                          (ngModelChange)="changeTenderMethod($index, $event)"
                         >
                           @for (method of orderedMethods(); track method.code) {
                             <option
@@ -295,7 +331,47 @@ interface Tender {
                         (focus)="selectAmount($event)"
                       />
                     </app-form-field>
-                    @if (tender.method !== 'cash') {
+                    @if (showAccountPicker(tender)) {
+                      <app-form-field
+                        [label]="tender.method === 'mpesa' ? 'M-PESA account' : 'Bank account'"
+                        hint="The location default is preselected."
+                      >
+                        <select
+                          class="select select-bordered min-h-11 w-full"
+                          [ngModel]="tender.accountCode"
+                          (ngModelChange)="patchTender($index, { accountCode: $event })"
+                        >
+                          @for (account of accountOptions(tender.method); track account.code) {
+                            <option [value]="account.code">
+                              {{ account.name }}{{ account.isDefault ? ' · Default' : '' }}
+                            </option>
+                          }
+                        </select>
+                      </app-form-field>
+                    } @else if (accountLabel(tender); as label) {
+                      <div
+                        class="flex min-h-11 items-center rounded-field bg-base-200/60 px-3 text-sm"
+                      >
+                        <span class="type-caption mr-2">Paid into</span>
+                        <span class="truncate font-medium">{{ label }}</span>
+                      </div>
+                    }
+                    @if (tender.method === 'mpesa' && usesStk()) {
+                      <app-form-field
+                        label="Payer phone"
+                        hint="The customer may use a different M-PESA phone."
+                      >
+                        <input
+                          type="tel"
+                          inputmode="tel"
+                          autocomplete="tel"
+                          class="input input-bordered min-h-11 w-full"
+                          placeholder="07xx xxx xxx"
+                          [ngModel]="mpesaPhone()"
+                          (ngModelChange)="mpesaPhone.set($event)"
+                        />
+                      </app-form-field>
+                    } @else if (tender.method !== 'cash') {
                       <app-form-field
                         [label]="
                           requiresReference(optionFor(tender.method))
@@ -304,9 +380,11 @@ interface Tender {
                         "
                         [required]="requiresReference(optionFor(tender.method))"
                         [hint]="
-                          requiresReference(optionFor(tender.method))
-                            ? 'Statement-matched payment — the bank reference is required.'
-                            : 'Optional transaction code.'
+                          tender.method === 'mpesa' && manualMpesa()
+                            ? 'Enter the M-PESA receipt code from the customer message.'
+                            : requiresReference(optionFor(tender.method))
+                              ? 'Statement-matched payment — the bank reference is required.'
+                              : 'Optional transaction code.'
                         "
                         [error]="bankReferenceError($index)"
                       >
@@ -433,7 +511,9 @@ interface Tender {
                   ? 'Request approval'
                   : armed()
                     ? 'Tap again to confirm'
-                    : 'Complete sale'
+                    : usesStk()
+                      ? 'Send STK prompt'
+                      : 'Complete sale'
               }}
             </button>
           </div>
@@ -463,6 +543,9 @@ export class CheckoutPanelComponent {
   readonly allowCredit = input(false);
   readonly heading = input('Checkout');
   readonly busy = input(false);
+  readonly mpesaStkEnabled = input(false);
+  readonly mpesaManualFallback = input(false);
+  readonly defaultPayerPhone = input('');
 
   readonly confirmed = output<PaymentInput[]>();
   readonly settlementConfirmed = output<SaleSettlementInput>();
@@ -478,6 +561,8 @@ export class CheckoutPanelComponent {
   protected readonly referenceTouched = signal<Set<number>>(new Set());
   protected readonly depositText = signal('0');
   protected readonly creditText = signal('0');
+  protected readonly mpesaPhone = signal('');
+  protected readonly manualMpesa = signal(false);
   protected readonly depositAmount = computed(() => parseKes(this.depositText()) ?? 0);
   protected readonly creditAmount = computed(() => parseKes(this.creditText()) ?? 0);
   protected readonly depositInputInvalid = computed(() => parseKes(this.depositText()) === null);
@@ -494,6 +579,18 @@ export class CheckoutPanelComponent {
   protected readonly isSplit = computed(() => this.tenders().length > 1);
   protected readonly singleMethod = computed(() =>
     this.isSplit() ? null : (this.tenders()[0]?.method ?? null)
+  );
+  protected readonly hasMpesa = computed(() =>
+    this.tenders().some(tender => tender.method === 'mpesa')
+  );
+  protected readonly usesStk = computed(
+    () => this.hasMpesa() && this.mpesaStkEnabled() && !this.manualMpesa()
+  );
+  protected readonly invalidStkMix = computed(
+    () =>
+      this.hasMpesa() &&
+      this.isSplit() &&
+      this.tenders().some(tender => !['mpesa', 'cash'].includes(tender.method))
   );
 
   /**
@@ -513,7 +610,10 @@ export class CheckoutPanelComponent {
     () =>
       this.tenders()
         .map(tender => this.optionFor(tender.method))
-        .find(option => option && !option.isCashierControlled) ?? null
+        .find(
+          option =>
+            option && !option.isCashierControlled && !(option.code === 'mpesa' && this.usesStk())
+        ) ?? null
   );
   protected readonly needsApproval = computed(
     () => this.directMethod() !== null && !this.canUseDirectAccounts()
@@ -535,11 +635,14 @@ export class CheckoutPanelComponent {
     this.initialized = true;
     this.depositText.set('0');
     this.creditText.set('0');
+    this.mpesaPhone.set(this.defaultPayerPhone());
+    this.manualMpesa.set(false);
     this.tenders.set([
       {
         method: this.defaultMethodCode(),
         amountText: this.amountText(this.tenderDue()),
         reference: '',
+        accountCode: this.defaultAccountCode(this.defaultMethodCode()),
       },
     ]);
     this.error.set(null);
@@ -559,6 +662,7 @@ export class CheckoutPanelComponent {
   /** Statement-matched methods (bank) need their transaction ID before confirming. */
   protected requiresReference(method: PaymentMethodOption | undefined): boolean {
     if (!method) return false;
+    if (method.code === 'mpesa' && this.manualMpesa()) return true;
     return isStatementMatch(method.reconciliationType, method.code);
   }
 
@@ -566,12 +670,66 @@ export class CheckoutPanelComponent {
     this.referenceTouched.update(set => new Set(set).add(index));
   }
 
+  protected accountOptions(methodCode: string): PaymentAccountOption[] {
+    return this.optionFor(methodCode)?.accounts ?? [];
+  }
+
+  protected showAccountPicker(tender: Tender): boolean {
+    return (
+      this.accountOptions(tender.method).length > 1 &&
+      !(tender.method === 'mpesa' && this.usesStk())
+    );
+  }
+
+  protected accountLabel(tender: Tender): string | null {
+    if (!['bank', 'mpesa'].includes(tender.method)) return null;
+    return (
+      this.accountOptions(tender.method).find(account => account.code === tender.accountCode)
+        ?.name ?? null
+    );
+  }
+
+  protected changeTenderMethod(index: number, method: string): void {
+    this.patchTender(index, {
+      method,
+      accountCode: this.defaultAccountCode(method),
+      reference: '',
+    });
+  }
+
+  protected setManualMpesa(manual: boolean): void {
+    this.manualMpesa.set(manual);
+    if (!manual) {
+      this.tenders.update(tenders =>
+        tenders.map(tender =>
+          tender.method === 'mpesa'
+            ? { ...tender, accountCode: this.defaultAccountCode('mpesa') }
+            : tender
+        )
+      );
+    }
+  }
+
+  private defaultAccountCode(methodCode: string): string {
+    const method = this.optionFor(methodCode);
+    return (
+      method?.defaultAccountCode ??
+      method?.accounts?.find(account => account.isDefault)?.code ??
+      method?.accounts?.[0]?.code ??
+      ''
+    );
+  }
+
   /** Inline validation text once a bank reference field was touched and left empty. */
   protected bankReferenceError(index: number): string | null {
     const tender = this.tenders()[index];
     if (!tender || !this.requiresReference(this.optionFor(tender.method))) return null;
     if (tender.reference.trim().length > 0) return null;
-    return this.referenceTouched().has(index) ? 'Enter the bank transaction ID' : null;
+    return this.referenceTouched().has(index)
+      ? tender.method === 'mpesa' && this.manualMpesa()
+        ? 'Enter the M-PESA receipt code'
+        : 'Enter the bank transaction ID'
+      : null;
   }
 
   protected setMode(code: string): void {
@@ -582,6 +740,7 @@ export class CheckoutPanelComponent {
         method: code,
         amountText: this.amountText(this.tenderDue()),
         reference: '',
+        accountCode: this.defaultAccountCode(code),
       },
     ]);
   }
@@ -625,8 +784,14 @@ export class CheckoutPanelComponent {
         method: first,
         amountText: this.amountText(this.tenderDue() - half),
         reference: '',
+        accountCode: this.defaultAccountCode(first),
       },
-      { method: second, amountText: this.amountText(half), reference: '' },
+      {
+        method: second,
+        amountText: this.amountText(half),
+        reference: '',
+        accountCode: this.defaultAccountCode(second),
+      },
     ]);
   }
 
@@ -717,11 +882,20 @@ export class CheckoutPanelComponent {
       return false;
     if (this.creditAmount() < 0 || (!this.allowCredit() && this.creditAmount() > 0)) return false;
     if (this.depositAmount() + this.creditAmount() > this.total()) return false;
+    if (this.usesStk() && this.usesHeldFunds()) return false;
+    if (this.invalidStkMix()) return false;
+    if (this.usesStk() && !/^(?:\+?254|0)[17]\d{8}$/.test(this.mpesaPhone().replace(/[\s-]/g, '')))
+      return false;
     if (this.tenderDue() === 0) return true;
     if (ts.length === 0) return false;
     if (this.hasInvalidTender()) return false;
     // Statement-matched (bank) tenders need their transaction ID before confirming.
     if (ts.some(t => this.requiresReference(this.optionFor(t.method)) && !t.reference.trim()))
+      return false;
+    if (
+      this.manualMpesa() &&
+      ts.some(t => t.method === 'mpesa' && !/^[A-Z0-9]{8,12}$/i.test(t.reference.trim()))
+    )
       return false;
     // A single cash tender may exceed the total (change given); anything else
     // must sum to the total exactly (the backend enforces payment_mismatch).
@@ -775,13 +949,27 @@ export class CheckoutPanelComponent {
         return null;
       }
       if (this.requiresReference(this.optionFor(t.method)) && t.reference.trim().length === 0) {
-        this.error.set('Enter the bank transaction ID');
+        this.error.set(
+          t.method === 'mpesa' ? 'Enter the M-PESA receipt code' : 'Enter the bank transaction ID'
+        );
+        return null;
+      }
+      if (
+        t.method === 'mpesa' &&
+        this.manualMpesa() &&
+        !/^[A-Z0-9]{8,12}$/i.test(t.reference.trim())
+      ) {
+        this.error.set('Enter a valid M-PESA receipt code');
         return null;
       }
       payments.push({
         method: t.method,
         amount,
+        ...(['bank', 'mpesa'].includes(t.method) && t.accountCode
+          ? { account_code: t.accountCode }
+          : {}),
         ...(t.reference.trim() ? { reference: t.reference.trim() } : {}),
+        ...(t.method === 'mpesa' && this.usesStk() ? { phone: this.mpesaPhone().trim() } : {}),
       });
     }
     return payments;
@@ -848,7 +1036,14 @@ export class CheckoutPanelComponent {
     this.tenders.set(
       due === 0
         ? []
-        : [{ method: this.defaultMethodCode(), amountText: this.amountText(due), reference: '' }]
+        : [
+            {
+              method: this.defaultMethodCode(),
+              amountText: this.amountText(due),
+              reference: '',
+              accountCode: this.defaultAccountCode(this.defaultMethodCode()),
+            },
+          ]
     );
   }
 }

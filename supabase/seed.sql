@@ -1,5 +1,6 @@
 -- Local development seed (runs on `supabase db reset`). NOT for production.
 -- Restores a fully walkable demo state after every reset:
+--   superadmin@dukarun.local / superadmin (platform administration)
 --   test user 254700000001 / OTP 123456 (configured in config.toml test_otp)
 --   → Mama Mboga Stores (fully-permitted Admin, ACTIVE) on the Standard tier,
 --     with three stock locations, products, distributed stock, a customer,
@@ -28,6 +29,58 @@ set name = excluded.name,
     max_stock_locations = excluded.max_stock_locations,
     max_orders_per_month = excluded.max_orders_per_month,
     sms_per_period = excluded.sms_per_period;
+
+-- ---------------------------------------------------------------------------
+-- Platform administrator (email/password; local development only)
+-- ---------------------------------------------------------------------------
+insert into auth.users (
+  id, instance_id, aud, role, email, email_confirmed_at, encrypted_password,
+  raw_app_meta_data, raw_user_meta_data,
+  confirmation_token, recovery_token, email_change, email_change_token_current,
+  email_change_token_new, phone_change, phone_change_token, reauthentication_token,
+  created_at, updated_at
+)
+values (
+  '5877ac73-ff8d-457c-afcd-791e66229d99',
+  '00000000-0000-0000-0000-000000000000',
+  'authenticated', 'authenticated',
+  'superadmin@dukarun.local', now(),
+  extensions.crypt('superadmin', extensions.gen_salt('bf')),
+  '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb,
+  '', '', '', '', '', '', '', '',
+  now(), now()
+)
+on conflict (id) do update
+set email = excluded.email,
+    email_confirmed_at = excluded.email_confirmed_at,
+    encrypted_password = excluded.encrypted_password,
+    raw_app_meta_data = excluded.raw_app_meta_data,
+    raw_user_meta_data = excluded.raw_user_meta_data,
+    updated_at = now();
+
+insert into auth.identities (
+  provider_id, user_id, identity_data, provider,
+  last_sign_in_at, created_at, updated_at
+)
+values (
+  '5877ac73-ff8d-457c-afcd-791e66229d99',
+  '5877ac73-ff8d-457c-afcd-791e66229d99',
+  jsonb_build_object(
+    'sub', '5877ac73-ff8d-457c-afcd-791e66229d99',
+    'email', 'superadmin@dukarun.local',
+    'email_verified', true,
+    'phone_verified', false
+  ),
+  'email', now(), now(), now()
+)
+on conflict (provider_id, provider) do update
+set user_id = excluded.user_id,
+    identity_data = excluded.identity_data,
+    updated_at = now();
+
+insert into public.platform_admins (user_id)
+values ('5877ac73-ff8d-457c-afcd-791e66229d99')
+on conflict (user_id) do nothing;
 
 -- ---------------------------------------------------------------------------
 -- Demo auth user (matches [auth.sms.test_otp] in config.toml)
@@ -80,7 +133,7 @@ update public.roles r
 set permissions = array[
   'ManageApprovals','OverridePrice','ManageStockAdjustments','ApproveCustomerCredit',
   'ManageCustomerCreditLimit','ManageCustomers','ManageCatalog','ManageCommunications',
-  'ReverseOrder','OverrideCustomerBalance','SettleOrder',
+  'ManageMpesaIntegration','ReverseOrder','OverrideCustomerBalance','SettleOrder',
   'ManageSupplierCreditPurchases','ViewFinancials','ManageReconciliation',
   'CloseAccountingPeriod','CreateInterAccountTransfer','ManageTeam','ViewAuditTrail',
   'ViewStaffPerformance','ManageCommissions'

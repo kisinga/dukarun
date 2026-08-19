@@ -13,6 +13,11 @@ const accounts: ReconcilableAccount[] = [
     balance: 12_000,
     requires_reconciliation: true,
     last_reconciled_at: null,
+    balance_scope: 'company',
+    location_id: null,
+    location_name: null,
+    can_adjust: true,
+    blocked_reason: null,
   },
   {
     account_code: 'CASH_ON_HAND',
@@ -20,13 +25,18 @@ const accounts: ReconcilableAccount[] = [
     balance: 4_000,
     requires_reconciliation: true,
     last_reconciled_at: null,
+    balance_scope: 'location',
+    location_id: 'location-id',
+    location_name: 'Main shop',
+    can_adjust: true,
+    blocked_reason: null,
   },
 ];
 
 describe('MoneyReconciliationComponent', () => {
-  async function render(canManage = true) {
+  async function render(canManage = true, accountRows = accounts) {
     const money = {
-      reconcilableAccounts: vi.fn().mockResolvedValue(accounts),
+      reconcilableAccounts: vi.fn().mockResolvedValue(accountRows),
       recentReconciliations: vi.fn().mockResolvedValue([]),
       recordManualReconciliation: vi.fn().mockResolvedValue('reconciliation-id'),
       revertVariance: vi.fn(),
@@ -123,5 +133,26 @@ describe('MoneyReconciliationComponent', () => {
     const { fixture } = await render(false);
     expect(fixture.nativeElement.textContent).toContain('View only');
     expect(fixture.nativeElement.textContent).not.toContain('Set actual balance');
+  });
+
+  it('blocks location balance changes while its cashier session is open', async () => {
+    const blockedAccounts = accounts.map(account =>
+      account.balance_scope === 'location'
+        ? {
+            ...account,
+            can_adjust: false,
+            blocked_reason: 'Close the cashier session before adjusting this balance',
+          }
+        : account
+    );
+    const { fixture } = await render(true, blockedAccounts);
+    const buttons = [...fixture.nativeElement.querySelectorAll('button')].filter(button =>
+      button.textContent?.includes('Set actual balance')
+    ) as HTMLButtonElement[];
+
+    expect(fixture.nativeElement.textContent).toContain(
+      'Close the cashier session before adjusting this balance'
+    );
+    expect(buttons[1].disabled).toBe(true);
   });
 });

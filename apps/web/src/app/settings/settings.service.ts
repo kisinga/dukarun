@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import type { Database } from '@dukarun/shared-types';
+import type { Database, Json } from '@dukarun/shared-types';
 import { SupabaseService } from '../core/supabase.service';
 import { rpcError } from '../pos/pos.service';
 
@@ -7,7 +7,21 @@ export type PaymentMethodRow = Database['public']['Tables']['payment_methods']['
 export type StockLocationRow = Database['public']['Tables']['stock_locations']['Row'];
 export type LocationPaymentMethodRow =
   Database['public']['Tables']['location_payment_methods']['Row'];
+export type MoneyAccountRow = Database['public']['Tables']['ledger_accounts']['Row'];
 export type ReminderRule = Database['public']['Tables']['payment_reminder_rules']['Row'];
+export type PrimaryContactNotificationChannel =
+  'whatsapp_sms_fallback' | 'whatsapp' | 'sms' | 'none';
+export interface PrimaryContactNotificationPreferences {
+  channel: PrimaryContactNotificationChannel;
+  team: boolean;
+  cashierSessions: boolean;
+}
+export interface PrimaryContactNotificationSettings {
+  primary_contact_user_id: string | null;
+  primary_contact_name: string | null;
+  primary_contact_phone: string | null;
+  preferences: PrimaryContactNotificationPreferences;
+}
 
 /**
  * Company settings. The companies table has a COLUMN-LIMITED update grant:
@@ -23,7 +37,7 @@ export interface CompanySettings {
   public_storefront_enabled: boolean;
   public_slug: string | null;
   public_whatsapp_number: string | null;
-  notification_category_preferences: Record<string, boolean> | null;
+  notification_category_preferences: Json | null;
   enable_printer: boolean;
   proforma_validity_days: number;
   low_stock_threshold: number;
@@ -126,7 +140,7 @@ export class SettingsService {
     const { data, error } = await this.db
       .from('payment_methods')
       .select(
-        'id, code, name, enabled, requires_reconciliation, is_cashier_controlled, availability_scope'
+        'id, code, name, ledger_account_code, reconciliation_type, enabled, requires_reconciliation, is_cashier_controlled, availability_scope'
       )
       .order('code');
     if (error) throw error;
@@ -176,6 +190,51 @@ export class SettingsService {
     if (error) throw rpcError(error);
   }
 
+  async moneyAccounts(): Promise<MoneyAccountRow[]> {
+    const { data, error } = await this.db
+      .from('ledger_accounts')
+      .select('*')
+      .not('money_account_kind', 'is', null)
+      .order('money_account_kind')
+      .order('name');
+    if (error) throw error;
+    return data;
+  }
+
+  async createMoneyAccount(kind: 'bank' | 'mpesa', name: string): Promise<string> {
+    const { data, error } = await this.db.rpc('create_money_account', {
+      p_kind: kind,
+      p_name: name,
+    });
+    if (error) throw rpcError(error);
+    return data;
+  }
+
+  async updateMoneyAccount(
+    accountId: string,
+    changes: { name?: string; isActive?: boolean }
+  ): Promise<void> {
+    const { error } = await this.db.rpc('update_money_account', {
+      p_account_id: accountId,
+      p_name: changes.name,
+      p_is_active: changes.isActive,
+    });
+    if (error) throw rpcError(error);
+  }
+
+  async setLocationPaymentAccount(
+    locationId: string,
+    methodCode: 'bank' | 'mpesa',
+    accountCode: string
+  ): Promise<void> {
+    const { error } = await this.db.rpc('set_location_payment_account', {
+      p_location_id: locationId,
+      p_method_code: methodCode,
+      p_account_code: accountCode,
+    });
+    if (error) throw rpcError(error);
+  }
+
   async setCommissionsEnabled(enabled: boolean): Promise<boolean> {
     const { data, error } = await this.db.rpc('set_commissions_enabled', { p_enabled: enabled });
     if (error) throw rpcError(error);
@@ -204,6 +263,24 @@ export class SettingsService {
     });
     if (error) throw rpcError(error);
     return data;
+  }
+
+  async getPrimaryContactNotificationSettings(): Promise<PrimaryContactNotificationSettings> {
+    const { data, error } = await this.db.rpc('primary_contact_notification_settings');
+    if (error) throw rpcError(error);
+    return data as unknown as PrimaryContactNotificationSettings;
+  }
+
+  async setPrimaryContactNotificationPreferences(
+    preferences: PrimaryContactNotificationPreferences
+  ): Promise<PrimaryContactNotificationPreferences> {
+    const { data, error } = await this.db.rpc('set_primary_contact_notification_preferences', {
+      p_channel: preferences.channel,
+      p_team_enabled: preferences.team,
+      p_cashier_enabled: preferences.cashierSessions,
+    });
+    if (error) throw rpcError(error);
+    return data as unknown as PrimaryContactNotificationPreferences;
   }
 
   async reminderConfiguration(): Promise<ReminderRule[]> {

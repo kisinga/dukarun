@@ -95,38 +95,92 @@ const FEATURE_FIELDS = [
     }
 
     <form
-      class="card mb-4 grid gap-4 bg-base-100 p-4 md:grid-cols-[1fr_1fr_auto] md:items-end"
-      (submit)="$event.preventDefault(); saveTrialConfig()"
+      class="card mb-4 space-y-4 bg-base-100 p-4"
+      (submit)="$event.preventDefault(); saveBillingPolicy()"
     >
-      <app-form-field
-        label="Free trial duration"
-        hint="Days granted to newly approved companies. Existing trials keep their end date."
-      >
-        <input
-          type="number"
-          min="1"
-          max="365"
-          class="input input-bordered w-full"
-          [formControl]="trialDays"
-        />
-      </app-form-field>
-      <app-form-field
-        label="Default trial tier"
-        hint="Used when registration does not arrive from a specific pricing plan."
-      >
-        <select class="select select-bordered w-full" [formControl]="defaultTrialTier">
-          @for (tier of activeTiers(); track tier.id) {
-            <option [value]="tier.id">{{ tier.name }}</option>
-          }
-        </select>
-      </app-form-field>
-      <button
-        type="submit"
-        class="btn btn-primary min-h-11"
-        [disabled]="configBusy() || !defaultTrialTier.value"
-      >
-        {{ configBusy() ? 'Saving…' : 'Save trial policy' }}
-      </button>
+      <div class="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 class="section-title">New-company offer</h2>
+          <p class="type-caption mt-1">
+            Require an upfront monthly payment, then add free bonus months.
+          </p>
+        </div>
+        <label
+          class="flex min-h-11 cursor-pointer items-center gap-3 rounded-field bg-base-200 px-3"
+        >
+          <input
+            type="checkbox"
+            class="toggle toggle-primary toggle-sm"
+            [formControl]="introOfferEnabled"
+          />
+          <span class="text-sm font-medium">Offer enabled</span>
+        </label>
+      </div>
+
+      @if (introOfferEnabled.value) {
+        <div class="grid gap-4 md:grid-cols-3">
+          <app-form-field label="Assigned plan" hint="Plan granted after successful payment.">
+            <select class="select select-bordered w-full" [formControl]="introOfferTier">
+              @for (tier of activeTiers(); track tier.id) {
+                <option [value]="tier.id">{{ tier.name }}</option>
+              }
+            </select>
+          </app-form-field>
+          <app-form-field label="Months paid" hint="Charged at the plan's monthly price.">
+            <input
+              type="number"
+              min="1"
+              max="12"
+              class="input input-bordered w-full"
+              [formControl]="introOfferPaidMonths"
+            />
+          </app-form-field>
+          <app-form-field label="Free months" hint="Added after payment at no charge.">
+            <input
+              type="number"
+              min="0"
+              max="12"
+              class="input input-bordered w-full"
+              [formControl]="introOfferBonusMonths"
+            />
+          </app-form-field>
+        </div>
+        <div class="alert alert-info py-3 text-sm">
+          {{ introOfferPreview() }}
+        </div>
+      } @else {
+        <div class="grid gap-4 md:grid-cols-2">
+          <app-form-field
+            label="Free trial duration"
+            hint="Days granted after approval. Existing trials keep their end date."
+          >
+            <input
+              type="number"
+              min="1"
+              max="365"
+              class="input input-bordered w-full"
+              [formControl]="trialDays"
+            />
+          </app-form-field>
+          <app-form-field label="Default trial tier">
+            <select class="select select-bordered w-full" [formControl]="defaultTrialTier">
+              @for (tier of activeTiers(); track tier.id) {
+                <option [value]="tier.id">{{ tier.name }}</option>
+              }
+            </select>
+          </app-form-field>
+        </div>
+      }
+
+      <div class="flex justify-end">
+        <button
+          type="submit"
+          class="btn btn-primary min-h-11"
+          [disabled]="configBusy() || !defaultTrialTier.value || !introOfferTier.value"
+        >
+          {{ configBusy() ? 'Saving…' : 'Save billing policy' }}
+        </button>
+      </div>
     </form>
 
     @if (tiers().length === 0) {
@@ -371,6 +425,10 @@ export class TiersComponent implements OnInit {
   protected readonly isActive = new FormControl(true, { nonNullable: true });
   protected readonly trialDays = new FormControl(30, { nonNullable: true });
   protected readonly defaultTrialTier = new FormControl('', { nonNullable: true });
+  protected readonly introOfferEnabled = new FormControl(false, { nonNullable: true });
+  protected readonly introOfferTier = new FormControl('', { nonNullable: true });
+  protected readonly introOfferPaidMonths = new FormControl(1, { nonNullable: true });
+  protected readonly introOfferBonusMonths = new FormControl(1, { nonNullable: true });
   protected readonly limits = signal<Record<string, number | undefined>>({});
   protected readonly features = signal<Record<string, boolean>>({});
 
@@ -401,37 +459,76 @@ export class TiersComponent implements OnInit {
       this.defaultTrialTier.setValue(
         tiers.value.find(tier => tier.code === billingConfig.defaultTrialTierCode)?.id ?? ''
       );
+      this.introOfferEnabled.setValue(billingConfig.introOfferEnabled);
+      this.introOfferTier.setValue(
+        tiers.value.find(tier => tier.code === billingConfig.introOfferTierCode)?.id ?? ''
+      );
+      this.introOfferPaidMonths.setValue(billingConfig.introOfferPaidMonths);
+      this.introOfferBonusMonths.setValue(billingConfig.introOfferBonusMonths);
       this.error.set(null);
     } else if (config.status === 'fulfilled') {
       this.defaultTrialTier.setValue(this.activeTiers()[0]?.id ?? '');
-      this.error.set('Tiers loaded; trial policy is not configured yet');
+      this.introOfferTier.setValue(this.activeTiers()[0]?.id ?? '');
+      this.error.set('Tiers loaded; billing policy is not configured yet');
     } else {
       this.error.set(
         config.reason instanceof Error
-          ? `Tiers loaded; trial policy unavailable: ${config.reason.message}`
-          : 'Tiers loaded; trial policy unavailable'
+          ? `Tiers loaded; billing policy unavailable: ${config.reason.message}`
+          : 'Tiers loaded; billing policy unavailable'
       );
     }
   }
 
-  protected async saveTrialConfig(): Promise<void> {
+  protected async saveBillingPolicy(): Promise<void> {
     const days = Math.round(this.trialDays.value);
-    if (days < 1 || days > 365 || !this.defaultTrialTier.value) {
-      this.error.set('Choose an active default tier and a trial duration from 1 to 365 days');
+    const paidMonths = Math.round(this.introOfferPaidMonths.value);
+    const bonusMonths = Math.round(this.introOfferBonusMonths.value);
+    if (
+      days < 1 ||
+      days > 365 ||
+      paidMonths < 1 ||
+      paidMonths > 12 ||
+      bonusMonths < 0 ||
+      bonusMonths > 12 ||
+      !this.defaultTrialTier.value ||
+      !this.introOfferTier.value
+    ) {
+      this.error.set('Choose active plans and valid paid, free, and trial durations');
       return;
     }
     this.configBusy.set(true);
     this.error.set(null);
     this.notice.set(null);
     try {
-      await this.platform.updateBillingConfig(days, this.defaultTrialTier.value);
+      await this.platform.updateBillingPolicy({
+        trialDays: days,
+        defaultTrialTierId: this.defaultTrialTier.value,
+        introOfferEnabled: this.introOfferEnabled.value,
+        introOfferTierId: this.introOfferTier.value,
+        introOfferPaidMonths: paidMonths,
+        introOfferBonusMonths: bonusMonths,
+      });
       this.trialDays.setValue(days);
-      this.notice.set('Trial policy updated. Existing trials are unchanged.');
+      this.introOfferPaidMonths.setValue(paidMonths);
+      this.introOfferBonusMonths.setValue(bonusMonths);
+      this.notice.set('Billing policy updated. Existing company access is unchanged.');
     } catch (error) {
-      this.error.set(error instanceof Error ? error.message : 'Trial policy update failed');
+      this.error.set(error instanceof Error ? error.message : 'Billing policy update failed');
     } finally {
       this.configBusy.set(false);
     }
+  }
+
+  protected introOfferPreview(): string {
+    const tier = this.activeTiers().find(item => item.id === this.introOfferTier.value);
+    const paid = Math.max(1, Math.round(this.introOfferPaidMonths.value));
+    const free = Math.max(0, Math.round(this.introOfferBonusMonths.value));
+    const paidLabel = `${paid} ${paid === 1 ? 'month' : 'months'}`;
+    const freeLabel = `${free} ${free === 1 ? 'month' : 'months'}`;
+    const amount = tier ? formatKesInput(tier.price_monthly * paid) : '—';
+    const wording =
+      free > 0 ? `Pay for ${paidLabel}, get ${freeLabel} free` : `Pay for ${paidLabel}`;
+    return `Customer wording: ${wording} on ${tier?.name ?? 'the selected plan'} — KES ${amount}.`;
   }
 
   protected setLimit(key: string, value: string): void {

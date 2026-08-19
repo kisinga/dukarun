@@ -21,6 +21,7 @@ import { EntityAvatarComponent } from '../shared/ui/entity-avatar.component';
 import { LegalService } from '../legal/legal.service';
 import { siteUrl } from '../core/public-url';
 import { ConnectivityService } from '../pos/offline/connectivity.service';
+import { WorkspaceNavigationService } from '../core/workspace-navigation.service';
 
 interface NavItem {
   route: string;
@@ -306,7 +307,7 @@ interface NavSection {
               <span class="bottom-nav-label">Sell</span>
             </a>
             <a
-              routerLink="/products"
+              routerLink="/inventory/products"
               routerLinkActive="bottom-nav-active"
               class="bottom-nav-item flex-1 justify-center"
             >
@@ -417,17 +418,6 @@ interface NavSection {
           </div>
 
           <div class="border-t border-base-300 p-2">
-            @if (perms.has('ViewAuditTrail')) {
-              <a
-                routerLink="/settings/audit-trail"
-                routerLinkActive="nav-item-active"
-                (click)="closeDrawer()"
-                class="nav-item"
-              >
-                <app-icon name="heroClipboardDocumentList" />
-                <span>Audit trail</span>
-              </a>
-            }
             <a
               routerLink="/settings"
               routerLinkActive="nav-item-active"
@@ -513,6 +503,7 @@ export class ShellComponent implements OnInit {
   protected readonly profile = inject(ProfileService);
   protected readonly legal = inject(LegalService);
   protected readonly connectivity = inject(ConnectivityService);
+  protected readonly workspaces = inject(WorkspaceNavigationService);
 
   protected readonly myName = computed(() => this.profile.me()?.display_name ?? 'Account');
   protected readonly myAvatarUrl = computed(() =>
@@ -563,20 +554,13 @@ export class ShellComponent implements OnInit {
           icon: 'heroDocumentText',
           badge: () => this.orderQueueCounts.proformas(),
         },
-        { route: '/products', label: 'Products', icon: 'heroCube' },
+        { route: '/inventory', label: 'Inventory', icon: 'heroCube' },
         { route: '/purchases', label: 'Purchases', icon: 'heroTruck' },
         {
-          route: '/stock-adjustments',
-          label: 'Stock Adjustments',
-          icon: 'heroArchiveBox',
-          visible: () => this.perms.has('ManageStockAdjustments'),
-        },
-        {
-          route: '/stock-transfers',
-          label: 'Stock Transfers',
-          icon: 'heroArrowsRightLeft',
-          visible: () =>
-            this.perms.has('ManageStockAdjustments') && this.locations.isMultiLocation(),
+          route: '/activity',
+          label: 'Activity',
+          icon: 'heroClipboardDocumentList',
+          visible: () => this.workspaces.visible('activity'),
         },
       ],
     },
@@ -613,27 +597,7 @@ export class ShellComponent implements OnInit {
           route: '/team',
           label: 'Team',
           icon: 'heroUserGroup',
-          visible: () => this.perms.has('ManageTeam'),
-        },
-        {
-          route: '/staff-performance',
-          label: 'Staff Performance',
-          icon: 'heroChartBar',
-          visible: () =>
-            this.perms.has('ViewStaffPerformance') && this.entitlements.enabled('staffPerformance'),
-        },
-        {
-          route: '/commissions',
-          label: 'Commissions',
-          icon: 'heroCurrencyDollar',
-          visible: () =>
-            this.perms.has('ManageCommissions') && this.entitlements.commissionsVisible(),
-        },
-        {
-          route: '/communications',
-          label: 'Communications',
-          icon: 'heroChatBubbleLeftRight',
-          visible: () => this.perms.has('ManageCommunications'),
+          visible: () => this.workspaces.visible('team'),
         },
       ],
     },

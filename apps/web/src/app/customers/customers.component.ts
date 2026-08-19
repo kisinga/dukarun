@@ -62,6 +62,9 @@ import {
   type CustomerReceiptPlan,
 } from './customer-account';
 import { CustomerStatementSendComponent } from '../communications/customer-statement-send.component';
+import { MpesaService } from '../core/mpesa.service';
+import { MpesaCheckoutCoordinator } from '../core/mpesa-checkout-coordinator.service';
+import { LocationContextService } from '../core/location-context.service';
 
 type CustomerWithAr = MoneyCustomer & {
   ar_balance: number;
@@ -739,12 +742,41 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
                             }
                           </select>
                         </app-form-field>
-                        <app-form-field label="Reference">
-                          <input
-                            class="input input-bordered input-sm"
-                            [formControl]="bulkReference"
-                          />
-                        </app-form-field>
+                        @if (
+                          bulkMethod.value === 'mpesa' &&
+                          mpesa.availability().active &&
+                          !bulkMpesaManual.value
+                        ) {
+                          <app-form-field label="Payer phone">
+                            <input
+                              class="input input-bordered input-sm"
+                              inputmode="tel"
+                              [formControl]="bulkMpesaPhone"
+                            />
+                          </app-form-field>
+                        } @else {
+                          <app-form-field
+                            [label]="
+                              bulkMethod.value === 'mpesa' ? 'M-PESA receipt code' : 'Reference'
+                            "
+                            [required]="bulkMethod.value === 'mpesa' && bulkMpesaManual.value"
+                          >
+                            <input
+                              class="input input-bordered input-sm"
+                              [formControl]="bulkReference"
+                            />
+                          </app-form-field>
+                        }
+                        @if (bulkMethod.value === 'mpesa' && mpesa.availability().manualFallback) {
+                          <label class="sm:col-span-3 flex items-center gap-2 text-sm">
+                            <input
+                              type="checkbox"
+                              class="toggle toggle-sm"
+                              [formControl]="bulkMpesaManual"
+                            />
+                            Use temporary manual fallback
+                          </label>
+                        }
                         <button
                           appButton
                           type="submit"
@@ -756,7 +788,13 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
                             customerIntegrity()?.is_consistent !== true
                           "
                         >
-                          Receive payment
+                          {{
+                            bulkMethod.value === 'mpesa' &&
+                            mpesa.availability().active &&
+                            !bulkMpesaManual.value
+                              ? 'Send STK prompt'
+                              : 'Receive payment'
+                          }}
                         </button>
                         @if (bulkPaymentPlan(); as plan) {
                           <div
@@ -1225,6 +1263,9 @@ export class CustomersComponent implements OnInit {
   private readonly approvals = inject(ApprovalsService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  protected readonly mpesa = inject(MpesaService);
+  private readonly mpesaCheckout = inject(MpesaCheckoutCoordinator);
+  private readonly locations = inject(LocationContextService);
   private readonly routeParams = toSignal(this.route.queryParamMap, {
     initialValue: this.route.snapshot.queryParamMap,
   });
@@ -1241,7 +1282,11 @@ export class CustomersComponent implements OnInit {
   protected readonly statementBusy = signal(false);
   private statementSequence = 0;
   private depositRefundClientRef: string | null = null;
-  private receiptAttempt: { fingerprint: string; clientRef: string } | null = null;
+  private receiptAttempt: {
+    fingerprint: string;
+    clientRef: string;
+    mpesaRetryAllowed: boolean;
+  } | null = null;
   protected readonly companyInfo = signal<CompanyPrintInfo | null>(null);
   protected readonly customerApprovals = signal<Approval[]>([]);
   protected readonly pageCustomerApprovals = signal<Map<string, Approval>>(new Map());
@@ -1296,6 +1341,8 @@ export class CustomersComponent implements OnInit {
   protected readonly bulkAmount = new FormControl('', { nonNullable: true });
   protected readonly bulkMethod = new FormControl('cash', { nonNullable: true });
   protected readonly bulkReference = new FormControl('', { nonNullable: true });
+  protected readonly bulkMpesaPhone = new FormControl('', { nonNullable: true });
+  protected readonly bulkMpesaManual = new FormControl(false, { nonNullable: true });
   protected readonly receiptReversalReason = new FormControl('', { nonNullable: true });
 
   protected readonly creditLimit = new FormControl('', { nonNullable: true });
@@ -1445,6 +1492,7 @@ export class CustomersComponent implements OnInit {
   });
 
   async ngOnInit(): Promise<void> {
+    void this.mpesa.refreshAvailability();
     try {
       this.methods.set(await this.money.enabledMethodCodes());
     } catch (err) {
@@ -1511,6 +1559,7 @@ export class CustomersComponent implements OnInit {
       this.customers().find(c => c.id === customerId) ??
       (await this.pos.customerWithCredit(customerId).catch(() => null));
     if (customer) {
+      this.bulkMpesaPhone.setValue(customer.phone ?? '');
       this.creditLimit.setValue(formatKesInput(customer.credit_limit));
       this.termsDays.setValue(customer.credit_terms_days ?? 0);
       this.approved.setValue(customer.is_credit_approved);
@@ -1843,9 +1892,60 @@ export class CustomersComponent implements OnInit {
         amount,
         method: this.bulkMethod.value,
         reference: this.bulkReference.value.trim(),
+        phone: this.bulkMpesaPhone.value.trim(),
+        manualMpesa: this.bulkMpesaManual.value,
       });
       if (this.receiptAttempt?.fingerprint !== fingerprint) {
-        this.receiptAttempt = { fingerprint, clientRef: crypto.randomUUID() };
+        this.receiptAttempt = {
+          fingerprint,
+          clientRef: crypto.randomUUID(),
+          mpesaRetryAllowed: false,
+        };
+      }
+      const integratedMpesa =
+        this.bulkMethod.value === 'mpesa' &&
+        ((this.mpesa.availability().active && !this.bulkMpesaManual.value) ||
+          (this.mpesa.availability().manualFallback && this.bulkMpesaManual.value));
+      if (integratedMpesa) {
+        if (!this.bulkMpesaManual.value && !this.bulkMpesaPhone.value.trim())
+          throw new Error('Enter the M-PESA payer phone');
+        const receipt = this.bulkReference.value.trim();
+        if (this.bulkMpesaManual.value && !/^[A-Z0-9]{8,12}$/i.test(receipt))
+          throw new Error('Enter a valid M-PESA receipt code');
+        const outcome = await this.mpesaCheckout.run(
+          retry =>
+            this.mpesa.initiateCustomerReceipt({
+              customerId,
+              locationId: this.locations.requireActiveId(),
+              amount,
+              clientRef: this.receiptAttempt!.clientRef,
+              retry,
+              ...(this.bulkMpesaManual.value ? { receipt } : { phone: this.bulkMpesaPhone.value }),
+            }),
+          this.receiptAttempt.mpesaRetryAllowed
+        );
+        if (outcome.kind !== 'completed') {
+          if (outcome.kind === 'manual_review') {
+            this.receiptAttempt = null;
+            this.bulkAmount.setValue('');
+          } else if (outcome.kind === 'failed' && outcome.retryAllowed) {
+            this.receiptAttempt.mpesaRetryAllowed = true;
+          }
+          throw new Error(
+            'message' in outcome ? outcome.message : 'M-PESA cash split is not supported here'
+          );
+        }
+        this.receiptAttempt = null;
+        this.bulkAmount.setValue('');
+        this.bulkReference.setValue('');
+        this.notice.set('M-PESA payment posted to the customer account');
+        await Promise.all([
+          this.load(),
+          this.money.creditOrders(customerId).then(rows => this.creditOrders.set(rows)),
+          this.refreshCustomerStatement(customerId),
+          this.refreshCustomerDepositData(customerId),
+        ]);
+        return;
       }
       const outcome = await this.money.postCustomerPayment(
         customerId,

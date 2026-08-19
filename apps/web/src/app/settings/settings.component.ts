@@ -1,6 +1,6 @@
 import { Component, DestroyRef, OnInit, computed, inject, signal, viewChild } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormControl, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { formatKesInput, parseKes } from '../core/money';
 import { reconciliationLabel } from '../core/payment-methods';
@@ -11,6 +11,9 @@ import {
   CompanySettings,
   PaymentMethodRow,
   LocationPaymentMethodRow,
+  MoneyAccountRow,
+  PrimaryContactNotificationChannel,
+  PrimaryContactNotificationSettings,
   SettingsService,
   StockLocationRow,
 } from './settings.service';
@@ -32,9 +35,11 @@ import {
   type CatalogImportResult,
 } from '../products/product-transfer.service';
 import { CachedDataExportService, type CachedExportKind } from './cached-data-export.service';
+import { TaxSettingsComponent } from './tax-settings.component';
+import { MpesaSettingsComponent } from './mpesa-settings.component';
 
 type SectionKey = 'profile' | 'pos' | 'inventory' | 'cash';
-type SettingsTab = 'business' | 'operations' | 'money' | 'communications' | 'data';
+type SettingsTab = 'business' | 'operations' | 'money' | 'mpesa' | 'communications' | 'data';
 type ReminderDraft = {
   stageDays: number;
   enabled: boolean;
@@ -46,13 +51,15 @@ const SETTINGS_TABS: ReadonlyArray<{ key: SettingsTab; label: string }> = [
   { key: 'business', label: 'Business' },
   { key: 'operations', label: 'Operations' },
   { key: 'money', label: 'Money' },
-  { key: 'communications', label: 'Messages' },
+  { key: 'mpesa', label: 'M-PESA' },
+  { key: 'communications', label: 'Notifications' },
   { key: 'data', label: 'Data' },
 ];
 
 @Component({
   selector: 'app-settings',
   imports: [
+    FormsModule,
     ReactiveFormsModule,
     RouterLink,
     PageLayoutComponent,
@@ -63,6 +70,8 @@ const SETTINGS_TABS: ReadonlyArray<{ key: SettingsTab; label: string }> = [
     MoneyComponent,
     MobileListComponent,
     ProductImportDialogComponent,
+    TaxSettingsComponent,
+    MpesaSettingsComponent,
   ],
   template: `
     <app-page title="Settings">
@@ -72,27 +81,42 @@ const SETTINGS_TABS: ReadonlyArray<{ key: SettingsTab; label: string }> = [
 
       @if (settings(); as s) {
         <div class="space-y-6">
-          <div class="overflow-x-auto" aria-label="Settings sections">
-            <div role="tablist" class="tabs tabs-box w-max min-w-full">
+          <label class="form-control md:hidden">
+            <span
+              class="label-text mb-1 text-xs font-semibold uppercase tracking-wide text-base-content/60"
+            >
+              Settings section
+            </span>
+            <select
+              class="select select-bordered min-h-11 w-full"
+              aria-label="Settings section"
+              [value]="activeTab()"
+              (change)="selectTabFromEvent($event)"
+            >
+              @for (tab of settingsTabs(); track tab.key) {
+                <option [value]="tab.key">{{ tab.label }}</option>
+              }
+            </select>
+          </label>
+          <nav class="hidden border-b border-base-300/70 md:block" aria-label="Settings sections">
+            <div role="tablist" class="-mb-px flex gap-1 overflow-x-auto">
               @for (tab of settingsTabs(); track tab.key) {
                 <button
                   role="tab"
                   type="button"
-                  class="tab min-h-11 px-4"
-                  [class.tab-active]="activeTab() === tab.key"
+                  class="flex min-h-11 shrink-0 items-center border-b-2 px-3 text-sm font-medium transition-colors hover:text-base-content"
+                  [class.border-primary]="activeTab() === tab.key"
+                  [class.border-transparent]="activeTab() !== tab.key"
+                  [class.text-base-content]="activeTab() === tab.key"
+                  [class.text-base-content/60]="activeTab() !== tab.key"
                   [attr.aria-selected]="activeTab() === tab.key"
                   (click)="selectTab(tab.key)"
                 >
                   {{ tab.label }}
                 </button>
               }
-              @if (perms.has('ViewAuditTrail')) {
-                <a role="tab" routerLink="/settings/audit-trail" class="tab min-h-11 px-4">
-                  Audit
-                </a>
-              }
             </div>
-          </div>
+          </nav>
 
           @if (activeTab() === 'business') {
             <!-- Profile -->
@@ -630,7 +654,13 @@ const SETTINGS_TABS: ReadonlyArray<{ key: SettingsTab; label: string }> = [
             </div>
           }
 
+          @if (activeTab() === 'mpesa') {
+            <app-mpesa-settings />
+          }
+
           @if (activeTab() === 'money') {
+            <app-tax-settings />
+
             <!-- Cash control threshold -->
             <div class="card bg-base-100">
               <div class="card-body p-4">
@@ -682,21 +712,158 @@ const SETTINGS_TABS: ReadonlyArray<{ key: SettingsTab; label: string }> = [
                       Optional staff commission plans and reviewable statements.
                     </p>
                   </div>
-                  <label class="label cursor-pointer gap-3">
-                    <span class="label-text font-medium">Enable commissions</span>
-                    <input
-                      type="checkbox"
-                      class="toggle toggle-primary"
-                      [checked]="s.commissions_enabled"
-                      [disabled]="busy()"
-                      (change)="toggleCommissions($event)"
-                    />
-                  </label>
+                  <div class="flex flex-wrap items-center justify-end gap-2">
+                    @if (s.commissions_enabled) {
+                      <a appButton variant="ghost" size="sm" routerLink="/team/commissions">
+                        Manage commissions
+                      </a>
+                    }
+                    <label class="label cursor-pointer gap-3">
+                      <span class="label-text font-medium">Enable commissions</span>
+                      <input
+                        type="checkbox"
+                        class="toggle toggle-primary"
+                        [checked]="s.commissions_enabled"
+                        [disabled]="busy()"
+                        (change)="toggleCommissions($event)"
+                      />
+                    </label>
+                  </div>
                 </div>
                 @if (msg('commissions'); as m) {
                   <p class="mt-2 text-sm" [class.text-success]="m.ok" [class.text-error]="!m.ok">
                     {{ m.text }}
                   </p>
+                }
+              </div>
+            </div>
+          }
+
+          @if (activeTab() === 'communications' && perms.has('ManageTeam')) {
+            <div class="card bg-base-100">
+              <div class="card-body p-4">
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h2 class="section-title">Primary contact alerts</h2>
+                    <p class="type-caption mt-1">
+                      Choose how operational alerts reach the company’s primary contact. Every alert
+                      also stays in their Dukarun inbox.
+                    </p>
+                  </div>
+                  <a appButton variant="ghost" size="sm" routerLink="/team">
+                    Manage primary contact
+                  </a>
+                </div>
+
+                @if (primaryContactSettings(); as primary) {
+                  @if (primary.primary_contact_user_id) {
+                    <div
+                      class="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-box border border-base-300 bg-base-200/40 px-3 py-2"
+                    >
+                      <div>
+                        <p class="text-sm font-semibold">
+                          {{ primary.primary_contact_name || 'Primary administrator' }}
+                        </p>
+                        <p class="type-caption">
+                          {{ primary.primary_contact_phone || 'No verified phone available' }}
+                        </p>
+                      </div>
+                      <span class="badge badge-primary badge-sm">Primary contact</span>
+                    </div>
+
+                    <div class="mt-4 grid gap-4 sm:grid-cols-2">
+                      <app-form-field
+                        label="External channel"
+                        hint="SMS fallback is used only after WhatsApp permanently fails."
+                      >
+                        <select
+                          class="select select-bordered select-sm w-full"
+                          [formControl]="primaryContactChannel"
+                        >
+                          <option value="whatsapp_sms_fallback">WhatsApp, then SMS fallback</option>
+                          <option value="whatsapp">WhatsApp only</option>
+                          <option value="sms">SMS only</option>
+                          <option value="none">In-app only</option>
+                        </select>
+                      </app-form-field>
+                      <div class="grid gap-2">
+                        <label
+                          class="flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-box border border-base-300 px-3 py-2"
+                        >
+                          <span>
+                            <span class="block text-sm font-medium">Team invitations</span>
+                            <span class="type-caption">Invited and joined events</span>
+                          </span>
+                          <input
+                            type="checkbox"
+                            class="toggle toggle-sm toggle-primary"
+                            [formControl]="primaryTeamNotifications"
+                          />
+                        </label>
+                        <label
+                          class="flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-box border border-base-300 px-3 py-2"
+                        >
+                          <span>
+                            <span class="block text-sm font-medium">Cashier sessions</span>
+                            <span class="type-caption">Day opened and closed summaries</span>
+                          </span>
+                          <input
+                            type="checkbox"
+                            class="toggle toggle-sm toggle-primary"
+                            [formControl]="primaryCashierNotifications"
+                          />
+                        </label>
+                      </div>
+                    </div>
+                    @if (msg('primary-contact-notifications'); as m) {
+                      <p
+                        class="mt-2 text-sm"
+                        [class.text-success]="m.ok"
+                        [class.text-error]="!m.ok"
+                      >
+                        {{ m.text }}
+                      </p>
+                    }
+                    <button
+                      appButton
+                      type="button"
+                      class="mt-3"
+                      [loading]="busy()"
+                      (click)="savePrimaryContactNotifications()"
+                    >
+                      Save admin alerts
+                    </button>
+                  } @else {
+                    <div class="alert alert-warning mt-4 text-sm">
+                      <app-icon name="heroExclamationTriangle" />
+                      <span>
+                        Select an approved administrator as primary contact before enabling external
+                        alerts.
+                      </span>
+                      <a routerLink="/team" class="link whitespace-nowrap font-semibold">
+                        Choose contact
+                      </a>
+                    </div>
+                  }
+                } @else if (primaryContactLoading()) {
+                  <div class="mt-4 grid gap-2" aria-label="Loading primary contact alerts">
+                    <div class="skeleton h-14 w-full"></div>
+                    <div class="skeleton h-10 w-full"></div>
+                  </div>
+                } @else if (primaryContactLoadError()) {
+                  <div class="alert alert-error mt-4 text-sm">
+                    <app-icon name="heroExclamationTriangle" />
+                    <span>{{ primaryContactLoadError() }}</span>
+                    <button
+                      appButton
+                      variant="ghost"
+                      size="sm"
+                      type="button"
+                      (click)="reloadPrimaryContactSettings()"
+                    >
+                      Try again
+                    </button>
+                  </div>
                 }
               </div>
             </div>
@@ -812,11 +979,196 @@ const SETTINGS_TABS: ReadonlyArray<{ key: SettingsTab; label: string }> = [
                     Save reminders
                   </button>
                 }
+                <div class="mt-4 border-t border-base-300/60 pt-4">
+                  <p class="type-caption">
+                    Campaigns and manually reviewed documents keep their send-time channel and
+                    recipient choices.
+                    <a routerLink="/activity/messages" class="link font-semibold">
+                      View message activity
+                    </a>
+                  </p>
+                </div>
               </div>
             </div>
           }
 
           @if (activeTab() === 'money' && perms.has('ManageReconciliation')) {
+            <div class="card bg-base-100">
+              <div class="card-body p-4">
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h2 class="section-title">Payment accounts</h2>
+                    <p class="type-caption mt-1">
+                      Checkout uses each location's default automatically. Cashiers can change it
+                      when another active account is appropriate.
+                    </p>
+                  </div>
+                  <div class="flex gap-2">
+                    <button
+                      appButton
+                      variant="outline"
+                      size="sm"
+                      type="button"
+                      (click)="startMoneyAccount('mpesa')"
+                    >
+                      Add M-PESA
+                    </button>
+                    <button
+                      appButton
+                      variant="outline"
+                      size="sm"
+                      type="button"
+                      (click)="startMoneyAccount('bank')"
+                    >
+                      Add bank
+                    </button>
+                  </div>
+                </div>
+
+                @if (addingMoneyKind() || editingMoneyAccount()) {
+                  <div class="mt-4 rounded-box border border-base-300 bg-base-200/40 p-3">
+                    <p class="type-heading">
+                      {{
+                        editingMoneyAccount()
+                          ? 'Rename account'
+                          : 'Add ' + moneyKindLabel(addingMoneyKind()!) + ' account'
+                      }}
+                    </p>
+                    <div class="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
+                      <app-form-field
+                        class="flex-1"
+                        label="Account name"
+                        hint="Use a recognizable label, such as Equity Westlands or Till 123456."
+                      >
+                        <input
+                          class="input input-bordered min-h-11 w-full"
+                          [formControl]="moneyAccountName"
+                          maxlength="100"
+                        />
+                      </app-form-field>
+                      <div class="flex gap-2">
+                        <button
+                          appButton
+                          type="button"
+                          [loading]="busy()"
+                          [disabled]="moneyAccountName.invalid"
+                          (click)="saveMoneyAccount()"
+                        >
+                          Save account
+                        </button>
+                        <button
+                          appButton
+                          variant="ghost"
+                          type="button"
+                          (click)="cancelMoneyAccountEdit()"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                }
+
+                <div class="mt-4 grid gap-4 lg:grid-cols-2">
+                  @for (kind of moneyAccountKinds; track kind) {
+                    <section class="rounded-box border border-base-300/70 p-3">
+                      <div class="flex items-center justify-between gap-2">
+                        <h3 class="type-heading">{{ moneyKindLabel(kind) }}</h3>
+                        <span class="badge badge-ghost"
+                          >{{ activeMoneyAccounts(kind).length }} active</span
+                        >
+                      </div>
+                      <div class="mt-2 divide-y divide-base-300/60">
+                        @for (account of moneyAccountsFor(kind); track account.id) {
+                          <div class="flex min-h-12 items-center justify-between gap-3 py-2">
+                            <div class="min-w-0">
+                              <p
+                                class="truncate font-medium"
+                                [class.text-base-content/50]="!account.is_active"
+                              >
+                                {{ account.name }}
+                              </p>
+                              <p class="type-caption">
+                                {{
+                                  account.is_active
+                                    ? defaultLocationLabel(account.code)
+                                    : 'Archived'
+                                }}
+                              </p>
+                            </div>
+                            <div class="flex shrink-0 gap-1">
+                              <button
+                                appButton
+                                variant="ghost"
+                                size="sm"
+                                type="button"
+                                (click)="editMoneyAccount(account)"
+                              >
+                                Rename
+                              </button>
+                              <button
+                                appButton
+                                variant="ghost"
+                                size="sm"
+                                type="button"
+                                [disabled]="busy()"
+                                (click)="toggleMoneyAccount(account)"
+                              >
+                                {{ account.is_active ? 'Archive' : 'Restore' }}
+                              </button>
+                            </div>
+                          </div>
+                        } @empty {
+                          <p class="type-caption py-3">No accounts yet.</p>
+                        }
+                      </div>
+                    </section>
+                  }
+                </div>
+
+                <div class="mt-5 border-t border-base-300/60 pt-4">
+                  <h3 class="type-heading">Location defaults</h3>
+                  <p class="type-caption mt-1">
+                    These are preselected at checkout and used by automated M-PESA payments.
+                  </p>
+                  <div class="mt-3 grid gap-3">
+                    @for (location of locations(); track location.id) {
+                      <div
+                        class="grid items-center gap-3 rounded-box bg-base-200/50 p-3 sm:grid-cols-[minmax(8rem,1fr)_1fr_1fr]"
+                      >
+                        <p class="font-medium">{{ location.name }}</p>
+                        @for (kind of moneyAccountKinds; track kind) {
+                          <app-form-field [label]="moneyKindLabel(kind)">
+                            <select
+                              class="select select-bordered min-h-11 w-full"
+                              [ngModel]="locationDefaultCode(location.id, kind)"
+                              [ngModelOptions]="{ standalone: true }"
+                              [disabled]="busy() || activeMoneyAccounts(kind).length === 0"
+                              (ngModelChange)="setLocationDefault(location.id, kind, $event)"
+                            >
+                              @for (account of activeMoneyAccounts(kind); track account.id) {
+                                <option [value]="account.code">{{ account.name }}</option>
+                              }
+                            </select>
+                          </app-form-field>
+                        }
+                      </div>
+                    }
+                  </div>
+                </div>
+
+                @if (pmMsg(); as message) {
+                  <p
+                    class="mt-3 text-sm"
+                    [class.text-success]="message.ok"
+                    [class.text-error]="!message.ok"
+                  >
+                    {{ message.text }}
+                  </p>
+                }
+              </div>
+            </div>
+
             <div class="card bg-base-100">
               <div class="card-body p-4">
                 <div class="flex items-center justify-between">
@@ -994,10 +1346,14 @@ const SETTINGS_TABS: ReadonlyArray<{ key: SettingsTab; label: string }> = [
             </div>
           }
 
-          @if (activeTab() === 'communications' && !perms.has('ManageCommunications')) {
+          @if (
+            activeTab() === 'communications' &&
+            !perms.has('ManageCommunications') &&
+            !perms.has('ManageTeam')
+          ) {
             <div class="card bg-base-100">
               <div class="card-body p-4">
-                <h2 class="section-title">Messages</h2>
+                <h2 class="section-title">Notifications</h2>
                 <p class="type-caption mt-1">
                   Your role does not include access to communication settings.
                 </p>
@@ -1265,7 +1621,11 @@ export class SettingsComponent implements OnInit {
 
   protected readonly settingsTabs = computed(() =>
     SETTINGS_TABS.filter(
-      tab => tab.key !== 'communications' || this.perms.has('ManageCommunications')
+      tab =>
+        (tab.key !== 'communications' ||
+          this.perms.has('ManageCommunications') ||
+          this.perms.has('ManageTeam')) &&
+        (tab.key !== 'mpesa' || this.perms.has('ManageMpesaIntegration'))
     )
   );
   protected readonly activeTab = signal<SettingsTab>('business');
@@ -1281,8 +1641,21 @@ export class SettingsComponent implements OnInit {
   );
 
   protected readonly settings = signal<CompanySettings | null>(null);
+  protected readonly primaryContactSettings = signal<PrimaryContactNotificationSettings | null>(
+    null
+  );
+  protected readonly primaryContactLoading = signal(false);
+  protected readonly primaryContactLoadError = signal<string | null>(null);
   protected readonly paymentMethods = signal<PaymentMethodRow[]>([]);
   protected readonly paymentMethodAssignments = signal<LocationPaymentMethodRow[]>([]);
+  protected readonly moneyAccounts = signal<MoneyAccountRow[]>([]);
+  protected readonly editingMoneyAccount = signal<MoneyAccountRow | null>(null);
+  protected readonly addingMoneyKind = signal<'bank' | 'mpesa' | null>(null);
+  protected readonly moneyAccountName = new FormControl('', {
+    nonNullable: true,
+    validators: [Validators.required, Validators.minLength(2), Validators.maxLength(100)],
+  });
+  protected readonly moneyAccountKinds = ['mpesa', 'bank'] as const;
   protected readonly locations = signal<StockLocationRow[]>([]);
   protected readonly loadError = signal<string | null>(null);
   protected readonly busy = signal(false);
@@ -1339,6 +1712,12 @@ export class SettingsComponent implements OnInit {
     nonNullable: true,
   });
   protected readonly reminderSmsFallback = new FormControl(true, { nonNullable: true });
+  protected readonly primaryContactChannel = new FormControl<PrimaryContactNotificationChannel>(
+    'whatsapp',
+    { nonNullable: true }
+  );
+  protected readonly primaryTeamNotifications = new FormControl(true, { nonNullable: true });
+  protected readonly primaryCashierNotifications = new FormControl(true, { nonNullable: true });
   protected readonly reminderDrafts = signal<ReminderDraft[]>([]);
   protected readonly locationName = new FormControl('', { nonNullable: true });
   protected readonly locationCode = new FormControl('', { nonNullable: true });
@@ -1348,7 +1727,11 @@ export class SettingsComponent implements OnInit {
     this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(params => {
       const requested = params.get('tab') as SettingsTab | null;
       this.activeTab.set(
-        requested && SETTINGS_TABS.some(tab => tab.key === requested) ? requested : 'business'
+        requested &&
+          SETTINGS_TABS.some(tab => tab.key === requested) &&
+          (requested !== 'mpesa' || this.perms.has('ManageMpesaIntegration'))
+          ? requested
+          : 'business'
       );
     });
   }
@@ -1364,6 +1747,12 @@ export class SettingsComponent implements OnInit {
       queryParams: { tab: tab === 'business' ? null : tab },
       queryParamsHandling: 'merge',
     });
+  }
+
+  protected selectTabFromEvent(event: Event): void {
+    const value = (event.target as HTMLSelectElement).value;
+    const tab = SETTINGS_TABS.find(item => item.key === value);
+    if (tab) this.selectTab(tab.key);
   }
 
   protected async exportCatalog(): Promise<void> {
@@ -1412,17 +1801,32 @@ export class SettingsComponent implements OnInit {
   protected async load(): Promise<void> {
     this.loadError.set(null);
     try {
-      const [settings, methods, locations, paymentAssignments, reminderConfiguration] =
-        await Promise.all([
-          this.settingsService.getSettings(),
-          this.settingsService.paymentMethods(),
-          this.settingsService.stockLocations(),
-          this.settingsService.paymentMethodLocations(),
-          this.settingsService.reminderConfiguration(),
-          this.entitlements.refresh(),
-        ]);
+      await this.perms.ensureLoaded();
+      const primarySettings = this.perms.has('ManageTeam')
+        ? this.fetchPrimaryContactSettings()
+        : Promise.resolve(null);
+      const [
+        settings,
+        methods,
+        locations,
+        paymentAssignments,
+        reminderConfiguration,
+        primaryContactSettings,
+        moneyAccounts,
+      ] = await Promise.all([
+        this.settingsService.getSettings(),
+        this.settingsService.paymentMethods(),
+        this.settingsService.stockLocations(),
+        this.settingsService.paymentMethodLocations(),
+        this.settingsService.reminderConfiguration(),
+        primarySettings,
+        this.settingsService.moneyAccounts(),
+        this.entitlements.refresh(),
+      ]);
       this.settings.set(settings);
+      this.primaryContactSettings.set(primaryContactSettings);
       this.paymentMethods.set(methods);
+      this.moneyAccounts.set(moneyAccounts);
       this.locations.set(locations);
       this.paymentMethodAssignments.set(paymentAssignments);
       this.name.setValue(settings.name);
@@ -1446,6 +1850,13 @@ export class SettingsComponent implements OnInit {
       );
       this.reminderChannel.setValue(settings.payment_reminder_channel);
       this.reminderSmsFallback.setValue(settings.payment_reminder_sms_fallback);
+      if (primaryContactSettings) {
+        this.primaryContactChannel.setValue(primaryContactSettings.preferences.channel);
+        this.primaryTeamNotifications.setValue(primaryContactSettings.preferences.team);
+        this.primaryCashierNotifications.setValue(
+          primaryContactSettings.preferences.cashierSessions
+        );
+      }
       this.reminderDrafts.set(
         reminderConfiguration.map(rule =>
           this.reminderDraft(rule.stage_days, rule.enabled, rule.template_key)
@@ -1453,6 +1864,33 @@ export class SettingsComponent implements OnInit {
       );
     } catch (err) {
       this.loadError.set(err instanceof Error ? err.message : 'Failed to load settings');
+    }
+  }
+
+  protected async reloadPrimaryContactSettings(): Promise<void> {
+    const settings = await this.fetchPrimaryContactSettings();
+    if (!settings) return;
+    this.primaryContactSettings.set(settings);
+    this.primaryContactChannel.setValue(settings.preferences.channel);
+    this.primaryTeamNotifications.setValue(settings.preferences.team);
+    this.primaryCashierNotifications.setValue(settings.preferences.cashierSessions);
+  }
+
+  private async fetchPrimaryContactSettings(): Promise<PrimaryContactNotificationSettings | null> {
+    this.primaryContactLoading.set(true);
+    this.primaryContactLoadError.set(null);
+    try {
+      const settings = await this.settingsService.getPrimaryContactNotificationSettings();
+      this.primaryContactSettings.set(settings);
+      return settings;
+    } catch (err) {
+      this.primaryContactSettings.set(null);
+      this.primaryContactLoadError.set(
+        err instanceof Error ? err.message : 'Primary contact alerts could not be loaded.'
+      );
+      return null;
+    } finally {
+      this.primaryContactLoading.set(false);
     }
   }
 
@@ -1756,6 +2194,34 @@ export class SettingsComponent implements OnInit {
     }
   }
 
+  protected async savePrimaryContactNotifications(): Promise<void> {
+    const current = this.primaryContactSettings();
+    if (!current?.primary_contact_user_id) return;
+    this.busy.set(true);
+    try {
+      const preferences = await this.settingsService.setPrimaryContactNotificationPreferences({
+        channel: this.primaryContactChannel.value,
+        team: this.primaryTeamNotifications.value,
+        cashierSessions: this.primaryCashierNotifications.value,
+      });
+      this.primaryContactSettings.set({ ...current, preferences });
+      this.flash('primary-contact-notifications', true, 'Admin alert preferences saved');
+    } catch (err) {
+      this.primaryContactChannel.setValue(current.preferences.channel, { emitEvent: false });
+      this.primaryTeamNotifications.setValue(current.preferences.team, { emitEvent: false });
+      this.primaryCashierNotifications.setValue(current.preferences.cashierSessions, {
+        emitEvent: false,
+      });
+      this.flash(
+        'primary-contact-notifications',
+        false,
+        err instanceof Error ? err.message : 'Save failed'
+      );
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
   protected async saveAutomationPreference(): Promise<void> {
     const current = this.settings();
     if (!current || current.automated_customer_notifications_override !== null) return;
@@ -1808,6 +2274,123 @@ export class SettingsComponent implements OnInit {
         assignment.location_id === locationId &&
         assignment.enabled
     );
+  }
+
+  protected moneyKindLabel(kind: 'bank' | 'mpesa'): string {
+    return kind === 'mpesa' ? 'M-PESA' : 'Bank';
+  }
+
+  protected moneyAccountsFor(kind: 'bank' | 'mpesa'): MoneyAccountRow[] {
+    return this.moneyAccounts()
+      .filter(account => account.money_account_kind === kind)
+      .sort((a, b) => Number(b.is_active) - Number(a.is_active) || a.name.localeCompare(b.name));
+  }
+
+  protected activeMoneyAccounts(kind: 'bank' | 'mpesa'): MoneyAccountRow[] {
+    return this.moneyAccountsFor(kind).filter(account => account.is_active);
+  }
+
+  protected locationDefaultCode(locationId: string, kind: 'bank' | 'mpesa'): string {
+    const method = this.paymentMethods().find(item => item.code === kind);
+    if (!method) return '';
+    return (
+      this.paymentMethodAssignments().find(
+        assignment =>
+          assignment.location_id === locationId && assignment.payment_method_id === method.id
+      )?.ledger_account_code ?? method.ledger_account_code
+    );
+  }
+
+  protected defaultLocationLabel(accountCode: string): string {
+    const defaults = this.locations().filter(location =>
+      this.moneyAccountKinds.some(
+        kind => this.locationDefaultCode(location.id, kind) === accountCode
+      )
+    );
+    if (defaults.length === 0) return 'Available at checkout';
+    if (defaults.length === this.locations().length) return 'Default at all locations';
+    return `Default at ${defaults.length} location${defaults.length === 1 ? '' : 's'}`;
+  }
+
+  protected startMoneyAccount(kind: 'bank' | 'mpesa'): void {
+    this.editingMoneyAccount.set(null);
+    this.addingMoneyKind.set(kind);
+    this.moneyAccountName.setValue('');
+  }
+
+  protected editMoneyAccount(account: MoneyAccountRow): void {
+    this.addingMoneyKind.set(null);
+    this.editingMoneyAccount.set(account);
+    this.moneyAccountName.setValue(account.name);
+  }
+
+  protected cancelMoneyAccountEdit(): void {
+    this.addingMoneyKind.set(null);
+    this.editingMoneyAccount.set(null);
+    this.moneyAccountName.setValue('');
+  }
+
+  protected async saveMoneyAccount(): Promise<void> {
+    if (this.moneyAccountName.invalid) return;
+    const name = this.moneyAccountName.value.trim();
+    const editing = this.editingMoneyAccount();
+    const kind = this.addingMoneyKind();
+    if (!editing && !kind) return;
+    this.busy.set(true);
+    this.pmMsg.set(null);
+    try {
+      if (editing) {
+        await this.settingsService.updateMoneyAccount(editing.id, { name });
+      } else {
+        await this.settingsService.createMoneyAccount(kind!, name);
+      }
+      this.moneyAccounts.set(await this.settingsService.moneyAccounts());
+      this.cancelMoneyAccountEdit();
+      this.pmMsg.set({ ok: true, text: editing ? 'Account renamed' : 'Account created' });
+    } catch (err) {
+      this.pmMsg.set({ ok: false, text: err instanceof Error ? err.message : 'Save failed' });
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected async toggleMoneyAccount(account: MoneyAccountRow): Promise<void> {
+    this.busy.set(true);
+    this.pmMsg.set(null);
+    try {
+      await this.settingsService.updateMoneyAccount(account.id, { isActive: !account.is_active });
+      this.moneyAccounts.set(await this.settingsService.moneyAccounts());
+      this.pmMsg.set({
+        ok: true,
+        text: account.is_active ? 'Account archived' : 'Account restored',
+      });
+    } catch (err) {
+      this.pmMsg.set({
+        ok: false,
+        text: err instanceof Error ? err.message : 'Account update failed',
+      });
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected async setLocationDefault(
+    locationId: string,
+    kind: 'bank' | 'mpesa',
+    accountCode: string
+  ): Promise<void> {
+    if (!accountCode || accountCode === this.locationDefaultCode(locationId, kind)) return;
+    this.busy.set(true);
+    this.pmMsg.set(null);
+    try {
+      await this.settingsService.setLocationPaymentAccount(locationId, kind, accountCode);
+      this.paymentMethodAssignments.set(await this.settingsService.paymentMethodLocations());
+      this.pmMsg.set({ ok: true, text: `${this.moneyKindLabel(kind)} default updated` });
+    } catch (err) {
+      this.pmMsg.set({ ok: false, text: err instanceof Error ? err.message : 'Update failed' });
+    } finally {
+      this.busy.set(false);
+    }
   }
 
   /** Human label for a payment method's reconciliation type (settings list). */

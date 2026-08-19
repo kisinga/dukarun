@@ -1,5 +1,5 @@
 begin;
-select plan(15);
+select plan(16);
 
 select testkit.create_user(
   '88888888-8888-4888-8888-888888888881',
@@ -181,6 +181,12 @@ select is(
   (select count(*)::integer from public.outbox
    where cashier_session_id=(select session_id from quota_session)),
   0,'exhausted WhatsApp quota queues no alert'
+);
+select is(
+  (select count(*)::integer from public.notifications
+   where dedupe_key='cashier:' || (select session_id from quota_session)::text ||
+     ':opened:primary'),
+  1,'exhausted external quota still preserves the primary-contact inbox record'
 );
 
 select * from finish();

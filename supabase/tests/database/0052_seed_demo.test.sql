@@ -39,11 +39,11 @@ select ok(
   (select r.permissions @> array[
     'ManageApprovals','OverridePrice','ManageStockAdjustments','ApproveCustomerCredit',
     'ManageCustomerCreditLimit','ManageCustomers','ManageCatalog','ManageCommunications',
-    'ReverseOrder','OverrideCustomerBalance','SettleOrder',
+    'ManageMpesaIntegration','ReverseOrder','OverrideCustomerBalance','SettleOrder',
     'ManageSupplierCreditPurchases','ViewFinancials','ManageReconciliation',
     'CloseAccountingPeriod','CreateInterAccountTransfer','ManageTeam','ViewAuditTrail',
     'ViewStaffPerformance','ManageCommissions'
-  ]::text[] and cardinality(r.permissions) = 20
+  ]::text[] and cardinality(r.permissions) = 21
   from public.roles r
   join public.companies c on c.id = r.company_id
   where c.name = 'Mama Mboga Stores' and r.name = 'Admin'),
