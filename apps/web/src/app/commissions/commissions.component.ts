@@ -650,7 +650,7 @@ import {
           aria-modal="true"
           aria-label="Commission statement"
         >
-          <div class="modal-box max-w-4xl">
+          <div class="modal-box modal-box-scroll md:w-full md:max-w-4xl">
             <div class="flex items-start justify-between gap-3">
               <div>
                 <div class="flex items-center gap-2">

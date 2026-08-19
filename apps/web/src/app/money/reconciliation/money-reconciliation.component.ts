@@ -260,7 +260,7 @@ type ReconciliationWithAccounts = Reconciliation & { reconciliation_accounts: Re
         aria-labelledby="reconcile-dialog-title"
         (cancel)="$event.preventDefault(); close()"
       >
-        <div class="modal-box max-w-lg p-0">
+        <div class="modal-box modal-box-task p-0 md:w-full md:max-w-lg">
           <header class="flex items-start justify-between gap-3 border-b border-base-300 p-4">
             <div>
               <h2 id="reconcile-dialog-title" class="type-title">Set actual balance</h2>
@@ -282,7 +282,7 @@ type ReconciliationWithAccounts = Reconciliation & { reconciliation_accounts: Re
             </button>
           </header>
 
-          <div class="p-4">
+          <div class="modal-body p-4">
             @if (error()) {
               <div role="alert" class="alert alert-error mb-4 text-sm">
                 <app-icon name="heroExclamationTriangle" />

@@ -21,8 +21,8 @@ const LABEL_LAYOUT_KEY = 'dukarun-barcode-label-layout';
   imports: [FormsModule, ButtonComponent, IconComponent],
   template: `
     <dialog class="modal modal-open" (cancel)="$event.preventDefault(); closed.emit()">
-      <section class="modal-box max-w-2xl">
-        <header class="flex items-start gap-3">
+      <section class="modal-box modal-box-task p-0 md:w-full md:max-w-2xl">
+        <header class="flex items-start gap-3 border-b border-base-300 p-4">
           <div>
             <h2 class="type-title">
               {{ mode() === 'single' ? 'Print barcode label' : 'Print catalogue labels' }}
@@ -52,129 +52,133 @@ const LABEL_LAYOUT_KEY = 'dukarun-barcode-label-layout';
           </button>
         </header>
 
-        <div class="mt-5 grid gap-3 sm:grid-cols-3">
-          <div class="rounded-field bg-success/10 p-3">
-            <p class="type-caption">Ready</p>
-            <p class="mt-1 text-xl font-semibold">{{ ready().length }}</p>
+        <div class="modal-body p-4">
+          <div class="grid gap-3 sm:grid-cols-3">
+            <div class="rounded-field bg-success/10 p-3">
+              <p class="type-caption">Ready</p>
+              <p class="mt-1 text-xl font-semibold">{{ ready().length }}</p>
+            </div>
+            <div class="rounded-field bg-warning/10 p-3">
+              <p class="type-caption">Missing</p>
+              <p class="mt-1 text-xl font-semibold">{{ missing().length }}</p>
+            </div>
+            <div class="rounded-field bg-error/10 p-3">
+              <p class="type-caption">Ambiguous</p>
+              <p class="mt-1 text-xl font-semibold">{{ ambiguous().length }}</p>
+            </div>
           </div>
-          <div class="rounded-field bg-warning/10 p-3">
-            <p class="type-caption">Missing</p>
-            <p class="mt-1 text-xl font-semibold">{{ missing().length }}</p>
-          </div>
-          <div class="rounded-field bg-error/10 p-3">
-            <p class="type-caption">Ambiguous</p>
-            <p class="mt-1 text-xl font-semibold">{{ ambiguous().length }}</p>
-          </div>
-        </div>
 
-        @if (mode() === 'single' && selected(); as selected) {
-          <div class="mt-4 rounded-field border border-base-300 p-3">
-            <p class="font-semibold">{{ label(selected.variant) }}</p>
-            <p class="type-caption mt-1 font-mono">
-              {{ selected.variant.barcode || 'No barcode' }}
-            </p>
-            @if (selected.state !== 'ready') {
-              <p class="mt-2 text-sm text-warning">
-                This item needs an individual, unambiguous barcode before it can be printed.
+          @if (mode() === 'single' && selected(); as selected) {
+            <div class="mt-4 rounded-field border border-base-300 p-3">
+              <p class="font-semibold">{{ label(selected.variant) }}</p>
+              <p class="type-caption mt-1 font-mono">
+                {{ selected.variant.barcode || 'No barcode' }}
               </p>
-            }
-          </div>
-        }
-
-        @if (missing().length || ambiguous().length) {
-          <div class="mt-4 rounded-field border border-warning/40 bg-warning/5 p-3">
-            <p class="font-medium">Some variants need individual barcodes</p>
-            <p class="type-caption mt-1">
-              Missing codes and shared duplicate codes are excluded from ready labels.
-            </p>
-            @if (!perms.has('ManageStockAdjustments')) {
-              <p class="mt-2 text-sm text-warning">
-                You can print ready labels, but barcode generation requires catalog edit access.
-              </p>
-            } @else if (!confirmGenerate()) {
-              <button
-                appButton
-                type="button"
-                variant="outline"
-                size="sm"
-                class="mt-3"
-                [disabled]="busy()"
-                (click)="confirmGenerate.set(true)"
-              >
-                Generate missing barcodes
-              </button>
-            } @else {
-              <div class="mt-3 flex flex-wrap items-center gap-2">
-                <span class="text-sm"
-                  >Generate Dukarun codes for {{ needsCodes().length }} variants?</span
-                >
-                <button
-                  appButton
-                  type="button"
-                  variant="primary"
-                  size="sm"
-                  [loading]="busy()"
-                  (click)="generateMissing()"
-                >
-                  Confirm
-                </button>
-                <button
-                  appButton
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  [disabled]="busy()"
-                  (click)="confirmGenerate.set(false)"
-                >
-                  Cancel
-                </button>
-              </div>
-            }
-          </div>
-        }
-
-        <div class="mt-5 grid gap-4 sm:grid-cols-2">
-          <label>
-            <span class="type-heading block">Print layout</span>
-            <select
-              class="select select-bordered mt-1 w-full"
-              [ngModel]="layout()"
-              (ngModelChange)="setLayout($event)"
-            >
-              @for (preset of labelPresets; track preset.id) {
-                <option [value]="preset.id">{{ preset.label }}</option>
+              @if (selected.state !== 'ready') {
+                <p class="mt-2 text-sm text-warning">
+                  This item needs an individual, unambiguous barcode before it can be printed.
+                </p>
               }
-            </select>
-            <p class="type-caption mt-1">Choose the same paper size in the system print dialog.</p>
-          </label>
-          @if (mode() === 'single') {
+            </div>
+          }
+
+          @if (missing().length || ambiguous().length) {
+            <div class="mt-4 rounded-field border border-warning/40 bg-warning/5 p-3">
+              <p class="font-medium">Some variants need individual barcodes</p>
+              <p class="type-caption mt-1">
+                Missing codes and shared duplicate codes are excluded from ready labels.
+              </p>
+              @if (!perms.has('ManageStockAdjustments')) {
+                <p class="mt-2 text-sm text-warning">
+                  You can print ready labels, but barcode generation requires catalog edit access.
+                </p>
+              } @else if (!confirmGenerate()) {
+                <button
+                  appButton
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  class="mt-3"
+                  [disabled]="busy()"
+                  (click)="confirmGenerate.set(true)"
+                >
+                  Generate missing barcodes
+                </button>
+              } @else {
+                <div class="mt-3 flex flex-wrap items-center gap-2">
+                  <span class="text-sm"
+                    >Generate Dukarun codes for {{ needsCodes().length }} variants?</span
+                  >
+                  <button
+                    appButton
+                    type="button"
+                    variant="primary"
+                    size="sm"
+                    [loading]="busy()"
+                    (click)="generateMissing()"
+                  >
+                    Confirm
+                  </button>
+                  <button
+                    appButton
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    [disabled]="busy()"
+                    (click)="confirmGenerate.set(false)"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              }
+            </div>
+          }
+
+          <div class="mt-5 grid gap-4 sm:grid-cols-2">
             <label>
-              <span class="type-heading block">Copies</span>
-              <input
-                type="number"
-                inputmode="numeric"
-                min="1"
-                max="500"
-                class="input input-bordered mt-1 w-full"
-                [ngModel]="copies()"
-                (ngModelChange)="setCopies($event)"
-              />
+              <span class="type-heading block">Print layout</span>
+              <select
+                class="select select-bordered mt-1 w-full"
+                [ngModel]="layout()"
+                (ngModelChange)="setLayout($event)"
+              >
+                @for (preset of labelPresets; track preset.id) {
+                  <option [value]="preset.id">{{ preset.label }}</option>
+                }
+              </select>
+              <p class="type-caption mt-1">
+                Choose the same paper size in the system print dialog.
+              </p>
             </label>
+            @if (mode() === 'single') {
+              <label>
+                <span class="type-heading block">Copies</span>
+                <input
+                  type="number"
+                  inputmode="numeric"
+                  min="1"
+                  max="500"
+                  class="input input-bordered mt-1 w-full"
+                  [ngModel]="copies()"
+                  (ngModelChange)="setCopies($event)"
+                />
+              </label>
+            }
+          </div>
+
+          @if (error()) {
+            <div class="alert alert-error mt-4 text-sm">{{ error() }}</div>
+          }
+          @if (renderFailures().length) {
+            <ul class="mt-3 list-disc space-y-1 pl-5 text-sm text-error">
+              @for (failure of renderFailures(); track failure) {
+                <li>{{ failure }}</li>
+              }
+            </ul>
           }
         </div>
 
-        @if (error()) {
-          <div class="alert alert-error mt-4 text-sm">{{ error() }}</div>
-        }
-        @if (renderFailures().length) {
-          <ul class="mt-3 list-disc space-y-1 pl-5 text-sm text-error">
-            @for (failure of renderFailures(); track failure) {
-              <li>{{ failure }}</li>
-            }
-          </ul>
-        }
-
-        <footer class="modal-action">
+        <footer class="flex flex-wrap justify-end gap-2 border-t border-base-300 p-4">
           <button
             appButton
             type="button"

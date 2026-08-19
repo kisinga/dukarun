@@ -581,7 +581,7 @@ const PROFORMA_SORT_OPTIONS: readonly ListSortOption[] = [
       }
       @if (mpesaSplitReady(); as split) {
         <dialog class="modal modal-open">
-          <div class="modal-box">
+          <div class="modal-box modal-box-scroll">
             <h2 class="type-title">M-PESA received</h2>
             <p class="mt-2 text-sm">Confirm the cash side only after it is in hand.</p>
             <p class="mt-4 text-xl font-semibold"><app-money [amount]="split.cashAmount" /></p>

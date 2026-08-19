@@ -459,7 +459,7 @@ interface NavSection {
           aria-modal="true"
           aria-labelledby="signout-title"
         >
-          <div class="modal-box max-w-md">
+          <div class="modal-box modal-box-scroll md:w-full md:max-w-md">
             <h2 id="signout-title" class="type-heading">Sign out with sales waiting?</h2>
             <p class="mt-2 text-sm text-base-content/70">
               {{ pendingSyncCount() }} sale(s) will remain safely on this device. They are tied to

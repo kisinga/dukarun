@@ -383,7 +383,7 @@ const QUEUE_SORT_OPTIONS: readonly ListSortOption[] = [
       }
       @if (mpesaSplitReady(); as split) {
         <dialog class="modal modal-open" aria-labelledby="queue-mpesa-cash-heading">
-          <div class="modal-box">
+          <div class="modal-box modal-box-scroll">
             <h2 id="queue-mpesa-cash-heading" class="type-title">M-PESA received</h2>
             <p class="mt-2 text-sm">Confirm cash only after it is in hand.</p>
             <p class="mt-4 text-xl font-semibold"><app-money [amount]="split.cashAmount" /></p>

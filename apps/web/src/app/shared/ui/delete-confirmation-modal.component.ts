@@ -21,7 +21,7 @@ export interface DeleteConfirmationData {
   imports: [NgIcon],
   template: `
     <dialog #modal class="modal">
-      <div class="modal-box">
+      <div class="modal-box modal-box-scroll">
         <div class="mb-4 flex justify-center">
           <div class="flex h-16 w-16 items-center justify-center rounded-full bg-error/10">
             <ng-icon name="heroExclamationTriangle" size="2.5rem" class="text-error" />

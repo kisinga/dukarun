@@ -27,7 +27,7 @@
     "dev:super-admin": "npm start -w @dukarun/super-admin",
     "build:super-admin": "npm run build -w @dukarun/super-admin",
     "build:active": "node tools/testing/run-production-builds.mjs",
-    "check:static": "node tools/verification/legal-documents.check.mjs && node tools/guards/public-design.check.mjs && node tools/guards/native-dependencies.check.mjs && node tools/guards/test-boundaries.check.mjs && npm run check:design -w @dukarun/web && npm run check:offline-architecture -w @dukarun/web",
+    "check:static": "node tools/verification/legal-documents.check.mjs && node tools/guards/public-design.check.mjs && node tools/guards/viewport-safety.check.mjs && node tools/guards/native-dependencies.check.mjs && node tools/guards/test-boundaries.check.mjs && npm run check:design -w @dukarun/web && npm run check:offline-architecture -w @dukarun/web",
     "check:web": "npm run check:static && npm run test:unit -w @dukarun/web && npm run test:component -w @dukarun/web && npm run build:web",
     "test:unit": "vitest run --config vitest.unit.config.ts",
     "test:component": "npm run test:component -w @dukarun/web && npm run test:component -w @dukarun/site && npm run test:component -w @dukarun/storefront && npm run test:component -w @dukarun/super-admin",
