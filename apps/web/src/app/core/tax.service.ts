@@ -29,6 +29,13 @@ export interface CompanyTaxSettings {
   activation: CompanyTaxActivation;
 }
 
+export interface TaxIntegrationLocation {
+  id: string;
+  code: string;
+  name: string;
+  tax_integration_branch_code: string | null;
+}
+
 export interface PeriodReadiness {
   period_id: string;
   start_date: string;
@@ -126,6 +133,21 @@ export class TaxService {
   async updatePrintVisibility(show: boolean): Promise<boolean> {
     const { data, error } = await this.db.rpc('update_tax_print_settings', {
       p_show_vat_breakdown: show,
+    });
+    if (error) throw rpcError(error);
+    return data;
+  }
+
+  async integrationLocations(): Promise<TaxIntegrationLocation[]> {
+    const { data, error } = await this.db.rpc('tax_integration_locations');
+    if (error) throw rpcError(error);
+    return data as unknown as TaxIntegrationLocation[];
+  }
+
+  async updateLocationTaxBranchCode(locationId: string, branchCode: string): Promise<string> {
+    const { data, error } = await this.db.rpc('update_location_tax_branch_code', {
+      p_location_id: locationId,
+      p_branch_code: branchCode,
     });
     if (error) throw rpcError(error);
     return data;

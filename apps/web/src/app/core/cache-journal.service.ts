@@ -48,6 +48,13 @@ interface RegisteredHandler {
 /**
  * Realtime is only a low-latency wake-up. sync_cache_stream is the durable,
  * ordered source of invalidations and heals events missed while disconnected.
+ *
+ * Cache rebuild invariant:
+ * - Replay changes whenever the saved sequence is still covered by the
+ *   server's retained sequence history, regardless of how many changes exist.
+ * - Rebuild only when resetRequired reports a retention gap, an explicit reset
+ *   is replayed, or local identity/cache state was deliberately invalidated.
+ * Never replace this with a change-count or catalogue-percentage heuristic.
  */
 @Injectable({ providedIn: 'root' })
 export class CacheJournalService {
@@ -235,6 +242,9 @@ export class CacheJournalService {
       if (error) throw error;
       const response = data as unknown as CacheSyncResponse;
       const forcedReset = this.forcedResets.has(reconcileKey);
+      // resetRequired means sequence < prunedThroughSequence: the server can no
+      // longer prove a continuous replay from our watermark. Page size and
+      // change count never trigger a rebuild; hasMore simply fetches the rest.
       const reset =
         forcedReset ||
         response.resetRequired ||

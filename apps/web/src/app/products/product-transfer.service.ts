@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import type { Cell, Workbook, Worksheet } from 'exceljs';
 import { CatalogCacheService } from '../core/catalog-cache.service';
+import { LocationContextService } from '../core/location-context.service';
 import { createExcelWorkbook } from '../shared/excel-workbook';
 import { SupabaseService } from '../core/supabase.service';
 
@@ -51,6 +52,12 @@ export interface CatalogPriceChange {
   newRetailPrice?: number;
   currentWholesalePrice: number | null;
   newWholesalePrice?: number | null;
+  expectedStockQuantity?: number;
+  currentStockQuantity?: number;
+  newStockQuantity?: number;
+  stockUnitCost?: number;
+  stockLocationId?: string;
+  stockLocationName?: string;
 }
 
 export interface CatalogPriceUpdatePreview {
@@ -60,6 +67,7 @@ export interface CatalogPriceUpdatePreview {
   unchangedRows: number;
   retailChanges: number;
   wholesaleChanges: number;
+  stockChanges: number;
   changes: CatalogPriceChange[];
   errors: string[];
   conflicts: string[];
@@ -81,6 +89,7 @@ export interface CatalogPriceUpdateResult {
   updated_variants: number;
   retail_changes: number;
   wholesale_changes: number;
+  stock_changes: number;
 }
 
 export type ProductWorkbookResult = CatalogImportResult | CatalogPriceUpdateResult;
@@ -122,6 +131,13 @@ const PRICE_UPDATE_HEADERS = [
   'new_retail_price_kes',
   'current_wholesale_price_kes',
   'new_wholesale_price_kes',
+  'expected_stock_quantity',
+  'stock_location',
+  'track_inventory',
+  'allow_fractional_stock',
+  'current_stock_quantity',
+  'new_stock_quantity',
+  'stock_increase_unit_cost_kes',
 ] as const;
 
 type Header = (typeof HEADERS)[number];
@@ -168,12 +184,17 @@ type PriceExportRow = {
   variant_active: boolean;
   retail_price: number;
   wholesale_price: number | null;
+  stock: number;
+  track_inventory: boolean;
+  allow_fractional: boolean;
+  stock_location: string;
 };
 
 @Injectable({ providedIn: 'root' })
 export class ProductTransferService {
   private readonly supabase = inject(SupabaseService);
   private readonly catalogCache = inject(CatalogCacheService);
+  private readonly locations = inject(LocationContextService);
 
   async exportCatalog(): Promise<void> {
     await this.catalogCache.ensureLoaded();
@@ -181,7 +202,7 @@ export class ProductTransferService {
       throw new Error('No cached product catalog is available on this device yet.');
     }
     if (this.catalogCache.catalogTruncated()) {
-      throw new Error(`Price workbooks support at most ${MAX_ROWS} variants.`);
+      throw new Error(`Product update workbooks support at most ${MAX_ROWS} variants.`);
     }
 
     let variants = this.cachedPriceVariants();
@@ -190,8 +211,10 @@ export class ProductTransferService {
       variants = this.cachedPriceVariants();
     }
     if (variants.some(variant => !variant.variant_updated_at)) {
-      throw new Error('Refresh the catalog cache before exporting prices.');
+      throw new Error('Refresh the catalog cache before exporting product updates.');
     }
+    const location = this.locations.active();
+    if (!location) throw new Error('Choose a business location before exporting.');
 
     const rows: PriceExportRow[] = variants.map(variant => ({
       variant_id: variant.variant_id!,
@@ -207,10 +230,14 @@ export class ProductTransferService {
         variant.wholesale_price === null || variant.wholesale_price === undefined
           ? null
           : Number(variant.wholesale_price),
+      stock: Number(variant.stock ?? 0),
+      track_inventory: variant.track_inventory ?? false,
+      allow_fractional: variant.allow_fractional ?? false,
+      stock_location: `${location.code} — ${location.name}`,
     }));
     const exportedAt = this.catalogCache.fetchedAt() ?? new Date().toISOString();
-    const workbook = await this.priceUpdateWorkbook(rows, exportedAt);
-    await this.download(workbook, `dukarun-price-update-${exportedAt.slice(0, 10)}.xlsx`);
+    const workbook = await this.priceUpdateWorkbook(rows, exportedAt, location.id);
+    await this.download(workbook, `dukarun-product-update-${exportedAt.slice(0, 10)}.xlsx`);
   }
 
   async downloadTemplate(): Promise<void> {
@@ -436,11 +463,15 @@ export class ProductTransferService {
   ): Promise<CatalogPriceUpdatePreview> {
     const companyId = this.supabase.claims()?.company_id ?? '';
     if (!companyId || metadata['company_id'] !== companyId) {
-      throw new Error('This price workbook belongs to a different company.');
+      throw new Error('This product update workbook belongs to a different company.');
     }
-    const sheet = workbook.getWorksheet('Price Updates');
-    if (!sheet) throw new Error('Workbook needs a Price Updates sheet.');
-    if (sheet.actualRowCount < 2) throw new Error('Price Updates sheet has no product rows.');
+    const activeLocation = this.locations.active();
+    if (!activeLocation || metadata['stock_location_id'] !== activeLocation.id) {
+      throw new Error('Switch to the stock location used by this workbook before importing it.');
+    }
+    const sheet = workbook.getWorksheet('Product Updates');
+    if (!sheet) throw new Error('Workbook needs a Product Updates sheet.');
+    if (sheet.actualRowCount < 2) throw new Error('Product Updates sheet has no product rows.');
     if (sheet.actualRowCount - 1 > MAX_ROWS) {
       throw new Error(`Maximum ${MAX_ROWS} rows per import.`);
     }
@@ -448,6 +479,9 @@ export class ProductTransferService {
     const headers = this.priceHeaderMap(sheet);
     const currentVariants = await this.allVariants();
     const currentById = new Map(currentVariants.map(variant => [variant.id, variant]));
+    const cachedById = new Map(
+      this.cachedPriceVariants().map(variant => [variant.variant_id!, variant])
+    );
     const seen = new Set<string>();
     const changes: CatalogPriceChange[] = [];
     const errors: string[] = [];
@@ -456,6 +490,7 @@ export class ProductTransferService {
     let unchangedRows = 0;
     let retailChanges = 0;
     let wholesaleChanges = 0;
+    let stockChanges = 0;
 
     sheet.eachRow((row, rowNumber) => {
       if (rowNumber === 1) return;
@@ -477,9 +512,16 @@ export class ProductTransferService {
 
         const retailCell = this.rawCell(cell('new_retail_price_kes'));
         const wholesaleCell = this.rawCell(cell('new_wholesale_price_kes'));
+        const stockCell = this.rawCell(cell('new_stock_quantity'));
+        const stockUnitCostCell = this.rawCell(cell('stock_increase_unit_cost_kes'));
         const retailSupplied = !this.blank(retailCell);
         const wholesaleSupplied = !this.blank(wholesaleCell);
-        if (!retailSupplied && !wholesaleSupplied) {
+        const stockSupplied = !this.blank(stockCell);
+        const stockUnitCostSupplied = !this.blank(stockUnitCostCell);
+        if (stockUnitCostSupplied && !stockSupplied) {
+          throw new Error('stock unit cost requires a new stock quantity');
+        }
+        if (!retailSupplied && !wholesaleSupplied && !stockSupplied) {
           unchangedRows++;
           return;
         }
@@ -494,6 +536,7 @@ export class ProductTransferService {
 
         const current = currentById.get(variantId);
         if (!current) throw new Error('variant no longer exists');
+        const cached = cachedById.get(variantId);
 
         const newRetailPrice = retailSupplied
           ? this.wholeMoney(retailCell, 'new_retail_price_kes')
@@ -505,7 +548,37 @@ export class ProductTransferService {
           newRetailPrice !== undefined && newRetailPrice !== Number(current.price);
         const wholesaleChanged =
           wholesaleSupplied && newWholesalePrice !== (current.wholesale_price ?? null);
-        if (!retailChanged && !wholesaleChanged) {
+        let expectedStockQuantity: number | undefined;
+        let currentStockQuantity: number | undefined;
+        let newStockQuantity: number | undefined;
+        let stockUnitCost: number | undefined;
+        let stockChanged = false;
+        if (stockSupplied) {
+          if (!current.track_inventory || current.kind === 'service') {
+            throw new Error('this variant does not track stock');
+          }
+          if (!cached) throw new Error('variant is not available in the current location cache');
+          expectedStockQuantity = this.quantity(
+            this.rawCell(cell('expected_stock_quantity')),
+            'expected_stock_quantity',
+            current.allow_fractional
+          );
+          currentStockQuantity = Number(cached.stock ?? 0);
+          newStockQuantity = this.quantity(
+            stockCell,
+            'new_stock_quantity',
+            current.allow_fractional
+          );
+          stockChanged = newStockQuantity !== currentStockQuantity;
+          if (stockUnitCostSupplied) {
+            stockUnitCost = this.wholeMoney(stockUnitCostCell, 'stock_increase_unit_cost_kes');
+            if (stockUnitCost === 0) throw new Error('stock unit cost must be greater than zero');
+            if (!stockChanged || newStockQuantity <= currentStockQuantity) {
+              throw new Error('stock unit cost is only used when increasing stock');
+            }
+          }
+        }
+        if (!retailChanged && !wholesaleChanged && !stockChanged) {
           unchangedRows++;
           return;
         }
@@ -518,15 +591,22 @@ export class ProductTransferService {
           throw new Error('wholesale price cannot exceed retail price');
         }
 
-        if (current.updated_at !== expectedUpdatedAt) {
+        if ((retailChanged || wholesaleChanged) && current.updated_at !== expectedUpdatedAt) {
           conflicts.push(
             `Row ${rowNumber}: ${this.priceRowLabel(row, headers)} changed after export`
+          );
+          return;
+        }
+        if (stockChanged && currentStockQuantity !== expectedStockQuantity) {
+          conflicts.push(
+            `Row ${rowNumber}: ${this.priceRowLabel(row, headers)} stock changed after export`
           );
           return;
         }
 
         if (retailChanged) retailChanges++;
         if (wholesaleChanged) wholesaleChanges++;
+        if (stockChanged) stockChanges++;
         changes.push({
           variantId,
           expectedUpdatedAt,
@@ -536,6 +616,16 @@ export class ProductTransferService {
           ...(retailChanged ? { newRetailPrice } : {}),
           currentWholesalePrice: current.wholesale_price ?? null,
           ...(wholesaleChanged ? { newWholesalePrice } : {}),
+          ...(stockChanged
+            ? {
+                expectedStockQuantity,
+                currentStockQuantity,
+                newStockQuantity,
+                ...(stockUnitCost !== undefined ? { stockUnitCost } : {}),
+                stockLocationId: activeLocation.id,
+                stockLocationName: activeLocation.name,
+              }
+            : {}),
         });
       } catch (error) {
         errors.push(`Row ${rowNumber}: ${error instanceof Error ? error.message : 'invalid row'}`);
@@ -549,6 +639,7 @@ export class ProductTransferService {
       unchangedRows,
       retailChanges,
       wholesaleChanges,
+      stockChanges,
       changes,
       errors,
       conflicts,
@@ -597,7 +688,7 @@ export class ProductTransferService {
     if (preview.errors.length || preview.conflicts.length) {
       throw new Error('Fix workbook errors before importing.');
     }
-    if (preview.changes.length === 0) throw new Error('Workbook has no price changes.');
+    if (preview.changes.length === 0) throw new Error('Workbook has no product changes.');
     const payload = preview.changes.map(change => ({
       variant_id: change.variantId,
       expected_updated_at: change.expectedUpdatedAt,
@@ -605,11 +696,29 @@ export class ProductTransferService {
       ...('newWholesalePrice' in change
         ? { new_wholesale_price: change.newWholesalePrice ?? null }
         : {}),
+      ...(change.newStockQuantity !== undefined
+        ? {
+            stock_location_id: change.stockLocationId,
+            expected_stock_quantity: change.expectedStockQuantity,
+            new_stock_quantity: change.newStockQuantity,
+            ...(change.stockUnitCost !== undefined
+              ? { stock_unit_cost: change.stockUnitCost }
+              : {}),
+          }
+        : {}),
     }));
     const { data, error } = await this.supabase.client.rpc('apply_catalog_price_updates', {
       p_changes: payload as never,
     });
-    if (error) throw error;
+    if (error) {
+      if (error.message.startsWith('stock_changed:')) {
+        throw new Error('Stock changed after preview. Export a fresh workbook and try again.');
+      }
+      if (error.message.includes('stale_catalog_price_export')) {
+        throw new Error('A price changed after preview. Export a fresh workbook and try again.');
+      }
+      throw new Error(error.message);
+    }
     return { kind: 'price_update', ...(data as Omit<CatalogPriceUpdateResult, 'kind'>) };
   }
 
@@ -694,16 +803,20 @@ export class ProductTransferService {
     >;
   }
 
-  private async priceUpdateWorkbook(rows: PriceExportRow[], exportedAt: string): Promise<Workbook> {
+  private async priceUpdateWorkbook(
+    rows: PriceExportRow[],
+    exportedAt: string,
+    stockLocationId = this.locations.active()?.id ?? ''
+  ): Promise<Workbook> {
     const workbook = await createExcelWorkbook();
     workbook.creator = 'DukaRun';
     workbook.created = new Date();
-    const sheet = workbook.addWorksheet('Price Updates', {
+    const sheet = workbook.addWorksheet('Product Updates', {
       views: [{ state: 'frozen', ySplit: 1, xSplit: 3 }],
       properties: { tabColor: { argb: '1F4E78' } },
     });
     sheet.addTable({
-      name: 'DukaRunPriceUpdates',
+      name: 'DukaRunProductUpdates',
       ref: 'A1',
       headerRow: true,
       totalsRow: false,
@@ -721,15 +834,24 @@ export class ProductTransferService {
         '',
         row.wholesale_price ?? '',
         '',
+        row.stock,
+        row.stock_location,
+        row.track_inventory,
+        row.allow_fractional,
+        row.stock,
+        '',
+        '',
       ]),
     });
-    const widths = [38, 30, 28, 22, 20, 15, 15, 24, 22, 27, 25];
+    const widths = [38, 30, 28, 22, 20, 15, 15, 24, 22, 27, 25, 24, 28, 18, 24, 24, 22, 30];
     widths.forEach((width, index) => (sheet.getColumn(index + 1).width = width));
     sheet.getColumn(1).hidden = true;
     sheet.getColumn(2).hidden = true;
-    for (const column of [8, 9, 10, 11]) sheet.getColumn(column).numFmt = '#,##0';
+    sheet.getColumn(12).hidden = true;
+    for (const column of [8, 9, 10, 11, 18]) sheet.getColumn(column).numFmt = '#,##0';
+    for (const column of [12, 16, 17]) sheet.getColumn(column).numFmt = '#,##0.###';
     for (let row = 2; row <= Math.max(2, sheet.rowCount); row++) {
-      for (const column of [9, 11]) {
+      for (const column of [9, 11, 17, 18]) {
         sheet.getCell(row, column).fill = {
           type: 'pattern',
           pattern: 'solid',
@@ -744,9 +866,18 @@ export class ProductTransferService {
     instructions.columns = [{ width: 26 }, { width: 100 }];
     [
       ['Rule', 'Details'],
-      ['Purpose', 'Use this workbook only to update retail and wholesale prices.'],
+      ['Purpose', 'Use this workbook to update prices and stock quantities.'],
       ['New prices', 'Enter whole Kenyan shillings in the yellow new-price columns.'],
-      ['No change', 'Leave a new-price cell blank to keep the current value.'],
+      ['New stock', 'Enter the counted quantity for the location shown in the stock columns.'],
+      [
+        'Stock cost',
+        'For stock increases, enter a whole-KES unit cost only when the product has no previous cost at this location.',
+      ],
+      [
+        'Stock permission',
+        'Stock changes require the Manage stock adjustments permission and are recorded as counted-stock adjustments.',
+      ],
+      ['No change', 'Leave a yellow cell blank to keep the current value.'],
       ['Clear wholesale', 'Enter CLEAR in new_wholesale_price_kes to remove the wholesale price.'],
       [
         'Formulas',
@@ -755,7 +886,7 @@ export class ProductTransferService {
       ['Rows', 'Do not change the hidden identity columns. Sorting and filtering are safe.'],
       [
         'Conflicts',
-        'Re-export if DukaRun reports that a product changed after this workbook was created.',
+        'Re-export if DukaRun reports that a price or stock quantity changed after export.',
       ],
     ].forEach(row => instructions.addRow(row));
     instructions.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
@@ -769,6 +900,7 @@ export class ProductTransferService {
       formatVersion: '2',
       workbookKind: 'price_update',
       exportedAt,
+      stockLocationId,
     });
     return workbook;
   }
@@ -887,6 +1019,7 @@ export class ProductTransferService {
       formatVersion: string;
       workbookKind: 'price_update' | 'product_create';
       exportedAt: string;
+      stockLocationId?: string;
     }
   ): void {
     const metadata = workbook.addWorksheet('_DukaRun Metadata', { state: 'veryHidden' });
@@ -896,6 +1029,7 @@ export class ProductTransferService {
       ['entity', 'products'],
       ['company_id', this.supabase.claims()?.company_id ?? ''],
       ['exported_at', values.exportedAt],
+      ...(values.stockLocationId ? [['stock_location_id', values.stockLocationId]] : []),
     ]);
   }
 
@@ -1006,6 +1140,21 @@ export class ProductTransferService {
   private wholesaleUpdateValue(value: unknown): number | null {
     if (this.text(value).toUpperCase() === 'CLEAR') return null;
     return this.wholeMoney(value, 'new_wholesale_price_kes');
+  }
+
+  private quantity(value: unknown, name: string, allowFractional: boolean): number {
+    const text = this.text(value).replaceAll(',', '');
+    if (!/^\d+(?:\.\d{1,3})?$/.test(text)) {
+      throw new Error(`${name} must be zero or greater with at most 3 decimal places`);
+    }
+    const result = Number(text);
+    if (!Number.isFinite(result) || result > 99_999_999_999.999) {
+      throw new Error(`${name} is too large`);
+    }
+    if (!allowFractional && !Number.isInteger(result)) {
+      throw new Error(`${name} does not allow fractional stock`);
+    }
+    return result;
   }
 
   private blank(value: unknown): boolean {

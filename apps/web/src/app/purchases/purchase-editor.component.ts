@@ -1,4 +1,5 @@
 import { Component, HostListener, OnInit, computed, inject, signal } from '@angular/core';
+import type { PurchaseTaxEstimate } from '@dukarun/tax-types';
 import { FormControl, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { CatalogSearchService } from '../core/catalog-search.service';
@@ -170,10 +171,13 @@ interface ExpenseForm {
                         }
                       </select>
                     </app-form-field>
-                    <app-form-field label="Invoice / reference">
+                    <app-form-field
+                      [label]="claimInputVat.value ? 'VAT invoice number' : 'Invoice / reference'"
+                      [required]="claimInputVat.value"
+                    >
                       <input
                         class="input input-bordered h-12 w-full"
-                        placeholder="Optional"
+                        [placeholder]="claimInputVat.value ? 'Required for input VAT' : 'Optional'"
                         [formControl]="reference"
                         (input)="markDirty()"
                       />
@@ -207,7 +211,7 @@ interface ExpenseForm {
                           type="date"
                           class="input input-bordered h-11 w-full md:h-10"
                           [formControl]="purchaseDate"
-                          (change)="markDirty()"
+                          (change)="onPurchaseDateChange()"
                         />
                       </app-form-field>
                       <app-form-field label="Notes">
@@ -219,6 +223,114 @@ interface ExpenseForm {
                         />
                       </app-form-field>
                     </div>
+                  }
+                </div>
+              </section>
+
+              <section class="card bg-base-100" data-purchase-input-vat>
+                <div class="card-body gap-4 p-4">
+                  <label class="flex cursor-pointer items-start gap-3">
+                    <input
+                      type="checkbox"
+                      class="checkbox checkbox-primary mt-0.5"
+                      [checked]="claimInputVat.value"
+                      (change)="setClaimInputVat($any($event.target).checked)"
+                    />
+                    <span>
+                      <span class="block text-sm font-semibold"
+                        >Claim input VAT from this invoice</span
+                      >
+                      <span class="type-caption mt-1 block">
+                        Costs stay VAT-inclusive. Claiming VAT extracts the recoverable amount; it
+                        does not increase the supplier invoice total.
+                      </span>
+                    </span>
+                  </label>
+
+                  @if (claimInputVat.value) {
+                    <div class="grid gap-4 border-t border-base-300 pt-4 md:grid-cols-2">
+                      <app-form-field
+                        label="Supplier tax PIN"
+                        [required]="true"
+                        hint="Saved to this supplier and snapshotted on the completed purchase."
+                        [error]="supplierPinError()"
+                      >
+                        <div class="flex gap-2">
+                          <input
+                            data-supplier-tax-pin
+                            class="input input-bordered h-11 min-w-0 flex-1"
+                            placeholder="e.g. P000000000A"
+                            [formControl]="supplierTaxPin"
+                            (input)="onSupplierPinInput()"
+                          />
+                          <button
+                            appButton
+                            variant="outline"
+                            size="sm"
+                            type="button"
+                            [loading]="supplierPinSaving()"
+                            [disabled]="supplierPinSaved() || !supplierTaxPin.value.trim()"
+                            (click)="saveSupplierPin()"
+                          >
+                            {{ supplierPinSaved() ? 'Saved' : 'Save PIN' }}
+                          </button>
+                        </div>
+                      </app-form-field>
+                      <app-form-field
+                        label="Tax invoice date"
+                        [required]="true"
+                        hint="This is the VAT tax point and may differ from the stock receipt date."
+                      >
+                        <input
+                          data-tax-invoice-date
+                          type="date"
+                          class="input input-bordered h-11 w-full"
+                          [formControl]="taxInvoiceDate"
+                          (change)="onTaxInvoiceDateChange()"
+                        />
+                      </app-form-field>
+                    </div>
+
+                    <div class="rounded-field border border-base-300 bg-base-200/30 p-3">
+                      @if (taxEstimateLoading()) {
+                        <div class="flex items-center gap-2 text-sm text-base-content/70">
+                          <span class="loading loading-spinner loading-sm"></span>
+                          Calculating VAT from the configured product rates…
+                        </div>
+                      } @else if (taxEstimateError()) {
+                        <div class="flex items-start gap-2 text-sm text-error" role="alert">
+                          <app-icon name="heroExclamationTriangle" />
+                          <span>{{ taxEstimateError() }}</span>
+                        </div>
+                      } @else if (taxEstimate(); as estimate) {
+                        <div class="grid gap-3 sm:grid-cols-3">
+                          <div>
+                            <p class="type-caption">Gross supplier invoice</p>
+                            <p class="font-semibold">
+                              <app-money [amount]="estimate.gross_total" />
+                            </p>
+                          </div>
+                          <div>
+                            <p class="type-caption">Net inventory and expense cost</p>
+                            <p class="font-semibold"><app-money [amount]="estimate.net_total" /></p>
+                          </div>
+                          <div>
+                            <p class="type-caption">Recoverable input VAT</p>
+                            <p class="font-semibold text-success">
+                              <app-money [amount]="estimate.tax_total" />
+                            </p>
+                          </div>
+                        </div>
+                      } @else {
+                        <p class="type-caption">
+                          Add valid items to see the VAT extracted from this supplier invoice.
+                        </p>
+                      }
+                    </div>
+                    <p class="type-caption">
+                      Expenses included in the supplier bill share this invoice's VAT treatment.
+                      Separately paid expenses remain outside this claim.
+                    </p>
                   }
                 </div>
               </section>
@@ -507,6 +619,14 @@ interface ExpenseForm {
                   <strong>Invoice total</strong
                   ><strong><app-money [amount]="invoiceTotal()" /></strong>
                 </div>
+                @if (claimInputVat.value && taxEstimate(); as estimate) {
+                  <div class="flex justify-between text-sm">
+                    <span>Net cost</span><app-money [amount]="estimate.net_total" />
+                  </div>
+                  <div class="flex justify-between text-sm text-success">
+                    <span>Input VAT</span><app-money [amount]="estimate.tax_total" />
+                  </div>
+                }
                 @if (separateExpenseTotal() > 0) {
                   <div class="flex justify-between text-sm">
                     <span>Paid separately</span><app-money [amount]="separateExpenseTotal()" />
@@ -671,6 +791,15 @@ interface ExpenseForm {
                   <strong>Supplier invoice</strong
                   ><strong><app-money [amount]="invoiceTotal()" /></strong>
                 </div>
+                @if (claimInputVat.value && taxEstimate(); as estimate) {
+                  <div class="flex justify-between text-sm">
+                    <span>Net inventory and expense cost</span
+                    ><app-money [amount]="estimate.net_total" />
+                  </div>
+                  <div class="flex justify-between text-sm text-success">
+                    <span>Recoverable input VAT</span><app-money [amount]="estimate.tax_total" />
+                  </div>
+                }
                 <div class="flex justify-between text-sm">
                   <span>Separately paid expenses</span
                   ><app-money [amount]="separateExpenseTotal()" />
@@ -788,6 +917,11 @@ export class PurchaseEditorComponent implements OnInit {
   protected readonly accountsError = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
   protected readonly draftId = signal<string | null>(null);
+  protected readonly taxEstimate = signal<PurchaseTaxEstimate | null>(null);
+  protected readonly taxEstimateLoading = signal(false);
+  protected readonly taxEstimateError = signal<string | null>(null);
+  protected readonly supplierPinSaving = signal(false);
+  protected readonly supplierPinSaved = signal(true);
   protected readonly label = variantLabel;
 
   protected readonly supplier = new FormControl('', { nonNullable: true });
@@ -795,6 +929,9 @@ export class PurchaseEditorComponent implements OnInit {
   protected readonly reference = new FormControl('', { nonNullable: true });
   protected readonly notes = new FormControl('', { nonNullable: true });
   protected readonly purchaseDate = new FormControl(this.today(), { nonNullable: true });
+  protected readonly claimInputVat = new FormControl(false, { nonNullable: true });
+  protected readonly supplierTaxPin = new FormControl('', { nonNullable: true });
+  protected readonly taxInvoiceDate = new FormControl(this.today(), { nonNullable: true });
   protected readonly paymentMode = new FormControl<PaymentMode>('paid', { nonNullable: true });
   protected readonly partialAmount = new FormControl('', { nonNullable: true });
   protected readonly advanceAmount = new FormControl('0', { nonNullable: true });
@@ -802,6 +939,9 @@ export class PurchaseEditorComponent implements OnInit {
   protected readonly account = new FormControl('', { nonNullable: true });
   private nextKey = 1;
   private searchRequest = 0;
+  private taxEstimateRequest = 0;
+  private taxEstimateTimer: ReturnType<typeof setTimeout> | null = null;
+  private taxInvoiceDateTouched = false;
   private purchaseClientRef: string = crypto.randomUUID();
   private advanceAwareDraft = false;
   private exitAllowed = false;
@@ -829,6 +969,8 @@ export class PurchaseEditorComponent implements OnInit {
   );
 
   async ngOnInit(): Promise<void> {
+    const requestedDraft = this.route.snapshot.paramMap.get('id');
+    let draftToRestore: PurchaseDraft | undefined;
     const errors = await runIndependentLoads([
       {
         fallback: 'Failed to load suppliers',
@@ -855,8 +997,7 @@ export class PurchaseEditorComponent implements OnInit {
         fallback: 'Failed to load purchase drafts',
         run: async () => {
           const drafts = await this.money.purchaseDrafts();
-          const requestedDraft = this.route.snapshot.paramMap.get('id');
-          if (requestedDraft) this.restoreDraft(drafts.find(item => item.id === requestedDraft));
+          if (requestedDraft) draftToRestore = drafts.find(item => item.id === requestedDraft);
         },
       },
       {
@@ -865,6 +1006,12 @@ export class PurchaseEditorComponent implements OnInit {
       },
     ]);
     this.location.setValue(this.locationContext.activeId() ?? this.locations()[0]?.id ?? '');
+    if (requestedDraft) {
+      if (draftToRestore) this.restoreDraft(draftToRestore);
+      else errors.push('Purchase draft was not found');
+    }
+    this.syncSupplierPin();
+    if (this.claimInputVat.value) this.scheduleTaxEstimate();
     this.error.set(errors.length > 0 ? errors.join('. ') : null);
     this.dirty.set(false);
     this.loading.set(false);
@@ -882,6 +1029,137 @@ export class PurchaseEditorComponent implements OnInit {
   protected markDirty(): void {
     this.dirty.set(true);
     this.notice.set(null);
+    if (this.claimInputVat.value) {
+      this.taxEstimate.set(null);
+      this.scheduleTaxEstimate();
+    }
+  }
+  protected setClaimInputVat(claim: boolean): void {
+    this.claimInputVat.setValue(claim);
+    if (claim) {
+      if (!this.taxInvoiceDateTouched) this.taxInvoiceDate.setValue(this.purchaseDate.value);
+      this.syncSupplierPin();
+    } else {
+      this.taxEstimateRequest++;
+      this.taxEstimate.set(null);
+      this.taxEstimateError.set(null);
+      this.taxEstimateLoading.set(false);
+    }
+    this.markDirty();
+  }
+  protected onPurchaseDateChange(): void {
+    if (this.claimInputVat.value && !this.taxInvoiceDateTouched) {
+      this.taxInvoiceDate.setValue(this.purchaseDate.value);
+    }
+    this.markDirty();
+  }
+  protected onTaxInvoiceDateChange(): void {
+    this.taxInvoiceDateTouched = true;
+    this.markDirty();
+  }
+  protected onSupplierPinInput(): void {
+    const savedPin = this.selectedSupplier()?.tax_registration_number?.trim() ?? '';
+    this.supplierPinSaved.set(this.supplierTaxPin.value.trim() === savedPin && !!savedPin);
+    this.markDirty();
+  }
+  protected supplierPinError(): string | null {
+    if (!this.claimInputVat.value) return null;
+    if (!this.supplier.value) return 'Choose a supplier first';
+    if (!this.supplierTaxPin.value.trim()) return 'Enter the supplier tax PIN';
+    if (!this.supplierPinSaved()) return 'Save this PIN to the supplier before claiming VAT';
+    return null;
+  }
+  protected async saveSupplierPin(): Promise<void> {
+    const supplierId = this.supplier.value;
+    const pin = this.supplierTaxPin.value.trim();
+    if (!supplierId || !pin) return;
+    this.supplierPinSaving.set(true);
+    this.error.set(null);
+    try {
+      await this.money.updateSupplierTaxRegistration(supplierId, pin);
+      this.parties.suppliers.update(items =>
+        items.map(item =>
+          item.id === supplierId ? { ...item, tax_registration_number: pin } : item
+        )
+      );
+      this.supplierPinSaved.set(true);
+      this.notice.set('Supplier tax PIN saved');
+    } catch (error) {
+      this.supplierPinSaved.set(false);
+      this.error.set(
+        error instanceof Error ? error.message : 'Supplier tax PIN could not be saved'
+      );
+    } finally {
+      this.supplierPinSaving.set(false);
+    }
+  }
+  private selectedSupplier() {
+    return this.suppliers().find(item => item.id === this.supplier.value);
+  }
+  private syncSupplierPin(): void {
+    const pin = this.selectedSupplier()?.tax_registration_number?.trim() ?? '';
+    this.supplierTaxPin.setValue(pin);
+    this.supplierPinSaved.set(!!pin);
+  }
+  private scheduleTaxEstimate(): void {
+    if (this.taxEstimateTimer) clearTimeout(this.taxEstimateTimer);
+    if (!this.claimInputVat.value || !this.canEstimateVat()) {
+      this.taxEstimateLoading.set(false);
+      this.taxEstimateError.set(null);
+      return;
+    }
+    this.taxEstimateTimer = setTimeout(() => void this.refreshVatEstimate(), 350);
+  }
+  private canEstimateVat(): boolean {
+    if (!this.taxInvoiceDate.value || this.lines().length === 0) return false;
+    if (
+      this.lines().some(
+        line =>
+          line.quantity <= 0 ||
+          (parseKes(line.unitCost) ?? 0) <= 0 ||
+          (parseKes(line.lineTotal) ?? 0) <= 0
+      )
+    )
+      return false;
+    return !this.expenses().some(
+      expense => (parseKes(expense.amount) ?? 0) <= 0 || !expense.settlement
+    );
+  }
+  private async refreshVatEstimate(): Promise<boolean> {
+    if (!this.claimInputVat.value) return true;
+    if (!this.canEstimateVat()) {
+      this.taxEstimate.set(null);
+      this.taxEstimateError.set(null);
+      return false;
+    }
+    const request = ++this.taxEstimateRequest;
+    this.taxEstimateLoading.set(true);
+    this.taxEstimateError.set(null);
+    try {
+      const estimate = await this.money.estimatePurchaseInputVat({
+        lines: this.parsedLines(),
+        expenses: this.parsedExpenses(),
+        taxInvoiceDate: this.taxInvoiceDate.value,
+      });
+      if (request !== this.taxEstimateRequest) return false;
+      this.taxEstimate.set(estimate);
+      if (!estimate.vat_registered) {
+        this.taxEstimateError.set(
+          'Input VAT cannot be claimed because the shop was not VAT-registered on this invoice date.'
+        );
+        return false;
+      }
+      return true;
+    } catch (error) {
+      if (request !== this.taxEstimateRequest) return false;
+      this.taxEstimate.set(null);
+      this.taxEstimateError.set(
+        error instanceof Error ? error.message : 'VAT could not be calculated'
+      );
+      return false;
+    } finally {
+      if (request === this.taxEstimateRequest) this.taxEstimateLoading.set(false);
+    }
   }
   protected expenseSettlementHint(settlement: ExpenseSettlement): string {
     if (settlement === 'supplier_bill') {
@@ -1121,12 +1399,12 @@ export class PurchaseEditorComponent implements OnInit {
     this.markDirty();
   }
 
-  protected goToReview(): void {
-    if (this.validateBuild()) {
-      this.error.set(null);
-      this.stage.set('review');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
+  protected async goToReview(): Promise<void> {
+    if (!this.validateBuild() || !this.validateTaxEvidence()) return;
+    if (this.claimInputVat.value && !(await this.refreshVatEstimate())) return;
+    this.error.set(null);
+    this.stage.set('review');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
   protected setPaymentMode(mode: PaymentMode): void {
     this.paymentMode.setValue(mode);
@@ -1135,6 +1413,7 @@ export class PurchaseEditorComponent implements OnInit {
   }
   protected onSupplierChange(supplierId: string): void {
     this.supplier.setValue(supplierId);
+    this.syncSupplierPin();
     this.advanceAmount.setValue('0');
     this.supplierAdvanceAvailable.set(0);
     this.markDirty();
@@ -1192,6 +1471,8 @@ export class PurchaseEditorComponent implements OnInit {
   protected canConfirm(): boolean {
     return (
       !this.busy() &&
+      (!this.claimInputVat.value ||
+        (!!this.taxEstimate() && !this.taxEstimateError() && !this.taxEstimateLoading())) &&
       !this.advanceAmountError() &&
       !this.partialPaymentError() &&
       !this.creditExceeded() &&
@@ -1204,7 +1485,7 @@ export class PurchaseEditorComponent implements OnInit {
     this.savingDraft.set(true);
     this.error.set(null);
     try {
-      const common = {
+      const id = await this.money.savePurchaseWorkspaceDraft({
         draftId: this.draftId() ?? undefined,
         supplierId: this.supplier.value,
         lines: this.parsedLines(),
@@ -1214,20 +1495,14 @@ export class PurchaseEditorComponent implements OnInit {
         purchaseDate: this.purchaseDate.value,
         stockLocationId: this.location.value,
         paymentAmount: this.initialPayment(),
+        paymentMode: this.paymentMode.value,
+        advanceAmount: this.advanceUsed(),
         accountCode: this.account.value || undefined,
-      };
-      const useAdvanceDraftRpc = this.advanceUsed() > 0 || this.advanceAwareDraft;
-      const id = useAdvanceDraftRpc
-        ? await this.money.savePurchaseDraftWithAdvance({
-            ...common,
-            advanceAmount: this.advanceUsed(),
-            clientRef: this.purchaseClientRef,
-          })
-        : await this.money.savePurchaseDraftComplete({
-            ...common,
-            paymentMode: this.paymentMode.value,
-          });
-      if (useAdvanceDraftRpc) this.advanceAwareDraft = true;
+        clientRef: this.purchaseClientRef,
+        claimInputVat: this.claimInputVat.value,
+        taxInvoiceDate: this.claimInputVat.value ? this.taxInvoiceDate.value : undefined,
+      });
+      this.advanceAwareDraft = this.advanceUsed() > 0;
       this.draftId.set(id);
       this.dirty.set(false);
       this.notice.set('Purchase draft saved');
@@ -1240,62 +1515,32 @@ export class PurchaseEditorComponent implements OnInit {
   }
 
   protected async confirmPurchase(): Promise<void> {
-    if (!this.validateBuild() || !this.canConfirm()) return;
+    if (!this.validateBuild() || !this.validateTaxEvidence()) return;
+    if (this.claimInputVat.value && !(await this.refreshVatEstimate())) return;
+    if (!this.canConfirm()) return;
     this.busy.set(true);
     this.error.set(null);
     try {
       if (this.requiresSession()) await this.cashierSession.assertOpen('recording this purchase');
-      let purchaseId: string;
-      if (this.draftId()) {
-        const common = {
-          draftId: this.draftId()!,
-          supplierId: this.supplier.value,
-          lines: this.parsedLines(),
-          expenses: this.parsedExpenses(),
-          reference: this.reference.value.trim() || undefined,
-          notes: this.notes.value.trim() || undefined,
-          purchaseDate: this.purchaseDate.value,
-          stockLocationId: this.location.value,
-          paymentAmount: this.initialPayment(),
-          accountCode: this.account.value || undefined,
-        };
-        if (this.advanceUsed() > 0 || this.advanceAwareDraft) {
-          await this.money.savePurchaseDraftWithAdvance({
-            ...common,
-            advanceAmount: this.advanceUsed(),
-            clientRef: this.purchaseClientRef,
-          });
-          this.advanceAwareDraft = true;
-          purchaseId = await this.money.confirmPurchaseDraftWithAdvance(this.draftId()!);
-        } else {
-          await this.money.savePurchaseDraftComplete({
-            ...common,
-            paymentMode: this.paymentMode.value,
-          });
-          purchaseId = await this.money.confirmPurchaseDraftComplete(this.draftId()!);
-        }
-      } else {
-        const common = {
-          supplierId: this.supplier.value,
-          lines: this.parsedLines(),
-          expenses: this.parsedExpenses(),
-          paymentAmount: this.initialPayment(),
-          reference: this.reference.value.trim() || undefined,
-          accountCode: this.account.value || undefined,
-          notes: this.notes.value.trim() || undefined,
-          purchaseDate: this.purchaseDate.value,
-          stockLocationId: this.location.value,
-        };
-        purchaseId =
-          this.advanceUsed() > 0
-            ? await this.money.recordPurchaseWithAdvance({
-                ...common,
-                advanceAmount: this.advanceUsed(),
-                creditAmount: this.balanceDue(),
-                clientRef: this.purchaseClientRef,
-              })
-            : await this.money.recordPurchaseComplete(common);
-      }
+      const draftId = await this.money.savePurchaseWorkspaceDraft({
+        draftId: this.draftId() ?? undefined,
+        supplierId: this.supplier.value,
+        lines: this.parsedLines(),
+        expenses: this.parsedExpenses(),
+        reference: this.reference.value.trim() || undefined,
+        notes: this.notes.value.trim() || undefined,
+        purchaseDate: this.purchaseDate.value,
+        stockLocationId: this.location.value,
+        paymentMode: this.paymentMode.value,
+        paymentAmount: this.initialPayment(),
+        advanceAmount: this.advanceUsed(),
+        accountCode: this.account.value || undefined,
+        clientRef: this.purchaseClientRef,
+        claimInputVat: this.claimInputVat.value,
+        taxInvoiceDate: this.claimInputVat.value ? this.taxInvoiceDate.value : undefined,
+      });
+      this.draftId.set(draftId);
+      const purchaseId = await this.money.finalizePurchaseDraft(draftId);
       this.exitAllowed = true;
       this.dirty.set(false);
       await this.router.navigate(['/purchases'], { state: { purchaseRecorded: true, purchaseId } });
@@ -1371,6 +1616,27 @@ export class PurchaseEditorComponent implements OnInit {
     return valid;
   }
 
+  private validateTaxEvidence(): boolean {
+    if (!this.claimInputVat.value) return true;
+    if (!this.reference.value.trim()) {
+      this.error.set('Enter the VAT invoice number in Invoice / reference');
+      this.focusControl('input[placeholder="Required for input VAT"]');
+      return false;
+    }
+    if (!this.taxInvoiceDate.value) {
+      this.error.set('Enter the supplier tax invoice date');
+      this.focusControl('[data-tax-invoice-date]');
+      return false;
+    }
+    const pinError = this.supplierPinError();
+    if (pinError) {
+      this.error.set(pinError);
+      this.focusControl('[data-supplier-tax-pin]');
+      return false;
+    }
+    return true;
+  }
+
   private focusControl(selector: string): void {
     setTimeout(() => document.querySelector<HTMLElement>(selector)?.focus());
   }
@@ -1430,6 +1696,9 @@ export class PurchaseEditorComponent implements OnInit {
     this.reference.setValue(draft.reference ?? '');
     this.notes.setValue(draft.notes ?? '');
     this.purchaseDate.setValue(draft.purchase_date);
+    this.claimInputVat.setValue(draft.claim_input_vat);
+    this.taxInvoiceDate.setValue(draft.tax_invoice_date ?? draft.purchase_date);
+    this.taxInvoiceDateTouched = draft.tax_invoice_date !== null;
     this.location.setValue(draft.stock_location_id ?? this.location.value);
     this.paymentMode.setValue((draft.payment_mode as PaymentMode | null) ?? 'paid');
     this.partialAmount.setValue(

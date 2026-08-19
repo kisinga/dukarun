@@ -2,7 +2,12 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import type { TaxCategory } from '@dukarun/tax-types';
 import { PermissionsService } from '../core/permissions.service';
-import { TaxService, type CompanyTaxSettings, type TaxJurisdiction } from '../core/tax.service';
+import {
+  TaxService,
+  type CompanyTaxSettings,
+  type TaxIntegrationLocation,
+  type TaxJurisdiction,
+} from '../core/tax.service';
 import { ButtonComponent } from '../shared/ui/button.component';
 import { FormFieldComponent } from '../shared/ui/form-field.component';
 import { IconComponent } from '../shared/ui/icon.component';
@@ -66,6 +71,60 @@ import { ReceiptDataService } from '../shared/print/receipt-data.service';
               />
             </label>
           </div>
+
+          @if (kenyaVatConfigured()) {
+            <section class="mt-4 rounded-box border border-base-300 p-3">
+              <div class="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <h3 class="text-sm font-semibold">eTIMS preparation</h3>
+                  <p class="type-caption mt-1">
+                    Save the KRA branch ID assigned to each location. Future VAT documents snapshot
+                    it, so an eTIMS connector can submit them without changing historical sales.
+                  </p>
+                </div>
+                <span class="badge badge-outline">No submission yet</span>
+              </div>
+              <div class="mt-3 grid gap-2">
+                @for (location of integrationLocations(); track location.id) {
+                  <div class="grid items-end gap-2 sm:grid-cols-[minmax(0,1fr)_11rem_auto]">
+                    <div>
+                      <p class="text-sm font-medium">{{ location.name }}</p>
+                      <p class="type-caption">{{ location.code }}</p>
+                    </div>
+                    <app-form-field
+                      label="KRA branch ID"
+                      hint="Use the ID assigned by KRA, often 00 for head office."
+                    >
+                      <input
+                        class="input input-bordered input-sm w-full"
+                        autocomplete="off"
+                        maxlength="32"
+                        [value]="branchCodes()[location.id]"
+                        [disabled]="!canManage() || savingBranchId() === location.id"
+                        (input)="setBranchCode(location.id, $event)"
+                      />
+                    </app-form-field>
+                    <button
+                      appButton
+                      type="button"
+                      variant="outline"
+                      [loading]="savingBranchId() === location.id"
+                      [disabled]="!canManage()"
+                      (click)="saveBranchCode(location)"
+                    >
+                      Save
+                    </button>
+                  </div>
+                } @empty {
+                  <p class="type-caption">No active shop locations found.</p>
+                }
+              </div>
+              <p class="type-caption mt-3">
+                This prepares document data only. Dukarun does not yet sign, transmit, or certify
+                invoices through eTIMS.
+              </p>
+            </section>
+          }
 
           @if (current.scheduled_profiles.length) {
             <div class="mt-4 rounded-box border border-info/30 bg-info/5 p-3">
@@ -267,8 +326,20 @@ export class TaxSettingsComponent implements OnInit {
   protected readonly savingPrint = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
+  protected readonly integrationLocations = signal<TaxIntegrationLocation[]>([]);
+  protected readonly branchCodes = signal<Record<string, string>>({});
+  protected readonly savingBranchId = signal<string | null>(null);
   protected readonly onboardingStep = signal(1);
   protected readonly canManage = computed(() => this.permissions.has('CloseAccountingPeriod'));
+  protected readonly kenyaVatConfigured = computed(() => {
+    const current = this.settings();
+    return Boolean(
+      (current?.active_profile?.vat_registered && current.active_profile.country_code === 'KE') ||
+      current?.scheduled_profiles.some(
+        profile => profile.vat_registered && profile.country_code === 'KE'
+      )
+    );
+  });
   protected readonly defaultCategoryName = computed(
     () =>
       this.categories().find(item => item.id === this.defaultCategory.value)?.name ??
@@ -355,6 +426,33 @@ export class TaxSettingsComponent implements OnInit {
     }
   }
 
+  protected setBranchCode(locationId: string, event: Event): void {
+    const value = (event.target as HTMLInputElement).value;
+    this.branchCodes.update(current => ({ ...current, [locationId]: value }));
+  }
+
+  protected async saveBranchCode(location: TaxIntegrationLocation): Promise<void> {
+    this.savingBranchId.set(location.id);
+    this.error.set(null);
+    this.notice.set(null);
+    try {
+      const branchCode = this.branchCodes()[location.id]?.trim() ?? '';
+      await this.tax.updateLocationTaxBranchCode(location.id, branchCode);
+      this.integrationLocations.update(locations =>
+        locations.map(item =>
+          item.id === location.id
+            ? { ...item, tax_integration_branch_code: branchCode || null }
+            : item
+        )
+      );
+      this.notice.set(`Saved the tax branch ID for ${location.name}.`);
+    } catch (error) {
+      this.error.set(error instanceof Error ? error.message : 'Could not save tax branch ID');
+    } finally {
+      this.savingBranchId.set(null);
+    }
+  }
+
   protected nextStep(): void {
     if (this.onboardingStep() === 2 && !this.jurisdiction.value) return;
     if (
@@ -396,8 +494,17 @@ export class TaxSettingsComponent implements OnInit {
     this.loading.set(true);
     this.error.set(null);
     try {
-      const settings = await this.tax.settings();
+      const [settings, locations] = await Promise.all([
+        this.tax.settings(),
+        this.tax.integrationLocations(),
+      ]);
       this.settings.set(settings);
+      this.integrationLocations.set(locations);
+      this.branchCodes.set(
+        Object.fromEntries(
+          locations.map(location => [location.id, location.tax_integration_branch_code ?? ''])
+        )
+      );
       this.effectiveFrom.setValue(settings.activation.earliest_effective_from);
       const profile = settings.active_profile;
       const jurisdictionId = profile?.jurisdiction_id ?? settings.jurisdictions[0]?.id ?? '';

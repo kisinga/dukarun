@@ -16,10 +16,10 @@ import { PermissionsService } from '../../core/permissions.service';
 import { SyncService } from '../../pos/offline/sync.service';
 import { PosService, variantLabel, type Variant } from '../../pos/pos.service';
 import {
-  DailyProductSales,
-  DailySummary,
+  DashboardDailySummary,
   DashboardLocationSummary,
   DashboardPeriodComparison,
+  DashboardTopVariant,
   ExpiringBatch,
   LowStockVariant,
   ReportsService,
@@ -32,12 +32,7 @@ import { MoneyComponent } from '../../shared/ui/money.component';
 import { PageLayoutComponent } from '../../shared/ui/page-layout.component';
 import { StatCardComponent } from '../../shared/ui/stat-card.component';
 import { CompanyPreferencesService } from '../../core/company-preferences.service';
-import {
-  offlineDb,
-  offlineScopeKey,
-  type CacheStream,
-  type NamedSnapshot,
-} from '../../pos/offline/offline-db';
+import { offlineDb, offlineScopeKey, type NamedSnapshot } from '../../pos/offline/offline-db';
 import { CacheJournalService, type CacheStreamHandler } from '../../core/cache-journal.service';
 import { PageActionsComponent } from '../../shared/ui/page-actions.component';
 
@@ -51,7 +46,12 @@ type TopVariant = {
 };
 type LowStockDisplay = LowStockVariant & { manufacturer_name: string | null };
 type ExpiringDisplay = ExpiringBatch & { manufacturer_name: string | null };
-type SalesChartPoint = DailySummary & { day: string; revenue: number; heightPercent: number };
+type SalesChartPoint = DashboardDailySummary & {
+  day: string;
+  revenue: number;
+  heightPercent: number;
+};
+type DashboardSection = 'sales' | 'attention';
 
 @Component({
   selector: 'app-dashboard',
@@ -390,13 +390,11 @@ type SalesChartPoint = DailySummary & { day: string; revenue: number; heightPerc
                         <div class="flex items-center gap-3 py-2 text-sm">
                           <div class="min-w-0 flex-1">
                             <p class="font-medium">{{ shortDay(day.day) }}</p>
-                            <p class="type-caption">{{ day.orders ?? 0 }} sales</p>
+                            <p class="type-caption">{{ day.orders }} sales</p>
                           </div>
                           <div class="shrink-0 text-right">
-                            <p class="font-semibold"><app-money [amount]="day.revenue ?? 0" /></p>
-                            <p class="type-caption">
-                              margin <app-money [amount]="day.margin ?? 0" />
-                            </p>
+                            <p class="font-semibold"><app-money [amount]="day.revenue" /></p>
+                            <p class="type-caption">margin <app-money [amount]="day.margin" /></p>
                           </div>
                         </div>
                       }
@@ -603,8 +601,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   protected readonly lastUpdated = signal<Date | null>(null);
   protected readonly salesChartExpanded = signal(false);
 
-  protected readonly summary = signal<DailySummary[]>([]);
-  protected readonly productSales = signal<DailyProductSales[]>([]);
+  protected readonly summary = signal<DashboardDailySummary[]>([]);
   protected readonly topVariants = signal<TopVariant[]>([]);
   protected readonly lowStock = signal<LowStockDisplay[]>([]);
   protected readonly lowStockTotal = signal(0);
@@ -638,7 +635,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   protected readonly today = computed(() =>
     this.summary().find(day => day.day === this.todayIso())
   );
-  protected readonly week = computed<DailySummary[]>(() => {
+  protected readonly week = computed<DashboardDailySummary[]>(() => {
     const byDay = new Map(
       this.summary()
         .filter(row => row.day)
@@ -654,6 +651,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
           revenue: 0,
           cogs: 0,
           margin: 0,
+          quantity: 0,
         }
       );
     });
@@ -667,13 +665,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
   protected readonly weekOrders = computed(() =>
     this.week().reduce((total, day) => total + (day.orders ?? 0), 0)
   );
-  protected readonly todayQuantity = computed(() =>
-    this.productSales()
-      .filter(row => row.day === this.todayIso())
-      .reduce((total, row) => total + Number(row.quantity ?? 0), 0)
-  );
+  protected readonly todayQuantity = computed(() => Number(this.today()?.quantity ?? 0));
   protected readonly weekQuantity = computed(() =>
-    this.productSales().reduce((total, row) => total + Number(row.quantity ?? 0), 0)
+    this.week().reduce((total, row) => total + Number(row.quantity ?? 0), 0)
   );
   protected readonly salesChartHasData = computed(() => this.weekRevenue() > 0);
   protected readonly salesChartPoints = computed<SalesChartPoint[]>(() => {
@@ -689,18 +683,21 @@ export class DashboardComponent implements OnInit, OnDestroy {
   protected readonly initialLoading = computed(() => this.loading() && !this.lastUpdated());
 
   private liveChannels: RealtimeChannel[] = [];
-  private loadQueued = false;
+  private readonly queuedSections = new Set<DashboardSection>();
   private readonly loadWaiters: Array<() => void> = [];
   private lastLoadSucceeded = false;
-  private cacheHandler: CacheStreamHandler | null = null;
+  private salesCacheHandler: CacheStreamHandler | null = null;
+  private catalogCacheHandler: CacheStreamHandler | null = null;
   private journalScope: string | null = null;
   private readonly connectedConsumers = new Set<string>();
-  private readonly journalConsumers: ReadonlyArray<readonly [CacheStream, string]> = [
-    ['sales', 'dashboard-sales'],
-    ['catalog', 'dashboard-catalog'],
-    ['parties', 'dashboard-parties'],
-  ];
   private serverLoadVersion = 0;
+  private salesJournalTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly salesJournalWaiters: Array<{
+    resolve: () => void;
+    reject: (reason: unknown) => void;
+  }> = [];
+  private snapshotRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+  private snapshotRefreshAt = 0;
 
   constructor() {
     effect(() => {
@@ -732,11 +729,24 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.cancelSalesJournalRefresh();
+    this.clearSnapshotRefresh();
     for (const channel of this.liveChannels) void this.supabase.client.removeChannel(channel);
-    if (this.journalScope && this.cacheHandler) {
-      for (const [stream, consumer] of this.journalConsumers) {
-        this.journal.unsubscribe(stream, this.journalScope, this.cacheHandler, consumer);
-      }
+    if (this.journalScope && this.salesCacheHandler) {
+      this.journal.unsubscribe(
+        'sales',
+        this.journalScope,
+        this.salesCacheHandler,
+        'dashboard-sales'
+      );
+    }
+    if (this.journalScope && this.catalogCacheHandler) {
+      this.journal.unsubscribe(
+        'catalog',
+        this.journalScope,
+        this.catalogCacheHandler,
+        'dashboard-catalog'
+      );
     }
     this.journalScope = null;
     this.connectedConsumers.clear();
@@ -772,80 +782,103 @@ export class DashboardComponent implements OnInit, OnDestroy {
     return `${value >= 0 ? '+' : ''}${value.toFixed(1)}%`;
   }
 
-  private async loadReports(): Promise<void> {
+  private async loadReports(
+    sections: readonly DashboardSection[] = ['sales', 'attention']
+  ): Promise<void> {
+    for (const section of sections) this.queuedSections.add(section);
     if (this.loading()) {
-      this.loadQueued = true;
       return new Promise(resolve => this.loadWaiters.push(resolve));
     }
 
-    ++this.serverLoadVersion;
     this.loading.set(true);
+    this.lastLoadSucceeded = true;
     try {
-      const requestedLocationId = this.dashboardLocationId();
-      const since = this.daysAgoIso(6);
-      const canView = this.canViewFinancials();
-      if (!canView) this.clearFinancials();
-      const [sales, lowStockResult, expiring] = await Promise.all([
-        canView ? this.reports.dashboardSales(since, requestedLocationId) : Promise.resolve(null),
-        this.reports.lowStock(requestedLocationId),
-        this.preferences.batchExpiryEnabled()
-          ? this.reports.expiringBatches()
-          : Promise.resolve([]),
-      ]);
-      const lowStock = lowStockResult.rows;
-      if (requestedLocationId !== this.dashboardLocationId()) {
-        this.loadQueued = true;
-        return;
+      while (this.queuedSections.size > 0) {
+        const requestedSections = new Set(this.queuedSections);
+        this.queuedSections.clear();
+        ++this.serverLoadVersion;
+        const requestedLocationId = this.dashboardLocationId();
+        const canView = this.canViewFinancials();
+        if (!canView) this.clearFinancials();
+
+        const salesPromise =
+          requestedSections.has('sales') && canView
+            ? this.reports.dashboardSales(this.daysAgoIso(6), requestedLocationId)
+            : Promise.resolve(null);
+        const attentionPromise = requestedSections.has('attention')
+          ? Promise.all([
+              this.reports.lowStock(requestedLocationId),
+              this.preferences.batchExpiryEnabled()
+                ? this.reports.expiringBatches()
+                : Promise.resolve([]),
+            ])
+          : Promise.resolve(null);
+        const [sales, attention] = await Promise.all([salesPromise, attentionPromise]);
+
+        if (requestedLocationId !== this.dashboardLocationId()) {
+          for (const section of requestedSections) this.queuedSections.add(section);
+          continue;
+        }
+
+        await Promise.all([
+          sales && this.canViewFinancials() ? this.applySalesReport(sales) : Promise.resolve(),
+          attention ? this.applyAttentionReport(attention[0], attention[1]) : Promise.resolve(),
+        ]);
+        // A role update can land while report data is in flight. Never let an
+        // old authorization decision restore financial data afterward.
+        if (!this.canViewFinancials()) this.clearFinancials();
+        this.lastUpdated.set(new Date());
+        this.loadError.set(null);
+        await this.persistDashboard(requestedLocationId);
       }
-      if (sales && this.canViewFinancials()) {
-        this.summary.set(sales.summary);
-        this.productSales.set(sales.productSales);
-        this.locationRows.set(sales.locations);
-        this.comparison.set(sales.comparison);
-        await this.computeTopVariants(sales.productSales);
-      }
-      if (!this.canViewFinancials()) this.clearFinancials();
-      const attentionIds = [
-        ...new Set(
-          [...lowStock, ...expiring].map(item => item.variant_id).filter((id): id is string => !!id)
-        ),
-      ];
-      const attentionVariants = await this.pos.variantsByIds(attentionIds);
-      const manufacturerByVariant = new Map(
-        attentionVariants.map(variant => [variant.variant_id, variant.manufacturer_name])
-      );
-      this.lowStock.set(
-        lowStock.map(item => ({
-          ...item,
-          manufacturer_name: manufacturerByVariant.get(item.variant_id) ?? null,
-        }))
-      );
-      this.lowStockTotal.set(lowStockResult.total);
-      this.expiring.set(
-        expiring.map(item => ({
-          ...item,
-          manufacturer_name: manufacturerByVariant.get(item.variant_id) ?? null,
-        }))
-      );
-      // A role update can land while the report RPCs or variant projection are
-      // in flight. Never let their old authorization decision win afterward.
-      if (!this.canViewFinancials()) this.clearFinancials();
-      this.lastUpdated.set(new Date());
-      this.loadError.set(null);
-      await this.persistDashboard(requestedLocationId);
-      this.lastLoadSucceeded = true;
     } catch (err) {
       this.lastLoadSucceeded = false;
+      this.queuedSections.clear();
       this.loadError.set(err instanceof Error ? err.message : 'Failed to load dashboard');
     } finally {
       this.loading.set(false);
-      if (this.loadQueued) {
-        this.loadQueued = false;
-        void this.loadReports();
-      } else {
-        for (const resolve of this.loadWaiters.splice(0)) resolve();
-      }
+      for (const resolve of this.loadWaiters.splice(0)) resolve();
     }
+  }
+
+  private async applySalesReport(
+    sales: Awaited<ReturnType<ReportsService['dashboardSales']>>
+  ): Promise<void> {
+    this.summary.set(sales.summary);
+    this.locationRows.set(sales.locations);
+    this.comparison.set(sales.comparison);
+    await this.computeTopVariants(sales.topVariants);
+    if (sales.refreshAfter) this.scheduleSnapshotRefresh(sales.refreshAfter);
+    else this.clearSnapshotRefresh();
+  }
+
+  private async applyAttentionReport(
+    lowStockResult: Awaited<ReturnType<ReportsService['lowStock']>>,
+    expiring: ExpiringBatch[]
+  ): Promise<void> {
+    const lowStock = lowStockResult.rows;
+    const attentionIds = [
+      ...new Set(
+        [...lowStock, ...expiring].map(item => item.variant_id).filter((id): id is string => !!id)
+      ),
+    ];
+    const attentionVariants = await this.pos.variantsByIds(attentionIds);
+    const manufacturerByVariant = new Map(
+      attentionVariants.map(variant => [variant.variant_id, variant.manufacturer_name])
+    );
+    this.lowStock.set(
+      lowStock.map(item => ({
+        ...item,
+        manufacturer_name: manufacturerByVariant.get(item.variant_id) ?? null,
+      }))
+    );
+    this.lowStockTotal.set(lowStockResult.total);
+    this.expiring.set(
+      expiring.map(item => ({
+        ...item,
+        manufacturer_name: manufacturerByVariant.get(item.variant_id) ?? null,
+      }))
+    );
   }
 
   private connectLiveUpdates(companyId: string): void {
@@ -855,13 +888,13 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.journalScope = scope;
     this.connectedConsumers.clear();
     this.liveConnected.set(false);
-    this.cacheHandler = {
+    this.salesCacheHandler = {
       apply: async () => {
-        await this.loadReports();
-        if (!this.lastLoadSucceeded) throw new Error('dashboard_refresh_failed');
+        await this.scheduleSalesJournalRefresh();
       },
       reset: async () => {
-        await this.loadReports();
+        this.cancelSalesJournalRefresh();
+        await this.loadReports(['sales']);
         return this.lastLoadSucceeded;
       },
       purge: () => {
@@ -869,12 +902,32 @@ export class DashboardComponent implements OnInit, OnDestroy {
         this.lastUpdated.set(null);
       },
     };
-    this.liveChannels = this.journalConsumers.map(([stream, consumer]) =>
-      this.journal.subscribe(stream, scope, companyId, this.cacheHandler!, consumer, status => {
+    this.catalogCacheHandler = {
+      apply: async () => {
+        await this.refreshTopVariantLabels();
+        await this.loadReports(['attention']);
+        if (!this.lastLoadSucceeded) throw new Error('dashboard_refresh_failed');
+      },
+      reset: async () => {
+        await this.refreshTopVariantLabels();
+        await this.loadReports(['attention']);
+        return this.lastLoadSucceeded;
+      },
+    };
+    const subscriptions = [
+      { stream: 'sales' as const, consumer: 'dashboard-sales', handler: this.salesCacheHandler },
+      {
+        stream: 'catalog' as const,
+        consumer: 'dashboard-catalog',
+        handler: this.catalogCacheHandler,
+      },
+    ];
+    this.liveChannels = subscriptions.map(({ stream, consumer, handler }) =>
+      this.journal.subscribe(stream, scope, companyId, handler, consumer, status => {
         if (scope !== this.journalScope) return;
         if (status === 'SUBSCRIBED') this.connectedConsumers.add(consumer);
         else this.connectedConsumers.delete(consumer);
-        this.liveConnected.set(this.connectedConsumers.size === this.journalConsumers.length);
+        this.liveConnected.set(this.connectedConsumers.size === subscriptions.length);
       })
     );
   }
@@ -898,8 +951,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
       return;
     }
     const value = cached.value as {
-      summary: DailySummary[];
-      productSales: DailyProductSales[];
+      summary: DashboardDailySummary[];
       topVariants: TopVariant[];
       lowStock: LowStockDisplay[];
       lowStockTotal?: number;
@@ -908,7 +960,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
       comparison: DashboardPeriodComparison;
     };
     this.summary.set(value.summary);
-    this.productSales.set(value.productSales);
     this.topVariants.set(value.topVariants);
     this.lowStock.set(value.lowStock);
     this.lowStockTotal.set(value.lowStockTotal ?? value.lowStock.length);
@@ -931,7 +982,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
       location_id: locationId ?? undefined,
       value: {
         summary: this.summary(),
-        productSales: this.productSales(),
         topVariants: this.topVariants(),
         lowStock: this.lowStock(),
         lowStockTotal: this.lowStockTotal(),
@@ -961,7 +1011,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   private clearFinancials(): void {
     this.summary.set([]);
-    this.productSales.set([]);
     this.topVariants.set([]);
     this.locationRows.set([]);
     this.comparison.set({
@@ -974,31 +1023,91 @@ export class DashboardComponent implements OnInit, OnDestroy {
     });
   }
 
-  private async computeTopVariants(rows: DailyProductSales[]): Promise<void> {
-    const byVariant = new Map<string, { quantity: number; revenue: number; margin: number }>();
-    for (const row of rows) {
-      if (!row.variant_id) continue;
-      const current = byVariant.get(row.variant_id) ?? { quantity: 0, revenue: 0, margin: 0 };
-      current.quantity += Number(row.quantity ?? 0);
-      current.revenue += row.revenue ?? 0;
-      current.margin += (row.revenue ?? 0) - (row.cogs ?? 0);
-      byVariant.set(row.variant_id, current);
-    }
-
-    const top = [...byVariant.entries()].sort((a, b) => b[1].margin - a[1].margin).slice(0, 5);
-    const variants = await this.pos.variantsByIds(top.map(([id]) => id));
+  private async computeTopVariants(rows: DashboardTopVariant[]): Promise<void> {
+    const variants = await this.pos.variantsByIds(rows.map(row => row.variant_id));
     const byId = new Map(variants.map(variant => [variant.variant_id, variant]));
     this.topVariants.set(
-      top.map(([variantId, totals]) => ({
-        variantId,
-        label: byId.has(variantId)
-          ? variantLabel(byId.get(variantId) as Variant)
-          : variantId.slice(0, 8),
-        manufacturer: byId.get(variantId)?.manufacturer_name || 'Manufacturer not set',
-        quantity: totals.quantity,
-        revenue: totals.revenue,
-        margin: totals.margin,
+      rows.map(row => ({
+        variantId: row.variant_id,
+        label: byId.has(row.variant_id)
+          ? variantLabel(byId.get(row.variant_id) as Variant)
+          : row.variant_id.slice(0, 8),
+        manufacturer: byId.get(row.variant_id)?.manufacturer_name || 'Manufacturer not set',
+        quantity: Number(row.quantity),
+        revenue: row.revenue,
+        margin: row.margin,
       }))
+    );
+  }
+
+  /** Coalesce a burst of sale invalidations before asking for the shared snapshot. */
+  private scheduleSalesJournalRefresh(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.salesJournalWaiters.push({ resolve, reject });
+      if (this.salesJournalTimer) clearTimeout(this.salesJournalTimer);
+      this.salesJournalTimer = setTimeout(() => {
+        this.salesJournalTimer = null;
+        void this.runSalesJournalRefresh();
+      }, 10_000);
+    });
+  }
+
+  private async runSalesJournalRefresh(): Promise<void> {
+    const waiters = this.salesJournalWaiters.splice(0);
+    try {
+      await this.loadReports(['sales']);
+      if (!this.lastLoadSucceeded) throw new Error('dashboard_refresh_failed');
+      for (const waiter of waiters) waiter.resolve();
+    } catch (error) {
+      for (const waiter of waiters) waiter.reject(error);
+    }
+  }
+
+  private cancelSalesJournalRefresh(): void {
+    if (this.salesJournalTimer) clearTimeout(this.salesJournalTimer);
+    this.salesJournalTimer = null;
+    for (const waiter of this.salesJournalWaiters.splice(0)) waiter.resolve();
+  }
+
+  /** A changed shared snapshot may be stale for 60s; retry only when it expires. */
+  private scheduleSnapshotRefresh(refreshAfter: string): void {
+    const refreshAt = Date.parse(refreshAfter);
+    if (!Number.isFinite(refreshAt)) return;
+    if (this.snapshotRefreshTimer && this.snapshotRefreshAt <= refreshAt) return;
+    this.clearSnapshotRefresh();
+    this.snapshotRefreshAt = refreshAt;
+    this.snapshotRefreshTimer = setTimeout(
+      () => {
+        this.snapshotRefreshTimer = null;
+        this.snapshotRefreshAt = 0;
+        if (this.canViewFinancials()) void this.loadReports(['sales']);
+      },
+      Math.max(0, refreshAt - Date.now() + 100)
+    );
+  }
+
+  private clearSnapshotRefresh(): void {
+    if (this.snapshotRefreshTimer) clearTimeout(this.snapshotRefreshTimer);
+    this.snapshotRefreshTimer = null;
+    this.snapshotRefreshAt = 0;
+  }
+
+  private async refreshTopVariantLabels(): Promise<void> {
+    const current = this.topVariants();
+    if (current.length === 0) return;
+    const variants = await this.pos.variantsByIds(current.map(row => row.variantId));
+    const byId = new Map(variants.map(variant => [variant.variant_id, variant]));
+    this.topVariants.set(
+      current.map(row => {
+        const variant = byId.get(row.variantId);
+        return variant
+          ? {
+              ...row,
+              label: variantLabel(variant),
+              manufacturer: variant.manufacturer_name || 'Manufacturer not set',
+            }
+          : row;
+      })
     );
   }
 

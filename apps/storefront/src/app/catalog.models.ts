@@ -1,4 +1,4 @@
-import { CatalogRow } from './storefront.service';
+import { CatalogPageRow, CatalogRow } from './storefront.service';
 
 export interface CatalogProduct {
   id: string;
@@ -6,6 +6,7 @@ export interface CatalogProduct {
   manufacturer: string | null;
   imagePath: string | null;
   variants: CatalogRow[];
+  variantCount: number;
   minPrice: number;
   maxPrice: number;
   available: boolean;
@@ -30,12 +31,27 @@ export function groupCatalog(rows: CatalogRow[]): CatalogProduct[] {
         manufacturer: first.manufacturer_name,
         imagePath: first.image_path,
         variants,
+        variantCount: variants.length,
         minPrice: Math.min(...prices),
         maxPrice: Math.max(...prices),
         available: variants.some(isVariantAvailable),
       };
     })
     .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export function catalogProductsFromPage(rows: readonly CatalogPageRow[]): CatalogProduct[] {
+  return rows.map(row => ({
+    id: row.product_id,
+    name: row.product_name,
+    manufacturer: row.manufacturer_name,
+    imagePath: row.image_path,
+    variants: [],
+    variantCount: Number(row.variant_count),
+    minPrice: Number(row.min_price),
+    maxPrice: Number(row.max_price),
+    available: row.available,
+  }));
 }
 
 export function isVariantAvailable(variant: CatalogRow): boolean {

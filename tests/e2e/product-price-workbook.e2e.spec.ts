@@ -43,6 +43,8 @@ async function mockPriceWorkbookFlow(page: Page) {
   let appliedChanges: unknown = null;
   let catalogRefreshes = 0;
   let lastCatalogPriceServed = 100;
+  let catalogStock = 10;
+  let lastCatalogStockServed = 10;
   await page.addInitScript(
     value => {
       localStorage.setItem('sb-127-auth-token', JSON.stringify(value.session));
@@ -117,7 +119,7 @@ async function mockPriceWorkbookFlow(page: Page) {
       return json({
         company_id: companyId,
         user_id: userId,
-        permissions: ['ManageCatalog'],
+        permissions: ['ManageCatalog', 'ManageStockAdjustments'],
         actions: {},
       });
     }
@@ -147,16 +149,28 @@ async function mockPriceWorkbookFlow(page: Page) {
       ]);
     }
     if (path.endsWith('/rest/v1/rpc/apply_catalog_price_updates')) {
-      const changes = request.postDataJSON().p_changes as Array<{ new_retail_price?: number }>;
+      const changes = request.postDataJSON().p_changes as Array<{
+        new_retail_price?: number;
+        new_stock_quantity?: number;
+      }>;
       appliedChanges = changes;
       if (changes[0]?.new_retail_price !== undefined) {
         variant.price = changes[0].new_retail_price;
       }
-      return json({ updated_variants: 1, retail_changes: 1, wholesale_changes: 0 });
+      if (changes[0]?.new_stock_quantity !== undefined) {
+        catalogStock = changes[0].new_stock_quantity;
+      }
+      return json({
+        updated_variants: 1,
+        retail_changes: 1,
+        wholesale_changes: 0,
+        stock_changes: 1,
+      });
     }
     if (path.endsWith('/rest/v1/rpc/catalog_cache_page')) {
       catalogRefreshes++;
       lastCatalogPriceServed = variant.price;
+      lastCatalogStockServed = catalogStock;
       return json([
         {
           variant_id: variantId,
@@ -175,11 +189,14 @@ async function mockPriceWorkbookFlow(page: Page) {
           variant_active: true,
           product_active: true,
           image_path: null,
-          stock: 0,
+          stock: catalogStock,
           manufacturer_id: null,
           manufacturer_name: null,
         },
       ]);
+    }
+    if (path.endsWith('/rest/v1/rpc/location_stock_for_variants')) {
+      return json([{ variant_id: variantId, stock: catalogStock, stock_value: 500 }]);
     }
     if (path.endsWith('/rest/v1/companies')) {
       return request.headers()['accept']?.includes('application/vnd.pgrst.object')
@@ -206,6 +223,7 @@ async function mockPriceWorkbookFlow(page: Page) {
     appliedChanges: () => appliedChanges,
     catalogRefreshes: () => catalogRefreshes,
     lastCatalogPriceServed: () => lastCatalogPriceServed,
+    lastCatalogStockServed: () => lastCatalogStockServed,
   };
 }
 
@@ -215,9 +233,9 @@ test('Settings exports, previews, and applies a price workbook', async ({ page }
   await expect(page.getByRole('heading', { name: 'Data import & export' })).toBeVisible();
 
   const downloadPromise = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Export prices' }).click();
+  await page.getByRole('button', { name: 'Export updates' }).click();
   const download = await downloadPromise;
-  expect(download.suggestedFilename()).toMatch(/^dukarun-price-update-.*\.xlsx$/);
+  expect(download.suggestedFilename()).toMatch(/^dukarun-product-update-.*\.xlsx$/);
   const stream = await download.createReadStream();
   expect(stream).not.toBeNull();
   const chunks: Buffer[] = [];
@@ -226,7 +244,8 @@ test('Settings exports, previews, and applies a price workbook', async ({ page }
   const workbook = new Workbook();
   await workbook.xlsx.load(Buffer.concat(chunks));
   expect(workbook.getWorksheet('_DukaRun Metadata')!.getCell('B2').value).toBe('price_update');
-  workbook.getWorksheet('Price Updates')!.getCell('I2').value = 125;
+  workbook.getWorksheet('Product Updates')!.getCell('I2').value = 125;
+  workbook.getWorksheet('Product Updates')!.getCell('Q2').value = 7;
   const edited = Buffer.from(await workbook.xlsx.writeBuffer());
 
   await page.getByRole('button', { name: 'Import workbook' }).click();
@@ -237,18 +256,22 @@ test('Settings exports, previews, and applies a price workbook', async ({ page }
   });
   await expect(page.getByText('Retail: KES 100 → KES 125')).toBeVisible();
   const refreshesBeforeApply = state.catalogRefreshes();
-  await page.getByRole('button', { name: 'Apply price changes' }).click();
+  await page.getByRole('button', { name: 'Apply product changes' }).click();
 
   await expect(page.getByRole('status')).toContainText(
-    'Price update complete: 1 variants updated · 1 retail · 0 wholesale.'
+    'Update complete: 1 variants · 1 retail · 0 wholesale · 1 stock.'
   );
   expect(state.appliedChanges()).toEqual([
     {
       variant_id: variantId,
       expected_updated_at: updatedAt,
       new_retail_price: 125,
+      stock_location_id: locationId,
+      expected_stock_quantity: 10,
+      new_stock_quantity: 7,
     },
   ]);
   await expect.poll(state.catalogRefreshes).toBeGreaterThan(refreshesBeforeApply);
   expect(state.lastCatalogPriceServed()).toBe(125);
+  expect(state.lastCatalogStockServed()).toBe(7);
 });

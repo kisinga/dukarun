@@ -1,11 +1,12 @@
 begin;
-select plan(61);
+select plan(85);
 
 select has_table('public','tax_rate_versions','VAT rates are effective-dated');
 select has_table('public','legacy_customer_account_reconciliations',
   'legacy UI balances have explicit document reconciliation records');
 select has_table('public','company_tax_profiles','company VAT profiles are versioned');
 select has_table('public','tax_documents','statutory document snapshots are durable');
+select has_table('public','tax_export_artifacts','provider exports are immutable artifacts');
 select has_table('public','period_closing_packs','period closing packs are durable');
 select has_function('public','resolve_inclusive_tax',array['uuid','uuid','bigint','timestamp with time zone'],
   'authoritative inclusive-tax resolver exists');
@@ -15,6 +16,8 @@ select has_function('public','estimate_order_tax',array['uuid'],
   'draft tax estimate RPC exists');
 select has_function('public','platform_tax_package_readiness',array['uuid'],
   'country-package readiness RPC exists');
+select has_function('public','tax_document_integration_envelope',array['uuid','text'],
+  'provider-neutral tax-document envelope RPC exists');
 
 select testkit.create_user('a1000000-0000-4000-8000-000000000001','vat-v1@test.local');
 select testkit.create_user('a1000000-0000-4000-8000-000000000002','vat-platform@test.local');
@@ -91,7 +94,25 @@ select is((select active from public.tax_categories where id=(select id from fut
 select lives_ok(format($$select public.platform_publish_tax_category(%L,current_date+30)$$,
   (select id from future_tax_category)),
   'a published package can evolve through a future-dated treatment activation');
+select public.upsert_tax_integration_reference_code(
+  'KRA_ETIMS','item_classification','14111501','Fixture item classification',true);
+select public.upsert_tax_integration_reference_code(
+  'KRA_ETIMS','item_type','1','Product',true);
+select public.upsert_tax_integration_reference_code(
+  'KRA_ETIMS','country','KE','Kenya',true);
+select public.upsert_tax_integration_reference_code(
+  'KRA_ETIMS','packaging_unit','NT','Net',true);
+select public.upsert_tax_integration_reference_code(
+  'KRA_ETIMS','quantity_unit','U','Unit',true);
+select public.upsert_tax_integration_reference_code(
+  'KRA_ETIMS','payment_type','01','Cash',true);
+select public.upsert_tax_integration_tender_mapping(
+  (select id from public.tax_jurisdictions where country_code='KE'),
+  'KRA_ETIMS','cash','01');
 reset role;
+select is((select count(*)::integer from public.tax_integration_rate_mappings m
+  where m.tax_rate_version_id=(select rate_id from vat_future_rate)),0,
+  'an unknown future tax rate stays unmapped instead of being mislabeled as non-VAT');
 
 insert into public.products(id,company_id,name,tax_category_id)
 select 'a1000000-0000-4000-8000-000000000010'::uuid,f.company_id,'Standard tea',null::uuid from vat_fixture f
@@ -126,8 +147,13 @@ where product_id in (
   'a1000000-0000-4000-8000-000000000013'::uuid
 );
 
-insert into public.customers(id,company_id,first_name,is_supplier,supplier_credit_limit)
-select 'a1000000-0000-4000-8000-000000000030',company_id,'VAT Supplier',true,100000 from vat_fixture;
+insert into public.customers(
+  id,company_id,first_name,is_supplier,supplier_credit_limit,tax_registration_number)
+select 'a1000000-0000-4000-8000-000000000030'::uuid,company_id,
+  'VAT Supplier',true,100000,'P009999999Z' from vat_fixture
+union all
+select 'a1000000-0000-4000-8000-000000000032'::uuid,company_id,
+  'VAT Buyer',false,0,null from vat_fixture;
 
 create temp table vat_standard_resolution as
 select gross_total,net_total,tax_total,tax_rate_bps from public.resolve_inclusive_tax(
@@ -147,6 +173,20 @@ select results_eq(
 select testkit.as_user((select company_id from vat_fixture),
   'a1000000-0000-4000-8000-000000000001','Admin');
 select testkit.ensure_open_session();
+select is(public.update_location_tax_branch_code(
+  (select id from public.stock_locations where company_id=(select company_id from vat_fixture)
+    and is_default limit 1),'00'),
+  (select id from public.stock_locations where company_id=(select company_id from vat_fixture)
+    and is_default limit 1),'finance administration can save a KRA branch ID');
+select is(public.update_customer_tax_registration(
+  'a1000000-0000-4000-8000-000000000032','P001234567B'),
+  'a1000000-0000-4000-8000-000000000032'::uuid,
+  'customer tax PIN updates through the existing customer-edit boundary');
+select ok(public.upsert_tax_integration_item_mapping(
+  'a1000000-0000-4000-8000-000000000020',
+  (select id from public.tax_jurisdictions where country_code='KE'),'KRA_ETIMS',
+  'KE-ITEM-STD','14111501','1','KE','NT','U','{}') is not null,
+  'catalog management can map an item without coupling sales to an eTIMS adapter');
 
 select public.schedule_company_tax_profile(
   (select j.id from public.tax_jurisdictions j where j.country_code='KE'),false,'',
@@ -195,10 +235,35 @@ select results_eq(
   $$values (current_date-1,current_date-1)$$,
   'expense snapshot and journal use the invoice tax point');
 
+select results_eq(
+  $$select (x->>'gross_total')::bigint,(x->>'net_total')::bigint,
+      (x->>'tax_total')::bigint,(x->>'separate_expense_total')::bigint
+    from (select public.estimate_purchase_input_vat(
+      '[{"variant_id":"a1000000-0000-4000-8000-000000000020","quantity":1,"unit_cost":116,"line_total":116,"value_source":"unit"}]',
+      '[{"category":"transport","amount":116,"settlement":"supplier_bill"},{"category":"loading","amount":50,"settlement":"separate","account_code":"CASH_ON_HAND"}]',
+      current_date) x) q$$,
+  $$values (232::bigint,200::bigint,32::bigint,50::bigint)$$,
+  'purchase VAT preview extracts supplier-bill VAT and excludes separately paid expenses');
+
+select public.update_supplier_tax_registration(
+  'a1000000-0000-4000-8000-000000000030','');
+select throws_ok($$select public.record_purchase_complete_with_tax(
+  'a1000000-0000-4000-8000-000000000030',
+  '[{"variant_id":"a1000000-0000-4000-8000-000000000020","quantity":1,"unit_cost":116,"line_total":116,"value_source":"unit"}]',
+  '[]',116,'SUP-MISSING-PIN','CASH_ON_HAND',null,current_date,
+  (select id from public.stock_locations where company_id=(select company_id from vat_fixture) and is_default limit 1),
+  true,null,'SUP-MISSING-PIN',current_date)$$,
+  'P0001','supplier_tax_pin_required',
+  'claiming purchase VAT requires a PIN saved on the supplier master');
+select is(public.update_supplier_tax_registration(
+  'a1000000-0000-4000-8000-000000000030','P009999999Z'),
+  'a1000000-0000-4000-8000-000000000030'::uuid,
+  'supplier tax PIN updates through the secured supplier boundary');
+
 create temp table vat_purchase as select public.record_purchase_complete_with_tax(
   'a1000000-0000-4000-8000-000000000030',
   '[{"variant_id":"a1000000-0000-4000-8000-000000000020","quantity":10,"unit_cost":116,"line_total":1160,"value_source":"unit"}]',
-  '[]',1160,'PUR-VAT-1','CASH_ON_HAND','VAT stock',current_date,
+  '[]',1160,'SUP-VAT-1','CASH_ON_HAND','VAT stock',current_date,
   (select id from public.stock_locations where company_id=(select company_id from vat_fixture) and is_default limit 1),
   true,'P009999999Z','SUP-VAT-1',current_date) purchase_id;
 grant select on pg_temp.vat_purchase to authenticated;
@@ -210,14 +275,86 @@ select results_eq(
 select is((select b.unit_cost from public.inventory_batches b join public.purchase_lines l
   on l.inventory_batch_id=b.id where l.purchase_id=(select purchase_id from vat_purchase)),100::bigint,
   'inventory batch uses net unit cost after recoverable VAT');
-select is((select coalesce(sum(debit),0)-coalesce(sum(credit),0) from public.ledger_journal_lines l
-  join public.ledger_journal_entries e on e.id=l.entry_id where e.source_type='PurchaseVatReclass'
-  and e.source_id=(select purchase_id::text from vat_purchase)),0::numeric,
-  'purchase VAT reclassification journal is balanced');
+select results_eq(
+  $$select a.code::text,sum(l.debit)::bigint,sum(l.credit)::bigint
+    from public.ledger_journal_lines l
+    join public.ledger_journal_entries e on e.id=l.entry_id
+    join public.ledger_accounts a on a.id=l.account_id
+    where e.source_type='InventoryPurchase'
+      and e.source_id=(select purchase_id::text from vat_purchase)
+    group by a.code order by a.code$$,
+  $$values ('ACCOUNTS_PAYABLE'::text,0::bigint,1160::bigint),
+    ('INVENTORY'::text,1000::bigint,0::bigint),
+    ('TAX_PAYABLE'::text,160::bigint,0::bigint)$$,
+  'claimable purchase posts net inventory and input VAT in one recognition journal');
+select is((select count(*)::integer from public.ledger_journal_entries e
+  where e.source_id=(select purchase_id::text from vat_purchase)
+    and e.source_type in ('InventoryPurchase','PurchaseVatReclass')),1,
+  'new purchases have one recognition journal and no VAT reclassification journal');
+select results_eq(
+  $$select claim_input_vat,supplier_tax_pin,tax_invoice_number,input_tax_total,
+      purchase_posting_version from public.purchase_history
+    where id=(select purchase_id from vat_purchase)$$,
+  $$values (true,'P009999999Z'::text,'SUP-VAT-1'::text,160::bigint,
+    'ap_invoice_v2'::text)$$,
+  'purchase history exposes immutable VAT evidence to the detail workspace');
+select throws_ok($$select public.record_purchase_complete_with_tax(
+  'a1000000-0000-4000-8000-000000000030',
+  '[{"variant_id":"a1000000-0000-4000-8000-000000000020","quantity":1,"unit_cost":116,"line_total":116,"value_source":"unit"}]',
+  '[]',116,'SUP-VAT-1','CASH_ON_HAND',null,current_date,
+  (select id from public.stock_locations where company_id=(select company_id from vat_fixture) and is_default limit 1),
+  true,'P009999999Z','SUP-VAT-1',current_date)$$,
+  'P0001','duplicate_supplier_tax_invoice',
+  'duplicate supplier tax invoice evidence cannot be claimed twice');
+
+create temp table vat_purchase_expense as select public.record_purchase_complete_with_tax(
+  'a1000000-0000-4000-8000-000000000030',
+  '[{"variant_id":"a1000000-0000-4000-8000-000000000020","quantity":1,"unit_cost":116,"line_total":116,"value_source":"unit"}]',
+  '[{"category":"transport","amount":116,"settlement":"supplier_bill"}]',
+  232,'SUP-VAT-EXP','CASH_ON_HAND',null,current_date,
+  (select id from public.stock_locations where company_id=(select company_id from vat_fixture) and is_default limit 1),
+  true,'P009999999Z','SUP-VAT-EXP',current_date) purchase_id;
+select results_eq(
+  $$select p.gross_total,p.net_total,p.input_tax_total,sum(l.debit)::bigint
+    from public.purchases p
+    join public.ledger_journal_entries e on e.source_type='InventoryPurchase'
+      and e.source_id=p.id::text
+    join public.ledger_journal_lines l on l.entry_id=e.id
+    join public.ledger_accounts a on a.id=l.account_id and a.code='EXPENSES'
+    where p.id=(select purchase_id from vat_purchase_expense)
+    group by p.id$$,
+  $$values (232::bigint,200::bigint,32::bigint,100::bigint)$$,
+  'supplier-bill expenses post net expense and recoverable VAT in the consolidated journal');
+
+create temp table vat_purchase_draft as select public.save_purchase_draft_complete_with_tax(
+  'a1000000-0000-4000-8000-000000000030',
+  '[{"variant_id":"a1000000-0000-4000-8000-000000000020","quantity":1,"unit_cost":116,"line_total":116,"value_source":"unit"}]',
+  '[]','SUP-VAT-DRAFT',null,current_date,
+  (select id from public.stock_locations where company_id=(select company_id from vat_fixture) and is_default limit 1),
+  'paid',116,'CASH_ON_HAND',null,true,current_date) draft_id;
+create temp table vat_purchase_draft_result as select public.confirm_purchase_draft_complete(
+  (select draft_id from vat_purchase_draft)) purchase_id;
+select results_eq(
+  $$select p.claim_input_vat,p.input_tax_total,p.purchase_posting_version
+    from public.purchases p where p.id=(select purchase_id from vat_purchase_draft_result)$$,
+  $$values (true,16::bigint,'ap_invoice_v2'::text)$$,
+  'saved-draft confirmation uses the same tax-aware purchase finalizer');
+
+create temp table vat_advance_path as select public.record_purchase_with_advance(
+  'a1000000-0000-4000-8000-000000000030',
+  '[{"variant_id":"a1000000-0000-4000-8000-000000000020","quantity":1,"unit_cost":116,"line_total":116,"value_source":"unit"}]',
+  '[]',0,0,116,'SUP-VAT-ADV','CASH_ON_HAND',null,current_date,
+  (select id from public.stock_locations where company_id=(select company_id from vat_fixture) and is_default limit 1),
+  'vat-advance-path',true,current_date) purchase_id;
+select results_eq(
+  $$select claim_input_vat,input_tax_total,purchase_posting_version from public.purchases
+    where id=(select purchase_id from vat_advance_path)$$,
+  $$values (true,16::bigint,'ap_invoice_v2'::text)$$,
+  'advance-aware purchase capture uses the same tax-aware purchase finalizer');
 create temp table vat_credit_purchase as select public.record_purchase_complete_with_tax(
   'a1000000-0000-4000-8000-000000000030',
   '[{"variant_id":"a1000000-0000-4000-8000-000000000020","quantity":1,"unit_cost":116,"line_total":116,"value_source":"unit"}]',
-  '[]',0,'PUR-VAT-REV','CASH_ON_HAND','VAT reversal',current_date,
+  '[]',0,'SUP-VAT-REV','CASH_ON_HAND','VAT reversal',current_date,
   (select id from public.stock_locations where company_id=(select company_id from vat_fixture) and is_default limit 1),
   true,'P009999999Z','SUP-VAT-REV',current_date) purchase_id;
 select public.reverse_credit_purchase((select purchase_id from vat_credit_purchase),'Supplier cancelled invoice');
@@ -243,7 +380,7 @@ select is((select tax_snapshot_status from public.orders where id=(select order_
 
 create temp table vat_sale as select public.post_sale_at_location(
   (select id from public.stock_locations where company_id=(select company_id from vat_fixture) and is_default limit 1),
-  null,'[{"variant_id":"a1000000-0000-4000-8000-000000000020","quantity":1,"unit_price":116}]',
+  'a1000000-0000-4000-8000-000000000032','[{"variant_id":"a1000000-0000-4000-8000-000000000020","quantity":1,"unit_price":116}]',
   '[{"method":"cash","amount":116}]',false,'vat-sale-1',null,null) result;
 grant select on pg_temp.vat_sale to authenticated;
 create temp table vat_sale_id as select (result->>'order_id')::uuid order_id from vat_sale;
@@ -259,6 +396,45 @@ select is((select coalesce(sum(debit),0)-coalesce(sum(credit),0) from public.led
   join public.ledger_journal_entries e on e.id=l.entry_id where e.source_type='VatSaleReclass'
   and e.source_id=(select order_id::text from vat_sale_id)),0::numeric,
   'sale recognition and VAT extraction remain balanced');
+select results_eq(
+  $$select issuer_tax_registration_number,buyer_tax_registration_number,
+      payment_method_codes,payment_breakdown from public.tax_documents
+    where source_order_id=(select order_id from vat_sale_id)$$,
+  $$values ('P051234567A'::text,'P001234567B'::text,array['cash']::text[],
+    '[{"method_code":"cash","amount":116}]'::jsonb)$$,
+  'issued VAT document snapshots provider-neutral seller, buyer, and tender facts');
+select results_eq(
+  $$select unit_price,tax_category_code,tax_classification,tax_rate_bps
+    from public.tax_document_lines where tax_document_id=(select tax_document_id
+      from public.orders where id=(select order_id from vat_sale_id))$$,
+  $$values (116::bigint,'STANDARD'::text,'standard'::text,1600)$$,
+  'issued VAT lines snapshot tax facts without freezing provider mappings');
+create temp table vat_integration_envelope as select public.tax_document_integration_envelope(
+  (select tax_document_id from public.orders where id=(select order_id from vat_sale_id))) envelope;
+grant select on pg_temp.vat_integration_envelope to service_role;
+select results_eq(
+  $$select (envelope->>'ready')::boolean,envelope->>'provider_hint',
+      envelope->'buyer'->>'tax_registration_number',jsonb_array_length(envelope->'blockers')
+    from vat_integration_envelope$$,
+  $$values (true,'KRA_ETIMS'::text,'P001234567B'::text,0)$$,
+  'complete snapshots produce a connector-ready provider-neutral envelope');
+select public.update_customer_tax_registration(
+  'a1000000-0000-4000-8000-000000000032','P009999999X');
+select public.update_location_tax_branch_code(
+  (select id from public.stock_locations where company_id=(select company_id from vat_fixture)
+    and is_default limit 1),'99');
+select public.upsert_tax_integration_item_mapping(
+  'a1000000-0000-4000-8000-000000000020',
+  (select id from public.tax_jurisdictions where country_code='KE'),'KRA_ETIMS',
+  'KE-ITEM-NEW','14111501','1','KE','NT','U','{}');
+select results_eq(
+  $$select envelope->'buyer'->>'tax_registration_number',
+      envelope->'location'->>'branch_code',envelope->'lines'->0->>'external_item_code'
+    from (select public.tax_document_integration_envelope(
+      (select tax_document_id from public.orders where id=(select order_id from vat_sale_id)),
+      'KRA_ETIMS') envelope) current_export$$,
+  $$values ('P001234567B'::text,'99'::text,'KE-ITEM-NEW'::text)$$,
+  'provider mappings resolve at export time while immutable document identity stays unchanged');
 reset role;
 select throws_ok(format('update public.orders set tax_total=15 where id=%L',
   (select order_id from vat_sale_id)),'P0001','final_tax_snapshot_immutable',
@@ -270,6 +446,17 @@ select throws_ok(format($$update public.tax_document_lines set gross_total=115
   where tax_document_id=(select tax_document_id from public.orders where id=%L)$$,
   (select order_id from vat_sale_id)),'P0001','tax_document_line_immutable',
   'issued VAT document lines cannot be rewritten');
+set local role service_role;
+create temp table vat_submission as select public.queue_tax_document_submission(
+  (select (envelope->'document'->>'id')::uuid from vat_integration_envelope),
+  'KRA_ETIMS',1,(select envelope from vat_integration_envelope)) submission_id;
+select ok((select submission_id is not null from vat_submission),
+  'a connector can durably queue the exact prepared payload');
+select throws_ok(format($$update public.tax_export_artifacts set request_payload='{"changed":true}'
+    where id=(select artifact_id from public.tax_submission_jobs where id=%L)$$,
+  (select submission_id from vat_submission)),'P0001','tax_export_artifact_immutable',
+  'frozen connector artifacts cannot be rewritten while job state remains mutable');
+reset role;
 select testkit.as_user((select company_id from vat_fixture),
   'a1000000-0000-4000-8000-000000000001','Admin');
 
@@ -348,6 +535,17 @@ select results_eq(
   'credit note copies original line-level tax and records the stock outcome');
 select ok((select tax_document_id is not null from public.refunds
   where order_id=(select order_id from vat_sale_id)),'VAT refund receives a linked credit-note document');
+select results_eq(
+  $$select credit.tax_category_code,credit.tax_classification,credit.tax_rate_bps,
+      document.buyer_tax_registration_number,
+      document.original_document_id=(select tax_document_id from public.orders
+        where id=(select order_id from vat_sale_id))
+    from public.refunds r
+    join public.tax_documents document on document.id=r.tax_document_id
+    join public.tax_document_lines credit on credit.tax_document_id=r.tax_document_id
+    where r.order_id=(select order_id from vat_sale_id)$$,
+  $$values ('STANDARD'::text,'standard'::text,1600,'P001234567B'::text,true)$$,
+  'credit notes copy original tax facts and reference the original document');
 select ok((select count(*)>0 from public.inventory_movements where source_type='RefundRestock'
   and source_id=(select id::text from public.refunds
     where order_id=(select order_id from vat_sale_id))),
@@ -357,13 +555,12 @@ select throws_ok($$select public.post_full_refund((select order_id from vat_sale
   'a sale cannot receive a second full credit note');
 
 reset role;
-delete from public.accounting_periods where company_id=(select company_id from vat_fixture);
+update public.accounting_periods set start_date=current_date-1,end_date=current_date-1,
+  status='closed',closed_at=now(),closed_by='a1000000-0000-4000-8000-000000000001'
+where company_id=(select company_id from vat_fixture) and status='open';
 insert into public.period_locks(company_id,lock_end_date,updated_at)
 select company_id,current_date-1,now()-interval '1 day' from vat_fixture
 on conflict(company_id) do update set lock_end_date=excluded.lock_end_date,updated_at=excluded.updated_at;
-insert into public.accounting_periods(company_id,start_date,end_date,status,created_by,closed_at,closed_by)
-select company_id,current_date-1,current_date-1,'closed','a1000000-0000-4000-8000-000000000001',now(),
-  'a1000000-0000-4000-8000-000000000001' from vat_fixture;
 insert into public.accounting_periods(company_id,start_date,end_date,status,created_by)
 select company_id,current_date,current_date,'open','a1000000-0000-4000-8000-000000000001' from vat_fixture;
 select testkit.as_user((select company_id from vat_fixture),
@@ -393,6 +590,19 @@ select is((select public.order_vat_reporting_date(o.id,o.tax_point_at,'Africa/Na
   'approved late sale keeps VAT on its immutable transaction tax point');
 select is((select jsonb_array_length(public.vat_report(current_date,current_date)->'late_transactions')),1,
   'current VAT report includes a prior-period correction schedule');
+create temp table late_vat_purchase as select public.record_purchase_complete_with_tax(
+  'a1000000-0000-4000-8000-000000000030',
+  '[{"variant_id":"a1000000-0000-4000-8000-000000000020","quantity":1,"unit_cost":116,"line_total":116,"value_source":"unit"}]',
+  '[]',116,'SUP-VAT-LATE','CASH_ON_HAND',null,current_date-1,
+  (select id from public.stock_locations where company_id=(select company_id from vat_fixture) and is_default limit 1),
+  true,'P009999999Z','SUP-VAT-LATE',current_date-1) purchase_id;
+select results_eq(
+  $$select (p.tax_point_at at time zone 'Africa/Nairobi')::date,
+      p.accounting_posting_date,p.is_late_tax_adjustment,
+      jsonb_array_length(public.vat_report(current_date,current_date)->'late_transactions')
+    from public.purchases p where p.id=(select purchase_id from late_vat_purchase)$$,
+  $$values (current_date-1,current_date,true,2)$$,
+  'closed-period supplier invoice keeps its tax point, posts now, and joins the correction schedule');
 select public.pos_device_heartbeat('vat-test-device',
   (select id from public.stock_locations where company_id=(select company_id from vat_fixture) and is_default limit 1),0,true);
 create temp table retired_device as select public.pos_device_heartbeat('vat-retired-device',
@@ -423,6 +633,10 @@ select is((public.period_close_readiness(current_date)->'warnings'->>'stale_devi
   'stale devices warn without blocking a known-clear queue');
 create temp table closed_vat_period as select public.close_accounting_period(current_date) period_id;
 grant select on pg_temp.closed_vat_period to authenticated;
+select is((select p.accounting_period_id from public.purchases p
+    where p.id=(select purchase_id from late_vat_purchase)),
+  (select period_id from closed_vat_period),
+  'period close preserves the posting-period identity referenced by transactions');
 select is((select count(*)::integer from public.accounting_periods
   where company_id=(select company_id from vat_fixture) and status='open'),1,
   'closing atomically creates exactly one next open period');

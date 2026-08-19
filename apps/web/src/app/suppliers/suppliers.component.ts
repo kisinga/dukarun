@@ -383,820 +383,7 @@ interface ParsedPurchaseLine {
         }
       }
 
-      <div
-        class="grid gap-4"
-        [class.mb-4]="isPurchasePage() && (purchaseFormOpen() || drafts().length > 0)"
-      >
-        @if (isPurchasePage() && purchaseFormOpen()) {
-          <section id="purchase-form" class="card overflow-visible bg-base-100">
-            <div class="card-body p-0">
-              <div
-                class="flex items-start justify-between gap-3 rounded-t-box border-b border-base-300 bg-base-200/30 px-5 py-4"
-              >
-                <div>
-                  <h2 class="section-title">Record a purchase</h2>
-                  <p class="type-caption mt-1">Stock is added as soon as this purchase is saved.</p>
-                </div>
-                <a routerLink="/suppliers" class="link link-hover shrink-0 text-sm">
-                  Manage suppliers
-                </a>
-              </div>
-
-              <form
-                (submit)="$event.preventDefault(); recordPurchase()"
-                class="flex flex-col gap-5 p-5"
-              >
-                <div class="grid gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-12">
-                  <div class="relative sm:col-span-2 lg:col-span-6 xl:col-span-4">
-                    <span class="form-field-label mb-1.5 block">
-                      Supplier <span class="text-error">*</span>
-                    </span>
-                    @if (activeSuppliers().length === 0) {
-                      <div class="rounded-field border border-dashed border-base-300 p-3 text-sm">
-                        <p class="font-medium">No active suppliers</p>
-                        <a routerLink="/suppliers" class="link link-primary mt-1 inline-block">
-                          Create a supplier first
-                        </a>
-                      </div>
-                    } @else {
-                      <button
-                        appButton
-                        variant="outline"
-                        size="sm"
-                        type="button"
-                        class="h-auto min-h-14 w-full justify-between gap-3 px-3 py-2 text-left"
-                        [attr.aria-expanded]="supplierPickerOpen()"
-                        aria-haspopup="listbox"
-                        (click)="supplierPickerOpen.set(!supplierPickerOpen())"
-                      >
-                        @if (selectedSupplier(); as supplier) {
-                          <span class="min-w-0 flex-1">
-                            <span class="block truncate font-semibold">{{ name(supplier) }}</span>
-                            <span class="type-caption block truncate font-normal">
-                              {{ supplier.phone || supplier.email || 'No contact details' }}
-                              @if (supplier.supplier_credit_terms_days) {
-                                · {{ supplier.supplier_credit_terms_days }}d terms
-                              }
-                            </span>
-                          </span>
-                          @if (perms.has('ViewFinancials')) {
-                            <span class="shrink-0 text-right font-normal">
-                              <span
-                                class="block text-xs font-semibold"
-                                [class.text-warning]="supplier.ap_balance > 0"
-                              >
-                                We owe <app-money [amount]="supplier.ap_balance" />
-                              </span>
-                              <span class="type-caption block">
-                                @if (supplier.supplier_credit_limit > 0) {
-                                  <app-money [amount]="supplierCreditAvailable(supplier)" />
-                                  available
-                                } @else {
-                                  No credit cap
-                                }
-                              </span>
-                            </span>
-                          }
-                        } @else {
-                          <span>Choose supplier</span>
-                        }
-                        <app-icon class="shrink-0" name="heroChevronDown" />
-                      </button>
-
-                      @if (supplierPickerOpen()) {
-                        <div
-                          class="absolute inset-x-0 top-full z-30 mt-1 overflow-hidden rounded-box border border-base-300 bg-base-100 shadow-overlay"
-                        >
-                          <div class="border-b border-base-300 p-2">
-                            <div class="relative">
-                              <span
-                                class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-base-content/50"
-                              >
-                                <app-icon name="heroMagnifyingGlass" />
-                              </span>
-                              <input
-                                type="search"
-                                class="input input-bordered input-sm w-full pl-9"
-                                placeholder="Search name, phone, or email…"
-                                [value]="supplierQuery()"
-                                (input)="supplierQuery.set($any($event.target).value)"
-                              />
-                            </div>
-                          </div>
-                          <div class="max-h-64 overflow-y-auto p-1" role="listbox">
-                            @for (supplier of filteredSuppliers(); track supplier.id) {
-                              <button
-                                type="button"
-                                class="flex min-h-14 w-full items-center gap-3 rounded-field px-3 py-2 text-left hover:bg-base-200"
-                                role="option"
-                                [attr.aria-selected]="supplier.id === purchaseSupplier.value"
-                                (click)="chooseSupplier(supplier)"
-                              >
-                                <span class="min-w-0 flex-1">
-                                  <span class="block truncate text-sm font-semibold">
-                                    {{ name(supplier) }}
-                                  </span>
-                                  <span class="type-caption block truncate">
-                                    {{ supplier.phone || supplier.email || 'No contact details' }}
-                                    @if (supplier.supplier_credit_terms_days) {
-                                      · {{ supplier.supplier_credit_terms_days }}d terms
-                                    }
-                                  </span>
-                                </span>
-                                <span class="shrink-0 text-right">
-                                  @if (perms.has('ViewFinancials')) {
-                                    <span
-                                      class="block text-xs font-semibold"
-                                      [class.text-warning]="supplier.ap_balance > 0"
-                                    >
-                                      We owe <app-money [amount]="supplier.ap_balance" />
-                                    </span>
-                                    <span class="type-caption">
-                                      @if (supplier.supplier_credit_limit > 0) {
-                                        <app-money [amount]="supplierCreditAvailable(supplier)" />
-                                        available
-                                      } @else {
-                                        No credit cap
-                                      }
-                                    </span>
-                                  } @else if (supplierStats(supplier.id); as stats) {
-                                    <span class="block text-xs font-medium">
-                                      {{ stats.purchases }} purchase(s)
-                                    </span>
-                                    <span class="type-caption"
-                                      >{{ stats.products }} product(s)</span
-                                    >
-                                  }
-                                </span>
-                              </button>
-                            } @empty {
-                              <p class="p-3 text-sm text-base-content/60">No matching suppliers.</p>
-                            }
-                          </div>
-                        </div>
-                      }
-                    }
-                  </div>
-                  <app-form-field label="Invoice / reference" class="lg:col-span-3 xl:col-span-2">
-                    <input
-                      type="text"
-                      class="input input-bordered h-14 w-full"
-                      placeholder="Optional"
-                      [formControl]="purchaseReference"
-                    />
-                  </app-form-field>
-                  <app-form-field label="Purchase date" class="lg:col-span-3 xl:col-span-2">
-                    <input
-                      type="date"
-                      class="input input-bordered h-14 w-full"
-                      [formControl]="purchaseDate"
-                    />
-                  </app-form-field>
-                  <app-form-field label="Receive into" class="lg:col-span-3 xl:col-span-2">
-                    <select
-                      class="select select-bordered h-14 w-full"
-                      [formControl]="purchaseLocation"
-                    >
-                      @for (location of locations(); track location.id) {
-                        <option [value]="location.id">{{ location.name }}</option>
-                      }
-                    </select>
-                  </app-form-field>
-                  <app-form-field label="Notes" class="sm:col-span-2 lg:col-span-9 xl:col-span-2">
-                    <input
-                      class="input input-bordered h-14 w-full"
-                      placeholder="Delivery notes…"
-                      [formControl]="purchaseNotes"
-                    />
-                  </app-form-field>
-                  <label
-                    class="flex min-h-14 cursor-pointer items-center gap-3 rounded-field border border-base-300 px-3 lg:col-span-3 xl:col-span-2"
-                  >
-                    <input
-                      type="checkbox"
-                      class="toggle toggle-primary"
-                      [formControl]="purchaseClaimInputVat"
-                      [disabled]="!!activeDraftId()"
-                    />
-                    <span>
-                      <span class="block text-sm font-semibold">Claim input VAT</span>
-                      <span class="type-caption">Costs entered above are VAT-inclusive.</span>
-                    </span>
-                  </label>
-                  @if (purchaseClaimInputVat.value) {
-                    <app-form-field
-                      label="Supplier tax PIN"
-                      class="lg:col-span-3 xl:col-span-2"
-                      [required]="true"
-                    >
-                      <input
-                        class="input input-bordered h-14 w-full"
-                        autocomplete="off"
-                        [formControl]="purchaseSupplierTaxPin"
-                      />
-                    </app-form-field>
-                    <app-form-field
-                      label="Tax invoice number"
-                      class="lg:col-span-3 xl:col-span-2"
-                      [required]="true"
-                    >
-                      <input
-                        class="input input-bordered h-14 w-full"
-                        autocomplete="off"
-                        [formControl]="purchaseTaxInvoiceNumber"
-                      />
-                    </app-form-field>
-                    <app-form-field
-                      label="Tax invoice date"
-                      class="lg:col-span-3 xl:col-span-2"
-                      [required]="true"
-                    >
-                      <input
-                        type="date"
-                        class="input input-bordered h-14 w-full"
-                        [formControl]="purchaseTaxInvoiceDate"
-                      />
-                    </app-form-field>
-                  }
-                </div>
-
-                <section class="rounded-box border border-base-300 bg-base-200/30 p-4">
-                  <div class="flex items-center justify-between gap-3">
-                    <div>
-                      <h3 class="text-sm font-semibold">Payment</h3>
-                      <p class="type-caption">Choose when and where the supplier is paid.</p>
-                    </div>
-                    <div class="shrink-0 text-right">
-                      <p class="type-caption">Current total</p>
-                      <p class="font-semibold tabular-nums">
-                        <app-money [amount]="purchaseTotal()" />
-                      </p>
-                    </div>
-                  </div>
-                  <div class="mt-3 grid items-start gap-4 lg:grid-cols-2">
-                    <div>
-                      <span class="form-field-label mb-1.5 block">Payment option</span>
-                      <div class="grid gap-2 sm:grid-cols-3">
-                        <button
-                          type="button"
-                          class="flex h-14 items-center justify-start gap-2 rounded-field border bg-base-100 px-3 text-left transition-colors"
-                          [class.border-primary]="purchasePaymentMode.value === 'paid'"
-                          [class.shadow-sm]="purchasePaymentMode.value === 'paid'"
-                          [class.border-base-300]="purchasePaymentMode.value !== 'paid'"
-                          (click)="setPurchasePaymentMode('paid')"
-                        >
-                          <input
-                            type="radio"
-                            class="radio radio-primary radio-sm"
-                            tabindex="-1"
-                            [checked]="purchasePaymentMode.value === 'paid'"
-                          />
-                          <span>
-                            <span class="block text-sm font-semibold">Paid now</span>
-                            <span class="type-caption block font-normal">Full payment</span>
-                          </span>
-                        </button>
-                        @if (perms.has('ManageSupplierCreditPurchases')) {
-                          <button
-                            type="button"
-                            class="flex h-14 items-center justify-start gap-2 rounded-field border bg-base-100 px-3 text-left transition-colors"
-                            [class.border-primary]="purchasePaymentMode.value === 'partial'"
-                            [class.shadow-sm]="purchasePaymentMode.value === 'partial'"
-                            [class.border-base-300]="purchasePaymentMode.value !== 'partial'"
-                            (click)="setPurchasePaymentMode('partial')"
-                          >
-                            <input
-                              type="radio"
-                              class="radio radio-primary radio-sm"
-                              tabindex="-1"
-                              [checked]="purchasePaymentMode.value === 'partial'"
-                            />
-                            <span>
-                              <span class="block text-sm font-semibold">Part-paid</span>
-                              <span class="type-caption block font-normal">Split payment</span>
-                            </span>
-                          </button>
-                          <button
-                            type="button"
-                            class="flex h-14 items-center justify-start gap-2 rounded-field border bg-base-100 px-3 text-left transition-colors"
-                            [class.border-warning]="purchasePaymentMode.value === 'later'"
-                            [class.shadow-sm]="purchasePaymentMode.value === 'later'"
-                            [class.border-base-300]="purchasePaymentMode.value !== 'later'"
-                            (click)="setPurchasePaymentMode('later')"
-                          >
-                            <input
-                              type="radio"
-                              class="radio radio-warning radio-sm"
-                              tabindex="-1"
-                              [checked]="purchasePaymentMode.value === 'later'"
-                            />
-                            <span>
-                              <span class="block text-sm font-semibold">Pay later</span>
-                              <span class="type-caption block font-normal">Supplier credit</span>
-                            </span>
-                          </button>
-                        }
-                      </div>
-                      <p class="type-caption mt-1">
-                        {{
-                          purchasePaymentMode.value === 'paid'
-                            ? 'Pay the full amount from an account now.'
-                            : purchasePaymentMode.value === 'partial'
-                              ? 'Pay part now and add only the remainder to what we owe this supplier.'
-                              : 'Add the full amount to what we owe this supplier.'
-                        }}
-                      </p>
-                    </div>
-
-                    @if (purchasePaymentMode.value === 'partial') {
-                      <div class="grid gap-3 sm:grid-cols-2">
-                        <app-form-field
-                          label="Amount paid"
-                          [hint]="partialPaymentHint()"
-                          [error]="partialPaymentError()"
-                        >
-                          <input
-                            class="input input-bordered h-14 w-full"
-                            inputmode="numeric"
-                            placeholder="0"
-                            [formControl]="purchaseAmountPaid"
-                          />
-                        </app-form-field>
-                        <app-form-field label="Paid from" [error]="accountSelectionError()">
-                          <select
-                            class="select select-bordered h-14 w-full"
-                            [formControl]="purchaseAccount"
-                          >
-                            @for (a of accounts(); track a.code) {
-                              <option [value]="a.code">{{ a.code }} — {{ a.name }}</option>
-                            }
-                          </select>
-                        </app-form-field>
-                        <p class="type-caption sm:col-span-2">
-                          The payment is recorded against the selected account when this purchase is
-                          saved.
-                        </p>
-                      </div>
-                    } @else if (purchasePaymentMode.value === 'paid') {
-                      <div>
-                        <app-form-field label="Paid from" [error]="accountSelectionError()">
-                          <select
-                            class="select select-bordered h-14 w-full"
-                            [formControl]="purchaseAccount"
-                          >
-                            @for (a of accounts(); track a.code) {
-                              <option [value]="a.code">{{ a.code }} — {{ a.name }}</option>
-                            }
-                          </select>
-                        </app-form-field>
-                        <p class="type-caption mt-1">
-                          The full purchase total is recorded against this account when saved.
-                        </p>
-                      </div>
-                    } @else if (selectedSupplier(); as supplier) {
-                      <div>
-                        <span class="form-field-label mb-1.5 block">Supplier credit</span>
-                        <div
-                          class="flex h-14 items-center justify-between rounded-field border border-base-300 bg-base-100 px-3 text-sm"
-                        >
-                          <span class="text-base-content/60">Available</span>
-                          <strong>
-                            @if (supplier.supplier_credit_limit > 0) {
-                              <app-money [amount]="supplierCreditAvailable(supplier)" />
-                            } @else {
-                              No configured cap
-                            }
-                          </strong>
-                        </div>
-                        <p class="type-caption mt-1">
-                          <app-money [amount]="purchaseBalanceDue()" /> will be added to what we owe
-                          {{ name(supplier) }}.
-                        </p>
-                      </div>
-                    }
-                  </div>
-                  @if (!cashierSession.canTakePayment()) {
-                    @if (purchasePaymentMode.value !== 'later') {
-                      <div class="mt-2">
-                        <app-session-required-notice
-                          action="recording a paid purchase"
-                          [compact]="true"
-                        />
-                      </div>
-                    }
-                  }
-                </section>
-
-                <section class="flex flex-col gap-3 border-t border-base-300 pt-4">
-                  <div class="flex items-center justify-between gap-2">
-                    <div>
-                      <span class="section-title">Items</span>
-                      @if (selectedPurchaseLineCount() > 0) {
-                        <span class="badge badge-ghost badge-xs ml-1">
-                          {{ selectedPurchaseLineCount() }}
-                        </span>
-                      }
-                      <p class="type-caption mt-0.5">
-                        Enter unit cost or line total—the other stays in sync.
-                      </p>
-                    </div>
-                    <button appButton variant="outline" size="sm" type="button" (click)="addLine()">
-                      <app-icon name="heroPlus" />
-                      Add line
-                    </button>
-                  </div>
-                  @for (line of lines; track $index) {
-                    <div
-                      class="relative grid gap-x-3 gap-y-4 rounded-box border border-base-300 bg-base-200/40 p-4 md:grid-cols-2 lg:grid-cols-12"
-                    >
-                      <div class="relative md:col-span-2 lg:col-span-4">
-                        <span class="form-field-label mb-1 block">Product</span>
-                        <button
-                          type="button"
-                          class="flex h-12 w-full items-center justify-between gap-2 rounded-field border border-base-300 bg-base-100 px-3 text-left text-sm hover:border-base-content/30"
-                          [attr.aria-expanded]="variantPickerFor() === $index"
-                          (click)="openVariantPicker($index)"
-                        >
-                          @if (variantFor(line); as selectedVariant) {
-                            <span class="min-w-0">
-                              <span class="block truncate font-medium">{{
-                                label(selectedVariant)
-                              }}</span>
-                              <span class="type-caption block truncate">
-                                {{ selectedVariant.manufacturer_name || 'Manufacturer not set' }}
-                                · {{ selectedVariant.sku }}
-                              </span>
-                            </span>
-                          } @else {
-                            <span class="text-base-content/60">Choose a product</span>
-                          }
-                          <app-icon name="heroChevronDown" />
-                        </button>
-                        @if (variantPickerFor() === $index) {
-                          <div
-                            class="absolute inset-x-0 top-full z-40 mt-1 overflow-hidden rounded-box border border-base-300 bg-base-100 shadow-overlay"
-                          >
-                            <div class="border-b border-base-300 p-2">
-                              <div class="relative">
-                                <span
-                                  class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-base-content/50"
-                                >
-                                  <app-icon name="heroMagnifyingGlass" />
-                                </span>
-                                <input
-                                  type="search"
-                                  #variantSearch
-                                  class="input input-bordered input-sm w-full pl-9"
-                                  placeholder="Search product, manufacturer, SKU, or barcode…"
-                                  [value]="variantQuery()"
-                                  (input)="updateVariantQuery($any($event.target).value)"
-                                />
-                              </div>
-                            </div>
-                            <div class="max-h-64 overflow-y-auto p-1" role="listbox">
-                              @for (
-                                variant of filteredPurchaseVariants();
-                                track variant.variant_id
-                              ) {
-                                <button
-                                  type="button"
-                                  class="flex min-h-11 w-full items-center justify-between gap-3 rounded-field px-3 py-2 text-left hover:bg-base-200"
-                                  [attr.aria-selected]="variant.variant_id === line.variantId"
-                                  (click)="chooseVariantForLine(line, $index, variant.variant_id!)"
-                                >
-                                  <span class="min-w-0">
-                                    <span class="block truncate text-sm font-medium">{{
-                                      label(variant)
-                                    }}</span>
-                                    <span class="type-caption block truncate">
-                                      {{ variant.manufacturer_name || 'Manufacturer not set' }} ·
-                                      {{ variant.sku
-                                      }}{{ variant.barcode ? ' · ' + variant.barcode : '' }}
-                                    </span>
-                                  </span>
-                                  <span class="type-caption shrink-0 tabular-nums"
-                                    >{{ variant.stock ?? 0 }} in stock</span
-                                  >
-                                </button>
-                              } @empty {
-                                <p class="p-3 text-sm text-base-content/60">
-                                  No matching products.
-                                </p>
-                              }
-                            </div>
-                          </div>
-                        }
-                      </div>
-                      <app-form-field label="Quantity" class="lg:col-span-2">
-                        <div class="join flex w-full">
-                          <button
-                            appButton
-                            variant="outline"
-                            size="sm"
-                            [iconOnly]="true"
-                            type="button"
-                            class="join-item h-12"
-                            aria-label="Decrease quantity"
-                            (click)="stepPurchaseQuantity(line, -1)"
-                          >
-                            <app-icon name="heroMinus" />
-                          </button>
-                          <input
-                            type="number"
-                            class="input input-bordered join-item h-12 min-w-10 flex-1 px-1 text-center tabular-nums"
-                            [min]="variantFor(line)?.allow_fractional ? 0.01 : 1"
-                            [step]="variantFor(line)?.allow_fractional ? 0.5 : 1"
-                            [ngModel]="line.quantity"
-                            [ngModelOptions]="{ standalone: true }"
-                            (ngModelChange)="updatePurchaseQuantity(line, $event)"
-                          />
-                          <button
-                            appButton
-                            variant="outline"
-                            size="sm"
-                            [iconOnly]="true"
-                            type="button"
-                            class="join-item h-12"
-                            aria-label="Increase quantity"
-                            (click)="stepPurchaseQuantity(line, 1)"
-                          >
-                            <app-icon name="heroPlus" />
-                          </button>
-                        </div>
-                      </app-form-field>
-                      <app-form-field label="Unit cost (KES)" class="lg:col-span-2">
-                        <input
-                          type="text"
-                          inputmode="numeric"
-                          class="input input-bordered h-12 w-full text-right tabular-nums"
-                          [ngModel]="line.unitCost"
-                          [ngModelOptions]="{ standalone: true }"
-                          (ngModelChange)="updateUnitCost(line, $event)"
-                          (blur)="normalizePurchaseValue(line)"
-                        />
-                      </app-form-field>
-                      <app-form-field
-                        label="Line total (KES)"
-                        [class.lg:col-span-3]="lines.length > 1"
-                        [class.lg:col-span-4]="lines.length === 1"
-                      >
-                        <input
-                          type="text"
-                          inputmode="numeric"
-                          class="input input-bordered h-12 w-full text-right font-semibold tabular-nums"
-                          [ngModel]="line.lineTotal"
-                          [ngModelOptions]="{ standalone: true }"
-                          (ngModelChange)="updateLineTotal(line, $event)"
-                          (blur)="normalizePurchaseValue(line)"
-                        />
-                      </app-form-field>
-                      @if (lines.length > 1) {
-                        <div class="flex items-end justify-end md:col-span-2 lg:col-span-1">
-                          <button
-                            appButton
-                            variant="ghost"
-                            type="button"
-                            aria-label="Remove purchase line"
-                            (click)="removeLine($index)"
-                          >
-                            <app-icon name="heroXMark" />
-                          </button>
-                        </div>
-                      }
-                      @if (variantFor(line); as variant) {
-                        <div
-                          class="grid gap-3 md:col-span-2 md:grid-cols-2 lg:col-span-12"
-                          [class.lg:grid-cols-4]="preferences.batchExpiryEnabled()"
-                          [class.lg:grid-cols-3]="!preferences.batchExpiryEnabled()"
-                        >
-                          @if (preferences.batchExpiryEnabled()) {
-                            <app-form-field label="Expiry (optional)">
-                              <input
-                                type="date"
-                                class="input input-bordered h-11 w-full"
-                                [(ngModel)]="line.expiryDate"
-                                [ngModelOptions]="{ standalone: true }"
-                              />
-                            </app-form-field>
-                          }
-                          <app-form-field label="Batch (optional)">
-                            <input
-                              class="input input-bordered h-11 w-full"
-                              [(ngModel)]="line.batchNumber"
-                              [ngModelOptions]="{ standalone: true }"
-                            />
-                          </app-form-field>
-                          <app-form-field label="Wholesale price (KES)">
-                            <div class="relative">
-                              <input
-                                type="text"
-                                inputmode="numeric"
-                                class="input input-bordered h-11 w-full text-right tabular-nums"
-                                [class.bg-base-200]="!perms.has('ManageStockAdjustments')"
-                                [class.pr-8]="hasDuplicateVariant(line)"
-                                [readonly]="!perms.has('ManageStockAdjustments')"
-                                [title]="
-                                  perms.has('ManageStockAdjustments')
-                                    ? ''
-                                    : 'Your role can receive stock but cannot change catalog prices'
-                                "
-                                [(ngModel)]="line.wholesalePrice"
-                                (ngModelChange)="updateWholesalePrice(line, $event)"
-                                [ngModelOptions]="{ standalone: true }"
-                              />
-                              @if (hasDuplicateVariant(line)) {
-                                <span
-                                  class="absolute inset-y-0 right-2 flex items-center text-warning"
-                                  [title]="duplicatePriceTooltip"
-                                >
-                                  <app-icon name="heroExclamationTriangle" />
-                                </span>
-                              }
-                            </div>
-                          </app-form-field>
-                          <app-form-field label="Retail price (KES)">
-                            <div class="relative">
-                              <input
-                                type="text"
-                                inputmode="numeric"
-                                class="input input-bordered h-11 w-full text-right tabular-nums"
-                                [class.bg-base-200]="!perms.has('ManageStockAdjustments')"
-                                [class.pr-8]="hasDuplicateVariant(line)"
-                                [readonly]="!perms.has('ManageStockAdjustments')"
-                                [title]="
-                                  perms.has('ManageStockAdjustments')
-                                    ? ''
-                                    : 'Your role can receive stock but cannot change catalog prices'
-                                "
-                                [(ngModel)]="line.retailPrice"
-                                (ngModelChange)="updateRetailPrice(line, $event)"
-                                [ngModelOptions]="{ standalone: true }"
-                              />
-                              @if (hasDuplicateVariant(line)) {
-                                <span
-                                  class="absolute inset-y-0 right-2 flex items-center text-warning"
-                                  [title]="duplicatePriceTooltip"
-                                >
-                                  <app-icon name="heroExclamationTriangle" />
-                                </span>
-                              }
-                            </div>
-                          </app-form-field>
-                          @if (!perms.has('ManageStockAdjustments')) {
-                            <p class="type-caption md:col-span-2 lg:col-span-2">
-                              Your role can receive stock but cannot change catalog prices.
-                            </p>
-                          }
-                        </div>
-
-                        <div
-                          class="grid overflow-hidden rounded-field border border-base-300 bg-base-100/70 sm:grid-cols-2 md:col-span-2 lg:col-span-12 lg:grid-cols-5 lg:divide-x lg:divide-base-300"
-                        >
-                          <div class="min-w-0 space-y-1 p-3">
-                            <p class="type-caption">SKU · current stock</p>
-                            <p class="font-semibold tabular-nums">
-                              {{ variant.sku }} · {{ variant.stock ?? 0 }}
-                              {{ variant.allow_fractional ? 'units' : 'in stock' }}
-                            </p>
-                          </div>
-                          <div class="min-w-0 space-y-1 border-t border-base-300 p-3 sm:border-t-0">
-                            <p class="type-caption">This supplier</p>
-                            @if (supplierInsight(line); as insight) {
-                              <p class="font-semibold">
-                                <app-money [amount]="insight.last_unit_cost ?? 0" />
-                              </p>
-                              <p class="type-caption">
-                                Last cost · {{ insight.purchase_count }} purchase(s)
-                              </p>
-                            } @else {
-                              <p class="text-sm text-base-content/60">No purchase history</p>
-                            }
-                          </div>
-                          <div class="min-w-0 space-y-1 border-t border-base-300 p-3 lg:border-t-0">
-                            <p class="type-caption">Wholesale margin</p>
-                            <app-status-badge
-                              size="xs"
-                              [type]="marginType(line, enteredCatalogPrice(line.wholesalePrice))"
-                              [label]="marginLabel(line, enteredCatalogPrice(line.wholesalePrice))"
-                            />
-                          </div>
-                          <div class="min-w-0 space-y-1 border-t border-base-300 p-3 lg:border-t-0">
-                            <p class="type-caption">Retail margin</p>
-                            <app-status-badge
-                              size="xs"
-                              [type]="marginType(line, enteredCatalogPrice(line.retailPrice))"
-                              [label]="marginLabel(line, enteredCatalogPrice(line.retailPrice))"
-                            />
-                          </div>
-                          <div class="min-w-0 space-y-1 border-t border-base-300 p-3 lg:border-t-0">
-                            <p class="type-caption">Best recorded price</p>
-                            @if (bestSupplierHint(line); as best) {
-                              <p class="text-sm font-semibold">{{ fmt(best.cost) }}</p>
-                              <p class="type-caption truncate">{{ best.supplier }}</p>
-                            } @else {
-                              <p class="text-sm text-base-content/60">No comparison yet</p>
-                            }
-                          </div>
-                        </div>
-
-                        @if (catalogPriceChanged(line)) {
-                          <div
-                            class="flex items-center gap-2 text-xs text-info md:col-span-2 lg:col-span-12"
-                          >
-                            <app-icon name="heroArrowPath" />
-                            Catalog prices will update when this purchase is confirmed.
-                          </div>
-                        }
-
-                        @if (priceWarning(line, variant); as warning) {
-                          <div
-                            class="alert alert-warning py-2 text-sm md:col-span-2 lg:col-span-12"
-                            role="status"
-                          >
-                            <app-icon name="heroExclamationTriangle" />
-                            <span>{{ warning }}</span>
-                          </div>
-                        }
-                      }
-                    </div>
-                  }
-                </section>
-
-                <div
-                  class="flex flex-wrap items-center gap-3 rounded-box border px-3 py-3"
-                  [class.border-warning]="purchasePaymentMode.value !== 'paid'"
-                  [class.border-base-300]="purchasePaymentMode.value === 'paid'"
-                  [class.bg-base-200]="true"
-                >
-                  <div>
-                    <p class="type-caption">Purchase total</p>
-                    <p class="type-hero"><app-money [amount]="purchaseTotal()" /></p>
-                  </div>
-                  <p class="ml-auto max-w-sm text-right text-sm">
-                    @if (purchasePaymentMode.value === 'partial') {
-                      <strong><app-money [amount]="purchaseInitialPayment()" /></strong> paid now ·
-                      <strong><app-money [amount]="purchaseBalanceDue()" /></strong> we still owe
-                    } @else if (purchasePaymentMode.value === 'later') {
-                      <strong><app-money [amount]="purchaseBalanceDue()" /></strong> will become
-                      money we owe {{ selectedSupplierName() }}.
-                    } @else {
-                      This is recorded as <strong>paid now</strong>; what we owe the supplier will
-                      not change.
-                    }
-                  </p>
-                </div>
-
-                @if (purchasePaymentMode.value !== 'paid' && supplierCreditExceeded()) {
-                  <div role="alert" class="alert alert-error text-sm">
-                    <app-icon name="heroExclamationTriangle" />
-                    <span>
-                      This purchase exceeds the supplier's available credit of
-                      <app-money [amount]="supplierCreditAvailable(selectedSupplier()!)" />.
-                    </span>
-                  </div>
-                }
-
-                <div class="flex flex-wrap gap-2">
-                  <button
-                    appButton
-                    type="submit"
-                    [loading]="busy()"
-                    [disabled]="
-                      activeSuppliers().length === 0 ||
-                      variants().length === 0 ||
-                      (purchasePaymentMode.value !== 'later' && !cashierSession.canTakePayment()) ||
-                      !partialPaymentValid() ||
-                      (purchasePaymentMode.value !== 'paid' && supplierCreditExceeded())
-                    "
-                  >
-                    {{
-                      activeDraftId()
-                        ? 'Confirm draft purchase'
-                        : purchasePaymentMode.value === 'paid'
-                          ? 'Record paid purchase'
-                          : purchasePaymentMode.value === 'partial'
-                            ? 'Record part-paid purchase'
-                            : 'Record credit purchase'
-                    }}
-                  </button>
-                  <button
-                    appButton
-                    variant="outline"
-                    type="button"
-                    [disabled]="busy()"
-                    (click)="saveDraft()"
-                  >
-                    {{ activeDraftId() ? 'Update draft' : 'Save draft' }}
-                  </button>
-                  <button appButton variant="ghost" type="button" (click)="closePurchaseForm()">
-                    {{ activeDraftId() ? 'Close draft' : 'Cancel' }}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </section>
-        }
-
+      <div class="grid gap-4" [class.mb-4]="isPurchasePage() && drafts().length > 0">
         <aside class="flex flex-col gap-4">
           @if (isPurchasePage() && drafts().length > 0) {
             <section class="card bg-base-100">
@@ -1341,6 +528,18 @@ interface ParsedPurchaseLine {
                     [formControl]="newEmail"
                   />
                 </app-form-field>
+                <app-form-field
+                  label="Supplier tax PIN"
+                  hint="Used as reusable evidence when claiming input VAT from supplier invoices."
+                >
+                  <input
+                    type="text"
+                    class="input input-bordered input-sm w-full"
+                    autocomplete="off"
+                    placeholder="e.g. P000000000A"
+                    [formControl]="newSupplierTaxPin"
+                  />
+                </app-form-field>
                 <app-form-field label="Notes">
                   <input
                     type="text"
@@ -1441,6 +640,19 @@ interface ParsedPurchaseLine {
                       : (s.supplier_credit_terms_days || 0) + 'd terms'
                   "
                 />
+              </div>
+
+              <div class="mt-3 rounded-field border border-base-300 p-3 text-sm">
+                <div class="grid gap-2 sm:grid-cols-2">
+                  <div>
+                    <p class="type-caption">Contact</p>
+                    <p>{{ s.phone || s.email || 'Not provided' }}</p>
+                  </div>
+                  <div>
+                    <p class="type-caption">Supplier tax PIN</p>
+                    <p>{{ s.tax_registration_number || 'Not provided' }}</p>
+                  </div>
+                </div>
               </div>
 
               @if (supplierStats(s.id); as stats) {
@@ -1864,7 +1076,7 @@ interface ParsedPurchaseLine {
                               </p>
                               <p class="type-caption">
                                 {{ time(p.purchase_date) }} ·
-                                {{ p.is_credit ? 'Pay later' : 'Paid now' }}
+                                {{ purchaseSettlementLabel(p) }}
                               </p>
                             </div>
                             <app-status-badge
@@ -1879,9 +1091,7 @@ interface ParsedPurchaseLine {
                               />
                             </span>
                             @if (
-                              p.is_credit &&
-                              p.paid < p.total_cost &&
-                              perms.has('ManageSupplierCreditPurchases')
+                              p.paid < p.total_cost && perms.has('ManageSupplierCreditPurchases')
                             ) {
                               @if (supplierAdvanceBalance() > 0) {
                                 <button
@@ -2133,7 +1343,7 @@ interface ParsedPurchaseLine {
                       >
                         <td class="whitespace-nowrap text-sm">{{ time(p.purchase_date) }}</td>
                         <td class="font-medium">{{ supplierName(p.supplier_id) }}</td>
-                        <td class="text-sm">{{ p.is_credit ? 'Pay later' : 'Paid now' }}</td>
+                        <td class="text-sm">{{ purchaseSettlementLabel(p) }}</td>
                         <td class="type-caption">{{ p.reference || '—' }}</td>
                         <td class="text-right font-semibold">
                           <app-money
@@ -2162,9 +1372,7 @@ interface ParsedPurchaseLine {
                             </button>
                           }
                           @if (
-                            p.is_credit &&
-                            p.paid < p.total_cost &&
-                            perms.has('ManageSupplierCreditPurchases')
+                            p.paid < p.total_cost && perms.has('ManageSupplierCreditPurchases')
                           ) {
                             <button
                               appButton
@@ -2215,11 +1423,7 @@ interface ParsedPurchaseLine {
                     [type]="purchaseStatusType(p)"
                     [label]="purchaseStatusLabel(p)"
                   />
-                  <app-status-badge
-                    size="xs"
-                    type="neutral"
-                    [label]="p.is_credit ? 'Pay later' : 'Paid now'"
-                  />
+                  <app-status-badge size="xs" type="neutral" [label]="purchaseSettlementLabel(p)" />
                 </div>
 
                 @if (perms.has('ManageCommunications') && perms.has('ViewFinancials')) {
@@ -2273,6 +1477,57 @@ interface ParsedPurchaseLine {
                   }
                 </div>
 
+                @if (perms.has('ViewFinancials')) {
+                  <section class="mt-3 rounded-field border border-base-300 p-3">
+                    <div class="flex items-center justify-between gap-3">
+                      <div>
+                        <h3 class="text-sm font-semibold">Input VAT</h3>
+                        <p class="type-caption">
+                          {{
+                            p.claim_input_vat
+                              ? 'Claimed from this supplier invoice'
+                              : 'Not claimed; costs remain gross'
+                          }}
+                        </p>
+                      </div>
+                      <app-status-badge
+                        size="xs"
+                        [type]="p.claim_input_vat ? 'success' : 'neutral'"
+                        [label]="p.claim_input_vat ? 'Claimed' : 'Not claimed'"
+                      />
+                    </div>
+                    @if (p.claim_input_vat) {
+                      <div class="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+                        <div>
+                          <span class="type-caption block">Gross</span>{{ fmt(p.gross_total) }}
+                        </div>
+                        <div>
+                          <span class="type-caption block">Net cost</span>{{ fmt(p.net_total) }}
+                        </div>
+                        <div>
+                          <span class="type-caption block">Recoverable VAT</span
+                          >{{ fmt(p.input_tax_total) }}
+                        </div>
+                        <div>
+                          <span class="type-caption block">Tax invoice</span
+                          >{{ p.tax_invoice_number }} · {{ p.tax_invoice_date }}
+                        </div>
+                        <div>
+                          <span class="type-caption block">Supplier PIN</span
+                          >{{ p.supplier_tax_pin }}
+                        </div>
+                        <div>
+                          <span class="type-caption block">Ledger posting date</span
+                          >{{ p.accounting_posting_date }}
+                          @if (p.is_late_tax_adjustment) {
+                            · prior-period correction
+                          }
+                        </div>
+                      </div>
+                    }
+                  </section>
+                }
+
                 @if (purchaseDetailLoading()) {
                   <div class="flex items-center justify-center gap-2 py-8 text-base-content/60">
                     <span class="loading loading-spinner loading-md"></span>
@@ -2312,6 +1567,10 @@ interface ParsedPurchaseLine {
                                   }
                                   @if (line.batch_number) {
                                     · batch {{ line.batch_number }}
+                                  }
+                                  @if (p.claim_input_vat) {
+                                    · {{ line.tax_category_code }} at {{ line.tax_rate_bps / 100 }}%
+                                    · net {{ fmt(line.net_total) }} · VAT {{ fmt(line.tax_total) }}
                                   }
                                 </p>
                               </div>
@@ -2388,11 +1647,7 @@ interface ParsedPurchaseLine {
                       }
                     </section>
 
-                    @if (
-                      p.is_credit &&
-                      p.paid < p.total_cost &&
-                      perms.has('ManageSupplierCreditPurchases')
-                    ) {
+                    @if (p.paid < p.total_cost && perms.has('ManageSupplierCreditPurchases')) {
                       <section class="border-t border-base-300/60 pt-3">
                         <h3 class="section-title mb-2">Pay this purchase</h3>
                         @if (!cashierSession.canTakePayment()) {
@@ -2454,7 +1709,6 @@ interface ParsedPurchaseLine {
                     }
 
                     @if (
-                      p.is_credit &&
                       p.paid === 0 &&
                       perms.has('ManageSupplierCreditPurchases') &&
                       perms.has('ReverseOrder')
@@ -2590,6 +1844,7 @@ export class SuppliersComponent implements OnInit, OnDestroy {
   protected readonly newName = new FormControl('', { nonNullable: true });
   protected readonly newPhone = new FormControl('', { nonNullable: true });
   protected readonly newEmail = new FormControl('', { nonNullable: true });
+  protected readonly newSupplierTaxPin = new FormControl('', { nonNullable: true });
   protected readonly newNotes = new FormControl('', { nonNullable: true });
   protected readonly supplierCreditLimit = new FormControl('0', { nonNullable: true });
   protected readonly supplierTermsDays = new FormControl(0, { nonNullable: true });
@@ -3555,40 +2810,7 @@ export class SuppliersComponent implements OnInit, OnDestroy {
   }
 
   protected openDraft(draft: PurchaseDraft): void {
-    this.purchaseFormOpen.set(true);
-    this.activeDraftId.set(draft.id);
-    this.purchaseSupplier.setValue(draft.supplier_id);
-    this.purchaseReference.setValue(draft.reference ?? '');
-    this.purchaseNotes.setValue(draft.notes ?? '');
-    this.purchaseDate.setValue(draft.purchase_date);
-    this.purchaseClaimInputVat.setValue(false);
-    const lines = Array.isArray(draft.lines)
-      ? (draft.lines as unknown as Array<Record<string, unknown>>)
-      : [];
-    this.lines = lines.map(line => ({
-      variantId: String(line['variant_id'] ?? ''),
-      quantity: Number(line['quantity'] ?? 1),
-      unitCost: formatKesInput(Number(line['unit_cost'] ?? 0)),
-      lineTotal: this.inputMoney(
-        Math.round(Number(line['quantity'] ?? 1) * Number(line['unit_cost'] ?? 0))
-      ),
-      valueSource: 'unit',
-      expiryDate: String(line['expiry_date'] ?? ''),
-      batchNumber: String(line['batch_number'] ?? ''),
-      wholesalePrice:
-        line['new_wholesale_price'] !== undefined
-          ? formatKesInput(Number(line['new_wholesale_price']))
-          : this.catalogPriceText(
-              this.variants().find(v => v.variant_id === line['variant_id'])?.wholesale_price
-            ),
-      retailPrice:
-        line['new_retail_price'] !== undefined
-          ? formatKesInput(Number(line['new_retail_price']))
-          : this.catalogPriceText(
-              this.variants().find(v => v.variant_id === line['variant_id'])?.price
-            ),
-    }));
-    this.scrollToPurchaseForm();
+    void this.router.navigate(['/purchases/drafts', draft.id]);
   }
 
   protected async cancelDraft(id: string): Promise<void> {
@@ -3617,9 +2839,7 @@ export class SuppliersComponent implements OnInit, OnDestroy {
   }
 
   protected startPurchase(): void {
-    if (!this.purchaseFormOpen()) this.clearPurchaseForm();
-    this.purchaseFormOpen.set(true);
-    this.scrollToPurchaseForm();
+    void this.router.navigate(['/purchases/new']);
   }
 
   protected closePurchaseForm(): void {
@@ -4165,6 +3385,7 @@ export class SuppliersComponent implements OnInit, OnDestroy {
     this.newName.setValue(this.name(supplier));
     this.newPhone.setValue(supplier.phone ?? '');
     this.newEmail.setValue(supplier.email ?? '');
+    this.newSupplierTaxPin.setValue(supplier.tax_registration_number ?? '');
     this.newNotes.setValue(supplier.notes ?? '');
     this.supplierCreditLimit.setValue(formatKesInput(supplier.supplier_credit_limit));
     this.supplierTermsDays.setValue(supplier.supplier_credit_terms_days ?? 0);
@@ -4196,6 +3417,7 @@ export class SuppliersComponent implements OnInit, OnDestroy {
     this.newName.setValue('');
     this.newPhone.setValue('');
     this.newEmail.setValue('');
+    this.newSupplierTaxPin.setValue('');
     this.newNotes.setValue('');
     this.supplierCreditLimit.setValue('0');
     this.supplierTermsDays.setValue(0);
@@ -4237,6 +3459,10 @@ export class SuppliersComponent implements OnInit, OnDestroy {
           email: this.newEmail.value.trim(),
           notes: this.newNotes.value.trim(),
         });
+        await this.money.updateSupplierTaxRegistration(
+          editing.id,
+          this.newSupplierTaxPin.value.trim()
+        );
         if (this.perms.has('ManageSupplierCreditPurchases')) {
           await this.money.updateSupplierCredit(
             editing.id,
@@ -4256,6 +3482,12 @@ export class SuppliersComponent implements OnInit, OnDestroy {
         if (this.newNotes.value.trim()) {
           await this.money.updateCustomer(supplierId, { notes: this.newNotes.value.trim() });
         }
+        if (this.newSupplierTaxPin.value.trim()) {
+          await this.money.updateSupplierTaxRegistration(
+            supplierId,
+            this.newSupplierTaxPin.value.trim()
+          );
+        }
         if (this.perms.has('ManageSupplierCreditPurchases')) {
           await this.money.updateSupplierCredit(
             supplierId,
@@ -4268,6 +3500,7 @@ export class SuppliersComponent implements OnInit, OnDestroy {
       this.newName.setValue('');
       this.newPhone.setValue('');
       this.newEmail.setValue('');
+      this.newSupplierTaxPin.setValue('');
       this.newNotes.setValue('');
       this.supplierCreditLimit.setValue('0');
       this.supplierTermsDays.setValue(0);
@@ -4357,16 +3590,20 @@ export class SuppliersComponent implements OnInit, OnDestroy {
   }
 
   protected purchaseStatusType(purchase: PurchaseRow): BadgeType {
-    if (!purchase.is_credit || purchase.paid >= purchase.total_cost) return 'success';
+    if (purchase.paid >= purchase.total_cost) return 'success';
     return 'warning';
   }
 
   protected purchaseStatusLabel(purchase: PurchaseRow): string {
-    if (!purchase.is_credit) return 'Paid now';
     if (purchase.paid >= purchase.total_cost) return 'Paid';
     if (!this.perms.has('ViewFinancials')) return purchase.paid > 0 ? 'Part-paid' : 'We owe';
     const due = this.fmt(purchase.total_cost - purchase.paid);
     return purchase.paid > 0 ? `Part-paid · we owe ${due}` : `We owe ${due}`;
+  }
+
+  protected purchaseSettlementLabel(purchase: PurchaseRow): string {
+    if (purchase.paid >= purchase.total_cost) return 'Paid';
+    return purchase.paid > 0 ? 'Part paid' : 'Unpaid';
   }
 
   protected supplierName(id: string): string {

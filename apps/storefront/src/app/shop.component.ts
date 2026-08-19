@@ -11,7 +11,7 @@ import {
 import { isPlatformBrowser } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { NgIcon } from '@ng-icons/core';
-import { CatalogProduct, groupCatalog } from './catalog.models';
+import { CatalogProduct, catalogProductsFromPage } from './catalog.models';
 import { ShopCategory, StorefrontInfo, StorefrontService } from './storefront.service';
 import { StorefrontBrandComponent } from './storefront-brand.component';
 import { StorefrontSeoService } from './storefront-seo.service';
@@ -324,7 +324,8 @@ function formatKes(amount: number): string {
                   <h2 class="mt-1 text-2xl font-bold">{{ activeCategoryName() }}</h2>
                 </div>
                 <p class="text-sm text-base-content/55">
-                  {{ resultCount() }} {{ resultCount() === 1 ? 'product' : 'products' }}
+                  {{ pagedProducts().length }}
+                  {{ pagedProducts().length === 1 ? 'product' : 'products' }} on this page
                 </p>
               </div>
 
@@ -373,9 +374,9 @@ function formatKes(amount: number): string {
                           >
                             {{ product.name }}
                           </h3>
-                          @if (product.variants.length > 1) {
+                          @if (product.variantCount > 1) {
                             <p class="mt-1 text-xs text-base-content/45">
-                              {{ product.variants.length }} options
+                              {{ product.variantCount }} options
                             </p>
                           }
                           <p class="mt-auto pt-3 text-base font-bold tabular-nums text-primary">
@@ -429,9 +430,9 @@ function formatKes(amount: number): string {
                             >
                               {{ product.name }}
                             </h3>
-                            @if (product.variants.length > 1) {
+                            @if (product.variantCount > 1) {
                               <p class="mt-1 text-xs text-base-content/45">
-                                {{ product.variants.length }} options
+                                {{ product.variantCount }} options
                               </p>
                             }
                           </div>
@@ -446,13 +447,13 @@ function formatKes(amount: number): string {
                   </div>
                 }
 
-                @if (pageCount() > 1) {
+                @if (page() > 1 || hasMore()) {
                   <nav
                     class="mt-8 flex flex-col items-center justify-between gap-4 border-t border-base-300 pt-6 sm:flex-row"
                     aria-label="Product pages"
                   >
                     <p class="text-sm text-base-content/55">
-                      Showing {{ firstResult() }}–{{ lastResult() }} of {{ resultCount() }}
+                      Showing products {{ firstResult() }}–{{ lastResult() }}
                     </p>
                     <div class="join">
                       <button
@@ -463,21 +464,16 @@ function formatKes(amount: number): string {
                       >
                         Previous
                       </button>
-                      @for (number of visiblePages(); track number) {
-                        <button
-                          type="button"
-                          class="btn join-item min-h-11 min-w-11"
-                          [class.btn-primary]="number === page()"
-                          (click)="goToPage(number)"
-                          [attr.aria-current]="number === page() ? 'page' : null"
-                        >
-                          {{ number }}
-                        </button>
-                      }
+                      <span
+                        class="btn join-item min-h-11 min-w-11 pointer-events-none"
+                        aria-current="page"
+                      >
+                        {{ page() }}
+                      </span>
                       <button
                         type="button"
                         class="btn join-item min-h-11"
-                        [disabled]="page() === pageCount()"
+                        [disabled]="!hasMore()"
                         (click)="goToPage(page() + 1)"
                       >
                         Next
@@ -554,7 +550,7 @@ export class ShopComponent implements OnInit, OnDestroy {
 
   protected readonly shop = signal<StorefrontInfo | null>(this.initialShop ?? null);
   protected readonly products = signal<CatalogProduct[]>(
-    groupCatalog(this.initialCatalog?.rows ?? [])
+    catalogProductsFromPage(this.initialCatalog?.rows ?? [])
   );
   protected readonly categories = signal<ShopCategory[]>(this.initialCategories ?? []);
   protected readonly selectedCategory = signal<string | null>(null);
@@ -570,7 +566,7 @@ export class ShopComponent implements OnInit, OnDestroy {
   protected readonly page = signal(
     this.initialCatalog ? Math.floor(this.initialCatalog.offset / PAGE_SIZE) + 1 : 1
   );
-  protected readonly resultCount = signal(this.initialCatalog?.total ?? 0);
+  protected readonly hasMore = signal(this.initialCatalog?.hasMore ?? false);
   protected readonly skeletons = Array.from({ length: 8 });
   private searchTimer: ReturnType<typeof setTimeout> | undefined;
   private requestSequence = 0;
@@ -579,9 +575,6 @@ export class ShopComponent implements OnInit, OnDestroy {
     afterNextRender(() => this.restoreProductView());
   }
 
-  protected readonly pageCount = computed(() =>
-    Math.max(1, Math.ceil(this.resultCount() / PAGE_SIZE))
-  );
   protected readonly pagedProducts = this.products;
   protected readonly sortedCategories = computed(() =>
     [...this.categories()].sort(
@@ -589,23 +582,16 @@ export class ShopComponent implements OnInit, OnDestroy {
     )
   );
   protected readonly firstResult = computed(() =>
-    this.resultCount() ? (this.page() - 1) * PAGE_SIZE + 1 : 0
+    this.products().length ? (this.page() - 1) * PAGE_SIZE + 1 : 0
   );
-  protected readonly lastResult = computed(() =>
-    Math.min(this.page() * PAGE_SIZE, this.resultCount())
+  protected readonly lastResult = computed(
+    () => this.firstResult() + Math.max(this.products().length - 1, 0)
   );
   protected readonly activeCategoryName = computed(
     () =>
       this.categories().find(category => category.id === this.selectedCategory())?.name ??
       'All products'
   );
-  protected readonly visiblePages = computed(() => {
-    const count = this.pageCount();
-    const current = this.page();
-    const start = Math.max(1, Math.min(current - 1, count - 2));
-    return Array.from({ length: Math.min(3, count) }, (_, index) => start + index);
-  });
-
   async ngOnInit(): Promise<void> {
     if (!this.slug) {
       this.seo.set('Shop not found', 'This shop could not be found.', '/', true);
@@ -614,10 +600,14 @@ export class ShopComponent implements OnInit, OnDestroy {
       return;
     }
     try {
-      const shop = await this.storefront.storefront(
-        this.slug,
-        isPlatformBrowser(this.platformId) && this.initialShop !== undefined
-      );
+      const transferredPageReady =
+        this.initialShop !== undefined &&
+        this.initialCatalog !== null &&
+        this.initialCategories !== null;
+      const page = transferredPageReady
+        ? this.initialCatalog!
+        : await this.storefront.catalogPage(this.slug, { limit: PAGE_SIZE });
+      const shop = transferredPageReady ? this.initialShop! : page.storefront;
       if (!shop) {
         this.seo.set('Shop not found', 'This shop could not be found.', `/${this.slug}`, true);
         this.notFound.set(true);
@@ -625,6 +615,12 @@ export class ShopComponent implements OnInit, OnDestroy {
         return;
       }
       this.shop.set(shop);
+      this.categories.set(page.categories);
+      this.products.set(catalogProductsFromPage(page.rows));
+      this.page.set(Math.floor(page.offset / PAGE_SIZE) + 1);
+      this.hasMore.set(page.hasMore);
+      this.catalogLoading.set(false);
+      this.categoriesLoading.set(false);
       this.seo.set(
         `${shop.name} | Dukarun shops`,
         `Browse ${shop.name} and order directly on WhatsApp.`,
@@ -633,14 +629,7 @@ export class ShopComponent implements OnInit, OnDestroy {
         this.companyLogoUrl(shop.logo_path)
       );
       this.seo.setStructuredData(this.shopStructuredData(shop));
-      if (shop.catalogue_visible) {
-        const refreshTransferredData =
-          isPlatformBrowser(this.platformId) && this.initialCatalog !== null;
-        await Promise.all([
-          this.loadCatalog(refreshTransferredData, refreshTransferredData),
-          this.loadCategories(refreshTransferredData),
-        ]);
-      } else {
+      if (!shop.catalogue_visible) {
         this.catalogLoading.set(false);
         this.categoriesLoading.set(false);
       }
@@ -695,8 +684,9 @@ export class ShopComponent implements OnInit, OnDestroy {
       });
       if (request !== this.requestSequence) return;
       this.page.set(Math.floor(result.offset / PAGE_SIZE) + 1);
-      this.resultCount.set(result.total);
-      this.products.set(groupCatalog(result.rows));
+      this.hasMore.set(result.hasMore);
+      this.categories.set(result.categories);
+      this.products.set(catalogProductsFromPage(result.rows));
     } catch {
       if (request === this.requestSequence && !preserveRenderedContent) {
         this.catalogError.set(true);
@@ -730,7 +720,8 @@ export class ShopComponent implements OnInit, OnDestroy {
     void this.loadPage(1);
   }
   protected goToPage(page: number): void {
-    const nextPage = Math.max(1, Math.min(page, this.pageCount()));
+    const nextPage = Math.max(1, page);
+    if (nextPage > this.page() && !this.hasMore()) return;
     void this.loadPage(nextPage);
     if (isPlatformBrowser(this.platformId)) window.scrollTo({ top: 420, behavior: 'smooth' });
   }

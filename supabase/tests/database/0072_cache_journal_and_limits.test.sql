@@ -1,5 +1,5 @@
 begin;
-select plan(36);
+select plan(51);
 
 select testkit.create_user('72727272-7272-4727-8727-727272727271', 'cache-admin@local.test');
 select testkit.create_user('72727272-7272-4727-8727-727272727272', 'cache-peer@local.test');
@@ -50,6 +50,61 @@ create temp table quota_products as
 select public.create_catalog_product('Quota One','[{"sku":"QUOTA-1","price":10}]') first_id;
 alter table quota_products add column second_id uuid;
 update quota_products set second_id=public.create_catalog_product('Quota Two','[{"sku":"QUOTA-2","price":20}]');
+
+select throws_ok(
+  $$select public.save_draft(null, (
+    select jsonb_agg(jsonb_build_object(
+      'variant_id', (
+        select variant.id from public.product_variants variant
+        where variant.product_id=(select first_id from quota_products)
+        limit 1
+      ),
+      'quantity', 1
+    ))
+    from generate_series(1,129)
+  ))$$,
+  'P0001',
+  'sale_line_limit_exceeded: maximum 128 distinct lines per order',
+  'the database rejects an order above the 128-line checkout bound'
+);
+select throws_ok(
+  $$select public.dashboard_location_snapshot(
+    (now() at time zone 'Africa/Nairobi')::date - 7,
+    null
+  )$$,
+  'P0001',
+  'invalid_dashboard_range: dashboard supports at most 7 days',
+  'the live dashboard cannot request an unbounded historical range'
+);
+
+create temp table parked_cache_sale as
+select public.post_sale(
+  null,
+  format('[{"variant_id":"%s","quantity":1}]', (
+    select v.id from public.product_variants v
+    where v.product_id=(select first_id from quota_products)
+    limit 1
+  ))::jsonb,
+  '[]'::jsonb,
+  true
+) order_id;
+select is(
+  current_setting('app.cache_change_suppressed', true),
+  'off',
+  'sale batching restores cache invalidation state before returning'
+);
+select is(
+  (select count(*)::integer
+   from public.cache_change_log log
+   where log.company_id=(select company_id from cache_company)
+     and log.stream='sales'
+     and log.changes @> jsonb_build_array(jsonb_build_object(
+       'entityType','order','entityId',(select order_id from parked_cache_sale),
+       'operation','upsert'
+     ))),
+  1,
+  'a parked sale writes one batched sales invalidation'
+);
 
 select is(
   (select active_variants from public.company_usage_counters
@@ -186,19 +241,25 @@ select is(
 reset role;
 select public.emit_cache_change(
   (select company_id from cache_company),'catalog','product',gen_random_uuid()::text
-) from generate_series(1,520);
+) from generate_series(1,1288);
+select ok(
+  (select count(*) from public.cache_change_log
+   where company_id=(select company_id from cache_company) and stream='catalog') > 1280,
+  'cache writes do not prune the journal inline'
+);
+select public.prune_cache_change_log();
 select testkit.as_user((select company_id from cache_company),
   '72727272-7272-4727-8727-727272727271','Admin');
 select is(
   (select count(*)::integer from public.cache_change_log
    where company_id=(select company_id from cache_company) and stream='catalog'),
-  512,
-  'each company stream retains exactly 512 entries'
+  1280,
+  'each company stream retains exactly 1,280 entries'
 );
 select is(
   (select head_sequence-pruned_through_sequence from public.cache_stream_heads
    where company_id=(select company_id from cache_company) and stream='catalog'),
-  512::bigint,
+  1280::bigint,
   'stream head records the retention floor'
 );
 select is(
@@ -215,6 +276,100 @@ select is(
   )->>'resetRequired')::boolean,
   false,
   'a reconnect inside retention receives incremental changes'
+);
+select is(
+  (public.sync_cache_stream(
+    'catalog',
+    (select head_sequence + 1 from public.cache_stream_heads
+     where company_id=(select company_id from cache_company) and stream='catalog'),
+    512
+  )->>'resetRequired')::boolean,
+  true,
+  'a cursor beyond the stream head requires an authoritative rebuild'
+);
+
+reset role;
+create temp table cache_batch_before as
+select head_sequence
+from public.cache_stream_heads
+where company_id=(select company_id from cache_company) and stream='catalog';
+grant select on pg_temp.cache_batch_before to authenticated;
+select is(
+  public.emit_cache_batch(
+    (select company_id from cache_company),
+    'catalog',
+    '[{"entityType":"stock","entityId":"batch-one","operation":"upsert"},{"entityType":"stock","entityId":"batch-two","operation":"upsert"}]'
+  ),
+  (select head_sequence + 1 from cache_batch_before),
+  'a cache batch consumes one stream sequence'
+);
+select is(
+  (select jsonb_array_length(changes)
+   from public.cache_change_log
+   where company_id=(select company_id from cache_company) and stream='catalog'
+   order by sequence desc limit 1),
+  2,
+  'a cache batch stores its logical changes in one journal row'
+);
+select testkit.as_user((select company_id from cache_company),
+  '72727272-7272-4727-8727-727272727271','Admin');
+select is(
+  jsonb_array_length(public.sync_cache_stream(
+    'catalog', (select head_sequence from cache_batch_before), 512
+  )->'changes'),
+  2,
+  'cache sync expands a stored batch for existing clients'
+);
+select ok(
+  exists(
+    select 1
+    from jsonb_array_elements(public.sync_cache_stream(
+      'catalog', (select head_sequence from cache_batch_before), 512
+    )->'changes') change
+    where change->>'entityId'='batch-two'
+  ),
+  'expanded cache batches retain each logical entity change'
+);
+
+reset role;
+select is(
+  public.emit_cache_batch(
+    (select company_id from cache_company),
+    'catalog',
+    '[{"entityType":"stock","entityId":"batch-three","operation":"upsert"},{"entityType":"stock","entityId":"batch-four","operation":"upsert"}]'
+  ),
+  (select head_sequence + 2 from cache_batch_before),
+  'a second cache batch follows the first sequence'
+);
+select testkit.as_user((select company_id from cache_company),
+  '72727272-7272-4727-8727-727272727271','Admin');
+select is(
+  jsonb_array_length(public.sync_cache_stream(
+    'catalog', (select head_sequence from cache_batch_before), 2
+  )->'changes'),
+  2,
+  'cache page size counts expanded logical changes, not journal rows'
+);
+select is(
+  public.sync_cache_stream(
+    'catalog', (select head_sequence from cache_batch_before), 2
+  )->>'nextSequence',
+  ((select head_sequence + 1 from cache_batch_before))::text,
+  'a logical page advances through the last complete batch it returned'
+);
+select is(
+  (public.sync_cache_stream(
+    'catalog', (select head_sequence from cache_batch_before), 2
+  )->>'hasMore')::boolean,
+  true,
+  'remaining retained changes request another incremental page, not a reset'
+);
+select is(
+  jsonb_array_length(public.sync_cache_stream(
+    'catalog', (select head_sequence + 1 from cache_batch_before), 2
+  )->'changes'),
+  2,
+  'the next logical page replays the remaining complete batch'
 );
 
 reset role;

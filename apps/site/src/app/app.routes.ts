@@ -45,7 +45,7 @@ export const routes: Routes = [
         title: 'Dukarun | POS and books for Kenyan businesses',
         data: {
           description:
-            'Sell online or offline, manage stock, and keep balanced books with Dukarun.',
+            'Sell online or offline, manage stock, calculate VAT, and keep balanced double-entry books with Dukarun.',
         },
         loadComponent: () => import('./marketing/home/home.component').then(m => m.HomeComponent),
       },

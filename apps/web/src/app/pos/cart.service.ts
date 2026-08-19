@@ -12,6 +12,13 @@ export interface CartLine {
   overrideReason: string;
 }
 
+/**
+ * One order is one payment, receipt, stock movement and accounting event.
+ * Keep that unit of work bounded; cashiers start another order after this.
+ * The database enforces the same authoritative limit.
+ */
+export const MAX_SALE_LINES = 128;
+
 @Injectable({ providedIn: 'root' })
 export class CartService {
   private readonly supabase = inject(SupabaseService);
@@ -102,22 +109,24 @@ export class CartService {
     return Math.round(line.quantity * (line.customPrice ?? line.unitPrice));
   }
 
-  addVariant(variant: Variant): void {
+  addVariant(variant: Variant): boolean {
     const existing = this.lines().find(l => l.variant.variant_id === variant.variant_id);
     if (existing) {
       this.setQuantity(variant.variant_id!, existing.quantity + this.quantityStep(variant));
-    } else {
-      this.lines.update(lines => [
-        ...lines,
-        {
-          variant,
-          quantity: this.quantityStep(variant),
-          unitPrice: variant.price ?? 0,
-          customPrice: null,
-          overrideReason: '',
-        },
-      ]);
+      return true;
     }
+    if (this.lines().length >= MAX_SALE_LINES) return false;
+    this.lines.update(lines => [
+      ...lines,
+      {
+        variant,
+        quantity: this.quantityStep(variant),
+        unitPrice: variant.price ?? 0,
+        customPrice: null,
+        overrideReason: '',
+      },
+    ]);
+    return true;
   }
 
   quantityStep(variant: Variant): number {
