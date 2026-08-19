@@ -63,7 +63,7 @@ import { formatKes } from '../core/money';
 
             @if (preview(); as data) {
               @if (data.kind === 'price_update') {
-                <div class="grid grid-cols-2 gap-2 sm:grid-cols-5">
+                <div class="grid grid-cols-2 gap-2 sm:grid-cols-6">
                   <div class="rounded-field bg-base-200 p-3">
                     <p class="type-caption">Rows</p>
                     <p class="font-semibold">{{ data.rows }}</p>
@@ -77,6 +77,10 @@ import { formatKes } from '../core/money';
                     <p class="font-semibold">{{ data.wholesaleChanges }}</p>
                   </div>
                   <div class="rounded-field bg-base-200 p-3">
+                    <p class="type-caption">Stock</p>
+                    <p class="font-semibold">{{ data.stockChanges }}</p>
+                  </div>
+                  <div class="rounded-field bg-base-200 p-3">
                     <p class="type-caption">Unchanged</p>
                     <p class="font-semibold">{{ data.unchangedRows }}</p>
                   </div>
@@ -88,7 +92,7 @@ import { formatKes } from '../core/money';
 
                 @if (data.changes.length) {
                   <div class="rounded-field border border-base-300 p-3">
-                    <h3 class="text-sm font-semibold">Price changes</h3>
+                    <h3 class="text-sm font-semibold">Product changes</h3>
                     <div class="mt-2 max-h-56 space-y-2 overflow-y-auto text-xs">
                       @for (change of data.changes; track change.variantId) {
                         <div class="border-b border-base-200 pb-2 last:border-0">
@@ -109,6 +113,16 @@ import { formatKes } from '../core/money';
                               Wholesale: {{ nullableMoney(change.currentWholesalePrice) }} →
                               {{ nullableMoney(change.newWholesalePrice) }}
                             </p>
+                          }
+                          @if (change.newStockQuantity !== undefined) {
+                            <p>
+                              Stock at {{ change.stockLocationName }}:
+                              {{ qty(change.currentStockQuantity ?? 0) }} →
+                              {{ qty(change.newStockQuantity) }}
+                            </p>
+                            @if (change.stockUnitCost !== undefined) {
+                              <p>Increase unit cost: {{ fmt(change.stockUnitCost) }}</p>
+                            }
                           }
                         </div>
                       }
@@ -168,7 +182,7 @@ import { formatKes } from '../core/money';
               [disabled]="!canImport()"
               (click)="apply()"
             >
-              {{ preview()?.kind === 'price_update' ? 'Apply price changes' : 'Create products' }}
+              {{ preview()?.kind === 'price_update' ? 'Apply product changes' : 'Create products' }}
             </button>
           </footer>
         </div>
@@ -244,6 +258,10 @@ export class ProductImportDialogComponent {
 
   protected nullableMoney(amount: number | null): string {
     return amount === null ? 'Not set' : formatKes(amount);
+  }
+
+  protected qty(amount: number): string {
+    return new Intl.NumberFormat('en-KE', { maximumFractionDigits: 3 }).format(amount);
   }
 
   protected close(): void {

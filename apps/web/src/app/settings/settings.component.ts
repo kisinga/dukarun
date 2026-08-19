@@ -1412,8 +1412,9 @@ const SETTINGS_TABS: ReadonlyArray<{ key: SettingsTab; label: string }> = [
                             }
                           </p>
                           <p class="mt-2 text-xs text-base-content/60">
-                            Export current prices, edit the yellow columns in Excel, then import to
-                            preview and apply the changes. New products use a separate template.
+                            Export prices and stock for the current location, edit the yellow
+                            columns in Excel, then preview and apply. New products use a separate
+                            template.
                           </p>
                         </div>
                       </div>
@@ -1427,7 +1428,7 @@ const SETTINGS_TABS: ReadonlyArray<{ key: SettingsTab; label: string }> = [
                           [disabled]="dataExportBusy() !== null"
                           (click)="exportCatalog()"
                         >
-                          <app-icon name="heroArrowDownTray" /> Export prices
+                          <app-icon name="heroArrowDownTray" /> Export updates
                         </button>
                         <button
                           appButton
@@ -1455,8 +1456,9 @@ const SETTINGS_TABS: ReadonlyArray<{ key: SettingsTab; label: string }> = [
                             {{ catalogCache.catalog().length }} variants · current location
                           </p>
                           <p class="mt-2 text-xs text-base-content/60">
-                            Excel with cached quantities, values, prices, SKUs and barcodes. Export
-                            only—stock changes belong in stock adjustments.
+                            Excel with cached quantities, values, prices, SKUs and barcodes. This
+                            file is view-only; use the product update workbook or stock adjustments
+                            to change quantities.
                           </p>
                         </div>
                       </div>
@@ -1759,7 +1761,7 @@ export class SettingsComponent implements OnInit {
     this.dataMessage.set(null);
     try {
       await this.productTransfer.exportCatalog();
-      this.dataMessage.set({ ok: true, text: 'Price update workbook downloaded.' });
+      this.dataMessage.set({ ok: true, text: 'Product update workbook downloaded.' });
     } catch (err) {
       this.dataMessage.set({
         ok: false,
@@ -1794,7 +1796,7 @@ export class SettingsComponent implements OnInit {
       ok: true,
       text:
         result.kind === 'price_update'
-          ? `Price update complete: ${result.updated_variants} variants updated · ${result.retail_changes} retail · ${result.wholesale_changes} wholesale.`
+          ? `Update complete: ${result.updated_variants} variants · ${result.retail_changes} retail · ${result.wholesale_changes} wholesale · ${result.stock_changes} stock.`
           : `Import complete: ${result.created ?? 0} products created.`,
     });
     await this.catalogCache.refresh();

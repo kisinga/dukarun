@@ -9,6 +9,7 @@ import {
 const COMPANY_ID = '11111111-1111-4111-8111-111111111111';
 const VARIANT_ID = '22222222-2222-4222-8222-222222222222';
 const UPDATED_AT = '2026-08-19T08:00:00.000Z';
+const LOCATION_ID = '55555555-5555-4555-8555-555555555555';
 
 type ExportRow = {
   variant_id: string;
@@ -21,6 +22,10 @@ type ExportRow = {
   variant_active: boolean;
   retail_price: number;
   wholesale_price: number | null;
+  stock: number;
+  track_inventory: boolean;
+  allow_fractional: boolean;
+  stock_location: string;
 };
 
 type TestService = {
@@ -30,6 +35,8 @@ type TestService = {
   };
   allProducts: () => Promise<Array<Record<string, unknown>>>;
   allVariants: () => Promise<Array<Record<string, unknown>>>;
+  locations: { active: () => { id: string; name: string } };
+  catalogCache: { catalog: () => Array<Record<string, unknown>> };
   baseWorkbook: (locationCodes: string[]) => Promise<Workbook>;
   previewProductCreate: (workbook: Workbook, fileName: string) => Promise<CatalogImportPreview>;
   priceUpdateWorkbook: (rows: ExportRow[], exportedAt: string) => Promise<Workbook>;
@@ -47,6 +54,10 @@ function service(): TestService {
     claims: () => ({ company_id: COMPANY_ID }),
     client: { rpc: async () => ({ data: { categories: [] }, error: null }) },
   };
+  instance.locations = { active: () => ({ id: LOCATION_ID, name: 'Main shop' }) };
+  instance.catalogCache = {
+    catalog: () => [{ variant_id: VARIANT_ID, stock: 10 }],
+  };
   instance.allProducts = async () => [];
   instance.allVariants = async () => [
     {
@@ -54,6 +65,9 @@ function service(): TestService {
       updated_at: UPDATED_AT,
       price: 100,
       wholesale_price: 80,
+      track_inventory: true,
+      allow_fractional: false,
+      kind: 'good',
     },
   ];
   return instance;
@@ -71,6 +85,10 @@ function row(overrides: Partial<ExportRow> = {}): ExportRow {
     variant_active: true,
     retail_price: 100,
     wholesale_price: 80,
+    stock: 10,
+    track_inventory: true,
+    allow_fractional: false,
+    stock_location: 'MAIN — Main shop',
     ...overrides,
   };
 }
@@ -80,6 +98,7 @@ const metadata = (companyId = COMPANY_ID) => ({
   workbook_kind: 'price_update',
   company_id: companyId,
   exported_at: UPDATED_AT,
+  stock_location_id: LOCATION_ID,
 });
 
 describe('price-update workbooks', () => {
@@ -88,10 +107,10 @@ describe('price-update workbooks', () => {
       [row({ product_active: false, variant_active: false })],
       UPDATED_AT
     );
-    const sheet = workbook.getWorksheet('Price Updates')!;
+    const sheet = workbook.getWorksheet('Product Updates')!;
     const workbookMetadata = workbook.getWorksheet('_DukaRun Metadata')!;
 
-    expect(sheet.getTable('DukaRunPriceUpdates')).toBeDefined();
+    expect(sheet.getTable('DukaRunProductUpdates')).toBeDefined();
     expect(sheet.views[0]).toMatchObject({ state: 'frozen', xSplit: 3, ySplit: 1 });
     expect(sheet.getColumn(1).hidden).toBe(true);
     expect(sheet.getColumn(2).hidden).toBe(true);
@@ -101,6 +120,7 @@ describe('price-update workbooks', () => {
       type: 'pattern',
       fgColor: { argb: 'FFFFF2CC' },
     });
+    expect(sheet.getColumn(16).numFmt).toBe('#,##0.###');
     expect(workbookMetadata.state).toBe('veryHidden');
     expect(workbookMetadata.getCell('B1').value).toBe('2');
     expect(workbookMetadata.getCell('B2').value).toBe('price_update');
@@ -110,7 +130,7 @@ describe('price-update workbooks', () => {
   it('previews retail changes, wholesale clearing, and unchanged rows exactly', async () => {
     const instance = service();
     const workbook = await instance.priceUpdateWorkbook([row()], UPDATED_AT);
-    const sheet = workbook.getWorksheet('Price Updates')!;
+    const sheet = workbook.getWorksheet('Product Updates')!;
     sheet.getCell('I2').value = 120;
     sheet.getCell('K2').value = 'CLEAR';
 
@@ -139,6 +159,25 @@ describe('price-update workbooks', () => {
     expect(unchanged.changes).toEqual([]);
   });
 
+  it('previews location stock changes and validates counted quantities', async () => {
+    const instance = service();
+    const workbook = await instance.priceUpdateWorkbook([row()], UPDATED_AT);
+    const sheet = workbook.getWorksheet('Product Updates')!;
+    sheet.getCell('Q2').value = 7;
+
+    const preview = await instance.previewPriceUpdate(workbook, 'updates.xlsx', metadata());
+    expect(preview).toMatchObject({ stockChanges: 1, errors: [], conflicts: [] });
+    expect(preview.changes[0]).toMatchObject({
+      currentStockQuantity: 10,
+      newStockQuantity: 7,
+      stockLocationId: LOCATION_ID,
+    });
+
+    sheet.getCell('Q2').value = 7.5;
+    const fractional = await instance.previewPriceUpdate(workbook, 'updates.xlsx', metadata());
+    expect(fractional.errors.join('\n')).toContain('does not allow fractional stock');
+  });
+
   it('rejects decimals, formulas, Excel errors, duplicates, and stale rows', async () => {
     const instance = service();
     const invalidValues: Array<[unknown, string]> = [
@@ -149,7 +188,7 @@ describe('price-update workbooks', () => {
     ];
     for (const [value, message] of invalidValues) {
       const invalidWorkbook = await instance.priceUpdateWorkbook([row()], UPDATED_AT);
-      invalidWorkbook.getWorksheet('Price Updates')!.getCell('I2').value = value as never;
+      invalidWorkbook.getWorksheet('Product Updates')!.getCell('I2').value = value as never;
       const invalid = await instance.previewPriceUpdate(invalidWorkbook, 'prices.xlsx', metadata());
       expect(invalid.errors.join('\n')).toContain(message);
     }
@@ -158,8 +197,8 @@ describe('price-update workbooks', () => {
       [row(), row({ product_name: 'Duplicate' })],
       UPDATED_AT
     );
-    duplicateWorkbook.getWorksheet('Price Updates')!.getCell('I2').value = 120;
-    duplicateWorkbook.getWorksheet('Price Updates')!.getCell('I3').value = 130;
+    duplicateWorkbook.getWorksheet('Product Updates')!.getCell('I2').value = 120;
+    duplicateWorkbook.getWorksheet('Product Updates')!.getCell('I3').value = 130;
     const duplicate = await instance.previewPriceUpdate(
       duplicateWorkbook,
       'prices.xlsx',
@@ -171,7 +210,7 @@ describe('price-update workbooks', () => {
       [row({ variant_updated_at: '2026-08-18T08:00:00.000Z' })],
       UPDATED_AT
     );
-    staleWorkbook.getWorksheet('Price Updates')!.getCell('I2').value = 120;
+    staleWorkbook.getWorksheet('Product Updates')!.getCell('I2').value = 120;
     const stale = await instance.previewPriceUpdate(staleWorkbook, 'prices.xlsx', metadata());
     expect(stale.conflicts).toHaveLength(1);
     expect(stale.changes).toEqual([]);
@@ -180,7 +219,7 @@ describe('price-update workbooks', () => {
       [row({ variant_updated_at: '2026-08-19T08:00:00.000500Z' })],
       UPDATED_AT
     );
-    preciseStaleWorkbook.getWorksheet('Price Updates')!.getCell('I2').value = 120;
+    preciseStaleWorkbook.getWorksheet('Product Updates')!.getCell('I2').value = 120;
     const preciseStale = await instance.previewPriceUpdate(
       preciseStaleWorkbook,
       'prices.xlsx',
