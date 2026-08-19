@@ -29,7 +29,7 @@ npm run build:active         # production-build all active Angular apps
 npm run check:web            # design guard + dashboard production build
 npm run sb:test              # pgTAP database suite
 npm run sb:lint              # lint public database objects
-npm run sb:types             # refresh checked-in database TypeScript types
+npm run sb:types             # reset local DB, then refresh checked-in database types
 ```
 
 ## Deploy (manual, first-party)
@@ -98,7 +98,8 @@ the internal migration runbook (gitignored — references real tenants).
   `dukarun.com` to site, `app.dukarun.com` to web, merchant domains to storefront,
   and `admin.dukarun.com` to super-admin.
 - CI production-builds all active apps and runs public and web design guards.
-- Database CI starts an ephemeral stack, runs lint + pgTAP, and verifies generated types.
+- Database CI starts a minimal ephemeral stack, runs database/API checks, and verifies generated
+  types. The real-stack browser smoke runs after merges to `main` and nightly.
 - Database migrations and Edge Functions are deployed explicitly with `npm run deploy` or
   `npm run deploy:functions`; the Git-connected Coolify app does not apply them.
 
