@@ -1,5 +1,6 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, ElementRef, OnInit, inject, signal, viewChild } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
+import QRCode from 'qrcode';
 import { environment } from '../../../environments/environment';
 import {
   PlatformSalesCommission,
@@ -9,6 +10,16 @@ import {
 } from '../../core/platform.service';
 import { MoneyComponent } from '../../shared/ui/money.component';
 import { PageHeaderComponent } from '../../shared/ui/page-header.component';
+import {
+  salesInvitationMessage,
+  salesInvitationUrl,
+  salesInvitationWhatsAppUrl,
+} from './sales-invitation-share';
+
+type SalesInvitationRecipient = Pick<
+  PlatformSalesperson,
+  'id' | 'name' | 'phone' | 'invitation_code'
+>;
 
 @Component({
   selector: 'app-platform-sales',
@@ -141,9 +152,9 @@ import { PageHeaderComponent } from '../../shared/ui/page-header.component';
                 <tr>
                   <td>
                     <p class="font-semibold">{{ person.name }}</p>
-                    <button class="link link-primary font-mono text-xs" (click)="copyLink(person)">
+                    <span class="font-mono text-xs text-base-content/65">
                       {{ person.invitation_code }}
-                    </button>
+                    </span>
                     @if (!person.active) {
                       <span class="badge badge-ghost ml-2">inactive</span>
                     }
@@ -160,13 +171,27 @@ import { PageHeaderComponent } from '../../shared/ui/page-header.component';
                     <app-money [amount]="person.paid_commission" /> paid
                   </td>
                   <td class="text-right">
-                    <button
-                      class="btn btn-ghost btn-sm"
-                      [disabled]="busy()"
-                      (click)="toggle(person)"
-                    >
-                      {{ person.active ? 'Deactivate' : 'Activate' }}
-                    </button>
+                    <div class="flex justify-end gap-1">
+                      <button
+                        class="btn btn-outline btn-sm"
+                        [disabled]="!person.active"
+                        [title]="
+                          person.active
+                            ? 'Share invitation'
+                            : 'Activate this salesperson before sharing'
+                        "
+                        (click)="openShare(person)"
+                      >
+                        Share invite
+                      </button>
+                      <button
+                        class="btn btn-ghost btn-sm"
+                        [disabled]="busy()"
+                        (click)="toggle(person)"
+                      >
+                        {{ person.active ? 'Deactivate' : 'Activate' }}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               } @empty {
@@ -290,6 +315,105 @@ import { PageHeaderComponent } from '../../shared/ui/page-header.component';
         }
       </section>
     }
+
+    <dialog #shareDialog class="modal" (close)="closeShare()">
+      <div class="modal-box modal-box-task p-0 md:w-full md:max-w-xl">
+        @if (sharedPerson(); as person) {
+          <header class="border-b border-base-300 p-4 sm:px-6">
+            <h2 class="text-lg font-semibold">Share invitation</h2>
+            <p class="type-caption mt-1">
+              Send {{ person.name }} their personal code and registration link.
+            </p>
+          </header>
+
+          <div class="modal-body p-4 sm:p-6">
+            <div class="grid items-start gap-5 sm:grid-cols-[minmax(0,1fr)_11rem]">
+              <div class="min-w-0">
+                <p class="type-caption">Invitation code</p>
+                <div
+                  class="mt-1 flex items-center justify-between gap-3 rounded-box border border-base-300 bg-base-200 px-4 py-3"
+                >
+                  <strong class="font-mono text-lg tracking-wider">{{
+                    person.invitation_code
+                  }}</strong>
+                  <button type="button" class="btn btn-ghost btn-sm" (click)="copyCode(person)">
+                    Copy code
+                  </button>
+                </div>
+
+                <p class="type-caption mt-4">Registration link</p>
+                <div class="mt-1 rounded-box border border-base-300 px-3 py-2.5">
+                  <p class="truncate text-sm" [title]="invitationUrl(person)">
+                    {{ invitationUrl(person) }}
+                  </p>
+                </div>
+
+                <a
+                  class="btn mt-4 w-full border-0 bg-[#25d366] text-white hover:bg-[#1fb458]"
+                  [href]="whatsAppUrl(person)"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Send with WhatsApp
+                </a>
+                <div class="mt-2 grid grid-cols-2 gap-2">
+                  <button class="btn btn-outline" type="button" (click)="copyLink(person)">
+                    Copy link
+                  </button>
+                  <button class="btn btn-outline" type="button" (click)="copyMessage(person)">
+                    Copy message
+                  </button>
+                </div>
+
+                @if (shareFeedback(); as feedback) {
+                  <div
+                    class="alert mt-3 py-2 text-sm"
+                    [class.alert-success]="feedback.kind === 'success'"
+                    [class.alert-error]="feedback.kind === 'error'"
+                    role="status"
+                  >
+                    <span>{{ feedback.message }}</span>
+                  </div>
+                }
+              </div>
+
+              <div class="text-center">
+                <p class="type-caption mb-2">Scan to register</p>
+                <div
+                  class="mx-auto flex aspect-square w-44 items-center justify-center overflow-hidden rounded-box border border-base-300 bg-white p-2"
+                >
+                  @if (qrCodeDataUrl(); as qrCode) {
+                    <img
+                      class="h-full w-full"
+                      [src]="qrCode"
+                      [alt]="'QR code for ' + person.name + ' invitation'"
+                    />
+                  } @else if (qrCodeError()) {
+                    <p class="px-3 text-xs text-error">QR code unavailable</p>
+                  } @else {
+                    <span class="loading loading-spinner loading-md text-primary"></span>
+                  }
+                </div>
+                @if (qrCodeDataUrl(); as qrCode) {
+                  <a
+                    class="btn btn-ghost btn-sm mt-2"
+                    [href]="qrCode"
+                    [download]="'dukarun-invite-' + person.invitation_code + '.png'"
+                  >
+                    Download QR
+                  </a>
+                }
+              </div>
+            </div>
+          </div>
+
+          <footer class="flex justify-end border-t border-base-300 p-4 sm:px-6">
+            <button class="btn" type="button" (click)="shareDialog.close()">Done</button>
+          </footer>
+        }
+      </div>
+      <form method="dialog" class="modal-backdrop"><button>Close</button></form>
+    </dialog>
   `,
 })
 export class SalesComponent implements OnInit {
@@ -299,6 +423,12 @@ export class SalesComponent implements OnInit {
   protected readonly busy = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
+  protected readonly sharedPerson = signal<SalesInvitationRecipient | null>(null);
+  protected readonly shareFeedback = signal<{ kind: 'success' | 'error'; message: string } | null>(
+    null
+  );
+  protected readonly qrCodeDataUrl = signal<string | null>(null);
+  protected readonly qrCodeError = signal(false);
   protected readonly commissionOffset = signal(0);
   protected readonly commissionPageSize = 100;
   protected readonly enabled = new FormControl(false, { nonNullable: true });
@@ -306,6 +436,7 @@ export class SalesComponent implements OnInit {
   protected readonly name = new FormControl('', { nonNullable: true });
   protected readonly phone = new FormControl('', { nonNullable: true });
   protected readonly code = new FormControl('', { nonNullable: true });
+  private readonly shareDialog = viewChild<ElementRef<HTMLDialogElement>>('shareDialog');
 
   async ngOnInit(): Promise<void> {
     await this.load();
@@ -342,15 +473,21 @@ export class SalesComponent implements OnInit {
   protected async createSalesperson(): Promise<void> {
     if (!this.name.value.trim()) return this.error.set('Enter the salesperson name');
     await this.run(async () => {
-      await this.platform.createSalesperson(
-        this.name.value,
-        this.phone.value,
-        this.code.value.toUpperCase()
+      const invitation = {
+        name: this.name.value.trim(),
+        phone: this.phone.value.trim() || null,
+        invitation_code: this.code.value.trim().toUpperCase(),
+      };
+      const salespersonId = await this.platform.createSalesperson(
+        invitation.name,
+        invitation.phone ?? '',
+        invitation.invitation_code
       );
       this.name.setValue('');
       this.phone.setValue('');
       this.code.setValue('');
-      this.notice.set('Salesperson created');
+      this.notice.set('Salesperson created. Their invitation is ready to share.');
+      this.openShare({ id: salespersonId, ...invitation });
       await this.load();
     }, 'Failed to create salesperson');
   }
@@ -363,11 +500,43 @@ export class SalesComponent implements OnInit {
     }, 'Failed to update salesperson');
   }
 
-  protected async copyLink(person: PlatformSalesperson): Promise<void> {
-    await navigator.clipboard.writeText(
-      `${environment.appPublicUrl}/register?sales_code=${encodeURIComponent(person.invitation_code)}`
+  protected invitationUrl(person: SalesInvitationRecipient): string {
+    return salesInvitationUrl(environment.appPublicUrl, person.invitation_code);
+  }
+
+  protected whatsAppUrl(person: SalesInvitationRecipient): string {
+    return salesInvitationWhatsAppUrl(person, this.invitationUrl(person));
+  }
+
+  protected openShare(person: SalesInvitationRecipient): void {
+    this.sharedPerson.set(person);
+    this.shareFeedback.set(null);
+    this.qrCodeDataUrl.set(null);
+    this.qrCodeError.set(false);
+    this.shareDialog()?.nativeElement.showModal();
+    void this.generateQrCode(person);
+  }
+
+  protected closeShare(): void {
+    this.sharedPerson.set(null);
+    this.shareFeedback.set(null);
+    this.qrCodeDataUrl.set(null);
+    this.qrCodeError.set(false);
+  }
+
+  protected async copyLink(person: SalesInvitationRecipient): Promise<void> {
+    await this.copyText(this.invitationUrl(person), 'Invitation link copied');
+  }
+
+  protected async copyCode(person: SalesInvitationRecipient): Promise<void> {
+    await this.copyText(person.invitation_code, 'Invitation code copied');
+  }
+
+  protected async copyMessage(person: SalesInvitationRecipient): Promise<void> {
+    await this.copyText(
+      salesInvitationMessage(person, this.invitationUrl(person)),
+      'Invitation message copied'
     );
-    this.notice.set('Invitation link copied');
   }
 
   protected async review(
@@ -408,6 +577,32 @@ export class SalesComponent implements OnInit {
       this.fail(error, fallback);
     } finally {
       this.busy.set(false);
+    }
+  }
+
+  private async generateQrCode(person: SalesInvitationRecipient): Promise<void> {
+    try {
+      const qrCode = await QRCode.toDataURL(this.invitationUrl(person), {
+        width: 320,
+        margin: 2,
+        errorCorrectionLevel: 'M',
+        color: { dark: '#1c1917', light: '#ffffff' },
+      });
+      if (this.sharedPerson()?.id === person.id) this.qrCodeDataUrl.set(qrCode);
+    } catch {
+      if (this.sharedPerson()?.id === person.id) this.qrCodeError.set(true);
+    }
+  }
+
+  private async copyText(text: string, successMessage: string): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(text);
+      this.shareFeedback.set({ kind: 'success', message: successMessage });
+    } catch {
+      this.shareFeedback.set({
+        kind: 'error',
+        message: 'Could not copy automatically. Select the code or link and copy it manually.',
+      });
     }
   }
 
