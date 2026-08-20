@@ -782,9 +782,12 @@ export class PlatformService {
     return data;
   }
 
-  async sendSalesInvitation(salespersonId: string): Promise<{ deliveryUncertain: boolean }> {
+  async sendSalesInvitation(
+    salespersonId: string,
+    qrCodeBase64: string
+  ): Promise<{ deliveryUncertain: boolean }> {
     const { data, error } = await this.db.functions.invoke('platform-sales-invitation-send', {
-      body: { salesperson_id: salespersonId },
+      body: { salesperson_id: salespersonId, qr_code_base64: qrCodeBase64 },
     });
     if (!error) {
       return {
@@ -809,6 +812,7 @@ export class PlatformService {
       salesperson_phone_invalid: 'Enter a valid international phone number before sending.',
       invitation_send_too_soon: 'This invitation was just sent. Wait 30 seconds before resending.',
       invitation_claim_failed: 'Invitation sending is temporarily unavailable.',
+      invalid_qr_code: 'The invitation QR code is invalid. Close this dialog and try again.',
       'provider_not_configured: openwa': 'The WhatsApp gateway is not configured.',
     };
     throw new Error(
