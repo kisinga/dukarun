@@ -29,7 +29,10 @@ export async function requestProvider(
   label: string
 ): Promise<Response> {
   try {
-    const response = await fetch(url, init);
+    const response = await fetch(url, {
+      ...init,
+      signal: init.signal ?? AbortSignal.timeout(12_000),
+    });
     if (!response.ok) {
       const permanent =
         response.status >= 400 && response.status < 500 && ![408, 429].includes(response.status);

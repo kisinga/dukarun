@@ -316,16 +316,16 @@ type SalesInvitationRecipient = Pick<
       <div class="modal-box modal-box-task p-0 md:w-full md:max-w-xl">
         @if (sharedPerson(); as person) {
           <header class="border-b border-base-300 p-4 sm:px-6">
-            <h2 class="text-lg font-semibold">Share invitation</h2>
+            <h2 class="text-lg font-semibold">Share referral kit</h2>
             <p class="type-caption mt-1">
-              Send {{ person.name }} their personal code and registration link.
+              Send {{ person.name }} the code, customer signup link, and QR they can share.
             </p>
           </header>
 
           <div class="modal-body p-4 sm:p-6">
             <div class="grid items-start gap-5 sm:grid-cols-[minmax(0,1fr)_11rem]">
               <div class="min-w-0">
-                <p class="type-caption">Invitation code</p>
+                <p class="type-caption">Sales code</p>
                 <div
                   class="mt-1 flex items-center justify-between gap-3 rounded-box border border-base-300 bg-base-200 px-4 py-3"
                 >
@@ -337,7 +337,7 @@ type SalesInvitationRecipient = Pick<
                   </button>
                 </div>
 
-                <p class="type-caption mt-4">Registration link</p>
+                <p class="type-caption mt-4">Customer signup link</p>
                 <div class="mt-1 rounded-box border border-base-300 px-3 py-2.5">
                   <p class="truncate text-sm" [title]="invitationUrl(person)">
                     {{ invitationUrl(person) }}
@@ -383,7 +383,7 @@ type SalesInvitationRecipient = Pick<
               </div>
 
               <div class="text-center">
-                <p class="type-caption mb-2">Scan to register</p>
+                <p class="type-caption mb-2">Customer signup QR</p>
                 <div
                   class="mx-auto flex aspect-square w-44 items-center justify-center overflow-hidden rounded-box border border-base-300 bg-white p-2"
                 >
@@ -493,7 +493,7 @@ export class SalesComponent implements OnInit {
       this.name.setValue('');
       this.phone.setValue('');
       this.code.setValue('');
-      this.notice.set('Salesperson created. Their invitation is ready to share.');
+      this.notice.set('Salesperson created. Their customer referral kit is ready to share.');
       this.openShare({ id: salespersonId, ...invitation });
       await this.load();
     }, 'Failed to create salesperson');
@@ -542,12 +542,12 @@ export class SalesComponent implements OnInit {
         this.shareFeedback.set({
           kind: result.deliveryUncertain ? 'warning' : 'success',
           message: result.deliveryUncertain
-            ? `WhatsApp may have received the invitation for ${person.name}. Check the chat before resending.`
-            : `Invitation message and QR sent to ${person.name}.`,
+            ? `WhatsApp may have received the referral kit for ${person.name}. Check the chat before resending.`
+            : `Referral message and QR sent to ${person.name}.`,
         });
       }
       if (!result.deliveryUncertain) {
-        this.notice.set(`Invitation sent to ${person.name} with QR code.`);
+        this.notice.set(`Referral kit sent to ${person.name}.`);
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'WhatsApp delivery failed';

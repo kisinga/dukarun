@@ -10,6 +10,7 @@ import {
 } from '../_shared/sales-invitation.ts';
 
 const url = Deno.env.get('SUPABASE_URL') ?? '';
+const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
 const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 const appPublicUrl = (Deno.env.get('APP_PUBLIC_URL') ?? 'https://app.dukarun.com').replace(
   /\/+$/,
@@ -65,22 +66,22 @@ Deno.serve(async request => {
   if (request.method === 'OPTIONS') return new Response('ok', { headers: cors });
   if (request.method !== 'POST') return response({ error: 'method_not_allowed' }, 405);
 
-  const token = (request.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '');
-  const { data: auth, error: authError } = await db.auth.getUser(token);
+  const authHeader = request.headers.get('Authorization') ?? '';
+  const userDb = createClient(url, anonKey, {
+    global: { headers: { Authorization: authHeader } },
+  });
+  const { data: auth, error: authError } = await userDb.auth.getUser();
   if (authError || !auth.user) return response({ error: 'not_authorized' }, 401);
 
-  const { data: admin } = await db
-    .from('platform_admins')
-    .select('user_id')
-    .eq('user_id', auth.user.id)
-    .maybeSingle();
-  if (!admin) return response({ error: 'platform_admin_required' }, 403);
+  const { error: adminError } = await userDb.rpc('assert_platform_admin');
+  if (adminError) return response({ error: 'platform_admin_required' }, 403);
 
   const input = (await request.json().catch(() => null)) as {
-    salesperson_id?: string;
-    qr_code_base64?: string;
+    salesperson_id?: unknown;
+    qr_code_base64?: unknown;
   } | null;
-  const salespersonId = input?.salesperson_id?.trim() ?? '';
+  const salespersonId =
+    typeof input?.salesperson_id === 'string' ? input.salesperson_id.trim() : '';
   if (
     !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
       salespersonId
@@ -88,7 +89,7 @@ Deno.serve(async request => {
   ) {
     return response({ error: 'invalid_salesperson_id' }, 400);
   }
-  const qrCodeBase64 = input?.qr_code_base64?.trim() ?? '';
+  const qrCodeBase64 = typeof input?.qr_code_base64 === 'string' ? input.qr_code_base64.trim() : '';
   if (!isValidPngBase64(qrCodeBase64)) {
     return response({ error: 'invalid_qr_code' }, 400);
   }
