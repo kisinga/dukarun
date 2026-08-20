@@ -347,7 +347,7 @@ type SalesInvitationRecipient = Pick<
                 <button
                   type="button"
                   class="btn mt-4 w-full border-0 bg-[#25d366] text-white hover:bg-[#1fb458]"
-                  [disabled]="whatsappSending() || !person.phone"
+                  [disabled]="whatsappSending() || !person.phone || !qrCodeDataUrl()"
                   [title]="
                     person.phone ? 'Send the message and QR code' : 'Add a phone number first'
                   "
@@ -522,10 +522,22 @@ export class SalesComponent implements OnInit {
 
   protected async sendWithWhatsApp(person: SalesInvitationRecipient): Promise<void> {
     if (!person.phone || this.whatsappSending()) return;
+    const qrCodeDataUrl = this.qrCodeDataUrl();
+    const separator = qrCodeDataUrl?.indexOf(',') ?? -1;
+    if (!qrCodeDataUrl?.startsWith('data:image/png;base64,') || separator < 0) {
+      this.shareFeedback.set({
+        kind: 'error',
+        message: 'Wait for the invitation QR code to finish loading, then try again.',
+      });
+      return;
+    }
     this.whatsappSending.set(true);
     this.shareFeedback.set(null);
     try {
-      const result = await this.platform.sendSalesInvitation(person.id);
+      const result = await this.platform.sendSalesInvitation(
+        person.id,
+        qrCodeDataUrl.slice(separator + 1)
+      );
       if (this.sharedPerson()?.id === person.id) {
         this.shareFeedback.set({
           kind: result.deliveryUncertain ? 'warning' : 'success',

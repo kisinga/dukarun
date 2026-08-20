@@ -1,6 +1,4 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
-// @ts-types="npm:@types/qrcode@1.5.6"
-import QRCode from 'npm:qrcode@1.5.4';
 import {
   DeliveryError,
   normalizeWhatsappPhone,
@@ -25,6 +23,26 @@ const cors = {
 
 function response(body: Record<string, unknown>, status = 200): Response {
   return Response.json(body, { status, headers: cors });
+}
+
+function isValidPngBase64(value: string): boolean {
+  if (!value || value.length > 1_000_000 || value.length % 4 !== 0) return false;
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(value)) return false;
+  try {
+    const bytes = atob(value);
+    return (
+      bytes.length <= 750_000 &&
+      bytes.length >= 8 &&
+      bytes.charCodeAt(0) === 0x89 &&
+      bytes.slice(1, 4) === 'PNG' &&
+      bytes.charCodeAt(4) === 0x0d &&
+      bytes.charCodeAt(5) === 0x0a &&
+      bytes.charCodeAt(6) === 0x1a &&
+      bytes.charCodeAt(7) === 0x0a
+    );
+  } catch {
+    return false;
+  }
 }
 
 async function audit(
@@ -60,6 +78,7 @@ Deno.serve(async request => {
 
   const input = (await request.json().catch(() => null)) as {
     salesperson_id?: string;
+    qr_code_base64?: string;
   } | null;
   const salespersonId = input?.salesperson_id?.trim() ?? '';
   if (
@@ -68,6 +87,10 @@ Deno.serve(async request => {
     )
   ) {
     return response({ error: 'invalid_salesperson_id' }, 400);
+  }
+  const qrCodeBase64 = input?.qr_code_base64?.trim() ?? '';
+  if (!isValidPngBase64(qrCodeBase64)) {
+    return response({ error: 'invalid_qr_code' }, 400);
   }
 
   const { data: person, error: personError } = await db
@@ -102,14 +125,7 @@ Deno.serve(async request => {
   if (!claimed) return response({ error: 'invitation_send_too_soon' }, 429);
 
   try {
-    const qrDataUrl = await QRCode.toDataURL(invitationUrl, {
-      width: 512,
-      margin: 3,
-      errorCorrectionLevel: 'M',
-      color: { dark: '#1c1917', light: '#ffffff' },
-    });
-    const qrBase64 = qrDataUrl.slice(qrDataUrl.indexOf(',') + 1);
-    await sendWhatsappImage(recipient, qrBase64, caption);
+    await sendWhatsappImage(recipient, qrCodeBase64, caption);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'provider_failed';
     const deliveryError =

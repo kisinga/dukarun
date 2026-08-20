@@ -54,7 +54,7 @@ test('WhatsApp image delivery uses the OpenWA media endpoint with a caption', as
     'https://openwa.example.test/api/sessions/sales-session/messages/send-image'
   );
   assert.deepEqual(JSON.parse(request.init.body), {
-    chatId: '254712345678@s.whatsapp.net',
+    chatId: '254712345678@c.us',
     base64: 'cG5nLWJ5dGVz',
     mimetype: 'image/png',
     filename: 'dukarun-invitation.png',

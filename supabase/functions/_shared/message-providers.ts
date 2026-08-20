@@ -89,7 +89,7 @@ export async function sendWhatsapp(recipient: string, body: string): Promise<voi
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
-      body: JSON.stringify({ chatId: `${kePhone(recipient)}@s.whatsapp.net`, text: body }),
+      body: JSON.stringify({ chatId: `${kePhone(recipient)}@c.us`, text: body }),
     },
     'openwa'
   );
@@ -110,7 +110,7 @@ export async function sendWhatsappImage(
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
       body: JSON.stringify({
-        chatId: `${kePhone(recipient)}@s.whatsapp.net`,
+        chatId: `${kePhone(recipient)}@c.us`,
         base64,
         mimetype: 'image/png',
         filename: 'dukarun-invitation.png',
