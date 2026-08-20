@@ -178,6 +178,14 @@ async function authenticateAccountUser(page: Page): Promise<{ creditRequest: () 
     }
     if (path.endsWith('/rest/v1/companies')) {
       const select = url.searchParams.get('select') ?? '';
+      if (select.includes('subscription_status')) {
+        return json({
+          subscription_status: 'active',
+          subscription_expires_at: '2099-12-31T23:59:59Z',
+          subscription_grace_period_end: null,
+          subscription_exempt_until: null,
+        });
+      }
       return json(
         select.includes('cashier_flow_enabled')
           ? [
