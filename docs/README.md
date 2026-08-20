@@ -14,6 +14,7 @@ Current system documentation:
 | Direct M-PESA integration      | [`MPESA_INTEGRATION.md`](MPESA_INTEGRATION.md)                        |
 | M-PESA merchant guide          | [`MPESA_MERCHANT_GUIDE.md`](MPESA_MERCHANT_GUIDE.md)                  |
 | Metrics decisions              | [`METRICS_DECISIONS.md`](METRICS_DECISIONS.md)                        |
+| Kitui market intelligence      | [`KITUI_MARKET_INTELLIGENCE.md`](KITUI_MARKET_INTELLIGENCE.md)        |
 | Vendure → Supabase cutover     | `V1_V2_MIGRATION.md` — internal, gitignored (references real tenants) |
 | Troubleshooting                | [`GENERAL_TROUBLESHOOTING.md`](GENERAL_TROUBLESHOOTING.md)            |
 

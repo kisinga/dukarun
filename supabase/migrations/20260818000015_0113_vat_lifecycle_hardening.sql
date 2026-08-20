@@ -313,8 +313,9 @@ $$;
 
 -- Resolve the company profile using the timezone captured on that profile, not
 -- whichever timezone the company happens to use today.
-create or replace function public.resolve_inclusive_tax(
-  p_company_id uuid,p_product_id uuid,p_gross bigint,p_tax_point timestamptz
+create or replace function public.resolve_configured_product_tax(
+  p_company_id uuid,p_product_id uuid,p_gross bigint,p_tax_point timestamptz,
+  p_require_registration boolean
 )
 returns table(
   tax_profile_id uuid,tax_category_id uuid,tax_rate_version_id uuid,
@@ -336,7 +337,7 @@ begin
       or cp.effective_to>=(p_tax_point at time zone cp.business_timezone)::date)
   order by cp.effective_from desc limit 1;
   v_tax_date:=(p_tax_point at time zone coalesce(v_profile.business_timezone,v_company_timezone))::date;
-  if v_profile.id is null or not v_profile.vat_registered then
+  if v_profile.id is null or (p_require_registration and not v_profile.vat_registered) then
     return query select v_profile.id,null::uuid,null::uuid,'NOT_REGISTERED'::text,
       'not_registered'::text,0,p_gross,p_gross,0::bigint,false;return;
   end if;
@@ -362,12 +363,39 @@ begin
   tax_category_code:=v_category.code;tax_classification:=v_category.classification;
   tax_rate_bps:=v_rate.rate_bps;gross_total:=p_gross;
   net_total:=round(p_gross::numeric*10000/(10000+v_rate.rate_bps))::bigint;
-  tax_total:=p_gross-net_total;vat_registered:=true;return next;
+  tax_total:=p_gross-net_total;vat_registered:=coalesce(v_profile.vat_registered,false);return next;
 end;
 $$;
 
-create or replace function public.resolve_category_inclusive_tax(
-  p_company_id uuid,p_tax_category_id uuid,p_gross bigint,p_tax_point timestamptz
+create or replace function public.resolve_inclusive_tax(
+  p_company_id uuid,p_product_id uuid,p_gross bigint,p_tax_point timestamptz
+)
+returns table(
+  tax_profile_id uuid,tax_category_id uuid,tax_rate_version_id uuid,
+  tax_category_code text,tax_classification text,tax_rate_bps integer,
+  gross_total bigint,net_total bigint,tax_total bigint,vat_registered boolean
+)
+language sql stable security definer set search_path='' as $$
+  select * from public.resolve_configured_product_tax(
+    p_company_id,p_product_id,p_gross,p_tax_point,true)
+$$;
+
+create or replace function public.resolve_purchase_invoice_tax(
+  p_company_id uuid,p_product_id uuid,p_gross bigint,p_tax_point timestamptz
+)
+returns table(
+  tax_profile_id uuid,tax_category_id uuid,tax_rate_version_id uuid,
+  tax_category_code text,tax_classification text,tax_rate_bps integer,
+  gross_total bigint,net_total bigint,tax_total bigint,vat_registered boolean
+)
+language sql stable security definer set search_path='' as $$
+  select * from public.resolve_configured_product_tax(
+    p_company_id,p_product_id,p_gross,p_tax_point,false)
+$$;
+
+create or replace function public.resolve_configured_category_tax(
+  p_company_id uuid,p_tax_category_id uuid,p_gross bigint,p_tax_point timestamptz,
+  p_require_registration boolean
 )
 returns table(
   tax_profile_id uuid,tax_category_id uuid,tax_rate_version_id uuid,
@@ -389,7 +417,7 @@ begin
       or cp.effective_to>=(p_tax_point at time zone cp.business_timezone)::date)
   order by cp.effective_from desc limit 1;
   v_tax_date:=(p_tax_point at time zone coalesce(v_profile.business_timezone,v_company_timezone))::date;
-  if v_profile.id is null or not v_profile.vat_registered then
+  if v_profile.id is null or (p_require_registration and not v_profile.vat_registered) then
     return query select v_profile.id,null::uuid,null::uuid,'NOT_REGISTERED'::text,
       'not_registered'::text,0,p_gross,p_gross,0::bigint,false;return;
   end if;
@@ -408,9 +436,48 @@ begin
   tax_category_code:=v_category.code;tax_classification:=v_category.classification;
   tax_rate_bps:=v_rate.rate_bps;gross_total:=p_gross;
   net_total:=round(p_gross::numeric*10000/(10000+v_rate.rate_bps))::bigint;
-  tax_total:=p_gross-net_total;vat_registered:=true;return next;
+  tax_total:=p_gross-net_total;vat_registered:=coalesce(v_profile.vat_registered,false);return next;
 end;
 $$;
+
+create or replace function public.resolve_category_inclusive_tax(
+  p_company_id uuid,p_tax_category_id uuid,p_gross bigint,p_tax_point timestamptz
+)
+returns table(
+  tax_profile_id uuid,tax_category_id uuid,tax_rate_version_id uuid,
+  tax_category_code text,tax_classification text,tax_rate_bps integer,
+  gross_total bigint,net_total bigint,tax_total bigint,vat_registered boolean
+)
+language sql stable security definer set search_path='' as $$
+  select * from public.resolve_configured_category_tax(
+    p_company_id,p_tax_category_id,p_gross,p_tax_point,true)
+$$;
+
+create or replace function public.resolve_purchase_invoice_category_tax(
+  p_company_id uuid,p_tax_category_id uuid,p_gross bigint,p_tax_point timestamptz
+)
+returns table(
+  tax_profile_id uuid,tax_category_id uuid,tax_rate_version_id uuid,
+  tax_category_code text,tax_classification text,tax_rate_bps integer,
+  gross_total bigint,net_total bigint,tax_total bigint,vat_registered boolean
+)
+language sql stable security definer set search_path='' as $$
+  select * from public.resolve_configured_category_tax(
+    p_company_id,p_tax_category_id,p_gross,p_tax_point,false)
+$$;
+
+revoke execute on function public.resolve_configured_product_tax(
+    uuid,uuid,bigint,timestamptz,boolean),
+  public.resolve_purchase_invoice_tax(uuid,uuid,bigint,timestamptz),
+  public.resolve_configured_category_tax(uuid,uuid,bigint,timestamptz,boolean),
+  public.resolve_purchase_invoice_category_tax(uuid,uuid,bigint,timestamptz)
+  from public,anon,authenticated;
+grant execute on function public.resolve_configured_product_tax(
+    uuid,uuid,bigint,timestamptz,boolean),
+  public.resolve_purchase_invoice_tax(uuid,uuid,bigint,timestamptz),
+  public.resolve_configured_category_tax(uuid,uuid,bigint,timestamptz,boolean),
+  public.resolve_purchase_invoice_category_tax(uuid,uuid,bigint,timestamptz)
+  to service_role;
 
 create or replace function public.set_product_tax_category(
   p_product_id uuid,p_tax_category_id uuid default null

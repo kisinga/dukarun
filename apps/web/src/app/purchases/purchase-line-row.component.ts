@@ -6,6 +6,7 @@ import { FormFieldComponent } from '../shared/ui/form-field.component';
 import { IconComponent } from '../shared/ui/icon.component';
 import { MoneyComponent } from '../shared/ui/money.component';
 import { StatusBadgeComponent, type BadgeType } from '../shared/ui/status-badge.component';
+import type { PurchasePriceBasis } from '@dukarun/tax-types';
 
 export interface PurchaseLineForm {
   key: number;
@@ -22,6 +23,8 @@ export interface PurchaseLineForm {
   retailPrice: string;
   expanded: boolean;
   error: string | null;
+  defaultCostNeedsConversion?: boolean;
+  grossAmountOverride?: number;
 }
 
 export type PurchaseLineDetailField =
@@ -85,7 +88,7 @@ export interface PurchaseLinePriceContext {
           />
         </app-form-field>
         <app-form-field
-          label="Unit cost (KES)"
+          [label]="priceBasis() === 'exclusive' ? 'Unit cost before VAT' : 'Unit cost (KES)'"
           class="md:col-span-2 xl:col-auto"
           [desktopLabelHidden]="true"
         >
@@ -98,7 +101,7 @@ export interface PurchaseLinePriceContext {
           />
         </app-form-field>
         <app-form-field
-          label="Line total (KES)"
+          [label]="priceBasis() === 'exclusive' ? 'Line total before VAT' : 'Line total (KES)'"
           class="md:col-span-2 xl:col-auto"
           [desktopLabelHidden]="true"
         >
@@ -321,6 +324,7 @@ export class PurchaseLineRowComponent {
   /** Batch identity remains useful independently; this preference gates expiry only. */
   readonly trackExpiry = input(false);
   readonly priceContext = input.required<PurchaseLinePriceContext>();
+  readonly priceBasis = input<PurchasePriceBasis>('inclusive');
 
   readonly quantityChange = output<number | string>();
   readonly unitCostChange = output<string>();
