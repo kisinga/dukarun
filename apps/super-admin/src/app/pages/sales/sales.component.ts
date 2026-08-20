@@ -10,11 +10,7 @@ import {
 } from '../../core/platform.service';
 import { MoneyComponent } from '../../shared/ui/money.component';
 import { PageHeaderComponent } from '../../shared/ui/page-header.component';
-import {
-  salesInvitationMessage,
-  salesInvitationUrl,
-  salesInvitationWhatsAppUrl,
-} from './sales-invitation-share';
+import { salesInvitationMessage, salesInvitationUrl } from './sales-invitation-share';
 
 type SalesInvitationRecipient = Pick<
   PlatformSalesperson,
@@ -348,14 +344,22 @@ type SalesInvitationRecipient = Pick<
                   </p>
                 </div>
 
-                <a
+                <button
+                  type="button"
                   class="btn mt-4 w-full border-0 bg-[#25d366] text-white hover:bg-[#1fb458]"
-                  [href]="whatsAppUrl(person)"
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  [disabled]="whatsappSending() || !person.phone"
+                  [title]="
+                    person.phone ? 'Send the message and QR code' : 'Add a phone number first'
+                  "
+                  (click)="sendWithWhatsApp(person)"
                 >
-                  Send with WhatsApp
-                </a>
+                  {{ whatsappSending() ? 'Sending…' : 'Send message + QR with WhatsApp' }}
+                </button>
+                @if (!person.phone) {
+                  <p class="type-caption mt-2 text-center">
+                    Add a phone number before sending directly through WhatsApp.
+                  </p>
+                }
                 <div class="mt-2 grid grid-cols-2 gap-2">
                   <button class="btn btn-outline" type="button" (click)="copyLink(person)">
                     Copy link
@@ -369,6 +373,7 @@ type SalesInvitationRecipient = Pick<
                   <div
                     class="alert mt-3 py-2 text-sm"
                     [class.alert-success]="feedback.kind === 'success'"
+                    [class.alert-warning]="feedback.kind === 'warning'"
                     [class.alert-error]="feedback.kind === 'error'"
                     role="status"
                   >
@@ -424,11 +429,13 @@ export class SalesComponent implements OnInit {
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
   protected readonly sharedPerson = signal<SalesInvitationRecipient | null>(null);
-  protected readonly shareFeedback = signal<{ kind: 'success' | 'error'; message: string } | null>(
-    null
-  );
+  protected readonly shareFeedback = signal<{
+    kind: 'success' | 'warning' | 'error';
+    message: string;
+  } | null>(null);
   protected readonly qrCodeDataUrl = signal<string | null>(null);
   protected readonly qrCodeError = signal(false);
+  protected readonly whatsappSending = signal(false);
   protected readonly commissionOffset = signal(0);
   protected readonly commissionPageSize = 100;
   protected readonly enabled = new FormControl(false, { nonNullable: true });
@@ -504,10 +511,6 @@ export class SalesComponent implements OnInit {
     return salesInvitationUrl(environment.appPublicUrl, person.invitation_code);
   }
 
-  protected whatsAppUrl(person: SalesInvitationRecipient): string {
-    return salesInvitationWhatsAppUrl(person, this.invitationUrl(person));
-  }
-
   protected openShare(person: SalesInvitationRecipient): void {
     this.sharedPerson.set(person);
     this.shareFeedback.set(null);
@@ -515,6 +518,35 @@ export class SalesComponent implements OnInit {
     this.qrCodeError.set(false);
     this.shareDialog()?.nativeElement.showModal();
     void this.generateQrCode(person);
+  }
+
+  protected async sendWithWhatsApp(person: SalesInvitationRecipient): Promise<void> {
+    if (!person.phone || this.whatsappSending()) return;
+    this.whatsappSending.set(true);
+    this.shareFeedback.set(null);
+    try {
+      const result = await this.platform.sendSalesInvitation(person.id);
+      if (this.sharedPerson()?.id === person.id) {
+        this.shareFeedback.set({
+          kind: result.deliveryUncertain ? 'warning' : 'success',
+          message: result.deliveryUncertain
+            ? `WhatsApp may have received the invitation for ${person.name}. Check the chat before resending.`
+            : `Invitation message and QR sent to ${person.name}.`,
+        });
+      }
+      if (!result.deliveryUncertain) {
+        this.notice.set(`Invitation sent to ${person.name} with QR code.`);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'WhatsApp delivery failed';
+      if (this.sharedPerson()?.id === person.id) {
+        this.shareFeedback.set({ kind: 'error', message });
+      } else {
+        this.error.set(message);
+      }
+    } finally {
+      this.whatsappSending.set(false);
+    }
   }
 
   protected closeShare(): void {

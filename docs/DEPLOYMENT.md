@@ -20,7 +20,7 @@ nothing sensitive is stored in the repo.
 
 ## Done
 
-- [x] Migrations tracked and applied via `supabase db push`
+- [x] Migrations through `0135` tracked and applied via `supabase db push`
 - [x] GoTrue hooks + SMS provider env (send_sms → TextSMS via vault, custom_access_token)
 - [x] SMS login OTP validity set to five minutes (`GOTRUE_SMS_OTP_EXP=300`)
 - [x] Vault secrets: `TEXTSMS_API_KEY`, `TEXTSMS_PARTNER_ID`, `TEXTSMS_SHORTCODE`,
@@ -28,6 +28,8 @@ nothing sensitive is stored in the repo.
       `SUPABASE_SERVICE_ROLE_KEY`, `NOTIFY_FLUSH_URL`, `SITE_DEPLOY_URL`
 - [x] Edge functions deployed: paystack-charge, paystack-webhook, notification-flush,
       platform-message-test, public-content-renderer, site-deploy, _shared
+- [ ] Apply migration `0136_platform_sales_invitation_send_claim`
+- [ ] Deploy `platform-sales-invitation-send`
 - [x] Edge-runtime env: `PAYSTACK_SECRET_KEY`, `TEXTSMS_*`, `OPENWA_*`, `EMAIL_API_*`
 - [x] Env managed in Coolify UI (survives redeploys)
 - [x] Commissioning hardening migration `0023` applied (2026-08-06)
