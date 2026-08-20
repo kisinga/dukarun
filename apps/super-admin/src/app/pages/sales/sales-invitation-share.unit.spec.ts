@@ -18,7 +18,9 @@ describe('sales invitation sharing', () => {
     const url = salesInvitationUrl('https://app.dukarun.com', person.invitation_code);
     const message = salesInvitationMessage(person, url);
 
-    expect(message).toContain('Invitation code: *AMINA+7*');
-    expect(message).toContain(`Register here: ${url}`);
+    expect(message).toContain('Your sales code: *AMINA+7*');
+    expect(message).toContain(`Customer signup link:\n${url}`);
+    expect(message).toContain("You don't need to register or log in");
+    expect(message).not.toContain('Register here');
   });
 });

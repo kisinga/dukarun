@@ -1,5 +1,5 @@
 begin;
-select plan(55);
+select plan(56);
 
 select is(
   public.next_monthly_anniversary('2026-01-31 10:00:00+03','2026-02-01 00:00:00+03'),
@@ -220,6 +220,11 @@ select ok(
   position('OPENWA_BASE_URL' in pg_get_functiondef('public.send_sms_hook(jsonb)'::regprocedure))>0
   and position('TEXTSMS_API_KEY' in pg_get_functiondef('public.send_sms_hook(jsonb)'::regprocedure))>0,
   'OTP hook submits through both SMS and WhatsApp provider boundaries'
+);
+select ok(
+  position('@c.us' in pg_get_functiondef('public.send_sms_hook(jsonb)'::regprocedure)) > 0
+  and position('@s.whatsapp.net' in pg_get_functiondef('public.send_sms_hook(jsonb)'::regprocedure)) = 0,
+  'OTP WhatsApp delivery uses the OpenWA engine-neutral chat id'
 );
 select ok(
   (select prosecdef from pg_proc where oid='public.send_sms_hook(jsonb)'::regprocedure),

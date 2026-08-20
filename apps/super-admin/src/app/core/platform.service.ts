@@ -810,6 +810,7 @@ export class PlatformService {
       salesperson_inactive: 'Activate this salesperson before sending their invitation.',
       salesperson_phone_required: 'Add a phone number before sending through WhatsApp.',
       salesperson_phone_invalid: 'Enter a valid international phone number before sending.',
+      platform_admin_required: 'Your platform-admin session is stale. Sign in again and retry.',
       invitation_send_too_soon: 'This invitation was just sent. Wait 30 seconds before resending.',
       invitation_claim_failed: 'Invitation sending is temporarily unavailable.',
       invalid_qr_code: 'The invitation QR code is invalid. Close this dialog and try again.',

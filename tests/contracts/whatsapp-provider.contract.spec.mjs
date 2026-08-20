@@ -18,8 +18,13 @@ test('sales invitation media caption carries both the permanent code and registr
   );
 
   assert.equal(invitationUrl, 'https://app.dukarun.com/register?sales_code=AMINA_7');
-  assert.match(caption, /Invitation code: \*AMINA_7\*/);
-  assert.match(caption, /Register here: https:\/\/app\.dukarun\.com\/register\?sales_code=AMINA_7/);
+  assert.match(caption, /Your sales code: \*AMINA_7\*/);
+  assert.match(
+    caption,
+    /Customer signup link:\nhttps:\/\/app\.dukarun\.com\/register\?sales_code=AMINA_7/
+  );
+  assert.match(caption, /You don't need to register or log in/);
+  assert.doesNotMatch(caption, /Register here/);
 });
 
 test('WhatsApp image delivery uses the OpenWA media endpoint with a caption', async () => {
