@@ -782,6 +782,43 @@ export class PlatformService {
     return data;
   }
 
+  async sendSalesInvitation(salespersonId: string): Promise<{ deliveryUncertain: boolean }> {
+    const { data, error } = await this.db.functions.invoke('platform-sales-invitation-send', {
+      body: { salesperson_id: salespersonId },
+    });
+    if (!error) {
+      return {
+        deliveryUncertain: Boolean(
+          (data as { delivery_uncertain?: boolean } | null)?.delivery_uncertain
+        ),
+      };
+    }
+
+    const context = (error as { context?: unknown }).context;
+    const payload =
+      context instanceof Response
+        ? await context
+            .clone()
+            .json()
+            .catch(() => null)
+        : null;
+    const code = (payload as { error?: string } | null)?.error;
+    const messages: Record<string, string> = {
+      salesperson_inactive: 'Activate this salesperson before sending their invitation.',
+      salesperson_phone_required: 'Add a phone number before sending through WhatsApp.',
+      salesperson_phone_invalid: 'Enter a valid international phone number before sending.',
+      invitation_send_too_soon: 'This invitation was just sent. Wait 30 seconds before resending.',
+      invitation_claim_failed: 'Invitation sending is temporarily unavailable.',
+      'provider_not_configured: openwa': 'The WhatsApp gateway is not configured.',
+    };
+    throw new Error(
+      (code && messages[code]) ||
+        (code?.startsWith('openwa ')
+          ? 'WhatsApp rejected the invitation. Check the phone number and try again.'
+          : error.message)
+    );
+  }
+
   async setSalespersonActive(salespersonId: string, active: boolean): Promise<void> {
     const { error } = await this.db.rpc('platform_set_salesperson_active', {
       p_salesperson_id: salespersonId,

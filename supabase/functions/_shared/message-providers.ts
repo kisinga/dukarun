@@ -1,16 +1,26 @@
 export class DeliveryError extends Error {
-  constructor(
-    message: string,
-    readonly permanent: boolean,
-    readonly accepted: boolean
-  ) {
+  readonly permanent: boolean;
+  readonly accepted: boolean;
+
+  constructor(message: string, permanent: boolean, accepted: boolean) {
     super(message);
+    this.permanent = permanent;
+    this.accepted = accepted;
   }
 }
 
+export function normalizeWhatsappPhone(raw: string): string | null {
+  const compact = raw.trim().replace(/[\s().-]/g, '');
+  if (!/^\+?\d+$/.test(compact)) return null;
+  const digits = compact.replace(/^\+/, '');
+  const normalized = digits.startsWith('0') ? `254${digits.slice(1)}` : digits;
+  return /^[1-9]\d{7,14}$/.test(normalized) ? normalized : null;
+}
+
 function kePhone(raw: string): string {
-  const digits = raw.replace(/[^\d]/g, '');
-  return digits.startsWith('0') ? '254' + digits.slice(1) : digits;
+  const normalized = normalizeWhatsappPhone(raw);
+  if (!normalized) throw new DeliveryError('invalid_recipient', true, false);
+  return normalized;
 }
 
 export async function requestProvider(
@@ -80,6 +90,32 @@ export async function sendWhatsapp(recipient: string, body: string): Promise<voi
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
       body: JSON.stringify({ chatId: `${kePhone(recipient)}@s.whatsapp.net`, text: body }),
+    },
+    'openwa'
+  );
+}
+
+export async function sendWhatsappImage(
+  recipient: string,
+  base64: string,
+  caption: string
+): Promise<void> {
+  const baseUrl = Deno.env.get('OPENWA_BASE_URL');
+  const apiKey = Deno.env.get('OPENWA_API_KEY');
+  const session = Deno.env.get('OPENWA_SESSION') ?? 'default';
+  if (!baseUrl || !apiKey) throw new DeliveryError('provider_not_configured: openwa', true, false);
+  await requestProvider(
+    `${baseUrl}/api/sessions/${session}/messages/send-image`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
+      body: JSON.stringify({
+        chatId: `${kePhone(recipient)}@s.whatsapp.net`,
+        base64,
+        mimetype: 'image/png',
+        filename: 'dukarun-invitation.png',
+        caption,
+      }),
     },
     'openwa'
   );

@@ -1,5 +1,5 @@
 begin;
-select plan(44);
+select plan(48);
 
 select hasnt_table('public','subscription_intro_offer_redemptions',
   'legacy introductory purchase table is removed');
@@ -26,6 +26,45 @@ select is((select invitation_code from public.platform_salespeople where id=(sel
 select public.platform_update_sales_commission_settings(true,1250);
 select is((public.platform_sales_snapshot()->'settings'->>'rate_bps')::integer,1250,
   'global commission rate is configurable');
+reset role;
+
+select has_function(
+  'public',
+  'claim_platform_sales_invitation_send',
+  array['uuid','uuid','text','text'],
+  'platform invitation sends have an atomic claim RPC'
+);
+set local role service_role;
+select ok(
+  public.claim_platform_sales_invitation_send(
+    (select id from salesperson),
+    'a9000000-0000-0000-0000-000000000001',
+    '1222',
+    'AMINA7'
+  ),
+  'first invitation send claims its cooldown window'
+);
+select is(
+  public.claim_platform_sales_invitation_send(
+    (select id from salesperson),
+    'a9000000-0000-0000-0000-000000000001',
+    '1222',
+    'AMINA7'
+  ),
+  false,
+  'a repeated invitation send cannot claim the same cooldown window'
+);
+select is(
+  (
+    select count(*)::integer
+    from public.audit_log
+    where table_name = 'platform_sales_invitation_send'
+      and operation = 'INSERT'
+      and row_id = (select id::text from salesperson)
+  ),
+  1,
+  'the cooldown claim records one durable attempt'
+);
 reset role;
 
 select throws_ok(

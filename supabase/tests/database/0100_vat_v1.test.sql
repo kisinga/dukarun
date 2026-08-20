@@ -1,4 +1,6 @@
 begin;
+-- Tax-profile effective dates are company-business dates, not runner UTC dates.
+set local timezone to 'Africa/Nairobi';
 select plan(95);
 
 select has_table('public','tax_rate_versions','VAT rates are effective-dated');

@@ -59,6 +59,10 @@ async function mockPriceWorkbookFlow(page: Page) {
   const company = {
     id: companyId,
     name: 'Workbook Shop',
+    subscription_status: 'active',
+    subscription_expires_at: '2099-12-31T23:59:59Z',
+    subscription_grace_period_end: null,
+    subscription_exempt_until: null,
     address: null,
     email: null,
     logo_path: null,

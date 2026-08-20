@@ -12291,6 +12291,15 @@ export type Database = {
         }
         Returns: Json
       }
+      claim_platform_sales_invitation_send: {
+        Args: {
+          p_actor: string
+          p_invitation_code: string
+          p_recipient_suffix: string
+          p_salesperson_id: string
+        }
+        Returns: boolean
+      }
       claim_public_site_deployment: { Args: never; Returns: Json }
       claim_team_invitations: { Args: never; Returns: Json }
       classify_mpesa_collection: {
