@@ -15,6 +15,9 @@ verification, rollback, and sign-off gates live in `docs/V1_V2_MIGRATION.md`.
 
 ## Product hardening
 
+- [ ] Gate order and order-line COGS behind `ViewFinancials` at the database/API boundary; replace
+      broad `orders.*` reads, purge/version cached sales snapshots, and normalize dashboard/report
+      margin calculations to VAT-exclusive revenue.
 - [ ] Add browser-level smoke coverage for sale, purchase, supplier payment, and credit flows.
 - [ ] Finish public storefront and platform-admin production journeys.
 - [ ] Add bulk catalog import and stock transfer workflows.

@@ -494,6 +494,15 @@ const SALE_SORT_OPTIONS: readonly ListSortOption[] = [
                   [tone]="order.status === 'pending_payment' ? 'warning' : 'neutral'"
                 />
               }
+              @if (order.status === 'completed') {
+                <app-stat-card label="COGS" [value]="fmtKes(order.cogs_total)" />
+                <app-stat-card
+                  label="Gross profit"
+                  [value]="fmtKes(margin(order.net_total, order.cogs_total))"
+                  [tone]="margin(order.net_total, order.cogs_total) >= 0 ? 'success' : 'error'"
+                  [sub]="marginPercent(order.net_total, order.cogs_total)"
+                />
+              }
             </div>
 
             @if (
@@ -556,6 +565,17 @@ const SALE_SORT_OPTIONS: readonly ListSortOption[] = [
                               {{ line.quantity }} ×
                               <app-money [amount]="line.custom_price ?? line.unit_price" />
                             </p>
+                            @if (order.status === 'completed') {
+                              <p class="type-caption mt-0.5">
+                                @if (line.cogs_total !== null) {
+                                  COGS <app-money [amount]="line.cogs_total" /> · Gross profit
+                                  <app-money [amount]="margin(line.net_total, line.cogs_total)" />
+                                  ({{ marginPercent(line.net_total, line.cogs_total) }})
+                                } @else {
+                                  COGS unavailable
+                                }
+                              </p>
+                            }
                           </div>
                           <span class="text-sm font-semibold tabular-nums">
                             <app-money [amount]="line.line_total" />
@@ -1032,6 +1052,15 @@ export class OrdersComponent implements OnInit, OnDestroy {
     if (!id) return null;
     return this.orders().find(order => order.id === id) ?? this.selectedOrderRecord();
   });
+
+  protected margin(revenue: number, cogs: number): number {
+    return revenue - cogs;
+  }
+
+  protected marginPercent(revenue: number, cogs: number): string {
+    if (revenue <= 0) return '0%';
+    return `${(((revenue - cogs) / revenue) * 100).toFixed(1)}%`;
+  }
 
   protected canSendReceipt(order: OrderWithCustomer): boolean {
     if (order.status !== 'completed') return false;

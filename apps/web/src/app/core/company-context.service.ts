@@ -1,4 +1,4 @@
-import { Injectable, computed, inject, signal } from '@angular/core';
+import { Injectable, computed, effect, inject, signal } from '@angular/core';
 import { SupabaseService } from './supabase.service';
 
 /** One row of the my_companies RPC: an approved membership with company info. */
@@ -27,22 +27,38 @@ export class CompanyContextService {
   readonly isMultiCompany = computed(() => this.companies().length > 1);
 
   private loadedFor: string | null = null;
+  private observedUserId: string | null | undefined;
+
+  constructor() {
+    effect(() => {
+      const userId = this.supabase.session()?.user.id ?? null;
+      if (userId === this.observedUserId) return;
+      this.observedUserId = userId;
+      this.companies.set([]);
+      this.loadedFor = null;
+    });
+  }
 
   /** Idempotent per user: repeat calls within a session cost nothing. */
-  async load(): Promise<void> {
+  async load(force = false): Promise<void> {
     const userId = this.supabase.session()?.user.id;
     if (!userId) {
       this.companies.set([]);
       this.loadedFor = null;
       return;
     }
-    if (this.loadedFor === userId) return;
+    if (!force && this.loadedFor === userId) return;
     const { data, error } = await this.supabase.client.rpc('my_companies');
     if (error) throw error;
     // Discard if the account changed mid-flight.
     if (this.supabase.session()?.user.id !== userId) return;
     this.companies.set(data ?? []);
     this.loadedFor = userId;
+  }
+
+  /** Reconcile membership changes such as a newly claimed company invitation. */
+  async refresh(): Promise<void> {
+    await this.load(true);
   }
 
   /**

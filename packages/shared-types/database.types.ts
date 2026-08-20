@@ -5497,6 +5497,7 @@ export type Database = {
       }
       order_lines: {
         Row: {
+          cogs_total: number | null
           company_id: string
           created_at: string
           custom_price: number | null
@@ -5517,6 +5518,7 @@ export type Database = {
           variant_id: string
         }
         Insert: {
+          cogs_total?: number | null
           company_id: string
           created_at?: string
           custom_price?: number | null
@@ -5537,6 +5539,7 @@ export type Database = {
           variant_id: string
         }
         Update: {
+          cogs_total?: number | null
           company_id?: string
           created_at?: string
           custom_price?: number | null

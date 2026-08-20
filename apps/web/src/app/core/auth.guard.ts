@@ -2,6 +2,7 @@ import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
 import { SupabaseService } from './supabase.service';
 import { hasRegistrationIntent } from './registration-intent';
+import { CompanyContextService } from './company-context.service';
 
 export const authGuard: CanActivateFn = async route => {
   const supabase = inject(SupabaseService);
@@ -31,10 +32,20 @@ export const authGuard: CanActivateFn = async route => {
 
 export const guestGuard: CanActivateFn = async route => {
   const supabase = inject(SupabaseService);
+  const companies = inject(CompanyContextService);
   const router = inject(Router);
   try {
     const session = await supabase.initializeSession();
     if (!session) return true;
+    // Invitation messages intentionally point to /login. Existing members may
+    // already have a valid company claim, so reconcile invitations before the
+    // guest guard redirects them back into their current company.
+    const invitationClaim = await supabase.claimTeamInvitations();
+    if (invitationClaim.claimed_count > 0) {
+      const { error } = await supabase.client.auth.refreshSession();
+      if (error) throw error;
+      await companies.refresh();
+    }
     if (supabase.claims()?.company_id) return router.createUrlTree(['/dashboard']);
     return hasRegistrationIntent(route.queryParamMap)
       ? router.createUrlTree(['/register'], {

@@ -145,6 +145,15 @@ const spaNginx = requireFile(resolve(root, 'apps/nginx-spa.conf'));
 if (!csrNginx.includes('try_files $uri $uri/index.html /index.csr.html;')) {
   throw new Error('Static apps must fall back to index.csr.html.');
 }
+const storefrontLocation = csrNginx.match(
+  /location \^~ \/api\/storefront\/ \{([\s\S]*?)\n  \}/
+)?.[1];
+if (
+  !storefrontLocation?.includes('rewrite ^ /functions/v1/public-content-renderer break;') ||
+  !storefrontLocation.includes('proxy_pass __SUPABASE_URL__;')
+) {
+  throw new Error('Storefront API proxy must not append slugs to the Edge Function name.');
+}
 for (const marker of [
   'location ~ ^/(?:statement|document)/',
   'X-Robots-Tag "noindex, nofollow, noarchive"',
