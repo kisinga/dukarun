@@ -1,5 +1,9 @@
 import { Component, HostListener, OnInit, computed, inject, signal } from '@angular/core';
-import type { PurchaseTaxEstimate } from '@dukarun/tax-types';
+import type {
+  PurchasePriceBasis,
+  PurchaseTaxContext,
+  PurchaseTaxEstimate,
+} from '@dukarun/tax-types';
 import { FormControl, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { CatalogSearchService } from '../core/catalog-search.service';
@@ -48,6 +52,15 @@ interface ExpenseForm {
   settlement: ExpenseSettlement;
   accountCode: string;
   error: string | null;
+  grossAmountOverride?: number;
+}
+
+interface EnteredTaxBreakdown {
+  entered: number;
+  gross: number;
+  net: number;
+  tax: number;
+  rateBps: number;
 }
 
 @Component({
@@ -241,8 +254,7 @@ interface ExpenseForm {
                         >Claim input VAT from this invoice</span
                       >
                       <span class="type-caption mt-1 block">
-                        Costs stay VAT-inclusive. Claiming VAT extracts the recoverable amount; it
-                        does not increase the supplier invoice total.
+                        Claiming VAT changes how the cost is posted, not what the supplier is paid.
                       </span>
                     </span>
                   </label>
@@ -292,32 +304,32 @@ interface ExpenseForm {
                     </div>
 
                     <div class="rounded-field border border-base-300 bg-base-200/30 p-3">
-                      @if (taxEstimateLoading()) {
+                      @if (taxContextLoading()) {
                         <div class="flex items-center gap-2 text-sm text-base-content/70">
                           <span class="loading loading-spinner loading-sm"></span>
                           Calculating VAT from the configured product rates…
                         </div>
-                      } @else if (taxEstimateError()) {
+                      } @else if (taxContextError()) {
                         <div class="flex items-start gap-2 text-sm text-error" role="alert">
                           <app-icon name="heroExclamationTriangle" />
-                          <span>{{ taxEstimateError() }}</span>
+                          <span>{{ taxContextError() }}</span>
                         </div>
-                      } @else if (taxEstimate(); as estimate) {
+                      } @else if (lines().length > 0) {
                         <div class="grid gap-3 sm:grid-cols-3">
                           <div>
                             <p class="type-caption">Gross supplier invoice</p>
                             <p class="font-semibold">
-                              <app-money [amount]="estimate.gross_total" />
+                              <app-money [amount]="invoiceTotal()" />
                             </p>
                           </div>
                           <div>
                             <p class="type-caption">Net inventory and expense cost</p>
-                            <p class="font-semibold"><app-money [amount]="estimate.net_total" /></p>
+                            <p class="font-semibold"><app-money [amount]="invoiceNetTotal()" /></p>
                           </div>
                           <div>
                             <p class="type-caption">Recoverable input VAT</p>
                             <p class="font-semibold text-success">
-                              <app-money [amount]="estimate.tax_total" />
+                              <app-money [amount]="invoiceTaxTotal()" />
                             </p>
                           </div>
                         </div>
@@ -337,13 +349,51 @@ interface ExpenseForm {
 
               <section class="card overflow-visible bg-base-100">
                 <div class="card-body gap-4 p-4">
-                  <div>
-                    <h2 class="section-title">Items</h2>
-                    <p class="type-caption mt-1">
-                      Search or scan once to add an item. Unit cost and line total are both
-                      editable.
-                    </p>
+                  <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <h2 class="section-title">Items</h2>
+                      <p class="type-caption mt-1">
+                        Search or scan once to add an item. Unit cost and line total are both
+                        editable.
+                      </p>
+                    </div>
+                    @if (taxContext()?.tax_configured || priceEntryBasis() === 'exclusive') {
+                      <div data-purchase-price-basis>
+                        <p class="mb-1 text-xs font-medium">Supplier prices</p>
+                        <div class="join" role="group" aria-label="Supplier price VAT basis">
+                          <button
+                            type="button"
+                            class="btn btn-sm join-item"
+                            [class.btn-primary]="priceEntryBasis() === 'inclusive'"
+                            [class.btn-outline]="priceEntryBasis() !== 'inclusive'"
+                            (click)="setPriceEntryBasis('inclusive')"
+                          >
+                            Include VAT
+                          </button>
+                          <button
+                            type="button"
+                            class="btn btn-sm join-item"
+                            [class.btn-primary]="priceEntryBasis() === 'exclusive'"
+                            [class.btn-outline]="priceEntryBasis() !== 'exclusive'"
+                            (click)="setPriceEntryBasis('exclusive')"
+                          >
+                            Exclude VAT
+                          </button>
+                        </div>
+                        <p class="type-caption mt-1 max-w-xs">
+                          This changes price entry only. The VAT claim is controlled separately.
+                        </p>
+                      </div>
+                    }
                   </div>
+                  @if (
+                    taxContextError() && (priceEntryBasis() === 'exclusive' || claimInputVat.value)
+                  ) {
+                    <div class="alert alert-error py-2 text-sm" role="alert">
+                      <app-icon name="heroExclamationTriangle" />
+                      <span>{{ taxContextError() }}</span>
+                    </div>
+                  }
                   <div class="sticky top-16 z-30 bg-base-100 py-1">
                     <div class="relative">
                       <span
@@ -410,8 +460,12 @@ interface ExpenseForm {
                       >
                         <span class="type-caption">Item</span>
                         <span class="type-caption text-right">Quantity</span>
-                        <span class="type-caption text-right">Unit cost</span>
-                        <span class="type-caption text-right">Line total</span>
+                        <span class="type-caption text-right">{{
+                          priceEntryBasis() === 'exclusive' ? 'Unit cost before VAT' : 'Unit cost'
+                        }}</span>
+                        <span class="type-caption text-right">{{
+                          priceEntryBasis() === 'exclusive' ? 'Line total before VAT' : 'Line total'
+                        }}</span>
                         <span class="sr-only">Actions</span>
                       </div>
                       @for (line of lines(); track line.key; let index = $index) {
@@ -420,6 +474,7 @@ interface ExpenseForm {
                           [variant]="lineVariant(line)"
                           [label]="lineLabel(line)"
                           [priceContext]="linePriceContext(line)"
+                          [priceBasis]="priceEntryBasis()"
                           [canEditPrices]="perms.has('ManageStockAdjustments')"
                           [trackExpiry]="preferences.batchExpiryEnabled()"
                           (quantityChange)="quantityChanged(line, $event)"
@@ -515,14 +570,22 @@ interface ExpenseForm {
                                 />
                               </app-form-field>
                             }
-                            <app-form-field label="Amount (KES)" [required]="true">
+                            <app-form-field
+                              [label]="
+                                priceEntryBasis() === 'exclusive' &&
+                                expense.settlement === 'supplier_bill'
+                                  ? 'Amount before VAT'
+                                  : 'Amount (KES)'
+                              "
+                              [required]="true"
+                            >
                               <input
                                 class="input input-bordered h-11 w-full text-right md:h-10"
                                 inputmode="numeric"
                                 placeholder="0"
                                 [(ngModel)]="expense.amount"
                                 [ngModelOptions]="{ standalone: true }"
-                                (input)="markDirty()"
+                                (input)="expenseAmountChanged(expense)"
                               />
                             </app-form-field>
                             <app-form-field
@@ -532,9 +595,9 @@ interface ExpenseForm {
                             >
                               <select
                                 class="select select-bordered h-11 w-full md:h-10"
-                                [(ngModel)]="expense.settlement"
+                                [ngModel]="expense.settlement"
                                 [ngModelOptions]="{ standalone: true }"
-                                (change)="markDirty()"
+                                (ngModelChange)="setExpenseSettlement(expense, $event)"
                               >
                                 <option value="" disabled>Choose settlement</option>
                                 <option value="supplier_bill">Included in supplier bill</option>
@@ -610,22 +673,45 @@ interface ExpenseForm {
                   <span>Items</span><strong>{{ lines().length }}</strong>
                 </div>
                 <div class="flex justify-between text-sm">
-                  <span>Goods</span><app-money [amount]="goodsSubtotal()" />
+                  <span>{{ priceEntryBasis() === 'exclusive' ? 'Goods before VAT' : 'Goods' }}</span
+                  ><app-money
+                    [amount]="
+                      priceEntryBasis() === 'exclusive' ? enteredGoodsSubtotal() : goodsSubtotal()
+                    "
+                  />
                 </div>
                 <div class="flex justify-between text-sm">
-                  <span>Supplier expenses</span><app-money [amount]="supplierExpenseTotal()" />
+                  <span>{{
+                    priceEntryBasis() === 'exclusive'
+                      ? 'Supplier expenses before VAT'
+                      : 'Supplier expenses'
+                  }}</span
+                  ><app-money
+                    [amount]="
+                      priceEntryBasis() === 'exclusive'
+                        ? enteredSupplierExpenseTotal()
+                        : supplierExpenseTotal()
+                    "
+                  />
                 </div>
+                @if (priceEntryBasis() === 'exclusive') {
+                  <div class="flex justify-between text-sm">
+                    <span>VAT on supplier invoice</span><app-money [amount]="invoiceTaxTotal()" />
+                  </div>
+                }
                 <div class="flex justify-between border-t border-base-300 pt-3">
                   <strong>Invoice total</strong
                   ><strong><app-money [amount]="invoiceTotal()" /></strong>
                 </div>
-                @if (claimInputVat.value && taxEstimate(); as estimate) {
+                @if (claimInputVat.value && invoiceTaxTotal() > 0) {
                   <div class="flex justify-between text-sm">
-                    <span>Net cost</span><app-money [amount]="estimate.net_total" />
+                    <span>Net cost</span><app-money [amount]="invoiceNetTotal()" />
                   </div>
                   <div class="flex justify-between text-sm text-success">
-                    <span>Input VAT</span><app-money [amount]="estimate.tax_total" />
+                    <span>Input VAT</span><app-money [amount]="invoiceTaxTotal()" />
                   </div>
+                } @else if (priceEntryBasis() === 'exclusive' && invoiceTaxTotal() > 0) {
+                  <p class="type-caption">VAT will be included in inventory and expense cost.</p>
                 }
                 @if (separateExpenseTotal() > 0) {
                   <div class="flex justify-between text-sm">
@@ -782,11 +868,34 @@ interface ExpenseForm {
               <div class="card-body gap-3 p-4">
                 <h2 class="section-title">Review</h2>
                 <div class="flex justify-between text-sm">
-                  <span>Merchandise</span><app-money [amount]="goodsSubtotal()" />
+                  <span>{{
+                    priceEntryBasis() === 'exclusive' ? 'Merchandise before VAT' : 'Merchandise'
+                  }}</span
+                  ><app-money
+                    [amount]="
+                      priceEntryBasis() === 'exclusive' ? enteredGoodsSubtotal() : goodsSubtotal()
+                    "
+                  />
                 </div>
                 <div class="flex justify-between text-sm">
-                  <span>Supplier-bill expenses</span><app-money [amount]="supplierExpenseTotal()" />
+                  <span>{{
+                    priceEntryBasis() === 'exclusive'
+                      ? 'Supplier expenses before VAT'
+                      : 'Supplier-bill expenses'
+                  }}</span
+                  ><app-money
+                    [amount]="
+                      priceEntryBasis() === 'exclusive'
+                        ? enteredSupplierExpenseTotal()
+                        : supplierExpenseTotal()
+                    "
+                  />
                 </div>
+                @if (priceEntryBasis() === 'exclusive') {
+                  <div class="flex justify-between text-sm">
+                    <span>VAT on supplier invoice</span><app-money [amount]="invoiceTaxTotal()" />
+                  </div>
+                }
                 <div class="flex justify-between border-t border-base-300 pt-3">
                   <strong>Supplier invoice</strong
                   ><strong><app-money [amount]="invoiceTotal()" /></strong>
@@ -799,6 +908,8 @@ interface ExpenseForm {
                   <div class="flex justify-between text-sm text-success">
                     <span>Recoverable input VAT</span><app-money [amount]="estimate.tax_total" />
                   </div>
+                } @else if (priceEntryBasis() === 'exclusive' && invoiceTaxTotal() > 0) {
+                  <p class="type-caption">VAT is included in inventory and expense cost.</p>
                 }
                 <div class="flex justify-between text-sm">
                   <span>Separately paid expenses</span
@@ -920,6 +1031,10 @@ export class PurchaseEditorComponent implements OnInit {
   protected readonly taxEstimate = signal<PurchaseTaxEstimate | null>(null);
   protected readonly taxEstimateLoading = signal(false);
   protected readonly taxEstimateError = signal<string | null>(null);
+  protected readonly taxContext = signal<PurchaseTaxContext | null>(null);
+  protected readonly taxContextLoading = signal(false);
+  protected readonly taxContextError = signal<string | null>(null);
+  protected readonly priceEntryBasis = signal<PurchasePriceBasis>('inclusive');
   protected readonly supplierPinSaving = signal(false);
   protected readonly supplierPinSaved = signal(true);
   protected readonly label = variantLabel;
@@ -940,20 +1055,77 @@ export class PurchaseEditorComponent implements OnInit {
   private nextKey = 1;
   private searchRequest = 0;
   private taxEstimateRequest = 0;
-  private taxEstimateTimer: ReturnType<typeof setTimeout> | null = null;
+  private taxContextRequest = 0;
+  private taxContextTimer: ReturnType<typeof setTimeout> | null = null;
   private taxInvoiceDateTouched = false;
   private purchaseClientRef: string = crypto.randomUUID();
   private advanceAwareDraft = false;
   private exitAllowed = false;
 
-  protected readonly goodsSubtotal = computed(() =>
+  protected readonly lineTaxBreakdowns = computed(() => {
+    const context = this.taxContext();
+    const basis = this.priceEntryBasis();
+    return new Map(
+      this.lines().map(line => {
+        const rule = context?.lines.find(item => item.variant_id === line.variantId);
+        return [line.key, this.lineTaxBreakdown(line, rule?.tax_rate_bps ?? 0, basis)] as const;
+      })
+    );
+  });
+  protected readonly expenseTaxBreakdowns = computed(() => {
+    const context = this.taxContext();
+    const basis = this.priceEntryBasis();
+    return new Map(
+      this.expenses().map(
+        expense => [expense.key, this.expenseTaxBreakdown(expense, context, basis)] as const
+      )
+    );
+  });
+  protected readonly enteredGoodsSubtotal = computed(() =>
     this.lines().reduce((sum, line) => sum + this.lineAmount(line), 0)
   );
-  protected readonly supplierExpenseTotal = computed(() =>
+  protected readonly enteredSupplierExpenseTotal = computed(() =>
     this.expenses().reduce(
       (sum, item) => sum + (item.settlement === 'supplier_bill' ? (parseKes(item.amount) ?? 0) : 0),
       0
     )
+  );
+  protected readonly goodsSubtotal = computed(() =>
+    [...this.lineTaxBreakdowns().values()].reduce((sum, item) => sum + item.gross, 0)
+  );
+  protected readonly supplierExpenseTotal = computed(() =>
+    this.expenses().reduce(
+      (sum, item) =>
+        sum +
+        (item.settlement === 'supplier_bill'
+          ? (this.expenseTaxBreakdowns().get(item.key)?.gross ?? 0)
+          : 0),
+      0
+    )
+  );
+  protected readonly invoiceNetTotal = computed(
+    () =>
+      [...this.lineTaxBreakdowns().values()].reduce((sum, item) => sum + item.net, 0) +
+      this.expenses().reduce(
+        (sum, item) =>
+          sum +
+          (item.settlement === 'supplier_bill'
+            ? (this.expenseTaxBreakdowns().get(item.key)?.net ?? 0)
+            : 0),
+        0
+      )
+  );
+  protected readonly invoiceTaxTotal = computed(
+    () =>
+      [...this.lineTaxBreakdowns().values()].reduce((sum, item) => sum + item.tax, 0) +
+      this.expenses().reduce(
+        (sum, item) =>
+          sum +
+          (item.settlement === 'supplier_bill'
+            ? (this.expenseTaxBreakdowns().get(item.key)?.tax ?? 0)
+            : 0),
+        0
+      )
   );
   protected readonly separateExpenseTotal = computed(() =>
     this.expenses().reduce(
@@ -1011,7 +1183,7 @@ export class PurchaseEditorComponent implements OnInit {
       else errors.push('Purchase draft was not found');
     }
     this.syncSupplierPin();
-    if (this.claimInputVat.value) this.scheduleTaxEstimate();
+    await this.refreshTaxContext();
     this.error.set(errors.length > 0 ? errors.join('. ') : null);
     this.dirty.set(false);
     this.loading.set(false);
@@ -1029,10 +1201,6 @@ export class PurchaseEditorComponent implements OnInit {
   protected markDirty(): void {
     this.dirty.set(true);
     this.notice.set(null);
-    if (this.claimInputVat.value) {
-      this.taxEstimate.set(null);
-      this.scheduleTaxEstimate();
-    }
   }
   protected setClaimInputVat(claim: boolean): void {
     this.claimInputVat.setValue(claim);
@@ -1045,16 +1213,22 @@ export class PurchaseEditorComponent implements OnInit {
       this.taxEstimateError.set(null);
       this.taxEstimateLoading.set(false);
     }
+    this.clearGrossOverrides();
+    this.scheduleTaxContext();
     this.markDirty();
   }
   protected onPurchaseDateChange(): void {
     if (this.claimInputVat.value && !this.taxInvoiceDateTouched) {
       this.taxInvoiceDate.setValue(this.purchaseDate.value);
     }
+    this.clearGrossOverrides();
+    this.scheduleTaxContext();
     this.markDirty();
   }
   protected onTaxInvoiceDateChange(): void {
     this.taxInvoiceDateTouched = true;
+    this.clearGrossOverrides();
+    this.scheduleTaxContext();
     this.markDirty();
   }
   protected onSupplierPinInput(): void {
@@ -1101,14 +1275,123 @@ export class PurchaseEditorComponent implements OnInit {
     this.supplierTaxPin.setValue(pin);
     this.supplierPinSaved.set(!!pin);
   }
-  private scheduleTaxEstimate(): void {
-    if (this.taxEstimateTimer) clearTimeout(this.taxEstimateTimer);
-    if (!this.claimInputVat.value || !this.canEstimateVat()) {
-      this.taxEstimateLoading.set(false);
-      this.taxEstimateError.set(null);
+  private taxDate(): string {
+    return this.claimInputVat.value ? this.taxInvoiceDate.value : this.purchaseDate.value;
+  }
+  private clearGrossOverrides(): void {
+    this.lines.update(lines => lines.map(line => ({ ...line, grossAmountOverride: undefined })));
+    this.expenses.update(expenses =>
+      expenses.map(expense => ({ ...expense, grossAmountOverride: undefined }))
+    );
+  }
+  private scheduleTaxContext(): void {
+    if (this.taxContextTimer) clearTimeout(this.taxContextTimer);
+    this.taxContextTimer = setTimeout(() => {
+      this.taxContextTimer = null;
+      void this.refreshTaxContext();
+    }, 120);
+  }
+  private async refreshTaxContext(): Promise<boolean> {
+    if (this.taxContextTimer) {
+      clearTimeout(this.taxContextTimer);
+      this.taxContextTimer = null;
+    }
+    const taxDate = this.taxDate();
+    if (!taxDate) return false;
+    const request = ++this.taxContextRequest;
+    this.taxContextLoading.set(true);
+    this.taxContextError.set(null);
+    try {
+      const context = await this.money.purchaseTaxContext({
+        variantIds: [...new Set(this.lines().map(line => line.variantId))],
+        taxDate,
+      });
+      if (request !== this.taxContextRequest) return false;
+      this.taxContext.set(context);
+      this.convertPendingDefaultCosts(context);
+      return true;
+    } catch (error) {
+      if (request !== this.taxContextRequest) return false;
+      this.taxContext.set(null);
+      this.taxContextError.set(
+        error instanceof Error ? error.message : 'Purchase VAT rates could not be loaded'
+      );
+      return false;
+    } finally {
+      if (request === this.taxContextRequest) this.taxContextLoading.set(false);
+    }
+  }
+  protected setPriceEntryBasis(basis: PurchasePriceBasis): void {
+    if (basis === this.priceEntryBasis()) return;
+    const context = this.taxContext();
+    if (basis === 'exclusive' && !context?.tax_configured) {
+      this.taxContextError.set(
+        'Configure a supported tax jurisdiction for this purchase date before entering prices without VAT.'
+      );
       return;
     }
-    this.taxEstimateTimer = setTimeout(() => void this.refreshVatEstimate(), 350);
+    this.clearGrossOverrides();
+    this.lines.update(lines => lines.map(line => ({ ...line, defaultCostNeedsConversion: false })));
+    this.priceEntryBasis.set(basis);
+    this.taxContextError.set(null);
+    this.markDirty();
+  }
+  private convertPendingDefaultCosts(context: PurchaseTaxContext): void {
+    if (this.priceEntryBasis() !== 'exclusive') return;
+    this.lines.update(lines =>
+      lines.map(line => {
+        if (!line.defaultCostNeedsConversion) return line;
+        const rate =
+          context.lines.find(item => item.variant_id === line.variantId)?.tax_rate_bps ?? 0;
+        const net = this.taxBreakdown(this.lineAmount(line), rate, 'inclusive').net;
+        return {
+          ...line,
+          unitCost: formatKesInput(line.quantity > 0 ? net / line.quantity : 0),
+          lineTotal: formatKesInput(net),
+          valueSource: 'total',
+          defaultCostNeedsConversion: false,
+          grossAmountOverride: this.lineAmount(line),
+        };
+      })
+    );
+  }
+  private taxBreakdown(
+    entered: number,
+    rateBps: number,
+    basis: PurchasePriceBasis
+  ): EnteredTaxBreakdown {
+    if (basis === 'exclusive') {
+      const tax = Math.round((entered * rateBps) / 10_000);
+      return { entered, net: entered, tax, gross: entered + tax, rateBps };
+    }
+    const net = Math.round((entered * 10_000) / (10_000 + rateBps));
+    return { entered, gross: entered, net, tax: entered - net, rateBps };
+  }
+  private lineTaxBreakdown(
+    line: PurchaseLineForm,
+    rateBps: number,
+    basis: PurchasePriceBasis
+  ): EnteredTaxBreakdown {
+    const entered = this.lineAmount(line);
+    if (basis === 'exclusive' && line.grossAmountOverride !== undefined) {
+      const gross = line.grossAmountOverride;
+      return { entered, gross, net: entered, tax: gross - entered, rateBps };
+    }
+    return this.taxBreakdown(entered, rateBps, basis);
+  }
+  private expenseTaxBreakdown(
+    expense: ExpenseForm,
+    context: PurchaseTaxContext | null,
+    basis: PurchasePriceBasis
+  ): EnteredTaxBreakdown {
+    const entered = parseKes(expense.amount) ?? 0;
+    const supplierBill = expense.settlement === 'supplier_bill';
+    const rateBps = supplierBill ? (context?.supplier_expense.tax_rate_bps ?? 0) : 0;
+    if (supplierBill && basis === 'exclusive' && expense.grossAmountOverride !== undefined) {
+      const gross = expense.grossAmountOverride;
+      return { entered, gross, net: entered, tax: gross - entered, rateBps };
+    }
+    return this.taxBreakdown(entered, rateBps, supplierBill ? basis : 'inclusive');
   }
   private canEstimateVat(): boolean {
     if (!this.taxInvoiceDate.value || this.lines().length === 0) return false;
@@ -1312,10 +1595,12 @@ export class PurchaseEditorComponent implements OnInit {
         retailPrice: formatKesInput(variant.price ?? 0),
         expanded: false,
         error: null,
+        defaultCostNeedsConversion: this.priceEntryBasis() === 'exclusive' && cost > 0,
       },
     ]);
     this.productQuery.set('');
     this.searchResults.set([]);
+    this.scheduleTaxContext();
     this.markDirty();
     setTimeout(() => {
       const quantity = document.querySelector<HTMLInputElement>(
@@ -1327,6 +1612,7 @@ export class PurchaseEditorComponent implements OnInit {
   }
   protected removeLine(index: number): void {
     this.lines.update(items => items.filter((_, itemIndex) => itemIndex !== index));
+    this.scheduleTaxContext();
     this.markDirty();
   }
   protected setLineExpanded(line: PurchaseLineForm, expanded: boolean): void {
@@ -1346,12 +1632,15 @@ export class PurchaseEditorComponent implements OnInit {
     line.quantity = Math.max(0, Number(value) || 0);
     if (line.valueSource === 'unit') this.syncTotal(line);
     else this.syncUnit(line);
+    line.grossAmountOverride = undefined;
     this.lines.update(items => [...items]);
     this.markDirty();
   }
   protected unitCostChanged(line: PurchaseLineForm, value: string): void {
     line.unitCost = value;
     line.valueSource = 'unit';
+    line.defaultCostNeedsConversion = false;
+    line.grossAmountOverride = undefined;
     this.syncTotal(line);
     this.lines.update(items => [...items]);
     this.markDirty();
@@ -1359,6 +1648,8 @@ export class PurchaseEditorComponent implements OnInit {
   protected lineTotalChanged(line: PurchaseLineForm, value: string): void {
     line.lineTotal = value;
     line.valueSource = 'total';
+    line.defaultCostNeedsConversion = false;
+    line.grossAmountOverride = undefined;
     this.syncUnit(line);
     this.lines.update(items => [...items]);
     this.markDirty();
@@ -1394,12 +1685,39 @@ export class PurchaseEditorComponent implements OnInit {
     ]);
     this.markDirty();
   }
+  protected expenseAmountChanged(expense: ExpenseForm): void {
+    expense.grossAmountOverride = undefined;
+    this.expenses.update(items => [...items]);
+    this.markDirty();
+  }
+  protected setExpenseSettlement(expense: ExpenseForm, settlement: ExpenseSettlement): void {
+    if (expense.settlement === settlement) return;
+    const amount = parseKes(expense.amount);
+    if (this.priceEntryBasis() === 'exclusive' && amount !== null && amount > 0) {
+      const previousGross = this.expenseTaxBreakdowns().get(expense.key)?.gross ?? amount;
+      if (settlement === 'supplier_bill') {
+        const rate = this.taxContext()?.supplier_expense.tax_rate_bps ?? 0;
+        const net = this.taxBreakdown(previousGross, rate, 'inclusive').net;
+        expense.amount = formatKesInput(net);
+        expense.grossAmountOverride = previousGross;
+      } else {
+        expense.amount = formatKesInput(previousGross);
+        expense.grossAmountOverride = undefined;
+      }
+    } else {
+      expense.grossAmountOverride = undefined;
+    }
+    expense.settlement = settlement;
+    this.expenses.update(items => [...items]);
+    this.markDirty();
+  }
   protected removeExpense(index: number): void {
     this.expenses.update(items => items.filter((_, itemIndex) => itemIndex !== index));
     this.markDirty();
   }
 
   protected async goToReview(): Promise<void> {
+    if (this.priceEntryBasis() === 'exclusive' && !(await this.refreshTaxContext())) return;
     if (!this.validateBuild() || !this.validateTaxEvidence()) return;
     if (this.claimInputVat.value && !(await this.refreshVatEstimate())) return;
     this.error.set(null);
@@ -1471,6 +1789,10 @@ export class PurchaseEditorComponent implements OnInit {
   protected canConfirm(): boolean {
     return (
       !this.busy() &&
+      (this.priceEntryBasis() !== 'exclusive' ||
+        (!!this.taxContext()?.tax_configured &&
+          !this.taxContextLoading() &&
+          !this.taxContextError())) &&
       (!this.claimInputVat.value ||
         (!!this.taxEstimate() && !this.taxEstimateError() && !this.taxEstimateLoading())) &&
       !this.advanceAmountError() &&
@@ -1481,6 +1803,7 @@ export class PurchaseEditorComponent implements OnInit {
   }
 
   protected async saveDraft(): Promise<void> {
+    if (this.priceEntryBasis() === 'exclusive' && !(await this.refreshTaxContext())) return;
     if (!this.validateBuild()) return;
     this.savingDraft.set(true);
     this.error.set(null);
@@ -1515,6 +1838,7 @@ export class PurchaseEditorComponent implements OnInit {
   }
 
   protected async confirmPurchase(): Promise<void> {
+    if (this.priceEntryBasis() === 'exclusive' && !(await this.refreshTaxContext())) return;
     if (!this.validateBuild() || !this.validateTaxEvidence()) return;
     if (this.claimInputVat.value && !(await this.refreshVatEstimate())) return;
     if (!this.canConfirm()) return;
@@ -1563,6 +1887,24 @@ export class PurchaseEditorComponent implements OnInit {
       this.error.set('Choose a receiving location');
       this.focusControl('[data-location-picker]');
       return false;
+    }
+    if (this.priceEntryBasis() === 'exclusive') {
+      const context = this.taxContext();
+      const missingLineRate = this.lines().some(
+        line => !context?.lines.some(item => item.variant_id === line.variantId)
+      );
+      if (
+        this.taxContextLoading() ||
+        !context?.tax_configured ||
+        missingLineRate ||
+        this.lines().some(line => line.defaultCostNeedsConversion)
+      ) {
+        this.error.set(
+          this.taxContextError() ||
+            'Wait for the applicable VAT rates before reviewing this purchase'
+        );
+        return false;
+      }
     }
     if (this.lines().length === 0) {
       this.error.set('Add at least one item');
@@ -1646,12 +1988,20 @@ export class PurchaseEditorComponent implements OnInit {
       const variant = this.lineVariant(line)!;
       const wholesale = parseKes(line.wholesalePrice) ?? 0;
       const retail = parseKes(line.retailPrice) ?? 0;
+      const enteredUnitCost = parseKes(line.unitCost)!;
+      const enteredLineTotal = parseKes(line.lineTotal)!;
+      const breakdown = this.lineTaxBreakdowns().get(line.key)!;
+      const exclusive = this.priceEntryBasis() === 'exclusive';
       return {
         variant_id: line.variantId,
         quantity: line.quantity,
-        unit_cost: parseKes(line.unitCost)!,
-        line_total: parseKes(line.lineTotal)!,
-        value_source: line.valueSource,
+        unit_cost: exclusive ? Math.round(breakdown.gross / line.quantity) : enteredUnitCost,
+        line_total: exclusive ? breakdown.gross : enteredLineTotal,
+        value_source: exclusive ? 'total' : line.valueSource,
+        price_entry_basis: this.priceEntryBasis(),
+        entered_value_source: line.valueSource,
+        entered_unit_cost: enteredUnitCost,
+        entered_line_total: enteredLineTotal,
         ...(this.preferences.batchExpiryEnabled() && line.expiryDate
           ? { expiry_date: line.expiryDate }
           : {}),
@@ -1666,14 +2016,23 @@ export class PurchaseEditorComponent implements OnInit {
     });
   }
   private parsedExpenses(): PurchaseExpenseInput[] {
-    return this.expenses().map(item => ({
-      category: item.category as PurchaseExpenseInput['category'],
-      ...(item.category === 'other' ? { custom_label: item.customCategory.trim() } : {}),
-      ...(item.memo.trim() ? { memo: item.memo.trim() } : {}),
-      amount: parseKes(item.amount)!,
-      settlement: item.settlement as Exclude<ExpenseSettlement, ''>,
-      ...(item.settlement === 'separate' ? { account_code: item.accountCode } : {}),
-    }));
+    return this.expenses().map(item => {
+      const enteredAmount = parseKes(item.amount)!;
+      const breakdown = this.expenseTaxBreakdowns().get(item.key)!;
+      return {
+        category: item.category as PurchaseExpenseInput['category'],
+        ...(item.category === 'other' ? { custom_label: item.customCategory.trim() } : {}),
+        ...(item.memo.trim() ? { memo: item.memo.trim() } : {}),
+        amount:
+          this.priceEntryBasis() === 'exclusive' && item.settlement === 'supplier_bill'
+            ? breakdown.gross
+            : enteredAmount,
+        settlement: item.settlement as Exclude<ExpenseSettlement, ''>,
+        ...(item.settlement === 'separate' ? { account_code: item.accountCode } : {}),
+        price_entry_basis: this.priceEntryBasis(),
+        entered_amount: enteredAmount,
+      };
+    });
   }
 
   private restoreDraft(draft: PurchaseDraft | undefined): void {
@@ -1697,6 +2056,7 @@ export class PurchaseEditorComponent implements OnInit {
     this.notes.setValue(draft.notes ?? '');
     this.purchaseDate.setValue(draft.purchase_date);
     this.claimInputVat.setValue(draft.claim_input_vat);
+    this.priceEntryBasis.set(draft.price_entry_basis === 'exclusive' ? 'exclusive' : 'inclusive');
     this.taxInvoiceDate.setValue(draft.tax_invoice_date ?? draft.purchase_date);
     this.taxInvoiceDateTouched = draft.tax_invoice_date !== null;
     this.location.setValue(draft.stock_location_id ?? this.location.value);
@@ -1709,36 +2069,47 @@ export class PurchaseEditorComponent implements OnInit {
       ? (draft.lines as unknown as Record<string, unknown>[])
       : [];
     this.lines.set(
-      rawLines.map(item => ({
-        key: this.nextKey++,
-        variantId: String(item['variant_id'] ?? ''),
-        quantity: Number(item['quantity'] ?? 1),
-        unitCost: formatKesInput(Number(item['unit_cost'] ?? 0)),
-        lineTotal: formatKesInput(
-          Number(
-            item['line_total'] ?? Number(item['quantity'] ?? 1) * Number(item['unit_cost'] ?? 0)
-          )
-        ),
-        valueSource: item['value_source'] === 'total' ? 'total' : 'unit',
-        batchNumber: String(item['batch_number'] ?? ''),
-        expiryDate: String(item['expiry_date'] ?? ''),
-        wholesalePrice: formatKesInput(
-          Number(
-            item['new_wholesale_price'] ??
-              this.variants().find(v => v.variant_id === item['variant_id'])?.wholesale_price ??
-              0
-          )
-        ),
-        retailPrice: formatKesInput(
-          Number(
-            item['new_retail_price'] ??
-              this.variants().find(v => v.variant_id === item['variant_id'])?.price ??
-              0
-          )
-        ),
-        expanded: false,
-        error: null,
-      }))
+      rawLines.map(item => {
+        const exclusive = this.priceEntryBasis() === 'exclusive';
+        const unitCost = exclusive ? item['entered_unit_cost'] : item['unit_cost'];
+        const lineTotal = exclusive ? item['entered_line_total'] : item['line_total'];
+        const valueSource = exclusive ? item['entered_value_source'] : item['value_source'];
+        return {
+          key: this.nextKey++,
+          variantId: String(item['variant_id'] ?? ''),
+          quantity: Number(item['quantity'] ?? 1),
+          unitCost: formatKesInput(Number(unitCost ?? item['unit_cost'] ?? 0)),
+          lineTotal: formatKesInput(
+            Number(
+              lineTotal ??
+                item['line_total'] ??
+                Number(item['quantity'] ?? 1) * Number(unitCost ?? item['unit_cost'] ?? 0)
+            )
+          ),
+          valueSource: valueSource === 'total' ? 'total' : 'unit',
+          batchNumber: String(item['batch_number'] ?? ''),
+          expiryDate: String(item['expiry_date'] ?? ''),
+          wholesalePrice: formatKesInput(
+            Number(
+              item['new_wholesale_price'] ??
+                this.variants().find(v => v.variant_id === item['variant_id'])?.wholesale_price ??
+                0
+            )
+          ),
+          retailPrice: formatKesInput(
+            Number(
+              item['new_retail_price'] ??
+                this.variants().find(v => v.variant_id === item['variant_id'])?.price ??
+                0
+            )
+          ),
+          expanded: false,
+          error: null,
+          defaultCostNeedsConversion: false,
+          grossAmountOverride:
+            exclusive && item['line_total'] !== undefined ? Number(item['line_total']) : undefined,
+        };
+      })
     );
     const rawExpenses = Array.isArray(draft.expenses)
       ? (draft.expenses as unknown as Record<string, unknown>[])
@@ -1752,10 +2123,20 @@ export class PurchaseEditorComponent implements OnInit {
           category: preset ? category : 'other',
           customCategory: String(item['custom_label'] ?? (preset ? '' : category)),
           memo: String(item['memo'] ?? ''),
-          amount: formatKesInput(Number(item['amount'] ?? 0)),
+          amount: formatKesInput(
+            Number(
+              this.priceEntryBasis() === 'exclusive'
+                ? (item['entered_amount'] ?? item['amount'] ?? 0)
+                : (item['amount'] ?? 0)
+            )
+          ),
           settlement: String(item['settlement'] ?? '') as ExpenseSettlement,
           accountCode: String(item['account_code'] ?? this.account.value),
           error: null,
+          grossAmountOverride:
+            this.priceEntryBasis() === 'exclusive' && item['settlement'] === 'supplier_bill'
+              ? Number(item['amount'] ?? 0)
+              : undefined,
         };
       })
     );

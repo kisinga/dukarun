@@ -39,7 +39,7 @@ const supplier = {
 };
 
 describe('PurchaseEditorComponent input VAT', () => {
-  async function render() {
+  async function render(taxContextOverrides: Record<string, unknown> = {}) {
     const suppliers = signal<Array<typeof supplier>>([supplier]);
     const money = {
       transactableAccounts: vi
@@ -48,8 +48,36 @@ describe('PurchaseEditorComponent input VAT', () => {
       purchaseDrafts: vi.fn().mockResolvedValue([]),
       supplierVariantPerformance: vi.fn().mockResolvedValue([]),
       supplierAdvanceAvailable: vi.fn().mockResolvedValue(0),
+      purchaseTaxContext: vi.fn().mockResolvedValue({
+        status: 'context',
+        tax_configured: true,
+        vat_registered: true,
+        tax_profile_id: 'profile-1',
+        tax_point_at: '2026-08-19T00:00:00+03:00',
+        lines: [
+          {
+            variant_id: 'variant-1',
+            tax_profile_id: 'profile-1',
+            tax_category_id: 'standard',
+            tax_rate_version_id: 'rate-1',
+            tax_category_code: 'STANDARD',
+            tax_classification: 'standard',
+            tax_rate_bps: 1600,
+          },
+        ],
+        supplier_expense: {
+          tax_profile_id: 'profile-1',
+          tax_category_id: 'standard',
+          tax_rate_version_id: 'rate-1',
+          tax_category_code: 'STANDARD',
+          tax_classification: 'standard',
+          tax_rate_bps: 1600,
+        },
+        ...taxContextOverrides,
+      }),
       estimatePurchaseInputVat: vi.fn().mockResolvedValue({
         status: 'estimate',
+        tax_configured: true,
         vat_registered: true,
         tax_profile_id: 'profile-1',
         tax_point_at: '2026-08-19T00:00:00+03:00',
@@ -195,6 +223,90 @@ describe('PurchaseEditorComponent input VAT', () => {
     expect(money.finalizePurchaseDraft).toHaveBeenCalledWith('draft-1');
   });
 
+  it('treats entered purchase values using the selected invoice-wide basis', async () => {
+    const { component, money } = await render();
+    addValidInvoice(component);
+    component.setPriceEntryBasis('exclusive');
+    component.lineTotalChanged(component.lines()[0], '100');
+
+    expect(component.lines()[0].lineTotal).toBe('100');
+    expect(component.invoiceTaxTotal()).toBe(16);
+    expect(component.invoiceTotal()).toBe(116);
+
+    await component.saveDraft();
+
+    expect(money.savePurchaseWorkspaceDraft).toHaveBeenCalledWith(
+      expect.objectContaining({
+        lines: [
+          expect.objectContaining({
+            value_source: 'total',
+            line_total: 116,
+            price_entry_basis: 'exclusive',
+            entered_line_total: 100,
+          }),
+        ],
+      })
+    );
+  });
+
+  it('keeps supplier price entry separate from the input VAT claim decision', async () => {
+    const { component, money } = await render();
+    addValidInvoice(component);
+    component.setPriceEntryBasis('exclusive');
+    component.lineTotalChanged(component.lines()[0], '100');
+    component.setClaimInputVat(false);
+
+    expect(component.invoiceTaxTotal()).toBe(16);
+    expect(component.invoiceTotal()).toBe(116);
+
+    await component.saveDraft();
+
+    expect(money.savePurchaseWorkspaceDraft).toHaveBeenCalledWith(
+      expect.objectContaining({ claimInputVat: false })
+    );
+  });
+
+  it('allows exclusive entry for a configured shop that cannot claim input VAT', async () => {
+    const { component } = await render({ vat_registered: false });
+    addValidInvoice(component);
+    component.setClaimInputVat(false);
+
+    component.setPriceEntryBasis('exclusive');
+
+    expect(component.priceEntryBasis()).toBe('exclusive');
+  });
+
+  it('does not rewrite entered values when the purchase-wide basis changes', async () => {
+    const { component } = await render();
+    addValidInvoice(component);
+    component.lineTotalChanged(component.lines()[0], '4');
+
+    component.setPriceEntryBasis('exclusive');
+    expect(component.lines()[0].lineTotal).toBe('4');
+    expect(component.invoiceTotal()).toBe(5);
+
+    component.setPriceEntryBasis('inclusive');
+    expect(component.lines()[0].lineTotal).toBe('4');
+    expect(component.invoiceTotal()).toBe(4);
+  });
+
+  it('preserves an expense gross amount when its settlement changes', async () => {
+    const { component } = await render();
+    addValidInvoice(component);
+    component.setPriceEntryBasis('exclusive');
+    component.addExpense();
+    const expense = component.expenses()[0];
+    expense.amount = '116';
+
+    component.setExpenseSettlement(expense, 'supplier_bill');
+    expect(expense.amount).toBe('100');
+    expect(component.supplierExpenseTotal()).toBe(116);
+
+    component.setExpenseSettlement(expense, 'separate');
+    expect(expense.amount).toBe('116');
+    expect(component.separateExpenseTotal()).toBe(116);
+  });
+
   it('restores VAT evidence from a draft and preserves it when saving again', async () => {
     const { component, money } = await render();
     component.restoreDraft({
@@ -208,6 +320,7 @@ describe('PurchaseEditorComponent input VAT', () => {
       stock_location_id: 'location-1',
       payment_mode: 'paid',
       payment_amount: 116,
+      price_entry_basis: 'inclusive',
       account_code: 'CASH_ON_HAND',
       client_ref: null,
       lines: [

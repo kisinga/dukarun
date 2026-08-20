@@ -1,5 +1,5 @@
 begin;
-select plan(85);
+select plan(95);
 
 select has_table('public','tax_rate_versions','VAT rates are effective-dated');
 select has_table('public','legacy_customer_account_reconciliations',
@@ -18,6 +18,8 @@ select has_function('public','platform_tax_package_readiness',array['uuid'],
   'country-package readiness RPC exists');
 select has_function('public','tax_document_integration_envelope',array['uuid','text'],
   'provider-neutral tax-document envelope RPC exists');
+select has_function('public','purchase_tax_context',array['uuid[]','date'],
+  'purchase editor can fetch effective tax rates without recalculating on every keystroke');
 
 select testkit.create_user('a1000000-0000-4000-8000-000000000001','vat-v1@test.local');
 select testkit.create_user('a1000000-0000-4000-8000-000000000002','vat-platform@test.local');
@@ -170,9 +172,32 @@ select results_eq(
   $$values (108::bigint,100::bigint,8::bigint,800)$$,
   'temporary effective-dated petroleum rate resolves at the tax point');
 
+update public.company_tax_profiles set vat_registered=false,tax_registration_number=null
+where company_id=(select company_id from vat_fixture) and effective_from<=current_date
+  and (effective_to is null or effective_to>=current_date);
+select results_eq(
+  $$select tax_total,vat_registered from public.resolve_purchase_invoice_tax(
+      (select company_id from vat_fixture),'a1000000-0000-4000-8000-000000000010',116,now())$$,
+  $$values (16::bigint,false)$$,
+  'supplier invoice VAT resolves independently of buyer registration');
+select results_eq(
+  $$select tax_total,vat_registered from public.resolve_inclusive_tax(
+      (select company_id from vat_fixture),'a1000000-0000-4000-8000-000000000010',116,now())$$,
+  $$values (0::bigint,false)$$,
+  'sales VAT remains disabled when the shop is not registered');
+update public.company_tax_profiles set vat_registered=true,tax_registration_number='P051234567A'
+where company_id=(select company_id from vat_fixture) and effective_from<=current_date
+  and (effective_to is null or effective_to>=current_date);
+
 select testkit.as_user((select company_id from vat_fixture),
   'a1000000-0000-4000-8000-000000000001','Admin');
 select testkit.ensure_open_session();
+select results_eq(
+  $$select (line->>'tax_rate_bps')::integer
+    from jsonb_array_elements(public.purchase_tax_context(
+      array['a1000000-0000-4000-8000-000000000020'::uuid],current_date)->'lines') line$$,
+  $$values (1600)$$,
+  'purchase tax context resolves the effective product rate once for local editor calculations');
 select is(public.update_location_tax_branch_code(
   (select id from public.stock_locations where company_id=(select company_id from vat_fixture)
     and is_default limit 1),'00'),
@@ -339,6 +364,88 @@ select results_eq(
     from public.purchases p where p.id=(select purchase_id from vat_purchase_draft_result)$$,
   $$values (true,16::bigint,'ap_invoice_v2'::text)$$,
   'saved-draft confirmation uses the same tax-aware purchase finalizer');
+
+create temp table vat_exclusive_draft as select public.save_purchase_workspace_draft(
+  'a1000000-0000-4000-8000-000000000030',
+  '[{"variant_id":"a1000000-0000-4000-8000-000000000020","quantity":1,
+    "unit_cost":116,"line_total":116,"value_source":"total",
+    "price_entry_basis":"exclusive","entered_value_source":"total",
+    "entered_unit_cost":100,"entered_line_total":100}]',
+  '[{"category":"transport","amount":116,"settlement":"supplier_bill",
+    "price_entry_basis":"exclusive","entered_amount":100}]',
+  'SUP-VAT-EXCLUSIVE',null,current_date,
+  (select id from public.stock_locations where company_id=(select company_id from vat_fixture)
+    and is_default limit 1),'paid',232,0,'CASH_ON_HAND','vat-exclusive-draft',null,true,current_date
+) draft_id;
+select is((select price_entry_basis from public.purchase_drafts
+  where id=(select draft_id from vat_exclusive_draft)),'exclusive',
+  'purchase drafts retain the invoice-wide price entry mode');
+create temp table vat_exclusive_result as select public.finalize_purchase_draft(
+  (select draft_id from vat_exclusive_draft)) purchase_id;
+select results_eq(
+  $$select gross_total,net_total,input_tax_total,price_entry_basis,
+      (price_entry_payload->>'invoice_tax_total')::bigint
+    from public.purchases where id=(select purchase_id from vat_exclusive_result)$$,
+  $$values (232::bigint,200::bigint,32::bigint,'exclusive'::text,32::bigint)$$,
+  'exclusive entry normalizes to gross while retaining the original invoice tax facts');
+select results_eq(
+  $$select a.code::text,sum(l.debit)::bigint,sum(l.credit)::bigint
+    from public.ledger_journal_lines l
+    join public.ledger_journal_entries e on e.id=l.entry_id
+    join public.ledger_accounts a on a.id=l.account_id
+    where e.source_type='InventoryPurchase'
+      and e.source_id=(select purchase_id::text from vat_exclusive_result)
+    group by a.code order by a.code$$,
+  $$values ('ACCOUNTS_PAYABLE'::text,0::bigint,232::bigint),
+    ('EXPENSES'::text,100::bigint,0::bigint),
+    ('INVENTORY'::text,100::bigint,0::bigint),
+    ('TAX_PAYABLE'::text,32::bigint,0::bigint)$$,
+  'exclusive entry uses the existing balanced purchase recognition journal');
+
+create temp table vat_exclusive_nonclaim_draft as select public.save_purchase_workspace_draft(
+  'a1000000-0000-4000-8000-000000000030',
+  '[{"variant_id":"a1000000-0000-4000-8000-000000000020","quantity":1,
+    "unit_cost":116,"line_total":116,"value_source":"total",
+    "price_entry_basis":"exclusive","entered_value_source":"total",
+    "entered_unit_cost":100,"entered_line_total":100}]',
+  '[]','SUP-VAT-EXCLUSIVE-NOCLAIM',null,current_date,
+  (select id from public.stock_locations where company_id=(select company_id from vat_fixture)
+    and is_default limit 1),'later',0,0,null,'vat-exclusive-nonclaim',null,false,null
+) draft_id;
+create temp table vat_exclusive_nonclaim_result as select public.finalize_purchase_draft(
+  (select draft_id from vat_exclusive_nonclaim_draft)) purchase_id;
+select results_eq(
+  $$select p.gross_total,p.net_total,p.input_tax_total,p.invoice_net_total,p.invoice_tax_total,
+      p.price_entry_basis,(p.price_entry_payload->>'invoice_tax_total')::bigint,
+      l.tax_category_code,l.net_total,l.tax_total,b.original_cost
+    from public.purchases p join public.purchase_lines l on l.purchase_id=p.id
+    join public.inventory_batches b on b.id=l.inventory_batch_id
+    where p.id=(select purchase_id from vat_exclusive_nonclaim_result)$$,
+  $$values (116::bigint,116::bigint,0::bigint,100::bigint,16::bigint,'exclusive'::text,
+    16::bigint,'STANDARD'::text,100::bigint,16::bigint,116::bigint)$$,
+  'unclaimed invoice VAT keeps immutable line facts but remains capitalized into inventory');
+select is((select count(*)::integer from public.ledger_journal_lines l
+  join public.ledger_journal_entries e on e.id=l.entry_id
+  join public.ledger_accounts a on a.id=l.account_id
+  where e.source_type='InventoryPurchase'
+    and e.source_id=(select purchase_id::text from vat_exclusive_nonclaim_result)
+    and a.code='TAX_PAYABLE'),0,
+  'unclaimed invoice VAT never posts to the VAT control account');
+
+create temp table vat_bad_exclusive_draft as select public.save_purchase_workspace_draft(
+  'a1000000-0000-4000-8000-000000000030',
+  '[{"variant_id":"a1000000-0000-4000-8000-000000000020","quantity":1,
+    "unit_cost":115,"line_total":115,"value_source":"total",
+    "price_entry_basis":"exclusive","entered_value_source":"total",
+    "entered_unit_cost":100,"entered_line_total":100}]',
+  '[]','SUP-VAT-BAD-NORMALIZATION',null,current_date,
+  (select id from public.stock_locations where company_id=(select company_id from vat_fixture)
+    and is_default limit 1),'later',0,0,null,'vat-bad-exclusive',null,false,null
+) draft_id;
+select throws_ok(format($$select public.finalize_purchase_draft(%L)$$,
+  (select draft_id from vat_bad_exclusive_draft)),
+  'P0001','purchase_price_normalization_changed',
+  'confirmation rejects browser totals that no longer match the effective tax rate');
 
 create temp table vat_advance_path as select public.record_purchase_with_advance(
   'a1000000-0000-4000-8000-000000000030',

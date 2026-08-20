@@ -5497,6 +5497,7 @@ export type Database = {
       }
       order_lines: {
         Row: {
+          cogs_total: number | null
           company_id: string
           created_at: string
           custom_price: number | null
@@ -5517,6 +5518,7 @@ export type Database = {
           variant_id: string
         }
         Insert: {
+          cogs_total?: number | null
           company_id: string
           created_at?: string
           custom_price?: number | null
@@ -5537,6 +5539,7 @@ export type Database = {
           variant_id: string
         }
         Update: {
+          cogs_total?: number | null
           company_id?: string
           created_at?: string
           custom_price?: number | null
@@ -7292,6 +7295,7 @@ export type Database = {
           payment_amount: number | null
           payment_mode: string | null
           posted_purchase_id: string | null
+          price_entry_basis: string
           purchase_date: string
           reference: string | null
           request_hash: string | null
@@ -7317,6 +7321,7 @@ export type Database = {
           payment_amount?: number | null
           payment_mode?: string | null
           posted_purchase_id?: string | null
+          price_entry_basis?: string
           purchase_date?: string
           reference?: string | null
           request_hash?: string | null
@@ -7342,6 +7347,7 @@ export type Database = {
           payment_amount?: number | null
           payment_mode?: string | null
           posted_purchase_id?: string | null
+          price_entry_basis?: string
           purchase_date?: string
           reference?: string | null
           request_hash?: string | null
@@ -7892,12 +7898,16 @@ export type Database = {
           gross_total: number
           id: string
           input_tax_total: number
+          invoice_net_total: number
+          invoice_tax_total: number
           is_credit: boolean
           is_late_tax_adjustment: boolean
           net_total: number
           notes: string | null
           posting_classification: string
           posting_reason: string | null
+          price_entry_basis: string
+          price_entry_payload: Json | null
           purchase_date: string
           purchase_posting_version: string
           reference: string | null
@@ -7933,12 +7943,16 @@ export type Database = {
           gross_total?: number
           id?: string
           input_tax_total?: number
+          invoice_net_total?: number
+          invoice_tax_total?: number
           is_credit?: boolean
           is_late_tax_adjustment?: boolean
           net_total?: number
           notes?: string | null
           posting_classification?: string
           posting_reason?: string | null
+          price_entry_basis?: string
+          price_entry_payload?: Json | null
           purchase_date?: string
           purchase_posting_version?: string
           reference?: string | null
@@ -7974,12 +7988,16 @@ export type Database = {
           gross_total?: number
           id?: string
           input_tax_total?: number
+          invoice_net_total?: number
+          invoice_tax_total?: number
           is_credit?: boolean
           is_late_tax_adjustment?: boolean
           net_total?: number
           notes?: string | null
           posting_classification?: string
           posting_reason?: string | null
+          price_entry_basis?: string
+          price_entry_payload?: Json | null
           purchase_date?: string
           purchase_posting_version?: string
           reference?: string | null
@@ -11077,6 +11095,8 @@ export type Database = {
           gross_total: number | null
           id: string | null
           input_tax_total: number | null
+          invoice_net_total: number | null
+          invoice_tax_total: number | null
           is_credit: boolean | null
           is_late_tax_adjustment: boolean | null
           net_total: number | null
@@ -11085,6 +11105,8 @@ export type Database = {
           payment_status: string | null
           posting_classification: string | null
           posting_reason: string | null
+          price_entry_basis: string | null
+          price_entry_payload: Json | null
           purchase_date: string | null
           purchase_posting_version: string | null
           reference: string | null
@@ -11933,6 +11955,15 @@ export type Database = {
         Returns: Json
       }
       calculate_purchase_input_vat: {
+        Args: {
+          p_company_id: string
+          p_expenses: Json
+          p_lines: Json
+          p_tax_date: string
+        }
+        Returns: Json
+      }
+      calculate_purchase_invoice_tax: {
         Args: {
           p_company_id: string
           p_expenses: Json
@@ -13859,6 +13890,10 @@ export type Database = {
         }
         Returns: string
       }
+      purchase_tax_context: {
+        Args: { p_tax_date?: string; p_variant_ids: string[] }
+        Returns: Json
+      }
       purge_mpesa_raw_payloads: { Args: never; Returns: number }
       queue_cashier_session_notification: {
         Args: { p_event: string; p_session_id: string }
@@ -14261,6 +14296,48 @@ export type Database = {
           vat_registered: boolean
         }[]
       }
+      resolve_configured_category_tax: {
+        Args: {
+          p_company_id: string
+          p_gross: number
+          p_require_registration: boolean
+          p_tax_category_id: string
+          p_tax_point: string
+        }
+        Returns: {
+          gross_total: number
+          net_total: number
+          tax_category_code: string
+          tax_category_id: string
+          tax_classification: string
+          tax_profile_id: string
+          tax_rate_bps: number
+          tax_rate_version_id: string
+          tax_total: number
+          vat_registered: boolean
+        }[]
+      }
+      resolve_configured_product_tax: {
+        Args: {
+          p_company_id: string
+          p_gross: number
+          p_product_id: string
+          p_require_registration: boolean
+          p_tax_point: string
+        }
+        Returns: {
+          gross_total: number
+          net_total: number
+          tax_category_code: string
+          tax_category_id: string
+          tax_classification: string
+          tax_profile_id: string
+          tax_rate_bps: number
+          tax_rate_version_id: string
+          tax_total: number
+          vat_registered: boolean
+        }[]
+      }
       resolve_inclusive_tax: {
         Args: {
           p_company_id: string
@@ -14284,6 +14361,46 @@ export type Database = {
       resolve_platform_campaign_recipient: {
         Args: { p_company_id: string }
         Returns: Json
+      }
+      resolve_purchase_invoice_category_tax: {
+        Args: {
+          p_company_id: string
+          p_gross: number
+          p_tax_category_id: string
+          p_tax_point: string
+        }
+        Returns: {
+          gross_total: number
+          net_total: number
+          tax_category_code: string
+          tax_category_id: string
+          tax_classification: string
+          tax_profile_id: string
+          tax_rate_bps: number
+          tax_rate_version_id: string
+          tax_total: number
+          vat_registered: boolean
+        }[]
+      }
+      resolve_purchase_invoice_tax: {
+        Args: {
+          p_company_id: string
+          p_gross: number
+          p_product_id: string
+          p_tax_point: string
+        }
+        Returns: {
+          gross_total: number
+          net_total: number
+          tax_category_code: string
+          tax_category_id: string
+          tax_classification: string
+          tax_profile_id: string
+          tax_rate_bps: number
+          tax_rate_version_id: string
+          tax_total: number
+          vat_registered: boolean
+        }[]
       }
       resolve_purchase_posting: {
         Args: {
@@ -15086,6 +15203,16 @@ export type Database = {
         }
         Returns: undefined
       }
+      validate_purchase_price_payload: {
+        Args: {
+          p_company_id: string
+          p_expenses: Json
+          p_lines: Json
+          p_price_entry_basis: string
+          p_tax_date: string
+        }
+        Returns: Json
+      }
       vat_late_transaction_schedule: {
         Args: {
           p_company_id: string
@@ -15258,3 +15385,4 @@ export const Constants = {
     Enums: {},
   },
 } as const
+

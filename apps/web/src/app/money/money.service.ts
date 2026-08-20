@@ -1,6 +1,10 @@
 import { Injectable, inject } from '@angular/core';
 import type { Database, Json } from '@dukarun/shared-types';
-import type { PurchaseTaxEstimate } from '@dukarun/tax-types';
+import type {
+  PurchasePriceBasis,
+  PurchaseTaxContext,
+  PurchaseTaxEstimate,
+} from '@dukarun/tax-types';
 import { SupabaseService } from '../core/supabase.service';
 import { rpcError } from '../pos/pos.service';
 import { LocationContextService } from '../core/location-context.service';
@@ -235,6 +239,10 @@ export interface PurchaseLineInput {
   batch_number?: string;
   new_wholesale_price?: number;
   new_retail_price?: number;
+  price_entry_basis?: PurchasePriceBasis;
+  entered_value_source?: 'unit' | 'total';
+  entered_unit_cost?: number;
+  entered_line_total?: number;
 }
 
 export interface PurchaseExpenseInput {
@@ -244,6 +252,8 @@ export interface PurchaseExpenseInput {
   amount: number;
   settlement: 'supplier_bill' | 'separate';
   account_code?: string;
+  price_entry_basis?: PurchasePriceBasis;
+  entered_amount?: number;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -1219,6 +1229,18 @@ export class MoneyService {
     });
     if (error) throw rpcError(error);
     return data as unknown as PurchaseTaxEstimate;
+  }
+
+  async purchaseTaxContext(input: {
+    variantIds: string[];
+    taxDate: string;
+  }): Promise<PurchaseTaxContext> {
+    const { data, error } = await this.db.rpc('purchase_tax_context', {
+      p_variant_ids: input.variantIds,
+      p_tax_date: input.taxDate,
+    });
+    if (error) throw rpcError(error);
+    return data as unknown as PurchaseTaxContext;
   }
 
   async updateSupplierTaxRegistration(

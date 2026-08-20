@@ -73,6 +73,7 @@ export interface PurchaseTaxEstimateLine extends TaxBreakdown {
 
 export interface PurchaseTaxEstimate {
   status: 'estimate';
+  tax_configured: boolean;
   vat_registered: boolean;
   tax_profile_id: string | null;
   tax_point_at: string;
@@ -88,6 +89,28 @@ export interface PurchaseTaxEstimate {
   separate_expense_total: number;
   lines: PurchaseTaxEstimateLine[];
   expenses: PurchaseTaxEstimateLine[];
+}
+
+export type PurchasePriceBasis = 'inclusive' | 'exclusive';
+
+export interface PurchaseTaxContextLine {
+  variant_id: string;
+  tax_profile_id: string | null;
+  tax_category_id: string | null;
+  tax_rate_version_id: string | null;
+  tax_category_code: string;
+  tax_classification: TaxClassification;
+  tax_rate_bps: number;
+}
+
+export interface PurchaseTaxContext {
+  status: 'context';
+  tax_configured: boolean;
+  vat_registered: boolean;
+  tax_profile_id: string | null;
+  tax_point_at: string;
+  lines: PurchaseTaxContextLine[];
+  supplier_expense: Omit<PurchaseTaxContextLine, 'variant_id'>;
 }
 
 export interface PurchaseTaxEvidence {

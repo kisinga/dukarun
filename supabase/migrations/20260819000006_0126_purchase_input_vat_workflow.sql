@@ -17,7 +17,9 @@ alter table public.purchases
   add column if not exists posting_reason text,
   add column if not exists purchase_posting_version text not null default 'gross_reclassification_v1'
     check (purchase_posting_version in ('gross_reclassification_v1','inline_input_vat_v1','ap_invoice_v2')),
-  add column if not exists is_late_tax_adjustment boolean not null default false;
+  add column if not exists is_late_tax_adjustment boolean not null default false,
+  add column if not exists invoice_net_total bigint not null default 0 check(invoice_net_total>=0),
+  add column if not exists invoice_tax_total bigint not null default 0 check(invoice_tax_total>=0);
 
 alter table public.purchase_expenses
   add column if not exists status text not null default 'posted'
@@ -37,6 +39,11 @@ set accounting_posting_date=coalesce(
   p.purchase_date
 )
 where p.accounting_posting_date is null;
+
+-- Existing documents keep their known snapshots. Do not infer unclaimed historical VAT.
+update public.purchases
+set invoice_net_total=case when claim_input_vat then net_total else gross_total end,
+    invoice_tax_total=case when claim_input_vat then input_tax_total else 0 end;
 
 -- Views expand p.* when they are created, so rebuild the purchase read model
 -- after adding the immutable evidence and posting columns above.
@@ -141,7 +148,7 @@ revoke execute on function public.purchase_accounting_posting_date(uuid,date)
   from public,anon,authenticated;
 grant execute on function public.purchase_accounting_posting_date(uuid,date) to service_role;
 
-create or replace function public.calculate_purchase_input_vat(
+create or replace function public.calculate_purchase_invoice_tax(
   p_company_id uuid,p_lines jsonb,p_expenses jsonb,p_tax_date date
 )
 returns jsonb language plpgsql stable security definer set search_path='' as $$
@@ -180,7 +187,7 @@ begin
         *nullif(v_item.value->>'unit_cost','')::bigint);
     end if;
     if v_gross is null or v_gross<=0 then raise exception 'invalid_purchase_line_total'; end if;
-    select * into v_tax from public.resolve_inclusive_tax(
+    select * into v_tax from public.resolve_purchase_invoice_tax(
       p_company_id,v_variant.product_id,v_gross,v_point);
     v_goods_gross:=v_goods_gross+v_tax.gross_total;
     v_goods_net:=v_goods_net+v_tax.net_total;
@@ -199,7 +206,7 @@ begin
     v_amount:=nullif(v_item.value->>'amount','')::bigint;
     if v_amount is null or v_amount<=0 then raise exception 'invalid_purchase_expense'; end if;
     if v_item.value->>'settlement'='supplier_bill' then
-      select * into v_tax from public.resolve_category_inclusive_tax(
+      select * into v_tax from public.resolve_purchase_invoice_category_tax(
         p_company_id,v_default_category,v_amount,v_point);
       v_expense_gross:=v_expense_gross+v_tax.gross_total;
       v_expense_net:=v_expense_net+v_tax.net_total;
@@ -221,7 +228,8 @@ begin
   end loop;
 
   return jsonb_build_object(
-    'status','estimate','vat_registered',coalesce(v_profile.vat_registered,false),
+    'status','estimate','tax_configured',v_profile.id is not null,
+    'vat_registered',coalesce(v_profile.vat_registered,false),
     'tax_profile_id',v_profile.id,'tax_point_at',v_point,
     'gross_total',v_goods_gross+v_expense_gross,
     'net_total',v_goods_net+v_expense_net,
@@ -231,6 +239,17 @@ begin
     'expense_net_total',v_expense_net,'expense_tax_total',v_expense_tax,
     'separate_expense_total',v_separate_expenses,'lines',v_lines,'expenses',v_expenses);
 end;
+$$;
+revoke execute on function public.calculate_purchase_invoice_tax(uuid,jsonb,jsonb,date)
+  from public,anon,authenticated;
+grant execute on function public.calculate_purchase_invoice_tax(uuid,jsonb,jsonb,date) to service_role;
+
+-- Compatibility name for claim previews. Invoice tax exists independently of recoverability.
+create or replace function public.calculate_purchase_input_vat(
+  p_company_id uuid,p_lines jsonb,p_expenses jsonb,p_tax_date date
+)
+returns jsonb language sql stable security definer set search_path='' as $$
+  select public.calculate_purchase_invoice_tax(p_company_id,p_lines,p_expenses,p_tax_date)
 $$;
 revoke execute on function public.calculate_purchase_input_vat(uuid,jsonb,jsonb,date)
   from public,anon,authenticated;
@@ -270,7 +289,8 @@ declare
   v_is_credit boolean;v_wholesale bigint;v_retail bigint;v_estimate jsonb;
   v_tax jsonb;v_index integer:=0;v_tax_date date;v_tax_point timestamptz;
   v_profile_id uuid;v_posting_date date;v_tax_total bigint:=0;v_goods_net bigint:=0;
-  v_invoice_net bigint:=0;v_supplier_pin text;v_tax_invoice_number text;
+  v_invoice_net bigint:=0;v_invoice_basis_net bigint:=0;v_invoice_tax bigint:=0;
+  v_cost_total bigint;v_supplier_pin text;v_tax_invoice_number text;
   v_resolution public.purchase_posting_resolution;v_context public.posting_context;
   v_timezone text;v_session_id uuid;v_outstanding bigint;
 begin
@@ -398,24 +418,19 @@ begin
     raise exception 'location_access_denied'; end if;
   perform set_config('app.business_location_id',v_location_id::text,true);
 
+  v_estimate:=public.calculate_purchase_invoice_tax(v_company_id,p_lines,p_expenses,v_tax_date);
+  v_invoice_basis_net:=(v_estimate->>'net_total')::bigint;
+  v_invoice_tax:=(v_estimate->>'tax_total')::bigint;
+  v_profile_id:=nullif(v_estimate->>'tax_profile_id','')::uuid;
+  v_tax_point:=(v_estimate->>'tax_point_at')::timestamptz;
   if p_claim_input_vat then
-    v_estimate:=public.calculate_purchase_input_vat(v_company_id,p_lines,p_expenses,v_tax_date);
     if not coalesce((v_estimate->>'vat_registered')::boolean,false) then
       raise exception 'input_vat_requires_registration'; end if;
     v_tax_total:=(v_estimate->>'tax_total')::bigint;
     v_goods_net:=(v_estimate->>'goods_net_total')::bigint;
     v_invoice_net:=(v_estimate->>'net_total')::bigint;
-    v_profile_id:=nullif(v_estimate->>'tax_profile_id','')::uuid;
-    v_tax_point:=(v_estimate->>'tax_point_at')::timestamptz;
   else
     v_tax_total:=0;v_goods_net:=v_goods_gross;v_invoice_net:=v_invoice_total;
-    select cp.id,(v_tax_date::timestamp at time zone coalesce(cp.business_timezone,c.business_timezone))
-      into v_profile_id,v_tax_point
-    from public.companies c left join lateral(
-      select p.* from public.company_tax_profiles p where p.company_id=c.id
-        and p.effective_from<=v_tax_date and (p.effective_to is null or p.effective_to>=v_tax_date)
-      order by p.effective_from desc limit 1) cp on true
-    where c.id=v_company_id;
   end if;
   v_resolution:=public.resolve_purchase_posting(
     v_company_id,coalesce(p_purchase_date,v_tax_date),v_tax_date);
@@ -440,7 +455,8 @@ begin
   insert into public.purchases(
     company_id,supplier_id,reference,total_cost,goods_subtotal,is_credit,created_by,notes,
     purchase_date,stock_location_id,client_ref,gross_total,net_total,goods_net_total,
-    input_tax_total,claim_input_vat,supplier_tax_pin,tax_invoice_number,tax_invoice_date,
+    input_tax_total,invoice_net_total,invoice_tax_total,claim_input_vat,
+    supplier_tax_pin,tax_invoice_number,tax_invoice_date,
     tax_point_at,tax_profile_id,tax_snapshot_status,accounting_posting_date,
     accounting_period_id,posting_classification,posting_reason,
     purchase_posting_version,is_late_tax_adjustment)
@@ -448,7 +464,8 @@ begin
     v_company_id,p_supplier_id,nullif(btrim(coalesce(p_reference,'')),''),v_invoice_total,
     v_goods_gross,true,auth.uid(),nullif(btrim(coalesce(p_notes,'')),''),
     coalesce(p_purchase_date,current_date),v_location_id,nullif(btrim(coalesce(p_client_ref,'')),''),
-    v_invoice_total,v_invoice_net,v_goods_net,v_tax_total,p_claim_input_vat,
+    v_invoice_total,v_invoice_net,v_goods_net,v_tax_total,v_invoice_basis_net,v_invoice_tax,
+    p_claim_input_vat,
     case when p_claim_input_vat then v_supplier_pin end,
     case when p_claim_input_vat then v_tax_invoice_number end,
     case when p_claim_input_vat then p_tax_invoice_date end,v_tax_point,v_profile_id,'final',
@@ -465,16 +482,15 @@ begin
     else
       v_unit_cost:=(v_line->>'unit_cost')::bigint;v_line_total:=round(v_quantity*v_unit_cost);
     end if;
-    if p_claim_input_vat then v_tax:=v_estimate->'lines'->v_index;
-    else v_tax:=jsonb_build_object('tax_category_id',null,'tax_rate_version_id',null,
-      'tax_category_code','NOT_CLAIMED','tax_classification','not_claimed','tax_rate_bps',0,
-      'gross_total',v_line_total,'net_total',v_line_total,'tax_total',0); end if;
+    v_tax:=v_estimate->'lines'->v_index;
+    v_cost_total:=case when p_claim_input_vat then (v_tax->>'net_total')::bigint
+      else v_line_total end;
     insert into public.inventory_batches(
       company_id,variant_id,stock_location_id,supplier_id,quantity,remaining,unit_cost,
       original_cost,remaining_cost,batch_number,expiry_date)
     values(v_company_id,v_variant_id,v_location_id,p_supplier_id,v_quantity,v_quantity,
-      round((v_tax->>'net_total')::bigint/v_quantity),(v_tax->>'net_total')::bigint,
-      (v_tax->>'net_total')::bigint,nullif(btrim(coalesce(v_line->>'batch_number','')),''),
+      round(v_cost_total/v_quantity),v_cost_total,
+      v_cost_total,nullif(btrim(coalesce(v_line->>'batch_number','')),''),
       nullif(v_line->>'expiry_date','')::date) returning id into v_batch_id;
     insert into public.purchase_lines(
       company_id,purchase_id,variant_id,inventory_batch_id,quantity,unit_cost,line_total,
@@ -491,9 +507,11 @@ begin
       company_id,variant_id,batch_id,stock_location_id,type,quantity,unit_cost,total_cost,
       source_type,source_id,meta)
     values(v_company_id,v_variant_id,v_batch_id,v_location_id,'purchase',v_quantity,
-      round((v_tax->>'net_total')::bigint/v_quantity),(v_tax->>'net_total')::bigint,
+      round(v_cost_total/v_quantity),v_cost_total,
       'InventoryPurchase',v_purchase_id::text,jsonb_build_object(
-        'grossCost',(v_tax->>'gross_total')::bigint,'inputVat',(v_tax->>'tax_total')::bigint));
+        'grossCost',(v_tax->>'gross_total')::bigint,
+        'invoiceVat',(v_tax->>'tax_total')::bigint,
+        'inputVat',case when p_claim_input_vat then (v_tax->>'tax_total')::bigint else 0 end));
     v_index:=v_index+1;
   end loop;
 
@@ -505,10 +523,7 @@ begin
     v_amount:=(v_expense->>'amount')::bigint;v_category:=lower(trim(v_expense->>'category'));
     v_custom_label:=nullif(trim(v_expense->>'custom_label'),'');
     v_settlement:=v_expense->>'settlement';v_expense_account:=nullif(v_expense->>'account_code','');
-    if p_claim_input_vat then v_tax:=v_estimate->'expenses'->v_index;
-    else v_tax:=jsonb_build_object('tax_category_id',null,'tax_rate_version_id',null,
-      'tax_category_code','NOT_CLAIMED','tax_classification','not_claimed','tax_rate_bps',0,
-      'gross_total',v_amount,'net_total',v_amount,'tax_total',0); end if;
+    v_tax:=v_estimate->'expenses'->v_index;
     insert into public.purchase_expenses(
       company_id,purchase_id,category,custom_label,memo,amount,settlement,account_code,
       created_by,tax_category_id,tax_rate_version_id,tax_category_code,tax_classification,
@@ -522,8 +537,10 @@ begin
       (v_tax->>'net_total')::bigint,(v_tax->>'tax_total')::bigint)
     returning id into v_expense_id;
     if v_settlement='supplier_bill' then
+      v_cost_total:=case when p_claim_input_vat then (v_tax->>'net_total')::bigint
+        else v_amount end;
       v_journal_lines:=v_journal_lines||jsonb_build_object('account_code','EXPENSES',
-        'debit',(v_tax->>'net_total')::bigint,'meta',jsonb_build_object(
+        'debit',v_cost_total,'meta',jsonb_build_object(
           'purchaseId',v_purchase_id,'purchaseExpenseId',v_expense_id,'supplierId',p_supplier_id,
           'expenseCategory',v_category,'grossAmount',v_amount));
     else
@@ -1128,7 +1145,7 @@ begin
     on b.id=pl.inventory_batch_id where pl.purchase_id=v_purchase.id order by b.id for update of b;
   if exists(select 1 from public.purchase_lines pl join public.inventory_batches b
       on b.id=pl.inventory_batch_id where pl.purchase_id=v_purchase.id
-      and (b.remaining<>pl.quantity or b.remaining_cost<>pl.net_total)) then
+      and (b.remaining<>pl.quantity or b.remaining_cost<>b.original_cost)) then
     raise exception 'purchase_stock_already_moved'; end if;
   for v_payment in select distinct s.id from public.supplier_payments s
     join public.purchase_payments pp on pp.supplier_payment_id=s.id
@@ -1176,20 +1193,22 @@ begin
         'reason',btrim(p_reason),'reversalOfPurchaseId',v_purchase.id,
         'locationId',v_purchase.stock_location_id));
   end loop;
-  for v_purchase_line in select pl.*,b.stock_location_id from public.purchase_lines pl
+  for v_purchase_line in select pl.*,b.stock_location_id,b.original_cost recognized_cost
+    from public.purchase_lines pl
     join public.inventory_batches b on b.id=pl.inventory_batch_id
     where pl.purchase_id=v_purchase.id order by b.id
   loop
-    v_net_unit_cost:=round(v_purchase_line.net_total/v_purchase_line.quantity);
+    v_net_unit_cost:=round(v_purchase_line.recognized_cost/v_purchase_line.quantity);
     update public.inventory_batches set remaining=0,remaining_cost=0
     where id=v_purchase_line.inventory_batch_id;
     insert into public.inventory_movements(company_id,variant_id,batch_id,stock_location_id,type,
       quantity,unit_cost,total_cost,source_type,source_id,meta)
     values(v_company_id,v_purchase_line.variant_id,v_purchase_line.inventory_batch_id,
       v_purchase_line.stock_location_id,'reversal',-v_purchase_line.quantity,v_net_unit_cost,
-      -v_purchase_line.net_total,'PurchaseReversal',v_purchase.id::text,jsonb_build_object(
+      -v_purchase_line.recognized_cost,'PurchaseReversal',v_purchase.id::text,jsonb_build_object(
         'reason',btrim(p_reason),'grossCost',v_purchase_line.gross_total,
-        'inputVat',v_purchase_line.tax_total));
+        'invoiceVat',v_purchase_line.tax_total,
+        'inputVat',case when v_purchase.claim_input_vat then v_purchase_line.tax_total else 0 end));
   end loop;
   update public.purchases set status='reversed',reversed_by=auth.uid(),reversed_at=now(),
     reversal_reason=btrim(p_reason) where id=v_purchase.id;
@@ -1294,6 +1313,8 @@ begin
     or new.net_total is distinct from old.net_total
     or new.goods_net_total is distinct from old.goods_net_total
     or new.input_tax_total is distinct from old.input_tax_total
+    or new.invoice_net_total is distinct from old.invoice_net_total
+    or new.invoice_tax_total is distinct from old.invoice_tax_total
     or new.claim_input_vat is distinct from old.claim_input_vat
     or new.supplier_tax_pin is distinct from old.supplier_tax_pin
     or new.tax_invoice_number is distinct from old.tax_invoice_number
