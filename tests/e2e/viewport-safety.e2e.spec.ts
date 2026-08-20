@@ -72,14 +72,27 @@ async function assertTaskModalGeometry(page: Page, shell: Locator): Promise<void
   await expect(shell.locator('.modal-body')).toHaveCount(1);
 
   const viewport = page.viewportSize();
-  const shellBox = await shell.boundingBox();
-  const headerBox = await shell.locator('header').first().boundingBox();
-  const footerBox = await shell.locator('footer').last().boundingBox();
+  const geometry = await shell.evaluate(element => {
+    const header = element.querySelector('header');
+    const footer = element
+      .querySelectorAll('footer')
+      .item(element.querySelectorAll('footer').length - 1);
+    if (!header || !footer) return null;
+
+    const box = (target: Element) => {
+      const { x, y, width, height } = target.getBoundingClientRect();
+      return { x, y, width, height };
+    };
+
+    // The modal scales in on entry. Read related boxes in one animation frame so
+    // the containment checks do not compare different points in that transition.
+    return { shell: box(element), header: box(header), footer: box(footer) };
+  });
   expect(viewport).not.toBeNull();
-  expect(shellBox).not.toBeNull();
-  expect(headerBox).not.toBeNull();
-  expect(footerBox).not.toBeNull();
-  if (!viewport || !shellBox || !headerBox || !footerBox) return;
+  expect(geometry).not.toBeNull();
+  if (!viewport || !geometry) return;
+
+  const { shell: shellBox, header: headerBox, footer: footerBox } = geometry;
 
   expect(shellBox.x).toBeGreaterThanOrEqual(-1);
   expect(shellBox.y).toBeGreaterThanOrEqual(-1);

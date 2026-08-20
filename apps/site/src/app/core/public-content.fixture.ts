@@ -47,14 +47,10 @@ export const FIXTURE_PLANS: PublicSubscriptionPlan[] = [
 ];
 
 export const FIXTURE_BILLING_CONFIG: PublicBillingConfig = {
-  trialDays: 14,
-  defaultTrialTierCode: 'standard',
-  introOfferEnabled: true,
-  introOfferTierCode: 'standard',
-  introOfferTierName: 'Standard',
-  introOfferPrice: 1500,
-  introOfferPaidMonths: 1,
-  introOfferBonusMonths: 1,
+  newCustomerTierCode: 'standard',
+  newCustomerTierName: 'Standard',
+  initialPurchasePrice: 1500,
+  testingAccessMonths: 2,
 };
 
 export const FIXTURE_BLOG_POSTS: PublishedBlogPost[] = [

@@ -118,8 +118,8 @@ grant select on pg_temp.company_count_before to authenticated;
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"73000000-0000-0000-0000-000000000003","role":"authenticated"}';
 select throws_ok(
-  $$select public.provision_company_with_terms(
-    'Bad Legal Co','Main','KES',null,null,null,'2026-08-09',repeat('f',64))$$,
+  $$select public.provision_company_registration(
+    'Bad Legal Co','Main','KES',null,null,'2026-08-09',repeat('f',64))$$,
   'P0001', 'legal_document_mismatch', 'invalid acceptance prevents provisioning'
 );
 reset role;
@@ -129,11 +129,11 @@ select is((select count(*) from public.companies), (select n from company_count_
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"73000000-0000-0000-0000-000000000003","role":"authenticated"}';
 create temp table accepted_provision as
-select public.provision_company_with_terms(
-  'Accepted Legal Co','Main','KES',null,null,null,'2026-08-09',
+select (public.provision_company_registration(
+  'Accepted Legal Co','Main','KES',null,null,'2026-08-09',
   '32cda54a4a204a635aab24e46965470b8feca6cb57930e043f2765b98e5b9415',
   'Legal Founder'
-) company_id;
+)->>'company_id')::uuid company_id;
 grant select on pg_temp.accepted_provision to authenticated;
 reset role;
 select is((select count(*)::int from public.company_legal_acceptances
@@ -258,10 +258,10 @@ reset role;
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"73000000-0000-0000-0000-000000000005","role":"authenticated"}';
 create temp table nonmaterial_provision as
-select public.provision_company_with_terms(
-  'Nonmaterial Terms Co', 'Main', 'KES', null, null, null,
+select (public.provision_company_registration(
+  'Nonmaterial Terms Co', 'Main', 'KES', null, null,
   '2026-08-11', repeat('b', 64)
-) company_id;
+)->>'company_id')::uuid company_id;
 grant select on pg_temp.nonmaterial_provision to authenticated;
 reset role;
 select is((select count(*)::integer from public.company_legal_acceptances

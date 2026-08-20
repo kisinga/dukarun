@@ -2,14 +2,10 @@ import { Injectable, inject } from '@angular/core';
 import { SupabaseService } from './supabase.service';
 
 export interface PublicBillingConfig {
-  trialDays: number;
-  defaultTrialTierCode: string;
-  introOfferEnabled: boolean;
-  introOfferTierCode: string;
-  introOfferTierName: string;
-  introOfferPrice: number;
-  introOfferPaidMonths: number;
-  introOfferBonusMonths: number;
+  newCustomerTierCode: string;
+  newCustomerTierName: string;
+  initialPurchasePrice: number;
+  testingAccessMonths: number;
 }
 
 @Injectable({ providedIn: 'root' })

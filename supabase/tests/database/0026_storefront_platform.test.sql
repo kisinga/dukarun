@@ -37,7 +37,7 @@ select is(
   'unapproved storefront hidden from anon'
 );
 
--- 2. Approved + trial: visible with catalogue.
+-- 2. Approved + paid access: visible with catalogue.
 reset role;
 update public.companies set status = 'approved' where id = (select company_id from sf_company);
 
@@ -47,7 +47,7 @@ set local request.jwt.claims = '{"role":"anon"}';
 select is(
   (select catalogue_visible from public.public_storefronts where slug = 'sf-co'),
   true,
-  'approved trial storefront visible with catalogue'
+  'approved paid storefront visible with catalogue'
 );
 
 select ok(

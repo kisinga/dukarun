@@ -12,7 +12,6 @@ import { BillingConfigService, PublicBillingConfig } from '../core/billing-confi
 type BadgeType = 'success' | 'info' | 'warning' | 'error' | 'neutral';
 
 const STATUS_TYPE: Record<string, BadgeType> = {
-  trial: 'info',
   active: 'success',
   expired: 'error',
   cancelled: 'neutral',
@@ -46,12 +45,6 @@ const POLL_TIMEOUT_MS = 60_000;
             </div>
 
             <dl class="mt-2 space-y-1 text-sm">
-              @if (b.subscription_status === 'trial' && b.trial_ends_at) {
-                <div class="flex justify-between">
-                  <dt class="text-base-content/60">Trial ends</dt>
-                  <dd class="tabular-nums">{{ date(b.trial_ends_at) }}</dd>
-                </div>
-              }
               @if (b.subscription_expires_at) {
                 <div class="flex justify-between">
                   <dt class="text-base-content/60">
@@ -75,17 +68,15 @@ const POLL_TIMEOUT_MS = 60_000;
               <div class="alert alert-warning mt-3 items-start sm:items-center">
                 <span class="text-sm">
                   @if (daysRemaining === 0) {
-                    Your {{ b.subscription_status === 'trial' ? 'trial' : 'subscription' }} expires
-                    today.
+                    Your subscription expires today.
                   } @else {
-                    Your {{ b.subscription_status === 'trial' ? 'trial' : 'subscription' }} expires
-                    in {{ daysRemaining }} {{ daysRemaining === 1 ? 'day' : 'days' }}.
+                    Your subscription expires in {{ daysRemaining }}
+                    {{ daysRemaining === 1 ? 'day' : 'days' }}.
                   }
-                  {{ b.subscription_status === 'trial' ? 'Choose a plan' : 'Renew now' }} to keep
-                  your workspace active.
+                  Renew now to keep your workspace active.
                 </span>
                 <a class="btn btn-warning btn-sm min-h-11 sm:ml-auto" href="#subscription-plans">
-                  {{ b.subscription_status === 'trial' ? 'Choose plan' : 'Renew now' }}
+                  Renew now
                 </a>
               </div>
             }
@@ -107,13 +98,14 @@ const POLL_TIMEOUT_MS = 60_000;
         </div>
       }
 
-      @if (introOfferAvailable()) {
+      @if (initialPurchaseRequired()) {
         <div class="alert alert-info mb-4">
           <span class="text-sm">
-            <strong>{{ introOfferWording() }}.</strong>
-            Get {{ introOfferAccessMonths() }} months of
-            {{ billingConfig()?.introOfferTierName }} for
-            {{ fmt(billingConfig()?.introOfferPrice ?? 0) }}.
+            <strong>Complete your first purchase to unlock the workspace.</strong>
+            Pay {{ fmt(billingConfig()?.initialPurchasePrice ?? 0) }} for
+            {{ billingConfig()?.testingAccessMonths }}
+            {{ billingConfig()?.testingAccessMonths === 1 ? 'month' : 'months' }} of
+            {{ billingConfig()?.newCustomerTierName }} access.
           </span>
         </div>
       }
@@ -150,22 +142,26 @@ const POLL_TIMEOUT_MS = 60_000;
       <!-- Subscription plans -->
       <div id="subscription-plans" class="mb-3 flex scroll-mt-4 items-center justify-between">
         <h2 class="type-heading">Subscription plans</h2>
-        <div role="tablist" class="tabs tabs-boxed">
-          <a
-            role="tab"
-            class="tab min-h-11"
-            [class.tab-active]="cycle() === 'monthly'"
-            (click)="cycle.set('monthly')"
-            >Monthly</a
-          >
-          <a
-            role="tab"
-            class="tab min-h-11"
-            [class.tab-active]="cycle() === 'yearly'"
-            (click)="cycle.set('yearly')"
-            >Yearly</a
-          >
-        </div>
+        @if (!initialPurchaseRequired()) {
+          <div role="tablist" class="tabs tabs-boxed">
+            <a
+              role="tab"
+              class="tab min-h-11"
+              [class.tab-active]="cycle() === 'monthly'"
+              (click)="cycle.set('monthly')"
+              >Monthly</a
+            >
+            <a
+              role="tab"
+              class="tab min-h-11"
+              [class.tab-active]="cycle() === 'yearly'"
+              (click)="cycle.set('yearly')"
+              >Yearly</a
+            >
+          </div>
+        } @else {
+          <span class="badge badge-primary">First purchase</span>
+        }
       </div>
 
       @if (tiers().length === 0) {
@@ -197,8 +193,8 @@ const POLL_TIMEOUT_MS = 60_000;
                 </div>
                 <p class="type-hero mt-1">{{ fmt(priceFor(tier)) }}</p>
                 <p class="type-caption">
-                  @if (isIntroOffer(tier)) {
-                    for {{ introOfferAccessMonths() }} months
+                  @if (isInitialPurchaseTier(tier)) {
+                    for {{ billingConfig()?.testingAccessMonths }} months
                   } @else {
                     per {{ cycle() === 'monthly' ? 'month' : 'year' }}
                   }
@@ -307,7 +303,7 @@ export class BillingComponent implements OnInit, OnDestroy {
   }
 
   protected statusLabel(status: string | null): string {
-    return status ?? (this.introOfferAvailable() ? 'awaiting payment' : 'unknown');
+    return status ?? (this.initialPurchaseRequired() ? 'awaiting payment' : 'unknown');
   }
 
   protected date(iso: string | null): string {
@@ -329,8 +325,8 @@ export class BillingComponent implements OnInit, OnDestroy {
   }
 
   protected expiringSoon(b: CompanyBilling): number | null {
-    if (!['trial', 'active'].includes(b.subscription_status ?? '') || this.exempt(b)) return null;
-    const expiry = b.subscription_status === 'trial' ? b.trial_ends_at : b.subscription_expires_at;
+    if (b.subscription_status !== 'active' || this.exempt(b)) return null;
+    const expiry = b.subscription_expires_at;
     if (!expiry) return null;
     const remaining = this.nairobiDateNumber(new Date(expiry)) - this.nairobiDateNumber(new Date());
     return remaining >= 0 && remaining <= 7 ? remaining : null;
@@ -354,6 +350,7 @@ export class BillingComponent implements OnInit, OnDestroy {
 
   protected canPurchase(tier: Tier): boolean {
     const billing = this.billing();
+    if (billing?.subscription_status === null) return this.isInitialPurchaseTier(tier);
     return (
       billing?.subscription_tier_id !== tier.id ||
       billing.subscription_status !== 'active' ||
@@ -362,8 +359,8 @@ export class BillingComponent implements OnInit, OnDestroy {
   }
 
   protected purchaseLabel(tier: Tier): string {
-    if (this.isIntroOffer(tier)) {
-      return `Get ${this.introOfferAccessMonths()} months for ${this.fmt(this.priceFor(tier))}`;
+    if (this.isInitialPurchaseTier(tier)) {
+      return `Unlock ${this.billingConfig()?.testingAccessMonths ?? 1} months for ${this.fmt(this.priceFor(tier))}`;
     }
     const billing = this.billing();
     const status = billing?.subscription_status;
@@ -379,39 +376,22 @@ export class BillingComponent implements OnInit, OnDestroy {
   }
 
   protected priceFor(tier: Tier): number {
-    if (this.isIntroOffer(tier)) return this.billingConfig()?.introOfferPrice ?? tier.price_monthly;
+    if (this.isInitialPurchaseTier(tier))
+      return this.billingConfig()?.initialPurchasePrice ?? tier.price_monthly;
     return this.cycle() === 'monthly' ? tier.price_monthly : tier.price_yearly;
   }
 
-  protected introOfferAvailable(): boolean {
-    return (
-      this.billing()?.subscription_status === null &&
-      this.billingConfig()?.introOfferEnabled === true
-    );
+  protected initialPurchaseRequired(): boolean {
+    return this.billing()?.subscription_status === null;
   }
 
-  protected isIntroOffer(tier: Tier): boolean {
+  protected isInitialPurchaseTier(tier: Tier): boolean {
     const config = this.billingConfig();
     return (
-      this.introOfferAvailable() &&
+      this.initialPurchaseRequired() &&
       this.cycle() === 'monthly' &&
-      config?.introOfferTierCode === tier.code
+      config?.newCustomerTierCode === tier.code
     );
-  }
-
-  protected introOfferAccessMonths(): number {
-    const config = this.billingConfig();
-    return (config?.introOfferPaidMonths ?? 0) + (config?.introOfferBonusMonths ?? 0);
-  }
-
-  protected introOfferWording(): string {
-    const config = this.billingConfig();
-    if (!config) return 'Introductory offer';
-    const paid = `${config.introOfferPaidMonths} ${config.introOfferPaidMonths === 1 ? 'month' : 'months'}`;
-    const bonus = `${config.introOfferBonusMonths} ${config.introOfferBonusMonths === 1 ? 'month' : 'months'}`;
-    return config.introOfferBonusMonths > 0
-      ? `Pay for ${paid}, get ${bonus} free`
-      : `Pay for ${paid}`;
   }
 
   /** Human-readable tier limits: "500 sales/mo", "5 team members", "50 SMS/mo". */

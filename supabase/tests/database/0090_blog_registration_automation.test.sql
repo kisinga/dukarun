@@ -144,7 +144,7 @@ set local role authenticated;
 set local request.jwt.claims = '{"sub":"90000000-0000-0000-0000-000000000003","role":"authenticated"}';
 create temp table auto_registration as
 select public.provision_company_registration(
-  'Automatic Company','Main','KES',null,null,null,'2099-01-01',repeat('c',64),'Auto Founder',
+  'Automatic Company','Main','KES',null,null,'2099-01-01',repeat('c',64),'Auto Founder',
   '90000000-0000-4000-8000-000000000013'
 ) result;
 grant select on pg_temp.auto_registration to authenticated, service_role;
@@ -154,8 +154,8 @@ reset role;
 select is((select status from public.companies where id=(select (result->>'company_id')::uuid from auto_registration)),
   'approved', 'automatic registration persists the approved company state');
 select is((select subscription_status from public.companies where id=
-  (select (result->>'company_id')::uuid from auto_registration)), 'trial',
-  'automatic approval starts the trial exactly at approval');
+  (select (result->>'company_id')::uuid from auto_registration)), null,
+  'automatic approval still requires the initial purchase');
 select is((select count(*)::integer from public.company_registration_attributions where company_id=
   (select (result->>'company_id')::uuid from auto_registration)), 1,
   'registration is attributed to the blog CTA click');
@@ -199,7 +199,7 @@ set local role authenticated;
 set local request.jwt.claims = '{"sub":"90000000-0000-0000-0000-000000000004","role":"authenticated"}';
 create temp table manual_registration as
 select public.provision_company_registration(
-  'Manual Company','Main','KES',null,null,null,'2099-01-01',repeat('c',64),'Manual Founder',null
+  'Manual Company','Main','KES',null,null,'2099-01-01',repeat('c',64),'Manual Founder',null,null
 ) result;
 grant select on pg_temp.manual_registration to authenticated, service_role;
 select is((select result->>'company_status' from manual_registration), 'unapproved',

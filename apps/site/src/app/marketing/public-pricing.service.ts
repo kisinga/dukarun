@@ -33,14 +33,10 @@ export type PublicSubscriptionPlan = Pick<
 >;
 
 export interface PublicBillingConfig {
-  trialDays: number;
-  defaultTrialTierCode: string;
-  introOfferEnabled: boolean;
-  introOfferTierCode: string;
-  introOfferTierName: string;
-  introOfferPrice: number;
-  introOfferPaidMonths: number;
-  introOfferBonusMonths: number;
+  newCustomerTierCode: string;
+  newCustomerTierName: string;
+  initialPurchasePrice: number;
+  testingAccessMonths: number;
 }
 
 const PLANS_KEY = makeStateKey<PublicSubscriptionPlan[]>('site:pricing-plans');

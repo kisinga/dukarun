@@ -10,7 +10,6 @@ export type BillingCycle = 'monthly' | 'yearly';
 export interface CompanyBilling {
   id: string;
   subscription_status: string | null;
-  trial_ends_at: string | null;
   subscription_expires_at: string | null;
   billing_cycle: string | null;
   last_payment_date: string | null;
@@ -49,7 +48,7 @@ export class BillingService {
     const { data, error } = await this.db
       .from('companies')
       .select(
-        'id, subscription_status, trial_ends_at, subscription_expires_at, billing_cycle, last_payment_date, last_payment_amount, subscription_grace_period_end, subscription_exempt_until, subscription_tier_id, subscription_tiers(name, code)'
+        'id, subscription_status, subscription_expires_at, billing_cycle, last_payment_date, last_payment_amount, subscription_grace_period_end, subscription_exempt_until, subscription_tier_id, subscription_tiers(name, code)'
       )
       .limit(1)
       .single();

@@ -14,8 +14,8 @@ export const authGuard: CanActivateFn = async route => {
       : router.createUrlTree(['/login'], {
           queryParams: {
             register: route.routeConfig?.path === 'register' ? '1' : undefined,
-            plan: route.queryParamMap.get('plan') ?? undefined,
             blog_ref: route.queryParamMap.get('blog_ref') ?? undefined,
+            sales_code: route.queryParamMap.get('sales_code') ?? undefined,
           },
         });
   } catch {
@@ -23,8 +23,8 @@ export const authGuard: CanActivateFn = async route => {
     return router.createUrlTree(['/login'], {
       queryParams: {
         register: route.routeConfig?.path === 'register' ? '1' : undefined,
-        plan: route.queryParamMap.get('plan') ?? undefined,
         blog_ref: route.queryParamMap.get('blog_ref') ?? undefined,
+        sales_code: route.queryParamMap.get('sales_code') ?? undefined,
       },
     });
   }
@@ -50,8 +50,8 @@ export const guestGuard: CanActivateFn = async route => {
     return hasRegistrationIntent(route.queryParamMap)
       ? router.createUrlTree(['/register'], {
           queryParams: {
-            plan: route.queryParamMap.get('plan') ?? undefined,
             blog_ref: route.queryParamMap.get('blog_ref') ?? undefined,
+            sales_code: route.queryParamMap.get('sales_code') ?? undefined,
           },
         })
       : router.createUrlTree(['/access-required']);

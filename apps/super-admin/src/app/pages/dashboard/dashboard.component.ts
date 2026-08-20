@@ -78,7 +78,6 @@ import { PageHeaderComponent } from '../../shared/ui/page-header.component';
             <p class="type-caption">Subscriptions</p>
             <p class="type-hero mt-1 text-success">{{ s.subscriptions_active }}</p>
             <p class="mt-0.5 type-caption">
-              {{ s.subscriptions_trial }} trial ·
               <span [class.text-error]="s.subscriptions_expired > 0"
                 >{{ s.subscriptions_expired }} expired</span
               >

@@ -61,22 +61,37 @@ Deno.serve(async req => {
     return Response.json({ received: true });
   }
 
-  const data = event.data ?? {};
-  const meta = data.metadata ?? {};
-  if (!['subscription', 'subscription_intro_offer'].includes(meta.type)) {
+  const webhookData = event.data ?? {};
+  if (!['subscription', 'subscription_initial_purchase'].includes(webhookData.metadata?.type)) {
     return Response.json({ received: true, skipped: 'not a subscription charge' });
   }
 
   // Verify the transaction with Paystack before trusting it.
+  let data = webhookData;
   if (ONLINE_VERIFY) {
     const verifyRes = await fetch(
-      `https://api.paystack.co/transaction/verify/${encodeURIComponent(data.reference)}`,
+      `https://api.paystack.co/transaction/verify/${encodeURIComponent(webhookData.reference)}`,
       { headers: { Authorization: `Bearer ${PAYSTACK_SECRET}` } }
     );
     const verifyBody = await verifyRes.json();
     if (!verifyRes.ok || !verifyBody.status || verifyBody.data?.status !== 'success') {
       return Response.json({ error: 'verification_failed' }, { status: 400 });
     }
+    data = verifyBody.data;
+  }
+
+  const meta = data.metadata ?? {};
+  const paidAt = data.paid_at ?? data.paidAt ?? data.transaction_date;
+  if (
+    !['subscription', 'subscription_initial_purchase'].includes(meta.type) ||
+    data.reference !== webhookData.reference ||
+    data.currency !== 'KES' ||
+    !Number.isFinite(data.amount) ||
+    data.amount <= 0 ||
+    !paidAt ||
+    Number.isNaN(Date.parse(paidAt))
+  ) {
+    return Response.json({ error: 'verified_transaction_mismatch' }, { status: 400 });
   }
 
   const serviceClient = createClient(
@@ -86,15 +101,15 @@ Deno.serve(async req => {
 
   const amount = Math.round(data.amount / 100); // Paystack sends cents; we store shillings
   const activation =
-    meta.type === 'subscription_intro_offer'
-      ? await serviceClient.rpc('activate_intro_offer', {
+    meta.type === 'subscription_initial_purchase'
+      ? await serviceClient.rpc('activate_initial_subscription_purchase', {
           p_company_id: meta.company_id,
           p_tier_id: meta.tier_id,
           p_reference: data.reference,
           p_amount: amount,
           p_unit_price: meta.unit_price,
-          p_paid_months: meta.paid_months,
-          p_bonus_months: meta.bonus_months,
+          p_testing_access_months: meta.testing_access_months,
+          p_paid_at: paidAt,
         })
       : await serviceClient.rpc('activate_subscription', {
           p_company_id: meta.company_id,

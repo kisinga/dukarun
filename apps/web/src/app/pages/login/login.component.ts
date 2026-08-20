@@ -98,8 +98,8 @@ export class LoginComponent {
   protected readonly otp = new FormControl('', { nonNullable: true });
 
   private cooldownTimer: ReturnType<typeof setInterval> | null = null;
-  private readonly requestedPlanCode = this.route.snapshot.queryParamMap.get('plan');
   private readonly requestedBlogRef = this.route.snapshot.queryParamMap.get('blog_ref');
+  private readonly requestedSalesCode = this.route.snapshot.queryParamMap.get('sales_code');
   private readonly registrationIntent = hasRegistrationIntent(this.route.snapshot.queryParamMap);
 
   constructor() {
@@ -163,8 +163,8 @@ export class LoginComponent {
         queryParams:
           target === '/register'
             ? {
-                plan: this.requestedPlanCode ?? undefined,
                 blog_ref: this.requestedBlogRef ?? undefined,
+                sales_code: this.requestedSalesCode ?? undefined,
               }
             : undefined,
       });

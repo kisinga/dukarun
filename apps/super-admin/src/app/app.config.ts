@@ -26,6 +26,7 @@ import {
   heroServerStack,
   heroShieldCheck,
   heroSun,
+  heroUserGroup,
   heroXMark,
 } from '@ng-icons/heroicons/outline';
 
@@ -58,6 +59,7 @@ export const appConfig: ApplicationConfig = {
       heroServerStack,
       heroShieldCheck,
       heroSun,
+      heroUserGroup,
       heroXMark,
     }),
   ],

@@ -21,7 +21,6 @@ export interface PlatformStats {
   companies_approved: number;
   companies_pending: number;
   subscriptions_active: number;
-  subscriptions_trial: number;
   subscriptions_expired: number;
   users_total: number;
   monthly_active_users: number;
@@ -44,14 +43,56 @@ export interface OperationsSnapshot {
   unbalanced_journals: number;
 }
 export interface BillingConfig {
-  trialDays: number;
-  defaultTrialTierCode: string;
-  introOfferEnabled: boolean;
-  introOfferTierCode: string;
-  introOfferTierName: string;
-  introOfferPrice: number;
-  introOfferPaidMonths: number;
-  introOfferBonusMonths: number;
+  newCustomerTierCode: string;
+  newCustomerTierName: string;
+  initialPurchasePrice: number;
+  testingAccessMonths: number;
+}
+export interface PlatformSalesperson {
+  id: string;
+  name: string;
+  phone: string | null;
+  invitation_code: string;
+  active: boolean;
+  created_at: string;
+  registrations: number;
+  approvals: number;
+  first_payments: number;
+  first_payment_revenue: number;
+  pending_commission: number;
+  paid_commission: number;
+}
+export interface PlatformSalesCommission {
+  id: string;
+  salesperson_id: string;
+  salesperson_name: string;
+  company_id: string;
+  company_name: string;
+  payment_reference: string;
+  collected_amount: number;
+  rate_bps: number;
+  commission_amount: number;
+  status: 'pending' | 'approved' | 'paid' | 'reversed';
+  payout_reference: string | null;
+  reversal_reason: string | null;
+  created_at: string;
+  approved_at: string | null;
+  paid_at: string | null;
+  reversed_at: string | null;
+}
+export interface PlatformSalesSnapshot {
+  settings: { enabled: boolean; rate_bps: number };
+  totals: {
+    registrations: number;
+    approvals: number;
+    first_payments: number;
+    first_payment_revenue: number;
+    pending_commission: number;
+    paid_commission: number;
+  };
+  salespeople: PlatformSalesperson[];
+  commissions: PlatformSalesCommission[];
+  commission_total: number;
 }
 export interface PlatformCampaignPreview {
   total: number;
@@ -712,20 +753,62 @@ export class PlatformService {
   }
 
   async updateBillingPolicy(input: {
-    trialDays: number;
-    defaultTrialTierId: string;
-    introOfferEnabled: boolean;
-    introOfferTierId: string;
-    introOfferPaidMonths: number;
-    introOfferBonusMonths: number;
+    newCustomerTierId: string;
+    testingAccessMonths: number;
   }): Promise<void> {
-    const { error } = await this.db.rpc('platform_update_billing_policy', {
-      p_trial_duration_days: input.trialDays,
-      p_default_trial_tier_id: input.defaultTrialTierId,
-      p_intro_offer_enabled: input.introOfferEnabled,
-      p_intro_offer_tier_id: input.introOfferTierId,
-      p_intro_offer_paid_months: input.introOfferPaidMonths,
-      p_intro_offer_bonus_months: input.introOfferBonusMonths,
+    const { error } = await this.db.rpc('platform_update_paid_onboarding_policy', {
+      p_new_customer_tier_id: input.newCustomerTierId,
+      p_testing_access_months: input.testingAccessMonths,
+    });
+    if (error) throw rpcError(error);
+  }
+
+  async salesSnapshot(offset = 0, limit = 100): Promise<PlatformSalesSnapshot> {
+    const { data, error } = await this.db.rpc('platform_sales_snapshot', {
+      p_commission_limit: limit,
+      p_commission_offset: offset,
+    });
+    if (error) throw rpcError(error);
+    return data as unknown as PlatformSalesSnapshot;
+  }
+
+  async createSalesperson(name: string, phone: string, invitationCode: string): Promise<string> {
+    const { data, error } = await this.db.rpc('platform_create_salesperson', {
+      p_name: name,
+      p_phone: phone,
+      p_invitation_code: invitationCode,
+    });
+    if (error) throw rpcError(error);
+    return data;
+  }
+
+  async setSalespersonActive(salespersonId: string, active: boolean): Promise<void> {
+    const { error } = await this.db.rpc('platform_set_salesperson_active', {
+      p_salesperson_id: salespersonId,
+      p_active: active,
+    });
+    if (error) throw rpcError(error);
+  }
+
+  async updateSalesCommissionSettings(enabled: boolean, rateBps: number): Promise<void> {
+    const { error } = await this.db.rpc('platform_update_sales_commission_settings', {
+      p_enabled: enabled,
+      p_rate_bps: rateBps,
+    });
+    if (error) throw rpcError(error);
+  }
+
+  async reviewSalesCommission(
+    commissionId: string,
+    status: 'approved' | 'paid' | 'reversed',
+    payoutReference?: string,
+    reason?: string
+  ): Promise<void> {
+    const { error } = await this.db.rpc('platform_review_sales_commission', {
+      p_commission_id: commissionId,
+      p_status: status,
+      p_payout_reference: payoutReference,
+      p_reason: reason,
     });
     if (error) throw rpcError(error);
   }

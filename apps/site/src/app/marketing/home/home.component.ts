@@ -454,8 +454,8 @@ interface Testimonial {
               <article class="mkt-card flex flex-col p-6 sm:p-7">
                 <div class="flex flex-wrap items-center justify-between gap-2">
                   <h3 class="text-xl font-semibold">{{ plan.name }}</h3>
-                  @if (isIntroOfferPlan(plan)) {
-                    <span class="badge badge-primary">{{ introOfferWording() }}</span>
+                  @if (isTestingAccessPlan(plan)) {
+                    <span class="badge badge-primary">New-customer access</span>
                   }
                 </div>
                 <div class="mt-4 flex items-end gap-2">
@@ -463,9 +463,11 @@ interface Testimonial {
                   <span class="pb-1 text-sm text-base-content/60">/ month</span>
                 </div>
                 <p class="mt-2 mb-0 min-h-10 text-sm text-base-content/70">
-                  @if (isIntroOfferPlan(plan)) {
-                    {{ introOfferAccessMonths() }} months of access for
-                    <span class="font-semibold text-primary">{{ kes(introOfferPrice()) }}</span>
+                  @if (isTestingAccessPlan(plan)) {
+                    {{ testingAccessMonths() }} months of access for
+                    <span class="font-semibold text-primary">{{
+                      kes(initialPurchasePrice())
+                    }}</span>
                   } @else {
                     {{ kes(plan.price_yearly) }} per year
                     @if (yearlySaving(plan) > 0) {
@@ -491,14 +493,11 @@ interface Testimonial {
                   }
                 </ul>
 
-                <a
-                  [href]="appUrl('/register', { plan: plan.code })"
-                  class="btn btn-primary mt-6 min-h-11 w-full"
-                >
-                  @if (isIntroOfferPlan(plan)) {
-                    Get {{ introOfferAccessMonths() }} months for {{ kes(introOfferPrice()) }}
+                <a [href]="appUrl('/register')" class="btn btn-primary mt-6 min-h-11 w-full">
+                  @if (isTestingAccessPlan(plan)) {
+                    Get {{ testingAccessMonths() }} months for {{ kes(initialPurchasePrice()) }}
                   } @else {
-                    Start with {{ plan.name }}
+                    Register your business
                   }
                   <app-icon name="heroArrowRight" size="md" />
                 </a>
@@ -507,12 +506,11 @@ interface Testimonial {
           </div>
           <p class="mt-5 mb-0 text-center text-xs text-base-content/60">
             No card or special hardware required.
-            @if (billingConfig()?.introOfferEnabled) {
-              {{ introOfferWording() }} on {{ billingConfig()?.introOfferTierName }}.
-            } @else if (billingConfig()?.trialDays; as days) {
-              Your {{ days }}-day free trial starts when your company is approved.
-            } @else {
-              Your free trial starts when your company is approved.
+            @if (billingConfig(); as config) {
+              Pay {{ kes(config.initialPurchasePrice) }} after approval for
+              {{ config.testingAccessMonths }}
+              {{ config.testingAccessMonths === 1 ? 'month' : 'months' }} of
+              {{ config.newCustomerTierName }} access.
             }
           </p>
         } @else {
@@ -732,28 +730,17 @@ export class HomeComponent implements OnInit {
     return Math.max(0, plan.price_monthly * 12 - plan.price_yearly);
   }
 
-  protected isIntroOfferPlan(plan: PublicSubscriptionPlan): boolean {
+  protected isTestingAccessPlan(plan: PublicSubscriptionPlan): boolean {
     const config = this.billingConfig();
-    return config?.introOfferEnabled === true && config.introOfferTierCode === plan.code;
+    return config?.newCustomerTierCode === plan.code;
   }
 
-  protected introOfferPrice(): number {
-    return this.billingConfig()?.introOfferPrice ?? 0;
+  protected initialPurchasePrice(): number {
+    return this.billingConfig()?.initialPurchasePrice ?? 0;
   }
 
-  protected introOfferAccessMonths(): number {
-    const config = this.billingConfig();
-    return (config?.introOfferPaidMonths ?? 0) + (config?.introOfferBonusMonths ?? 0);
-  }
-
-  protected introOfferWording(): string {
-    const config = this.billingConfig();
-    if (!config) return 'Introductory offer';
-    const paid = `${config.introOfferPaidMonths} ${config.introOfferPaidMonths === 1 ? 'month' : 'months'}`;
-    const bonus = `${config.introOfferBonusMonths} ${config.introOfferBonusMonths === 1 ? 'month' : 'months'}`;
-    return config.introOfferBonusMonths > 0
-      ? `Pay for ${paid}, get ${bonus} free`
-      : `Pay for ${paid}`;
+  protected testingAccessMonths(): number {
+    return this.billingConfig()?.testingAccessMonths ?? 1;
   }
 
   protected planFeatures(plan: PublicSubscriptionPlan): string[] {

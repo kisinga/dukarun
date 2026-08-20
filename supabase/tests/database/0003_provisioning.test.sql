@@ -44,7 +44,7 @@ select is(
 select is(
   (select subscription_status from public.companies where id = (select company_id from provision_result)),
   null,
-  'trial waits for platform approval before starting'
+  'new company has no access before its initial purchase'
 );
 
 select is(

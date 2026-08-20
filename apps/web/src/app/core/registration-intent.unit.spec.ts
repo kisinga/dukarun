@@ -17,8 +17,8 @@ function paramMap(values: Record<string, string>): ParamMap {
 describe('hasRegistrationIntent', () => {
   const explicitIntents: Record<string, string>[] = [
     { register: '1' },
-    { plan: 'pro' },
     { blog_ref: 'launch-post' },
+    { sales_code: 'AMINA7' },
   ];
 
   it.each(explicitIntents)('accepts explicit registration query params: %o', params => {

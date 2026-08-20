@@ -7,6 +7,7 @@ import { workspaceLandingRedirect } from './core/workspace-landing.redirect';
 import { multiLocationGuard } from './core/multi-location.guard';
 import { preserveQueryRedirect } from './core/route-redirect';
 import { legalAcceptanceGuard } from './legal/legal.guard';
+import { paidAccessGuard } from './core/paid-access.guard';
 
 interface UnsavedChangesComponent {
   canDeactivate(): boolean;
@@ -55,7 +56,7 @@ export const routes: Routes = [
   {
     path: '',
     canActivate: [authGuard, legalAcceptanceGuard],
-    canActivateChild: [locationGuard],
+    canActivateChild: [locationGuard, paidAccessGuard],
     loadComponent: () => import('./shell/shell.component').then(m => m.ShellComponent),
     children: [
       {
