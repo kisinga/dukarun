@@ -87,7 +87,9 @@ try {
 
   await pool.query(
     `update public.companies set status='approved',cash_control_enabled=false,
-       cashier_flow_enabled=false where id=$1`,
+       cashier_flow_enabled=false,subscription_status='active',
+       subscription_started_at=now(),subscription_expires_at=now()+interval '1 year',
+       billing_cycle='yearly' where id=$1`,
     [companyId]
   );
   await pool.query(

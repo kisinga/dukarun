@@ -365,8 +365,24 @@ export class StorefrontService {
             if (search) requestUrl.searchParams.set('search', search);
             if (categoryId) requestUrl.searchParams.set('category', categoryId);
             const request = await fetch(requestUrl, { headers: { Accept: 'application/json' } });
-            if (!request.ok) throw new Error(`storefront_page_failed:${request.status}`);
-            const response = (await request.json()) as Partial<CatalogPage> | null;
+            let response: Partial<CatalogPage> | null;
+            if (request.status === 404) {
+              // Angular's development server and older frontend containers do
+              // not have the Nginx /api/storefront proxy. Keep the bounded RPC
+              // as a rollout-safe fallback; all other HTTP failures stay loud.
+              const { data, error } = await this.client.rpc('storefront_page', {
+                p_slug: slug,
+                p_limit: limit,
+                p_offset: requestedOffset,
+                ...(search ? { p_search: search } : {}),
+                ...(categoryId ? { p_category_id: categoryId } : {}),
+              });
+              if (error) throw error;
+              response = data as Partial<CatalogPage> | null;
+            } else {
+              if (!request.ok) throw new Error(`storefront_page_failed:${request.status}`);
+              response = (await request.json()) as Partial<CatalogPage> | null;
+            }
             return {
               storefront: response?.storefront ?? null,
               categories: response?.categories ?? [],

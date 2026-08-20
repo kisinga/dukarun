@@ -69,8 +69,8 @@ import { DataTableShellComponent } from '../../shared/ui/data-table-shell.compon
                 </span>
               </div>
               <p class="type-caption mt-1 max-w-2xl">
-                When enabled, every newly created company starts its trial immediately. Existing
-                pending registrations stay in review.
+                When enabled, every newly created company is approved immediately and proceeds to
+                the required first payment. Existing pending registrations stay in review.
               </p>
             </div>
             <input

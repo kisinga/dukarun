@@ -73,27 +73,101 @@ Deno.serve(async req => {
 
     const { data: billingPolicy } = await serviceClient
       .from('platform_billing_settings')
-      .select(
-        'intro_offer_enabled, intro_offer_tier_id, intro_offer_paid_months, intro_offer_bonus_months'
-      )
+      .select('new_customer_tier_id, testing_access_months')
       .eq('singleton', true)
       .single();
 
-    const introOffer =
+    const initialPurchase =
       billing_cycle === 'monthly' &&
-      billingPolicy?.intro_offer_enabled === true &&
-      billingPolicy.intro_offer_tier_id === tier.id &&
+      billingPolicy?.new_customer_tier_id === tier.id &&
       company.status === 'approved' &&
       company.subscription_status === null &&
       company.last_payment_reference === null;
-    const paidMonths = introOffer ? billingPolicy.intro_offer_paid_months : 1;
-    const bonusMonths = introOffer ? billingPolicy.intro_offer_bonus_months : 0;
-    const amount = introOffer
-      ? tier.price_monthly * paidMonths
+    if (company.subscription_status === null && !initialPurchase) {
+      return Response.json(
+        { error: 'initial_purchase_requires_configured_monthly_tier' },
+        { status: 400, headers: cors }
+      );
+    }
+    const amount = initialPurchase
+      ? tier.price_monthly
       : billing_cycle === 'yearly'
         ? tier.price_yearly
         : tier.price_monthly;
     const normalizedPhone = phone.replace(/[^\d]/g, '').replace(/^0/, '254');
+    let paymentReference: string | undefined;
+
+    if (initialPurchase) {
+      const testingAccessMonths = billingPolicy!.testing_access_months;
+      const { data: pendingAttempt, error: pendingError } = await serviceClient
+        .from('initial_subscription_payment_attempts')
+        .select('payment_reference, created_at')
+        .eq('company_id', company.id)
+        .eq('status', 'pending')
+        .maybeSingle();
+      if (pendingError) throw pendingError;
+
+      if (pendingAttempt) {
+        const ageMs = Date.now() - Date.parse(pendingAttempt.created_at);
+        let terminalStatus: string | null = null;
+        if (ageMs >= 10_000) {
+          try {
+            const verifyRes = await fetch(
+              `https://api.paystack.co/transaction/verify/${encodeURIComponent(pendingAttempt.payment_reference)}`,
+              { headers: { Authorization: `Bearer ${PAYSTACK_SECRET}` } }
+            );
+            const verifyBody = await verifyRes.json();
+            const status = verifyBody.data?.status;
+            if (['failed', 'timeout', 'abandoned', 'reversed'].includes(status)) {
+              terminalStatus = status;
+            }
+          } catch {
+            // An inconclusive provider check must not permit a competing charge.
+          }
+        }
+
+        if (terminalStatus) {
+          const { error: failedError } = await serviceClient
+            .from('initial_subscription_payment_attempts')
+            .update({
+              status: 'failed',
+              failure_reason: `paystack_${terminalStatus}`,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('payment_reference', pendingAttempt.payment_reference)
+            .eq('status', 'pending');
+          if (failedError) throw failedError;
+        } else {
+          return Response.json(
+            {
+              status: 'pending',
+              reference: pendingAttempt.payment_reference,
+              display_text:
+                'Your first payment is still pending. Complete the prompt on your phone.',
+            },
+            { headers: cors }
+          );
+        }
+      }
+
+      paymentReference = `DUK-INIT-${crypto.randomUUID().replaceAll('-', '')}`;
+      const { error: reservationError } = await serviceClient.rpc(
+        'reserve_initial_subscription_payment',
+        {
+          p_company_id: company.id,
+          p_tier_id: tier.id,
+          p_reference: paymentReference,
+          p_amount: amount,
+          p_testing_access_months: testingAccessMonths,
+        }
+      );
+      if (reservationError) {
+        const status = reservationError.message.includes('initial_purchase_payment_pending')
+          ? 409
+          : 400;
+        return Response.json({ error: reservationError.message }, { status, headers: cors });
+      }
+    }
 
     const res = await fetch('https://api.paystack.co/charge', {
       method: 'POST',
@@ -105,17 +179,17 @@ Deno.serve(async req => {
         email: SYSTEM_EMAIL,
         amount: amount * 100, // Paystack expects the smallest currency unit; we store shillings
         currency: 'KES',
+        ...(paymentReference ? { reference: paymentReference } : {}),
         mobile_money: { phone: `+${normalizedPhone}`, provider: 'mpesa' },
         metadata: {
-          type: introOffer ? 'subscription_intro_offer' : 'subscription',
+          type: initialPurchase ? 'subscription_initial_purchase' : 'subscription',
           company_id: company.id,
           tier_id: tier.id,
           billing_cycle,
-          ...(introOffer
+          ...(initialPurchase
             ? {
                 unit_price: tier.price_monthly,
-                paid_months: paidMonths,
-                bonus_months: bonusMonths,
+                testing_access_months: billingPolicy!.testing_access_months,
               }
             : {}),
         },
@@ -123,9 +197,33 @@ Deno.serve(async req => {
     });
 
     const result = await res.json();
-    if (!res.ok || !result.status) {
+    const resultStatus = result.data?.status;
+    const terminalFailure = ['failed', 'timeout', 'abandoned', 'reversed'].includes(resultStatus);
+    if (!res.ok || !result.status || terminalFailure) {
+      if (paymentReference && (res.status < 500 || terminalFailure)) {
+        const { error: failedError } = await serviceClient
+          .from('initial_subscription_payment_attempts')
+          .update({
+            status: 'failed',
+            failure_reason: resultStatus ?? result.code ?? `http_${res.status}`,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('payment_reference', paymentReference)
+          .eq('status', 'pending');
+        if (failedError) console.error('failed to close initial payment attempt', failedError);
+      }
       return Response.json(
         { error: result.message ?? 'paystack_error' },
+        { status: 502, headers: cors }
+      );
+    }
+    if (paymentReference && result.data?.reference !== paymentReference) {
+      console.error('paystack reference mismatch', {
+        requested: paymentReference,
+        returned: result.data?.reference,
+      });
+      return Response.json(
+        { error: 'paystack_reference_mismatch' },
         { status: 502, headers: cors }
       );
     }

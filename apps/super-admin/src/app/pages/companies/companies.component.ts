@@ -23,7 +23,6 @@ const STATUS_TYPE: Record<string, BadgeType> = {
   banned: 'error',
 };
 const SUB_TYPE: Record<string, BadgeType> = {
-  trial: 'info',
   active: 'success',
   expired: 'error',
   cancelled: 'neutral',
@@ -260,10 +259,6 @@ const LEGAL_TYPE: Record<string, BadgeType> = {
             <h3 class="section-title">Subscription details</h3>
             <dl class="mt-3 divide-y divide-base-200">
               <div class="flex items-center justify-between gap-4 py-2.5">
-                <dt class="type-caption">Trial ends</dt>
-                <dd class="text-sm tabular-nums">{{ date(company.trial_ends_at) }}</dd>
-              </div>
-              <div class="flex items-center justify-between gap-4 py-2.5">
                 <dt class="type-caption">Subscription expires</dt>
                 <dd class="text-sm tabular-nums">{{ date(company.subscription_expires_at) }}</dd>
               </div>
@@ -326,7 +321,6 @@ const LEGAL_TYPE: Record<string, BadgeType> = {
               <app-form-field label="Status">
                 <select class="select select-bordered w-full" [formControl]="subStatus">
                   <option value="">Leave unchanged</option>
-                  <option value="trial">Trial</option>
                   <option value="active">Active</option>
                   <option value="expired">Expired</option>
                   <option value="cancelled">Cancelled</option>

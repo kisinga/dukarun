@@ -21,14 +21,12 @@ import { LegalService, PublishedLegalDocument } from '../../legal/legal.service'
               This creates your company workspace. Ledger, locations, and payment methods are set up
               automatically.
             </p>
-            @if (billingConfig()?.introOfferEnabled) {
+            @if (billingConfig(); as config) {
               <p class="mt-2 text-sm font-medium text-primary">
-                {{ introOfferWording() }} on {{ billingConfig()?.introOfferTierName }}. Pay after
-                approval to unlock your workspace.
-              </p>
-            } @else if (billingConfig()?.trialDays; as days) {
-              <p class="mt-2 text-sm font-medium text-primary">
-                Your {{ days }}-day free trial starts when the company is approved.
+                Pay {{ config.initialPurchasePrice }} KES after approval to unlock
+                {{ config.testingAccessMonths }}
+                {{ config.testingAccessMonths === 1 ? 'month' : 'months' }} of
+                {{ config.newCustomerTierName }} access.
               </p>
             }
           </div>
@@ -48,13 +46,7 @@ import { LegalService, PublishedLegalDocument } from '../../legal/legal.service'
                 [disabled]="saving()"
                 (click)="continueToWorkspace()"
               >
-                {{
-                  saving()
-                    ? 'Opening…'
-                    : billingConfig()?.introOfferEnabled
-                      ? 'Continue to payment'
-                      : 'Continue to dashboard'
-                }}
+                {{ saving() ? 'Opening…' : 'Continue to payment' }}
               </button>
             </div>
           }
@@ -76,6 +68,20 @@ import { LegalService, PublishedLegalDocument } from '../../legal/legal.service'
                   />
                   <span class="label-text-alt mt-1 text-base-content/45">
                     Shown to your team and on audit records.
+                  </span>
+                </label>
+                <label class="form-control">
+                  <span class="label-text mb-1">Salesperson invitation code</span>
+                  <input
+                    type="text"
+                    class="input input-bordered w-full uppercase"
+                    placeholder="AMINA7"
+                    autocomplete="off"
+                    maxlength="24"
+                    [formControl]="salesCode"
+                  />
+                  <span class="label-text-alt mt-1 text-base-content/45">
+                    Optional. Leave blank if nobody invited you.
                   </span>
                 </label>
               </fieldset>
@@ -212,7 +218,6 @@ export class RegisterComponent implements OnInit {
   protected readonly legalLoading = signal(true);
   protected readonly legalLoadError = signal(false);
   protected readonly legalReady = computed(() => this.currentTerms() !== null);
-  private readonly requestedPlanCode = this.route.snapshot.queryParamMap.get('plan');
   private readonly requestedBlogRef = this.validUuid(
     this.route.snapshot.queryParamMap.get('blog_ref')
   );
@@ -228,6 +233,10 @@ export class RegisterComponent implements OnInit {
     validators: [Validators.email],
   });
   protected readonly companyAddress = new FormControl('', { nonNullable: true });
+  protected readonly salesCode = new FormControl(
+    this.route.snapshot.queryParamMap.get('sales_code')?.trim().toUpperCase() ?? '',
+    { nonNullable: true }
+  );
   protected readonly acceptedTerms = new FormControl(false, {
     nonNullable: true,
     validators: [Validators.requiredTrue],
@@ -280,11 +289,13 @@ export class RegisterComponent implements OnInit {
         p_currency: 'KES',
         p_email: this.companyEmail.value.trim() || undefined,
         p_address: this.companyAddress.value.trim() || undefined,
-        ...(this.requestedPlanCode ? { p_trial_tier_code: this.requestedPlanCode } : {}),
         p_terms_version: terms.version,
         p_terms_content_sha256: terms.content_sha256,
         p_owner_name: this.ownerName.value.trim() || undefined,
         ...(this.requestedBlogRef ? { p_blog_ref: this.requestedBlogRef } : {}),
+        ...(this.salesCode.value.trim()
+          ? { p_sales_code: this.salesCode.value.trim().toUpperCase() }
+          : {}),
       });
       if (error) throw error;
       const result = data as unknown as {
@@ -299,7 +310,17 @@ export class RegisterComponent implements OnInit {
       this.createdApproved.set(true);
       await this.continueToWorkspace();
     } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Provisioning failed');
+      const message =
+        err instanceof Error
+          ? err.message
+          : typeof err === 'object' && err !== null && 'message' in err
+            ? String(err.message)
+            : 'Provisioning failed';
+      this.error.set(
+        message.includes('invalid_or_inactive_sales_code')
+          ? 'That salesperson invitation code is invalid or inactive.'
+          : message
+      );
     } finally {
       this.saving.set(false);
     }
@@ -317,7 +338,7 @@ export class RegisterComponent implements OnInit {
         throw new Error('Your workspace is ready. Select Continue again to refresh access.');
       }
       // Reload all tenant-scoped stores under the newly selected company.
-      window.location.assign(this.billingConfig()?.introOfferEnabled ? '/billing' : '/dashboard');
+      window.location.assign('/billing');
     } catch (err) {
       this.error.set(
         err instanceof Error ? err.message : 'Workspace access could not be refreshed'
@@ -325,16 +346,6 @@ export class RegisterComponent implements OnInit {
     } finally {
       this.saving.set(false);
     }
-  }
-
-  protected introOfferWording(): string {
-    const config = this.billingConfig();
-    if (!config) return 'Introductory offer';
-    const paid = `${config.introOfferPaidMonths} ${config.introOfferPaidMonths === 1 ? 'month' : 'months'}`;
-    const bonus = `${config.introOfferBonusMonths} ${config.introOfferBonusMonths === 1 ? 'month' : 'months'}`;
-    return config.introOfferBonusMonths > 0
-      ? `Pay for ${paid}, get ${bonus} free`
-      : `Pay for ${paid}`;
   }
 
   private validUuid(value: string | null): string | null {

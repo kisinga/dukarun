@@ -153,7 +153,6 @@ import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
               class="select select-bordered w-full max-w-md"
               [formControl]="subscriptionStatus"
             >
-              <option value="trial">Trial</option>
               <option value="active">Active</option>
               <option value="expired">Expired</option>
               <option value="cancelled">Cancelled</option>

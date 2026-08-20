@@ -10,9 +10,10 @@ grant select on pg_temp.bl_company to authenticated;
 
 select testkit.as_user((select company_id from bl_company), '11111111-1111-1111-1111-111111111111', 'Admin');
 
--- 1. Activation sets active + expiry extending from the remaining trial
---    (trial expiry is real since 0010_trial_expiry, so base = ~30 days out).
+-- 1. A regular renewal extends active paid access.
 reset role;
+update public.companies set subscription_expires_at = now()
+where id = (select company_id from bl_company);
 select public.activate_subscription(
   (select company_id from bl_company),
   (select id from public.subscription_tiers where code = 'standard'),
@@ -26,9 +27,10 @@ select is(
 );
 
 select ok(
-  (select subscription_expires_at > now() + interval '55 days' from public.companies
+  (select subscription_expires_at > now() + interval '25 days'
+     and subscription_expires_at < now() + interval '35 days' from public.companies
    where id = (select company_id from bl_company)),
-  'expiry extends from remaining trial (~2 months out)'
+  'expiry extends by one paid month'
 );
 
 -- 3. Replay with same reference is a no-op (no double extension).
@@ -39,7 +41,7 @@ select public.activate_subscription(
 );
 
 select ok(
-  (select subscription_expires_at < now() + interval '65 days' from public.companies
+  (select subscription_expires_at < now() + interval '35 days' from public.companies
    where id = (select company_id from bl_company)),
   'webhook replay with same reference does not double-extend'
 );
@@ -62,12 +64,10 @@ select ok(
   'renewal extends from current expiry (10 + 30 days)'
 );
 
--- 5. Expiry scan: expired trial flips to expired without paid grace.
+-- 5. Expiry scan moves paid access into its grace period.
 reset role;
 update public.companies
-set subscription_status = 'trial',
-    trial_started_at = now() - interval '31 days',
-    trial_ends_at = now() - interval '1 day',
+set subscription_status = 'active',
     subscription_expires_at = now() - interval '1 day',
     subscription_grace_period_end = null
 where id = (select company_id from bl_company);
@@ -80,20 +80,18 @@ select is(
   'scanner flips expired subscriptions'
 );
 
--- 6. Trials do not receive the paid-subscription grace period.
-select is(
-  (select subscription_grace_period_end from public.companies where id = (select company_id from bl_company)),
-  null,
-  'expired trial has no grace period'
+-- 6. Paid subscriptions receive a three-day grace period.
+select ok(
+  (select subscription_grace_period_end > now() from public.companies where id = (select company_id from bl_company)),
+  'expired paid subscription receives grace'
 );
 
--- 7. Expired trial is blocked immediately.
+-- 7. Grace-period access remains entitled.
 select testkit.as_user((select company_id from bl_company), '11111111-1111-1111-1111-111111111111', 'Admin');
 
-select throws_ok(
+select lives_ok(
   $$select public.save_draft(null, '[]')$$,
-  'P0001', 'subscription_expired: renew to continue selling',
-  'expired trial cannot continue selling'
+  'paid grace period can continue selling'
 );
 reset role;
 

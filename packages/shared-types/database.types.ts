@@ -1472,8 +1472,6 @@ export type Database = {
           subscription_started_at: string | null
           subscription_status: string | null
           subscription_tier_id: string | null
-          trial_ends_at: string | null
-          trial_started_at: string | null
           updated_at: string
           variance_notification_threshold: number
           whatsapp_reserved_this_period: number
@@ -1530,8 +1528,6 @@ export type Database = {
           subscription_started_at?: string | null
           subscription_status?: string | null
           subscription_tier_id?: string | null
-          trial_ends_at?: string | null
-          trial_started_at?: string | null
           updated_at?: string
           variance_notification_threshold?: number
           whatsapp_reserved_this_period?: number
@@ -1588,8 +1584,6 @@ export type Database = {
           subscription_started_at?: string | null
           subscription_status?: string | null
           subscription_tier_id?: string | null
-          trial_ends_at?: string | null
-          trial_started_at?: string | null
           updated_at?: string
           variance_notification_threshold?: number
           whatsapp_reserved_this_period?: number
@@ -1854,6 +1848,49 @@ export type Database = {
             columns: ["post_id"]
             isOneToOne: false
             referencedRelation: "blog_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      company_sales_attributions: {
+        Row: {
+          attributed_at: string
+          company_id: string
+          invitation_code: string
+          salesperson_id: string
+        }
+        Insert: {
+          attributed_at?: string
+          company_id: string
+          invitation_code: string
+          salesperson_id: string
+        }
+        Update: {
+          attributed_at?: string
+          company_id?: string
+          invitation_code?: string
+          salesperson_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_sales_attributions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_sales_attributions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_sales_attributions_salesperson_id_fkey"
+            columns: ["salesperson_id"]
+            isOneToOne: false
+            referencedRelation: "platform_salespeople"
             referencedColumns: ["id"]
           },
         ]
@@ -3324,6 +3361,119 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "supplier_ap_balances"
             referencedColumns: ["supplier_id"]
+          },
+        ]
+      }
+      initial_subscription_payment_attempts: {
+        Row: {
+          amount: number
+          company_id: string
+          created_at: string
+          failure_reason: string | null
+          id: string
+          payment_reference: string
+          status: string
+          testing_access_months: number
+          tier_id: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          company_id: string
+          created_at?: string
+          failure_reason?: string | null
+          id?: string
+          payment_reference: string
+          status?: string
+          testing_access_months: number
+          tier_id: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          company_id?: string
+          created_at?: string
+          failure_reason?: string | null
+          id?: string
+          payment_reference?: string
+          status?: string
+          testing_access_months?: number
+          tier_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "initial_subscription_payment_attempts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "initial_subscription_payment_attempts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "initial_subscription_payment_attempts_tier_id_fkey"
+            columns: ["tier_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_tiers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      initial_subscription_purchases: {
+        Row: {
+          amount: number
+          company_id: string
+          id: string
+          payment_reference: string
+          purchased_at: string
+          testing_access_months: number
+          tier_id: string
+        }
+        Insert: {
+          amount: number
+          company_id: string
+          id?: string
+          payment_reference: string
+          purchased_at?: string
+          testing_access_months: number
+          tier_id: string
+        }
+        Update: {
+          amount?: number
+          company_id?: string
+          id?: string
+          payment_reference?: string
+          purchased_at?: string
+          testing_access_months?: number
+          tier_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "initial_subscription_purchases_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "initial_subscription_purchases_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "initial_subscription_purchases_tier_id_fkey"
+            columns: ["tier_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_tiers"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -6708,46 +6858,33 @@ export type Database = {
       }
       platform_billing_settings: {
         Row: {
-          default_trial_tier_id: string
-          intro_offer_bonus_months: number
-          intro_offer_enabled: boolean
-          intro_offer_paid_months: number
-          intro_offer_tier_id: string
+          new_customer_tier_id: string
+          sales_commission_rate_bps: number
+          sales_commissions_enabled: boolean
           singleton: boolean
-          trial_duration_days: number
+          testing_access_months: number
           updated_at: string
         }
         Insert: {
-          default_trial_tier_id: string
-          intro_offer_bonus_months?: number
-          intro_offer_enabled?: boolean
-          intro_offer_paid_months?: number
-          intro_offer_tier_id: string
+          new_customer_tier_id: string
+          sales_commission_rate_bps?: number
+          sales_commissions_enabled?: boolean
           singleton?: boolean
-          trial_duration_days?: number
+          testing_access_months: number
           updated_at?: string
         }
         Update: {
-          default_trial_tier_id?: string
-          intro_offer_bonus_months?: number
-          intro_offer_enabled?: boolean
-          intro_offer_paid_months?: number
-          intro_offer_tier_id?: string
+          new_customer_tier_id?: string
+          sales_commission_rate_bps?: number
+          sales_commissions_enabled?: boolean
           singleton?: boolean
-          trial_duration_days?: number
+          testing_access_months?: number
           updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "platform_billing_settings_default_trial_tier_id_fkey"
-            columns: ["default_trial_tier_id"]
-            isOneToOne: false
-            referencedRelation: "subscription_tiers"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "platform_billing_settings_intro_offer_tier_id_fkey"
-            columns: ["intro_offer_tier_id"]
+            foreignKeyName: "platform_billing_settings_new_customer_tier_id_fkey"
+            columns: ["new_customer_tier_id"]
             isOneToOne: false
             referencedRelation: "subscription_tiers"
             referencedColumns: ["id"]
@@ -6832,6 +6969,124 @@ export type Database = {
           singleton?: boolean
           updated_at?: string
           updated_by?: string | null
+        }
+        Relationships: []
+      }
+      platform_sales_commissions: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          collected_amount: number
+          commission_amount: number
+          company_id: string
+          created_at: string
+          id: string
+          paid_at: string | null
+          paid_by: string | null
+          payment_reference: string
+          payout_reference: string | null
+          rate_bps: number
+          reversal_reason: string | null
+          reversed_at: string | null
+          reversed_by: string | null
+          salesperson_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          collected_amount: number
+          commission_amount: number
+          company_id: string
+          created_at?: string
+          id?: string
+          paid_at?: string | null
+          paid_by?: string | null
+          payment_reference: string
+          payout_reference?: string | null
+          rate_bps: number
+          reversal_reason?: string | null
+          reversed_at?: string | null
+          reversed_by?: string | null
+          salesperson_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          collected_amount?: number
+          commission_amount?: number
+          company_id?: string
+          created_at?: string
+          id?: string
+          paid_at?: string | null
+          paid_by?: string | null
+          payment_reference?: string
+          payout_reference?: string | null
+          rate_bps?: number
+          reversal_reason?: string | null
+          reversed_at?: string | null
+          reversed_by?: string | null
+          salesperson_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_sales_commissions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "platform_sales_commissions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "platform_sales_commissions_salesperson_id_fkey"
+            columns: ["salesperson_id"]
+            isOneToOne: false
+            referencedRelation: "platform_salespeople"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      platform_salespeople: {
+        Row: {
+          active: boolean
+          created_at: string
+          created_by: string | null
+          id: string
+          invitation_code: string
+          name: string
+          phone: string | null
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          invitation_code: string
+          name: string
+          phone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          invitation_code?: string
+          name?: string
+          phone?: string | null
+          updated_at?: string
         }
         Relationships: []
       }
@@ -8607,64 +8862,6 @@ export type Database = {
             columns: ["to_location_id"]
             isOneToOne: false
             referencedRelation: "stock_locations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      subscription_intro_offer_redemptions: {
-        Row: {
-          amount: number
-          bonus_applied: boolean
-          bonus_months: number
-          company_id: string
-          id: string
-          paid_months: number
-          payment_reference: string
-          redeemed_at: string
-          tier_id: string
-        }
-        Insert: {
-          amount: number
-          bonus_applied?: boolean
-          bonus_months: number
-          company_id: string
-          id?: string
-          paid_months: number
-          payment_reference: string
-          redeemed_at?: string
-          tier_id: string
-        }
-        Update: {
-          amount?: number
-          bonus_applied?: boolean
-          bonus_months?: number
-          company_id?: string
-          id?: string
-          paid_months?: number
-          payment_reference?: string
-          redeemed_at?: string
-          tier_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "subscription_intro_offer_redemptions_company_id_fkey"
-            columns: ["company_id"]
-            isOneToOne: false
-            referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "subscription_intro_offer_redemptions_company_id_fkey"
-            columns: ["company_id"]
-            isOneToOne: false
-            referencedRelation: "public_storefronts"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "subscription_intro_offer_redemptions_tier_id_fkey"
-            columns: ["tier_id"]
-            isOneToOne: false
-            referencedRelation: "subscription_tiers"
             referencedColumns: ["id"]
           },
         ]
@@ -11790,13 +11987,13 @@ export type Database = {
         Args: { p_code: string; p_company_id: string }
         Returns: number
       }
-      activate_intro_offer: {
+      activate_initial_subscription_purchase: {
         Args: {
           p_amount: number
-          p_bonus_months: number
           p_company_id: string
-          p_paid_months: number
+          p_paid_at: string
           p_reference: string
+          p_testing_access_months: number
           p_tier_id: string
           p_unit_price: number
         }
@@ -13121,6 +13318,10 @@ export type Database = {
         }
         Returns: string
       }
+      platform_create_salesperson: {
+        Args: { p_invitation_code: string; p_name: string; p_phone: string }
+        Returns: string
+      }
       platform_delete_blog_post: {
         Args: { p_post_id: string }
         Returns: boolean
@@ -13216,6 +13417,19 @@ export type Database = {
         Args: { p_campaign_id: string }
         Returns: Json
       }
+      platform_review_sales_commission: {
+        Args: {
+          p_commission_id: string
+          p_payout_reference?: string
+          p_reason?: string
+          p_status: string
+        }
+        Returns: string
+      }
+      platform_sales_snapshot: {
+        Args: { p_commission_limit?: number; p_commission_offset?: number }
+        Returns: Json
+      }
       platform_save_blog_draft: {
         Args: {
           p_author_name: string
@@ -13307,26 +13521,15 @@ export type Database = {
         }
         Returns: undefined
       }
+      platform_set_salesperson_active: {
+        Args: { p_active: boolean; p_salesperson_id: string }
+        Returns: string
+      }
       platform_site_deployments: { Args: never; Returns: Json }
       platform_stats: { Args: never; Returns: Json }
       platform_tax_catalog: { Args: never; Returns: Json }
       platform_tax_package_readiness: {
         Args: { p_jurisdiction_id: string }
-        Returns: Json
-      }
-      platform_update_billing_config: {
-        Args: { p_default_trial_tier_id: string; p_trial_duration_days: number }
-        Returns: Json
-      }
-      platform_update_billing_policy: {
-        Args: {
-          p_default_trial_tier_id: string
-          p_intro_offer_bonus_months: number
-          p_intro_offer_enabled: boolean
-          p_intro_offer_paid_months: number
-          p_intro_offer_tier_id: string
-          p_trial_duration_days: number
-        }
         Returns: Json
       }
       platform_update_mpesa_connection: {
@@ -13339,12 +13542,23 @@ export type Database = {
         }
         Returns: undefined
       }
+      platform_update_paid_onboarding_policy: {
+        Args: {
+          p_new_customer_tier_id: string
+          p_testing_access_months: number
+        }
+        Returns: Json
+      }
       platform_update_registration_config: {
         Args: {
           p_automatic_company_approval_enabled: boolean
           p_daily_alert_threshold: number
           p_hourly_alert_threshold: number
         }
+        Returns: Json
+      }
+      platform_update_sales_commission_settings: {
+        Args: { p_enabled: boolean; p_rate_bps: number }
         Returns: Json
       }
       platform_update_subscription: {
@@ -13772,7 +13986,6 @@ export type Database = {
           p_currency?: string
           p_email?: string
           p_store_name?: string
-          p_trial_tier_code?: string
         }
         Returns: string
       }
@@ -13794,41 +14007,12 @@ export type Database = {
           p_currency?: string
           p_email?: string
           p_owner_name?: string
+          p_sales_code?: string
           p_store_name?: string
           p_terms_content_sha256?: string
           p_terms_version?: string
-          p_trial_tier_code?: string
         }
         Returns: Json
-      }
-      provision_company_registration_core: {
-        Args: {
-          p_address: string
-          p_blog_ref: string
-          p_company_name: string
-          p_currency: string
-          p_email: string
-          p_owner_name: string
-          p_store_name: string
-          p_terms_content_sha256: string
-          p_terms_version: string
-          p_trial_tier_code: string
-        }
-        Returns: Json
-      }
-      provision_company_with_terms: {
-        Args: {
-          p_address?: string
-          p_company_name: string
-          p_currency?: string
-          p_email?: string
-          p_owner_name?: string
-          p_store_name?: string
-          p_terms_content_sha256?: string
-          p_terms_version?: string
-          p_trial_tier_code?: string
-        }
-        Returns: string
       }
       prune_cache_change_log: { Args: never; Returns: number }
       public_billing_config: { Args: never; Returns: Json }
@@ -14240,6 +14424,16 @@ export type Database = {
       resend_team_invitation: {
         Args: { p_invitation_id: string }
         Returns: Json
+      }
+      reserve_initial_subscription_payment: {
+        Args: {
+          p_amount: number
+          p_company_id: string
+          p_reference: string
+          p_testing_access_months: number
+          p_tier_id: string
+        }
+        Returns: string
       }
       reserve_message_quota: {
         Args: { p_channel: string; p_company_id: string; p_units: number }

@@ -45,14 +45,10 @@ begin
       cash_control_enabled = true,
       batch_expiry_enabled = true,
       status = 'approved',
-      subscription_status = 'trial',
-      trial_started_at = now(),
-      trial_ends_at = now() + make_interval(days => (
-        select trial_duration_days from public.platform_billing_settings where singleton
-      )),
-      subscription_expires_at = now() + make_interval(days => (
-        select trial_duration_days from public.platform_billing_settings where singleton
-      ))
+      subscription_status = 'active',
+      subscription_started_at = coalesce(subscription_started_at, now()),
+      subscription_expires_at = now() + interval '1 year',
+      billing_cycle = 'yearly'
   where id = v_company_id;
   return v_company_id;
 end;
