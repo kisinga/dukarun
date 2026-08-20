@@ -1,4 +1,6 @@
 begin;
+-- Provider timestamps and period locks are compared in the Kenyan business day.
+set local timezone to 'Africa/Nairobi';
 select plan(54);
 
 select has_table('public','mpesa_onboarding_requests','onboarding is durable');

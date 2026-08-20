@@ -1,6 +1,9 @@
 -- Period closing tests (migration 0010): reconciliation gate, lock
 -- enforcement, no closing entries, permissions.
 begin;
+-- Business-day assertions must not depend on the CI runner's UTC date near
+-- midnight in Nairobi.
+set local timezone to 'Africa/Nairobi';
 select plan(9);
 
 select testkit.create_user('11111111-1111-1111-1111-111111111111', 'admin@period.local');

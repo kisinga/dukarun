@@ -28,7 +28,8 @@ nothing sensitive is stored in the repo.
       `SUPABASE_SERVICE_ROLE_KEY`, `NOTIFY_FLUSH_URL`, `SITE_DEPLOY_URL`
 - [x] Edge functions deployed: paystack-charge, paystack-webhook, notification-flush,
       platform-message-test, public-content-renderer, site-deploy, _shared
-- [ ] Apply migration `0136_platform_sales_invitation_send_claim`
+- [ ] Apply migrations `0136_platform_sales_invitation_send_claim` and
+      `0137_business_day_signoff_timezone`
 - [ ] Deploy `platform-sales-invitation-send`
 - [x] Edge-runtime env: `PAYSTACK_SECRET_KEY`, `TEXTSMS_*`, `OPENWA_*`, `EMAIL_API_*`
 - [x] Env managed in Coolify UI (survives redeploys)
