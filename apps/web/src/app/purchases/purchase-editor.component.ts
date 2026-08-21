@@ -51,6 +51,7 @@ interface ExpenseForm {
   amount: string;
   settlement: ExpenseSettlement;
   accountCode: string;
+  noteExpanded: boolean;
   error: string | null;
   grossAmountOverride?: number;
 }
@@ -80,8 +81,18 @@ interface EnteredTaxBreakdown {
   ],
   template: `
     <app-page
-      [title]="draftId() ? 'Continue purchase' : 'Record purchase'"
-      subtitle="Receive stock, match the supplier invoice, and post the books in one transaction."
+      [title]="
+        stage() === 'review'
+          ? 'Review purchase'
+          : draftId()
+            ? 'Continue purchase'
+            : 'Record purchase'
+      "
+      [subtitle]="
+        stage() === 'review'
+          ? 'Confirm the invoice and choose how it is paid.'
+          : 'Match the supplier invoice and receive stock.'
+      "
       backLink="/purchases"
       [wide]="true"
     >
@@ -103,58 +114,9 @@ interface EnteredTaxBreakdown {
           </div>
         }
 
-        <nav class="mb-6 max-w-lg" aria-label="Purchase progress">
-          <ol class="flex items-center">
-            <li class="flex shrink-0 items-center gap-2">
-              <span
-                class="flex size-6 items-center justify-center rounded-full border text-xs font-semibold"
-                [class.border-primary]="stage() === 'build'"
-                [class.bg-primary]="stage() === 'build'"
-                [class.text-primary-content]="stage() === 'build'"
-                [class.border-base-content/30]="stage() === 'review'"
-                [class.bg-base-content/10]="stage() === 'review'"
-              >
-                @if (stage() === 'review') {
-                  <app-icon name="heroCheck" size="sm" />
-                } @else {
-                  1
-                }
-              </span>
-              <span
-                class="text-sm"
-                [class.font-semibold]="stage() === 'build'"
-                [class.text-base-content/60]="stage() === 'review'"
-                >Build purchase</span
-              >
-            </li>
-            <li
-              class="mx-3 h-px min-w-8 flex-1 bg-base-300"
-              [class.bg-base-content/30]="stage() === 'review'"
-              aria-hidden="true"
-            ></li>
-            <li class="flex shrink-0 items-center gap-2">
-              <span
-                class="flex size-6 items-center justify-center rounded-full border text-xs font-semibold"
-                [class.border-primary]="stage() === 'review'"
-                [class.bg-primary]="stage() === 'review'"
-                [class.text-primary-content]="stage() === 'review'"
-                [class.border-base-300]="stage() === 'build'"
-                [class.text-base-content/60]="stage() === 'build'"
-                >2</span
-              >
-              <span
-                class="text-sm"
-                [class.font-semibold]="stage() === 'review'"
-                [class.text-base-content/60]="stage() === 'build'"
-                >Review and pay</span
-              >
-            </li>
-          </ol>
-        </nav>
-
         @if (stage() === 'build') {
-          <div class="grid items-start gap-6 lg:grid-cols-12">
-            <div class="min-w-0 space-y-6 lg:col-span-9">
+          <div class="grid items-start gap-4 lg:grid-cols-12">
+            <div class="min-w-0 space-y-4 lg:col-span-9">
               <section class="card bg-base-100">
                 <div class="card-body gap-4 p-4">
                   <div
@@ -240,160 +202,204 @@ interface EnteredTaxBreakdown {
                 </div>
               </section>
 
-              <section class="card bg-base-100" data-purchase-input-vat>
-                <div class="card-body gap-4 p-4">
-                  <label class="flex cursor-pointer items-start gap-3">
-                    <input
-                      type="checkbox"
-                      class="checkbox checkbox-primary mt-0.5"
-                      [checked]="claimInputVat.value"
-                      (change)="setClaimInputVat($any($event.target).checked)"
-                    />
-                    <span>
-                      <span class="block text-sm font-semibold"
-                        >Claim input VAT from this invoice</span
-                      >
-                      <span class="type-caption mt-1 block">
-                        Claiming VAT changes how the cost is posted, not what the supplier is paid.
-                      </span>
-                    </span>
-                  </label>
-
-                  @if (claimInputVat.value) {
-                    <div class="grid gap-4 border-t border-base-300 pt-4 md:grid-cols-2">
-                      <app-form-field
-                        label="Supplier tax PIN"
-                        [required]="true"
-                        hint="Saved to this supplier and snapshotted on the completed purchase."
-                        [error]="supplierPinError()"
-                      >
-                        <div class="flex gap-2">
-                          <input
-                            data-supplier-tax-pin
-                            class="input input-bordered h-11 min-w-0 flex-1"
-                            placeholder="e.g. P000000000A"
-                            [formControl]="supplierTaxPin"
-                            (input)="onSupplierPinInput()"
-                          />
-                          <button
-                            appButton
-                            variant="outline"
-                            size="sm"
-                            type="button"
-                            [loading]="supplierPinSaving()"
-                            [disabled]="supplierPinSaved() || !supplierTaxPin.value.trim()"
-                            (click)="saveSupplierPin()"
-                          >
-                            {{ supplierPinSaved() ? 'Saved' : 'Save PIN' }}
-                          </button>
-                        </div>
-                      </app-form-field>
-                      <app-form-field
-                        label="Tax invoice date"
-                        [required]="true"
-                        hint="This is the VAT tax point and may differ from the stock receipt date."
-                      >
-                        <input
-                          data-tax-invoice-date
-                          type="date"
-                          class="input input-bordered h-11 w-full"
-                          [formControl]="taxInvoiceDate"
-                          (change)="onTaxInvoiceDateChange()"
-                        />
-                      </app-form-field>
-                    </div>
-
-                    <div class="rounded-field border border-base-300 bg-base-200/30 p-3">
-                      @if (taxContextLoading()) {
-                        <div class="flex items-center gap-2 text-sm text-base-content/70">
-                          <span class="loading loading-spinner loading-sm"></span>
-                          Calculating VAT from the configured product rates…
-                        </div>
-                      } @else if (taxContextError()) {
-                        <div class="flex items-start gap-2 text-sm text-error" role="alert">
-                          <app-icon name="heroExclamationTriangle" />
-                          <span>{{ taxContextError() }}</span>
-                        </div>
-                      } @else if (lines().length > 0) {
-                        <div class="grid gap-3 sm:grid-cols-3">
-                          <div>
-                            <p class="type-caption">Gross supplier invoice</p>
-                            <p class="font-semibold">
-                              <app-money [amount]="invoiceTotal()" />
-                            </p>
-                          </div>
-                          <div>
-                            <p class="type-caption">Net inventory and expense cost</p>
-                            <p class="font-semibold"><app-money [amount]="invoiceNetTotal()" /></p>
-                          </div>
-                          <div>
-                            <p class="type-caption">Recoverable input VAT</p>
-                            <p class="font-semibold text-success">
-                              <app-money [amount]="invoiceTaxTotal()" />
-                            </p>
-                          </div>
-                        </div>
-                      } @else {
-                        <p class="type-caption">
-                          Add valid items to see the VAT extracted from this supplier invoice.
-                        </p>
-                      }
-                    </div>
-                    <p class="type-caption">
-                      Expenses included in the supplier bill share this invoice's VAT treatment.
-                      Separately paid expenses remain outside this claim.
-                    </p>
-                  }
-                </div>
-              </section>
-
-              <section class="card overflow-visible bg-base-100">
-                <div class="card-body gap-4 p-4">
-                  <div class="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <h2 class="section-title">Items</h2>
-                      <p class="type-caption mt-1">
-                        Search or scan once to add an item. Unit cost and line total are both
-                        editable.
-                      </p>
-                    </div>
-                    @if (taxContext()?.tax_configured || priceEntryBasis() === 'exclusive') {
-                      <div data-purchase-price-basis>
-                        <p class="mb-1 text-xs font-medium">Supplier prices</p>
-                        <div class="join" role="group" aria-label="Supplier price VAT basis">
+              @if (
+                taxContextLoading() ||
+                taxContext()?.tax_configured ||
+                taxContextError() ||
+                claimInputVat.value ||
+                priceEntryBasis() === 'exclusive'
+              ) {
+                <section
+                  class="card bg-base-100"
+                  data-purchase-input-vat
+                  data-purchase-vat-settings
+                >
+                  <div class="card-body gap-3 p-4">
+                    <div class="flex flex-wrap items-center gap-x-5 gap-y-3">
+                      <div class="flex shrink-0 items-center gap-2 text-primary">
+                        <app-icon name="heroReceiptPercent" size="sm" />
+                        <h2 class="section-title text-base-content">VAT</h2>
+                      </div>
+                      <span class="hidden h-7 w-px bg-base-300 lg:block" aria-hidden="true"></span>
+                      <div class="flex flex-wrap items-center gap-2">
+                        <span class="text-sm font-medium">Supplier prices</span>
+                        <div
+                          class="join"
+                          role="group"
+                          aria-label="How supplier prices are entered"
+                          data-purchase-price-basis
+                        >
                           <button
                             type="button"
                             class="btn btn-sm join-item"
+                            [attr.aria-pressed]="priceEntryBasis() === 'inclusive'"
                             [class.btn-primary]="priceEntryBasis() === 'inclusive'"
                             [class.btn-outline]="priceEntryBasis() !== 'inclusive'"
                             (click)="setPriceEntryBasis('inclusive')"
                           >
-                            Include VAT
+                            VAT included
                           </button>
                           <button
                             type="button"
                             class="btn btn-sm join-item"
+                            [attr.aria-pressed]="priceEntryBasis() === 'exclusive'"
                             [class.btn-primary]="priceEntryBasis() === 'exclusive'"
                             [class.btn-outline]="priceEntryBasis() !== 'exclusive'"
+                            [disabled]="
+                              priceEntryBasis() !== 'exclusive' &&
+                              (taxContextLoading() || !taxContext()?.tax_configured)
+                            "
                             (click)="setPriceEntryBasis('exclusive')"
                           >
-                            Exclude VAT
+                            Before VAT
                           </button>
                         </div>
-                        <p class="type-caption mt-1 max-w-xs">
-                          This changes price entry only. The VAT claim is controlled separately.
-                        </p>
+                      </div>
+                      <label
+                        class="flex cursor-pointer items-center gap-3 lg:ml-auto"
+                        [class.cursor-not-allowed]="
+                          !claimInputVat.value &&
+                          (taxContextLoading() || !taxContext()?.vat_registered)
+                        "
+                      >
+                        <span class="text-sm font-medium">Claim input VAT</span>
+                        <input
+                          type="checkbox"
+                          class="toggle toggle-primary toggle-sm shrink-0"
+                          aria-label="Claim input VAT"
+                          [checked]="claimInputVat.value"
+                          [disabled]="
+                            !claimInputVat.value &&
+                            (taxContextLoading() || !taxContext()?.vat_registered)
+                          "
+                          (change)="setClaimInputVat($any($event.target).checked)"
+                        />
+                      </label>
+                    </div>
+
+                    <p class="type-caption">
+                      @if (taxContextLoading()) {
+                        Checking the VAT setup…
+                      } @else if (!taxContext()?.tax_configured) {
+                        VAT rates are not configured; enter invoice totals exactly as shown.
+                      } @else if (priceEntryBasis() === 'exclusive') {
+                        Enter net prices; Dukarun calculates VAT on top.
+                      } @else {
+                        Enter prices as shown; Dukarun extracts the VAT portion.
+                      }
+                      <span class="mx-1" aria-hidden="true">·</span>
+                      @if (taxContextLoading()) {
+                        Checking claim eligibility.
+                      } @else if (!taxContext()?.vat_registered && !claimInputVat.value) {
+                        Claiming becomes available when the shop is VAT registered.
+                      } @else if (claimInputVat.value) {
+                        VAT is recorded separately from inventory and expense cost.
+                      } @else {
+                        VAT remains part of inventory and expense cost.
+                      }
+                    </p>
+
+                    @if (taxContextError()) {
+                      <div class="alert alert-error py-2 text-sm" role="alert">
+                        <app-icon name="heroExclamationTriangle" />
+                        <span>{{ taxContextError() }}</span>
                       </div>
                     }
+
+                    @if (claimInputVat.value) {
+                      <div class="grid gap-4 border-t border-base-300 pt-4 md:grid-cols-2">
+                        <app-form-field
+                          label="Supplier tax PIN"
+                          [required]="true"
+                          hint="Saved to this supplier and snapshotted on the completed purchase."
+                          [error]="supplierPinError()"
+                        >
+                          <div class="flex gap-2">
+                            <input
+                              data-supplier-tax-pin
+                              class="input input-bordered h-11 min-w-0 flex-1"
+                              placeholder="e.g. P000000000A"
+                              [formControl]="supplierTaxPin"
+                              (input)="onSupplierPinInput()"
+                            />
+                            <button
+                              appButton
+                              variant="outline"
+                              size="sm"
+                              type="button"
+                              [loading]="supplierPinSaving()"
+                              [disabled]="supplierPinSaved() || !supplierTaxPin.value.trim()"
+                              (click)="saveSupplierPin()"
+                            >
+                              {{ supplierPinSaved() ? 'Saved' : 'Save PIN' }}
+                            </button>
+                          </div>
+                        </app-form-field>
+                        <app-form-field
+                          label="Tax invoice date"
+                          [required]="true"
+                          hint="This is the VAT tax point and may differ from the stock receipt date."
+                        >
+                          <input
+                            data-tax-invoice-date
+                            type="date"
+                            class="input input-bordered h-11 w-full"
+                            [formControl]="taxInvoiceDate"
+                            (change)="onTaxInvoiceDateChange()"
+                          />
+                        </app-form-field>
+                      </div>
+
+                      <div class="rounded-field border border-base-300 bg-base-200/30 p-3">
+                        @if (taxContextLoading()) {
+                          <div class="flex items-center gap-2 text-sm text-base-content/70">
+                            <span class="loading loading-spinner loading-sm"></span>
+                            Calculating VAT from the configured product rates…
+                          </div>
+                        } @else if (lines().length > 0) {
+                          <div class="grid gap-3 sm:grid-cols-3">
+                            <div>
+                              <p class="type-caption">Gross supplier invoice</p>
+                              <p class="font-semibold">
+                                <app-money [amount]="invoiceTotal()" />
+                              </p>
+                            </div>
+                            <div>
+                              <p class="type-caption">Net inventory and expense cost</p>
+                              <p class="font-semibold">
+                                <app-money [amount]="invoiceNetTotal()" />
+                              </p>
+                            </div>
+                            <div>
+                              <p class="type-caption">Recoverable input VAT</p>
+                              <p class="font-semibold text-success">
+                                <app-money [amount]="invoiceTaxTotal()" />
+                              </p>
+                            </div>
+                          </div>
+                        } @else {
+                          <p class="type-caption">
+                            Add valid items to see the VAT extracted from this supplier invoice.
+                          </p>
+                        }
+                      </div>
+                      <p class="type-caption">
+                        Expenses included in the supplier bill share this invoice's VAT treatment.
+                        Separately paid expenses remain outside this claim.
+                      </p>
+                    }
                   </div>
-                  @if (
-                    taxContextError() && (priceEntryBasis() === 'exclusive' || claimInputVat.value)
-                  ) {
-                    <div class="alert alert-error py-2 text-sm" role="alert">
-                      <app-icon name="heroExclamationTriangle" />
-                      <span>{{ taxContextError() }}</span>
-                    </div>
-                  }
+                </section>
+              }
+
+              <section class="card overflow-visible bg-base-100">
+                <div class="card-body gap-4 p-4">
+                  <div class="flex flex-wrap items-start justify-between gap-3">
+                    <h2 class="section-title">Items</h2>
+                    @if (lines().length > 0) {
+                      <span class="badge badge-ghost">{{ lines().length }}</span>
+                    }
+                  </div>
                   <div class="sticky top-16 z-30 bg-base-100 py-1">
                     <div class="relative">
                       <span
@@ -444,11 +450,8 @@ interface EnteredTaxBreakdown {
                   </div>
 
                   @if (lines().length === 0) {
-                    <div class="rounded-box border border-dashed border-base-300 p-6 text-center">
-                      <p class="text-sm font-medium">No items added</p>
-                      <p class="type-caption mt-1">
-                        Use the search above to begin matching the supplier invoice.
-                      </p>
+                    <div class="rounded-box border border-dashed border-base-300 p-4 text-center">
+                      <p class="type-caption">Search or scan the first item to begin.</p>
                     </div>
                   }
 
@@ -487,178 +490,172 @@ interface EnteredTaxBreakdown {
                       }
                     </div>
                   }
-                </div>
-              </section>
 
-              <section class="card bg-base-100">
-                <div class="card-body gap-4 p-4">
-                  <div class="flex items-start justify-between gap-3">
-                    <div>
-                      <h2 class="section-title">Additional expenses</h2>
-                      <p class="type-caption mt-1">
-                        Transport, loading, packaging, duty, or another cost associated with this
-                        purchase.
-                      </p>
-                    </div>
-                    <button
-                      appButton
-                      variant="outline"
-                      size="sm"
-                      type="button"
-                      (click)="addExpense()"
-                    >
-                      <app-icon name="heroPlus" /> Add expense
-                    </button>
-                  </div>
-                  @if (expenses().length > 0) {
-                    <div class="divide-y divide-base-300 border-y border-base-300">
-                      @for (expense of expenses(); track expense.key; let index = $index) {
-                        <article
-                          class="overflow-visible bg-base-100"
-                          [attr.data-expense-key]="expense.key"
+                  @if (lines().length > 0 || expenses().length > 0) {
+                    <div class="border-t border-base-300 pt-3" data-purchase-expenses>
+                      <div class="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <span class="text-sm font-medium">Additional costs</span>
+                          @if (expenses().length > 0) {
+                            <span class="type-caption ml-2">{{ expenses().length }} added</span>
+                          } @else {
+                            <span class="type-caption ml-2"
+                              >Transport, duty, packaging, or loading</span
+                            >
+                          }
+                        </div>
+                        <button
+                          appButton
+                          variant="ghost"
+                          size="sm"
+                          type="button"
+                          (click)="addExpense()"
                         >
-                          <div
-                            class="flex items-center justify-between gap-3 bg-base-200/30 px-3 py-2"
-                          >
-                            <div class="min-w-0">
-                              <h3 class="truncate text-sm font-semibold">
-                                Expense {{ index + 1 }}
-                              </h3>
-                              <p class="type-caption truncate">
-                                {{ expenseCategoryLabel(expense) }}
-                              </p>
-                            </div>
-                            <button
-                              appButton
-                              variant="ghost"
-                              size="sm"
-                              [iconOnly]="true"
-                              type="button"
-                              title="Remove expense"
-                              [attr.aria-label]="'Remove expense ' + (index + 1)"
-                              (click)="removeExpense(index)"
-                            >
-                              <app-icon name="heroXMark" />
-                            </button>
-                          </div>
+                          <app-icon name="heroPlus" />
+                          {{ expenses().length > 0 ? 'Add another' : 'Add cost' }}
+                        </button>
+                      </div>
 
-                          <div
-                            class="grid gap-x-4 gap-y-3 border-t border-base-300 p-3 md:grid-cols-2 xl:grid-cols-4"
-                          >
-                            <app-form-field label="Category">
-                              <select
-                                class="select select-bordered h-11 w-full md:h-10"
-                                [(ngModel)]="expense.category"
-                                [ngModelOptions]="{ standalone: true }"
-                                (change)="markDirty()"
-                              >
-                                <option value="transport">Transport</option>
-                                <option value="loading">Loading</option>
-                                <option value="packaging">Packaging</option>
-                                <option value="duty">Duty</option>
-                                <option value="other">Other</option>
-                              </select>
-                            </app-form-field>
-                            @if (expense.category === 'other') {
-                              <app-form-field label="Expense name" [required]="true">
-                                <input
-                                  class="input input-bordered h-11 w-full md:h-10"
-                                  placeholder="e.g. Port handling"
-                                  [(ngModel)]="expense.customCategory"
-                                  [ngModelOptions]="{ standalone: true }"
-                                  (input)="markDirty()"
-                                />
-                              </app-form-field>
-                            }
-                            <app-form-field
-                              [label]="
-                                priceEntryBasis() === 'exclusive' &&
-                                expense.settlement === 'supplier_bill'
-                                  ? 'Amount before VAT'
-                                  : 'Amount (KES)'
-                              "
-                              [required]="true"
+                      @if (expenses().length > 0) {
+                        <div class="mt-3 grid gap-2">
+                          @for (expense of expenses(); track expense.key; let index = $index) {
+                            <article
+                              class="rounded-field border border-base-300 p-3"
+                              [attr.data-expense-key]="expense.key"
                             >
-                              <input
-                                class="input input-bordered h-11 w-full text-right md:h-10"
-                                inputmode="numeric"
-                                placeholder="0"
-                                [(ngModel)]="expense.amount"
-                                [ngModelOptions]="{ standalone: true }"
-                                (input)="expenseAmountChanged(expense)"
-                              />
-                            </app-form-field>
-                            <app-form-field
-                              label="Settlement"
-                              [required]="true"
-                              [hint]="expenseSettlementHint(expense.settlement)"
-                            >
-                              <select
-                                class="select select-bordered h-11 w-full md:h-10"
-                                [ngModel]="expense.settlement"
-                                [ngModelOptions]="{ standalone: true }"
-                                (ngModelChange)="setExpenseSettlement(expense, $event)"
+                              <div
+                                class="grid items-end gap-3 md:grid-cols-2 xl:grid-cols-[minmax(9rem,.8fr)_minmax(8rem,.55fr)_minmax(13rem,1fr)_2.5rem]"
                               >
-                                <option value="" disabled>Choose settlement</option>
-                                <option value="supplier_bill">Included in supplier bill</option>
-                                @if (perms.has('CreateInterAccountTransfer')) {
-                                  <option value="separate">Paid separately</option>
-                                }
-                              </select>
-                            </app-form-field>
-                            @if (expense.settlement === 'separate') {
-                              <app-form-field
-                                label="Paid from"
-                                [required]="true"
-                                class="xl:col-span-2"
-                                [error]="
-                                  accountOptions().length === 0
-                                    ? accountsError() ||
-                                      'No cash, bank, or M-Pesa account is configured.'
-                                    : null
-                                "
-                              >
-                                <app-searchable-filter
-                                  data-expense-account-picker
-                                  ariaLabel="Choose account used for this expense"
-                                  placeholder="Choose cash, bank, or M-Pesa account"
-                                  searchPlaceholder="Search accounts by name or code…"
-                                  controlSize="md"
-                                  [options]="accountOptions()"
-                                  [value]="expense.accountCode"
-                                  (valueChange)="expense.accountCode = $event; markDirty()"
-                                />
-                              </app-form-field>
-                              <app-form-field label="Memo" class="xl:col-span-2">
-                                <input
-                                  class="input input-bordered h-11 w-full md:h-10"
-                                  placeholder="Optional note about this charge"
-                                  [(ngModel)]="expense.memo"
-                                  [ngModelOptions]="{ standalone: true }"
-                                  (input)="markDirty()"
-                                />
-                              </app-form-field>
-                            } @else {
-                              <app-form-field label="Memo" class="md:col-span-2 xl:col-span-4">
-                                <input
-                                  class="input input-bordered h-11 w-full md:h-10"
-                                  placeholder="Optional note about this charge"
-                                  [(ngModel)]="expense.memo"
-                                  [ngModelOptions]="{ standalone: true }"
-                                  (input)="markDirty()"
-                                />
-                              </app-form-field>
-                            }
-                            @if (expense.error) {
-                              <p
-                                class="text-sm text-error md:col-span-2 xl:col-span-4"
-                                role="alert"
-                              >
-                                {{ expense.error }}
-                              </p>
-                            }
-                          </div>
-                        </article>
+                                <app-form-field label="Cost type">
+                                  <select
+                                    class="select select-bordered h-10 w-full"
+                                    [(ngModel)]="expense.category"
+                                    [ngModelOptions]="{ standalone: true }"
+                                    (change)="markDirty()"
+                                  >
+                                    <option value="transport">Transport</option>
+                                    <option value="loading">Loading</option>
+                                    <option value="packaging">Packaging</option>
+                                    <option value="duty">Duty</option>
+                                    <option value="other">Other</option>
+                                  </select>
+                                </app-form-field>
+                                <app-form-field
+                                  [label]="
+                                    priceEntryBasis() === 'exclusive' &&
+                                    expense.settlement === 'supplier_bill'
+                                      ? 'Amount before VAT'
+                                      : 'Amount'
+                                  "
+                                  [required]="true"
+                                >
+                                  <input
+                                    class="input input-bordered h-10 w-full text-right"
+                                    inputmode="numeric"
+                                    placeholder="0"
+                                    [(ngModel)]="expense.amount"
+                                    [ngModelOptions]="{ standalone: true }"
+                                    (input)="expenseAmountChanged(expense)"
+                                  />
+                                </app-form-field>
+                                <app-form-field label="This cost is" [required]="true">
+                                  <select
+                                    class="select select-bordered h-10 w-full"
+                                    [ngModel]="expense.settlement"
+                                    [ngModelOptions]="{ standalone: true }"
+                                    (ngModelChange)="setExpenseSettlement(expense, $event)"
+                                  >
+                                    <option value="" disabled>Choose</option>
+                                    <option value="supplier_bill">On the supplier invoice</option>
+                                    @if (perms.has('CreateInterAccountTransfer')) {
+                                      <option value="separate">Paid separately</option>
+                                    }
+                                  </select>
+                                </app-form-field>
+                                <button
+                                  appButton
+                                  variant="ghost"
+                                  size="sm"
+                                  [iconOnly]="true"
+                                  type="button"
+                                  class="justify-self-end md:col-start-2 xl:col-start-auto"
+                                  title="Remove cost"
+                                  [attr.aria-label]="'Remove additional cost ' + (index + 1)"
+                                  (click)="removeExpense(index)"
+                                >
+                                  <app-icon name="heroXMark" />
+                                </button>
+                              </div>
+
+                              @if (expense.category === 'other') {
+                                <app-form-field
+                                  label="Cost name"
+                                  [required]="true"
+                                  class="mt-3 block"
+                                >
+                                  <input
+                                    class="input input-bordered h-10 w-full"
+                                    placeholder="e.g. Port handling"
+                                    [(ngModel)]="expense.customCategory"
+                                    [ngModelOptions]="{ standalone: true }"
+                                    (input)="markDirty()"
+                                  />
+                                </app-form-field>
+                              }
+
+                              @if (expense.settlement === 'separate') {
+                                <app-form-field
+                                  label="Paid from"
+                                  [required]="true"
+                                  class="mt-3 block"
+                                  [error]="
+                                    accountOptions().length === 0
+                                      ? accountsError() ||
+                                        'No cash, bank, or M-Pesa account is configured.'
+                                      : null
+                                  "
+                                >
+                                  <app-searchable-filter
+                                    data-expense-account-picker
+                                    ariaLabel="Choose account used for this cost"
+                                    placeholder="Choose cash, bank, or M-Pesa account"
+                                    searchPlaceholder="Search accounts by name or code…"
+                                    controlSize="sm"
+                                    [options]="accountOptions()"
+                                    [value]="expense.accountCode"
+                                    (valueChange)="expense.accountCode = $event; markDirty()"
+                                  />
+                                </app-form-field>
+                              }
+
+                              @if (expense.noteExpanded) {
+                                <app-form-field label="Note" class="mt-3 block">
+                                  <input
+                                    class="input input-bordered h-10 w-full"
+                                    placeholder="Optional note about this cost"
+                                    [(ngModel)]="expense.memo"
+                                    [ngModelOptions]="{ standalone: true }"
+                                    (input)="markDirty()"
+                                  />
+                                </app-form-field>
+                              } @else {
+                                <button
+                                  type="button"
+                                  class="btn btn-ghost btn-xs mt-2 px-1 text-base-content/60"
+                                  (click)="showExpenseNote(expense)"
+                                >
+                                  <app-icon name="heroPlus" size="sm" /> Add note
+                                </button>
+                              }
+
+                              @if (expense.error) {
+                                <p class="mt-2 text-sm text-error" role="alert">
+                                  {{ expense.error }}
+                                </p>
+                              }
+                            </article>
+                          }
+                        </div>
                       }
                     </div>
                   }
@@ -680,20 +677,22 @@ interface EnteredTaxBreakdown {
                     "
                   />
                 </div>
-                <div class="flex justify-between text-sm">
-                  <span>{{
-                    priceEntryBasis() === 'exclusive'
-                      ? 'Supplier expenses before VAT'
-                      : 'Supplier expenses'
-                  }}</span
-                  ><app-money
-                    [amount]="
+                @if (supplierExpenseTotal() > 0) {
+                  <div class="flex justify-between text-sm">
+                    <span>{{
                       priceEntryBasis() === 'exclusive'
-                        ? enteredSupplierExpenseTotal()
-                        : supplierExpenseTotal()
-                    "
-                  />
-                </div>
+                        ? 'Additional costs before VAT'
+                        : 'Additional costs'
+                    }}</span
+                    ><app-money
+                      [amount]="
+                        priceEntryBasis() === 'exclusive'
+                          ? enteredSupplierExpenseTotal()
+                          : supplierExpenseTotal()
+                      "
+                    />
+                  </div>
+                }
                 @if (priceEntryBasis() === 'exclusive') {
                   <div class="flex justify-between text-sm">
                     <span>VAT on supplier invoice</span><app-money [amount]="invoiceTaxTotal()" />
@@ -744,7 +743,7 @@ interface EnteredTaxBreakdown {
             </aside>
           </div>
         } @else {
-          <div class="grid items-start gap-6 lg:grid-cols-12">
+          <div class="grid items-start gap-4 lg:grid-cols-12">
             <section class="card bg-base-100 lg:col-span-9">
               <div class="card-body gap-5 p-4 md:p-5">
                 <div class="flex items-center justify-between gap-3">
@@ -877,20 +876,22 @@ interface EnteredTaxBreakdown {
                     "
                   />
                 </div>
-                <div class="flex justify-between text-sm">
-                  <span>{{
-                    priceEntryBasis() === 'exclusive'
-                      ? 'Supplier expenses before VAT'
-                      : 'Supplier-bill expenses'
-                  }}</span
-                  ><app-money
-                    [amount]="
+                @if (supplierExpenseTotal() > 0) {
+                  <div class="flex justify-between text-sm">
+                    <span>{{
                       priceEntryBasis() === 'exclusive'
-                        ? enteredSupplierExpenseTotal()
-                        : supplierExpenseTotal()
-                    "
-                  />
-                </div>
+                        ? 'Additional costs before VAT'
+                        : 'Additional costs'
+                    }}</span
+                    ><app-money
+                      [amount]="
+                        priceEntryBasis() === 'exclusive'
+                          ? enteredSupplierExpenseTotal()
+                          : supplierExpenseTotal()
+                      "
+                    />
+                  </div>
+                }
                 @if (priceEntryBasis() === 'exclusive') {
                   <div class="flex justify-between text-sm">
                     <span>VAT on supplier invoice</span><app-money [amount]="invoiceTaxTotal()" />
@@ -911,24 +912,30 @@ interface EnteredTaxBreakdown {
                 } @else if (priceEntryBasis() === 'exclusive' && invoiceTaxTotal() > 0) {
                   <p class="type-caption">VAT is included in inventory and expense cost.</p>
                 }
-                <div class="flex justify-between text-sm">
-                  <span>Separately paid expenses</span
-                  ><app-money [amount]="separateExpenseTotal()" />
-                </div>
+                @if (separateExpenseTotal() > 0) {
+                  <div class="flex justify-between text-sm">
+                    <span>Costs paid separately</span
+                    ><app-money [amount]="separateExpenseTotal()" />
+                  </div>
+                }
                 <div class="flex justify-between text-sm">
                   <span>Initial supplier payment</span><app-money [amount]="initialPayment()" />
                 </div>
-                <div class="flex justify-between text-sm">
-                  <span>Advance applied</span><app-money [amount]="advanceUsed()" />
-                </div>
+                @if (advanceUsed() > 0) {
+                  <div class="flex justify-between text-sm">
+                    <span>Advance applied</span><app-money [amount]="advanceUsed()" />
+                  </div>
+                }
                 <div class="flex justify-between text-sm">
                   <span>Cash leaving now</span
                   ><strong><app-money [amount]="cashLeavingNow()" /></strong>
                 </div>
-                <div class="flex justify-between text-sm">
-                  <span>Remaining supplier balance</span
-                  ><strong><app-money [amount]="balanceDue()" /></strong>
-                </div>
+                @if (balanceDue() > 0) {
+                  <div class="flex justify-between text-sm">
+                    <span>Remaining supplier balance</span
+                    ><strong><app-money [amount]="balanceDue()" /></strong>
+                  </div>
+                }
                 <button
                   appButton
                   type="button"
@@ -1444,21 +1451,6 @@ export class PurchaseEditorComponent implements OnInit {
       if (request === this.taxEstimateRequest) this.taxEstimateLoading.set(false);
     }
   }
-  protected expenseSettlementHint(settlement: ExpenseSettlement): string {
-    if (settlement === 'supplier_bill') {
-      return 'Follows the supplier payment and affects the supplier balance.';
-    }
-    if (settlement === 'separate') {
-      return 'Paid now from the selected account; does not affect the supplier balance.';
-    }
-    return 'Choose who is being paid before continuing.';
-  }
-  protected expenseCategoryLabel(expense: ExpenseForm): string {
-    if (expense.category === 'other') {
-      return expense.customCategory.trim() || 'Other purchase cost';
-    }
-    return expense.category.charAt(0).toUpperCase() + expense.category.slice(1);
-  }
   protected purchaseInfoSummary(): string {
     const [year, month, day] = this.purchaseDate.value.split('-').map(Number);
     const date =
@@ -1680,6 +1672,7 @@ export class PurchaseEditorComponent implements OnInit {
         amount: '',
         settlement: '',
         accountCode: this.account.value || this.accounts()[0]?.code || '',
+        noteExpanded: false,
         error: null,
       },
     ]);
@@ -1689,6 +1682,10 @@ export class PurchaseEditorComponent implements OnInit {
     expense.grossAmountOverride = undefined;
     this.expenses.update(items => [...items]);
     this.markDirty();
+  }
+  protected showExpenseNote(expense: ExpenseForm): void {
+    expense.noteExpanded = true;
+    this.expenses.update(items => [...items]);
   }
   protected setExpenseSettlement(expense: ExpenseForm, settlement: ExpenseSettlement): void {
     if (expense.settlement === settlement) return;
@@ -2132,6 +2129,7 @@ export class PurchaseEditorComponent implements OnInit {
           ),
           settlement: String(item['settlement'] ?? '') as ExpenseSettlement,
           accountCode: String(item['account_code'] ?? this.account.value),
+          noteExpanded: Boolean(String(item['memo'] ?? '').trim()),
           error: null,
           grossAmountOverride:
             this.priceEntryBasis() === 'exclusive' && item['settlement'] === 'supplier_bill'

@@ -148,7 +148,7 @@ describe('PurchaseEditorComponent input VAT', () => {
     fixture.detectChanges();
     await vi.waitFor(() => {
       fixture.detectChanges();
-      expect(fixture.nativeElement.textContent).toContain('Claim input VAT from this invoice');
+      expect(fixture.nativeElement.textContent).toContain('Supplier prices');
       expect(fixture.nativeElement.querySelector('.loading-spinner')).toBeNull();
     });
     return { fixture, component: fixture.componentInstance as any, money, suppliers };
@@ -178,6 +178,13 @@ describe('PurchaseEditorComponent input VAT', () => {
 
   it('shows the claim control, prefills supplier evidence, and renders a server estimate', async () => {
     const { fixture, component, money } = await render();
+    const priceBasis = fixture.nativeElement.querySelector('[data-purchase-price-basis]');
+    const claimToggle = fixture.nativeElement.querySelector('input[aria-label="Claim input VAT"]');
+
+    expect(priceBasis.textContent).toContain('VAT included');
+    expect(priceBasis.textContent).toContain('Before VAT');
+    expect(claimToggle).not.toBeNull();
+
     addValidInvoice(component);
 
     expect(component.supplierTaxPin.value).toBe('P000000001A');
@@ -267,13 +274,20 @@ describe('PurchaseEditorComponent input VAT', () => {
   });
 
   it('allows exclusive entry for a configured shop that cannot claim input VAT', async () => {
-    const { component } = await render({ vat_registered: false });
+    const { fixture, component } = await render({ vat_registered: false });
     addValidInvoice(component);
     component.setClaimInputVat(false);
+    fixture.detectChanges();
 
     component.setPriceEntryBasis('exclusive');
 
     expect(component.priceEntryBasis()).toBe('exclusive');
+    expect(
+      fixture.nativeElement.querySelector('input[aria-label="Claim input VAT"]').disabled
+    ).toBe(true);
+    expect(fixture.nativeElement.textContent).toContain(
+      'Claiming becomes available when the shop is VAT registered'
+    );
   });
 
   it('does not rewrite entered values when the purchase-wide basis changes', async () => {
@@ -291,12 +305,23 @@ describe('PurchaseEditorComponent input VAT', () => {
   });
 
   it('preserves an expense gross amount when its settlement changes', async () => {
-    const { component } = await render();
+    const { fixture, component } = await render();
     addValidInvoice(component);
     component.setPriceEntryBasis('exclusive');
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('Additional costs');
+    expect(fixture.nativeElement.textContent).not.toContain('This cost is');
+
     component.addExpense();
+    fixture.detectChanges();
     const expense = component.expenses()[0];
     expense.amount = '116';
+    component.expenseAmountChanged(expense);
+
+    expect(fixture.nativeElement.textContent).toContain('This cost is');
+    expect(fixture.nativeElement.textContent).not.toContain('Expense 1');
+    expect(expense.settlement).toBe('');
 
     component.setExpenseSettlement(expense, 'supplier_bill');
     expect(expense.amount).toBe('100');
@@ -305,6 +330,9 @@ describe('PurchaseEditorComponent input VAT', () => {
     component.setExpenseSettlement(expense, 'separate');
     expect(expense.amount).toBe('116');
     expect(component.separateExpenseTotal()).toBe(116);
+
+    component.setExpenseSettlement(expense, 'supplier_bill');
+    expect(expense.amount).toBe('100');
   });
 
   it('restores VAT evidence from a draft and preserves it when saving again', async () => {

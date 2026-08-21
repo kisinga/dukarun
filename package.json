@@ -34,7 +34,7 @@
     "test:contract": "node --no-warnings --experimental-strip-types --test tests/contracts/*.contract.spec.mjs",
     "test:api": "node --no-warnings --experimental-strip-types --test tests/api/*.api.spec.mjs",
     "test:db": "supabase test db",
-    "test:db:migration": "node supabase/tests/migrations/paid-onboarding-migration.spec.mjs",
+    "test:db:migration": "node supabase/tests/migrations/paid-onboarding-migration.spec.mjs && node supabase/tests/migrations/purchase-workflow-schema-convergence.spec.mjs",
     "test:db:concurrency": "node supabase/tests/concurrency/ledger.concurrency.spec.mjs && node supabase/tests/concurrency/customer-accounts.concurrency.spec.mjs && node supabase/tests/concurrency/communications.concurrency.spec.mjs && node supabase/tests/concurrency/paid-onboarding.concurrency.spec.mjs",
     "test:e2e:mocked": "playwright test --project=mocked-desktop --project=mocked-mobile",
     "test:e2e:critical": "playwright test --config=playwright.critical.config.ts",

@@ -1,7 +1,7 @@
 begin;
 -- Tax-profile effective dates are company-business dates, not runner UTC dates.
 set local timezone to 'Africa/Nairobi';
-select plan(95);
+select plan(96);
 
 select has_table('public','tax_rate_versions','VAT rates are effective-dated');
 select has_table('public','legacy_customer_account_reconciliations',
@@ -22,6 +22,9 @@ select has_function('public','tax_document_integration_envelope',array['uuid','t
   'provider-neutral tax-document envelope RPC exists');
 select has_function('public','purchase_tax_context',array['uuid[]','date'],
   'purchase editor can fetch effective tax rates without recalculating on every keystroke');
+select has_function('public','calculate_purchase_invoice_tax',
+  array['uuid','jsonb','jsonb','date'],
+  'purchase finalization has an invoice-tax calculator independent of claim eligibility');
 
 select testkit.create_user('a1000000-0000-4000-8000-000000000001','vat-v1@test.local');
 select testkit.create_user('a1000000-0000-4000-8000-000000000002','vat-platform@test.local');

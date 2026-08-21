@@ -64,6 +64,9 @@ jobs:
         # pgtap's own extension functions produce false positives; lint our schema only.
         run: supabase db lint --schema public
 
+      - name: Run migration upgrade tests
+        run: npm run test:db:migration
+
       - name: Run pgTAP tests
         run: npm run test:db
 

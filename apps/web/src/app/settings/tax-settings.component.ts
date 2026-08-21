@@ -27,10 +27,14 @@ import { ReceiptDataService } from '../shared/print/receipt-data.service';
               added at checkout.
             </p>
           </div>
-          @if (settings()?.active_profile; as profile) {
-            <span class="badge" [class.badge-success]="profile.vat_registered">
-              {{ profile.vat_registered ? 'VAT registered' : 'Not VAT registered' }}
-            </span>
+          @if (settings(); as current) {
+            @if (current.active_profile?.vat_registered) {
+              <span class="badge badge-success">VAT active</span>
+            } @else if (scheduledVatActivation()) {
+              <span class="badge badge-info badge-outline">VAT scheduled</span>
+            } @else {
+              <span class="badge badge-ghost">VAT off</span>
+            }
           }
         </div>
 
@@ -42,88 +46,115 @@ import { ReceiptDataService } from '../shared/print/receipt-data.service';
             <span>{{ error() }}</span>
           </div>
         } @else if (settings(); as current) {
-          <div class="mt-4 grid gap-4 sm:grid-cols-2">
-            <div class="rounded-box border border-base-300 p-3">
-              <p class="type-caption">Current treatment</p>
-              <p class="mt-1 font-semibold">
-                {{ current.active_profile?.jurisdiction_name ?? 'Not configured' }}
-              </p>
-              @if (current.active_profile?.vat_registered) {
-                <p class="type-caption mt-1">
-                  PIN {{ current.active_profile?.tax_registration_number }} · effective
-                  {{ current.active_profile?.effective_from }}
-                </p>
+          <div class="mt-4 rounded-box border border-base-300 p-3">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                @if (current.active_profile?.vat_registered) {
+                  <p class="text-sm font-semibold">
+                    {{ current.active_profile?.jurisdiction_name }} VAT is active
+                  </p>
+                  <p class="type-caption mt-1">
+                    PIN {{ current.active_profile?.tax_registration_number }} · active since
+                    {{ current.active_profile?.effective_from }} · prices remain VAT-inclusive
+                  </p>
+                } @else if (scheduledVatActivation(); as scheduled) {
+                  <p class="text-sm font-semibold">VAT activation is scheduled</p>
+                  <p class="type-caption mt-1">
+                    {{ scheduled.jurisdiction_name }} · starts {{ scheduled.effective_from }} · PIN
+                    {{ scheduled.tax_registration_number }}
+                  </p>
+                } @else {
+                  <p class="text-sm font-semibold">VAT is not active</p>
+                  <p class="type-caption mt-1">
+                    Sales are recorded without output VAT. Historical transactions are unchanged.
+                  </p>
+                }
+              </div>
+              @if (canManage() && !profileEditorOpen() && current.scheduled_profiles.length === 0) {
+                <button appButton type="button" variant="outline" size="sm" (click)="openEditor()">
+                  {{ current.active_profile?.vat_registered ? 'Schedule a change' : 'Set up VAT' }}
+                </button>
               }
             </div>
-            <label
-              class="flex min-h-16 cursor-pointer items-center justify-between gap-3 rounded-box border border-base-300 p-3"
-            >
-              <span>
-                <span class="block text-sm font-semibold">Show VAT breakdown on prints</span>
-                <span class="type-caption">One shop-wide setting for receipts and invoices.</span>
-              </span>
-              <input
-                type="checkbox"
-                class="toggle toggle-primary"
-                [checked]="current.show_vat_breakdown_on_prints"
-                [disabled]="savingPrint() || !canManage()"
-                (change)="savePrint($event)"
-              />
-            </label>
+
+            @if (current.active_profile?.vat_registered || scheduledVatActivation()) {
+              <label
+                class="mt-3 flex cursor-pointer items-center justify-between gap-3 border-t border-base-300 pt-3"
+              >
+                <span>
+                  <span class="block text-sm font-medium">Show VAT on printed documents</span>
+                  <span class="type-caption">Applies to receipts, invoices, and reprints.</span>
+                </span>
+                <input
+                  type="checkbox"
+                  class="toggle toggle-primary toggle-sm"
+                  [checked]="current.show_vat_breakdown_on_prints"
+                  [disabled]="savingPrint() || !canManage()"
+                  (change)="savePrint($event)"
+                />
+              </label>
+            }
           </div>
 
+          @if (notice()) {
+            <p class="mt-3 text-sm text-success">{{ notice() }}</p>
+          }
+
           @if (kenyaVatConfigured()) {
-            <section class="mt-4 rounded-box border border-base-300 p-3">
-              <div class="flex flex-wrap items-start justify-between gap-2">
+            <details class="mt-4 rounded-box border border-base-300 p-3">
+              <summary class="flex cursor-pointer list-none items-center justify-between gap-3">
                 <div>
                   <h3 class="text-sm font-semibold">eTIMS preparation</h3>
                   <p class="type-caption mt-1">
-                    Save the KRA branch ID assigned to each location. Future VAT documents snapshot
-                    it, so an eTIMS connector can submit them without changing historical sales.
+                    Optional branch identifiers for future integration.
                   </p>
                 </div>
                 <span class="badge badge-outline">No submission yet</span>
-              </div>
-              <div class="mt-3 grid gap-2">
-                @for (location of integrationLocations(); track location.id) {
-                  <div class="grid items-end gap-2 sm:grid-cols-[minmax(0,1fr)_11rem_auto]">
-                    <div>
-                      <p class="text-sm font-medium">{{ location.name }}</p>
-                      <p class="type-caption">{{ location.code }}</p>
+              </summary>
+              <div class="mt-3 border-t border-base-300 pt-3">
+                <p class="type-caption">
+                  Future VAT documents snapshot the KRA branch ID saved for each location.
+                </p>
+                <div class="mt-3 grid gap-2">
+                  @for (location of integrationLocations(); track location.id) {
+                    <div class="grid items-end gap-2 sm:grid-cols-[minmax(0,1fr)_11rem_auto]">
+                      <div>
+                        <p class="text-sm font-medium">{{ location.name }}</p>
+                        <p class="type-caption">{{ location.code }}</p>
+                      </div>
+                      <app-form-field
+                        label="KRA branch ID"
+                        hint="Use the ID assigned by KRA, often 00 for head office."
+                      >
+                        <input
+                          class="input input-bordered input-sm w-full"
+                          autocomplete="off"
+                          maxlength="32"
+                          [value]="branchCodes()[location.id]"
+                          [disabled]="!canManage() || savingBranchId() === location.id"
+                          (input)="setBranchCode(location.id, $event)"
+                        />
+                      </app-form-field>
+                      <button
+                        appButton
+                        type="button"
+                        variant="outline"
+                        [loading]="savingBranchId() === location.id"
+                        [disabled]="!canManage()"
+                        (click)="saveBranchCode(location)"
+                      >
+                        Save
+                      </button>
                     </div>
-                    <app-form-field
-                      label="KRA branch ID"
-                      hint="Use the ID assigned by KRA, often 00 for head office."
-                    >
-                      <input
-                        class="input input-bordered input-sm w-full"
-                        autocomplete="off"
-                        maxlength="32"
-                        [value]="branchCodes()[location.id]"
-                        [disabled]="!canManage() || savingBranchId() === location.id"
-                        (input)="setBranchCode(location.id, $event)"
-                      />
-                    </app-form-field>
-                    <button
-                      appButton
-                      type="button"
-                      variant="outline"
-                      [loading]="savingBranchId() === location.id"
-                      [disabled]="!canManage()"
-                      (click)="saveBranchCode(location)"
-                    >
-                      Save
-                    </button>
-                  </div>
-                } @empty {
-                  <p class="type-caption">No active shop locations found.</p>
-                }
+                  } @empty {
+                    <p class="type-caption">No active shop locations found.</p>
+                  }
+                </div>
+                <p class="type-caption mt-3">
+                  Dukarun does not yet sign, transmit, or certify invoices through eTIMS.
+                </p>
               </div>
-              <p class="type-caption mt-3">
-                This prepares document data only. Dukarun does not yet sign, transmit, or certify
-                invoices through eTIMS.
-              </p>
-            </section>
+            </details>
           }
 
           @if (current.scheduled_profiles.length) {
@@ -157,14 +188,18 @@ import { ReceiptDataService } from '../shared/print/receipt-data.service';
             </div>
           }
 
-          @if (canManage()) {
+          @if (canManage() && profileEditorOpen()) {
             <form
               class="mt-5 border-t border-base-300/70 pt-4"
               (submit)="$event.preventDefault(); saveProfile()"
             >
               <div class="flex items-center justify-between gap-3">
                 <div>
-                  <h3 class="text-sm font-semibold">Set up VAT</h3>
+                  <h3 class="text-sm font-semibold">
+                    {{
+                      current.active_profile?.vat_registered ? 'Schedule VAT change' : 'Set up VAT'
+                    }}
+                  </h3>
                   <p class="type-caption mt-1">Step {{ onboardingStep() }} of 4</p>
                 </div>
                 <ul class="steps steps-horizontal hidden text-xs sm:flex">
@@ -181,7 +216,11 @@ import { ReceiptDataService } from '../shared/print/receipt-data.service';
                 @if (onboardingStep() === 1) {
                   <h4 class="font-semibold">Is this shop VAT registered?</h4>
                   <p class="type-caption mt-1">
-                    Choose no when recording a deregistration or keeping VAT disabled.
+                    {{
+                      current.active_profile?.vat_registered
+                        ? 'Choose deregister only when the shop is legally ending its VAT registration.'
+                        : 'VAT registration is required before Dukarun can calculate output VAT.'
+                    }}
                   </p>
                   <div class="mt-4 grid gap-2 sm:grid-cols-2">
                     <button
@@ -198,7 +237,11 @@ import { ReceiptDataService } from '../shared/print/receipt-data.service';
                       [class.btn-primary]="!registered.value"
                       (click)="registered.setValue(false)"
                     >
-                      No, not registered
+                      {{
+                        current.active_profile?.vat_registered
+                          ? 'Deregister from VAT'
+                          : 'Keep VAT off'
+                      }}
                     </button>
                   </div>
                 } @else if (onboardingStep() === 2) {
@@ -277,17 +320,13 @@ import { ReceiptDataService } from '../shared/print/receipt-data.service';
                   </div>
                 }
               </div>
-              @if (notice()) {
-                <p class="mt-3 text-sm text-success">{{ notice() }}</p>
-              }
               <div class="mt-4 flex justify-between gap-2">
                 <button
                   type="button"
                   class="btn btn-ghost"
-                  [disabled]="onboardingStep() === 1"
-                  (click)="previousStep()"
+                  (click)="onboardingStep() === 1 ? closeEditor() : previousStep()"
                 >
-                  Back
+                  {{ onboardingStep() === 1 ? 'Cancel' : 'Back' }}
                 </button>
                 @if (onboardingStep() < 4) {
                   <button type="button" class="btn btn-primary" (click)="nextStep()">
@@ -304,7 +343,7 @@ import { ReceiptDataService } from '../shared/print/receipt-data.service';
                 }
               </div>
             </form>
-          } @else {
+          } @else if (!canManage()) {
             <p class="type-caption mt-4 border-t border-base-300/70 pt-4">
               Finance administration permission is required to change VAT settings.
             </p>
@@ -330,7 +369,11 @@ export class TaxSettingsComponent implements OnInit {
   protected readonly branchCodes = signal<Record<string, string>>({});
   protected readonly savingBranchId = signal<string | null>(null);
   protected readonly onboardingStep = signal(1);
+  protected readonly profileEditorOpen = signal(false);
   protected readonly canManage = computed(() => this.permissions.has('CloseAccountingPeriod'));
+  protected readonly scheduledVatActivation = computed(
+    () => this.settings()?.scheduled_profiles.find(profile => profile.vat_registered) ?? null
+  );
   protected readonly kenyaVatConfigured = computed(() => {
     const current = this.settings();
     return Boolean(
@@ -418,6 +461,7 @@ export class TaxSettingsComponent implements OnInit {
       this.receiptData.invalidateCompanyInfo();
       this.notice.set(`VAT treatment will start on ${this.effectiveFrom.value}.`);
       this.onboardingStep.set(1);
+      this.profileEditorOpen.set(false);
       await this.load();
     } catch (error) {
       this.error.set(error instanceof Error ? error.message : 'Could not schedule VAT treatment');
@@ -465,6 +509,18 @@ export class TaxSettingsComponent implements OnInit {
 
   protected previousStep(): void {
     this.onboardingStep.update(step => Math.max(step - 1, 1));
+  }
+
+  protected openEditor(): void {
+    this.onboardingStep.set(1);
+    this.notice.set(null);
+    this.registered.setValue(true);
+    this.profileEditorOpen.set(true);
+  }
+
+  protected closeEditor(): void {
+    this.onboardingStep.set(1);
+    this.profileEditorOpen.set(false);
   }
 
   protected jurisdictionName(): string {
