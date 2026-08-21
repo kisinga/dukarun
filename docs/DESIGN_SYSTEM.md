@@ -415,6 +415,17 @@ container (`.nav-item-active` / the icon pill in `.bottom-nav-active`) — no in
 bars, dots, gradients, or weight games on top of it. Apply the active class via
 `routerLinkActive`. Never hand-roll nav rows in shell files.
 
+### Section tabs
+
+Peer views inside a workspace use the global `.section-tabs` surface and `.section-tab` items.
+The group is content-width, horizontally scrollable when necessary, and uses the standard box and
+field radii. `.section-tab-active` is the only active signifier: a quiet primary tint with primary
+text. Do not use underline-only tabs, square outlines, full-width empty tab bars, or page-specific
+tab geometry. On phones, multi-view workspaces may replace the strip with a labeled select.
+
+Wizard steps and in-flow choices such as payment methods are not section navigation and keep their
+own purpose-specific patterns.
+
 ## Tables (the row language)
 
 Header chrome is encoded globally (`.dashboard-main .table thead th`): uppercase 12px

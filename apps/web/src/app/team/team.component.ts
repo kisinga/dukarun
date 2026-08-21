@@ -877,7 +877,13 @@ export class TeamComponent implements OnInit {
     },
     {
       label: 'Administration',
-      permissions: ['ManageTeam', 'ViewAuditTrail', 'ViewStaffPerformance', 'ManageCommunications'],
+      permissions: [
+        'ManageCompanySettings',
+        'ManageTeam',
+        'ViewAuditTrail',
+        'ViewStaffPerformance',
+        'ManageCommunications',
+      ],
     },
   ] as const;
   protected readonly members = this.team.members;

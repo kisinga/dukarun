@@ -345,6 +345,8 @@ export const routes: Routes = [
       },
       {
         path: 'settings',
+        canActivate: [permissionGuard],
+        data: { permission: 'ManageCompanySettings' },
         loadComponent: () => import('./settings/settings.component').then(m => m.SettingsComponent),
       },
       {

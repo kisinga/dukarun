@@ -613,6 +613,73 @@ input.search-with-custom-clear::-ms-clear {
     }
   }
 
+  /* ONE section-tab recipe for switching peer views within a workspace.
+     The rounded surface establishes the group; the tinted tab is the only active signifier. */
+  .section-tabs {
+    display: flex;
+    width: max-content;
+    max-width: 100%;
+    align-items: center;
+    gap: 0.25rem;
+    overflow-x: auto;
+    border: 1px solid color-mix(in oklab, var(--color-base-300) 70%, transparent);
+    border-radius: var(--radius-box);
+    background: var(--color-base-100);
+    padding: 0.25rem;
+    box-shadow: var(--shadow-card);
+    scrollbar-width: thin;
+  }
+
+  .section-tab {
+    display: inline-flex;
+    min-height: 2.75rem;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border: 0;
+    border-radius: var(--radius-field);
+    background: transparent;
+    padding: 0.5rem 0.875rem;
+    color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1.25rem;
+    white-space: nowrap;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition:
+      background-color 150ms ease,
+      color 150ms ease;
+
+    &:hover:not(:disabled):not(.section-tab-active) {
+      background: color-mix(in oklab, var(--color-base-content) 6%, transparent);
+      color: var(--color-base-content);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--color-primary);
+      outline-offset: 1px;
+    }
+
+    &:disabled,
+    &[aria-disabled='true'] {
+      cursor: not-allowed;
+      opacity: 0.45;
+    }
+  }
+
+  .section-tab-active,
+  .section-tab-active:hover {
+    background: color-mix(in oklab, var(--color-primary) 10%, transparent);
+    color: var(--color-primary);
+    font-weight: 600;
+
+    ng-icon {
+      color: currentColor;
+    }
+  }
+
   /* Desktop pointer: denser nav rows (touch keeps the 44px target). */
   @media (min-width: 1024px) {
     .nav-item {

@@ -143,21 +143,27 @@ const POLL_TIMEOUT_MS = 60_000;
       <div id="subscription-plans" class="mb-3 flex scroll-mt-4 items-center justify-between">
         <h2 class="type-heading">Subscription plans</h2>
         @if (!initialPurchaseRequired()) {
-          <div role="tablist" class="tabs tabs-boxed">
-            <a
+          <div role="tablist" class="section-tabs">
+            <button
               role="tab"
-              class="tab min-h-11"
-              [class.tab-active]="cycle() === 'monthly'"
+              type="button"
+              class="section-tab"
+              [class.section-tab-active]="cycle() === 'monthly'"
+              [attr.aria-selected]="cycle() === 'monthly'"
               (click)="cycle.set('monthly')"
-              >Monthly</a
             >
-            <a
+              Monthly
+            </button>
+            <button
               role="tab"
-              class="tab min-h-11"
-              [class.tab-active]="cycle() === 'yearly'"
+              type="button"
+              class="section-tab"
+              [class.section-tab-active]="cycle() === 'yearly'"
+              [attr.aria-selected]="cycle() === 'yearly'"
               (click)="cycle.set('yearly')"
-              >Yearly</a
             >
+              Yearly
+            </button>
           </div>
         } @else {
           <span class="badge badge-primary">First purchase</span>
