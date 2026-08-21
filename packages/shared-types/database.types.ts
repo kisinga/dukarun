@@ -15103,7 +15103,7 @@ export type Database = {
         Args: { p_location_id?: string; p_supplier_id: string }
         Returns: {
           stock: number
-          stock_value: number | null
+          stock_value: number
           variant_id: string
         }[]
       }
@@ -15596,3 +15596,4 @@ export const Constants = {
     Enums: {},
   },
 } as const
+
