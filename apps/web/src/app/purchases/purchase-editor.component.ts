@@ -22,7 +22,7 @@ import {
   PurchaseLineInput,
   SupplierVariantPerformance,
 } from '../money/money.service';
-import { Variant, variantLabel } from '../pos/pos.service';
+import { PosService, SupplierStockRow, Variant, variantLabel } from '../pos/pos.service';
 import { ButtonComponent } from '../shared/ui/button.component';
 import { FormFieldComponent } from '../shared/ui/form-field.component';
 import { IconComponent } from '../shared/ui/icon.component';
@@ -39,6 +39,7 @@ import {
   type PurchaseLineForm,
   type PurchaseLinePriceContext,
 } from './purchase-line-row.component';
+import { resolveLinkedSupplier } from './purchase-editor-link';
 
 type PaymentMode = 'paid' | 'partial' | 'later';
 type ExpenseSettlement = '' | 'supplier_bill' | 'separate';
@@ -139,7 +140,7 @@ interface EnteredTaxBreakdown {
                         data-location-picker
                         class="select select-bordered h-12 w-full"
                         [formControl]="location"
-                        (change)="markDirty()"
+                        (change)="onReceivingLocationChange()"
                       >
                         @for (item of locations(); track item.id) {
                           <option [value]="item.id">{{ item.name }}</option>
@@ -198,6 +199,108 @@ interface EnteredTaxBreakdown {
                         />
                       </app-form-field>
                     </div>
+                  }
+                  @if (selectedSupplier(); as selected) {
+                    <section
+                      class="rounded-field border border-base-300 bg-base-200/30 p-3"
+                      aria-label="Supplier account context"
+                    >
+                      <div class="flex flex-wrap items-start justify-between gap-2">
+                        <div>
+                          <p class="text-sm font-semibold">{{ supplierName(selected) }}</p>
+                          <p class="type-caption">
+                            {{ selected.supplier_credit_terms_days || 0 }} day terms
+                            @if (selected.days_outstanding !== null) {
+                              · {{ selected.days_outstanding }} days outstanding
+                            }
+                            @if (selected.bucket) {
+                              · {{ selected.bucket }}
+                            }
+                          </p>
+                        </div>
+                        <a
+                          class="link text-xs"
+                          routerLink="/suppliers"
+                          [queryParams]="{ supplier: selected.id }"
+                          >View supplier</a
+                        >
+                      </div>
+                      <div class="mt-3 grid gap-2 text-sm sm:grid-cols-2 xl:grid-cols-3">
+                        <div>
+                          <p class="type-caption">Currently owed</p>
+                          <p class="font-semibold">
+                            <app-money
+                              [amount]="selected.ap_balance"
+                              [masked]="!perms.has('ViewFinancials')"
+                            />
+                          </p>
+                        </div>
+                        <div>
+                          <p class="type-caption">Projected balance</p>
+                          <p class="font-semibold">
+                            <app-money
+                              [amount]="projectedSupplierBalance()"
+                              [masked]="!perms.has('ViewFinancials')"
+                            />
+                          </p>
+                        </div>
+                        <div>
+                          <p class="type-caption">Credit limit</p>
+                          <p class="font-semibold">
+                            @if (!perms.has('ViewFinancials')) {
+                              Hidden
+                            } @else if (selected.supplier_credit_limit <= 0) {
+                              No configured limit
+                            } @else {
+                              <app-money [amount]="selected.supplier_credit_limit" />
+                            }
+                          </p>
+                        </div>
+                        <div>
+                          <p class="type-caption">Available credit after purchase</p>
+                          <p class="font-semibold">
+                            @if (!perms.has('ViewFinancials')) {
+                              Hidden
+                            } @else if (projectedCreditAvailable() === null) {
+                              Not limited
+                            } @else {
+                              <app-money [amount]="projectedCreditAvailable()!" />
+                            }
+                          </p>
+                        </div>
+                        <div>
+                          <p class="type-caption">Advance available</p>
+                          <p class="font-semibold">
+                            <app-money
+                              [amount]="supplierAdvanceAvailable()"
+                              [masked]="!perms.has('ViewFinancials')"
+                            />
+                          </p>
+                        </div>
+                        <div>
+                          <p class="type-caption">Stock sourced here</p>
+                          @if (supplierStockLoading()) {
+                            <span class="loading loading-spinner loading-xs"></span>
+                          } @else if (supplierStockError()) {
+                            <p class="text-xs text-warning">Unavailable</p>
+                          } @else {
+                            <p class="font-semibold">
+                              {{ supplierStock().length }} variants ·
+                              <app-money
+                                [amount]="supplierStockValue()"
+                                [masked]="!perms.has('ViewFinancials')"
+                              />
+                            </p>
+                            <a
+                              class="link type-caption"
+                              routerLink="/inventory/products"
+                              [queryParams]="{ supplier: selected.id }"
+                              >{{ receivingLocationName() }}</a
+                            >
+                          }
+                        </div>
+                      </div>
+                    </section>
                   }
                 </div>
               </section>
@@ -936,6 +1039,35 @@ interface EnteredTaxBreakdown {
                     ><strong><app-money [amount]="balanceDue()" /></strong>
                   </div>
                 }
+                @if (selectedSupplier(); as selected) {
+                  <div class="rounded-field bg-base-200/60 p-3 text-sm">
+                    <div class="flex justify-between gap-3">
+                      <span>Currently owed</span>
+                      <app-money
+                        [amount]="selected.ap_balance"
+                        [masked]="!perms.has('ViewFinancials')"
+                      />
+                    </div>
+                    <div class="mt-1 flex justify-between gap-3 font-semibold">
+                      <span>Projected balance</span>
+                      <app-money
+                        [amount]="projectedSupplierBalance()"
+                        [masked]="!perms.has('ViewFinancials')"
+                      />
+                    </div>
+                    @if (selected.supplier_credit_limit > 0) {
+                      <p class="type-caption mt-1 text-right">
+                        Limit
+                        <app-money
+                          [amount]="selected.supplier_credit_limit"
+                          [masked]="!perms.has('ViewFinancials')"
+                        />
+                      </p>
+                    } @else {
+                      <p class="type-caption mt-1 text-right">No configured credit limit</p>
+                    }
+                  </div>
+                }
                 <button
                   appButton
                   type="button"
@@ -990,6 +1122,7 @@ export class PurchaseEditorComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly money = inject(MoneyService);
   private readonly catalog = inject(CatalogSearchService);
+  private readonly pos = inject(PosService);
   private readonly parties = inject(PartyCacheService);
   private readonly locationContext = inject(LocationContextService);
   protected readonly perms = inject(PermissionsService);
@@ -1021,6 +1154,9 @@ export class PurchaseEditorComponent implements OnInit {
   );
   protected readonly variants = signal<Variant[]>([]);
   protected readonly performance = signal<SupplierVariantPerformance[]>([]);
+  protected readonly supplierStock = signal<SupplierStockRow[]>([]);
+  protected readonly supplierStockLoading = signal(false);
+  protected readonly supplierStockError = signal<string | null>(null);
   protected readonly lines = signal<PurchaseLineForm[]>([]);
   protected readonly expenses = signal<ExpenseForm[]>([]);
   protected readonly searchResults = signal<Variant[]>([]);
@@ -1063,6 +1199,10 @@ export class PurchaseEditorComponent implements OnInit {
   private searchRequest = 0;
   private taxEstimateRequest = 0;
   private taxContextRequest = 0;
+  private supplierAdvanceRequest = 0;
+  private supplierStockRequest = 0;
+  private readonly performanceLoadedKeys = new Set<string>();
+  private readonly performanceLoads = new Map<string, Promise<void>>();
   private taxContextTimer: ReturnType<typeof setTimeout> | null = null;
   private taxInvoiceDateTouched = false;
   private purchaseClientRef: string = crypto.randomUUID();
@@ -1146,9 +1286,24 @@ export class PurchaseEditorComponent implements OnInit {
   protected readonly suggestedAdvance = computed(() =>
     Math.min(this.supplierAdvanceAvailable(), this.invoiceTotal())
   );
+  protected readonly supplierStockValue = computed(() =>
+    this.supplierStock().reduce((sum, row) => sum + (row.stock_value ?? 0), 0)
+  );
+  protected projectedSupplierBalance(): number {
+    return (this.selectedSupplier()?.ap_balance ?? 0) + this.balanceDue();
+  }
+  protected projectedCreditAvailable(): number | null {
+    const selected = this.selectedSupplier();
+    if (!selected || selected.supplier_credit_limit <= 0) return null;
+    return Math.max(0, selected.supplier_credit_limit - this.projectedSupplierBalance());
+  }
+  protected receivingLocationName(): string {
+    return this.locations().find(item => item.id === this.location.value)?.name ?? 'this location';
+  }
 
   async ngOnInit(): Promise<void> {
     const requestedDraft = this.route.snapshot.paramMap.get('id');
+    const requestedSupplier = this.route.snapshot.queryParamMap.get('supplier');
     let draftToRestore: PurchaseDraft | undefined;
     const errors = await runIndependentLoads([
       {
@@ -1179,15 +1334,15 @@ export class PurchaseEditorComponent implements OnInit {
           if (requestedDraft) draftToRestore = drafts.find(item => item.id === requestedDraft);
         },
       },
-      {
-        fallback: 'Failed to load supplier purchase history',
-        run: async () => this.performance.set(await this.money.supplierVariantPerformance()),
-      },
     ]);
     this.location.setValue(this.locationContext.activeId() ?? this.locations()[0]?.id ?? '');
     if (requestedDraft) {
       if (draftToRestore) this.restoreDraft(draftToRestore);
       else errors.push('Purchase draft was not found');
+    } else if (requestedSupplier) {
+      const linkedSupplier = resolveLinkedSupplier(requestedSupplier, this.parties.suppliers());
+      if (linkedSupplier.supplierId) this.applySupplierSelection(linkedSupplier.supplierId, false);
+      else errors.push(linkedSupplier.error ?? 'The linked supplier is unavailable');
     }
     this.syncSupplierPin();
     await this.refreshTaxContext();
@@ -1274,7 +1429,7 @@ export class PurchaseEditorComponent implements OnInit {
       this.supplierPinSaving.set(false);
     }
   }
-  private selectedSupplier() {
+  protected selectedSupplier() {
     return this.suppliers().find(item => item.id === this.supplier.value);
   }
   private syncSupplierPin(): void {
@@ -1481,16 +1636,6 @@ export class PurchaseEditorComponent implements OnInit {
       item => item.variant_id === line.variantId && item.supplier_id === this.supplier.value
     );
     const supplierCost = supplierInsight?.last_unit_cost ?? null;
-    const peers = this.performance().filter(
-      item => item.variant_id === line.variantId && (item.average_unit_cost ?? 0) > 0
-    );
-    const best = peers.length
-      ? peers.reduce((lowest, item) =>
-          (item.average_unit_cost ?? Infinity) < (lowest.average_unit_cost ?? Infinity)
-            ? item
-            : lowest
-        )
-      : null;
     const wholesale = parseKes(line.wholesalePrice) ?? variant?.wholesale_price ?? 0;
     const retail = parseKes(line.retailPrice) ?? variant?.price ?? 0;
     return {
@@ -1499,15 +1644,6 @@ export class PurchaseEditorComponent implements OnInit {
       purchaseCount: Number(supplierInsight?.purchase_count ?? 0),
       wholesaleMargin: this.marginContext(currentCost, wholesale),
       retailMargin: this.marginContext(currentCost, retail),
-      bestRecordedCost: best?.average_unit_cost ?? null,
-      bestRecordedSupplier: best?.supplier_id
-        ? this.supplierName(
-            this.suppliers().find(item => item.id === best.supplier_id) ?? {
-              first_name: 'Unknown supplier',
-              last_name: null,
-            }
-          )
-        : null,
       warning: this.linePriceWarning(currentCost, wholesale, retail, supplierCost),
       catalogPriceChanged:
         !!variant &&
@@ -1567,10 +1703,12 @@ export class PurchaseEditorComponent implements OnInit {
     if (first) this.addVariant(first);
   }
   protected addVariant(variant: Variant): void {
+    const supplierId = this.supplier.value;
     const supplierCost = this.performance().find(
-      item => item.variant_id === variant.variant_id && item.supplier_id === this.supplier.value
+      item => item.variant_id === variant.variant_id && item.supplier_id === supplierId
     )?.last_unit_cost;
     const cost = supplierCost ?? variant.wholesale_price ?? 0;
+    const initialCost = cost > 0 ? formatKesInput(cost) : '';
     const key = this.nextKey++;
     this.lines.update(items => [
       ...items,
@@ -1578,8 +1716,8 @@ export class PurchaseEditorComponent implements OnInit {
         key,
         variantId: variant.variant_id!,
         quantity: 1,
-        unitCost: cost > 0 ? formatKesInput(cost) : '',
-        lineTotal: cost > 0 ? formatKesInput(cost) : '',
+        unitCost: initialCost,
+        lineTotal: initialCost,
         valueSource: 'unit',
         batchNumber: '',
         expiryDate: '',
@@ -1594,6 +1732,14 @@ export class PurchaseEditorComponent implements OnInit {
     this.searchResults.set([]);
     this.scheduleTaxContext();
     this.markDirty();
+    if (
+      supplierId &&
+      variant.variant_id &&
+      supplierCost === undefined &&
+      !this.performanceLoadedKeys.has(`${supplierId}:${variant.variant_id}`)
+    ) {
+      void this.enrichAddedVariantCost(key, variant.variant_id, supplierId, initialCost);
+    }
     setTimeout(() => {
       const quantity = document.querySelector<HTMLInputElement>(
         `[data-line-key="${key}"] [data-quantity]`
@@ -1601,6 +1747,41 @@ export class PurchaseEditorComponent implements OnInit {
       quantity?.scrollIntoView({ block: 'center' });
       quantity?.focus({ preventScroll: true });
     });
+  }
+  private async enrichAddedVariantCost(
+    lineKey: number,
+    variantId: string,
+    supplierId: string,
+    initialCost: string
+  ): Promise<void> {
+    await this.loadSelectedSupplierPerformance([variantId]);
+    if (this.supplier.value !== supplierId) return;
+    const supplierCost = this.performance().find(
+      item => item.variant_id === variantId && item.supplier_id === supplierId
+    )?.last_unit_cost;
+    if (supplierCost === undefined || supplierCost === null) return;
+    const updatedCost = formatKesInput(supplierCost);
+    let updated = false;
+    this.lines.update(items =>
+      items.map(line => {
+        if (
+          line.key !== lineKey ||
+          line.valueSource !== 'unit' ||
+          line.unitCost !== initialCost ||
+          line.lineTotal !== initialCost
+        ) {
+          return line;
+        }
+        updated = true;
+        return {
+          ...line,
+          unitCost: updatedCost,
+          lineTotal: updatedCost,
+          defaultCostNeedsConversion: this.priceEntryBasis() === 'exclusive' && supplierCost > 0,
+        };
+      })
+    );
+    if (updated) this.scheduleTaxContext();
   }
   protected removeLine(index: number): void {
     this.lines.update(items => items.filter((_, itemIndex) => itemIndex !== index));
@@ -1727,16 +1908,130 @@ export class PurchaseEditorComponent implements OnInit {
     this.markDirty();
   }
   protected onSupplierChange(supplierId: string): void {
+    this.applySupplierSelection(supplierId, true);
+  }
+  protected onReceivingLocationChange(): void {
+    this.markDirty();
+    void this.loadSupplierStock(this.supplier.value);
+  }
+  private applySupplierSelection(supplierId: string, dirty: boolean): void {
+    ++this.supplierAdvanceRequest;
+    ++this.supplierStockRequest;
     this.supplier.setValue(supplierId);
     this.syncSupplierPin();
     this.advanceAmount.setValue('0');
     this.supplierAdvanceAvailable.set(0);
-    this.markDirty();
+    this.performance.set([]);
+    this.performanceLoadedKeys.clear();
+    this.supplierStock.set([]);
+    this.supplierStockLoading.set(false);
+    this.supplierStockError.set(null);
+    if (dirty) this.markDirty();
     if (supplierId) {
-      void this.money.supplierAdvanceAvailable(supplierId).then(balance => {
-        if (this.supplier.value === supplierId) this.supplierAdvanceAvailable.set(balance);
-      });
+      void this.loadSupplierContext(supplierId);
+      void this.loadSelectedSupplierPerformance();
     }
+  }
+  private async loadSupplierContext(supplierId: string): Promise<void> {
+    await Promise.allSettled([
+      this.loadSupplierAdvance(supplierId),
+      this.loadSupplierStock(supplierId),
+    ]);
+  }
+  private async loadSupplierAdvance(supplierId: string): Promise<void> {
+    const request = ++this.supplierAdvanceRequest;
+    try {
+      const advance = await this.money.supplierAdvanceAvailable(supplierId);
+      if (request === this.supplierAdvanceRequest && this.supplier.value === supplierId) {
+        this.supplierAdvanceAvailable.set(advance);
+      }
+    } catch {
+      // Advance context is decision support; purchase entry remains available without it.
+    }
+  }
+  private async loadSupplierStock(supplierId: string): Promise<void> {
+    const locationId = this.location.value;
+    if (!supplierId || !locationId) {
+      ++this.supplierStockRequest;
+      this.supplierStock.set([]);
+      this.supplierStockLoading.set(false);
+      this.supplierStockError.set(null);
+      return;
+    }
+    const request = ++this.supplierStockRequest;
+    this.supplierStockLoading.set(true);
+    this.supplierStockError.set(null);
+    try {
+      const rows = await this.pos.supplierStockByVariant(supplierId, locationId);
+      if (
+        request === this.supplierStockRequest &&
+        this.supplier.value === supplierId &&
+        this.location.value === locationId
+      ) {
+        this.supplierStock.set(rows);
+      }
+    } catch {
+      if (
+        request === this.supplierStockRequest &&
+        this.supplier.value === supplierId &&
+        this.location.value === locationId
+      ) {
+        this.supplierStock.set([]);
+        this.supplierStockError.set('Supplier stock is unavailable');
+      }
+    } finally {
+      if (request === this.supplierStockRequest) this.supplierStockLoading.set(false);
+    }
+  }
+  private async loadSelectedSupplierPerformance(variantIds?: string[]): Promise<void> {
+    const supplierId = this.supplier.value;
+    const ids = [
+      ...new Set(
+        (variantIds ?? this.lines().map(line => line.variantId)).filter(id => id.length > 0)
+      ),
+    ];
+    if (!supplierId || ids.length === 0) return;
+    const pending = new Set<Promise<void>>();
+    for (const id of ids) {
+      const load = this.performanceLoads.get(`${supplierId}:${id}`);
+      if (load) pending.add(load);
+    }
+    const missing = ids.filter(
+      id =>
+        !this.performanceLoadedKeys.has(`${supplierId}:${id}`) &&
+        !this.performanceLoads.has(`${supplierId}:${id}`)
+    );
+    if (missing.length > 0) {
+      const missingSet = new Set(missing);
+      let load!: Promise<void>;
+      load = this.money
+        .supplierVariantPerformance(supplierId, missing)
+        .then(rows => {
+          if (this.supplier.value !== supplierId) return;
+          for (const id of missing) this.performanceLoadedKeys.add(`${supplierId}:${id}`);
+          this.performance.update(current => [
+            ...current.filter(
+              row =>
+                row.supplier_id !== supplierId ||
+                row.variant_id === null ||
+                !missingSet.has(row.variant_id)
+            ),
+            ...rows,
+          ]);
+        })
+        .catch(() => {
+          // Price history is decision support; purchase entry remains available without it.
+        })
+        .finally(() => {
+          for (const id of missing) {
+            const key = `${supplierId}:${id}`;
+            if (this.performanceLoads.get(key) === load) this.performanceLoads.delete(key);
+          }
+        });
+      for (const id of missing) this.performanceLoads.set(`${supplierId}:${id}`, load);
+      pending.add(load);
+    }
+    await Promise.all(pending);
   }
   protected advanceUsed(): number {
     return parseKes(this.advanceAmount.value) ?? 0;
@@ -2046,9 +2341,6 @@ export class PurchaseEditorComponent implements OnInit {
     );
     this.advanceAwareDraft = restoredAdvance > 0 || !!draft.client_ref;
     this.advanceAmount.setValue(formatKesInput(restoredAdvance));
-    void this.money.supplierAdvanceAvailable(draft.supplier_id).then(balance => {
-      if (this.supplier.value === draft.supplier_id) this.supplierAdvanceAvailable.set(balance);
-    });
     this.reference.setValue(draft.reference ?? '');
     this.notes.setValue(draft.notes ?? '');
     this.purchaseDate.setValue(draft.purchase_date);
@@ -2138,6 +2430,8 @@ export class PurchaseEditorComponent implements OnInit {
         };
       })
     );
+    void this.loadSupplierContext(draft.supplier_id);
+    void this.loadSelectedSupplierPerformance();
   }
   private today(): string {
     return new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Nairobi' });

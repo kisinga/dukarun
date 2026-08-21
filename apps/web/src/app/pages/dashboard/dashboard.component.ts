@@ -44,7 +44,10 @@ type TopVariant = {
   revenue: number;
   margin: number;
 };
-type LowStockDisplay = LowStockVariant & { manufacturer_name: string | null };
+type LowStockDisplay = LowStockVariant & {
+  manufacturer_name: string | null;
+  product_id: string | null;
+};
 type ExpiringDisplay = ExpiringBatch & { manufacturer_name: string | null };
 type SalesChartPoint = DashboardDailySummary & {
   day: string;
@@ -475,11 +478,22 @@ type DashboardSection = 'sales' | 'attention';
                 <div class="flex items-center justify-between gap-2">
                   <div class="flex items-center gap-2">
                     <app-icon name="heroCube" />
-                    <h3 class="section-title">Low stock</h3>
+                    <div>
+                      <h3 class="section-title">Needs restock</h3>
+                      <p class="type-caption">{{ attentionLocationName() }}</p>
+                    </div>
                   </div>
-                  @if (lowStock().length > 0) {
-                    <span class="badge badge-warning badge-sm">{{ lowStockTotal() }}</span>
-                  }
+                  <div class="flex items-center gap-2">
+                    @if (lowStock().length > 0) {
+                      <span class="badge badge-warning badge-sm">{{ lowStockTotal() }}</span>
+                    }
+                    <a
+                      routerLink="/inventory/products"
+                      [queryParams]="{ stock: 'needs_restock' }"
+                      class="link text-xs"
+                      >View all</a
+                    >
+                  </div>
                 </div>
 
                 @if (initialLoading()) {
@@ -501,7 +515,14 @@ type DashboardSection = 'sales' | 'attention';
                 } @else {
                   <div class="mt-2 flex flex-col divide-y divide-base-200">
                     @for (item of lowStock(); track item.variant_id) {
-                      <div class="flex items-center gap-3 py-3">
+                      <a
+                        class="flex items-center gap-3 py-3 hover:text-primary"
+                        routerLink="/inventory/products"
+                        [queryParams]="{
+                          product: item.product_id,
+                          variant: item.variant_id,
+                        }"
+                      >
                         <div class="min-w-0 flex-1">
                           <p class="truncate text-sm font-medium">{{ item.product_name }}</p>
                           <p class="type-caption truncate">
@@ -513,7 +534,7 @@ type DashboardSection = 'sales' | 'attention';
                           <p class="font-medium tabular-nums text-warning">{{ item.stock }}</p>
                           <p class="type-caption">threshold {{ item.low_stock_threshold }}</p>
                         </div>
-                      </div>
+                      </a>
                     }
                   </div>
                 }
@@ -616,6 +637,11 @@ export class DashboardComponent implements OnInit, OnDestroy {
     previous_orders: 0,
   });
   protected readonly dashboardLocationId = signal<string | null>(null);
+  protected readonly attentionLocationName = computed(
+    () =>
+      this.locations.locations().find(location => location.id === this.locations.activeId())
+        ?.name ?? 'Active location'
+  );
 
   protected readonly dashboardSubtitle = computed(() => {
     const company = this.company();
@@ -698,11 +724,25 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }> = [];
   private snapshotRefreshTimer: ReturnType<typeof setTimeout> | null = null;
   private snapshotRefreshAt = 0;
+  private reportsReady = false;
 
   constructor() {
     effect(() => {
       const canView = this.canViewFinancials();
       if (!canView) untracked(() => this.clearFinancials());
+    });
+    let attentionLocationId = this.locations.activeId();
+    effect(() => {
+      const nextLocationId = this.locations.activeId();
+      if (nextLocationId === attentionLocationId) return;
+      attentionLocationId = nextLocationId;
+      if (!this.reportsReady || !nextLocationId) return;
+      untracked(() => {
+        // Do not show the previous location's stock under the new location label.
+        this.lowStock.set([]);
+        this.lowStockTotal.set(0);
+        void this.loadReports(['attention']);
+      });
     });
   }
 
@@ -720,6 +760,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
         this.dashboardLocationId.set(this.locations.activeId());
       await this.restoreDashboard();
       this.connectLiveUpdates(company.id);
+      this.reportsReady = true;
     } catch (err) {
       this.loadError.set(err instanceof Error ? err.message : 'Failed to load company');
       return;
@@ -729,6 +770,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.reportsReady = false;
     this.cancelSalesJournalRefresh();
     this.clearSnapshotRefresh();
     for (const channel of this.liveChannels) void this.supabase.client.removeChannel(channel);
@@ -805,9 +847,12 @@ export class DashboardComponent implements OnInit, OnDestroy {
           requestedSections.has('sales') && canView
             ? this.reports.dashboardSales(this.daysAgoIso(6), requestedLocationId)
             : Promise.resolve(null);
-        const attentionPromise = requestedSections.has('attention')
+        const attentionLocationId = requestedSections.has('attention')
+          ? this.locations.requireActiveId()
+          : null;
+        const attentionPromise = attentionLocationId
           ? Promise.all([
-              this.reports.lowStock(requestedLocationId),
+              this.reports.lowStock(attentionLocationId),
               this.preferences.batchExpiryEnabled()
                 ? this.reports.expiringBatches()
                 : Promise.resolve([]),
@@ -815,15 +860,27 @@ export class DashboardComponent implements OnInit, OnDestroy {
           : Promise.resolve(null);
         const [sales, attention] = await Promise.all([salesPromise, attentionPromise]);
 
-        if (requestedLocationId !== this.dashboardLocationId()) {
+        if (
+          requestedLocationId !== this.dashboardLocationId() ||
+          (requestedSections.has('attention') && attentionLocationId !== this.locations.activeId())
+        ) {
           for (const section of requestedSections) this.queuedSections.add(section);
           continue;
         }
 
         await Promise.all([
           sales && this.canViewFinancials() ? this.applySalesReport(sales) : Promise.resolve(),
-          attention ? this.applyAttentionReport(attention[0], attention[1]) : Promise.resolve(),
+          attention && attentionLocationId
+            ? this.applyAttentionReport(attention[0], attention[1], attentionLocationId)
+            : Promise.resolve(),
         ]);
+        if (
+          requestedSections.has('attention') &&
+          attentionLocationId !== this.locations.activeId()
+        ) {
+          this.queuedSections.add('attention');
+          continue;
+        }
         // A role update can land while report data is in flight. Never let an
         // old authorization decision restore financial data afterward.
         if (!this.canViewFinancials()) this.clearFinancials();
@@ -854,7 +911,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   private async applyAttentionReport(
     lowStockResult: Awaited<ReturnType<ReportsService['lowStock']>>,
-    expiring: ExpiringBatch[]
+    expiring: ExpiringBatch[],
+    locationId: string
   ): Promise<void> {
     const lowStock = lowStockResult.rows;
     const attentionIds = [
@@ -863,13 +921,18 @@ export class DashboardComponent implements OnInit, OnDestroy {
       ),
     ];
     const attentionVariants = await this.pos.variantsByIds(attentionIds);
+    if (this.locations.activeId() !== locationId) return;
     const manufacturerByVariant = new Map(
       attentionVariants.map(variant => [variant.variant_id, variant.manufacturer_name])
+    );
+    const productByVariant = new Map(
+      attentionVariants.map(variant => [variant.variant_id, variant.product_id])
     );
     this.lowStock.set(
       lowStock.map(item => ({
         ...item,
         manufacturer_name: manufacturerByVariant.get(item.variant_id) ?? null,
+        product_id: productByVariant.get(item.variant_id) ?? null,
       }))
     );
     this.lowStockTotal.set(lowStockResult.total);
@@ -955,14 +1018,17 @@ export class DashboardComponent implements OnInit, OnDestroy {
       topVariants: TopVariant[];
       lowStock: LowStockDisplay[];
       lowStockTotal?: number;
+      attentionLocationId?: string;
       expiring: ExpiringDisplay[];
       locationRows: DashboardLocationSummary[];
       comparison: DashboardPeriodComparison;
     };
     this.summary.set(value.summary);
     this.topVariants.set(value.topVariants);
-    this.lowStock.set(value.lowStock);
-    this.lowStockTotal.set(value.lowStockTotal ?? value.lowStock.length);
+    if (value.attentionLocationId === this.locations.activeId()) {
+      this.lowStock.set(value.lowStock);
+      this.lowStockTotal.set(value.lowStockTotal ?? value.lowStock.length);
+    }
     this.expiring.set(value.expiring);
     this.locationRows.set(value.locationRows);
     this.comparison.set(value.comparison);
@@ -985,6 +1051,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
         topVariants: this.topVariants(),
         lowStock: this.lowStock(),
         lowStockTotal: this.lowStockTotal(),
+        attentionLocationId: this.locations.activeId(),
         expiring: this.expiring(),
         locationRows: this.locationRows(),
         comparison: this.comparison(),

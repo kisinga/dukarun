@@ -9,6 +9,7 @@ import { LocationContextService } from '../core/location-context.service';
 import { PartyCacheService } from '../core/party-cache.service';
 import { PermissionsService } from '../core/permissions.service';
 import { MoneyService } from '../money/money.service';
+import { PosService } from '../pos/pos.service';
 import { IconComponent } from '../shared/ui/icon.component';
 import { PurchaseEditorComponent } from './purchase-editor.component';
 
@@ -38,9 +39,37 @@ const supplier = {
   tax_registration_number: 'P000000001A',
 };
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
+function supplierPerformance(variantId: string, lastUnitCost: number) {
+  return {
+    average_unit_cost: lastUnitCost,
+    company_id: 'company-1',
+    highest_unit_cost: lastUnitCost,
+    last_purchase_date: '2026-08-19',
+    last_unit_cost: lastUnitCost,
+    lowest_unit_cost: lastUnitCost,
+    purchase_count: 1,
+    supplier_id: 'supplier-1',
+    total_quantity: 1,
+    total_spend: lastUnitCost,
+    variant_id: variantId,
+  };
+}
+
 describe('PurchaseEditorComponent input VAT', () => {
   async function render(taxContextOverrides: Record<string, unknown> = {}) {
     const suppliers = signal<Array<typeof supplier>>([supplier]);
+    const activeLocationId = signal('location-1');
+    const pos = { supplierStockByVariant: vi.fn().mockResolvedValue([]) };
     const money = {
       transactableAccounts: vi
         .fn()
@@ -121,11 +150,18 @@ describe('PurchaseEditorComponent input VAT', () => {
         {
           provide: LocationContextService,
           useValue: {
-            locations: signal([{ id: 'location-1', name: 'Main shop' }]),
-            activeId: () => 'location-1',
+            locations: signal([
+              { id: 'location-1', name: 'Main shop' },
+              { id: 'location-2', name: 'Branch' },
+            ]),
+            activeId: activeLocationId,
           },
         },
         { provide: PermissionsService, useValue: { has: () => true } },
+        {
+          provide: PosService,
+          useValue: pos,
+        },
         {
           provide: CashierSessionService,
           useValue: {
@@ -145,13 +181,24 @@ describe('PurchaseEditorComponent input VAT', () => {
     const router = TestBed.inject(Router);
     vi.spyOn(router, 'navigate').mockResolvedValue(true);
     vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined);
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: vi.fn(),
+    });
     fixture.detectChanges();
     await vi.waitFor(() => {
       fixture.detectChanges();
       expect(fixture.nativeElement.textContent).toContain('Supplier prices');
       expect(fixture.nativeElement.querySelector('.loading-spinner')).toBeNull();
     });
-    return { fixture, component: fixture.componentInstance as any, money, suppliers };
+    return {
+      fixture,
+      component: fixture.componentInstance as any,
+      money,
+      pos,
+      suppliers,
+      activeLocationId,
+    };
   }
 
   function addValidInvoice(component: any): void {
@@ -211,6 +258,90 @@ describe('PurchaseEditorComponent input VAT', () => {
     expect(money.updateSupplierTaxRegistration).toHaveBeenCalledWith('supplier-1', 'P000000099Z');
     expect(suppliers()[0]?.tax_registration_number).toBe('P000000099Z');
     expect(component.supplierPinSaved()).toBe(true);
+  });
+
+  it('loads supplier price history only for selected purchase variants', async () => {
+    const { component, money } = await render();
+
+    expect(money.supplierVariantPerformance).not.toHaveBeenCalled();
+    component.onSupplierChange('supplier-1');
+    component.lines.set([{ variantId: 'variant-1' }]);
+    await component.loadSelectedSupplierPerformance();
+
+    expect(money.supplierVariantPerformance).toHaveBeenCalledWith('supplier-1', ['variant-1']);
+  });
+
+  it('keeps a pending supplier advance when the receiving location changes', async () => {
+    const { component, money, pos } = await render();
+    const advance = deferred<number>();
+    const firstStock = deferred<never[]>();
+    money.supplierAdvanceAvailable.mockReturnValueOnce(advance.promise);
+    pos.supplierStockByVariant.mockReturnValueOnce(firstStock.promise).mockResolvedValueOnce([]);
+
+    component.onSupplierChange('supplier-1');
+    component.location.setValue('location-2');
+    component.onReceivingLocationChange();
+    advance.resolve(2_500);
+    firstStock.resolve([]);
+
+    await vi.waitFor(() => expect(component.supplierAdvanceAvailable()).toBe(2_500));
+    expect(pos.supplierStockByVariant).toHaveBeenLastCalledWith('supplier-1', 'location-2');
+  });
+
+  it('keeps concurrent supplier price results for different variants', async () => {
+    const { component, money } = await render();
+    const first = deferred<ReturnType<typeof supplierPerformance>[]>();
+    const second = deferred<ReturnType<typeof supplierPerformance>[]>();
+    money.supplierVariantPerformance.mockImplementation(
+      (_supplierId: string, variantIds: string[]) =>
+        variantIds[0] === 'variant-1' ? first.promise : second.promise
+    );
+    component.supplier.setValue('supplier-1');
+
+    const firstLoad = component.loadSelectedSupplierPerformance(['variant-1']);
+    const secondLoad = component.loadSelectedSupplierPerformance(['variant-2']);
+    second.resolve([supplierPerformance('variant-2', 82)]);
+    first.resolve([supplierPerformance('variant-1', 91)]);
+    await Promise.all([firstLoad, secondLoad]);
+
+    expect(component.performance()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ variant_id: 'variant-1', last_unit_cost: 91 }),
+        expect.objectContaining({ variant_id: 'variant-2', last_unit_cost: 82 }),
+      ])
+    );
+  });
+
+  it('adds a line immediately and applies supplier cost only while it is untouched', async () => {
+    const { component, money } = await render();
+    const price = deferred<ReturnType<typeof supplierPerformance>[]>();
+    money.supplierVariantPerformance.mockReturnValueOnce(price.promise);
+    component.supplier.setValue('supplier-1');
+
+    const add = component.addVariant(variant);
+    expect(component.lines()).toHaveLength(1);
+    expect(component.lines()[0].unitCost).toBe('116');
+
+    price.resolve([supplierPerformance('variant-1', 104)]);
+    await add;
+    await vi.waitFor(() => expect(component.lines()[0].unitCost).toBe('104'));
+
+    const secondPrice = deferred<ReturnType<typeof supplierPerformance>[]>();
+    money.supplierVariantPerformance.mockReturnValueOnce(secondPrice.promise);
+    component.performance.set([]);
+    component.performanceLoadedKeys.clear();
+    const secondAdd = component.addVariant(variant);
+    const secondLine = component.lines()[1];
+    secondLine.unitCost = '109';
+    secondLine.lineTotal = '109';
+    component.lines.update((items: unknown[]) => [...items]);
+    secondPrice.resolve([supplierPerformance('variant-1', 101)]);
+    await secondAdd;
+    await secondPrice.promise;
+    await Promise.resolve();
+
+    expect(component.lines()[1].unitCost).toBe('109');
+    expect(component.lines()[1].lineTotal).toBe('109');
   });
 
   it('persists VAT evidence before invoking the canonical finalizer', async () => {

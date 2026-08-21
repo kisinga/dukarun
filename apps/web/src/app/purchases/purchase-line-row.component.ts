@@ -36,8 +36,6 @@ export interface PurchaseLinePriceContext {
   purchaseCount: number;
   wholesaleMargin: { label: string; type: BadgeType };
   retailMargin: { label: string; type: BadgeType };
-  bestRecordedCost: number | null;
-  bestRecordedSupplier: string | null;
   warning: string | null;
   catalogPriceChanged: boolean;
 }
@@ -171,17 +169,6 @@ export interface PurchaseLinePriceContext {
               [type]="priceContext().retailMargin.type"
               [label]="priceContext().retailMargin.label"
             />
-          </span>
-          <span class="flex min-w-0 items-center gap-1.5">
-            <span class="type-caption shrink-0">Best recorded</span>
-            @if (priceContext().bestRecordedCost !== null) {
-              <span class="text-xs font-semibold">
-                <app-money [amount]="priceContext().bestRecordedCost!" />
-              </span>
-              <span class="type-caption truncate">{{ priceContext().bestRecordedSupplier }}</span>
-            } @else {
-              <span class="text-xs text-base-content/60">No comparison yet</span>
-            }
           </span>
         </span>
         <app-icon name="heroChevronRight" class="shrink-0 text-base-content/50" />

@@ -1,5 +1,14 @@
-import { Component, OnInit, computed, effect, inject, signal, viewChild } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import {
+  Component,
+  OnInit,
+  computed,
+  effect,
+  inject,
+  signal,
+  untracked,
+  viewChild,
+} from '@angular/core';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { EmptyStateComponent } from '../shared/ui/empty-state.component';
 import { PageLayoutComponent } from '../shared/ui/page-layout.component';
 import { FormControl, FormsModule, ReactiveFormsModule } from '@angular/forms';
@@ -12,6 +21,7 @@ import {
   PosService,
   Product,
   ProductVariant,
+  SupplierStockRow,
   Variant,
 } from '../pos/pos.service';
 import { matchesCatalogQuery } from '../pos/catalog-search';
@@ -52,10 +62,13 @@ import {
 import { PublicProductLinkService } from './public-product-link.service';
 import { TaxService } from '../core/tax.service';
 import type { TaxCategory } from '@dukarun/tax-types';
+import { variantNeedsRestock } from './product-stock-status';
+import { PartyCacheService } from '../core/party-cache.service';
+import { MoneyService, type VariantPurchaseHistoryRow } from '../money/money.service';
 
 type StockInfo = { stock: number; stock_value: number };
 type ProductStatusFilter = 'all' | 'active' | 'inactive';
-type StockStatusFilter = 'all' | 'in_stock' | 'out_of_stock' | 'not_tracked';
+type StockStatusFilter = 'all' | 'needs_restock' | 'in_stock' | 'out_of_stock' | 'not_tracked';
 type ManagementVariant = Variant & { stock_value?: number | null };
 type ProductGroup = { family: Product; variants: ManagementVariant[] };
 type ShareFeedback = { kind: 'success' | 'error'; message: string };
@@ -1208,10 +1221,21 @@ interface PendingProductImage {
             (change)="setStockStatusFilter($event)"
           >
             <option value="all">All stock states</option>
+            <option value="needs_restock">Needs restock</option>
             <option value="in_stock">In stock</option>
             <option value="out_of_stock">Out of stock</option>
             <option value="not_tracked">Not tracked</option>
           </select>
+          <app-searchable-filter
+            class="w-full sm:w-56"
+            ariaLabel="Filter products by supplier"
+            placeholder="All suppliers"
+            emptyValue="all"
+            searchPlaceholder="Search suppliers…"
+            [options]="supplierOptions()"
+            [value]="supplierFilter()"
+            (valueChange)="setSupplierFilter($event)"
+          />
           <app-searchable-filter
             class="w-full sm:w-56"
             ariaLabel="Filter products by manufacturer"
@@ -1247,6 +1271,40 @@ interface PendingProductImage {
           }
         </div>
       </app-list-search-bar>
+
+      @if (stockStatusFilter() === 'needs_restock') {
+        <div class="alert mb-3 border-warning/30 bg-warning/5 text-sm" role="status">
+          <app-icon name="heroExclamationTriangle" />
+          <span>
+            {{ needsRestockSummary().variants }} variants need restocking across
+            {{ needsRestockSummary().products }} products · {{ activeLocationName() }}
+          </span>
+        </div>
+      }
+      @if (supplierFilter() !== 'all') {
+        @if (supplierStockError()) {
+          <div class="alert alert-error mb-3 text-sm" role="alert">
+            <app-icon name="heroExclamationTriangle" />
+            <span>{{ supplierStockError() }}</span>
+          </div>
+        } @else {
+          <div class="alert mb-3 border-info/30 bg-info/5 text-sm" role="status">
+            @if (supplierStockLoading()) {
+              <span class="loading loading-spinner loading-sm"></span>
+              <span>Loading stock sourced from {{ selectedSupplierName() }}…</span>
+            } @else {
+              <app-icon name="heroTruck" />
+              <span>
+                {{ supplierStockSummary().variants }} stocked variants sourced from
+                {{ selectedSupplierName() }} · {{ activeLocationName() }}
+                @if (perms.has('ViewFinancials')) {
+                  · <app-money [amount]="supplierStockValue()" /> cost value
+                }
+              </span>
+            }
+          </div>
+        }
+      }
 
       @if (selectedProductIds().size > 0 && categoryMembershipsComplete()) {
         <div class="card mb-3 flex-row items-center gap-3 bg-base-100 p-3">
@@ -1329,6 +1387,11 @@ interface PendingProductImage {
                       <p class="font-semibold tabular-nums">
                         {{ familyStock(group.variants) }} units
                       </p>
+                      @if (supplierFilter() !== 'all') {
+                        <p class="type-caption tabular-nums">
+                          {{ familySupplierStock(group.variants) }} from supplier
+                        </p>
+                      }
                     } @else {
                       <p class="type-caption">Not tracked</p>
                     }
@@ -1469,6 +1532,11 @@ interface PendingProductImage {
                     <td class="text-right">
                       @if (familyTracksInventory(group.variants)) {
                         <p class="font-medium tabular-nums">{{ familyStock(group.variants) }}</p>
+                        @if (supplierFilter() !== 'all') {
+                          <p class="type-caption tabular-nums">
+                            {{ familySupplierStock(group.variants) }} from supplier
+                          </p>
+                        }
                         <p class="type-caption tabular-nums">
                           Retail <app-money [amount]="familyRetailStockValue(group.variants)" />
                         </p>
@@ -1643,6 +1711,11 @@ interface PendingProductImage {
                 @for (v of group.variants; track v.variant_id) {
                   <li
                     class="p-3 [&:not(:last-child)]:border-b [&:not(:last-child)]:border-base-200"
+                    [id]="'product-variant-' + v.variant_id"
+                    [class.bg-base-200]="selectedVariantId() === v.variant_id"
+                    [class.outline]="selectedVariantId() === v.variant_id"
+                    [class.outline-1]="selectedVariantId() === v.variant_id"
+                    [class.outline-primary]="selectedVariantId() === v.variant_id"
                   >
                     <div class="flex items-start justify-between gap-3">
                       <div class="min-w-0">
@@ -1682,6 +1755,10 @@ interface PendingProductImage {
                           <span class="font-semibold text-base-content/80">
                             {{ stockOf(v.variant_id!)?.stock ?? 0 }} in stock
                           </span>
+                          @if (supplierFilter() !== 'all') {
+                            · {{ supplierStockOf(v.variant_id!)?.stock ?? 0 }} sourced from
+                            {{ selectedSupplierName() }}
+                          }
                           · <app-money [amount]="variantRetailStockValue(v)" /> retail value
                         </p>
                       } @else {
@@ -1729,14 +1806,23 @@ interface PendingProductImage {
                           (click)="toggleBatches(v.variant_id!)"
                         >
                           <app-icon name="heroQueueList" />
-                          {{ batchesFor() === v.variant_id ? 'Hide batches' : 'Batches' }}
+                          {{ batchesFor() === v.variant_id ? 'Hide stock lots' : 'Stock lots' }}
                         </button>
                       }
+                      <button
+                        appButton
+                        variant="ghost"
+                        size="sm"
+                        (click)="togglePurchaseHistory(v.variant_id!)"
+                      >
+                        <app-icon name="heroDocumentText" />
+                        {{ purchaseHistoryFor() === v.variant_id ? 'Hide purchases' : 'Purchases' }}
+                      </button>
                     </div>
                     @if (batchesFor() === v.variant_id) {
                       <div class="mt-3 rounded-field bg-base-200/70 p-3">
                         <div class="mb-2 flex items-center justify-between gap-2">
-                          <h4 class="type-caption">Batch history</h4>
+                          <h4 class="type-caption">Stock lots</h4>
                           <a routerLink="/suppliers" class="link text-xs">Restock</a>
                         </div>
                         <ul class="divide-y divide-base-200">
@@ -1750,7 +1836,11 @@ interface PendingProductImage {
                                 >
                               </div>
                               <p class="type-caption mt-0.5">
-                                Cost <app-money [amount]="b.unit_cost" />
+                                Cost
+                                <app-money
+                                  [amount]="b.unit_cost"
+                                  [masked]="!perms.has('ViewFinancials')"
+                                />
                                 @if (preferences.batchExpiryEnabled()) {
                                   · {{ b.expiry_date ? 'Expires ' + b.expiry_date : 'No expiry' }}
                                 }
@@ -1760,6 +1850,75 @@ interface PendingProductImage {
                             <p class="type-caption py-1">No stock batches yet.</p>
                           }
                         </ul>
+                      </div>
+                    }
+                    @if (purchaseHistoryFor() === v.variant_id) {
+                      <div class="mt-3 rounded-field border border-base-300 p-3">
+                        <div class="mb-2 flex items-center justify-between gap-2">
+                          <h4 class="type-caption">Purchase history</h4>
+                          <span class="type-caption">{{ purchaseHistoryTotal() }} records</span>
+                        </div>
+                        @if (purchaseHistoryLoading() && purchaseHistory().length === 0) {
+                          <div class="flex items-center gap-2 py-3 text-sm text-base-content/60">
+                            <span class="loading loading-spinner loading-sm"></span>
+                            Loading purchases
+                          </div>
+                        } @else {
+                          <ul class="divide-y divide-base-200">
+                            @for (row of purchaseHistory(); track row.id) {
+                              <li class="py-2">
+                                <div class="flex flex-wrap items-start justify-between gap-2">
+                                  <div class="min-w-0">
+                                    <a
+                                      class="link text-sm font-medium"
+                                      routerLink="/purchases"
+                                      [queryParams]="{ purchase: row.purchase.id }"
+                                      >{{ row.purchase.reference || 'Purchase' }}</a
+                                    >
+                                    <p class="type-caption">
+                                      {{ supplierName(row.purchase.supplier_id) }} ·
+                                      {{ date(row.purchase.purchase_date) }} ·
+                                      {{ row.purchase.status }}
+                                    </p>
+                                  </div>
+                                  <div class="text-right text-sm">
+                                    <p>
+                                      {{ row.quantity }} ×
+                                      <app-money
+                                        [amount]="row.unit_cost"
+                                        [masked]="!perms.has('ViewFinancials')"
+                                      />
+                                    </p>
+                                    <p class="type-caption">
+                                      Total
+                                      <app-money
+                                        [amount]="row.line_total"
+                                        [masked]="!perms.has('ViewFinancials')"
+                                      />
+                                    </p>
+                                  </div>
+                                </div>
+                              </li>
+                            } @empty {
+                              <p class="type-caption py-2">
+                                No purchases recorded for this variant.
+                              </p>
+                            }
+                          </ul>
+                          @if (purchaseHistory().length < purchaseHistoryTotal()) {
+                            <button
+                              appButton
+                              variant="ghost"
+                              size="sm"
+                              type="button"
+                              class="mt-2"
+                              [loading]="purchaseHistoryLoading()"
+                              (click)="loadMorePurchaseHistory(v.variant_id!)"
+                            >
+                              Load more
+                            </button>
+                          }
+                        }
                       </div>
                     }
                   </li>
@@ -1841,8 +2000,12 @@ interface PendingProductImage {
 })
 export class ProductsComponent implements OnInit {
   private readonly pos = inject(PosService);
+  private readonly money = inject(MoneyService);
   private readonly supabase = inject(SupabaseService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly catalogCache = inject(CatalogCacheService);
+  private readonly parties = inject(PartyCacheService);
   private readonly locationContext = inject(LocationContextService);
   protected readonly connectivity = inject(ConnectivityService);
   private readonly publicProductLinks = inject(PublicProductLinkService);
@@ -1858,14 +2021,24 @@ export class ProductsComponent implements OnInit {
   protected readonly catalogTruncated = this.catalogCache.catalogTruncated;
   protected readonly stock = this.catalogCache.stock;
   protected readonly selectedProductId = signal<string | null>(null);
+  protected readonly selectedVariantId = signal<string | null>(null);
+  private readonly selectedGroupOverride = signal<ProductGroup | null>(null);
   protected readonly batchesFor = signal<string | null>(null);
   protected readonly batches = signal<InventoryBatch[]>([]);
+  protected readonly purchaseHistoryFor = signal<string | null>(null);
+  protected readonly purchaseHistory = signal<VariantPurchaseHistoryRow[]>([]);
+  protected readonly purchaseHistoryTotal = signal(0);
+  protected readonly purchaseHistoryLoading = signal(false);
 
   protected readonly query = signal('');
   protected readonly productStatusFilter = signal<ProductStatusFilter>(
     DEFAULT_PRODUCT_STATUS_FILTER
   );
   protected readonly stockStatusFilter = signal<StockStatusFilter>('all');
+  protected readonly supplierFilter = signal('all');
+  protected readonly supplierStock = signal<Map<string, SupplierStockRow>>(new Map());
+  protected readonly supplierStockLoading = signal(false);
+  protected readonly supplierStockError = signal<string | null>(null);
   protected readonly manufacturerFilter = signal<string>('all');
   protected readonly categoryFilter = signal<string>('all');
   protected readonly productSortOptions = PRODUCT_SORT_OPTIONS;
@@ -1906,7 +2079,31 @@ export class ProductsComponent implements OnInit {
   private serverRequest = 0;
   private serverSearchTimer: ReturnType<typeof setTimeout> | null = null;
   private shareFeedbackTimer: ReturnType<typeof setTimeout> | null = null;
+  private supplierStockRequest = 0;
+  private productRouteRequest = 0;
+  private purchaseHistoryRequest = 0;
   protected readonly serverMode = computed(() => this.productStatusFilter() !== 'active');
+  protected readonly supplierOptions = computed<readonly SearchableFilterOption[]>(() =>
+    this.parties
+      .suppliers()
+      .filter(supplier => supplier.supplier_active)
+      .map(supplier => ({
+        value: supplier.id,
+        label: [supplier.first_name, supplier.last_name].filter(Boolean).join(' '),
+        description: supplier.phone || undefined,
+        searchText: supplier.email ?? undefined,
+      }))
+  );
+  protected readonly selectedSupplierName = computed(
+    () =>
+      this.supplierOptions().find(option => option.value === this.supplierFilter())?.label ??
+      'supplier'
+  );
+  protected readonly activeLocationName = computed(
+    () =>
+      this.locationContext.locations().find(item => item.id === this.locationContext.activeId())
+        ?.name ?? 'Active location'
+  );
 
   /** Camera/gallery state shared by product create and edit. */
   protected readonly imageBusy = signal(false);
@@ -1993,6 +2190,9 @@ export class ProductsComponent implements OnInit {
     const q = this.query().trim();
     const productStatus = this.productStatusFilter();
     const stockStatus = this.stockStatusFilter();
+    const supplier = this.supplierFilter();
+    const supplierStock = this.supplierStock();
+    const lowStockThreshold = this.preferences.lowStockThreshold();
     const manufacturer = this.manufacturerFilter();
     const category = this.categoryMembershipsComplete() ? this.categoryFilter() : 'all';
     const categoryIdsByProduct = this.categoryIdsByProduct();
@@ -2025,6 +2225,12 @@ export class ProductsComponent implements OnInit {
         if (category !== 'all' && category !== 'uncategorized' && !categoryIds.has(category)) {
           return false;
         }
+        if (
+          supplier !== 'all' &&
+          !g.variants.some(variant => (supplierStock.get(variant.variant_id ?? '')?.stock ?? 0) > 0)
+        ) {
+          return false;
+        }
         if (stockStatus === 'all') return true;
         const tracked = g.variants.filter(
           variant => variant.kind !== 'service' && variant.track_inventory
@@ -2032,6 +2238,9 @@ export class ProductsComponent implements OnInit {
         if (stockStatus === 'not_tracked') return tracked.length === 0;
         return tracked.some(variant => {
           const quantity = this.stockOf(variant.variant_id!)?.stock ?? 0;
+          if (stockStatus === 'needs_restock') {
+            return variantNeedsRestock(variant, quantity, lowStockThreshold);
+          }
           return stockStatus === 'in_stock' ? quantity > 0 : quantity <= 0;
         });
       });
@@ -2080,6 +2289,7 @@ export class ProductsComponent implements OnInit {
       this.query().trim().length > 0 ||
       this.productStatusFilter() !== DEFAULT_PRODUCT_STATUS_FILTER ||
       this.stockStatusFilter() !== 'all' ||
+      this.supplierFilter() !== 'all' ||
       this.manufacturerFilter() !== 'all' ||
       (this.categoryMembershipsComplete() && this.categoryFilter() !== 'all')
   );
@@ -2087,20 +2297,22 @@ export class ProductsComponent implements OnInit {
     () =>
       Number(this.productStatusFilter() !== DEFAULT_PRODUCT_STATUS_FILTER) +
       Number(this.stockStatusFilter() !== 'all') +
+      Number(this.supplierFilter() !== 'all') +
       Number(this.manufacturerFilter() !== 'all') +
       Number(this.categoryMembershipsComplete() && this.categoryFilter() !== 'all')
   );
   protected readonly productStats = computed(() => {
     const groups = this.grouped();
     const variants = groups.reduce((count, group) => count + group.variants.length, 0);
-    const outOfStock = groups.reduce(
+    const needsRestock = groups.reduce(
       (count, group) =>
         count +
-        group.variants.filter(
-          variant =>
-            variant.kind !== 'service' &&
-            variant.track_inventory &&
-            (this.stockOf(variant.variant_id!)?.stock ?? 0) <= 0
+        group.variants.filter(variant =>
+          variantNeedsRestock(
+            variant,
+            this.stockOf(variant.variant_id!)?.stock ?? 0,
+            this.preferences.lowStockThreshold()
+          )
         ).length,
       0
     );
@@ -2112,9 +2324,9 @@ export class ProductsComponent implements OnInit {
       },
       { label: 'Variants shown', value: variants, mobilePriority: 'secondary' as const },
       {
-        label: 'Out of stock',
-        value: outOfStock,
-        tone: outOfStock > 0 ? ('warning' as const) : ('neutral' as const),
+        label: 'Needs restock',
+        value: needsRestock,
+        tone: needsRestock > 0 ? ('warning' as const) : ('neutral' as const),
         mobilePriority: 'primary' as const,
       },
       {
@@ -2152,8 +2364,49 @@ export class ProductsComponent implements OnInit {
   /** Product family shown in the detail drawer (live — derived from loaded signals). */
   protected readonly selectedGroup = computed(() => {
     const id = this.selectedProductId();
-    return id ? (this.grouped().find(g => g.family.id === id) ?? null) : null;
+    if (!id) return null;
+    const visible = this.grouped().find(group => group.family.id === id);
+    if (visible) return visible;
+    const family = this.families().find(item => item.id === id);
+    if (family) {
+      return {
+        family,
+        variants: this.catalog().filter(variant => variant.product_id === id),
+      };
+    }
+    return this.selectedGroupOverride()?.family.id === id ? this.selectedGroupOverride() : null;
   });
+  protected readonly needsRestockSummary = computed(() => {
+    const groups = this.grouped();
+    const variants = groups.reduce(
+      (count, group) =>
+        count +
+        group.variants.filter(variant =>
+          variantNeedsRestock(
+            variant,
+            this.stockOf(variant.variant_id!)?.stock ?? 0,
+            this.preferences.lowStockThreshold()
+          )
+        ).length,
+      0
+    );
+    return { variants, products: groups.length };
+  });
+  protected readonly supplierStockSummary = computed(() => {
+    const activeVariantIds = new Set(
+      this.catalog().flatMap(variant => (variant.variant_id ? [variant.variant_id] : []))
+    );
+    return [...this.supplierStock().entries()].reduce(
+      (summary, [variantId, row]) => {
+        if (!activeVariantIds.has(variantId) || row.stock <= 0) return summary;
+        summary.variants += 1;
+        summary.value += row.stock_value ?? 0;
+        return summary;
+      },
+      { variants: 0, value: 0 }
+    );
+  });
+  protected readonly supplierStockValue = computed(() => this.supplierStockSummary().value);
 
   constructor() {
     // Search is pure client-side filtering over the cached catalog (grouped());
@@ -2163,6 +2416,7 @@ export class ProductsComponent implements OnInit {
       this.query();
       this.productStatusFilter();
       this.stockStatusFilter();
+      this.supplierFilter();
       this.manufacturerFilter();
       this.categoryFilter();
       this.productSort();
@@ -2180,6 +2434,20 @@ export class ProductsComponent implements OnInit {
         this.serverLoaded.set(false);
       }
       this.clearSelection();
+    });
+    effect(() => {
+      const supplierId = this.supplierFilter();
+      const locationId = this.locationContext.activeId();
+      untracked(() => {
+        if (supplierId === 'all' || !locationId) {
+          ++this.supplierStockRequest;
+          this.supplierStock.set(new Map());
+          this.supplierStockLoading.set(false);
+          this.supplierStockError.set(null);
+          return;
+        }
+        void this.loadSupplierStock(supplierId, locationId);
+      });
     });
     effect(() => {
       const complete = this.categoryMembershipsComplete();
@@ -2214,11 +2482,38 @@ export class ProductsComponent implements OnInit {
   }
 
   protected setProductStatusFilter(event: Event): void {
-    this.productStatusFilter.set((event.target as HTMLSelectElement).value as ProductStatusFilter);
+    const status = (event.target as HTMLSelectElement).value as ProductStatusFilter;
+    this.productStatusFilter.set(status);
+    if (status !== 'active') {
+      this.supplierFilter.set('all');
+      if (this.stockStatusFilter() === 'needs_restock') this.stockStatusFilter.set('all');
+    }
+    this.syncFilterUrl();
   }
 
   protected setStockStatusFilter(event: Event): void {
-    this.stockStatusFilter.set((event.target as HTMLSelectElement).value as StockStatusFilter);
+    const status = (event.target as HTMLSelectElement).value as StockStatusFilter;
+    if (status === 'needs_restock') this.productStatusFilter.set('active');
+    this.stockStatusFilter.set(status);
+    this.syncFilterUrl();
+  }
+
+  protected setSupplierFilter(supplierId: string): void {
+    if (supplierId !== 'all') this.productStatusFilter.set('active');
+    this.supplierFilter.set(supplierId);
+    this.syncFilterUrl();
+  }
+
+  private syncFilterUrl(): void {
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: {
+        stock: this.stockStatusFilter() === 'all' ? null : this.stockStatusFilter(),
+        supplier: this.supplierFilter() === 'all' ? null : this.supplierFilter(),
+      },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
   }
 
   protected setManufacturerFilter(value: string): void {
@@ -2278,8 +2573,11 @@ export class ProductsComponent implements OnInit {
     this.query.set('');
     this.productStatusFilter.set(DEFAULT_PRODUCT_STATUS_FILTER);
     this.stockStatusFilter.set('all');
+    this.supplierFilter.set('all');
+    this.supplierStock.set(new Map());
     this.manufacturerFilter.set('all');
     this.categoryFilter.set('all');
+    this.syncFilterUrl();
   }
 
   protected manufacturerName(id: string | null): string | null {
@@ -2297,16 +2595,43 @@ export class ProductsComponent implements OnInit {
   }
 
   async ngOnInit(): Promise<void> {
+    const params = this.route.snapshot.queryParamMap;
+    const requestedStock = params.get('stock');
+    const allowedStock: StockStatusFilter[] = [
+      'all',
+      'needs_restock',
+      'in_stock',
+      'out_of_stock',
+      'not_tracked',
+    ];
+    if (requestedStock && allowedStock.includes(requestedStock as StockStatusFilter)) {
+      this.stockStatusFilter.set(requestedStock as StockStatusFilter);
+    }
     this.loading.set(true);
     void this.publicProductLinks.load().catch(() => undefined);
     void this.loadTaxCategories();
-    const hydrated = await this.catalogCache.ensureLoaded();
+    const [hydrated] = await Promise.all([
+      this.catalogCache.ensureLoaded(),
+      this.parties.ensureLoaded(),
+      this.preferences.refresh(),
+    ]);
+    const requestedSupplier = params.get('supplier');
+    if (requestedSupplier) {
+      const supplier = this.parties
+        .suppliers()
+        .find(item => item.id === requestedSupplier && item.supplier_active);
+      if (supplier) this.supplierFilter.set(requestedSupplier);
+      else this.error.set('The linked supplier is unavailable');
+    }
     if (hydrated) this.loading.set(false);
-    void this.preferences.refresh();
     if (!hydrated) {
       const refreshed = await this.catalogCache.refresh();
       if (!refreshed) this.error.set('Could not load the catalog; check your connection.');
       this.loading.set(false);
+    }
+    const requestedProduct = params.get('product');
+    if (requestedProduct) {
+      await this.showProduct(requestedProduct, params.get('variant'), false);
     }
   }
 
@@ -2374,6 +2699,37 @@ export class ProductsComponent implements OnInit {
       }
     } finally {
       if (request === this.serverRequest) this.loading.set(false);
+    }
+  }
+
+  private async loadSupplierStock(supplierId: string, locationId: string): Promise<void> {
+    const request = ++this.supplierStockRequest;
+    this.supplierStockLoading.set(true);
+    this.supplierStockError.set(null);
+    try {
+      const rows = await this.pos.supplierStockByVariant(supplierId, locationId);
+      if (
+        request !== this.supplierStockRequest ||
+        this.supplierFilter() !== supplierId ||
+        this.locationContext.activeId() !== locationId
+      ) {
+        return;
+      }
+      this.supplierStock.set(new Map(rows.map(row => [row.variant_id, row])));
+      this.supplierStockError.set(null);
+    } catch (error) {
+      if (request === this.supplierStockRequest) {
+        this.supplierStock.set(new Map());
+        this.supplierStockError.set(
+          this.connectivity.online()
+            ? error instanceof Error
+              ? error.message
+              : 'Could not load supplier-sourced stock'
+            : 'Reconnect to filter stock by supplier.'
+        );
+      }
+    } finally {
+      if (request === this.supplierStockRequest) this.supplierStockLoading.set(false);
     }
   }
 
@@ -2612,6 +2968,17 @@ export class ProductsComponent implements OnInit {
       : this.stock().get(variantId);
   }
 
+  protected supplierStockOf(variantId: string): SupplierStockRow | undefined {
+    return this.supplierStock().get(variantId);
+  }
+
+  protected familySupplierStock(variants: Variant[]): number {
+    return variants.reduce(
+      (sum, variant) => sum + (this.supplierStockOf(variant.variant_id ?? '')?.stock ?? 0),
+      0
+    );
+  }
+
   protected familyStock(variants: Variant[]): number {
     return variants.reduce(
       (sum, variant) =>
@@ -2656,10 +3023,54 @@ export class ProductsComponent implements OnInit {
   }
 
   protected openProduct(productId: string): void {
+    void this.showProduct(productId, null, true);
+  }
+
+  private async showProduct(
+    productId: string,
+    variantId: string | null,
+    updateUrl: boolean
+  ): Promise<void> {
+    const request = ++this.productRouteRequest;
     void this.publicProductLinks.load().catch(() => undefined);
     this.selectedProductId.set(productId);
+    this.selectedVariantId.set(variantId);
+    this.selectedGroupOverride.set(null);
     this.batchesFor.set(null);
     this.batches.set([]);
+    this.purchaseHistoryFor.set(null);
+    this.purchaseHistory.set([]);
+    this.purchaseHistoryTotal.set(0);
+    const loaded = this.grouped().find(group => group.family.id === productId);
+    if (!loaded) {
+      try {
+        const group = await this.pos.productGroupById(productId, variantId);
+        if (request !== this.productRouteRequest) return;
+        if (!group) throw new Error('Product not found');
+        this.selectedGroupOverride.set(group);
+      } catch (error) {
+        if (request !== this.productRouteRequest) return;
+        this.selectedProductId.set(null);
+        this.selectedVariantId.set(null);
+        this.error.set(error instanceof Error ? error.message : 'Could not load product');
+        return;
+      }
+    }
+    if (updateUrl) {
+      void this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams: { product: productId, variant: variantId },
+        queryParamsHandling: 'merge',
+        replaceUrl: true,
+      });
+    }
+    if (variantId) {
+      setTimeout(() =>
+        document
+          .getElementById(`product-variant-${variantId}`)
+          ?.scrollIntoView({ block: 'nearest' })
+      );
+    }
   }
 
   protected canShareProduct(group: ProductGroup): boolean {
@@ -2693,9 +3104,21 @@ export class ProductsComponent implements OnInit {
 
   /** Called by the drawer after its close transition finishes. */
   protected closeProductDrawer(): void {
+    this.productRouteRequest++;
     this.selectedProductId.set(null);
+    this.selectedVariantId.set(null);
+    this.selectedGroupOverride.set(null);
     this.batchesFor.set(null);
     this.batches.set([]);
+    this.purchaseHistoryFor.set(null);
+    this.purchaseHistory.set([]);
+    this.purchaseHistoryTotal.set(0);
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { product: null, variant: null },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
   }
 
   private showShareFeedback(kind: ShareFeedback['kind'], message: string): void {
@@ -2732,6 +3155,51 @@ export class ProductsComponent implements OnInit {
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Failed to load batches');
     }
+  }
+
+  protected async togglePurchaseHistory(variantId: string): Promise<void> {
+    if (this.purchaseHistoryFor() === variantId) {
+      this.purchaseHistoryRequest++;
+      this.purchaseHistoryFor.set(null);
+      this.purchaseHistoryLoading.set(false);
+      return;
+    }
+    this.purchaseHistoryRequest++;
+    this.purchaseHistoryLoading.set(false);
+    this.purchaseHistoryFor.set(variantId);
+    this.purchaseHistory.set([]);
+    this.purchaseHistoryTotal.set(0);
+    await this.loadMorePurchaseHistory(variantId);
+  }
+
+  protected async loadMorePurchaseHistory(variantId: string): Promise<void> {
+    if (this.purchaseHistoryLoading() || this.purchaseHistoryFor() !== variantId) return;
+    const request = ++this.purchaseHistoryRequest;
+    this.purchaseHistoryLoading.set(true);
+    try {
+      const result = await this.money.variantPurchaseHistory(
+        variantId,
+        this.purchaseHistory().length,
+        25
+      );
+      if (request !== this.purchaseHistoryRequest || this.purchaseHistoryFor() !== variantId)
+        return;
+      this.purchaseHistory.update(rows => [...rows, ...result.rows]);
+      this.purchaseHistoryTotal.set(result.total);
+    } catch (error) {
+      if (request === this.purchaseHistoryRequest && this.purchaseHistoryFor() === variantId) {
+        this.error.set(error instanceof Error ? error.message : 'Could not load purchase history');
+      }
+    } finally {
+      if (request === this.purchaseHistoryRequest) this.purchaseHistoryLoading.set(false);
+    }
+  }
+
+  protected supplierName(supplierId: string): string {
+    const supplier = this.parties.suppliers().find(item => item.id === supplierId);
+    return supplier
+      ? [supplier.first_name, supplier.last_name].filter(Boolean).join(' ')
+      : 'Unknown supplier';
   }
 
   // --- Coupled product editor ---
