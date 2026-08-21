@@ -27,7 +27,7 @@
   },
   "small-interactive-target": {
     "products/products.component.ts": 2,
-    "purchases/purchase-editor.component.ts": 8,
+    "purchases/purchase-editor.component.ts": 7,
     "purchases/purchase-line-row.component.ts": 7,
     "settings/settings.component.ts": 1,
     "shared/ui/pagination.component.ts": 1,

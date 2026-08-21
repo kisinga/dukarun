@@ -26,6 +26,7 @@ export type SupplierPayment = Database['public']['Tables']['supplier_payments'][
 export type PurchaseDraft = Database['public']['Tables']['purchase_drafts']['Row'];
 export type PurchaseLine = Database['public']['Tables']['purchase_lines']['Row'];
 export type PurchaseExpense = Database['public']['Tables']['purchase_expenses']['Row'];
+export type VariantPurchaseHistoryRow = PurchaseLine & { purchase: Purchase };
 export type PurchaseHistoryRow = Purchase & {
   goods_subtotal: number;
   expense_total: number;
@@ -712,6 +713,50 @@ export class MoneyService {
     return data;
   }
 
+  async purchaseById(purchaseId: string): Promise<PurchaseHistoryRow | null> {
+    const { data, error } = await this.db
+      .from('purchase_history')
+      .select('*')
+      .eq('id', purchaseId)
+      .maybeSingle();
+    if (error) throw error;
+    return data as PurchaseHistoryRow | null;
+  }
+
+  async variantPurchaseHistory(
+    variantId: string,
+    offset = 0,
+    limit = 25
+  ): Promise<{ rows: VariantPurchaseHistoryRow[]; total: number }> {
+    const {
+      data: lines,
+      error,
+      count,
+    } = await this.db
+      .from('purchase_lines')
+      .select('*', { count: 'exact' })
+      .eq('variant_id', variantId)
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
+      .range(offset, offset + limit - 1);
+    if (error) throw error;
+    const purchaseIds = [...new Set((lines ?? []).map(line => line.purchase_id))];
+    if (purchaseIds.length === 0) return { rows: [], total: count ?? 0 };
+    const { data: purchases, error: purchasesError } = await this.db
+      .from('purchases')
+      .select('*')
+      .in('id', purchaseIds);
+    if (purchasesError) throw purchasesError;
+    const byId = new Map((purchases ?? []).map(purchase => [purchase.id, purchase]));
+    return {
+      rows: (lines ?? []).flatMap(line => {
+        const purchase = byId.get(line.purchase_id);
+        return purchase ? [{ ...line, purchase }] : [];
+      }),
+      total: count ?? 0,
+    };
+  }
+
   async purchaseExpenses(purchaseId: string): Promise<PurchaseExpense[]> {
     const { data, error } = await this.db
       .from('purchase_expenses')
@@ -766,10 +811,16 @@ export class MoneyService {
     return status;
   }
 
-  async supplierVariantPerformance(): Promise<SupplierVariantPerformance[]> {
+  async supplierVariantPerformance(
+    supplierId: string,
+    variantIds: string[]
+  ): Promise<SupplierVariantPerformance[]> {
+    if (!supplierId || variantIds.length === 0) return [];
     const { data, error } = await this.db
       .from('supplier_variant_performance')
       .select('*')
+      .eq('supplier_id', supplierId)
+      .in('variant_id', [...new Set(variantIds)])
       .order('last_purchase_date', { ascending: false });
     if (error) throw error;
     return data;

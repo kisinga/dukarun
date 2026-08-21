@@ -555,7 +555,19 @@ const SALE_SORT_OPTIONS: readonly ListSortOption[] = [
                       @for (line of lines(); track line.id) {
                         <li class="flex items-center gap-3 py-2">
                           <div class="min-w-0 flex-1">
-                            <p class="truncate text-sm font-medium">{{ line.label }}</p>
+                            @if (line.product_id) {
+                              <a
+                                class="link block truncate text-sm font-medium"
+                                routerLink="/inventory/products"
+                                [queryParams]="{
+                                  product: line.product_id,
+                                  variant: line.variant_id,
+                                }"
+                                >{{ line.label }}</a
+                              >
+                            } @else {
+                              <p class="truncate text-sm font-medium">{{ line.label }}</p>
+                            }
                             <p class="type-caption">
                               {{ line.manufacturer_name || 'Manufacturer not set' }}
                               @if (line.sku) {

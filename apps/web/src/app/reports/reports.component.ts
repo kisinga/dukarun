@@ -140,35 +140,47 @@ type InventoryRow = {
         <option value="customers">Customers</option>
         <option value="inventory">Inventory</option>
       </select>
-      <div role="tablist" class="tabs tabs-boxed mb-4 hidden sm:flex">
-        <a
+      <div role="tablist" class="section-tabs mb-4 hidden sm:flex">
+        <button
           role="tab"
-          class="tab min-h-11"
-          [class.tab-active]="tab() === 'sales'"
+          type="button"
+          class="section-tab"
+          [class.section-tab-active]="tab() === 'sales'"
+          [attr.aria-selected]="tab() === 'sales'"
           (click)="tab.set('sales')"
-          >Sales</a
         >
-        <a
+          Sales
+        </button>
+        <button
           role="tab"
-          class="tab min-h-11"
-          [class.tab-active]="tab() === 'products'"
+          type="button"
+          class="section-tab"
+          [class.section-tab-active]="tab() === 'products'"
+          [attr.aria-selected]="tab() === 'products'"
           (click)="tab.set('products')"
-          >Products</a
         >
-        <a
+          Products
+        </button>
+        <button
           role="tab"
-          class="tab min-h-11"
-          [class.tab-active]="tab() === 'customers'"
+          type="button"
+          class="section-tab"
+          [class.section-tab-active]="tab() === 'customers'"
+          [attr.aria-selected]="tab() === 'customers'"
           (click)="tab.set('customers')"
-          >Customers</a
         >
-        <a
+          Customers
+        </button>
+        <button
           role="tab"
-          class="tab min-h-11"
-          [class.tab-active]="tab() === 'inventory'"
+          type="button"
+          class="section-tab"
+          [class.section-tab-active]="tab() === 'inventory'"
+          [attr.aria-selected]="tab() === 'inventory'"
           (click)="tab.set('inventory')"
-          >Inventory</a
         >
+          Inventory
+        </button>
       </div>
 
       <!-- Sales tab -->

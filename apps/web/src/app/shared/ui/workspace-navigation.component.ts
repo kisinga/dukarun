@@ -33,19 +33,13 @@ import { WorkspaceKey, WorkspaceNavigationService } from '../../core/workspace-n
           }
         </select>
       </label>
-      <nav
-        class="mb-4 hidden border-b border-base-300/70 md:block"
-        [attr.aria-label]="label() + ' views'"
-      >
-        <div role="tablist" class="-mb-px flex gap-1 overflow-x-auto">
+      <nav class="mb-4 hidden md:block" [attr.aria-label]="label() + ' views'">
+        <div role="tablist" class="section-tabs">
           @for (item of items(); track item.route) {
             <a
               role="tab"
-              class="flex min-h-11 shrink-0 items-center border-b-2 px-3 text-sm font-medium transition-colors hover:text-base-content"
-              [class.border-primary]="activeRoute() === item.route"
-              [class.border-transparent]="activeRoute() !== item.route"
-              [class.text-base-content]="activeRoute() === item.route"
-              [class.text-base-content/60]="activeRoute() !== item.route"
+              class="section-tab"
+              [class.section-tab-active]="activeRoute() === item.route"
               [routerLink]="item.route"
               [attr.aria-selected]="activeRoute() === item.route"
               routerLinkActive

@@ -7,6 +7,7 @@ import { LocationContextService } from '../core/location-context.service';
 import { ButtonComponent } from '../shared/ui/button.component';
 import { FormFieldComponent } from '../shared/ui/form-field.component';
 import { IconComponent } from '../shared/ui/icon.component';
+import { StatusBadgeComponent, type BadgeType } from '../shared/ui/status-badge.component';
 import type { MpesaCommissioningStatus } from '@dukarun/mpesa-types';
 
 type MerchantStatus = {
@@ -34,15 +35,24 @@ type MerchantStatus = {
 
 @Component({
   selector: 'app-mpesa-settings',
-  imports: [ReactiveFormsModule, DatePipe, ButtonComponent, FormFieldComponent, IconComponent],
+  imports: [
+    ReactiveFormsModule,
+    DatePipe,
+    ButtonComponent,
+    FormFieldComponent,
+    IconComponent,
+    StatusBadgeComponent,
+  ],
   template: `
     @if (perms.has('ManageMpesaIntegration')) {
       <section class="card bg-base-100">
         <div class="card-body p-4">
           <div class="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h2 class="section-title">M-PESA</h2>
-              <p class="type-caption mt-1">STK Push and automatic Till payment notifications.</p>
+              <h2 class="section-title">M-PESA setup</h2>
+              <p class="type-caption mt-1">
+                Accept STK Push and automatically match Till or Paybill payments.
+              </p>
             </div>
             <button
               appButton
@@ -78,13 +88,10 @@ type MerchantStatus = {
                       Payments settle directly to {{ connection.party_b }}.
                     </p>
                   </div>
-                  <span
-                    class="badge"
-                    [class.badge-success]="connection.status === 'active'"
-                    [class.badge-warning]="connection.status === 'testing'"
-                  >
-                    {{ statusLabel(connection.status) }}
-                  </span>
+                  <app-status-badge
+                    [type]="connectionStatusType(connection.status)"
+                    [label]="statusLabel(connection.status)"
+                  />
                 </div>
 
                 <ol class="mt-4 grid gap-2 text-sm sm:grid-cols-2">
@@ -184,7 +191,7 @@ type MerchantStatus = {
                     </p>
                     <p class="type-caption mt-1">Setup request</p>
                   </div>
-                  <span class="badge badge-warning">{{ statusLabel(request.status) }}</span>
+                  <app-status-badge type="warning" [label]="statusLabel(request.status)" />
                 </div>
                 <p class="mt-3 text-sm">{{ requestGuidance(request.status) }}</p>
                 <ol class="steps steps-horizontal mt-4 w-full text-xs">
@@ -222,111 +229,160 @@ type MerchantStatus = {
 
             @if (showRequestForm() || (!connections().length && !pendingRequests().length)) {
               <form
-                class="mt-4 grid gap-3 rounded-box border border-base-300 p-4 sm:grid-cols-2"
+                class="mt-3 grid gap-3 border-t border-base-300/60 pt-3 sm:grid-cols-2"
                 (submit)="$event.preventDefault(); submit()"
               >
-                <div class="sm:col-span-2">
-                  <h3 class="font-semibold">Request a Till or Paybill connection</h3>
-                  <p class="type-caption mt-1">
-                    Your money still settles directly to the registered Till or Paybill.
-                  </p>
-                </div>
-                <app-form-field label="Registered business name">
+                <app-form-field
+                  label="Registered business name"
+                  [required]="true"
+                  [error]="
+                    legalName.touched && legalName.invalid
+                      ? 'Enter the name registered with Safaricom.'
+                      : null
+                  "
+                >
                   <input
-                    class="input input-bordered w-full"
+                    class="input input-bordered input-sm w-full"
                     [formControl]="legalName"
                     autocomplete="organization"
                   />
                 </app-form-field>
                 <app-form-field label="Account type">
-                  <select class="select select-bordered w-full" [formControl]="shortcodeType">
+                  <select
+                    class="select select-bordered select-sm w-full"
+                    [formControl]="shortcodeType"
+                  >
                     <option value="till">Till</option>
                     <option value="paybill">Paybill</option>
                   </select>
                 </app-form-field>
-                <app-form-field label="Till / Paybill number">
+                <app-form-field
+                  label="Till / Paybill number"
+                  [required]="true"
+                  [error]="shortcode.touched && shortcode.invalid ? 'Use 5–10 digits.' : null"
+                >
                   <input
-                    class="input input-bordered w-full"
+                    class="input input-bordered input-sm w-full"
                     inputmode="numeric"
                     [formControl]="shortcode"
                   />
                 </app-form-field>
                 <app-form-field
                   label="M-PESA portal username"
-                  hint="Business Admin or Business Manager username."
+                  hint="Business Admin or Business Manager username—not your password."
+                  [required]="true"
+                  [error]="
+                    mpesaUsername.touched && mpesaUsername.invalid
+                      ? 'Enter the portal username.'
+                      : null
+                  "
                 >
                   <input
-                    class="input input-bordered w-full"
+                    class="input input-bordered input-sm w-full"
                     [formControl]="mpesaUsername"
                     autocomplete="off"
                   />
                 </app-form-field>
-                <app-form-field label="Contact person">
+                <app-form-field
+                  label="Contact person"
+                  [required]="true"
+                  [error]="
+                    contactName.touched && contactName.invalid ? 'Enter a contact person.' : null
+                  "
+                >
                   <input
-                    class="input input-bordered w-full"
+                    class="input input-bordered input-sm w-full"
                     [formControl]="contactName"
                     autocomplete="name"
                   />
                 </app-form-field>
-                <app-form-field label="Contact phone">
+                <app-form-field
+                  label="Contact phone"
+                  [required]="true"
+                  [error]="
+                    contactPhone.touched && contactPhone.invalid ? 'Enter a contact phone.' : null
+                  "
+                >
                   <input
-                    class="input input-bordered w-full"
+                    class="input input-bordered input-sm w-full"
                     inputmode="tel"
                     [formControl]="contactPhone"
                     autocomplete="tel"
                   />
                 </app-form-field>
-                <app-form-field label="Contact email">
+                <app-form-field
+                  label="Contact email"
+                  [required]="true"
+                  [error]="
+                    contactEmail.touched && contactEmail.invalid
+                      ? 'Enter a valid email address.'
+                      : null
+                  "
+                >
                   <input
-                    class="input input-bordered w-full"
+                    class="input input-bordered input-sm w-full"
                     type="email"
                     [formControl]="contactEmail"
                     autocomplete="email"
                   />
                 </app-form-field>
                 <app-form-field label="Notes" hint="Optional store or Safaricom account details.">
-                  <input class="input input-bordered w-full" [formControl]="notes" />
+                  <input class="input input-bordered input-sm w-full" [formControl]="notes" />
                 </app-form-field>
-                <fieldset class="sm:col-span-2">
-                  <legend class="text-sm font-medium">Locations using this Till / Paybill</legend>
-                  <div class="mt-2 flex flex-wrap gap-3">
+
+                <fieldset class="border-t border-base-300/60 pt-3 sm:col-span-2">
+                  <legend class="type-heading">Checkout locations</legend>
+                  <p class="type-caption mt-1">Choose where cashiers can use this account.</p>
+                  <div class="mt-2 flex flex-wrap gap-2">
                     @for (location of locations.locations(); track location.id) {
                       <label
-                        class="flex items-center gap-2 rounded-box border border-base-300 px-3 py-2 text-sm"
+                        class="flex min-h-11 cursor-pointer items-center gap-2 rounded-field bg-base-200/50 px-3 py-2 text-sm"
                       >
                         <input
                           type="checkbox"
-                          class="checkbox checkbox-sm"
+                          class="checkbox checkbox-sm checkbox-primary"
                           [checked]="locationSelected(location.id)"
                           (change)="toggleLocation(location.id, $any($event.target).checked)"
                         />
-                        {{ location.name }}
+                        <span>{{ location.name }}</span>
                       </label>
+                    } @empty {
+                      <p class="type-caption py-2">Loading locations…</p>
                     }
                   </div>
                 </fieldset>
-                <div class="sm:col-span-2 rounded-box bg-base-200/60 p-3 text-sm">
-                  We will ask you to approve Safaricom’s ownership check. We never ask for your
-                  M-PESA PIN, portal password or OTP.
-                </div>
+
+                <p class="type-caption flex items-start gap-1.5 sm:col-span-2">
+                  <app-icon name="heroLockClosed" size="sm" class="mt-0.5" />
+                  <span>
+                    We never ask for your M-PESA PIN, portal password or OTP. Enter an OTP only on
+                    Safaricom’s own verification flow.
+                  </span>
+                </p>
+
                 @if (message()) {
-                  <p class="sm:col-span-2 text-sm" [class.text-error]="failed()">{{ message() }}</p>
+                  <p
+                    role="status"
+                    class="text-sm sm:col-span-2"
+                    [class.text-error]="failed()"
+                    [class.text-success]="!failed()"
+                  >
+                    {{ message() }}
+                  </p>
                 }
-                <div class="sm:col-span-2">
-                  <div class="flex flex-wrap gap-2">
-                    <button appButton type="submit" [loading]="saving()">Send setup request</button>
-                    @if (connections().length || pendingRequests().length) {
-                      <button
-                        appButton
-                        type="button"
-                        variant="outline"
-                        [disabled]="saving()"
-                        (click)="showRequestForm.set(false)"
-                      >
-                        Cancel
-                      </button>
-                    }
-                  </div>
+                <div class="flex flex-wrap justify-end gap-2 sm:col-span-2">
+                  @if (connections().length || pendingRequests().length) {
+                    <button
+                      appButton
+                      type="button"
+                      variant="ghost"
+                      [disabled]="saving()"
+                      (click)="showRequestForm.set(false)"
+                    >
+                      Cancel
+                    </button>
+                  }
+                  <button appButton type="submit" [loading]="saving()">Send setup request</button>
                 </div>
               </form>
             } @else {
@@ -468,6 +524,14 @@ export class MpesaSettingsComponent implements OnInit {
 
   protected statusLabel(value: string): string {
     return value.replaceAll('_', ' ').replace(/^./, letter => letter.toUpperCase());
+  }
+
+  protected connectionStatusType(value: string): BadgeType {
+    if (value === 'active') return 'success';
+    if (value === 'testing') return 'warning';
+    if (value === 'configuring') return 'info';
+    if (value === 'error') return 'error';
+    return 'neutral';
   }
 
   protected connectionGuidance(connection: MerchantStatus['accounts'][number]): string {

@@ -418,16 +418,18 @@ interface NavSection {
           </div>
 
           <div class="border-t border-base-300 p-2">
-            <a
-              routerLink="/settings"
-              routerLinkActive="nav-item-active"
-              [routerLinkActiveOptions]="{ exact: true }"
-              (click)="closeDrawer()"
-              class="nav-item"
-            >
-              <app-icon name="heroCog6Tooth" />
-              <span>Settings</span>
-            </a>
+            @if (perms.has('ManageCompanySettings')) {
+              <a
+                routerLink="/settings"
+                routerLinkActive="nav-item-active"
+                [routerLinkActiveOptions]="{ exact: true }"
+                (click)="closeDrawer()"
+                class="nav-item"
+              >
+                <app-icon name="heroCog6Tooth" />
+                <span>Settings</span>
+              </a>
+            }
             <div class="mt-1 text-center text-xs text-base-content/30">v2.0.0</div>
           </div>
         </aside>

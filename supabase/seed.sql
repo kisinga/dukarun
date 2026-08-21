@@ -133,7 +133,7 @@ update public.roles r
 set permissions = array[
   'ManageApprovals','OverridePrice','ManageStockAdjustments','ApproveCustomerCredit',
   'ManageCustomerCreditLimit','ManageCustomers','ManageCatalog','ManageCommunications',
-  'ManageMpesaIntegration','ReverseOrder','OverrideCustomerBalance','SettleOrder',
+  'ManageMpesaIntegration','ManageCompanySettings','ReverseOrder','OverrideCustomerBalance','SettleOrder',
   'ManageSupplierCreditPurchases','ViewFinancials','ManageReconciliation',
   'CloseAccountingPeriod','CreateInterAccountTransfer','ManageTeam','ViewAuditTrail',
   'ViewStaffPerformance','ManageCommissions'

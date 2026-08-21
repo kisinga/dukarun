@@ -148,6 +148,7 @@ export interface PosSettingsSnapshot extends ScopedRecord {
   require_opening_count?: boolean;
   variance_notification_threshold?: number;
   batch_expiry_enabled?: boolean;
+  low_stock_threshold?: number;
   fetched_at: string;
 }
 

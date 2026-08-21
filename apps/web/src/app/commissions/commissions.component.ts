@@ -115,18 +115,13 @@ import {
         </select>
       </label>
       <nav class="mb-4 hidden md:block" aria-label="Commission views">
-        <p class="mb-1 text-xs font-semibold uppercase tracking-wide text-base-content/55">
-          Commission view
-        </p>
-        <div role="tablist" class="flex flex-wrap gap-1">
+        <div role="tablist" class="section-tabs">
           @for (item of commissionTabs; track item.value) {
             <button
               role="tab"
               type="button"
-              class="flex min-h-11 shrink-0 items-center rounded-field px-3 text-sm font-medium transition-colors hover:bg-base-200 hover:text-base-content"
-              [class.bg-base-200]="activeTab() === item.value"
-              [class.text-base-content]="activeTab() === item.value"
-              [class.text-base-content/60]="activeTab() !== item.value"
+              class="section-tab"
+              [class.section-tab-active]="activeTab() === item.value"
               [attr.aria-selected]="activeTab() === item.value"
               (click)="activeTab.set(item.value)"
             >

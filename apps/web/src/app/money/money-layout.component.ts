@@ -41,17 +41,15 @@ interface MoneyTab {
           }
         </select>
       </label>
-      <div
-        role="tablist"
-        aria-label="Money sections"
-        class="tabs tabs-boxed mb-4 hidden w-full gap-1 overflow-x-auto border border-base-300/70 bg-base-100 p-1 md:flex"
-      >
+      <div role="tablist" aria-label="Money sections" class="section-tabs mb-4 hidden md:flex">
         @for (tab of tabs; track tab.route) {
           <a
             role="tab"
-            class="tab min-h-11 shrink-0 gap-2 px-4"
+            class="section-tab"
             [routerLink]="tab.route"
-            routerLinkActive="tab-active"
+            routerLinkActive="section-tab-active"
+            ariaCurrentWhenActive="page"
+            [attr.aria-selected]="activeRoute() === tab.route"
           >
             <app-icon [name]="tab.icon" />
             {{ tab.label }}

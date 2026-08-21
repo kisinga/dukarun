@@ -14,6 +14,7 @@ export class CompanyPreferencesService {
   readonly requireOpeningCount = signal(true);
   readonly varianceNotificationThreshold = signal(100);
   readonly batchExpiryEnabled = signal(false);
+  readonly lowStockThreshold = signal(10);
   readonly loaded = signal(false);
 
   private readonly refreshes = new Map<string, Promise<void>>();
@@ -45,6 +46,7 @@ export class CompanyPreferencesService {
           this.requireOpeningCount.set(true);
           this.varianceNotificationThreshold.set(100);
           this.batchExpiryEnabled.set(false);
+          this.lowStockThreshold.set(10);
           this.loaded.set(false);
           if (identity && locationId && scope) void this.start(identity.companyId, scope);
         }
@@ -77,7 +79,7 @@ export class CompanyPreferencesService {
       const { data, error } = await this.supabase.client
         .from('companies')
         .select(
-          'cashier_flow_enabled, cash_control_enabled, require_opening_count, variance_notification_threshold, batch_expiry_enabled'
+          'cashier_flow_enabled, cash_control_enabled, require_opening_count, variance_notification_threshold, batch_expiry_enabled, low_stock_threshold'
         )
         .eq('id', identity.companyId)
         .single();
@@ -89,6 +91,7 @@ export class CompanyPreferencesService {
       this.requireOpeningCount.set(data.require_opening_count);
       this.varianceNotificationThreshold.set(data.variance_notification_threshold);
       this.batchExpiryEnabled.set(data.batch_expiry_enabled);
+      this.lowStockThreshold.set(data.low_stock_threshold);
       const existing = await db.get('settings', key);
       if (this.currentScope() !== expectedScope) return;
       await db.put('settings', {
@@ -103,6 +106,7 @@ export class CompanyPreferencesService {
         require_opening_count: data.require_opening_count,
         variance_notification_threshold: data.variance_notification_threshold,
         batch_expiry_enabled: data.batch_expiry_enabled,
+        low_stock_threshold: data.low_stock_threshold,
         fetched_at: new Date().toISOString(),
       });
     } catch {
@@ -115,6 +119,7 @@ export class CompanyPreferencesService {
       this.requireOpeningCount.set(cached?.require_opening_count ?? true);
       this.varianceNotificationThreshold.set(cached?.variance_notification_threshold ?? 100);
       this.batchExpiryEnabled.set(cached?.batch_expiry_enabled ?? false);
+      this.lowStockThreshold.set(cached?.low_stock_threshold ?? 10);
     } finally {
       if (this.currentScope() === expectedScope) this.loaded.set(true);
     }
@@ -129,6 +134,7 @@ export class CompanyPreferencesService {
       this.requireOpeningCount.set(cached.require_opening_count ?? true);
       this.varianceNotificationThreshold.set(cached.variance_notification_threshold ?? 100);
       this.batchExpiryEnabled.set(cached.batch_expiry_enabled ?? false);
+      this.lowStockThreshold.set(cached.low_stock_threshold ?? 10);
       this.loaded.set(true);
     }
     this.handler = {

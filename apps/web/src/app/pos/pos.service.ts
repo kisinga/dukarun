@@ -90,8 +90,15 @@ export type OrderLineWithProduct = OrderLine & {
   manufacturer_name: string | null;
   sku: string | null;
   wholesale_price: number | null;
+  product_id: string | null;
   stock: number;
   track_inventory: boolean;
+};
+
+export type SupplierStockRow = {
+  variant_id: string;
+  stock: number;
+  stock_value: number | null;
 };
 
 /** One enabled tender method from `available_payment_methods` (credit excluded). */
@@ -281,6 +288,23 @@ export class PosService {
       .limit(50);
     if (error) throw error;
     return data;
+  }
+
+  /** Current stock whose surviving batches originated with one supplier. */
+  async supplierStockByVariant(
+    supplierId: string,
+    locationId = this.locations.requireActiveId()
+  ): Promise<SupplierStockRow[]> {
+    const { data, error } = await this.client.rpc('supplier_stock_by_variant', {
+      p_supplier_id: supplierId,
+      p_location_id: locationId,
+    });
+    if (error) throw rpcError(error);
+    return (data ?? []).map(row => ({
+      variant_id: row.variant_id,
+      stock: Number(row.stock ?? 0),
+      stock_value: row.stock_value === null ? null : Number(row.stock_value),
+    }));
   }
 
   /** Create a product family (variants are added via upsertVariant). */
@@ -688,6 +712,7 @@ export class PosService {
         manufacturer_name: v?.manufacturer_name ?? null,
         sku: v?.sku ?? null,
         wholesale_price: v?.wholesale_price ?? null,
+        product_id: v?.product_id ?? null,
         stock: v?.stock ?? 0,
         track_inventory: v?.track_inventory ?? false,
       };
@@ -740,6 +765,35 @@ export class PosService {
   async variantById(id: string): Promise<Variant | null> {
     const rows = await this.variantsByIds([id]);
     return (await this.withLocationStock(rows))[0] ?? null;
+  }
+
+  /** Bounded product detail read used by URL-addressable drawers. */
+  async productGroupById(
+    productId: string,
+    focusVariantId?: string | null
+  ): Promise<{ family: Product; variants: Variant[] } | null> {
+    const [familyResult, variantsResult] = await Promise.all([
+      this.client.from('products').select('*').eq('id', productId).maybeSingle(),
+      this.client
+        .from('variant_catalog')
+        .select('*')
+        .eq('product_id', productId)
+        .order('variant_name')
+        .order('variant_id')
+        .limit(16),
+    ]);
+    if (familyResult.error) throw familyResult.error;
+    if (variantsResult.error) throw variantsResult.error;
+    if (!familyResult.data) return null;
+    let variants = variantsResult.data as Variant[];
+    if (focusVariantId && !variants.some(row => row.variant_id === focusVariantId)) {
+      const focused = await this.variantsByIds([focusVariantId]);
+      variants = [...variants, ...focused.filter(row => row.product_id === productId)];
+    }
+    return {
+      family: familyResult.data,
+      variants: await this.withLocationStock(variants),
+    };
   }
 
   async getOrder(orderId: string): Promise<OrderWithCustomer> {

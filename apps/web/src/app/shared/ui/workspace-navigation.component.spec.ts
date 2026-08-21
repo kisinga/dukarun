@@ -75,7 +75,9 @@ describe('WorkspaceNavigationComponent', () => {
     expect(tablist.textContent).toContain('Audit trail');
     expect(select.getAttribute('aria-label')).toBe('Activity view');
     expect(select.value).toBe('/activity/messages');
-    expect(tablist.querySelector('[aria-selected="true"]')?.textContent).toContain('Messages');
+    const activeTab = tablist.querySelector('[aria-selected="true"]') as HTMLElement;
+    expect(activeTab.textContent).toContain('Messages');
+    expect(activeTab.classList.contains('section-tab-active')).toBe(true);
 
     select.value = '/activity/audit';
     select.dispatchEvent(new Event('change'));

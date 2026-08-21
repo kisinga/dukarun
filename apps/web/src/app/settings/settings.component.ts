@@ -1,6 +1,12 @@
 import { Component, DestroyRef, OnInit, computed, inject, signal, viewChild } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { FormControl, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
+import {
+  AbstractControl,
+  FormControl,
+  FormsModule,
+  ReactiveFormsModule,
+  Validators,
+} from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { formatKesInput, parseKes } from '../core/money';
 import { reconciliationLabel } from '../core/payment-methods';
@@ -47,13 +53,37 @@ type ReminderDraft = {
 };
 
 const PUBLIC_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-const SETTINGS_TABS: ReadonlyArray<{ key: SettingsTab; label: string }> = [
-  { key: 'business', label: 'Business' },
-  { key: 'operations', label: 'Operations' },
-  { key: 'money', label: 'Money' },
-  { key: 'mpesa', label: 'M-PESA' },
-  { key: 'communications', label: 'Notifications' },
-  { key: 'data', label: 'Data' },
+const SETTINGS_TABS: ReadonlyArray<{ key: SettingsTab; label: string; description: string }> = [
+  {
+    key: 'business',
+    label: 'Business',
+    description: 'Your business identity, contact details and public storefront.',
+  },
+  {
+    key: 'operations',
+    label: 'Operations',
+    description: 'Checkout, till, inventory and stock-location rules.',
+  },
+  {
+    key: 'money',
+    label: 'Money',
+    description: 'Tax, reconciliation, payment accounts and financial controls.',
+  },
+  {
+    key: 'mpesa',
+    label: 'M-PESA',
+    description: 'Connect and monitor your M-PESA merchant account.',
+  },
+  {
+    key: 'communications',
+    label: 'Notifications',
+    description: 'Choose which operational and customer alerts are sent.',
+  },
+  {
+    key: 'data',
+    label: 'Data',
+    description: 'Move business data in and out of Dukarun safely.',
+  },
 ];
 
 @Component({
@@ -74,13 +104,13 @@ const SETTINGS_TABS: ReadonlyArray<{ key: SettingsTab; label: string }> = [
     MpesaSettingsComponent,
   ],
   template: `
-    <app-page title="Settings">
+    <app-page title="Settings" subtitle="Manage how Dukarun works for this business." [wide]="true">
       @if (loadError()) {
         <p class="mb-2 text-sm text-error">{{ loadError() }}</p>
       }
 
       @if (settings(); as s) {
-        <div class="space-y-6">
+        <div class="space-y-4">
           <label class="form-control md:hidden">
             <span
               class="label-text mb-1 text-xs font-semibold uppercase tracking-wide text-base-content/60"
@@ -98,17 +128,14 @@ const SETTINGS_TABS: ReadonlyArray<{ key: SettingsTab; label: string }> = [
               }
             </select>
           </label>
-          <nav class="hidden border-b border-base-300/70 md:block" aria-label="Settings sections">
-            <div role="tablist" class="-mb-px flex gap-1 overflow-x-auto">
+          <nav class="hidden md:block" aria-label="Settings sections">
+            <div role="tablist" class="section-tabs">
               @for (tab of settingsTabs(); track tab.key) {
                 <button
                   role="tab"
                   type="button"
-                  class="flex min-h-11 shrink-0 items-center border-b-2 px-3 text-sm font-medium transition-colors hover:text-base-content"
-                  [class.border-primary]="activeTab() === tab.key"
-                  [class.border-transparent]="activeTab() !== tab.key"
-                  [class.text-base-content]="activeTab() === tab.key"
-                  [class.text-base-content/60]="activeTab() !== tab.key"
+                  class="section-tab"
+                  [class.section-tab-active]="activeTab() === tab.key"
                   [attr.aria-selected]="activeTab() === tab.key"
                   (click)="selectTab(tab.key)"
                 >
@@ -117,6 +144,11 @@ const SETTINGS_TABS: ReadonlyArray<{ key: SettingsTab; label: string }> = [
               }
             </div>
           </nav>
+
+          <header class="border-b border-base-300/60 pb-3">
+            <h2 class="type-heading">{{ activeTabMeta().label }}</h2>
+            <p class="type-caption mt-1">{{ activeTabMeta().description }}</p>
+          </header>
 
           @if (activeTab() === 'business') {
             <!-- Profile -->
@@ -243,211 +275,239 @@ const SETTINGS_TABS: ReadonlyArray<{ key: SettingsTab; label: string }> = [
                       <a routerLink="/billing" class="link">View plans</a>
                     </p>
                   }
-                  <div class="sm:col-span-2">
-                    @if (msg('profile'); as m) {
-                      <p
-                        class="mb-2 text-sm"
-                        [class.text-success]="m.ok"
-                        [class.text-error]="!m.ok"
+                  <div class="flex flex-wrap items-center justify-end gap-2 sm:col-span-2">
+                    @if (sectionDirty('profile')) {
+                      <button
+                        appButton
+                        variant="ghost"
+                        type="button"
+                        [disabled]="busy()"
+                        (click)="discardSection('profile')"
                       >
-                        {{ m.text }}
-                      </p>
+                        Discard
+                      </button>
+                      <button appButton type="submit" [loading]="busy()">Save changes</button>
                     }
-                    <button appButton type="submit" [loading]="busy()">Save profile</button>
                   </div>
                 </form>
+                @if (msg('profile'); as m) {
+                  <p class="mt-2 text-sm" [class.text-success]="m.ok" [class.text-error]="!m.ok">
+                    {{ m.text }}
+                  </p>
+                }
               </div>
             </div>
           }
 
           @if (activeTab() === 'operations') {
-            <!-- POS & cash control -->
-            <div class="card bg-base-100">
-              <div class="card-body p-4">
-                <h2 class="section-title">POS &amp; cash control</h2>
-                <form (submit)="$event.preventDefault(); saveSection('pos')" class="mt-1">
-                  <div class="divide-y divide-base-300">
-                    <!-- Receipt printing -->
-                    <label class="flex cursor-pointer items-center justify-between gap-4 py-3">
-                      <span>
-                        <span class="block text-sm font-medium">Enable receipt printing</span>
-                        <span class="block text-xs text-base-content/60">
-                          Print a receipt after each completed sale.
-                        </span>
-                      </span>
-                      <input
-                        type="checkbox"
-                        class="toggle toggle-primary"
-                        [formControl]="enablePrinter"
-                      />
-                    </label>
-
-                    <!-- Cashier queue -->
-                    <div class="py-3">
-                      <label class="flex cursor-pointer items-center justify-between gap-4">
-                        <span>
-                          <span class="block text-sm font-medium"
-                            >Use a separate cashier queue</span
-                          >
-                          <span class="block text-xs text-base-content/60">
-                            When off, sellers take payment and complete orders directly on the Sell
-                            screen.
-                          </span>
-                        </span>
-                        <input
-                          type="checkbox"
-                          class="toggle toggle-primary"
-                          [formControl]="cashierFlow"
-                        />
-                      </label>
-                      @if (!cashierFlow.value) {
-                        <p class="mt-1.5 flex items-center gap-1 text-xs text-info">
-                          <app-icon name="heroInformationCircle" size="sm" />
-                          Direct checkout will be used. New orders will not enter a cashier queue.
-                        </p>
-                      }
-                    </div>
-
-                    <!-- Till sessions -->
-                    <div class="py-3">
-                      <label class="flex cursor-pointer items-center justify-between gap-4">
-                        <span>
-                          <span class="block text-sm font-medium">Track till sessions</span>
-                          <span class="block text-xs text-base-content/60">
-                            Require an open till for payments and keep opening, closing, and
-                            variance counts.
-                          </span>
-                        </span>
-                        <input
-                          type="checkbox"
-                          class="toggle toggle-primary"
-                          [formControl]="cashControl"
-                        />
-                      </label>
-                      <div
-                        class="ml-4 mt-1 border-l-2 border-base-300 pl-4"
-                        [class.opacity-40]="!cashControl.value"
-                      >
-                        <label
-                          class="flex items-center justify-between gap-4 py-2"
-                          [class.cursor-pointer]="cashControl.value"
-                        >
+            <div class="grid gap-4 xl:grid-cols-3">
+              <!-- POS & cash control -->
+              <div class="card bg-base-100 xl:col-span-2 @container">
+                <div class="card-body p-4">
+                  <h2 class="section-title">POS &amp; cash control</h2>
+                  <form (submit)="$event.preventDefault(); saveSection('pos')" class="mt-1">
+                    <div class="grid gap-x-6 @3xl:grid-cols-2">
+                      <div class="divide-y divide-base-300">
+                        <!-- Receipt printing -->
+                        <label class="flex cursor-pointer items-center justify-between gap-4 py-3">
                           <span>
-                            <span class="block text-sm font-medium">Require opening count</span>
+                            <span class="block text-sm font-medium">Enable receipt printing</span>
                             <span class="block text-xs text-base-content/60">
-                              Count cash in the drawer before a till can be used.
+                              Print a receipt after each completed sale.
                             </span>
                           </span>
                           <input
                             type="checkbox"
                             class="toggle toggle-primary"
-                            [formControl]="requireOpening"
-                            [attr.disabled]="!cashControl.value ? '' : null"
+                            [formControl]="enablePrinter"
                           />
                         </label>
-                        @if (cashControl.value && !requireOpening.value) {
-                          <p class="flex items-center gap-1 pb-1 text-xs text-info">
-                            <app-icon name="heroInformationCircle" size="sm" />
-                            Tills will open immediately using current balances; closing counts still
-                            apply.
-                          </p>
-                        }
+
+                        <!-- Cashier queue -->
+                        <div class="py-3">
+                          <label class="flex cursor-pointer items-center justify-between gap-4">
+                            <span>
+                              <span class="block text-sm font-medium"
+                                >Use a separate cashier queue</span
+                              >
+                              <span class="block text-xs text-base-content/60">
+                                When off, sellers take payment and complete orders directly on the
+                                Sell screen.
+                              </span>
+                            </span>
+                            <input
+                              type="checkbox"
+                              class="toggle toggle-primary"
+                              [formControl]="cashierFlow"
+                            />
+                          </label>
+                          @if (!cashierFlow.value) {
+                            <p class="mt-1.5 flex items-center gap-1 text-xs text-info">
+                              <app-icon name="heroInformationCircle" size="sm" />
+                              Direct checkout will be used. New orders will not enter a cashier
+                              queue.
+                            </p>
+                          }
+                        </div>
+                      </div>
+
+                      <div
+                        class="divide-y divide-base-300 border-t border-base-300 @3xl:border-t-0"
+                      >
+                        <!-- Till sessions -->
+                        <div class="py-3">
+                          <label class="flex cursor-pointer items-center justify-between gap-4">
+                            <span>
+                              <span class="block text-sm font-medium">Track till sessions</span>
+                              <span class="block text-xs text-base-content/60">
+                                Require an open till for payments and keep opening, closing, and
+                                variance counts.
+                              </span>
+                            </span>
+                            <input
+                              type="checkbox"
+                              class="toggle toggle-primary"
+                              [formControl]="cashControl"
+                            />
+                          </label>
+                          <div
+                            class="ml-4 mt-1 border-l-2 border-base-300 pl-4"
+                            [class.opacity-40]="!cashControl.value"
+                          >
+                            <label
+                              class="flex items-center justify-between gap-4 py-2"
+                              [class.cursor-pointer]="cashControl.value"
+                            >
+                              <span>
+                                <span class="block text-sm font-medium">Require opening count</span>
+                                <span class="block text-xs text-base-content/60">
+                                  Count cash in the drawer before a till can be used.
+                                </span>
+                              </span>
+                              <input
+                                type="checkbox"
+                                class="toggle toggle-primary"
+                                [formControl]="requireOpening"
+                                [attr.disabled]="!cashControl.value ? '' : null"
+                              />
+                            </label>
+                            @if (cashControl.value && !requireOpening.value) {
+                              <p class="flex items-center gap-1 pb-1 text-xs text-info">
+                                <app-icon name="heroInformationCircle" size="sm" />
+                                Tills will open immediately using current balances; closing counts
+                                still apply.
+                              </p>
+                            }
+                          </div>
+                        </div>
+
+                        <!-- Proforma validity -->
+                        <div class="flex items-center justify-between gap-4 py-3">
+                          <span>
+                            <span class="block text-sm font-medium">Proforma validity</span>
+                            <span class="block text-xs text-base-content/60">
+                              Applies to newly created proformas. Default: 30 days.
+                            </span>
+                          </span>
+                          <label class="flex items-center gap-2">
+                            <input
+                              type="number"
+                              min="1"
+                              max="3650"
+                              class="input input-bordered input-sm w-20 text-right"
+                              [formControl]="proformaValidityDays"
+                            />
+                            <span class="text-xs text-base-content/60">days</span>
+                          </label>
+                        </div>
                       </div>
                     </div>
 
-                    <!-- Proforma validity -->
-                    <div class="flex items-center justify-between gap-4 py-3">
-                      <span>
-                        <span class="block text-sm font-medium">Proforma validity</span>
-                        <span class="block text-xs text-base-content/60">
-                          Applies to newly created proformas. Default: 30 days.
+                    @if (sectionDirty('pos')) {
+                      <div class="mt-3 flex justify-end gap-2 border-t border-base-300/60 pt-3">
+                        <button
+                          appButton
+                          variant="ghost"
+                          type="button"
+                          [disabled]="busy()"
+                          (click)="discardSection('pos')"
+                        >
+                          Discard
+                        </button>
+                        <button appButton type="submit" [loading]="busy()">Save changes</button>
+                      </div>
+                    }
+                  </form>
+                  @if (msg('pos'); as m) {
+                    <p class="mt-2 text-sm" [class.text-success]="m.ok" [class.text-error]="!m.ok">
+                      {{ m.text }}
+                    </p>
+                  }
+                </div>
+              </div>
+
+              <!-- Inventory -->
+              <div class="card bg-base-100">
+                <div class="card-body p-4">
+                  <h2 class="section-title">Inventory</h2>
+                  <form (submit)="$event.preventDefault(); saveSection('inventory')" class="mt-1">
+                    <div class="divide-y divide-base-300">
+                      <div class="flex items-center justify-between gap-4 py-3">
+                        <span>
+                          <span class="block text-sm font-medium">Low-stock threshold</span>
+                          <span class="block text-xs text-base-content/60">
+                            Warn when available stock falls to this level.
+                          </span>
                         </span>
-                      </span>
-                      <label class="flex items-center gap-2">
                         <input
                           type="number"
-                          min="1"
-                          max="3650"
+                          min="0"
                           class="input input-bordered input-sm w-20 text-right"
-                          [formControl]="proformaValidityDays"
+                          [formControl]="lowStock"
                         />
-                        <span class="text-xs text-base-content/60">days</span>
+                      </div>
+                      <label class="flex cursor-pointer items-center justify-between gap-4 py-3">
+                        <span>
+                          <span class="block text-sm font-medium">Track expiry dates</span>
+                          <span class="block text-xs text-base-content/60">
+                            Show expiry fields on stock intake and warn about batches nearing
+                            expiry.
+                          </span>
+                        </span>
+                        <input
+                          type="checkbox"
+                          class="toggle toggle-primary"
+                          [formControl]="batchExpiry"
+                        />
                       </label>
                     </div>
-                  </div>
-
-                  <div class="mt-3">
-                    @if (msg('pos'); as m) {
-                      <p
-                        class="mb-2 text-sm"
-                        [class.text-success]="m.ok"
-                        [class.text-error]="!m.ok"
-                      >
-                        {{ m.text }}
+                    @if (!batchExpiry.value) {
+                      <p class="type-caption mt-2 flex items-start gap-1.5 text-info">
+                        <app-icon name="heroInformationCircle" size="sm" />
+                        <span>Expiry fields are hidden. Existing expiry history is retained.</span>
                       </p>
                     }
-                    <button appButton type="submit" [loading]="busy()">Save POS settings</button>
-                  </div>
-                </form>
-              </div>
-            </div>
-
-            <!-- Inventory -->
-            <div class="card bg-base-100">
-              <div class="card-body p-4">
-                <h2 class="section-title">Inventory</h2>
-                <form (submit)="$event.preventDefault(); saveSection('inventory')" class="mt-1">
-                  <div class="divide-y divide-base-300">
-                    <div class="flex items-center justify-between gap-4 py-3">
-                      <span>
-                        <span class="block text-sm font-medium">Low-stock threshold</span>
-                        <span class="block text-xs text-base-content/60">
-                          Warn when available stock falls to this level.
-                        </span>
-                      </span>
-                      <input
-                        type="number"
-                        min="0"
-                        class="input input-bordered input-sm w-20 text-right"
-                        [formControl]="lowStock"
-                      />
-                    </div>
-                    <label class="flex cursor-pointer items-center justify-between gap-4 py-3">
-                      <span>
-                        <span class="block text-sm font-medium">Track expiry dates</span>
-                        <span class="block text-xs text-base-content/60">
-                          Show expiry fields on stock intake and warn about batches nearing expiry.
-                        </span>
-                      </span>
-                      <input
-                        type="checkbox"
-                        class="toggle toggle-primary"
-                        [formControl]="batchExpiry"
-                      />
-                    </label>
-                  </div>
-                  @if (!batchExpiry.value) {
-                    <div class="alert alert-info mt-2 py-2 text-sm">
-                      <app-icon name="heroInformationCircle" />
-                      <span
-                        >Expiry fields and alerts are hidden. Existing expiry history is
-                        retained.</span
-                      >
-                    </div>
+                    @if (sectionDirty('inventory')) {
+                      <div class="mt-3 flex justify-end gap-2 border-t border-base-300/60 pt-3">
+                        <button
+                          appButton
+                          variant="ghost"
+                          type="button"
+                          [disabled]="busy()"
+                          (click)="discardSection('inventory')"
+                        >
+                          Discard
+                        </button>
+                        <button appButton type="submit" [loading]="busy()">Save changes</button>
+                      </div>
+                    }
+                  </form>
+                  @if (msg('inventory'); as m) {
+                    <p class="mt-2 text-sm" [class.text-success]="m.ok" [class.text-error]="!m.ok">
+                      {{ m.text }}
+                    </p>
                   }
-                  <div class="mt-3">
-                    @if (msg('inventory'); as m) {
-                      <p
-                        class="mb-2 text-sm"
-                        [class.text-success]="m.ok"
-                        [class.text-error]="!m.ok"
-                      >
-                        {{ m.text }}
-                      </p>
-                    }
-                    <button appButton type="submit" [loading]="busy()">Save inventory</button>
-                  </div>
-                </form>
+                </div>
               </div>
             </div>
 
@@ -455,7 +515,7 @@ const SETTINGS_TABS: ReadonlyArray<{ key: SettingsTab; label: string }> = [
             <div class="card bg-base-100">
               <div class="card-body p-4">
                 <div class="flex flex-wrap items-start justify-between gap-3">
-                  <div>
+                  <div class="min-w-0 flex-1">
                     <div class="flex flex-wrap items-center gap-2">
                       <h2 class="section-title">Stock locations</h2>
                       @if (entitlements.snapshot(); as plan) {
@@ -475,6 +535,7 @@ const SETTINGS_TABS: ReadonlyArray<{ key: SettingsTab; label: string }> = [
                     <button
                       appButton
                       variant="outline"
+                      class="shrink-0"
                       [disabled]="!canAddLocation()"
                       (click)="startLocationCreate()"
                     >
@@ -670,13 +731,16 @@ const SETTINGS_TABS: ReadonlyArray<{ key: SettingsTab; label: string }> = [
                   <app-money [amount]="s.variance_notification_threshold" [showCurrency]="true" />.
                 </p>
                 @if (!cashControl.value) {
-                  <div class="alert alert-info mt-2 py-2 text-sm">
-                    <app-icon name="heroInformationCircle" />
-                    <span>This threshold applies when till-session cash control is enabled.</span>
-                  </div>
+                  <p class="type-caption mt-2 flex items-start gap-1.5 text-info">
+                    <app-icon name="heroInformationCircle" size="sm" />
+                    <span>This takes effect when till-session cash control is enabled.</span>
+                  </p>
                 }
-                <form (submit)="$event.preventDefault(); saveSection('cash')" class="mt-2 max-w-40">
-                  <app-form-field label="Threshold (KES)">
+                <form
+                  (submit)="$event.preventDefault(); saveSection('cash')"
+                  class="mt-3 flex flex-wrap items-end gap-2"
+                >
+                  <app-form-field label="Threshold (KES)" class="w-40">
                     <input
                       type="text"
                       inputmode="numeric"
@@ -684,15 +748,24 @@ const SETTINGS_TABS: ReadonlyArray<{ key: SettingsTab; label: string }> = [
                       [formControl]="varianceThreshold"
                     />
                   </app-form-field>
-                  @if (msg('cash'); as m) {
-                    <p class="mt-2 text-sm" [class.text-success]="m.ok" [class.text-error]="!m.ok">
-                      {{ m.text }}
-                    </p>
+                  @if (sectionDirty('cash')) {
+                    <button
+                      appButton
+                      variant="ghost"
+                      type="button"
+                      [disabled]="busy()"
+                      (click)="discardSection('cash')"
+                    >
+                      Discard
+                    </button>
+                    <button appButton type="submit" [loading]="busy()">Save changes</button>
                   }
-                  <button appButton type="submit" class="mt-3" [loading]="busy()">
-                    Save threshold
-                  </button>
                 </form>
+                @if (msg('cash'); as m) {
+                  <p class="mt-2 text-sm" [class.text-success]="m.ok" [class.text-error]="!m.ok">
+                    {{ m.text }}
+                  </p>
+                }
               </div>
             </div>
           }
@@ -786,9 +859,9 @@ const SETTINGS_TABS: ReadonlyArray<{ key: SettingsTab; label: string }> = [
                           <option value="none">In-app only</option>
                         </select>
                       </app-form-field>
-                      <div class="grid gap-2">
+                      <div class="divide-y divide-base-300 rounded-box bg-base-200/40 px-3">
                         <label
-                          class="flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-box border border-base-300 px-3 py-2"
+                          class="flex min-h-11 cursor-pointer items-center justify-between gap-3 py-2"
                         >
                           <span>
                             <span class="block text-sm font-medium">Team invitations</span>
@@ -801,7 +874,7 @@ const SETTINGS_TABS: ReadonlyArray<{ key: SettingsTab; label: string }> = [
                           />
                         </label>
                         <label
-                          class="flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-box border border-base-300 px-3 py-2"
+                          class="flex min-h-11 cursor-pointer items-center justify-between gap-3 py-2"
                         >
                           <span>
                             <span class="block text-sm font-medium">Cashier sessions</span>
@@ -824,15 +897,27 @@ const SETTINGS_TABS: ReadonlyArray<{ key: SettingsTab; label: string }> = [
                         {{ m.text }}
                       </p>
                     }
-                    <button
-                      appButton
-                      type="button"
-                      class="mt-3"
-                      [loading]="busy()"
-                      (click)="savePrimaryContactNotifications()"
-                    >
-                      Save admin alerts
-                    </button>
+                    @if (primaryContactDirty()) {
+                      <div class="mt-3 flex justify-end gap-2 border-t border-base-300/60 pt-3">
+                        <button
+                          appButton
+                          variant="ghost"
+                          type="button"
+                          [disabled]="busy()"
+                          (click)="discardPrimaryContactNotifications()"
+                        >
+                          Discard
+                        </button>
+                        <button
+                          appButton
+                          type="button"
+                          [loading]="busy()"
+                          (click)="savePrimaryContactNotifications()"
+                        >
+                          Save changes
+                        </button>
+                      </div>
+                    }
                   } @else {
                     <div class="alert alert-warning mt-4 text-sm">
                       <app-icon name="heroExclamationTriangle" />
@@ -922,62 +1007,80 @@ const SETTINGS_TABS: ReadonlyArray<{ key: SettingsTab; label: string }> = [
                     <a routerLink="/billing" class="link">View plans</a>
                   </p>
                 } @else {
-                  <div class="mt-4 grid gap-3 sm:grid-cols-2">
-                    <app-form-field label="Default channel">
-                      <select
-                        class="select select-bordered select-sm w-full"
-                        [formControl]="reminderChannel"
-                      >
-                        <option value="whatsapp">WhatsApp</option>
-                        <option value="sms">SMS</option>
-                      </select>
-                    </app-form-field>
-                    <label class="label cursor-pointer justify-start gap-3 self-end">
-                      <input
-                        type="checkbox"
-                        class="checkbox checkbox-sm"
-                        [formControl]="reminderSmsFallback"
-                      />
-                      <span class="label-text">Use SMS if WhatsApp permanently fails</span>
-                    </label>
-                    <div class="sm:col-span-2">
-                      <div class="flex flex-wrap items-baseline justify-between gap-2">
-                        <p class="text-sm font-medium">Reminder stages</p>
-                        <p class="type-caption">Message wording is managed by Dukarun.</p>
-                      </div>
-                      <div class="mt-2 grid gap-2 sm:grid-cols-2">
-                        @for (draft of reminderDrafts(); track draft.key) {
-                          <label
-                            class="flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-box border border-base-300 px-3 py-2"
-                          >
-                            <span class="font-medium">{{
-                              reminderStageLabel(draft.stageDays)
-                            }}</span>
-                            <input
-                              type="checkbox"
-                              class="toggle toggle-sm toggle-primary"
-                              [checked]="draft.enabled"
-                              (change)="setReminderStageEnabled(draft.key, $event)"
-                            />
-                          </label>
-                        }
+                  @if (paymentRemindersEnabled.value) {
+                    <div class="mt-4 grid gap-3 sm:grid-cols-2">
+                      <app-form-field label="Default channel">
+                        <select
+                          class="select select-bordered select-sm w-full"
+                          [formControl]="reminderChannel"
+                        >
+                          <option value="whatsapp">WhatsApp</option>
+                          <option value="sms">SMS</option>
+                        </select>
+                      </app-form-field>
+                      <label class="label cursor-pointer justify-start gap-3 self-end">
+                        <input
+                          type="checkbox"
+                          class="checkbox checkbox-sm"
+                          [formControl]="reminderSmsFallback"
+                        />
+                        <span class="label-text">Use SMS if WhatsApp permanently fails</span>
+                      </label>
+                      <div class="sm:col-span-2">
+                        <div class="flex flex-wrap items-baseline justify-between gap-2">
+                          <p class="text-sm font-medium">Reminder stages</p>
+                          <p class="type-caption">Message wording is managed by Dukarun.</p>
+                        </div>
+                        <div class="mt-2 grid gap-1 rounded-box bg-base-200/40 p-1 sm:grid-cols-2">
+                          @for (draft of reminderDrafts(); track draft.key) {
+                            <label
+                              class="flex min-h-11 cursor-pointer items-center justify-between gap-3 px-2 py-2"
+                            >
+                              <span class="font-medium">{{
+                                reminderStageLabel(draft.stageDays)
+                              }}</span>
+                              <input
+                                type="checkbox"
+                                class="toggle toggle-sm toggle-primary"
+                                [checked]="draft.enabled"
+                                (change)="setReminderStageEnabled(draft.key, $event)"
+                              />
+                            </label>
+                          }
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  } @else {
+                    <p class="type-caption mt-3">
+                      Reminder schedules and delivery options are paused while this is off.
+                    </p>
+                  }
                   @if (msg('communications'); as m) {
                     <p class="mt-2 text-sm" [class.text-success]="m.ok" [class.text-error]="!m.ok">
                       {{ m.text }}
                     </p>
                   }
-                  <button
-                    appButton
-                    type="button"
-                    class="mt-3"
-                    [loading]="busy()"
-                    (click)="saveCommunicationSettings()"
-                  >
-                    Save reminders
-                  </button>
+                  @if (reminderSettingsDirty()) {
+                    <div class="mt-3 flex justify-end gap-2 border-t border-base-300/60 pt-3">
+                      <button
+                        appButton
+                        variant="ghost"
+                        type="button"
+                        [disabled]="busy()"
+                        (click)="discardCommunicationSettings()"
+                      >
+                        Discard
+                      </button>
+                      <button
+                        appButton
+                        type="button"
+                        [loading]="busy()"
+                        (click)="saveCommunicationSettings()"
+                      >
+                        Save changes
+                      </button>
+                    </div>
+                  }
                 }
                 <div class="mt-4 border-t border-base-300/60 pt-4">
                   <p class="type-caption">
@@ -1362,7 +1465,7 @@ const SETTINGS_TABS: ReadonlyArray<{ key: SettingsTab; label: string }> = [
           }
 
           @if (activeTab() === 'data') {
-            <div class="card border border-warning/30 bg-base-100">
+            <div class="card bg-base-100">
               <div class="card-body gap-4 p-4">
                 <div>
                   <h2 class="section-title">Data import &amp; export</h2>
@@ -1372,13 +1475,13 @@ const SETTINGS_TABS: ReadonlyArray<{ key: SettingsTab; label: string }> = [
                   </p>
                 </div>
 
-                <div class="alert alert-info text-sm">
-                  <app-icon name="heroInformationCircle" />
+                <p class="type-caption flex items-start gap-1.5 text-info">
+                  <app-icon name="heroInformationCircle" size="sm" />
                   <span>
                     Exports use this device's fresh synchronized cache. Refresh the related screen
                     first if you want to force a new snapshot before downloading.
                   </span>
-                </div>
+                </p>
 
                 @if (dataMessage(); as message) {
                   <div
@@ -1626,10 +1729,14 @@ export class SettingsComponent implements OnInit {
         (tab.key !== 'communications' ||
           this.perms.has('ManageCommunications') ||
           this.perms.has('ManageTeam')) &&
-        (tab.key !== 'mpesa' || this.perms.has('ManageMpesaIntegration'))
+        (tab.key !== 'mpesa' || this.perms.has('ManageMpesaIntegration')) &&
+        (tab.key !== 'data' || this.canTransferData())
     )
   );
   protected readonly activeTab = signal<SettingsTab>('business');
+  protected readonly activeTabMeta = computed(
+    () => SETTINGS_TABS.find(tab => tab.key === this.activeTab()) ?? SETTINGS_TABS[0]
+  );
   protected readonly dataExportBusy = signal<'catalog' | CachedExportKind | null>(null);
   protected readonly dataMessage = signal<{ ok: boolean; text: string } | null>(null);
   protected readonly importOpen = signal(false);
@@ -1679,6 +1786,7 @@ export class SettingsComponent implements OnInit {
     warningDetails: ['Locations with inventory or purchase history cannot be deleted.'],
   }));
   private readonly locationDeleteModal = viewChild(DeleteConfirmationModalComponent);
+  private requestedTab: SettingsTab | null = null;
 
   protected readonly name = new FormControl('', { nonNullable: true });
   protected readonly slug = new FormControl('', {
@@ -1720,6 +1828,7 @@ export class SettingsComponent implements OnInit {
   protected readonly primaryTeamNotifications = new FormControl(true, { nonNullable: true });
   protected readonly primaryCashierNotifications = new FormControl(true, { nonNullable: true });
   protected readonly reminderDrafts = signal<ReminderDraft[]>([]);
+  private readonly savedReminderDrafts = signal<ReminderDraft[]>([]);
   protected readonly locationName = new FormControl('', { nonNullable: true });
   protected readonly locationCode = new FormControl('', { nonNullable: true });
   protected readonly locationDefault = new FormControl(false, { nonNullable: true });
@@ -1727,13 +1836,8 @@ export class SettingsComponent implements OnInit {
   constructor() {
     this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(params => {
       const requested = params.get('tab') as SettingsTab | null;
-      this.activeTab.set(
-        requested &&
-          SETTINGS_TABS.some(tab => tab.key === requested) &&
-          (requested !== 'mpesa' || this.perms.has('ManageMpesaIntegration'))
-          ? requested
-          : 'business'
-      );
+      this.requestedTab = requested;
+      this.normalizeActiveTab(requested);
     });
   }
 
@@ -1861,11 +1965,13 @@ export class SettingsComponent implements OnInit {
           primaryContactSettings.preferences.cashierSessions
         );
       }
-      this.reminderDrafts.set(
-        reminderConfiguration.map(rule =>
-          this.reminderDraft(rule.stage_days, rule.enabled, rule.template_key)
-        )
+      const reminderDrafts = reminderConfiguration.map(rule =>
+        this.reminderDraft(rule.stage_days, rule.enabled, rule.template_key)
       );
+      this.reminderDrafts.set(reminderDrafts);
+      this.savedReminderDrafts.set(reminderDrafts.map(draft => ({ ...draft })));
+      this.markAllSectionsPristine();
+      this.normalizeActiveTab(this.requestedTab);
     } catch (err) {
       this.loadError.set(err instanceof Error ? err.message : 'Failed to load settings');
     }
@@ -1878,6 +1984,7 @@ export class SettingsComponent implements OnInit {
     this.primaryContactChannel.setValue(settings.preferences.channel);
     this.primaryTeamNotifications.setValue(settings.preferences.team);
     this.primaryCashierNotifications.setValue(settings.preferences.cashierSessions);
+    this.markPrimaryContactPristine();
   }
 
   private async fetchPrimaryContactSettings(): Promise<PrimaryContactNotificationSettings | null> {
@@ -1992,6 +2099,45 @@ export class SettingsComponent implements OnInit {
 
   protected msg(key: string): { ok: boolean; text: string } | null {
     return this.messages().get(key) ?? null;
+  }
+
+  protected sectionDirty(section: SectionKey): boolean {
+    return this.sectionControls(section).some(control => control.dirty);
+  }
+
+  protected discardSection(section: SectionKey): void {
+    const current = this.settings();
+    if (!current) return;
+    switch (section) {
+      case 'profile':
+        this.name.setValue(current.name);
+        this.slug.setValue(current.public_slug ?? '');
+        this.whatsapp.setValue(current.public_whatsapp_number ?? '');
+        this.address.setValue(current.address ?? '');
+        this.email.setValue(current.email ?? '');
+        this.storefrontEnabled.setValue(current.public_storefront_enabled);
+        break;
+      case 'pos':
+        this.enablePrinter.setValue(current.enable_printer);
+        this.proformaValidityDays.setValue(current.proforma_validity_days);
+        this.cashierFlow.setValue(current.cashier_flow_enabled);
+        this.cashControl.setValue(current.cash_control_enabled);
+        this.requireOpening.setValue(current.require_opening_count);
+        break;
+      case 'inventory':
+        this.lowStock.setValue(current.low_stock_threshold);
+        this.batchExpiry.setValue(current.batch_expiry_enabled);
+        break;
+      case 'cash':
+        this.varianceThreshold.setValue(formatKesInput(current.variance_notification_threshold));
+        break;
+    }
+    this.markSectionPristine(section);
+    this.messages.update(messages => {
+      const next = new Map(messages);
+      next.delete(section);
+      return next;
+    });
   }
 
   protected logoUrl(logoPath: string): string {
@@ -2117,6 +2263,7 @@ export class SettingsComponent implements OnInit {
     try {
       await this.settingsService.updateSettings(s.id, patch);
       this.settings.set({ ...s, ...patch });
+      this.markSectionPristine(section);
       if (section === 'pos' || section === 'inventory') {
         await this.cashierSession.refreshConfiguration();
       }
@@ -2189,6 +2336,8 @@ export class SettingsComponent implements OnInit {
         payment_reminder_channel: this.reminderChannel.value,
         payment_reminder_sms_fallback: this.reminderSmsFallback.value,
       });
+      this.savedReminderDrafts.set(this.reminderDrafts().map(draft => ({ ...draft })));
+      this.markReminderSettingsPristine();
       await this.entitlements.refresh();
       this.flash('communications', true, 'Reminder settings saved');
     } catch (err) {
@@ -2209,6 +2358,7 @@ export class SettingsComponent implements OnInit {
         cashierSessions: this.primaryCashierNotifications.value,
       });
       this.primaryContactSettings.set({ ...current, preferences });
+      this.markPrimaryContactPristine();
       this.flash('primary-contact-notifications', true, 'Admin alert preferences saved');
     } catch (err) {
       this.primaryContactChannel.setValue(current.preferences.channel, { emitEvent: false });
@@ -2216,6 +2366,7 @@ export class SettingsComponent implements OnInit {
       this.primaryCashierNotifications.setValue(current.preferences.cashierSessions, {
         emitEvent: false,
       });
+      this.markPrimaryContactPristine();
       this.flash(
         'primary-contact-notifications',
         false,
@@ -2234,6 +2385,7 @@ export class SettingsComponent implements OnInit {
     try {
       const cancelled = await this.settingsService.setAutomatedCustomerNotifications(enabled);
       this.settings.set({ ...current, automated_customer_notifications_enabled: enabled });
+      this.automatedCustomerNotificationsEnabled.markAsPristine();
       this.flash(
         'automation',
         true,
@@ -2246,10 +2398,135 @@ export class SettingsComponent implements OnInit {
         current.automated_customer_notifications_enabled,
         { emitEvent: false }
       );
+      this.automatedCustomerNotificationsEnabled.markAsPristine();
       this.flash('automation', false, err instanceof Error ? err.message : 'Update failed');
     } finally {
       this.busy.set(false);
     }
+  }
+
+  private normalizeActiveTab(requested: SettingsTab | null): void {
+    const available = this.settingsTabs();
+    const next = requested && available.some(tab => tab.key === requested) ? requested : 'business';
+    this.activeTab.set(next);
+  }
+
+  protected primaryContactDirty(): boolean {
+    return [
+      this.primaryContactChannel,
+      this.primaryTeamNotifications,
+      this.primaryCashierNotifications,
+    ].some(control => control.dirty);
+  }
+
+  protected discardPrimaryContactNotifications(): void {
+    const current = this.primaryContactSettings();
+    if (!current) return;
+    this.primaryContactChannel.setValue(current.preferences.channel);
+    this.primaryTeamNotifications.setValue(current.preferences.team);
+    this.primaryCashierNotifications.setValue(current.preferences.cashierSessions);
+    this.markPrimaryContactPristine();
+    this.clearMessage('primary-contact-notifications');
+  }
+
+  protected reminderSettingsDirty(): boolean {
+    const controlsDirty = [
+      this.paymentRemindersEnabled,
+      this.reminderChannel,
+      this.reminderSmsFallback,
+    ].some(control => control.dirty);
+    if (controlsDirty) return true;
+    return !this.sameReminderDrafts(this.reminderDrafts(), this.savedReminderDrafts());
+  }
+
+  protected discardCommunicationSettings(): void {
+    const current = this.settings();
+    if (!current) return;
+    this.paymentRemindersEnabled.setValue(current.payment_reminders_enabled);
+    this.reminderChannel.setValue(current.payment_reminder_channel);
+    this.reminderSmsFallback.setValue(current.payment_reminder_sms_fallback);
+    this.reminderDrafts.set(this.savedReminderDrafts().map(draft => ({ ...draft })));
+    this.markReminderSettingsPristine();
+    this.clearMessage('communications');
+  }
+
+  private sectionControls(section: SectionKey): AbstractControl[] {
+    switch (section) {
+      case 'profile':
+        return [
+          this.name,
+          this.slug,
+          this.whatsapp,
+          this.address,
+          this.email,
+          this.storefrontEnabled,
+        ];
+      case 'pos':
+        return [
+          this.enablePrinter,
+          this.proformaValidityDays,
+          this.cashierFlow,
+          this.cashControl,
+          this.requireOpening,
+        ];
+      case 'inventory':
+        return [this.lowStock, this.batchExpiry];
+      case 'cash':
+        return [this.varianceThreshold];
+    }
+  }
+
+  private markSectionPristine(section: SectionKey): void {
+    for (const control of this.sectionControls(section)) control.markAsPristine();
+  }
+
+  private markAllSectionsPristine(): void {
+    for (const section of ['profile', 'pos', 'inventory', 'cash'] as const) {
+      this.markSectionPristine(section);
+    }
+    this.markPrimaryContactPristine();
+    this.markReminderSettingsPristine();
+    this.automatedCustomerNotificationsEnabled.markAsPristine();
+  }
+
+  private markPrimaryContactPristine(): void {
+    for (const control of [
+      this.primaryContactChannel,
+      this.primaryTeamNotifications,
+      this.primaryCashierNotifications,
+    ]) {
+      control.markAsPristine();
+    }
+  }
+
+  private markReminderSettingsPristine(): void {
+    for (const control of [
+      this.paymentRemindersEnabled,
+      this.reminderChannel,
+      this.reminderSmsFallback,
+    ]) {
+      control.markAsPristine();
+    }
+  }
+
+  private clearMessage(key: string): void {
+    this.messages.update(messages => {
+      const next = new Map(messages);
+      next.delete(key);
+      return next;
+    });
+  }
+
+  private sameReminderDrafts(left: ReminderDraft[], right: ReminderDraft[]): boolean {
+    return (
+      left.length === right.length &&
+      left.every(
+        (draft, index) =>
+          draft.key === right[index]?.key &&
+          draft.stageDays === right[index]?.stageDays &&
+          draft.enabled === right[index]?.enabled
+      )
+    );
   }
 
   private reminderDraft(stageDays: number, enabled: boolean, key: string): ReminderDraft {

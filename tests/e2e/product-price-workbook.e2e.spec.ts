@@ -123,7 +123,7 @@ async function mockPriceWorkbookFlow(page: Page) {
       return json({
         company_id: companyId,
         user_id: userId,
-        permissions: ['ManageCatalog', 'ManageStockAdjustments'],
+        permissions: ['ManageCatalog', 'ManageStockAdjustments', 'ManageCompanySettings'],
         actions: {},
       });
     }

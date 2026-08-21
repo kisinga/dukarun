@@ -16,7 +16,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { formatKes, formatKesInput, parseKes } from '../core/money';
 import { PermissionsService } from '../core/permissions.service';
 import { CatalogSearchService } from '../core/catalog-search.service';
-import { PosService, Variant, variantLabel } from '../pos/pos.service';
+import { PosService, SupplierStockRow, Variant, variantLabel } from '../pos/pos.service';
 import { LocationContextService } from '../core/location-context.service';
 import { runIndependentLoads } from '../core/independent-load';
 import { PrintService } from '../shared/print/print.service';
@@ -304,7 +304,7 @@ interface ParsedPurchaseLine {
                       <td>
                         @if (supplierStats(supplier.id); as stats) {
                           <p class="table-primary">{{ stats.purchases }} purchases</p>
-                          <p class="table-secondary">{{ stats.products }} products supplied</p>
+                          <p class="table-secondary">{{ stats.openPurchases }} still open</p>
                         }
                       </td>
                       <td>
@@ -662,16 +662,31 @@ interface ParsedPurchaseLine {
                     <p class="text-sm font-semibold">{{ stats.purchases }}</p>
                   </div>
                   <div>
-                    <p class="type-caption">Products supplied</p>
-                    <p class="text-sm font-semibold">{{ stats.products }}</p>
+                    <p class="type-caption">Open purchases</p>
+                    <p class="text-sm font-semibold">{{ stats.openPurchases }}</p>
                   </div>
                   <div>
                     <p class="type-caption">Average order</p>
                     <p class="text-sm font-semibold">{{ fmt(stats.averageOrder) }}</p>
                   </div>
                   <div>
-                    <p class="type-caption">Price leader</p>
-                    <p class="text-sm font-semibold">{{ stats.bestPrices }} product(s)</p>
+                    <p class="type-caption">Stock sourced · {{ activeLocationName() }}</p>
+                    @if (drawerSupplierStockLoading()) {
+                      <span class="loading loading-spinner loading-xs"></span>
+                    } @else {
+                      <p class="text-sm font-semibold">
+                        {{ drawerSupplierStock().length }} variants
+                        @if (perms.has('ViewFinancials')) {
+                          · {{ fmt(drawerSupplierStockValue()) }}
+                        }
+                      </p>
+                      <a
+                        class="link type-caption"
+                        routerLink="/inventory/products"
+                        [queryParams]="{ supplier: s.id }"
+                        >View products</a
+                      >
+                    }
                   </div>
                 </div>
               }
@@ -1548,9 +1563,21 @@ interface ParsedPurchaseLine {
                           @for (line of drawerPurchaseLines(); track line.id) {
                             <li class="flex items-center gap-3 py-2">
                               <div class="min-w-0 flex-1">
-                                <p class="truncate text-sm font-medium">
-                                  {{ purchaseLineLabel(line.variant_id) }}
-                                </p>
+                                @if (purchaseLineProductId(line.variant_id); as productId) {
+                                  <a
+                                    class="link block truncate text-sm font-medium"
+                                    routerLink="/inventory/products"
+                                    [queryParams]="{
+                                      product: productId,
+                                      variant: line.variant_id,
+                                    }"
+                                    >{{ purchaseLineLabel(line.variant_id) }}</a
+                                  >
+                                } @else {
+                                  <p class="truncate text-sm font-medium">
+                                    {{ purchaseLineLabel(line.variant_id) }}
+                                  </p>
+                                }
                                 <p class="type-caption">
                                   {{ purchaseLineManufacturer(line.variant_id) }}
                                   @if (purchaseLineSku(line.variant_id); as sku) {
@@ -1832,6 +1859,12 @@ export class SuppliersComponent implements OnInit, OnDestroy {
   private purchaseSearchTimer: ReturnType<typeof setTimeout> | null = null;
   protected readonly drafts = signal<PurchaseDraft[]>([]);
   protected readonly performance = signal<SupplierVariantPerformance[]>([]);
+  protected readonly drawerSupplierStock = signal<SupplierStockRow[]>([]);
+  protected readonly drawerSupplierStockLoading = signal(false);
+  private drawerSupplierStockRequest = 0;
+  protected readonly drawerSupplierStockValue = computed(() =>
+    this.drawerSupplierStock().reduce((sum, row) => sum + (row.stock_value ?? 0), 0)
+  );
   protected readonly purchaseMetrics = signal<SupplierPurchaseMetric[]>([]);
   protected readonly locations = this.locationContext.locations;
   protected readonly activeDraftId = signal<string | null>(null);
@@ -1910,6 +1943,22 @@ export class SuppliersComponent implements OnInit, OnDestroy {
         return;
       }
       untracked(() => void this.load(this.suppliers().length > 0));
+    });
+    let drawerStockLocationId = this.locationContext.activeId();
+    effect(() => {
+      const locationId = this.locationContext.activeId();
+      if (locationId === drawerStockLocationId) return;
+      drawerStockLocationId = locationId;
+      untracked(() => {
+        const supplierId = this.drawerSupplierId();
+        this.drawerSupplierStock.set([]);
+        if (!supplierId || !locationId) {
+          ++this.drawerSupplierStockRequest;
+          this.drawerSupplierStockLoading.set(false);
+          return;
+        }
+        void this.loadDrawerSupplierStock(supplierId, locationId);
+      });
     });
   }
   protected lines: PurchaseLineForm[] = [this.emptyLine()];
@@ -2035,11 +2084,16 @@ export class SuppliersComponent implements OnInit, OnDestroy {
   });
   // Purchase detail drawer (/purchases side)
   protected readonly drawerPurchaseId = signal<string | null>(null);
+  private readonly drawerPurchaseOverride = signal<PurchaseRow | null>(null);
   protected readonly drawerPurchase = computed(() => {
     const id = this.drawerPurchaseId();
-    return id ? (this.purchases().find(p => p.id === id) ?? null) : null;
+    return id
+      ? (this.purchases().find(p => p.id === id) ??
+          (this.drawerPurchaseOverride()?.id === id ? this.drawerPurchaseOverride() : null))
+      : null;
   });
   protected readonly drawerPurchaseLines = signal<PurchaseLine[]>([]);
+  private readonly drawerPurchaseVariants = signal<Map<string, Variant>>(new Map());
   protected readonly drawerPurchaseExpenses = signal<PurchaseExpense[]>([]);
   protected readonly drawerPurchasePayments = signal<PurchasePayment[]>([]);
   protected readonly purchaseDetailLoading = signal(false);
@@ -2136,6 +2190,14 @@ export class SuppliersComponent implements OnInit, OnDestroy {
       if (supplierId && this.activeSuppliers().some(row => row.id === supplierId)) {
         this.purchaseSupplier.setValue(supplierId);
       }
+      const purchaseId = params.get('purchase');
+      if (purchaseId) {
+        const purchase =
+          this.purchases().find(row => row.id === purchaseId) ??
+          (await this.money.purchaseById(purchaseId));
+        if (purchase) await this.openPurchaseDrawer(purchase, false);
+        else this.error.set('The linked purchase was not found');
+      }
     } else {
       const supplierId = params.get('supplier');
       const supplier = supplierId ? this.suppliers().find(row => row.id === supplierId) : null;
@@ -2226,10 +2288,6 @@ export class SuppliersComponent implements OnInit, OnDestroy {
       {
         fallback: 'Failed to load purchase drafts',
         run: async () => this.drafts.set(await this.money.purchaseDrafts()),
-      },
-      {
-        fallback: 'Failed to load supplier purchase history',
-        run: async () => this.performance.set(await this.money.supplierVariantPerformance()),
       },
       {
         fallback: 'Failed to load supplier purchase metrics',
@@ -2658,41 +2716,16 @@ export class SuppliersComponent implements OnInit, OnDestroy {
     return null;
   }
 
-  protected bestSupplierHint(line: PurchaseLineForm): { supplier: string; cost: number } | null {
-    const options = this.performance().filter(
-      insight => insight.variant_id === line.variantId && (insight.average_unit_cost ?? 0) > 0
-    );
-    if (options.length === 0) return null;
-    const best = options.reduce((lowest, current) =>
-      (current.average_unit_cost ?? Infinity) < (lowest.average_unit_cost ?? Infinity)
-        ? current
-        : lowest
-    );
-    return {
-      supplier: this.supplierName(best.supplier_id ?? ''),
-      cost: best.average_unit_cost ?? 0,
-    };
-  }
-
   protected supplierStats(supplierId: string): {
     purchases: number;
-    products: number;
     averageOrder: number;
-    bestPrices: number;
+    openPurchases: number;
   } {
     const metric = this.purchaseMetrics().find(row => row.supplier_id === supplierId);
-    const rows = this.performance().filter(row => row.supplier_id === supplierId);
-    const comparable = rows.filter(row => {
-      const peers = this.performance().filter(peer => peer.variant_id === row.variant_id);
-      if (peers.length < 2) return false;
-      const best = Math.min(...peers.map(peer => peer.average_unit_cost ?? Infinity));
-      return (row.average_unit_cost ?? Infinity) === best;
-    });
     return {
       purchases: Number(metric?.purchase_count ?? 0),
-      products: rows.length,
       averageOrder: Number(metric?.average_order ?? 0),
-      bestPrices: comparable.length,
+      openPurchases: Number(metric?.open_purchase_count ?? 0),
     };
   }
 
@@ -2859,10 +2892,12 @@ export class SuppliersComponent implements OnInit, OnDestroy {
     this.selectedPayAmount.setValue(formatKesInput(purchase.total_cost - purchase.paid));
   }
 
-  protected async openPurchaseDrawer(purchase: PurchaseRow): Promise<void> {
+  protected async openPurchaseDrawer(purchase: PurchaseRow, updateUrl = true): Promise<void> {
     this.drawerPurchaseId.set(purchase.id);
+    this.drawerPurchaseOverride.set(purchase);
     this.payPurchaseId.set(null);
     this.drawerPurchaseLines.set([]);
+    this.drawerPurchaseVariants.set(new Map());
     this.drawerPurchaseExpenses.set([]);
     this.drawerPurchasePayments.set([]);
     this.purchaseDetailLoading.set(true);
@@ -2872,9 +2907,17 @@ export class SuppliersComponent implements OnInit, OnDestroy {
         this.money.purchaseExpenses(purchase.id),
         this.money.purchasePayments(purchase.id),
       ]);
+      const variants = await this.pos.variantsByIds([
+        ...new Set(lines.map(line => line.variant_id)),
+      ]);
       // Ignore stale results when the drawer was closed (or reopened) meanwhile.
       if (this.drawerPurchaseId() !== purchase.id) return;
       this.drawerPurchaseLines.set(lines);
+      this.drawerPurchaseVariants.set(
+        new Map(
+          variants.flatMap(variant => (variant.variant_id ? [[variant.variant_id, variant]] : []))
+        )
+      );
       this.drawerPurchaseExpenses.set(expenses);
       this.drawerPurchasePayments.set(payments);
     } catch (err) {
@@ -2882,34 +2925,70 @@ export class SuppliersComponent implements OnInit, OnDestroy {
     } finally {
       if (this.drawerPurchaseId() === purchase.id) this.purchaseDetailLoading.set(false);
     }
+    if (updateUrl && this.isPurchasePage()) {
+      void this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams: { purchase: purchase.id },
+        queryParamsHandling: 'merge',
+        replaceUrl: true,
+      });
+    }
   }
 
   /** Called by the drawer after its close transition finishes. */
   protected closePurchaseDrawer(): void {
     this.drawerPurchaseId.set(null);
+    this.drawerPurchaseOverride.set(null);
     this.payPurchaseId.set(null);
     this.purchaseDetailLoading.set(false);
     this.drawerPurchaseLines.set([]);
+    this.drawerPurchaseVariants.set(new Map());
     this.drawerPurchaseExpenses.set([]);
     this.drawerPurchasePayments.set([]);
     this.purchaseReversalReason.setValue('');
     this.reversingPurchaseId.set(null);
+    if (this.isPurchasePage()) {
+      void this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams: { purchase: null },
+        queryParamsHandling: 'merge',
+        replaceUrl: true,
+      });
+    }
   }
 
   protected purchaseLineLabel(variantId: string): string {
-    const variant = this.variants().find(v => v.variant_id === variantId);
+    const variant =
+      this.drawerPurchaseVariants().get(variantId) ??
+      this.variants().find(v => v.variant_id === variantId);
     return variant ? this.label(variant) : 'Item';
   }
 
   protected purchaseLineManufacturer(variantId: string): string {
     return (
-      this.variants().find(variant => variant.variant_id === variantId)?.manufacturer_name ??
-      'Manufacturer not set'
+      (
+        this.drawerPurchaseVariants().get(variantId) ??
+        this.variants().find(variant => variant.variant_id === variantId)
+      )?.manufacturer_name ?? 'Manufacturer not set'
     );
   }
 
   protected purchaseLineSku(variantId: string): string | null {
-    return this.variants().find(variant => variant.variant_id === variantId)?.sku ?? null;
+    return (
+      (
+        this.drawerPurchaseVariants().get(variantId) ??
+        this.variants().find(variant => variant.variant_id === variantId)
+      )?.sku ?? null
+    );
+  }
+
+  protected purchaseLineProductId(variantId: string): string | null {
+    return (
+      (
+        this.drawerPurchaseVariants().get(variantId) ??
+        this.variants().find(variant => variant.variant_id === variantId)
+      )?.product_id ?? null
+    );
   }
 
   protected async paySelectedPurchase(): Promise<void> {
@@ -3245,6 +3324,7 @@ export class SuppliersComponent implements OnInit, OnDestroy {
     this.supplierCreditLimit.setValue(formatKesInput(supplier.supplier_credit_limit));
     this.supplierTermsDays.setValue(supplier.supplier_credit_terms_days ?? 0);
     this.drawerPurchases.set([]);
+    this.drawerSupplierStock.set([]);
     this.supplierAdvanceBalance.set(0);
     this.advanceActivity.set([]);
     this.advanceAmount.setValue('');
@@ -3254,6 +3334,8 @@ export class SuppliersComponent implements OnInit, OnDestroy {
     this.advanceApplicationAttempt = null;
     this.advanceReturnClientRef = null;
     void this.loadDrawerPurchases(supplier.id);
+    const locationId = this.locationContext.activeId();
+    if (locationId) void this.loadDrawerSupplierStock(supplier.id, locationId);
     if (this.perms.has('ViewFinancials') || this.perms.has('ManageSupplierCreditPurchases')) {
       void this.loadSupplierAccount(supplier.id);
     }
@@ -3269,6 +3351,33 @@ export class SuppliersComponent implements OnInit, OnDestroy {
         queryParamsHandling: 'merge',
         replaceUrl: true,
       });
+    }
+  }
+
+  private async loadDrawerSupplierStock(supplierId: string, locationId: string): Promise<void> {
+    const request = ++this.drawerSupplierStockRequest;
+    this.drawerSupplierStockLoading.set(true);
+    try {
+      const rows = await this.pos.supplierStockByVariant(supplierId, locationId);
+      if (
+        request === this.drawerSupplierStockRequest &&
+        this.drawerSupplierId() === supplierId &&
+        this.locationContext.activeId() === locationId
+      ) {
+        this.drawerSupplierStock.set(rows);
+      }
+    } catch (error) {
+      if (
+        request === this.drawerSupplierStockRequest &&
+        this.drawerSupplierId() === supplierId &&
+        this.locationContext.activeId() === locationId
+      ) {
+        this.error.set(
+          error instanceof Error ? error.message : 'Could not load supplier-sourced stock'
+        );
+      }
+    } finally {
+      if (request === this.drawerSupplierStockRequest) this.drawerSupplierStockLoading.set(false);
     }
   }
 
@@ -3357,9 +3466,12 @@ export class SuppliersComponent implements OnInit, OnDestroy {
   /** Called by the drawer after its close transition finishes. */
   protected closeSupplierDrawer(): void {
     this.drawerPurchasesSequence++;
+    this.drawerSupplierStockRequest++;
     this.drawerSupplierId.set(null);
     this.payPurchaseId.set(null);
     this.supplierAdvanceBalance.set(0);
+    this.drawerSupplierStock.set([]);
+    this.drawerSupplierStockLoading.set(false);
     this.advanceActivity.set([]);
     this.supplierPayments.set([]);
     this.supplierAccountStatus.set(null);
@@ -3613,6 +3725,13 @@ export class SuppliersComponent implements OnInit, OnDestroy {
 
   protected name(c: MoneyCustomer): string {
     return [c.first_name, c.last_name].filter(Boolean).join(' ');
+  }
+
+  protected activeLocationName(): string {
+    return (
+      this.locations().find(location => location.id === this.locationContext.activeId())?.name ??
+      'Active location'
+    );
   }
 
   protected time(iso: string): string {

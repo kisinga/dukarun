@@ -15099,6 +15099,14 @@ export type Database = {
         Args: { p_company_id: string; p_supplier_id: string }
         Returns: number
       }
+      supplier_stock_by_variant: {
+        Args: { p_location_id?: string; p_supplier_id: string }
+        Returns: {
+          stock: number
+          stock_value: number
+          variant_id: string
+        }[]
+      }
       sweep_mpesa_processing: { Args: never; Returns: undefined }
       sync_cache_stream: {
         Args: { p_after_sequence?: number; p_limit?: number; p_stream: string }
