@@ -19,6 +19,7 @@ import {
   DashboardDailySummary,
   DashboardLocationSummary,
   DashboardPeriodComparison,
+  DashboardProductSignals,
   DashboardTopVariant,
   ExpiringBatch,
   LowStockVariant,
@@ -35,6 +36,7 @@ import { CompanyPreferencesService } from '../../core/company-preferences.servic
 import { offlineDb, offlineScopeKey, type NamedSnapshot } from '../../pos/offline/offline-db';
 import { CacheJournalService, type CacheStreamHandler } from '../../core/cache-journal.service';
 import { PageActionsComponent } from '../../shared/ui/page-actions.component';
+import { selectDashboardSignalCandidates } from '../../reports/product-intelligence';
 
 type TopVariant = {
   variantId: string;
@@ -43,6 +45,11 @@ type TopVariant = {
   quantity: number;
   revenue: number;
   margin: number;
+};
+type ProductSignal = TopVariant & {
+  productId: string | null;
+  kind: 'restock' | 'margin' | 'movement';
+  stock: number | null;
 };
 type LowStockDisplay = LowStockVariant & {
   manufacturer_name: string | null;
@@ -412,10 +419,15 @@ type DashboardSection = 'sales' | 'attention';
                 class="flex flex-wrap items-end justify-between gap-2 border-b border-base-300 px-4 py-3"
               >
                 <div>
-                  <h2 class="section-title">Best margin</h2>
-                  <p class="type-caption mt-1">Top-performing variants over 7 days.</p>
+                  <h2 class="section-title">Product signals</h2>
+                  <p class="type-caption mt-1">Useful product movement over 7 days.</p>
                 </div>
-                <span class="type-caption">Top 5</span>
+                <a
+                  class="link text-xs"
+                  routerLink="/inventory/products"
+                  [queryParams]="{ stock: 'needs_restock' }"
+                  >View restock list</a
+                >
               </div>
 
               @if (initialLoading()) {
@@ -426,36 +438,50 @@ type DashboardSection = 'sales' | 'attention';
                   <span class="loading loading-spinner loading-sm"></span>
                   Loading products
                 </div>
-              } @else if (topVariants().length === 0) {
+              } @else if (productSignals().length === 0) {
                 <app-empty-state
                   [embedded]="true"
                   [compact]="true"
                   icon="heroCube"
-                  title="Nothing sold yet"
-                  description="Products rank here once completed sales have stock cost."
+                  title="No product signals yet"
+                  description="Product movement appears here after completed sales."
                 />
               } @else {
                 <div class="divide-y divide-base-200">
-                  @for (variant of topVariants(); track variant.variantId) {
-                    <div class="flex min-h-20 items-center gap-3 px-4 py-3">
+                  @for (signal of productSignals(); track signal.kind + signal.variantId) {
+                    <a
+                      class="flex min-h-20 items-center gap-3 px-4 py-3 hover:bg-base-200/40"
+                      [routerLink]="signal.productId ? '/inventory/products' : null"
+                      [queryParams]="{ product: signal.productId, variant: signal.variantId }"
+                    >
                       <div class="min-w-0 flex-1">
-                        <p class="truncate">
-                          <span class="font-medium">{{ variant.label }}</span>
-                          <span class="type-caption ml-2">#{{ $index + 1 }}</span>
-                        </p>
+                        <p class="truncate font-medium">{{ signal.label }}</p>
                         <p class="type-caption truncate">
-                          {{ variant.manufacturer }} · qty {{ quantity(variant.quantity) }}
+                          {{ signal.manufacturer }} · {{ quantity(signal.quantity) }} sold
+                          @if (signal.stock !== null) {
+                            · {{ quantity(signal.stock) }} in stock
+                          }
                         </p>
                       </div>
-                      <div
-                        class="shrink-0 text-right font-medium"
-                        [class.text-success]="variant.margin > 0"
-                        [class.text-error]="variant.margin < 0"
-                      >
-                        <p class="text-base-content"><app-money [amount]="variant.revenue" /></p>
-                        <p class="type-caption">margin <app-money [amount]="variant.margin" /></p>
+                      <div class="shrink-0 text-right">
+                        <p class="text-xs font-semibold uppercase text-base-content/70">
+                          {{ signalLabel(signal.kind) }}
+                        </p>
+                        @if (signal.kind === 'margin') {
+                          <p
+                            class="type-caption"
+                            [class.text-success]="signal.margin > 0"
+                            [class.text-error]="signal.margin < 0"
+                          >
+                            <app-money [amount]="signal.margin" /> margin
+                          </p>
+                        } @else if (signal.kind === 'movement') {
+                          <p class="type-caption"><app-money [amount]="signal.revenue" /> sales</p>
+                        } @else {
+                          <p class="type-caption">Needs attention</p>
+                        }
                       </div>
-                    </div>
+                    </a>
                   }
                 </div>
               }
@@ -624,6 +650,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   protected readonly summary = signal<DashboardDailySummary[]>([]);
   protected readonly topVariants = signal<TopVariant[]>([]);
+  protected readonly productSignals = signal<ProductSignal[]>([]);
   protected readonly lowStock = signal<LowStockDisplay[]>([]);
   protected readonly lowStockTotal = signal(0);
   protected readonly expiring = signal<ExpiringDisplay[]>([]);
@@ -904,7 +931,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.summary.set(sales.summary);
     this.locationRows.set(sales.locations);
     this.comparison.set(sales.comparison);
-    await this.computeTopVariants(sales.topVariants);
+    await this.computeProductPerformance(sales.topVariants, sales.productSignals);
     if (sales.refreshAfter) this.scheduleSnapshotRefresh(sales.refreshAfter);
     else this.clearSnapshotRefresh();
   }
@@ -967,13 +994,11 @@ export class DashboardComponent implements OnInit, OnDestroy {
     };
     this.catalogCacheHandler = {
       apply: async () => {
-        await this.refreshTopVariantLabels();
-        await this.loadReports(['attention']);
+        await this.loadReports(['sales', 'attention']);
         if (!this.lastLoadSucceeded) throw new Error('dashboard_refresh_failed');
       },
       reset: async () => {
-        await this.refreshTopVariantLabels();
-        await this.loadReports(['attention']);
+        await this.loadReports(['sales', 'attention']);
         return this.lastLoadSucceeded;
       },
     };
@@ -1016,6 +1041,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     const value = cached.value as {
       summary: DashboardDailySummary[];
       topVariants: TopVariant[];
+      productSignals?: ProductSignal[];
       lowStock: LowStockDisplay[];
       lowStockTotal?: number;
       attentionLocationId?: string;
@@ -1025,6 +1051,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     };
     this.summary.set(value.summary);
     this.topVariants.set(value.topVariants);
+    this.productSignals.set(value.productSignals ?? []);
     if (value.attentionLocationId === this.locations.activeId()) {
       this.lowStock.set(value.lowStock);
       this.lowStockTotal.set(value.lowStockTotal ?? value.lowStock.length);
@@ -1049,6 +1076,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
       value: {
         summary: this.summary(),
         topVariants: this.topVariants(),
+        productSignals: this.productSignals(),
         lowStock: this.lowStock(),
         lowStockTotal: this.lowStockTotal(),
         attentionLocationId: this.locations.activeId(),
@@ -1079,6 +1107,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   private clearFinancials(): void {
     this.summary.set([]);
     this.topVariants.set([]);
+    this.productSignals.set([]);
     this.locationRows.set([]);
     this.comparison.set({
       current_revenue: 0,
@@ -1090,21 +1119,70 @@ export class DashboardComponent implements OnInit, OnDestroy {
     });
   }
 
-  private async computeTopVariants(rows: DashboardTopVariant[]): Promise<void> {
-    const variants = await this.pos.variantsByIds(rows.map(row => row.variant_id));
+  private async computeProductPerformance(
+    rows: DashboardTopVariant[],
+    signals: DashboardProductSignals
+  ): Promise<void> {
+    const variantIds = [
+      ...new Set([
+        ...rows.map(row => row.variant_id),
+        ...signals.fastVariants.map(row => row.variant_id),
+        ...signals.restockRisks.map(row => row.variant_id),
+      ]),
+    ];
+    let variants: Variant[] = [];
+    try {
+      variants = await this.pos.variantsByIds(variantIds);
+    } catch {
+      // Snapshot totals remain useful when catalog metadata is temporarily unavailable.
+    }
     const byId = new Map(variants.map(variant => [variant.variant_id, variant]));
-    this.topVariants.set(
-      rows.map(row => ({
-        variantId: row.variant_id,
-        label: byId.has(row.variant_id)
-          ? variantLabel(byId.get(row.variant_id) as Variant)
-          : row.variant_id.slice(0, 8),
-        manufacturer: byId.get(row.variant_id)?.manufacturer_name || 'Manufacturer not set',
-        quantity: Number(row.quantity),
-        revenue: row.revenue,
-        margin: row.margin,
-      }))
-    );
+    const displayRow = (row: DashboardTopVariant): TopVariant => ({
+      variantId: row.variant_id,
+      label: byId.has(row.variant_id)
+        ? variantLabel(byId.get(row.variant_id) as Variant)
+        : row.variant_id.slice(0, 8),
+      manufacturer: byId.get(row.variant_id)?.manufacturer_name || 'Manufacturer not set',
+      quantity: Number(row.quantity),
+      revenue: row.revenue,
+      margin: row.margin,
+    });
+    const top = rows.map(displayRow);
+    this.topVariants.set(top);
+
+    const result = selectDashboardSignalCandidates(
+      rows,
+      signals,
+      variantId => byId.get(variantId)?.product_id ?? variantId
+    ).map(candidate => {
+      const variant = byId.get(candidate.row.variant_id);
+      if (candidate.kind === 'restock') {
+        return {
+          variantId: candidate.row.variant_id,
+          productId: variant?.product_id ?? null,
+          label: variant ? variantLabel(variant) : candidate.row.variant_id.slice(0, 8),
+          manufacturer: variant?.manufacturer_name || 'Manufacturer not set',
+          quantity: Number(candidate.row.quantity),
+          revenue: 0,
+          margin: 0,
+          kind: candidate.kind,
+          stock: Number(candidate.row.stock),
+        } satisfies ProductSignal;
+      }
+      return {
+        ...displayRow(candidate.row),
+        productId: variant?.product_id ?? null,
+        kind: candidate.kind,
+        stock: null,
+      } satisfies ProductSignal;
+    });
+    this.productSignals.set(result);
+  }
+
+  protected signalLabel(kind: ProductSignal['kind']): string {
+    if (kind === 'restock') return 'Restock risk';
+    if (kind === 'margin') return 'Margin leader';
+    return 'Fast mover';
   }
 
   /** Coalesce a burst of sale invalidations before asking for the shared snapshot. */
@@ -1157,25 +1235,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
     if (this.snapshotRefreshTimer) clearTimeout(this.snapshotRefreshTimer);
     this.snapshotRefreshTimer = null;
     this.snapshotRefreshAt = 0;
-  }
-
-  private async refreshTopVariantLabels(): Promise<void> {
-    const current = this.topVariants();
-    if (current.length === 0) return;
-    const variants = await this.pos.variantsByIds(current.map(row => row.variantId));
-    const byId = new Map(variants.map(variant => [variant.variant_id, variant]));
-    this.topVariants.set(
-      current.map(row => {
-        const variant = byId.get(row.variantId);
-        return variant
-          ? {
-              ...row,
-              label: variantLabel(variant),
-              manufacturer: variant.manufacturer_name || 'Manufacturer not set',
-            }
-          : row;
-      })
-    );
   }
 
   protected quantity(value: number): string {

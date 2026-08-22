@@ -12,18 +12,9 @@ import { FormFieldComponent } from '../shared/ui/form-field.component';
 import { IconComponent } from '../shared/ui/icon.component';
 import { MobileListComponent } from '../shared/ui/mobile-list.component';
 import { PageActionsComponent } from '../shared/ui/page-actions.component';
+import { RestockIntelligenceComponent } from './restock-intelligence.component';
 
 type Tab = 'sales' | 'products' | 'customers' | 'inventory';
-
-type ProductRow = {
-  variantId: string;
-  label: string;
-  manufacturer: string;
-  quantity: number;
-  revenue: number;
-  cogs: number;
-  margin: number;
-};
 
 type CustomerRow = {
   customerId: string;
@@ -55,6 +46,7 @@ type InventoryRow = {
     IconComponent,
     MobileListComponent,
     PageActionsComponent,
+    RestockIntelligenceComponent,
   ],
   template: `
     <app-page title="Reports" [wide]="true">
@@ -275,72 +267,7 @@ type InventoryRow = {
 
       <!-- Products tab -->
       @if (tab() === 'products') {
-        @if (!loading() && products().length === 0) {
-          <app-empty-state
-            [compact]="true"
-            icon="heroCube"
-            title="No product sales in this range"
-            description="Variants rank here by revenue once you sell."
-          />
-        } @else {
-          <app-mobile-list>
-            @for (p of products(); track p.variantId) {
-              <div mobileListRow class="flex min-h-20 items-center gap-3 p-3">
-                <div class="min-w-0 flex-1">
-                  <p class="truncate font-semibold">{{ p.label }}</p>
-                  <p class="type-caption mt-1 truncate">
-                    {{ p.manufacturer }} · qty {{ p.quantity }}
-                  </p>
-                </div>
-                <div class="shrink-0 text-right">
-                  <p class="font-semibold tabular-nums">{{ fmt(p.revenue) }}</p>
-                  <p
-                    class="type-caption tabular-nums"
-                    [class.text-success]="p.margin > 0"
-                    [class.text-error]="p.margin < 0"
-                  >
-                    margin {{ fmt(p.margin) }}
-                  </p>
-                </div>
-              </div>
-            }
-          </app-mobile-list>
-          <div class="hidden bg-base-100 lg:block lg:rounded-box">
-            <div class="hidden lg:block">
-              <table class="table table-sm">
-                <thead>
-                  <tr>
-                    <th>Variant</th>
-                    <th class="text-right">Qty</th>
-                    <th class="text-right">Revenue</th>
-                    <th class="text-right">COGS</th>
-                    <th class="text-right">Margin</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @for (p of products(); track p.variantId) {
-                    <tr>
-                      <td>
-                        <p class="text-sm font-medium">{{ p.label }}</p>
-                        <p class="type-caption">{{ p.manufacturer }}</p>
-                      </td>
-                      <td class="text-right">{{ p.quantity }}</td>
-                      <td class="text-right">{{ fmt(p.revenue) }}</td>
-                      <td class="text-right">{{ fmt(p.cogs) }}</td>
-                      <td
-                        class="text-right font-medium"
-                        [class.text-success]="p.margin > 0"
-                        [class.text-error]="p.margin < 0"
-                      >
-                        {{ fmt(p.margin) }}
-                      </td>
-                    </tr>
-                  }
-                </tbody>
-              </table>
-            </div>
-          </div>
-        }
+        <app-restock-intelligence [since]="appliedFrom()" [until]="appliedTo()" />
       }
 
       <!-- Customers tab -->
@@ -493,11 +420,10 @@ export class ReportsComponent implements OnInit {
   protected readonly tab = signal<Tab>('sales');
   protected readonly from = new FormControl(this.daysAgoIso(29), { nonNullable: true });
   protected readonly to = new FormControl(this.todayIso(), { nonNullable: true });
-  private appliedFrom = this.from.value;
-  private appliedTo = this.to.value;
+  protected readonly appliedFrom = signal(this.from.value);
+  protected readonly appliedTo = signal(this.to.value);
 
   protected readonly summary = signal<DailySummary[]>([]);
-  protected readonly products = signal<ProductRow[]>([]);
   protected readonly customers = signal<CustomerRow[]>([]);
   protected readonly inventory = signal<InventoryRow[]>([]);
   protected readonly error = signal<string | null>(null);
@@ -505,7 +431,6 @@ export class ReportsComponent implements OnInit {
   protected readonly filtersOpen = signal(false);
   protected readonly page = signal(1);
   protected readonly pageSize = 15;
-
   protected readonly totalPages = computed(() =>
     Math.max(1, Math.ceil(this.summary().length / this.pageSize))
   );
@@ -551,15 +476,13 @@ export class ReportsComponent implements OnInit {
     try {
       const since = this.from.value;
       const until = this.to.value;
-      const [summary, productSales, customerStats, stock, catalog] = await Promise.all([
+      const [summary, customerStats, stock, catalog] = await Promise.all([
         this.reports.salesSummary(since, until),
-        this.reports.productSales(since, until),
         this.reports.customerStats(since, until),
         this.pos.productStock(),
         this.pos.fetchActiveVariants(),
       ]);
       this.summary.set(summary);
-      await this.aggregateProducts(productSales);
       await this.aggregateCustomers(customerStats);
       this.inventory.set(
         catalog
@@ -579,8 +502,8 @@ export class ReportsComponent implements OnInit {
           })
           .sort((a, b) => b.value - a.value)
       );
-      this.appliedFrom = since;
-      this.appliedTo = until;
+      this.appliedFrom.set(since);
+      this.appliedTo.set(until);
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Failed to load reports');
     } finally {
@@ -594,44 +517,13 @@ export class ReportsComponent implements OnInit {
   }
 
   protected cancelReportFilters(): void {
-    this.from.setValue(this.appliedFrom);
-    this.to.setValue(this.appliedTo);
+    this.from.setValue(this.appliedFrom());
+    this.to.setValue(this.appliedTo());
     this.filtersOpen.set(false);
   }
 
   protected setReportTab(event: Event): void {
     this.tab.set((event.target as HTMLSelectElement).value as Tab);
-  }
-
-  private async aggregateProducts(
-    rows: import('./reports.service').DailyProductSales[]
-  ): Promise<void> {
-    const byVariant = new Map<string, { quantity: number; revenue: number; cogs: number }>();
-    for (const r of rows) {
-      if (!r.variant_id) continue;
-      const acc = byVariant.get(r.variant_id) ?? { quantity: 0, revenue: 0, cogs: 0 };
-      acc.quantity += Number(r.quantity ?? 0);
-      acc.revenue += r.revenue ?? 0;
-      acc.cogs += r.cogs ?? 0;
-      byVariant.set(r.variant_id, acc);
-    }
-    const top = [...byVariant.entries()].sort((a, b) => b[1].revenue - a[1].revenue).slice(0, 20);
-    const variants = await this.pos.variantsByIds(top.map(([id]) => id));
-    const byId = new Map(variants.map(v => [v.variant_id, v]));
-    this.products.set(
-      top.map(([variantId, acc]) => {
-        const variant = byId.get(variantId);
-        return {
-          variantId,
-          label: variant ? variantLabel(variant) : variantId.slice(0, 8),
-          manufacturer: variant?.manufacturer_name || 'Manufacturer not set',
-          quantity: acc.quantity,
-          revenue: acc.revenue,
-          cogs: acc.cogs,
-          margin: acc.revenue - acc.cogs,
-        };
-      })
-    );
   }
 
   private async aggregateCustomers(
