@@ -14102,17 +14102,6 @@ export type Database = {
         }
         Returns: Json
       }
-      restock_product_intelligence: {
-        Args: {
-          p_limit?: number
-          p_location_id: string
-          p_manufacturer_id?: string
-          p_since: string
-          p_supplier_id?: string
-          p_until: string
-        }
-        Returns: Json
-      }
       prune_cache_change_log: { Args: never; Returns: number }
       public_billing_config: { Args: never; Returns: Json }
       public_blog_post: { Args: { p_slug: string }; Returns: Json }
@@ -14717,6 +14706,17 @@ export type Database = {
           p_requested_account_code?: string
         }
         Returns: string
+      }
+      restock_product_intelligence: {
+        Args: {
+          p_limit?: number
+          p_location_id: string
+          p_manufacturer_id?: string
+          p_since: string
+          p_supplier_id?: string
+          p_until: string
+        }
+        Returns: Json
       }
       retire_pos_device: {
         Args: { p_device_id: string; p_reason: string }
@@ -15686,3 +15686,4 @@ export const Constants = {
     Enums: {},
   },
 } as const
+
