@@ -3046,6 +3046,7 @@ export type Database = {
       dashboard_snapshot_cache: {
         Row: {
           as_of_date: string
+          catalog_sequence: number
           company_id: string
           computed_at: string
           range_days: number
@@ -3056,6 +3057,7 @@ export type Database = {
         }
         Insert: {
           as_of_date: string
+          catalog_sequence?: number
           company_id: string
           computed_at?: string
           range_days: number
@@ -3066,6 +3068,7 @@ export type Database = {
         }
         Update: {
           as_of_date?: string
+          catalog_sequence?: number
           company_id?: string
           computed_at?: string
           range_days?: number
@@ -11106,6 +11109,82 @@ export type Database = {
           },
         ]
       }
+      mv_daily_location_product_sales: {
+        Row: {
+          cogs: number | null
+          company_id: string | null
+          day: string | null
+          location_id: string | null
+          quantity: number | null
+          revenue: number | null
+          variant_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_lines_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "low_stock_variants"
+            referencedColumns: ["variant_id"]
+          },
+          {
+            foreignKeyName: "order_lines_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "low_stock_variants_by_location"
+            referencedColumns: ["variant_id"]
+          },
+          {
+            foreignKeyName: "order_lines_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "product_stock"
+            referencedColumns: ["variant_id"]
+          },
+          {
+            foreignKeyName: "order_lines_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "product_variants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_lines_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "variant_catalog"
+            referencedColumns: ["variant_id"]
+          },
+          {
+            foreignKeyName: "orders_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "low_stock_variants_by_location"
+            referencedColumns: ["location_id"]
+          },
+          {
+            foreignKeyName: "orders_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "stock_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       mv_daily_order_stats: {
         Row: {
           company_id: string | null
@@ -14023,6 +14102,17 @@ export type Database = {
         }
         Returns: Json
       }
+      restock_product_intelligence: {
+        Args: {
+          p_limit?: number
+          p_location_id: string
+          p_manufacturer_id?: string
+          p_since: string
+          p_supplier_id?: string
+          p_until: string
+        }
+        Returns: Json
+      }
       prune_cache_change_log: { Args: never; Returns: number }
       public_billing_config: { Args: never; Returns: Json }
       public_blog_post: { Args: { p_slug: string }; Returns: Json }
@@ -15596,4 +15686,3 @@ export const Constants = {
     Enums: {},
   },
 } as const
-

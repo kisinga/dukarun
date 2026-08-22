@@ -26,12 +26,73 @@ export interface DashboardTopVariant {
   margin: number;
 }
 
+export interface DashboardRestockRisk {
+  variant_id: string;
+  quantity: number;
+  stock: number;
+  low_stock_threshold: number;
+}
+
+export interface DashboardProductSignals {
+  restockRisks: DashboardRestockRisk[];
+  fastVariants: DashboardTopVariant[];
+}
+
 export interface DashboardSalesSnapshot {
   summary: DashboardDailySummary[];
   topVariants: DashboardTopVariant[];
+  productSignals: DashboardProductSignals;
   locations: DashboardLocationSummary[];
   comparison: DashboardPeriodComparison;
   refreshAfter?: string;
+}
+
+export interface RestockTrendPoint {
+  day: string;
+  currentQuantity: number;
+  previousQuantity: number;
+  currentRevenue: number;
+  previousRevenue: number;
+}
+
+export interface RestockProductRow {
+  variantId: string;
+  productId: string;
+  productName: string;
+  variantName: string;
+  manufacturerId: string | null;
+  manufacturerName: string | null;
+  currentQuantity: number;
+  currentRevenue: number;
+  currentCogs: number;
+  currentMargin: number;
+  previousQuantity: number;
+  previousRevenue: number;
+  stock: number;
+  stockValue: number;
+  supplierStock: number;
+  daysCover: number | null;
+  lastSupplierId: string | null;
+  lastSupplierName: string | null;
+  lastUnitCost: number | null;
+  lastPurchaseDate: string | null;
+  lastSoldOn: string | null;
+  trend: number[];
+}
+
+export interface RestockIntelligence {
+  days: number;
+  lowStockThreshold: number;
+  summary: {
+    products: number;
+    unitsSold: number;
+    sales: number;
+    stock: number;
+    stockValue: number;
+    restockRisks: number;
+  };
+  trend: RestockTrendPoint[];
+  products: RestockProductRow[];
 }
 
 export interface DashboardLocationSummary {
@@ -79,6 +140,7 @@ export class ReportsService {
     return {
       summary: snapshot?.summary ?? [],
       topVariants: snapshot?.topVariants ?? [],
+      productSignals: snapshot?.productSignals ?? { restockRisks: [], fastVariants: [] },
       locations: snapshot?.locations ?? [],
       comparison: snapshot?.comparison ?? {
         current_revenue: 0,
@@ -89,6 +151,59 @@ export class ReportsService {
         previous_orders: 0,
       },
       ...(snapshot?.refreshAfter ? { refreshAfter: snapshot.refreshAfter } : {}),
+    };
+  }
+
+  async restockIntelligence(
+    since: string,
+    until: string,
+    locationId: string,
+    scope: { supplierId: string | null; manufacturerId: string | null },
+    limit = 50
+  ): Promise<RestockIntelligence> {
+    const { data, error } = await this.db.rpc('restock_product_intelligence', {
+      p_since: since,
+      p_until: until,
+      p_location_id: locationId,
+      p_supplier_id: scope.supplierId ?? undefined,
+      p_manufacturer_id: scope.manufacturerId ?? undefined,
+      p_limit: limit,
+    });
+    if (error) throw error;
+    const value = (data ?? {}) as unknown as Partial<RestockIntelligence>;
+    return {
+      days: Number(value.days ?? 0),
+      lowStockThreshold: Number(value.lowStockThreshold ?? 0),
+      summary: {
+        products: Number(value.summary?.products ?? 0),
+        unitsSold: Number(value.summary?.unitsSold ?? 0),
+        sales: Number(value.summary?.sales ?? 0),
+        stock: Number(value.summary?.stock ?? 0),
+        stockValue: Number(value.summary?.stockValue ?? 0),
+        restockRisks: Number(value.summary?.restockRisks ?? 0),
+      },
+      trend: (value.trend ?? []).map(point => ({
+        day: point.day,
+        currentQuantity: Number(point.currentQuantity ?? 0),
+        previousQuantity: Number(point.previousQuantity ?? 0),
+        currentRevenue: Number(point.currentRevenue ?? 0),
+        previousRevenue: Number(point.previousRevenue ?? 0),
+      })),
+      products: (value.products ?? []).map(product => ({
+        ...product,
+        currentQuantity: Number(product.currentQuantity ?? 0),
+        currentRevenue: Number(product.currentRevenue ?? 0),
+        currentCogs: Number(product.currentCogs ?? 0),
+        currentMargin: Number(product.currentMargin ?? 0),
+        previousQuantity: Number(product.previousQuantity ?? 0),
+        previousRevenue: Number(product.previousRevenue ?? 0),
+        stock: Number(product.stock ?? 0),
+        stockValue: Number(product.stockValue ?? 0),
+        supplierStock: Number(product.supplierStock ?? 0),
+        daysCover: product.daysCover === null ? null : Number(product.daysCover),
+        lastUnitCost: product.lastUnitCost === null ? null : Number(product.lastUnitCost),
+        trend: (product.trend ?? []).map(Number),
+      })),
     };
   }
 
