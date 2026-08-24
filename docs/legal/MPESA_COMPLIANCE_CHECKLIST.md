@@ -6,6 +6,8 @@ Complete this before broad production rollout. It is an operational checklist, n
 
 - Obtain written confirmation that Dukarun may integrate merchant-owned Tills/Paybills.
 - Keep the merchant's setup request and Safaricom ownership result.
+- Keep the tenant-signed Safaricom authorization naming the Dukarun Daraja app.
+- Confirm whether the merchant already has a C2B callback integration before registering Dukarun URLs.
 - Confirm production access covers STK query and C2B for the merchant's Till or Paybill.
 - Keep credentials in Vault; never collect OTPs, PINs or portal passwords.
 - Document the manual reversal process and responsible contacts.

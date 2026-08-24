@@ -18,7 +18,7 @@ import {
           <p class="type-caption font-semibold uppercase tracking-wide">Payment operations</p>
           <h1 class="mt-1 text-2xl font-bold">M-PESA merchant setup</h1>
           <p class="mt-1 text-sm text-base-content/60">
-            A verified Daraja app may serve several authorized Tills.
+            Prepare a tenant Daraja app, get merchant authorization, then connect the shortcode.
           </p>
         </div>
         <button
@@ -42,7 +42,7 @@ import {
       @if (overview(); as data) {
         <details class="rounded-box border border-base-300 bg-base-100 p-4">
           <summary class="cursor-pointer font-semibold">Operations controls</summary>
-          <div class="flex flex-wrap items-center justify-between gap-4">
+          <div class="mt-4 flex flex-wrap items-center justify-between gap-4">
             <div>
               <p class="type-caption">
                 Global checkout kill switch and temporary fallback policy. These are not
@@ -72,6 +72,37 @@ import {
               </button>
             </div>
           </div>
+          <div class="mt-4 grid gap-3 border-t border-base-300 pt-4 md:grid-cols-2 xl:grid-cols-5">
+            <label class="form-control xl:col-span-2"
+              ><span class="label-text mb-1">Safaricom authorization email</span
+              ><input
+                type="email"
+                class="input input-bordered input-sm"
+                placeholder="Use Safaricom-provided recipient"
+                [formControl]="safaricomAuthorizationEmail"
+            /></label>
+            <label class="form-control"
+              ><span class="label-text mb-1">Dukarun contact name</span
+              ><input class="input input-bordered input-sm" [formControl]="dukarunMpesaContactName"
+            /></label>
+            <label class="form-control"
+              ><span class="label-text mb-1">Dukarun contact email</span
+              ><input
+                type="email"
+                class="input input-bordered input-sm"
+                [formControl]="dukarunMpesaContactEmail"
+            /></label>
+            <label class="form-control"
+              ><span class="label-text mb-1">Dukarun contact phone</span
+              ><input
+                class="input input-bordered input-sm"
+                [formControl]="dukarunMpesaContactPhone"
+            /></label>
+            <label class="form-control md:col-span-2 xl:col-span-5"
+              ><span class="label-text mb-1">Public callback base URL</span
+              ><input class="input input-bordered input-sm" [formControl]="mpesaCallbackBaseUrl"
+            /></label>
+          </div>
         </details>
 
         <div class="grid gap-5 xl:grid-cols-[1fr_25rem]">
@@ -89,6 +120,12 @@ import {
                         {{ request.shortcode_type }} {{ request.shortcode }} ·
                         {{ request.contact_name }} · {{ request.status.replaceAll('_', ' ') }}
                       </p>
+                      @if (request.existing_c2b_integration) {
+                        <p class="mt-1 text-xs font-medium text-warning">
+                          Existing C2B integration declared. Confirm callback ownership before
+                          registering Dukarun URLs.
+                        </p>
+                      }
                     </div>
                     @if (
                       request.status !== 'live' &&
@@ -369,6 +406,12 @@ import {
                 @if (request.commissioning.allowed_actions.includes('begin_review')) {
                   <div class="mt-3 text-sm">
                     <p>Review the submitted business, shortcode, locations and contact details.</p>
+                    @if (request.existing_c2b_integration) {
+                      <p class="mt-2 text-warning">
+                        Existing C2B integration:
+                        {{ request.existing_c2b_notes || 'details not provided' }}
+                      </p>
+                    }
                   </div>
                   <button
                     class="btn btn-primary btn-sm mt-4 w-full"
@@ -378,18 +421,87 @@ import {
                   >
                     Business details reviewed
                   </button>
-                } @else if (request.commissioning.allowed_actions.includes('merchant_verified')) {
-                  <div class="alert alert-info mt-3 text-sm">
-                    Confirm merchant ownership outside Dukarun. Never request or store the merchant
-                    OTP, M-PESA PIN or portal password.
+                } @else if (request.commissioning.allowed_actions.includes('prepare_daraja_app')) {
+                  <div class="mt-3 rounded-box bg-base-200/60 p-3 text-sm">
+                    Create the Dukarun-owned Daraja app first. The tenant uses this exact app name
+                    when asking Safaricom to authorize their Till/Paybill.
                   </div>
+                  <label class="form-control mt-3"
+                    ><span class="label-text mb-1">Daraja app name</span
+                    ><input class="input input-bordered input-sm" [formControl]="appName"
+                  /></label>
+                  <label class="form-control mt-3"
+                    ><span class="label-text mb-1">Environment</span
+                    ><select class="select select-bordered select-sm" [formControl]="environment">
+                      <option value="production">
+                        Production — Safaricom authorization required
+                      </option>
+                      <option value="sandbox">Sandbox — testing only</option>
+                    </select></label
+                  >
+                  <label class="form-control mt-3"
+                    ><span class="label-text mb-1">Consumer key</span
+                    ><input
+                      type="password"
+                      autocomplete="new-password"
+                      class="input input-bordered input-sm"
+                      [formControl]="consumerKey"
+                  /></label>
+                  <label class="form-control mt-3"
+                    ><span class="label-text mb-1">Consumer secret</span
+                    ><input
+                      type="password"
+                      autocomplete="new-password"
+                      class="input input-bordered input-sm"
+                      [formControl]="consumerSecret"
+                  /></label>
+                  <p class="type-caption mt-3">
+                    Stored in Supabase Vault. The merchant should never receive these credentials.
+                  </p>
                   <button
                     class="btn btn-primary btn-sm mt-4 w-full"
                     type="button"
                     [disabled]="busy()"
-                    (click)="advanceRequest(request, 'merchant_verified')"
+                    (click)="prepareDarajaApp(request)"
                   >
-                    Merchant verification complete
+                    Prepare Daraja app
+                  </button>
+                } @else if (
+                  request.commissioning.allowed_actions.includes('authorization_verified')
+                ) {
+                  <div class="alert alert-info mt-3 text-sm">
+                    Tenant submits the Safaricom authorization naming
+                    {{ preparedApp(request)?.app_name || appName.value }}. Dukarun may be copied as
+                    technical contact, but the merchant performs any Safaricom ownership or OTP
+                    verification.
+                  </div>
+                  <div class="mt-3 rounded-box bg-base-200/60 p-3 text-sm">
+                    <p class="font-semibold">Authorization pack details</p>
+                    <p class="mt-1">Business: {{ request.legal_name }}</p>
+                    <p>Shortcode: {{ request.shortcode_type }} {{ request.shortcode }}</p>
+                    <p>Daraja app: {{ preparedApp(request)?.app_name || 'Prepared app' }}</p>
+                    <p>Requested products: STK Push, STK Query, C2B validation and confirmation.</p>
+                  </div>
+                  <label class="form-control mt-3"
+                    ><span class="label-text mb-1">Safaricom authorization reference</span
+                    ><input
+                      class="input input-bordered input-sm"
+                      placeholder="Email thread, ticket, approval ID or stored evidence path"
+                      [formControl]="authorizationReference"
+                  /></label>
+                  <button
+                    class="btn btn-primary btn-sm mt-4 w-full"
+                    type="button"
+                    [disabled]="busy()"
+                    (click)="
+                      advanceRequest(
+                        request,
+                        'authorization_verified',
+                        authorizationReference.value
+                      )
+                    "
+                  >
+                    Safaricom authorization confirmed
                   </button>
                 } @else if (
                   request.commissioning.allowed_actions.includes('configure_connection')
@@ -401,7 +513,7 @@ import {
                       [formControl]="darajaAppId"
                       (change)="darajaAppChanged()"
                     >
-                      <option value="">Create a new Daraja app (first setup only)</option>
+                      <option value="">Select prepared tenant Daraja app</option>
                       @for (app of appsForRequest(request); track app.id) {
                         <option [value]="app.id">
                           Reuse {{ app.app_name }} · {{ app.environment }}
@@ -411,20 +523,14 @@ import {
                   >
                   @if (darajaAppId.value) {
                     <p class="mt-3 rounded-box bg-base-200/60 p-3 text-sm">
-                      Reusing this app’s consumer credentials. Only the Till/Paybill passkey is new.
+                      Using the prepared Dukarun app credentials. Enter only the approved
+                      shortcode/passkey details from Safaricom.
                     </p>
                   } @else {
-                    <label class="form-control mt-3"
-                      ><span class="label-text mb-1">Daraja app name</span
-                      ><input class="input input-bordered input-sm" [formControl]="appName"
-                    /></label>
-                    <label class="form-control mt-3"
-                      ><span class="label-text mb-1">Environment</span
-                      ><select class="select select-bordered select-sm" [formControl]="environment">
-                        <option value="production">Production — can go live</option>
-                        <option value="sandbox">Sandbox — testing only</option>
-                      </select></label
-                    >
+                    <div class="alert alert-warning mt-3 text-sm">
+                      Select the prepared tenant Daraja app before adding shortcode and passkey
+                      details.
+                    </div>
                   }
                   <label class="form-control mt-3"
                     ><span class="label-text mb-1">Organization shortcode</span
@@ -440,24 +546,6 @@ import {
                     ><span class="label-text mb-1">Party B / destination Till</span
                     ><input class="input input-bordered input-sm" [formControl]="partyB"
                   /></label>
-                  @if (!darajaAppId.value) {
-                    <label class="form-control mt-3"
-                      ><span class="label-text mb-1">Consumer key</span
-                      ><input
-                        type="password"
-                        autocomplete="new-password"
-                        class="input input-bordered input-sm"
-                        [formControl]="consumerKey"
-                    /></label>
-                    <label class="form-control mt-3"
-                      ><span class="label-text mb-1">Consumer secret</span
-                      ><input
-                        type="password"
-                        autocomplete="new-password"
-                        class="input input-bordered input-sm"
-                        [formControl]="consumerSecret"
-                    /></label>
-                  }
                   <label class="form-control mt-3"
                     ><span class="label-text mb-1">Lipa na M-PESA passkey</span
                     ><input
@@ -485,12 +573,12 @@ import {
             </form>
 
             <div class="rounded-box border border-warning/30 bg-warning/5 p-4 text-sm">
-              <p class="font-semibold">Merchant verification</p>
+              <p class="font-semibold">Authorization boundary</p>
               <ol class="mt-2 list-decimal space-y-1 pl-4">
-                <li>Merchant enters the ownership OTP on Safaricom.</li>
+                <li>Dukarun owns and secures the Daraja app credentials.</li>
+                <li>The merchant authorizes Safaricom to connect their shortcode to that app.</li>
                 <li>Dukarun never receives or stores the OTP.</li>
-                <li>Check credentials and register C2B URLs.</li>
-                <li>Follow the connection’s go-live checklist.</li>
+                <li>Confirm existing C2B callbacks before registering Dukarun URLs.</li>
               </ol>
             </div>
           </aside>
@@ -511,6 +599,26 @@ export class MpesaComponent implements OnInit {
   protected readonly notice = signal<string | null>(null);
   protected readonly platformEnabled = new FormControl(true, { nonNullable: true });
   protected readonly fallbackAllowed = new FormControl(true, { nonNullable: true });
+  protected readonly safaricomAuthorizationEmail = new FormControl('', {
+    nonNullable: true,
+    validators: Validators.email,
+  });
+  protected readonly dukarunMpesaContactName = new FormControl('Dukarun M-PESA Operations', {
+    nonNullable: true,
+    validators: Validators.required,
+  });
+  protected readonly dukarunMpesaContactEmail = new FormControl('hello@dukarun.com', {
+    nonNullable: true,
+    validators: [Validators.required, Validators.email],
+  });
+  protected readonly dukarunMpesaContactPhone = new FormControl('', { nonNullable: true });
+  protected readonly mpesaCallbackBaseUrl = new FormControl(
+    'https://supa.dukarun.com/functions/v1',
+    {
+      nonNullable: true,
+      validators: [Validators.required, Validators.pattern(/^https:\/\/.+/)],
+    }
+  );
   protected readonly appName = new FormControl('', {
     nonNullable: true,
     validators: Validators.required,
@@ -543,6 +651,10 @@ export class MpesaComponent implements OnInit {
     nonNullable: true,
     validators: Validators.required,
   });
+  protected readonly authorizationReference = new FormControl('', {
+    nonNullable: true,
+    validators: Validators.required,
+  });
   protected readonly testPhone = new FormControl('', { nonNullable: true });
 
   async ngOnInit(): Promise<void> {
@@ -556,6 +668,11 @@ export class MpesaComponent implements OnInit {
       this.overview.set(value);
       this.platformEnabled.setValue(value.settings.enabled);
       this.fallbackAllowed.setValue(value.settings.manual_fallback_allowed);
+      this.safaricomAuthorizationEmail.setValue(value.settings.safaricom_authorization_email ?? '');
+      this.dukarunMpesaContactName.setValue(value.settings.dukarun_mpesa_contact_name);
+      this.dukarunMpesaContactEmail.setValue(value.settings.dukarun_mpesa_contact_email);
+      this.dukarunMpesaContactPhone.setValue(value.settings.dukarun_mpesa_contact_phone ?? '');
+      this.mpesaCallbackBaseUrl.setValue(value.settings.mpesa_callback_base_url);
     } catch (error) {
       this.error.set(this.message(error));
     } finally {
@@ -569,16 +686,26 @@ export class MpesaComponent implements OnInit {
     const reusableApps = this.appsForRequest(request).filter(
       app => app.environment === 'production' && app.status !== 'disabled'
     );
-    this.darajaAppId.setValue(reusableApps.length === 1 ? reusableApps[0].id : '');
-    if (reusableApps.length === 1) this.appName.setValue(reusableApps[0].app_name);
+    const prepared = this.preparedApp(request);
+    this.darajaAppId.setValue(
+      prepared?.id ?? (reusableApps.length === 1 ? reusableApps[0].id : '')
+    );
+    if (prepared) {
+      this.appName.setValue(prepared.app_name);
+      this.environment.setValue(prepared.environment);
+    } else if (reusableApps.length === 1) this.appName.setValue(reusableApps[0].app_name);
     this.organizationShortcode.setValue(request.shortcode);
     this.businessShortcode.setValue(request.shortcode);
     this.partyB.setValue(request.shortcode);
     this.consumerKey.setValue('');
     this.consumerSecret.setValue('');
     this.passkey.setValue('');
+    this.authorizationReference.setValue(request.safaricom_authorization_reference ?? '');
     this.error.set(null);
     this.notice.set(null);
+  }
+  protected preparedApp(request: PlatformMpesaRequest) {
+    return this.overview()?.daraja_apps.find(app => app.id === request.prepared_daraja_app_id);
   }
   protected darajaAppChanged(): void {
     const selected = this.overview()?.daraja_apps.find(app => app.id === this.darajaAppId.value);
@@ -588,16 +715,57 @@ export class MpesaComponent implements OnInit {
     this.consumerKey.setValue('');
     this.consumerSecret.setValue('');
   }
-  protected async advanceRequest(request: PlatformMpesaRequest, action: string): Promise<void> {
+  protected async advanceRequest(
+    request: PlatformMpesaRequest,
+    action: string,
+    notes?: string
+  ): Promise<void> {
+    const reference = notes?.trim();
+    if (action === 'authorization_verified' && !reference) {
+      this.authorizationReference.markAsTouched();
+      this.error.set('Enter the Safaricom authorization reference or evidence note.');
+      return;
+    }
     this.busy.set(true);
     this.error.set(null);
     this.notice.set(null);
     try {
-      await this.platform.advanceMpesaRequest(request.id, action);
+      await this.platform.advanceMpesaRequest(request.id, action, reference);
       this.notice.set(`Commissioning advanced: ${action.replaceAll('_', ' ')}.`);
       await this.load();
       const refreshed = this.overview()?.requests.find(item => item.id === request.id) ?? null;
       this.selectedRequest.set(refreshed);
+    } catch (error) {
+      this.error.set(this.message(error));
+    } finally {
+      this.busy.set(false);
+    }
+  }
+  protected async prepareDarajaApp(request: PlatformMpesaRequest): Promise<void> {
+    const required = [this.appName, this.consumerKey, this.consumerSecret];
+    required.forEach(control => control.markAsTouched());
+    if (required.some(control => control.invalid)) {
+      this.error.set('Complete the Daraja app name and consumer credentials.');
+      return;
+    }
+    this.busy.set(true);
+    this.error.set(null);
+    this.notice.set(null);
+    try {
+      await this.platform.prepareMpesaDarajaApp({
+        requestId: request.id,
+        appName: this.appName.value,
+        environment: this.environment.value,
+        consumerKey: this.consumerKey.value,
+        consumerSecret: this.consumerSecret.value,
+      });
+      this.notice.set('Daraja app prepared. Send the merchant the Safaricom authorization pack.');
+      this.consumerKey.setValue('');
+      this.consumerSecret.setValue('');
+      await this.load();
+      const refreshed = this.overview()?.requests.find(item => item.id === request.id) ?? null;
+      this.selectedRequest.set(refreshed);
+      if (refreshed) this.selectRequest(refreshed);
     } catch (error) {
       this.error.set(this.message(error));
     } finally {
@@ -613,9 +781,12 @@ export class MpesaComponent implements OnInit {
       this.businessShortcode,
       this.partyB,
       this.passkey,
-      ...(this.darajaAppId.value ? [] : [this.consumerKey, this.consumerSecret]),
     ];
     required.forEach(control => control.markAsTouched());
+    if (!this.darajaAppId.value) {
+      this.error.set('Select the prepared tenant Daraja app.');
+      return;
+    }
     if (required.some(control => control.invalid)) {
       this.error.set('Complete all connection fields.');
       return;
@@ -673,7 +844,10 @@ export class MpesaComponent implements OnInit {
   protected appsForRequest(request: PlatformMpesaRequest) {
     return (
       this.overview()?.daraja_apps.filter(
-        app => app.company_id === request.company_id && app.status !== 'disabled'
+        app =>
+          app.id === request.prepared_daraja_app_id &&
+          app.company_id === request.company_id &&
+          app.status !== 'disabled'
       ) ?? []
     );
   }
@@ -688,12 +862,28 @@ export class MpesaComponent implements OnInit {
     );
   }
   protected async saveSettings(): Promise<void> {
+    const required = [
+      this.safaricomAuthorizationEmail,
+      this.dukarunMpesaContactName,
+      this.dukarunMpesaContactEmail,
+      this.mpesaCallbackBaseUrl,
+    ];
+    required.forEach(control => control.markAsTouched());
+    if (required.some(control => control.invalid)) {
+      this.error.set('Check the authorization email, Dukarun contact and HTTPS callback URL.');
+      return;
+    }
     await this.run(
       {
         action: 'settings',
         enabled: this.platformEnabled.value,
         manual_fallback_allowed: this.fallbackAllowed.value,
         pilot_company_id: this.overview()?.settings.pilot_company_id ?? null,
+        safaricom_authorization_email: this.safaricomAuthorizationEmail.value || null,
+        dukarun_mpesa_contact_name: this.dukarunMpesaContactName.value,
+        dukarun_mpesa_contact_email: this.dukarunMpesaContactEmail.value,
+        dukarun_mpesa_contact_phone: this.dukarunMpesaContactPhone.value || null,
+        mpesa_callback_base_url: this.mpesaCallbackBaseUrl.value,
       },
       'Platform controls updated.'
     );

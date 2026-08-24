@@ -1,5 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import {
+  callbackBaseUrl,
   classifyStkResult,
   cors,
   darajaAccessToken,
@@ -55,6 +56,11 @@ Deno.serve(async req => {
         p_enabled: Boolean(input.enabled),
         p_manual_fallback_allowed: Boolean(input.manual_fallback_allowed),
         p_pilot_company_id: input.pilot_company_id ?? null,
+        p_safaricom_authorization_email: input.safaricom_authorization_email ?? null,
+        p_dukarun_mpesa_contact_name: input.dukarun_mpesa_contact_name ?? null,
+        p_dukarun_mpesa_contact_email: input.dukarun_mpesa_contact_email ?? null,
+        p_dukarun_mpesa_contact_phone: input.dukarun_mpesa_contact_phone ?? null,
+        p_mpesa_callback_base_url: input.mpesa_callback_base_url ?? null,
       });
       if (error) throw error;
       return json({ status: 'updated' });
@@ -86,9 +92,7 @@ Deno.serve(async req => {
         return json({ status: 'credentials_verified' });
       }
 
-      const callbackBase = (Deno.env.get('MPESA_CALLBACK_BASE_URL') ?? '').replace(/\/$/, '');
-      if (!callbackBase.startsWith('https://'))
-        throw new Error('mpesa_callback_url_not_configured');
+      const callbackBase = callbackBaseUrl(privateConfig);
 
       if (action === 'test_stk') {
         const callbackToken = `${crypto.randomUUID()}${crypto.randomUUID()}`.replace(/-/g, '');

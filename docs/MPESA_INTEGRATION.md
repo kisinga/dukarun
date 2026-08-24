@@ -34,18 +34,35 @@ Required Daraja products:
 This access cannot withdraw funds, view balances or statements, open the M-PESA portal, send
 B2C/B2B payments, or reverse a transaction.
 
+## Source of truth
+
+- Tenant-facing Safaricom documents are generated in
+  `apps/web/src/app/settings/mpesa-settings.component.ts`.
+- Platform authorization/contact settings are configured in
+  `apps/super-admin/src/app/pages/mpesa/mpesa.component.ts`.
+- Do not duplicate the letter body in docs; update the generator and keep this file to the flow and
+  safety boundary.
+
 ## Setup
 
 1. Merchant opens **Settings → M-PESA**, requests setup and names the locations that use the Till or Paybill.
-2. Platform Admin creates or reuses the merchant's Daraja app.
-3. Merchant completes Safaricom ownership verification on Safaricom's page.
-4. Platform Admin stores the consumer key, consumer secret and passkey in Vault.
-5. OAuth is checked and C2B URLs are registered.
-6. Run a real KES 1 STK payment.
-7. Run a real KES 1 direct Till or Paybill payment.
-8. Platform Admin activates the connection.
+2. If the merchant does not know the required account facts, the same screen can email, download or
+   print a Safaricom details request before setup is submitted.
+3. Platform Admin prepares the tenant-specific Dukarun Daraja app and stores the consumer key and
+   consumer secret in Vault.
+4. Merchant receives the in-app Safaricom authorization pack, then emails, downloads or prints the
+   request naming that Daraja app.
+5. Merchant completes any Safaricom ownership verification directly with Safaricom.
+6. Platform Admin records Safaricom authorization, then stores the approved shortcode fields and
+   passkey in Vault.
+7. OAuth is checked and C2B URLs are registered.
+8. Run a real KES 1 STK payment.
+9. Run a real KES 1 direct Till or Paybill payment.
+10. Platform Admin activates the connection.
 
 Never ask for the merchant's OTP, M-PESA PIN or portal password.
+Before C2B URL registration, confirm whether another system already receives callbacks for the
+merchant's Till or Paybill.
 
 ## Runtime rules
 
@@ -76,12 +93,6 @@ unresolved work to review after 15 minutes.
 General company members cannot read provider tables.
 
 ## Deployment
-
-Edge secret:
-
-```text
-MPESA_CALLBACK_BASE_URL=https://<project>.supabase.co/functions/v1
-```
 
 Vault secrets:
 

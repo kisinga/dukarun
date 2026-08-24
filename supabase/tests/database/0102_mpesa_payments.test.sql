@@ -1,7 +1,7 @@
 begin;
 -- Provider timestamps and period locks are compared in the Kenyan business day.
 set local timezone to 'Africa/Nairobi';
-select plan(54);
+select plan(59);
 
 select has_table('public','mpesa_onboarding_requests','onboarding is durable');
 select has_table('public','mpesa_daraja_apps','Daraja apps are separate from merchant accounts');
@@ -63,7 +63,11 @@ create temp table mpesa_account as
 with app as (
   insert into public.mpesa_daraja_apps(company_id,app_name,environment,
     consumer_key_secret_id,consumer_secret_secret_id,status)
-  select company_id,'Test Daraja','production',gen_random_uuid(),gen_random_uuid(),'verified'
+  select company_id,'Test Daraja','production',
+    vault.create_secret('test-consumer-key','MPESA_TEST_CONSUMER_KEY_'||gen_random_uuid()::text,
+      'M-PESA test consumer key'),
+    vault.create_secret('test-consumer-secret','MPESA_TEST_CONSUMER_SECRET_'||gen_random_uuid()::text,
+      'M-PESA test consumer secret'),'verified'
   from mpesa_fixture returning id,company_id
 ), account as (
   insert into public.payment_provider_accounts(company_id,provider,environment,display_name,status)
@@ -72,7 +76,10 @@ with app as (
   insert into public.mpesa_connections(provider_account_id,company_id,onboarding_request_id,
     daraja_app_id,shortcode_type,organization_shortcode,business_shortcode,party_b,passkey_secret_id)
   select account.id,account.company_id,(select request_id from mpesa_request),app.id,
-    'till','555555','555555','555555',gen_random_uuid() from account join app using(company_id)
+    'till','555555','555555','555555',
+    vault.create_secret('test-passkey','MPESA_TEST_PASSKEY_'||gen_random_uuid()::text,
+      'M-PESA test passkey')
+  from account join app using(company_id)
   returning provider_account_id,company_id
 ), mapped as (
   insert into public.location_payment_provider_accounts(location_id,company_id,provider,provider_account_id)
@@ -285,6 +292,83 @@ select is((select status from public.mpesa_payment_attempts
 
 select testkit.create_user('b2000000-0000-4000-8000-000000000002','mpesa-platform@test.local');
 insert into public.platform_admins(user_id) values('b2000000-0000-4000-8000-000000000002');
+
+create temp table mpesa_authorization_request as
+with app as (
+  insert into public.mpesa_daraja_apps(company_id,app_name,environment,
+    consumer_key_secret_id,consumer_secret_secret_id,status)
+  select company_id,'Authorization App','production',gen_random_uuid(),gen_random_uuid(),'verified'
+  from mpesa_fixture returning id,company_id
+), request as (
+  insert into public.mpesa_onboarding_requests(company_id,legal_name,shortcode,shortcode_type,
+    mpesa_username,contact_name,contact_phone,contact_email,requested_location_ids,status,
+    prepared_daraja_app_id,requested_by)
+  select app.company_id,'Auth Store Ltd','666666','till','auth-admin','Auth Owner',
+    '0712345678','auth@example.test',
+    array[(select id from public.stock_locations where company_id=app.company_id and is_default)],
+    'merchant_verification',app.id,'b2000000-0000-4000-8000-000000000001'
+  from app returning id
+)
+select id request_id from request;
+grant select on pg_temp.mpesa_authorization_request to authenticated;
+
+create temp table mpesa_app_boundary_request as
+with prepared_app as (
+  insert into public.mpesa_daraja_apps(company_id,app_name,environment,
+    consumer_key_secret_id,consumer_secret_secret_id,status)
+  select company_id,'Prepared Boundary App','production',gen_random_uuid(),gen_random_uuid(),'verified'
+  from mpesa_fixture returning id,company_id
+), other_app as (
+  insert into public.mpesa_daraja_apps(company_id,app_name,environment,
+    consumer_key_secret_id,consumer_secret_secret_id,status)
+  select company_id,'Wrong Boundary App','production',gen_random_uuid(),gen_random_uuid(),'verified'
+  from mpesa_fixture returning id
+), request as (
+  insert into public.mpesa_onboarding_requests(company_id,legal_name,shortcode,shortcode_type,
+    mpesa_username,contact_name,contact_phone,contact_email,requested_location_ids,status,
+    prepared_daraja_app_id,safaricom_authorization_verified_at,safaricom_authorization_reference,
+    requested_by)
+  select prepared_app.company_id,'Boundary Store Ltd','777777','till','boundary-admin',
+    'Boundary Owner','0712345678','boundary@example.test',
+    array[(select id from public.stock_locations where company_id=prepared_app.company_id and is_default)],
+    'merchant_verification',prepared_app.id,now(),'Ticket SAF-456',
+    'b2000000-0000-4000-8000-000000000001'
+  from prepared_app returning id
+)
+select request.id request_id,(select id from other_app) other_app_id from request;
+grant select on pg_temp.mpesa_app_boundary_request to authenticated;
+
+select testkit.as_user((select company_id from mpesa_fixture),
+  'b2000000-0000-4000-8000-000000000002','Platform');
+select set_config('request.jwt.claims',format(
+  '{"sub":"b2000000-0000-4000-8000-000000000002","role":"authenticated","company_id":"%s","user_role":"Platform","is_platform_admin":true}',
+  (select company_id from mpesa_fixture)),true);
+select throws_ok($$select public.platform_advance_mpesa_request(
+    (select request_id from mpesa_authorization_request),'authorization_verified')$$,
+  'P0001','safaricom_authorization_reference_required',
+  'Safaricom authorization requires an evidence reference');
+select lives_ok($$select public.platform_advance_mpesa_request(
+    (select request_id from mpesa_authorization_request),'authorization_verified','Ticket SAF-123')$$,
+  'Safaricom authorization can be recorded with evidence');
+reset role;
+select is((select safaricom_authorization_reference from public.mpesa_onboarding_requests
+  where id=(select request_id from mpesa_authorization_request)),'Ticket SAF-123',
+  'Safaricom authorization evidence is retained');
+select testkit.as_user((select company_id from mpesa_fixture),
+  'b2000000-0000-4000-8000-000000000002','Platform');
+select set_config('request.jwt.claims',format(
+  '{"sub":"b2000000-0000-4000-8000-000000000002","role":"authenticated","company_id":"%s","user_role":"Platform","is_platform_admin":true}',
+  (select company_id from mpesa_fixture)),true);
+select throws_ok($$select public.platform_configure_mpesa_connection(
+    (select request_id from mpesa_app_boundary_request),'Ignored','production',
+    '777777','777777','777777',null,null,'PASSKEY',
+    array[(select id from public.stock_locations
+      where company_id=(select company_id from mpesa_fixture) and is_default)],
+    (select other_app_id from mpesa_app_boundary_request))$$,
+  'P0001','prepared_daraja_app_mismatch',
+  'configured Daraja app must match the tenant-authorized app');
+
+reset role;
 update public.mpesa_onboarding_requests set status='testing'
 where id=(select request_id from mpesa_request);
 select testkit.as_user((select company_id from mpesa_fixture),
@@ -298,6 +382,11 @@ select throws_ok(format(
   'P0001','mpesa_activation_checks_incomplete','activation requires both KES 1 tests');
 
 reset role;
+select set_config('request.jwt.claims','{"role":"service_role"}',true);
+select is((public.mpesa_private_connection((select account_id from mpesa_account))->>'callback_base_url'),
+  'https://supa.dukarun.com/functions/v1',
+  'private M-PESA config uses the platform callback base URL');
+
 update public.mpesa_provider_events set received_at=now()-interval '91 days'
   where provider_event_key='EVT001';
 select public.purge_mpesa_raw_payloads();
