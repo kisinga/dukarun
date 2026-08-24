@@ -5039,14 +5039,19 @@ export type Database = {
           contact_name: string
           contact_phone: string
           created_at: string
+          existing_c2b_integration: boolean
+          existing_c2b_notes: string | null
           handled_by: string | null
           id: string
           legal_name: string
           merchant_notes: string | null
           mpesa_username: string
           operator_notes: string | null
+          prepared_daraja_app_id: string | null
           requested_by: string
           requested_location_ids: string[]
+          safaricom_authorization_reference: string | null
+          safaricom_authorization_verified_at: string | null
           shortcode: string
           shortcode_type: string
           status: string
@@ -5058,14 +5063,19 @@ export type Database = {
           contact_name: string
           contact_phone: string
           created_at?: string
+          existing_c2b_integration?: boolean
+          existing_c2b_notes?: string | null
           handled_by?: string | null
           id?: string
           legal_name: string
           merchant_notes?: string | null
           mpesa_username: string
           operator_notes?: string | null
+          prepared_daraja_app_id?: string | null
           requested_by: string
           requested_location_ids?: string[]
+          safaricom_authorization_reference?: string | null
+          safaricom_authorization_verified_at?: string | null
           shortcode: string
           shortcode_type: string
           status?: string
@@ -5077,14 +5087,19 @@ export type Database = {
           contact_name?: string
           contact_phone?: string
           created_at?: string
+          existing_c2b_integration?: boolean
+          existing_c2b_notes?: string | null
           handled_by?: string | null
           id?: string
           legal_name?: string
           merchant_notes?: string | null
           mpesa_username?: string
           operator_notes?: string | null
+          prepared_daraja_app_id?: string | null
           requested_by?: string
           requested_location_ids?: string[]
+          safaricom_authorization_reference?: string | null
+          safaricom_authorization_verified_at?: string | null
           shortcode?: string
           shortcode_type?: string
           status?: string
@@ -5103,6 +5118,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mpesa_onboarding_requests_prepared_daraja_app_id_fkey"
+            columns: ["prepared_daraja_app_id"]
+            isOneToOne: false
+            referencedRelation: "mpesa_daraja_apps"
             referencedColumns: ["id"]
           },
         ]
@@ -5338,25 +5360,40 @@ export type Database = {
       }
       mpesa_platform_settings: {
         Row: {
+          dukarun_mpesa_contact_email: string
+          dukarun_mpesa_contact_name: string
+          dukarun_mpesa_contact_phone: string | null
           enabled: boolean
           manual_fallback_allowed: boolean
+          mpesa_callback_base_url: string
           pilot_company_id: string | null
+          safaricom_authorization_email: string | null
           singleton: boolean
           updated_at: string
           updated_by: string | null
         }
         Insert: {
+          dukarun_mpesa_contact_email?: string
+          dukarun_mpesa_contact_name?: string
+          dukarun_mpesa_contact_phone?: string | null
           enabled?: boolean
           manual_fallback_allowed?: boolean
+          mpesa_callback_base_url?: string
           pilot_company_id?: string | null
+          safaricom_authorization_email?: string | null
           singleton?: boolean
           updated_at?: string
           updated_by?: string | null
         }
         Update: {
+          dukarun_mpesa_contact_email?: string
+          dukarun_mpesa_contact_name?: string
+          dukarun_mpesa_contact_phone?: string | null
           enabled?: boolean
           manual_fallback_allowed?: boolean
+          mpesa_callback_base_url?: string
           pilot_company_id?: string | null
+          safaricom_authorization_email?: string | null
           singleton?: boolean
           updated_at?: string
           updated_by?: string | null
@@ -13397,6 +13434,16 @@ export type Database = {
         }
         Returns: string
       }
+      platform_prepare_mpesa_daraja_app: {
+        Args: {
+          p_app_name: string
+          p_consumer_key: string
+          p_consumer_secret: string
+          p_environment: string
+          p_request_id: string
+        }
+        Returns: string
+      }
       platform_create_mpesa_test_attempt: {
         Args: {
           p_amount: number
@@ -13603,9 +13650,14 @@ export type Database = {
       }
       platform_set_mpesa_settings: {
         Args: {
+          p_dukarun_mpesa_contact_email?: string
+          p_dukarun_mpesa_contact_name?: string
+          p_dukarun_mpesa_contact_phone?: string
           p_enabled: boolean
           p_manual_fallback_allowed: boolean
+          p_mpesa_callback_base_url?: string
           p_pilot_company_id?: string
+          p_safaricom_authorization_email?: string
         }
         Returns: undefined
       }
@@ -14469,6 +14521,8 @@ export type Database = {
           p_contact_email: string
           p_contact_name: string
           p_contact_phone: string
+          p_existing_c2b_integration?: boolean
+          p_existing_c2b_notes?: string
           p_legal_name: string
           p_location_ids?: string[]
           p_mpesa_username: string
@@ -15686,4 +15740,3 @@ export const Constants = {
     Enums: {},
   },
 } as const
-

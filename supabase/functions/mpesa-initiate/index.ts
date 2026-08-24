@@ -1,5 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import {
+  callbackBaseUrl,
   classifyStkResult,
   cors,
   initiateStk,
@@ -14,10 +15,6 @@ Deno.serve(async req => {
   if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405);
   const authorization = req.headers.get('Authorization');
   if (!authorization) return json({ error: 'not_authenticated' }, 401);
-
-  const callbackBase = (Deno.env.get('MPESA_CALLBACK_BASE_URL') ?? '').replace(/\/$/, '');
-  if (!callbackBase.startsWith('https://'))
-    return json({ error: 'mpesa_callback_url_not_configured' }, 503);
 
   const userClient = createClient(
     Deno.env.get('SUPABASE_URL') ?? '',
@@ -95,6 +92,7 @@ Deno.serve(async req => {
     if (privateError || !privateConfig)
       throw new Error(privateError?.message ?? 'mpesa_config_missing');
 
+    const callbackBase = callbackBaseUrl(privateConfig as MpesaPrivateConfig);
     const callbackUrl = `${callbackBase}/mpesa-callback?kind=stk&token=${encodeURIComponent(callbackToken)}`;
     let provider: Record<string, unknown>;
     try {

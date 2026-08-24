@@ -78,11 +78,10 @@ if [ "$SYNC_FUNCTIONS" = "1" ] && [ "$VAULT_ONLY" = "1" ]; then
   exit 2
 fi
 
-# One ssh connection, reused (ControlMaster) — a single password prompt.
-SSH_SOCKET_DIR=$(mktemp -d -t dukarun-deploy-ssh)
+# Shared SSH options. Keep the tunnel as a real background process so cleanup
+# can reliably close it on every exit path.
 SSH_OPTS=(
   -o BatchMode=no -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new
-  -o ControlMaster=auto -o ControlPath="$SSH_SOCKET_DIR/s" -o ControlPersist=300
 )
 TUNNEL_PID=""
 
@@ -92,7 +91,6 @@ cleanup() {
     wait "$TUNNEL_PID" 2>/dev/null || true
     echo "→ tunnel closed"
   fi
-  rm -rf "$SSH_SOCKET_DIR" 2>/dev/null || true
 }
 trap cleanup EXIT
 
@@ -182,7 +180,7 @@ if [ -z "${DB_IP:-}" ]; then
 fi
 
 echo "→ opening tunnel $SSH_HOST : localhost:$DB_PORT -> $DB_CONTAINER:5432 ($DB_IP)"
-ssh "${SSH_OPTS[@]}" -N -L "$DB_PORT:$DB_IP:5432" "$SSH_HOST" &
+ssh "${SSH_OPTS[@]}" -o ExitOnForwardFailure=yes -N -L "$DB_PORT:$DB_IP:5432" "$SSH_HOST" &
 TUNNEL_PID=$!
 
 # Wait for the forward to come up.

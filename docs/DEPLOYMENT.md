@@ -70,7 +70,7 @@ show a 200 and the company row updating).
 
 ### 3. M-PESA pilot
 
-- Set Edge secret `MPESA_CALLBACK_BASE_URL=https://supa.dukarun.com/functions/v1`.
+- Set the platform M-PESA callback base URL to `https://supa.dukarun.com/functions/v1`.
 - Set Vault secrets `MPESA_PROCESS_URL` and `SUPABASE_SERVICE_ROLE_KEY`.
 - Run `npm run deploy:functions`; this syncs all four M-PESA functions.
 - Complete OAuth, C2B URL registration, KES 1 STK and KES 1 direct-payment tests.

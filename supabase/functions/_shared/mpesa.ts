@@ -16,6 +16,7 @@ export type MpesaPrivateConfig = {
   consumer_key: string;
   consumer_secret: string;
   passkey: string;
+  callback_base_url: string;
 };
 
 export const cors = {
@@ -59,6 +60,12 @@ export function darajaBase(environment: 'sandbox' | 'production'): string {
   return environment === 'production'
     ? 'https://api.safaricom.co.ke'
     : 'https://sandbox.safaricom.co.ke';
+}
+
+export function callbackBaseUrl(config: MpesaPrivateConfig): string {
+  const callbackBase = String(config.callback_base_url ?? '').replace(/\/+$/, '');
+  if (!callbackBase.startsWith('https://')) throw new Error('mpesa_callback_url_not_configured');
+  return callbackBase;
 }
 
 async function responseBody(response: Response): Promise<Record<string, unknown>> {

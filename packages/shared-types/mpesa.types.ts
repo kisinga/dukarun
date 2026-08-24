@@ -15,6 +15,8 @@ export type MpesaCheckoutAction =
 
 export type MpesaCommissioningStage =
   | 'business_review'
+  | 'daraja_app_preparation'
+  | 'safaricom_authorization'
   | 'merchant_verification'
   | 'daraja_connection'
   | 'credential_verification'
@@ -35,6 +37,8 @@ export interface MpesaCommissioningStatus {
   blockers: string[];
   checks: {
     business_details: boolean;
+    daraja_app_prepared: boolean;
+    safaricom_authorized: boolean;
     merchant_verified: boolean;
     connection_configured: boolean;
     production: boolean;

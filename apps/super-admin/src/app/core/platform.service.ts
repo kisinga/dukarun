@@ -223,6 +223,11 @@ export interface PlatformMpesaRequest {
   contact_phone: string;
   contact_email: string;
   requested_location_ids: string[];
+  existing_c2b_integration: boolean;
+  existing_c2b_notes: string | null;
+  prepared_daraja_app_id: string | null;
+  safaricom_authorization_verified_at: string | null;
+  safaricom_authorization_reference: string | null;
   status: string;
   merchant_notes: string | null;
   operator_notes: string | null;
@@ -256,6 +261,11 @@ export interface PlatformMpesaOverview {
     enabled: boolean;
     manual_fallback_allowed: boolean;
     pilot_company_id: string | null;
+    safaricom_authorization_email: string | null;
+    dukarun_mpesa_contact_name: string;
+    dukarun_mpesa_contact_email: string;
+    dukarun_mpesa_contact_phone: string | null;
+    mpesa_callback_base_url: string;
   };
   requests: PlatformMpesaRequest[];
   daraja_apps: Array<{
@@ -302,7 +312,7 @@ async function mpesaFunctionError(error: unknown): Promise<Error> {
 
   const friendlyMessages: Record<string, string> = {
     mpesa_callback_url_not_configured:
-      'Public callbacks are not configured. Deploy the M-PESA Edge Functions and set MPESA_CALLBACK_BASE_URL before registering C2B or sending a live test.',
+      'Public callbacks are not configured. Set the platform M-PESA callback base URL before registering C2B or sending a live test.',
     invalid_mpesa_phone: 'Enter a valid Safaricom phone number, for example 0712345678.',
     mpesa_activation_checks_incomplete: 'Complete all four production checks before going live.',
     production_connection_required: 'Only a production connection can go live.',
@@ -1011,6 +1021,24 @@ export class PlatformService {
     const { data, error } = await this.db.functions.invoke('mpesa-credentials', { body: input });
     if (error) throw await mpesaFunctionError(error);
     return data as Record<string, unknown>;
+  }
+
+  async prepareMpesaDarajaApp(input: {
+    requestId: string;
+    appName: string;
+    environment: 'sandbox' | 'production';
+    consumerKey: string;
+    consumerSecret: string;
+  }): Promise<string> {
+    const { data, error } = await this.db.rpc('platform_prepare_mpesa_daraja_app', {
+      p_request_id: input.requestId,
+      p_app_name: input.appName,
+      p_environment: input.environment,
+      p_consumer_key: input.consumerKey,
+      p_consumer_secret: input.consumerSecret,
+    });
+    if (error) throw rpcError(error);
+    return data;
   }
 
   async upsertTaxJurisdiction(input: {
