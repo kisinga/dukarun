@@ -512,6 +512,7 @@ interface Testimonial {
               {{ config.testingAccessMonths === 1 ? 'month' : 'months' }} of
               {{ config.newCustomerTierName }} access.
             }
+            Trial access can be requested after approval when a shop needs evaluation time.
           </p>
         } @else {
           <div
