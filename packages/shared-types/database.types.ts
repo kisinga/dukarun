@@ -12631,6 +12631,7 @@ export type Database = {
       current_company_id_unchecked: { Args: never; Returns: string }
       current_company_legal_status: { Args: never; Returns: Json }
       current_entitlements: { Args: never; Returns: Json }
+      current_trial_access_request: { Args: never; Returns: Json }
       current_published_company_terms: {
         Args: never
         Returns: {
@@ -13672,6 +13673,10 @@ export type Database = {
         Args: { p_jurisdiction_id: string }
         Returns: Json
       }
+      platform_trial_access_requests: {
+        Args: { p_limit?: number; p_status?: string }
+        Returns: Json
+      }
       platform_update_mpesa_connection: {
         Args: {
           p_action: string
@@ -13688,6 +13693,16 @@ export type Database = {
           p_testing_access_months: number
         }
         Returns: Json
+      }
+      platform_review_trial_access_request: {
+        Args: {
+          p_decision: string
+          p_decision_note?: string
+          p_granted_until?: string
+          p_request_id: string
+          p_tier_id?: string
+        }
+        Returns: string
       }
       platform_update_registration_config: {
         Args: {
@@ -14566,6 +14581,10 @@ export type Database = {
       resend_team_invitation: {
         Args: { p_invitation_id: string }
         Returns: Json
+      }
+      request_trial_access: {
+        Args: { p_reason: string; p_requested_days: number }
+        Returns: string
       }
       reserve_initial_subscription_payment: {
         Args: {

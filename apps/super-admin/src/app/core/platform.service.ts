@@ -94,6 +94,24 @@ export interface PlatformSalesSnapshot {
   commissions: PlatformSalesCommission[];
   commission_total: number;
 }
+export interface TrialAccessRequestRow {
+  id: string;
+  company_id: string;
+  company_name: string;
+  company_code: string;
+  company_status: string;
+  subscription_status: string | null;
+  subscription_exempt_until: string | null;
+  subscription_tier_name: string | null;
+  subscription_tier_code: string | null;
+  requested_days: number;
+  reason: string;
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled';
+  decision_note: string | null;
+  granted_until: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+}
 export interface PlatformCampaignPreview {
   total: number;
   eligible: number;
@@ -657,6 +675,32 @@ export class PlatformService {
     const { data, error } = await this.db.rpc('platform_company_legal_status');
     if (error) throw rpcError(error);
     return data as unknown as CompanyLegalStatus[];
+  }
+
+  async trialAccessRequests(status: string | null = 'pending'): Promise<TrialAccessRequestRow[]> {
+    const { data, error } = await this.db.rpc('platform_trial_access_requests', {
+      p_status: status!,
+      p_limit: 100,
+    });
+    if (error) throw rpcError(error);
+    return data as unknown as TrialAccessRequestRow[];
+  }
+
+  async reviewTrialAccessRequest(input: {
+    requestId: string;
+    decision: 'approved' | 'rejected';
+    tierId?: string;
+    grantedUntil?: string;
+    note?: string;
+  }): Promise<void> {
+    const { error } = await this.db.rpc('platform_review_trial_access_request', {
+      p_request_id: input.requestId,
+      p_decision: input.decision,
+      ...(input.tierId ? { p_tier_id: input.tierId } : {}),
+      ...(input.grantedUntil ? { p_granted_until: input.grantedUntil } : {}),
+      ...(input.note ? { p_decision_note: input.note } : {}),
+    });
+    if (error) throw rpcError(error);
   }
 
   async legalDocuments(): Promise<LegalDocumentVersion[]> {

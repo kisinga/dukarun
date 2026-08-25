@@ -26,7 +26,8 @@ import { LegalService, PublishedLegalDocument } from '../../legal/legal.service'
                 Pay {{ config.initialPurchasePrice }} KES after approval to unlock
                 {{ config.testingAccessMonths }}
                 {{ config.testingAccessMonths === 1 ? 'month' : 'months' }} of
-                {{ config.newCustomerTierName }} access.
+                {{ config.newCustomerTierName }} access. If you need evaluation time first, you can
+                request trial access after approval.
               </p>
             }
           </div>

@@ -3,7 +3,13 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { NgIcon } from '@ng-icons/core';
 import { debounceTime, distinctUntilChanged } from 'rxjs';
-import { Company, CompanyLegalStatus, PlatformService, Tier } from '../../core/platform.service';
+import {
+  Company,
+  CompanyLegalStatus,
+  PlatformService,
+  Tier,
+  TrialAccessRequestRow,
+} from '../../core/platform.service';
 import { DataTableShellComponent } from '../../shared/ui/data-table-shell.component';
 import { DrawerComponent } from '../../shared/ui/drawer.component';
 import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
@@ -85,6 +91,85 @@ const LEGAL_TYPE: Record<string, BadgeType> = {
         </span>
       </div>
     </app-list-search-bar>
+
+    @if (trialRequests().length > 0) {
+      <section class="mb-4 rounded-box border border-base-300 bg-base-100 p-4">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 class="section-title">Trial requests</h2>
+            <p class="type-caption mt-1">Approve temporary access with a required expiry date.</p>
+          </div>
+          <span class="badge badge-warning">{{ trialRequests().length }} pending</span>
+        </div>
+        <div class="mt-4 grid gap-3 lg:grid-cols-2">
+          @for (request of trialRequests(); track request.id) {
+            <article class="rounded-box border border-base-300 p-3">
+              <div class="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <p class="font-semibold">{{ request.company_name }}</p>
+                  <p class="type-caption font-mono">{{ request.company_code }}</p>
+                </div>
+                <app-status-badge type="warning" label="pending" size="sm" />
+              </div>
+              <p class="mt-3 text-sm">{{ request.reason }}</p>
+              <p class="type-caption mt-2">
+                Requested {{ request.requested_days }} days · {{ date(request.created_at) }}
+              </p>
+              <div class="mt-3 grid gap-2 sm:grid-cols-2">
+                <app-form-field label="Tier">
+                  <select
+                    class="select select-bordered select-sm w-full"
+                    [value]="trialDraft(request).tierId"
+                    (change)="setTrialDraft(request.id, 'tierId', inputValue($event))"
+                  >
+                    @for (tier of activeTiers(); track tier.id) {
+                      <option [value]="tier.id">{{ tier.name }}</option>
+                    }
+                  </select>
+                </app-form-field>
+                <app-form-field label="Grant until">
+                  <input
+                    type="date"
+                    class="input input-bordered input-sm w-full"
+                    [value]="trialDraft(request).grantedUntil"
+                    (input)="setTrialDraft(request.id, 'grantedUntil', inputValue($event))"
+                  />
+                </app-form-field>
+              </div>
+              <app-form-field label="Decision note" class="mt-2 block">
+                <input
+                  type="text"
+                  class="input input-bordered input-sm w-full"
+                  placeholder="Optional internal/customer note"
+                  [value]="trialDraft(request).note"
+                  (input)="setTrialDraft(request.id, 'note', inputValue($event))"
+                />
+              </app-form-field>
+              <div class="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  class="btn btn-primary btn-sm min-h-11"
+                  [disabled]="
+                    busy() || !trialDraft(request).tierId || !trialDraft(request).grantedUntil
+                  "
+                  (click)="reviewTrialRequest(request, 'approved')"
+                >
+                  Approve
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-outline btn-sm min-h-11"
+                  [disabled]="busy()"
+                  (click)="reviewTrialRequest(request, 'rejected')"
+                >
+                  Reject
+                </button>
+              </div>
+            </article>
+          }
+        </div>
+      </section>
+    }
 
     @if (!loading() && companies().length === 0) {
       <app-empty-state
@@ -425,6 +510,8 @@ export class CompaniesComponent implements OnInit {
 
   protected readonly companies = signal<CompanyRow[]>([]);
   protected readonly tiers = signal<Tier[]>([]);
+  protected readonly activeTiers = signal<Tier[]>([]);
+  protected readonly trialRequests = signal<TrialAccessRequestRow[]>([]);
   protected readonly legalStatuses = signal<Map<string, CompanyLegalStatus>>(new Map());
   protected readonly legalStatusesAvailable = signal(true);
   protected readonly selected = signal<CompanyRow | null>(null);
@@ -441,6 +528,9 @@ export class CompaniesComponent implements OnInit {
   protected readonly subExemptUntil = new FormControl('', { nonNullable: true });
   protected readonly subExpiresAt = new FormControl('', { nonNullable: true });
   protected readonly subExemptReason = new FormControl('', { nonNullable: true });
+  protected readonly trialDrafts = signal<
+    Record<string, { tierId: string; grantedUntil: string; note: string }>
+  >({});
   protected readonly automationOverride = new FormControl<
     'inherit' | 'force_enabled' | 'force_disabled'
   >('inherit', { nonNullable: true });
@@ -459,7 +549,9 @@ export class CompaniesComponent implements OnInit {
 
   async ngOnInit(): Promise<void> {
     try {
-      this.tiers.set(await this.platform.tiers());
+      const tiers = await this.platform.tiers();
+      this.tiers.set(tiers);
+      this.activeTiers.set(tiers.filter(tier => tier.is_active));
     } catch {
       // The company list remains useful when tiers fail to load.
     }
@@ -474,14 +566,17 @@ export class CompaniesComponent implements OnInit {
     this.loading.set(true);
     try {
       let legalStatusesAvailable = true;
-      const [companies, legalStatuses] = await Promise.all([
+      const [companies, legalStatuses, trialRequests] = await Promise.all([
         this.platform.companies(this.search.value) as Promise<CompanyRow[]>,
         this.platform.companyLegalStatuses().catch(() => {
           legalStatusesAvailable = false;
           return [];
         }),
+        this.platform.trialAccessRequests().catch(() => []),
       ]);
       this.companies.set(companies);
+      this.trialRequests.set(trialRequests);
+      this.syncTrialDrafts(trialRequests);
       this.legalStatuses.set(new Map(legalStatuses.map(status => [status.company_id, status])));
       this.legalStatusesAvailable.set(legalStatusesAvailable);
       const selectedId = this.selected()?.id;
@@ -535,6 +630,44 @@ export class CompaniesComponent implements OnInit {
     this.counts.set(null);
   }
 
+  protected trialDraft(request: TrialAccessRequestRow): {
+    tierId: string;
+    grantedUntil: string;
+    note: string;
+  } {
+    return (
+      this.trialDrafts()[request.id] ?? {
+        tierId: this.defaultTrialTierId(),
+        grantedUntil: this.dateInputFromDays(request.requested_days),
+        note: '',
+      }
+    );
+  }
+
+  protected setTrialDraft(
+    requestId: string,
+    key: 'tierId' | 'grantedUntil' | 'note',
+    value: string
+  ): void {
+    this.trialDrafts.update(drafts => ({
+      ...drafts,
+      [requestId]: {
+        ...(drafts[requestId] ?? {
+          tierId: this.defaultTrialTierId(),
+          grantedUntil: this.dateInputFromDays(14),
+          note: '',
+        }),
+        [key]: value,
+      },
+    }));
+  }
+
+  protected inputValue(event: Event): string {
+    return event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement
+      ? event.target.value
+      : '';
+  }
+
   protected async setStatus(company: CompanyRow, status: string): Promise<void> {
     this.busy.set(true);
     this.error.set(null);
@@ -545,6 +678,40 @@ export class CompaniesComponent implements OnInit {
       await this.load();
     } catch (error) {
       this.error.set(error instanceof Error ? error.message : 'Update failed');
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected async reviewTrialRequest(
+    request: TrialAccessRequestRow,
+    decision: 'approved' | 'rejected'
+  ): Promise<void> {
+    this.busy.set(true);
+    this.error.set(null);
+    this.notice.set(null);
+    try {
+      const draft = this.trialDraft(request);
+      await this.platform.reviewTrialAccessRequest({
+        requestId: request.id,
+        decision,
+        ...(decision === 'approved'
+          ? { tierId: draft.tierId, grantedUntil: draft.grantedUntil }
+          : {}),
+        ...(draft.note.trim() ? { note: draft.note.trim() } : {}),
+      });
+      this.notice.set(
+        decision === 'approved'
+          ? `Trial access granted for ${request.company_name}`
+          : `Trial request rejected for ${request.company_name}`
+      );
+      this.trialDrafts.update(drafts => {
+        const { [request.id]: _removed, ...rest } = drafts;
+        return rest;
+      });
+      await this.load();
+    } catch (error) {
+      this.error.set(error instanceof Error ? error.message : 'Trial review failed');
     } finally {
       this.busy.set(false);
     }
@@ -626,6 +793,30 @@ export class CompaniesComponent implements OnInit {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
+    });
+  }
+
+  private dateInputFromDays(days: number): string {
+    const date = new Date();
+    date.setDate(date.getDate() + days);
+    return date.toISOString().slice(0, 10);
+  }
+
+  private defaultTrialTierId(): string {
+    return this.activeTiers()[0]?.id ?? this.tiers()[0]?.id ?? '';
+  }
+
+  private syncTrialDrafts(requests: TrialAccessRequestRow[]): void {
+    this.trialDrafts.update(current => {
+      const next: Record<string, { tierId: string; grantedUntil: string; note: string }> = {};
+      for (const request of requests) {
+        next[request.id] = current[request.id] ?? {
+          tierId: this.defaultTrialTierId(),
+          grantedUntil: this.dateInputFromDays(request.requested_days),
+          note: '',
+        };
+      }
+      return next;
     });
   }
 }

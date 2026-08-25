@@ -5,7 +5,13 @@ import { normalizeKenyanPhone } from '../core/phone';
 import { EmptyStateComponent } from '../shared/ui/empty-state.component';
 import { PageLayoutComponent } from '../shared/ui/page-layout.component';
 import { StatusBadgeComponent } from '../shared/ui/status-badge.component';
-import { BillingCycle, BillingService, CompanyBilling, Tier } from './billing.service';
+import {
+  BillingCycle,
+  BillingService,
+  CompanyBilling,
+  Tier,
+  TrialAccessRequest,
+} from './billing.service';
 import { EntitlementsService } from '../core/entitlements.service';
 import { BillingConfigService, PublicBillingConfig } from '../core/billing-config.service';
 
@@ -107,6 +113,77 @@ const POLL_TIMEOUT_MS = 60_000;
             {{ billingConfig()?.testingAccessMonths === 1 ? 'month' : 'months' }} of
             {{ billingConfig()?.newCustomerTierName }} access.
           </span>
+        </div>
+
+        <div class="card mb-4 bg-base-100">
+          <div class="card-body p-4">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h3 class="type-heading">Trial access</h3>
+                @if (trialRequest(); as request) {
+                  <p class="type-caption mt-1">
+                    {{ trialStatusText(request) }}
+                  </p>
+                } @else {
+                  <p class="type-caption mt-1">
+                    Ask for temporary access while your account is being evaluated.
+                  </p>
+                }
+              </div>
+              @if (trialRequest()?.status !== 'pending' && !trialRequestOpen()) {
+                <button
+                  type="button"
+                  class="btn btn-outline btn-sm min-h-11"
+                  [disabled]="busy()"
+                  (click)="trialRequestOpen.set(true)"
+                >
+                  Request trial
+                </button>
+              }
+            </div>
+
+            @if (trialRequest()?.status === 'rejected' && trialRequest()?.decision_note) {
+              <p class="mt-3 rounded-box bg-base-200 p-3 text-sm">
+                {{ trialRequest()?.decision_note }}
+              </p>
+            }
+
+            @if (trialRequestOpen()) {
+              <form
+                class="mt-3 flex flex-col gap-3 border-t border-base-300/60 pt-3"
+                (submit)="$event.preventDefault(); requestTrialAccess()"
+              >
+                <label class="form-control">
+                  <span class="label-text text-xs">Requested duration</span>
+                  <select class="select select-bordered select-sm" [formControl]="trialDays">
+                    <option [value]="7">7 days</option>
+                    <option [value]="14">14 days</option>
+                    <option [value]="30">30 days</option>
+                  </select>
+                </label>
+                <label class="form-control">
+                  <span class="label-text text-xs">Reason</span>
+                  <textarea
+                    class="textarea textarea-bordered min-h-24"
+                    placeholder="Tell us what you want to test and when you expect to decide."
+                    [formControl]="trialReason"
+                  ></textarea>
+                </label>
+                <div class="flex flex-wrap gap-2">
+                  <button type="submit" class="btn btn-primary btn-sm min-h-11" [disabled]="busy()">
+                    {{ busy() ? 'Sending…' : 'Send request' }}
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-ghost btn-sm"
+                    (click)="trialRequestOpen.set(false)"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            }
+          </div>
         </div>
       }
 
@@ -272,9 +349,13 @@ export class BillingComponent implements OnInit, OnDestroy {
   protected readonly billing = signal<CompanyBilling | null>(null);
   protected readonly tiers = signal<Tier[]>([]);
   protected readonly billingConfig = signal<PublicBillingConfig | null>(null);
+  protected readonly trialRequest = signal<TrialAccessRequest | null>(null);
+  protected readonly trialRequestOpen = signal(false);
   protected readonly cycle = signal<BillingCycle>('monthly');
   protected readonly choosing = signal<string | null>(null);
   protected readonly phone = new FormControl('', { nonNullable: true });
+  protected readonly trialDays = new FormControl(14, { nonNullable: true });
+  protected readonly trialReason = new FormControl('', { nonNullable: true });
   protected readonly pending = signal<{ reference: string; displayText: string } | null>(null);
   protected readonly pollTimedOut = signal(false);
   protected readonly busy = signal(false);
@@ -286,14 +367,16 @@ export class BillingComponent implements OnInit, OnDestroy {
 
   async ngOnInit(): Promise<void> {
     try {
-      const [billing, tiers, config] = await Promise.all([
+      const [billing, tiers, config, trialRequest] = await Promise.all([
         this.billingService.companyBilling(),
         this.billingService.tiers(),
         this.billingConfigService.load(),
+        this.billingService.currentTrialRequest(),
       ]);
       this.billing.set(billing);
       this.tiers.set(tiers);
       this.billingConfig.set(config);
+      this.trialRequest.set(trialRequest);
       if (billing.billing_cycle === 'yearly') this.cycle.set('yearly');
     } catch (err) {
       this.loadError.set(err instanceof Error ? err.message : 'Failed to load billing');
@@ -400,6 +483,14 @@ export class BillingComponent implements OnInit, OnDestroy {
     );
   }
 
+  protected trialStatusText(request: TrialAccessRequest): string {
+    if (request.status === 'pending') return 'Your trial request is waiting for review.';
+    if (request.status === 'approved' && request.granted_until)
+      return `Trial access approved until ${this.date(request.granted_until)}.`;
+    if (request.status === 'rejected') return 'Your last trial request was not approved.';
+    return 'Your trial request is closed.';
+  }
+
   /** Human-readable tier limits: "500 sales/mo", "5 team members", "50 SMS/mo". */
   protected limitLines(tier: Tier): string[] {
     const lines: string[] = [];
@@ -445,6 +536,31 @@ export class BillingComponent implements OnInit, OnDestroy {
       // Local stack: paystack-charge 502s against real Paystack with the mock
       // key — the message is shown verbatim.
       this.error.set(err instanceof Error ? err.message : 'Payment request failed');
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected async requestTrialAccess(): Promise<void> {
+    const days = Math.round(this.trialDays.value);
+    const reason = this.trialReason.value.trim();
+    if (![7, 14, 30].includes(days)) {
+      this.error.set('Choose a trial duration');
+      return;
+    }
+    if (reason.length < 10) {
+      this.error.set('Add a short reason for the trial request');
+      return;
+    }
+    this.busy.set(true);
+    this.error.set(null);
+    try {
+      await this.billingService.requestTrialAccess(days, reason);
+      this.trialRequest.set(await this.billingService.currentTrialRequest());
+      this.trialReason.setValue('');
+      this.trialRequestOpen.set(false);
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message.replaceAll('_', ' ') : 'Request failed');
     } finally {
       this.busy.set(false);
     }
