@@ -8,10 +8,15 @@ import { provideClientHydration, withEventReplay } from '@angular/platform-brows
 import { provideIcons, provideNgIconsConfig } from '@ng-icons/core';
 import {
   heroChevronRight,
+  heroMinus,
+  heroPlus,
   heroListBullet,
   heroQueueList,
   heroShare,
+  heroShoppingBag,
   heroSquares2x2,
+  heroTrash,
+  heroXMark,
 } from '@ng-icons/heroicons/outline';
 
 import { routes } from './app.routes';
@@ -23,6 +28,17 @@ export const appConfig: ApplicationConfig = {
     provideClientHydration(withEventReplay()),
     provideRouter(routes, withInMemoryScrolling({ scrollPositionRestoration: 'enabled' })),
     provideNgIconsConfig({ size: '1rem' }),
-    provideIcons({ heroChevronRight, heroListBullet, heroQueueList, heroShare, heroSquares2x2 }),
+    provideIcons({
+      heroChevronRight,
+      heroListBullet,
+      heroMinus,
+      heroPlus,
+      heroQueueList,
+      heroShare,
+      heroShoppingBag,
+      heroSquares2x2,
+      heroTrash,
+      heroXMark,
+    }),
   ],
 };
