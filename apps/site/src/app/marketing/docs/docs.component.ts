@@ -276,9 +276,10 @@ export class DocsComponent {
       title: 'VAT calculations',
       summary: 'Input and output VAT connected to the books.',
       details: [
-        'For a configured VAT-registered shop in a supported jurisdiction, Dukarun extracts VAT from VAT-inclusive sales and supplier invoices. Entered prices stay gross, so VAT is never added unexpectedly at checkout or purchase confirmation.',
+        'In a supported jurisdiction, a business can turn on VAT accounting in Dukarun when it needs it. Dukarun extracts VAT from VAT-inclusive sales and supplier invoices. Entered prices stay gross, so VAT is never added unexpectedly at checkout or purchase confirmation.',
         'Eligible supplier invoices record their invoice number, date, and supplier tax PIN. Recoverable input VAT posts to the VAT control account while inventory and supplier-bill expenses are valued at net cost.',
-        'VAT breakdowns and reports show gross sales, net revenue, output VAT, claimed input VAT, and net VAT payable. These tools do not submit invoices to eTIMS and are not tax advice or a guarantee of statutory compliance.',
+        'A business can add its tax PIN when it needs the number on tax documents or integrations; the PIN does not control VAT calculation. VAT breakdowns and reports show gross sales, net revenue, output VAT, claimed input VAT, and net VAT payable.',
+        'The business remains responsible for registration, filing, and meeting its tax obligations. eTIMS support is in development; Dukarun does not currently submit invoices or guarantee statutory compliance.',
       ],
     },
     {

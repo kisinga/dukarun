@@ -21,11 +21,15 @@ class HostComponent {
 }
 
 describe('TaskDialogComponent', () => {
-  async function render(focusBeforeOpen?: HTMLElement): Promise<ComponentFixture<HostComponent>> {
+  async function render(
+    focusBeforeOpen?: HTMLElement,
+    configure?: (host: HostComponent) => void
+  ): Promise<ComponentFixture<HostComponent>> {
     await TestBed.configureTestingModule({ imports: [HostComponent] })
       .overrideComponent(IconComponent, { set: { template: '' } })
       .compileComponents();
     const fixture = TestBed.createComponent(HostComponent);
+    configure?.(fixture.componentInstance);
     focusBeforeOpen?.focus();
     fixture.detectChanges();
     await fixture.whenStable();
@@ -76,11 +80,10 @@ describe('TaskDialogComponent', () => {
   });
 
   it('keeps the panel mounted while closed so the backdrop cannot outlive it', async () => {
-    const fixture = await render();
+    const fixture = await render(undefined, host => {
+      host.open = false;
+    });
     const dialog = fixture.nativeElement.querySelector('dialog') as HTMLDialogElement;
-
-    fixture.componentInstance.open = false;
-    fixture.detectChanges();
 
     expect(dialog.open).toBe(false);
     expect(fixture.nativeElement.querySelector('.task-dialog-panel')).not.toBeNull();

@@ -862,7 +862,7 @@ export class HomeComponent implements OnInit {
     {
       icon: 'heroClipboardDocumentList',
       title: 'VAT calculations and double-entry books',
-      copy: 'Extract VAT from inclusive sales and supplier invoices, then track input and output VAT in balanced books.',
+      copy: 'Turn on VAT accounting when your business needs it, then track VAT from inclusive sales and supplier invoices in balanced books.',
       docId: 'vat',
     },
   ];
@@ -922,7 +922,7 @@ export class HomeComponent implements OnInit {
     {
       question: 'Does Dukarun calculate VAT?',
       answer:
-        'Yes, for a configured VAT-registered shop in a supported jurisdiction. Dukarun extracts VAT from VAT-inclusive sales and eligible supplier invoices, posts input and output VAT to the ledger, and provides VAT breakdowns and reports. It does not submit to eTIMS and is not tax advice or a compliance guarantee.',
+        'Yes. In a supported jurisdiction, a business can turn on VAT accounting when it needs it. Dukarun extracts VAT from VAT-inclusive sales and eligible supplier invoices, posts input and output VAT to the ledger, and provides VAT breakdowns and reports. The business remains responsible for registration, filing, and its tax obligations. eTIMS support is in development; Dukarun does not currently submit invoices.',
     },
     {
       question: 'How is the subscription billed?',

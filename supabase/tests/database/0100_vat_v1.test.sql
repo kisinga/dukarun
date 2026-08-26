@@ -1,7 +1,7 @@
 begin;
 -- Tax-profile effective dates are company-business dates, not runner UTC dates.
 set local timezone to 'Africa/Nairobi';
-select plan(96);
+select plan(99);
 
 select has_table('public','tax_rate_versions','VAT rates are effective-dated');
 select has_table('public','legacy_customer_account_reconciliations',
@@ -237,6 +237,24 @@ select lives_ok(format($$select public.cancel_scheduled_company_tax_profile(%L)$
   (select id from public.company_tax_profiles
     where company_id=(select company_id from vat_fixture) and effective_from=current_date+1)),
   'an unused future tax profile can be cancelled');
+select lives_ok(format($$select public.schedule_company_tax_profile(%L,true,'',current_date+2,%L)$$,
+  (select j.id from public.tax_jurisdictions j where j.country_code='KE'),
+  (select c.id from public.tax_categories c join public.tax_jurisdictions j
+    on j.id=c.jurisdiction_id where j.country_code='KE' and c.code='STANDARD')),
+  'VAT accounting can be enabled without supplying invoice PIN metadata');
+select is((select tax_registration_number from public.company_tax_profiles
+  where company_id=(select company_id from vat_fixture) and effective_from=current_date+2),null,
+  'an enabled VAT profile stores a missing invoice PIN as null');
+select is(public.update_company_tax_registration_number(
+  (select id from public.company_tax_profiles
+    where company_id=(select company_id from vat_fixture) and effective_from=current_date+2),
+  'P051234567A'),
+  (select id from public.company_tax_profiles
+    where company_id=(select company_id from vat_fixture) and effective_from=current_date+2),
+  'invoice PIN metadata can be added without rescheduling VAT');
+select public.cancel_scheduled_company_tax_profile(
+  (select id from public.company_tax_profiles
+    where company_id=(select company_id from vat_fixture) and effective_from=current_date+2));
 
 select throws_ok($$select public.post_expense_with_tax(116,'CASH_ON_HAND','transport','Fuel',
   current_date,true,null,null,null,null)$$,'P0001','input_vat_evidence_required',
