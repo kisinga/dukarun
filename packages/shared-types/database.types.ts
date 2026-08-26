@@ -2876,6 +2876,13 @@ export type Database = {
             referencedColumns: ["supplier_id"]
           },
           {
+            foreignKeyName: "customer_receipts_ledger_account_fkey"
+            columns: ["company_id", "ledger_account_code"]
+            isOneToOne: false
+            referencedRelation: "ledger_accounts"
+            referencedColumns: ["company_id", "code"]
+          },
+          {
             foreignKeyName: "customer_receipts_location_id_fkey"
             columns: ["location_id"]
             isOneToOne: false
@@ -5443,6 +5450,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "mpesa_onboarding_requests_ledger_account_fkey"
+            columns: ["company_id", "ledger_account_code"]
+            isOneToOne: false
+            referencedRelation: "ledger_accounts"
+            referencedColumns: ["company_id", "code"]
+          },
+          {
             foreignKeyName: "mpesa_onboarding_requests_prepared_daraja_app_id_fkey"
             columns: ["prepared_daraja_app_id"]
             isOneToOne: false
@@ -7193,6 +7207,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "public_storefronts"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_provider_accounts_ledger_account_fkey"
+            columns: ["company_id", "ledger_account_code"]
+            isOneToOne: false
+            referencedRelation: "ledger_accounts"
+            referencedColumns: ["company_id", "code"]
           },
         ]
       }
@@ -12769,6 +12790,10 @@ export type Database = {
         }
         Returns: string
       }
+      active_mpesa_provider_account_at_location: {
+        Args: { p_company_id: string; p_location_id: string }
+        Returns: string
+      }
       add_commission_adjustment: {
         Args: {
           p_commission_amount: number
@@ -13656,6 +13681,10 @@ export type Database = {
         Args: { p_event: string; p_invitation_id: string; p_version: number }
         Returns: Json
       }
+      ensure_mpesa_money_account: {
+        Args: { p_company_id: string; p_name?: string }
+        Returns: string
+      }
       estimate_order_tax: { Args: { p_order_id: string }; Returns: Json }
       estimate_purchase_input_vat: {
         Args: { p_expenses?: Json; p_lines: Json; p_tax_invoice_date?: string }
@@ -14043,15 +14072,6 @@ export type Database = {
           phone_normalized: string
         }[]
       }
-      mpesa_apply_collection_to_intent: {
-        Args: {
-          p_attempt_id: string
-          p_collection_id: string
-          p_intent_id: string
-        }
-        Returns: Json
-      }
-      mpesa_availability: { Args: { p_location_id: string }; Returns: Json }
       money_payment_accounts_overview: {
         Args: never
         Returns: {
@@ -14066,6 +14086,15 @@ export type Database = {
           mpesa_request: Json
         }[]
       }
+      mpesa_apply_collection_to_intent: {
+        Args: {
+          p_attempt_id: string
+          p_collection_id: string
+          p_intent_id: string
+        }
+        Returns: Json
+      }
+      mpesa_availability: { Args: { p_location_id: string }; Returns: Json }
       mpesa_claim_provider_events: {
         Args: { p_limit?: number }
         Returns: {
@@ -14129,6 +14158,10 @@ export type Database = {
       mpesa_latest_trusted_callback_payload: {
         Args: { p_attempt_id: string }
         Returns: Json
+      }
+      mpesa_money_account_code_at_location: {
+        Args: { p_company_id: string; p_location_id: string }
+        Returns: string
       }
       mpesa_post_reserved_allocation: {
         Args: {
@@ -14598,6 +14631,7 @@ export type Database = {
           p_code: string
           p_commissions_available: boolean
           p_customer_campaigns_available: boolean
+          p_fulfillment_available?: boolean
           p_is_active?: boolean
           p_max_orders_per_month?: number
           p_max_products?: number
@@ -15651,6 +15685,10 @@ export type Database = {
       }
       require_asset_leaf_account: {
         Args: { p_code: string; p_company_id: string }
+        Returns: string
+      }
+      require_mpesa_money_account: {
+        Args: { p_account_code: string; p_company_id: string }
         Returns: string
       }
       require_open_cashier_session: {
@@ -16887,3 +16925,4 @@ export const Constants = {
     Enums: {},
   },
 } as const
+
