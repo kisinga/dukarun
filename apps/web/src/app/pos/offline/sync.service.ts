@@ -15,6 +15,7 @@ import {
   type PosSettingsSnapshot,
 } from './offline-db';
 import { CacheJournalService, type CacheStreamHandler } from '../../core/cache-journal.service';
+import { FulfillmentService } from '../../fulfillment/fulfillment.service';
 
 export type BarcodeResolution =
   | { status: 'found'; variant: Variant; source: 'server' | 'cache' }
@@ -50,6 +51,7 @@ export class SyncService {
   private readonly catalogCache = inject(CatalogCacheService);
   private readonly catalogSearch = inject(CatalogSearchService);
   private readonly journal = inject(CacheJournalService);
+  private readonly fulfillment = inject(FulfillmentService);
 
   /** All outbox entries (queued + failed), FIFO by queued_at. */
   readonly entries = signal<OutboxEntry[]>([]);
@@ -184,17 +186,25 @@ export class SyncService {
         const currentIdentity = this.supabase.offlineIdentity();
         if (!currentIdentity || offlineScopeKey(currentIdentity) !== identityKey) break;
         try {
-          await this.pos.postOfflineSale({
-            customerId: entry.customer_id,
+          const replay = {
+            locationId: entry.location_id ?? this.locations.requireActiveId(),
             lines: entry.lines,
             payments: entry.payments,
             clientRef: entry.client_ref,
             occurredAt: entry.occurred_at ?? entry.queued_at,
             deviceKey: entry.device_key ?? this.deviceKey,
             pendingCount: queued.length - index,
-            locationId: entry.location_id ?? this.locations.requireActiveId(),
             draftId: entry.draft_id ?? undefined,
-          });
+          };
+          if (entry.fulfillment && entry.checkout_customer) {
+            await this.fulfillment.offlineCheckout({
+              ...replay,
+              customer: entry.checkout_customer,
+              fulfillment: entry.fulfillment,
+            });
+          } else {
+            await this.pos.postOfflineSale({ ...replay, customerId: entry.customer_id });
+          }
           await db.delete('outbox', entry.client_ref);
           posted++;
         } catch (err) {

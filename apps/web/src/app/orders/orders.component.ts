@@ -45,6 +45,10 @@ import {
   SearchableFilterComponent,
   type SearchableFilterOption,
 } from '../shared/ui/searchable-filter.component';
+import {
+  FulfillmentService,
+  type OrderFulfillmentSummary,
+} from '../fulfillment/fulfillment.service';
 
 const ALL_STATUSES = ['completed', 'voided', 'draft', 'expired', 'pending_payment'];
 
@@ -271,13 +275,27 @@ const SALE_SORT_OPTIONS: readonly ListSortOption[] = [
             >
               <div class="flex min-h-20 items-center gap-3 p-3">
                 <div class="min-w-0 flex-1">
-                  <div class="flex items-center gap-2">
+                  <div class="flex flex-wrap items-center gap-2">
                     <span class="truncate font-mono font-semibold">{{ order.code }}</span>
                     <app-status-badge
                       size="xs"
                       [type]="statusType(order.status)"
                       [label]="statusLabel(order.status, order.id)"
                     />
+                    @if (fulfillmentSummary(order.id); as fulfillment) {
+                      <app-status-badge
+                        size="xs"
+                        [type]="fulfillmentStatusType(fulfillment.fulfillment_status)"
+                        [label]="fulfillmentLabel(fulfillment)"
+                      />
+                      @if (fulfillment.collection_kind === 'cod') {
+                        <app-status-badge
+                          size="xs"
+                          type="warning"
+                          [label]="codLabel(fulfillment)"
+                        />
+                      }
+                    }
                   </div>
                   <p class="type-caption mt-1 truncate">
                     {{ time(order.created_at) }} · {{ customerName(order) }}
@@ -351,6 +369,15 @@ const SALE_SORT_OPTIONS: readonly ListSortOption[] = [
                           [type]="creditBadge(order).type"
                           [label]="creditBadge(order).label"
                         />
+                      }
+                      @if (fulfillmentSummary(order.id); as fulfillment) {
+                        <app-status-badge
+                          [type]="fulfillmentStatusType(fulfillment.fulfillment_status)"
+                          [label]="fulfillmentLabel(fulfillment)"
+                        />
+                        @if (fulfillment.collection_kind === 'cod') {
+                          <app-status-badge type="warning" [label]="codLabel(fulfillment)" />
+                        }
                       }
                       @for (approval of approvalBadges(order.id); track approval.id) {
                         <span
@@ -472,6 +499,16 @@ const SALE_SORT_OPTIONS: readonly ListSortOption[] = [
                   [type]="creditBadge(order).type"
                   [label]="creditBadge(order).label"
                 />
+              }
+              @if (fulfillmentSummary(order.id); as fulfillment) {
+                <app-status-badge
+                  size="xs"
+                  [type]="fulfillmentStatusType(fulfillment.fulfillment_status)"
+                  [label]="fulfillmentLabel(fulfillment)"
+                />
+                @if (fulfillment.collection_kind === 'cod') {
+                  <app-status-badge size="xs" type="warning" [label]="codLabel(fulfillment)" />
+                }
               }
             </div>
             @if (order.status === 'voided' && order.void_reason) {
@@ -934,6 +971,7 @@ export class OrdersComponent implements OnInit, OnDestroy {
   private readonly approvals = inject(ApprovalsService);
   private readonly recentSales = inject(RecentSalesCacheService);
   private readonly partyCache = inject(PartyCacheService);
+  private readonly fulfillment = inject(FulfillmentService);
   protected readonly fmtKes = formatKes;
 
   protected readonly pageSize = signal(20);
@@ -941,6 +979,7 @@ export class OrdersComponent implements OnInit, OnDestroy {
   protected readonly orders = signal<OrderWithCustomer[]>([]);
   /** Paid-so-far totals (shillings) for the credit sales currently listed. */
   protected readonly creditPaid = signal<Map<string, number>>(new Map());
+  protected readonly fulfillmentByOrder = signal<Map<string, OrderFulfillmentSummary>>(new Map());
   protected readonly selectedOrderId = signal<string | null>(null);
   private readonly selectedOrderRecord = signal<OrderWithCustomer | null>(null);
   protected readonly detailLoading = signal(false);
@@ -1214,13 +1253,17 @@ export class OrdersComponent implements OnInit, OnDestroy {
         sortDirection: this.saleSortDirection(),
       });
       const creditIds = result.rows.filter(order => order.is_credit_sale).map(order => order.id);
-      const paidTotals = await this.pos.paidTotalsByOrder(creditIds);
+      const [paidTotals, fulfillmentRows] = await Promise.all([
+        this.pos.paidTotalsByOrder(creditIds),
+        this.fulfillment.orderSummaries(result.rows.map(order => order.id)),
+      ]);
       if (sequence !== this.loadSequence) return;
       // Publish the page and all derived metadata together after every request
       // succeeds; journal revisions never patch only one part of this state.
       this.orders.set(result.rows);
       this.totalItems.set(result.count);
       this.creditPaid.set(paidTotals);
+      this.fulfillmentByOrder.set(new Map(fulfillmentRows.map(row => [row.order_id, row])));
       this.authoritativeLoaded = true;
       await this.loadPageApprovals();
       if (sequence !== this.loadSequence) return;
@@ -1542,6 +1585,25 @@ export class OrdersComponent implements OnInit, OnDestroy {
 
   protected statusType(status: string) {
     return ORDER_STATUS_MAP[status] ?? 'neutral';
+  }
+
+  protected fulfillmentSummary(orderId: string): OrderFulfillmentSummary | null {
+    return this.fulfillmentByOrder().get(orderId) ?? null;
+  }
+
+  protected fulfillmentStatusType(status: string) {
+    if (status === 'fulfilled') return 'success' as const;
+    if (status === 'failed') return 'warning' as const;
+    if (status === 'cancelled') return 'error' as const;
+    return 'info' as const;
+  }
+
+  protected fulfillmentLabel(summary: OrderFulfillmentSummary): string {
+    return `${summary.fulfillment_type} · ${summary.fulfillment_status.replaceAll('_', ' ')}`;
+  }
+
+  protected codLabel(summary: OrderFulfillmentSummary): string {
+    return summary.cod_balance === null ? 'COD' : `COD · ${formatKes(summary.cod_balance)} due`;
   }
 
   protected approvalBadges(orderId: string): Approval[] {

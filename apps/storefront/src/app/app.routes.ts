@@ -6,6 +6,10 @@ export const routes: Routes = [
     loadComponent: () => import('./directory.component').then(m => m.DirectoryComponent),
   },
   {
+    path: 'track/:token',
+    loadComponent: () => import('./tracking.component').then(m => m.TrackingComponent),
+  },
+  {
     path: 'statement/:token',
     loadComponent: () => import('./statement.component').then(m => m.StatementComponent),
   },

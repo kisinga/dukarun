@@ -80,6 +80,33 @@ async function authenticateFinancialUser(
         company_id: companyId,
         user_id: userId,
         permissions,
+        workspaces: [
+          'dashboard',
+          ...(permissions.includes('SettleOrder') ? ['sell', 'sales'] : []),
+          ...(permissions.some(permission =>
+            ['ManageCatalog', 'ManageStockAdjustments'].includes(permission)
+          )
+            ? ['inventory']
+            : []),
+          ...(permissions.some(permission =>
+            ['ManageSupplierCreditPurchases', 'ManageStockAdjustments', 'ViewFinancials'].includes(
+              permission
+            )
+          )
+            ? ['purchasing']
+            : []),
+          ...(permissions.some(permission =>
+            [
+              'ManageCustomers',
+              'ApproveCustomerCredit',
+              'ManageCustomerCreditLimit',
+              'OverrideCustomerBalance',
+              'ViewFinancials',
+            ].includes(permission)
+          )
+            ? ['customers']
+            : []),
+        ],
         actions: {
           'sale.void': 'execute',
           'sale.refund': 'execute',

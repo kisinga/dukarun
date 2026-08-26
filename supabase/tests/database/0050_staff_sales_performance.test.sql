@@ -20,7 +20,7 @@ where c.id = (select company_id from perf_company) and t.code = 'standard';
 select testkit.add_member(
   (select company_id from perf_company),
   '22222222-2222-2222-2222-222222222222',
-  'Seller', '{}'
+  'Seller', '{SettleOrder}'
 );
 select testkit.add_member(
   (select company_id from perf_company),

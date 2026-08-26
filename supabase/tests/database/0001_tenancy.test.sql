@@ -46,7 +46,7 @@ select is(
 
 select is(
   (select count(*)::int from public.roles where is_template),
-  4,
+  5,
   'member also sees the platform role templates'
 );
 

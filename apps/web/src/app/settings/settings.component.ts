@@ -43,9 +43,11 @@ import {
 import { CachedDataExportService, type CachedExportKind } from './cached-data-export.service';
 import { TaxSettingsComponent } from './tax-settings.component';
 import { MpesaSettingsComponent } from './mpesa-settings.component';
+import { FulfillmentSettingsComponent } from './fulfillment-settings.component';
 
 type SectionKey = 'profile' | 'pos' | 'inventory' | 'cash';
-type SettingsTab = 'business' | 'operations' | 'money' | 'mpesa' | 'communications' | 'data';
+type SettingsTab =
+  'business' | 'operations' | 'fulfillment' | 'money' | 'mpesa' | 'communications' | 'data';
 type ReminderDraft = {
   stageDays: number;
   enabled: boolean;
@@ -63,6 +65,11 @@ const SETTINGS_TABS: ReadonlyArray<{ key: SettingsTab; label: string; descriptio
     key: 'operations',
     label: 'Operations',
     description: 'Checkout, till, inventory and stock-location rules.',
+  },
+  {
+    key: 'fulfillment',
+    label: 'Pickup & Delivery',
+    description: 'Pickup, delivery, COD, tracking and promise settings by location.',
   },
   {
     key: 'money',
@@ -102,6 +109,7 @@ const SETTINGS_TABS: ReadonlyArray<{ key: SettingsTab; label: string; descriptio
     ProductImportDialogComponent,
     TaxSettingsComponent,
     MpesaSettingsComponent,
+    FulfillmentSettingsComponent,
   ],
   template: `
     <app-page title="Settings" subtitle="Manage how Dukarun works for this business." [wide]="true">
@@ -120,8 +128,8 @@ const SETTINGS_TABS: ReadonlyArray<{ key: SettingsTab; label: string; descriptio
             <select
               class="select select-bordered min-h-11 w-full"
               aria-label="Settings section"
-              [value]="activeTab()"
-              (change)="selectTabFromEvent($event)"
+              [ngModel]="activeTab()"
+              (ngModelChange)="selectTabFromValue($event)"
             >
               @for (tab of settingsTabs(); track tab.key) {
                 <option [value]="tab.key">{{ tab.label }}</option>
@@ -713,6 +721,10 @@ const SETTINGS_TABS: ReadonlyArray<{ key: SettingsTab; label: string; descriptio
                 </div>
               </div>
             </div>
+          }
+
+          @if (activeTab() === 'fulfillment') {
+            <app-fulfillment-settings />
           }
 
           @if (activeTab() === 'mpesa') {
@@ -1854,8 +1866,7 @@ export class SettingsComponent implements OnInit {
     });
   }
 
-  protected selectTabFromEvent(event: Event): void {
-    const value = (event.target as HTMLSelectElement).value;
+  protected selectTabFromValue(value: string): void {
     const tab = SETTINGS_TABS.find(item => item.key === value);
     if (tab) this.selectTab(tab.key);
   }

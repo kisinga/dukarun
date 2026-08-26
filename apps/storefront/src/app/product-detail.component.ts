@@ -8,6 +8,8 @@ import { StorefrontBrandComponent } from './storefront-brand.component';
 import { StorefrontSeoService } from './storefront-seo.service';
 import { environment } from '../environments/environment';
 import { PoweredByDukarunComponent } from './powered-by-dukarun.component';
+import { StorefrontCartComponent } from './storefront-cart.component';
+import { StorefrontCartService } from './storefront-cart.service';
 
 function formatKes(amount: number): string {
   return `KES ${Math.round(amount).toLocaleString('en-KE')}`;
@@ -15,7 +17,13 @@ function formatKes(amount: number): string {
 
 @Component({
   selector: 'app-product-detail',
-  imports: [RouterLink, NgIcon, StorefrontBrandComponent, PoweredByDukarunComponent],
+  imports: [
+    RouterLink,
+    NgIcon,
+    StorefrontBrandComponent,
+    PoweredByDukarunComponent,
+    StorefrontCartComponent,
+  ],
   template: `
     <main class="min-h-screen bg-base-200 pb-24">
       @if (shop(); as s) {
@@ -159,6 +167,46 @@ function formatKes(amount: number): string {
                   </div>
                 }
 
+                @if (selectedVariant(); as variant) {
+                  <div class="mt-5 rounded-2xl border border-base-300 bg-base-100 p-4">
+                    <div class="flex items-center justify-between gap-4">
+                      <span class="text-sm font-semibold">Quantity</span>
+                      <div class="join">
+                        <button
+                          type="button"
+                          class="btn join-item min-h-11"
+                          aria-label="Decrease quantity"
+                          [disabled]="quantity() <= 1"
+                          (click)="setQuantity(quantity() - 1)"
+                        >
+                          <ng-icon name="heroMinus" size="1rem" aria-hidden="true" />
+                        </button>
+                        <span
+                          class="join-item grid min-h-11 min-w-14 place-items-center border-y border-base-300 px-4 font-semibold tabular-nums"
+                          >{{ quantity() }}</span
+                        >
+                        <button
+                          type="button"
+                          class="btn join-item min-h-11"
+                          aria-label="Increase quantity"
+                          (click)="setQuantity(quantity() + 1)"
+                        >
+                          <ng-icon name="heroPlus" size="1rem" aria-hidden="true" />
+                        </button>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      class="btn btn-primary mt-4 min-h-14 w-full rounded-2xl text-base"
+                      [disabled]="!available(variant)"
+                      (click)="addToBasket(variant)"
+                    >
+                      <ng-icon name="heroShoppingBag" size="1.15rem" aria-hidden="true" />
+                      {{ addNotice() || 'Add to basket' }}
+                    </button>
+                  </div>
+                }
+
                 <button
                   type="button"
                   class="btn btn-outline mt-5 min-h-12 w-full rounded-2xl"
@@ -173,12 +221,12 @@ function formatKes(amount: number): string {
                     [href]="href"
                     target="_blank"
                     rel="noopener"
-                    class="btn btn-primary mt-3 min-h-14 w-full rounded-2xl text-base"
+                    class="btn btn-outline mt-3 min-h-12 w-full rounded-2xl"
                     [class.btn-disabled]="selectedVariant() && !available(selectedVariant()!)"
-                    >Order this on WhatsApp</a
+                    >Send only this item on WhatsApp</a
                   >
                   <p class="mt-2 text-center text-xs text-base-content/45">
-                    We'll prepare the product name, option and price for you.
+                    The shop will confirm availability and final total.
                   </p>
                 } @else {
                   <p class="mt-6 rounded-2xl bg-base-300/50 p-4 text-sm text-base-content/60">
@@ -202,6 +250,15 @@ function formatKes(amount: number): string {
         <footer class="mx-auto max-w-6xl px-5 pb-10 text-center text-xs text-base-content/45">
           <app-powered-by-dukarun />
         </footer>
+        @if (s.public_whatsapp_number && s.catalogue_visible) {
+          <app-storefront-cart
+            [shop]="{
+              slug: shopSlug,
+              name: s.name ?? 'the shop',
+              whatsappNumber: s.public_whatsapp_number,
+            }"
+          />
+        }
       } @else if (!loading()) {
         <div class="mx-auto max-w-lg px-5 py-24 text-center">
           <h1 class="text-2xl font-bold">Shop not found</h1>
@@ -216,6 +273,7 @@ export class ProductDetailComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly platformId = inject(PLATFORM_ID);
   private readonly seo = inject(StorefrontSeoService);
+  private readonly cart = inject(StorefrontCartService);
   protected readonly shopSlug = (this.route.snapshot.paramMap.get('slug') ?? '').toLowerCase();
   private readonly productId = this.route.snapshot.paramMap.get('productId') ?? '';
   protected readonly shop = signal<StorefrontInfo | null>(null);
@@ -224,6 +282,8 @@ export class ProductDetailComponent implements OnInit {
   protected readonly loading = signal(true);
   protected readonly loadError = signal(false);
   protected readonly shareNotice = signal<string | null>(null);
+  protected readonly addNotice = signal<string | null>(null);
+  protected readonly quantity = signal(1);
   protected readonly selectedVariant = computed(
     () =>
       this.product()?.variants.find(variant => variant.variant_id === this.selectedVariantId()) ??
@@ -250,6 +310,13 @@ export class ProductDetailComponent implements OnInit {
     try {
       const shop = await this.storefront.storefront(this.shopSlug);
       this.shop.set(shop);
+      if (shop) {
+        this.cart.setShop({
+          slug: this.shopSlug,
+          name: shop.name ?? 'the shop',
+          whatsappNumber: shop.public_whatsapp_number,
+        });
+      }
       if (!shop?.catalogue_visible) {
         this.seo.set(
           'Product not found',
@@ -287,6 +354,33 @@ export class ProductDetailComponent implements OnInit {
 
   protected selectVariant(variant: CatalogRow): void {
     this.selectedVariantId.set(variant.variant_id);
+    this.quantity.set(1);
+  }
+  protected setQuantity(quantity: number): void {
+    this.quantity.set(Math.max(1, Math.min(999, Math.round(quantity))));
+  }
+  protected addToBasket(variant: CatalogRow): void {
+    const shop = this.shop();
+    if (!shop || !isVariantAvailable(variant)) return;
+    const productUrl = new URL(
+      `/${this.shopSlug}/products/${this.productId}`,
+      `${environment.storefrontPublicUrl.replace(/\/+$/, '')}/`
+    ).toString();
+    const added = this.cart.add(
+      {
+        shopSlug: this.shopSlug,
+        productId: variant.product_id,
+        variantId: variant.variant_id,
+        productName: variant.product_name ?? '',
+        variantName: variant.variant_name ?? '',
+        price: Number(variant.price),
+        quantity: this.quantity(),
+        imagePath: variant.image_path,
+        productUrl,
+      },
+      this.quantity()
+    );
+    this.showAddNotice(added ? 'Added to basket' : 'Basket full');
   }
   protected available(variant: CatalogRow): boolean {
     return isVariantAvailable(variant);
@@ -324,6 +418,10 @@ export class ProductDetailComponent implements OnInit {
   private showShareNotice(message: string): void {
     this.shareNotice.set(message);
     setTimeout(() => this.shareNotice.set(null), 2_000);
+  }
+  private showAddNotice(message: string): void {
+    this.addNotice.set(message);
+    setTimeout(() => this.addNotice.set(null), 2_000);
   }
   private applySeo(shop: StorefrontInfo, product: CatalogProduct): void {
     const path = `/${this.shopSlug}/products/${this.productId}`;

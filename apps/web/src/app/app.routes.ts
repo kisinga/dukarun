@@ -61,18 +61,22 @@ export const routes: Routes = [
     children: [
       {
         path: 'dashboard',
-        data: { preload: true },
+        canActivate: [permissionGuard],
+        data: { preload: true, workspaceAccess: 'dashboard' },
         loadComponent: () =>
           import('./pages/dashboard/dashboard.component').then(m => m.DashboardComponent),
       },
       {
         path: 'pos/sell',
-        data: { preload: true },
+        canActivate: [permissionGuard],
+        data: { preload: true, permission: 'SettleOrder' },
         loadComponent: () => import('./pos/sell/sell.component').then(m => m.SellComponent),
       },
       { path: 'pos/sales', redirectTo: 'sales' },
       {
         path: 'pos/proformas',
+        canActivate: [permissionGuard],
+        data: { permission: 'SettleOrder' },
         loadComponent: () =>
           import('./pos/proformas/proformas.component').then(m => m.ProformasComponent),
       },
@@ -85,8 +89,25 @@ export const routes: Routes = [
       },
       {
         path: 'pos/sync',
+        canActivate: [permissionGuard],
+        data: { permission: 'SettleOrder' },
         loadComponent: () =>
           import('./pos/sync/pending-sync.component').then(m => m.PendingSyncComponent),
+      },
+      {
+        path: 'fulfillment',
+        canActivate: [permissionGuard, featureGuard],
+        data: {
+          anyPermission: [
+            'ProcessFulfillments',
+            'CompleteFulfillments',
+            'ManageFulfillments',
+            'SettleOrder',
+          ],
+          feature: 'fulfillment',
+        },
+        loadComponent: () =>
+          import('./fulfillment/fulfillment.component').then(m => m.FulfillmentComponent),
       },
       {
         path: 'money',
@@ -160,6 +181,8 @@ export const routes: Routes = [
       },
       {
         path: 'inventory',
+        canActivate: [permissionGuard],
+        data: { workspaceAccess: 'inventory' },
         children: [
           {
             path: 'products',
@@ -197,30 +220,38 @@ export const routes: Routes = [
       },
       {
         path: 'customers',
-        data: { preload: true },
+        canActivate: [permissionGuard],
+        data: { preload: true, workspaceAccess: 'customers' },
         loadComponent: () =>
           import('./customers/customers.component').then(m => m.CustomersComponent),
       },
       {
         path: 'suppliers',
+        canActivate: [permissionGuard],
+        data: { workspaceAccess: 'purchasing' },
         loadComponent: () =>
           import('./suppliers/suppliers.component').then(m => m.SuppliersComponent),
       },
       {
         path: 'purchases/new',
+        canActivate: [permissionGuard],
+        data: { workspaceAccess: 'purchasing' },
         canDeactivate: [confirmUnsavedChanges],
         loadComponent: () =>
           import('./purchases/purchase-editor.component').then(m => m.PurchaseEditorComponent),
       },
       {
         path: 'purchases/drafts/:id',
+        canActivate: [permissionGuard],
+        data: { workspaceAccess: 'purchasing' },
         canDeactivate: [confirmUnsavedChanges],
         loadComponent: () =>
           import('./purchases/purchase-editor.component').then(m => m.PurchaseEditorComponent),
       },
       {
         path: 'purchases',
-        data: { purchasePage: true },
+        canActivate: [permissionGuard],
+        data: { purchasePage: true, workspaceAccess: 'purchasing' },
         loadComponent: () =>
           import('./suppliers/suppliers.component').then(m => m.SuppliersComponent),
       },
@@ -297,7 +328,8 @@ export const routes: Routes = [
       },
       {
         path: 'sales',
-        data: { preload: true },
+        canActivate: [permissionGuard],
+        data: { preload: true, workspaceAccess: 'sales' },
         loadComponent: () => import('./orders/orders.component').then(m => m.OrdersComponent),
       },
       { path: 'orders', redirectTo: 'sales' },
@@ -351,6 +383,8 @@ export const routes: Routes = [
       },
       {
         path: 'billing',
+        canActivate: [permissionGuard],
+        data: { permission: 'ManageCompanySettings' },
         loadComponent: () => import('./billing/billing.component').then(m => m.BillingComponent),
       },
       {

@@ -148,6 +148,7 @@ select results_eq(
 select testkit.as_user((select company_id from cr_company),
   '33333333-3333-3333-3333-333333333173','Manager');
 select public.approve_request((select (result->>'approval_id')::uuid from cr_overdraft),'Approved exception');
+reset role;
 select is((select status from public.orders
   where id=(select (result->>'order_id')::uuid from cr_overdraft)),'completed',
   'approving the request completes the credit sale');

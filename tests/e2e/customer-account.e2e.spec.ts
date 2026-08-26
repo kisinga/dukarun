@@ -7,6 +7,9 @@ const customerId = '93000000-0000-4000-8000-000000000004';
 const orderId = '93000000-0000-4000-8000-000000000005';
 const productId = '93000000-0000-4000-8000-000000000006';
 const variantId = '93000000-0000-4000-8000-000000000007';
+const deliveryFeeProductId = '93000000-0000-4000-8000-000000000008';
+const deliveryFeeVariantId = '93000000-0000-4000-8000-000000000009';
+const fulfillmentId = '93000000-0000-4000-8000-000000000010';
 
 const customer = {
   id: customerId,
@@ -15,6 +18,7 @@ const customer = {
   last_name: 'Kamau',
   phone: '+254700000001',
   email: null,
+  delivery_address: 'Kilimani, Nairobi',
   notes: null,
   is_supplier: false,
   is_credit_approved: true,
@@ -48,7 +52,20 @@ const variant = {
   manufacturer_name: null,
 };
 
-async function authenticateAccountUser(page: Page): Promise<{ creditRequest: () => unknown }> {
+const deliveryFeeVariant = {
+  ...variant,
+  variant_id: deliveryFeeVariantId,
+  product_id: deliveryFeeProductId,
+  product_name: 'Delivery',
+  sku: 'DELIVERY',
+  price: 50,
+};
+
+async function authenticateAccountUser(page: Page): Promise<{
+  creditRequest: () => unknown;
+  fulfillmentCreditRequest: () => unknown;
+  customerProfileRequest: () => unknown;
+}> {
   const permissions = ['ViewFinancials', 'SettleOrder', 'ManageCustomers', 'OverridePrice'];
   const payload = {
     aud: 'authenticated',
@@ -78,6 +95,8 @@ async function authenticateAccountUser(page: Page): Promise<{ creditRequest: () 
     },
   };
   let postedCreditRequest: unknown;
+  let postedFulfillmentCreditRequest: unknown;
+  let postedCustomerProfileRequest: unknown;
   await page.addInitScript(
     value => {
       localStorage.setItem('sb-127-auth-token', JSON.stringify(value.session));
@@ -110,6 +129,7 @@ async function authenticateAccountUser(page: Page): Promise<{ creditRequest: () 
         company_id: companyId,
         user_id: userId,
         permissions,
+        workspaces: ['dashboard', 'customers'],
         actions: {
           'sale.credit_over_limit': 'execute',
           'customer.credit.update': 'execute',
@@ -117,8 +137,49 @@ async function authenticateAccountUser(page: Page): Promise<{ creditRequest: () 
         },
       });
     }
+    if (path.endsWith('/rest/v1/rpc/current_entitlements')) {
+      return json({
+        companyId,
+        status: 'active',
+        tierCode: 'standard',
+        tierName: 'Standard',
+        features: {
+          multipleLocations: false,
+          staffPerformance: false,
+          commissions: false,
+          storefront: false,
+          paymentReminders: false,
+          fulfillment: true,
+        },
+        settings: {},
+        limits: {},
+        usage: {},
+      });
+    }
     if (path.endsWith('/rest/v1/rpc/accessible_business_locations')) {
       return json([{ id: locationId, code: 'MAIN', name: 'Main shop', is_default: true }]);
+    }
+    if (path.endsWith('/rest/v1/rpc/fulfillment_settings_at_location')) {
+      return json({
+        company_id: companyId,
+        location_id: locationId,
+        enabled: true,
+        feature_available: true,
+        pickup_enabled: true,
+        delivery_enabled: true,
+        cod_enabled: false,
+        default_delivery_fee_variant_id: deliveryFeeVariantId,
+        pickup_sla_minutes: 30,
+        delivery_sla_minutes: 60,
+        notification_channel: 'whatsapp',
+        sms_fallback: true,
+        notify_initial: true,
+        notify_ready: true,
+        notify_in_transit: true,
+        notify_failed: true,
+        notify_fulfilled: false,
+        tracking_token_ttl_days: 14,
+      });
     }
     if (path.endsWith('/rest/v1/rpc/available_payment_methods')) {
       return json([
@@ -151,7 +212,10 @@ async function authenticateAccountUser(page: Page): Promise<{ creditRequest: () 
       );
     }
     if (path.endsWith('/rest/v1/rpc/location_stock_for_variants')) {
-      return json([{ variant_id: variantId, stock: 999, stock_value: 0 }]);
+      return json([
+        { variant_id: variantId, stock: 999, stock_value: 0 },
+        { variant_id: deliveryFeeVariantId, stock: 999, stock_value: 0 },
+      ]);
     }
     if (path.endsWith('/rest/v1/rpc/customer_deposit_available')) return json(300);
     if (path.endsWith('/rest/v1/rpc/customer_account_status')) {
@@ -175,6 +239,28 @@ async function authenticateAccountUser(page: Page): Promise<{ creditRequest: () 
         downpayment_applied: 300,
         credit_amount: 200,
       });
+    }
+    if (path.endsWith('/rest/v1/rpc/post_fulfillment_credit_sale_at_location')) {
+      postedFulfillmentCreditRequest = request.postDataJSON();
+      return json({
+        status: 'completed',
+        order_id: orderId,
+        subject_id: orderId,
+        resource_id: orderId,
+        fulfillment_id: fulfillmentId,
+        pin: '123456',
+        downpayment_applied: 300,
+        credit_amount: 250,
+      });
+    }
+    if (path.endsWith('/rest/v1/rpc/save_customer_profile')) {
+      postedCustomerProfileRequest = request.postDataJSON();
+      const body = postedCustomerProfileRequest as {
+        p_profile?: { delivery_address?: string };
+      };
+      if (body.p_profile?.delivery_address !== undefined)
+        customer.delivery_address = body.p_profile.delivery_address;
+      return json(customerId);
     }
     if (path.endsWith('/rest/v1/companies')) {
       const select = url.searchParams.get('select') ?? '';
@@ -234,10 +320,21 @@ async function authenticateAccountUser(page: Page): Promise<{ creditRequest: () 
     if (path.endsWith('/rest/v1/products')) {
       return json([{ id: productId, company_id: companyId, name: 'Account item', active: true }]);
     }
+    if (path.endsWith('/rest/v1/variant_catalog')) {
+      return json(
+        (url.searchParams.get('variant_id') ?? '').includes(deliveryFeeVariantId)
+          ? [deliveryFeeVariant]
+          : [variant]
+      );
+    }
     if (path.includes('/rest/v1/rpc/')) return json([]);
     return json([]);
   });
-  return { creditRequest: () => postedCreditRequest };
+  return {
+    creditRequest: () => postedCreditRequest,
+    fulfillmentCreditRequest: () => postedFulfillmentCreditRequest,
+    customerProfileRequest: () => postedCustomerProfileRequest,
+  };
 }
 
 test('overpayment preview explains FIFO allocations and the resulting downpayment', async ({
@@ -280,4 +377,80 @@ test('credit checkout shows the projected split and confirms the server-owned re
   const body = capture.creditRequest() as Record<string, unknown>;
   expect(body).not.toHaveProperty('p_deposit_amount');
   expect(body).not.toHaveProperty('p_credit_amount');
+});
+
+test('delivery credit checkout keeps a one-off address and suppresses milestone updates', async ({
+  page,
+}) => {
+  const capture = await authenticateAccountUser(page);
+  await page.setViewportSize({ width: 1100, height: 720 });
+  await page.goto('http://127.0.0.1:4203/pos/sell');
+
+  const paymentDock = page.getByTestId('sell-payment-dock');
+  await expect(paymentDock).toBeVisible();
+  const dockBox = await paymentDock.boundingBox();
+  expect(dockBox).not.toBeNull();
+  expect(dockBox!.x).toBeGreaterThanOrEqual(255);
+  expect(Math.round(dockBox!.y + dockBox!.height)).toBe(720);
+
+  await page
+    .getByRole('button', { name: /Account item/ })
+    .first()
+    .click();
+  await page.getByLabel('Search customers').fill('Amina');
+  await page.getByRole('button', { name: /Amina Kamau/ }).click();
+  await page
+    .locator('section[aria-labelledby="order-method-heading"]')
+    .getByRole('button', { name: 'Delivery', exact: true })
+    .click();
+
+  const details = page.getByRole('dialog', { name: 'Delivery details' });
+  await details.getByLabel('Delivery address').fill('Westlands, Nairobi');
+  await details.getByRole('checkbox', { name: /Status updates/ }).uncheck();
+  await details.getByRole('checkbox', { name: /Use this address next time/ }).uncheck();
+  await details.getByRole('button', { name: 'Done', exact: true }).click();
+
+  await page.getByRole('button', { name: 'Sell on credit' }).first().click();
+  await page
+    .getByRole('dialog', { name: 'Confirm credit sale' })
+    .getByRole('button', { name: 'Confirm sale' })
+    .click();
+
+  await expect(page.getByText(/Sale completed/)).toBeVisible();
+  const body = capture.fulfillmentCreditRequest() as {
+    p_customer: Record<string, unknown>;
+    p_fulfillment: Record<string, unknown>;
+  };
+  expect(body.p_customer).toMatchObject({
+    customer_id: customerId,
+    delivery_address: 'Westlands, Nairobi',
+    save_delivery_address: false,
+  });
+  expect(body.p_fulfillment).toMatchObject({
+    address: 'Westlands, Nairobi',
+    transactional_message_consent: false,
+  });
+});
+
+test('customer address editing uses one task and returns to refreshed detail', async ({ page }) => {
+  const capture = await authenticateAccountUser(page);
+  await page.goto(`http://127.0.0.1:4203/customers?customer=${customerId}`);
+  await expect(page.getByText('Kilimani, Nairobi')).toBeVisible();
+
+  await page
+    .getByRole('dialog', { name: 'Amina Kamau' })
+    .getByRole('button', { name: 'Edit customer' })
+    .click();
+  const editor = page.getByRole('dialog', { name: 'Edit Amina Kamau' });
+  await expect(editor).toBeVisible();
+  await editor.getByLabel('Delivery address').fill('Riverside Drive, Nairobi');
+  await editor.getByRole('button', { name: 'Save changes' }).click();
+
+  await expect(editor).toBeHidden();
+  await expect(page.getByRole('heading', { name: 'Amina Kamau' })).toBeVisible();
+  await expect(page.getByText('Riverside Drive, Nairobi')).toBeVisible();
+  expect(capture.customerProfileRequest()).toMatchObject({
+    p_customer_id: customerId,
+    p_profile: { delivery_address: 'Riverside Drive, Nairobi' },
+  });
 });

@@ -1078,7 +1078,8 @@ export class MoneyService {
     lastName?: string,
     phone?: string,
     email?: string,
-    isSupplier = false
+    isSupplier = false,
+    deliveryAddress?: string
   ): Promise<string> {
     const { data, error } = await this.db.rpc('create_customer', {
       p_first_name: firstName,
@@ -1086,6 +1087,40 @@ export class MoneyService {
       ...(phone ? { p_phone: phone } : {}),
       ...(email ? { p_email: email } : {}),
       p_is_supplier: isSupplier,
+      ...(deliveryAddress ? { p_delivery_address: deliveryAddress } : {}),
+    });
+    if (error) throw rpcError(error);
+    this.parties.invalidate();
+    return data;
+  }
+
+  async saveCustomerProfile(input: {
+    customerId?: string;
+    firstName: string;
+    lastName: string;
+    phone: string;
+    email: string;
+    deliveryAddress: string;
+    taxRegistrationNumber: string;
+    notes: string;
+    notificationsEnabled: boolean;
+    smsNotificationsEnabled: boolean;
+    whatsappNotificationsEnabled: boolean;
+  }): Promise<string> {
+    const { data, error } = await this.db.rpc('save_customer_profile', {
+      ...(input.customerId ? { p_customer_id: input.customerId } : {}),
+      p_profile: {
+        first_name: input.firstName,
+        last_name: input.lastName,
+        phone: input.phone,
+        email: input.email,
+        delivery_address: input.deliveryAddress,
+        tax_registration_number: input.taxRegistrationNumber,
+        notes: input.notes,
+        notifications_enabled: input.notificationsEnabled,
+        sms_notifications_enabled: input.smsNotificationsEnabled,
+        whatsapp_notifications_enabled: input.whatsappNotificationsEnabled,
+      },
     });
     if (error) throw rpcError(error);
     this.parties.invalidate();
@@ -1101,6 +1136,7 @@ export class MoneyService {
       phone?: string;
       email?: string;
       notes?: string;
+      delivery_address?: string;
     }
   ): Promise<string> {
     const { data, error } = await this.db.rpc('update_customer', {
@@ -1110,6 +1146,9 @@ export class MoneyService {
       ...(changes.phone !== undefined ? { p_phone: changes.phone } : {}),
       ...(changes.email !== undefined ? { p_email: changes.email } : {}),
       ...(changes.notes !== undefined ? { p_notes: changes.notes } : {}),
+      ...(changes.delivery_address !== undefined
+        ? { p_delivery_address: changes.delivery_address }
+        : {}),
     });
     if (error) throw rpcError(error);
     this.parties.invalidate();

@@ -20,6 +20,8 @@ describe('company settings permission gate', () => {
     const permissions = {
       ensureLoaded: vi.fn().mockResolvedValue(true),
       has: vi.fn().mockReturnValue(false),
+      canAccessWorkspace: vi.fn().mockReturnValue(false),
+      landingRoute: vi.fn().mockReturnValue('/dashboard'),
     };
     const router = { createUrlTree: vi.fn().mockReturnValue(dashboardTree) };
     const injector = Injector.create({
@@ -44,6 +46,44 @@ describe('company settings permission gate', () => {
         permissionGuard(route, {} as RouterStateSnapshot)
       );
       expect(allowed).toBe(true);
+    } finally {
+      injector.destroy();
+    }
+  });
+
+  it('gates baseline operational routes and redirects fulfillment-only users', async () => {
+    const shell = routes.find(route => route.path === '');
+    for (const path of ['dashboard', 'pos/sell', 'customers', 'suppliers', 'sales']) {
+      expect(shell?.children?.find(route => route.path === path)?.canActivate).toContain(
+        permissionGuard
+      );
+    }
+
+    const fulfillmentTree = { path: '/fulfillment' };
+    const permissions = {
+      ensureLoaded: vi.fn().mockResolvedValue(true),
+      has: vi.fn().mockReturnValue(false),
+      canAccessWorkspace: vi.fn().mockReturnValue(false),
+      landingRoute: vi.fn().mockReturnValue('/fulfillment'),
+    };
+    const router = { createUrlTree: vi.fn().mockReturnValue(fulfillmentTree) };
+    const injector = Injector.create({
+      providers: [
+        { provide: PermissionsService, useValue: permissions },
+        { provide: Router, useValue: router },
+      ],
+    });
+    const route = {
+      data: { workspaceAccess: 'sales' },
+    } as unknown as ActivatedRouteSnapshot;
+
+    try {
+      const denied = await runInInjectionContext(injector, () =>
+        permissionGuard(route, {} as RouterStateSnapshot)
+      );
+      expect(denied).toBe(fulfillmentTree);
+      expect(permissions.canAccessWorkspace).toHaveBeenCalledWith('sales');
+      expect(router.createUrlTree).toHaveBeenCalledWith(['/fulfillment']);
     } finally {
       injector.destroy();
     }

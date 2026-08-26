@@ -1,6 +1,6 @@
 -- The local demo must stay fully walkable as features and permissions grow.
 begin;
-select plan(14);
+select plan(15);
 
 select is(
   (select count(*)::int from public.companies where name = 'Mama Mboga Stores'),
@@ -35,6 +35,21 @@ select results_eq(
   'the demo user is an approved Admin'
 );
 
+select is(
+  (select jsonb_build_object(
+      'role',r.name,'permissions',r.permissions,'locations',count(ml.location_id)
+    )
+   from public.company_memberships m
+   join public.roles r on r.id=m.role_id
+   join public.companies c on c.id=m.company_id
+   left join public.company_membership_locations ml on ml.membership_id=m.id
+   where c.name='Mama Mboga Stores'
+     and m.user_id='5877ac73-ff8d-457c-afcd-791e66229d04'
+   group by r.name,r.permissions),
+  '{"role":"Delivery person","permissions":["CompleteFulfillments"],"locations":1}'::jsonb,
+  'the local delivery persona has only handoff access at the default location'
+);
+
 select ok(
   (select r.permissions @> array[
     'ManageApprovals','OverridePrice','ManageStockAdjustments','ApproveCustomerCredit',
@@ -43,8 +58,9 @@ select ok(
     'OverrideCustomerBalance','SettleOrder',
     'ManageSupplierCreditPurchases','ViewFinancials','ManageReconciliation',
     'CloseAccountingPeriod','CreateInterAccountTransfer','ManageTeam','ViewAuditTrail',
-    'ViewStaffPerformance','ManageCommissions'
-  ]::text[] and cardinality(r.permissions) = 22
+    'ViewStaffPerformance','ManageCommissions','ProcessFulfillments',
+    'CompleteFulfillments','ManageFulfillments'
+  ]::text[] and cardinality(r.permissions) = 25
   from public.roles r
   join public.companies c on c.id = r.company_id
   where c.name = 'Mama Mboga Stores' and r.name = 'Admin'),

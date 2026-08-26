@@ -17,6 +17,8 @@ import { StorefrontBrandComponent } from './storefront-brand.component';
 import { StorefrontSeoService } from './storefront-seo.service';
 import { environment } from '../environments/environment';
 import { PoweredByDukarunComponent } from './powered-by-dukarun.component';
+import { StorefrontCartComponent } from './storefront-cart.component';
+import { StorefrontCartService } from './storefront-cart.service';
 
 const PAGE_SIZE = 12;
 const CATALOG_VIEW_KEY = 'dukarun.storefront.catalog-view';
@@ -30,7 +32,13 @@ function formatKes(amount: number): string {
 
 @Component({
   selector: 'app-shop',
-  imports: [RouterLink, NgIcon, StorefrontBrandComponent, PoweredByDukarunComponent],
+  imports: [
+    RouterLink,
+    NgIcon,
+    StorefrontBrandComponent,
+    PoweredByDukarunComponent,
+    StorefrontCartComponent,
+  ],
   template: `
     <main class="min-h-screen bg-base-200 pb-24">
       @if (notFound()) {
@@ -505,13 +513,22 @@ function formatKes(amount: number): string {
         </div>
 
         @if (s.public_whatsapp_number && s.catalogue_visible) {
-          <a
-            [href]="waLink(s.public_whatsapp_number, 'Hello ' + s.name + '!')"
-            target="_blank"
-            rel="noopener"
-            class="btn btn-primary fixed right-4 bottom-4 z-40 min-h-12 rounded-full px-6 shadow-lg sm:hidden"
-            >Ask the shop</a
-          >
+          @if (cart.isEmpty()) {
+            <a
+              [href]="waLink(s.public_whatsapp_number, 'Hello ' + s.name + '!')"
+              target="_blank"
+              rel="noopener"
+              class="btn btn-primary fixed right-4 bottom-4 z-40 min-h-12 rounded-full px-6 shadow-lg sm:hidden"
+              >Ask the shop</a
+            >
+          }
+          <app-storefront-cart
+            [shop]="{
+              slug: slug,
+              name: s.name ?? 'the shop',
+              whatsappNumber: s.public_whatsapp_number,
+            }"
+          />
         }
         <footer class="mx-auto max-w-6xl px-5 pb-10 text-center text-xs text-base-content/45">
           <app-powered-by-dukarun /><span aria-hidden="true"> · </span
@@ -537,6 +554,7 @@ export class ShopComponent implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly platformId = inject(PLATFORM_ID);
   private readonly seo = inject(StorefrontSeoService);
+  protected readonly cart = inject(StorefrontCartService);
   protected readonly slug = (this.route.snapshot.paramMap.get('slug') ?? '').toLowerCase();
   private readonly initialShop = this.slug
     ? this.storefront.transferredStorefront(this.slug)
@@ -615,6 +633,11 @@ export class ShopComponent implements OnInit, OnDestroy {
         return;
       }
       this.shop.set(shop);
+      this.cart.setShop({
+        slug: this.slug,
+        name: shop.name ?? 'the shop',
+        whatsappNumber: shop.public_whatsapp_number,
+      });
       this.categories.set(page.categories);
       this.products.set(catalogProductsFromPage(page.rows));
       this.page.set(Math.floor(page.offset / PAGE_SIZE) + 1);

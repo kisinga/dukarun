@@ -155,7 +155,7 @@ if (
   throw new Error('Storefront API proxy must not append slugs to the Edge Function name.');
 }
 for (const marker of [
-  'location ~ ^/(?:statement|document)/',
+  'location ~ ^/(?:statement|document|track)/',
   'X-Robots-Tag "noindex, nofollow, noarchive"',
   'Referrer-Policy "no-referrer"',
   'public-content-renderer',
