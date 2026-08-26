@@ -1,5 +1,6 @@
 import {
   Component,
+  ElementRef,
   computed,
   effect,
   inject,
@@ -7,9 +8,15 @@ import {
   output,
   signal,
   untracked,
+  viewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { ButtonComponent } from '../shared/ui/button.component';
 import { FormFieldComponent } from '../shared/ui/form-field.component';
+import { FormSectionComponent } from '../shared/ui/form-section.component';
+import { IconComponent } from '../shared/ui/icon.component';
+import { PreferenceRowComponent } from '../shared/ui/preference-row.component';
+import { TaskDialogComponent } from '../shared/ui/task-dialog.component';
 import {
   FulfillmentService,
   type CheckoutCustomerInput,
@@ -23,6 +30,7 @@ export interface CheckoutCustomerSummary {
   id: string;
   name: string;
   phone: string | null;
+  delivery_address: string | null;
 }
 
 export interface FulfillmentCheckoutDraft {
@@ -30,218 +38,344 @@ export interface FulfillmentCheckoutDraft {
   fulfillment: FulfillmentCheckoutInput;
 }
 
+type DraftState = {
+  mode: CheckoutMode;
+  recipientName: string;
+  phone: string;
+  address: string;
+  landmark: string;
+  mapLink: string;
+  preparationNotes: string;
+  handoffNotes: string;
+  promisedAt: string;
+  collectionKind: 'none' | 'cod';
+  updatesRequested: boolean;
+  saveAsCustomer: boolean;
+  saveDeliveryAddress: boolean;
+  moreDetailsOpen: boolean;
+  committed: boolean;
+};
+
+type ValidationKey = 'recipient' | 'phone' | 'address' | 'mapLink' | 'promisedAt';
+type ValidationErrors = Partial<Record<ValidationKey, string>>;
+
 @Component({
   selector: 'app-fulfillment-checkout-fields',
-  imports: [FormsModule, FormFieldComponent],
+  imports: [
+    FormsModule,
+    ButtonComponent,
+    FormFieldComponent,
+    FormSectionComponent,
+    IconComponent,
+    PreferenceRowComponent,
+    TaskDialogComponent,
+  ],
   template: `
     @if (settings()?.enabled && settings()?.feature_available) {
       <section class="border-t border-base-300/60 p-4" aria-labelledby="order-method-heading">
         <p id="order-method-heading" class="type-caption">Order method</p>
         <div class="mt-2 grid grid-cols-3 rounded-field bg-base-200 p-1">
-          <button
-            type="button"
-            class="btn btn-sm border-0"
-            [class.btn-ghost]="mode() !== 'counter'"
-            [class.btn-neutral]="mode() === 'counter'"
-            (click)="selectMode('counter')"
-          >
-            Counter
-          </button>
-          <button
-            type="button"
-            class="btn btn-sm border-0"
-            [class.btn-ghost]="mode() !== 'pickup'"
-            [class.btn-neutral]="mode() === 'pickup'"
-            [disabled]="!settings()?.pickup_enabled"
-            (click)="selectMode('pickup')"
-          >
-            Pickup
-          </button>
-          <button
-            type="button"
-            class="btn btn-sm border-0"
-            [class.btn-ghost]="mode() !== 'delivery'"
-            [class.btn-neutral]="mode() === 'delivery'"
-            [disabled]="!settings()?.delivery_enabled"
-            (click)="selectMode('delivery')"
-          >
-            Delivery
-          </button>
+          @for (option of modeOptions; track option.value) {
+            <button
+              appButton
+              type="button"
+              size="sm"
+              [variant]="mode() === option.value ? 'secondary' : 'ghost'"
+              [disabled]="!modeEnabled(option.value)"
+              (click)="selectMode(option.value)"
+            >
+              {{ option.label }}
+            </button>
+          }
         </div>
 
         @if (mode() !== 'counter') {
-          <div class="mt-4 space-y-3">
-            <app-form-field label="Recipient name" [required]="true">
+          <div class="mt-4 border-t border-base-300/60 pt-4">
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <p class="text-sm font-semibold">
+                  {{ mode() === 'delivery' ? 'Delivery details' : 'Pickup details' }}
+                </p>
+                @if (detailsCommitted()) {
+                  <p class="mt-1 truncate text-sm">{{ recipientName() }}</p>
+                  <p class="type-caption mt-0.5 truncate">
+                    @if (mode() === 'delivery') {
+                      {{ address() }}
+                    } @else {
+                      {{ phone() || 'No phone provided' }}
+                    }
+                  </p>
+                } @else {
+                  <p class="type-caption mt-1">Recipient details still need attention.</p>
+                }
+              </div>
+              <button
+                appButton
+                type="button"
+                variant="ghost"
+                size="sm"
+                [iconOnly]="true"
+                [attr.aria-label]="detailsCommitted() ? 'Edit order details' : 'Add order details'"
+                [title]="detailsCommitted() ? 'Edit details' : 'Add details'"
+                (click)="openDetails()"
+              >
+                <app-icon [name]="detailsCommitted() ? 'heroPencilSquare' : 'heroPlus'" />
+              </button>
+            </div>
+            @if (detailsCommitted()) {
+              <div class="mt-3 flex flex-wrap gap-2">
+                <span class="badge badge-ghost badge-sm">
+                  {{ updatesRequested() ? 'Updates on' : 'Updates off' }}
+                </span>
+                @if (collectionKind() === 'cod') {
+                  <span class="badge badge-warning badge-sm">COD</span>
+                }
+                @if (promiseLabel(); as promise) {
+                  <span class="badge badge-ghost badge-sm">{{ promise }}</span>
+                }
+              </div>
+            }
+          </div>
+        }
+      </section>
+
+      <app-task-dialog
+        #detailsDialog
+        [(open)]="detailsOpen"
+        size="lg"
+        [title]="mode() === 'delivery' ? 'Delivery details' : 'Pickup details'"
+        [subtitle]="customer()?.name ?? 'Walk-in customer'"
+        [dirty]="detailsDirty()"
+        (closed)="cancelDetails()"
+      >
+        <app-form-section title="Recipient" description="Who should receive this order?">
+          <div class="grid gap-3 md:grid-cols-2">
+            <app-form-field
+              label="Recipient name"
+              [required]="true"
+              [error]="validationErrors().recipient"
+            >
               <input
+                data-checkout-field="recipient"
                 class="input input-bordered min-h-11 w-full"
                 autocomplete="name"
                 [ngModel]="recipientName()"
-                (ngModelChange)="recipientName.set($event)"
+                (ngModelChange)="recipientName.set($event); clearError('recipient')"
               />
             </app-form-field>
-
             <app-form-field
               label="Phone"
               [required]="mode() === 'delivery' || updatesRequested()"
               [hint]="phoneHint()"
+              [error]="validationErrors().phone"
             >
               <input
+                data-checkout-field="phone"
                 class="input input-bordered min-h-11 w-full"
                 type="tel"
                 inputmode="tel"
                 autocomplete="tel"
                 placeholder="0712 345 678"
                 [ngModel]="phone()"
-                (ngModelChange)="phoneChanged($event)"
+                (ngModelChange)="phoneChanged($event); clearError('phone')"
               />
             </app-form-field>
+          </div>
 
-            @if (!customer() && customerMatches().length > 0) {
-              <div class="border-y border-base-300/60 py-2">
-                <p class="type-caption">Existing customer with this phone</p>
-                @for (match of customerMatches(); track match.id) {
-                  <button
-                    type="button"
-                    class="mt-1 flex min-h-11 w-full items-center justify-between gap-3 rounded-field px-2 text-left hover:bg-base-200"
-                    (click)="useCustomer(match)"
-                  >
-                    <span class="truncate text-sm font-medium">{{ match.display_name }}</span>
-                    <span class="text-xs text-base-content/60">Use customer</span>
-                  </button>
-                }
-              </div>
-            }
+          <app-preference-row
+            class="mt-3 block"
+            label="Status updates"
+            description="Ready, dispatched, failed and delivered messages. The link and PIN are still sent once."
+          >
+            <input
+              type="checkbox"
+              class="toggle toggle-primary toggle-sm"
+              [ngModel]="updatesRequested()"
+              (ngModelChange)="updatesRequested.set($event)"
+            />
+          </app-preference-row>
 
-            @if (mode() === 'delivery') {
-              <app-form-field label="Delivery address" [required]="true">
-                <textarea
-                  class="textarea textarea-bordered min-h-20 w-full"
-                  autocomplete="street-address"
-                  [ngModel]="address()"
-                  (ngModelChange)="address.set($event)"
-                ></textarea>
-              </app-form-field>
-              <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-                <app-form-field label="Landmark">
-                  <input
-                    class="input input-bordered min-h-11 w-full"
-                    [ngModel]="landmark()"
-                    (ngModelChange)="landmark.set($event)"
-                  />
-                </app-form-field>
-                <app-form-field label="Map link">
-                  <input
-                    class="input input-bordered min-h-11 w-full"
-                    type="url"
-                    inputmode="url"
-                    placeholder="https://maps.google.com/..."
-                    [ngModel]="mapLink()"
-                    (ngModelChange)="mapLink.set($event)"
-                  />
-                </app-form-field>
-              </div>
-              <app-form-field label="Delivery instructions">
-                <textarea
-                  class="textarea textarea-bordered min-h-16 w-full"
-                  [ngModel]="handoffNotes()"
-                  (ngModelChange)="handoffNotes.set($event)"
-                ></textarea>
-              </app-form-field>
-            }
-
-            <app-form-field label="Preparation notes">
-              <textarea
-                class="textarea textarea-bordered min-h-16 w-full"
-                [ngModel]="preparationNotes()"
-                (ngModelChange)="preparationNotes.set($event)"
-              ></textarea>
-            </app-form-field>
-
-            <app-form-field label="Promised time">
-              <input
-                class="input input-bordered min-h-11 w-full"
-                type="datetime-local"
-                [ngModel]="promisedAt()"
-                (ngModelChange)="promisedAt.set($event)"
-              />
-            </app-form-field>
-
-            @if (mode() === 'delivery' && settings()?.cod_enabled) {
-              <div
-                class="grid grid-cols-2 rounded-field bg-base-200 p-1"
-                role="group"
-                aria-label="Collection at handoff"
-              >
+          @if (!customer() && customerMatches().length > 0) {
+            <div class="mt-3 border-y border-base-300/60 py-2">
+              <p class="type-caption">Existing customer with this phone</p>
+              @for (match of customerMatches(); track match.id) {
                 <button
                   type="button"
-                  class="btn btn-sm border-0"
-                  [class.btn-ghost]="collectionKind() !== 'none'"
-                  [class.btn-neutral]="collectionKind() === 'none'"
-                  (click)="collectionKind.set('none')"
+                  class="mt-1 flex min-h-11 w-full items-center justify-between gap-3 rounded-field px-2 text-left hover:bg-base-200"
+                  (click)="useCustomer(match)"
                 >
-                  No collection
+                  <span class="truncate text-sm font-medium">{{ match.display_name }}</span>
+                  <span class="text-xs text-base-content/60">Use customer</span>
                 </button>
-                <button
-                  type="button"
-                  class="btn btn-sm border-0"
-                  [class.btn-ghost]="collectionKind() !== 'cod'"
-                  [class.btn-neutral]="collectionKind() === 'cod'"
-                  (click)="chooseCod()"
-                >
-                  Cash on delivery
-                </button>
-              </div>
-            }
+              }
+            </div>
+          }
 
-            <label
-              class="flex min-h-11 cursor-pointer items-center justify-between gap-3 border-y border-base-300/60 py-2"
+          @if (!customer()) {
+            <app-preference-row
+              class="mt-3 block"
+              label="Save as customer"
+              description="Keep these details for future orders; campaigns stay off."
             >
-              <span>
-                <span class="block text-sm font-medium">Send tracking updates</span>
-                <span class="type-caption">Transactional updates only</span>
-              </span>
               <input
                 type="checkbox"
                 class="toggle toggle-primary toggle-sm"
-                [ngModel]="updatesRequested()"
-                (ngModelChange)="updatesRequested.set($event)"
+                [ngModel]="saveAsCustomer()"
+                (ngModelChange)="saveAsCustomer.set($event)"
+                [disabled]="collectionKind() === 'cod'"
               />
-            </label>
+            </app-preference-row>
+          }
+        </app-form-section>
 
-            @if (!customer()) {
-              <label class="flex min-h-11 cursor-pointer items-center justify-between gap-3">
-                <span>
-                  <span class="block text-sm font-medium">Save as customer</span>
-                  <span class="type-caption">Campaigns and reminders stay off</span>
-                </span>
+        @if (mode() === 'delivery') {
+          <app-form-section title="Destination" description="Where should the order be delivered?">
+            <app-form-field
+              label="Delivery address"
+              [required]="true"
+              [error]="validationErrors().address"
+              [hint]="addressHint()"
+            >
+              <textarea
+                data-checkout-field="address"
+                class="textarea textarea-bordered min-h-24 w-full"
+                autocomplete="street-address"
+                maxlength="500"
+                [ngModel]="address()"
+                (ngModelChange)="address.set($event); addressChanged(); clearError('address')"
+              ></textarea>
+            </app-form-field>
+
+            @if (showAddressSavePreference()) {
+              <app-preference-row
+                class="mt-3 block"
+                label="Use this address next time"
+                [description]="'Update the saved delivery address for ' + customer()!.name + '.'"
+              >
                 <input
                   type="checkbox"
                   class="toggle toggle-primary toggle-sm"
-                  [ngModel]="saveAsCustomer()"
-                  (ngModelChange)="saveAsCustomer.set($event)"
-                  [disabled]="collectionKind() === 'cod'"
+                  [ngModel]="saveDeliveryAddress()"
+                  (ngModelChange)="saveDeliveryAddress.set($event)"
                 />
-              </label>
+              </app-preference-row>
             }
+          </app-form-section>
+        }
 
-            @if (validationMessage(); as message) {
-              <p class="text-sm text-error" role="alert">{{ message }}</p>
+        <app-form-section title="Timing and collection">
+          <div
+            class="grid gap-3"
+            [class.md:grid-cols-2]="mode() === 'delivery' && settings()?.cod_enabled"
+          >
+            <app-form-field label="Promised time" [error]="validationErrors().promisedAt">
+              <input
+                data-checkout-field="promisedAt"
+                class="input input-bordered min-h-11 w-full"
+                type="datetime-local"
+                [ngModel]="promisedAt()"
+                (ngModelChange)="promisedAt.set($event); clearError('promisedAt')"
+              />
+            </app-form-field>
+            @if (mode() === 'delivery' && settings()?.cod_enabled) {
+              <app-form-field label="Payment timing">
+                <select
+                  class="select select-bordered min-h-11 w-full"
+                  [ngModel]="collectionKind()"
+                  (ngModelChange)="setCollectionKind($event)"
+                >
+                  <option value="none">Pay before delivery</option>
+                  <option value="cod">Collect on delivery</option>
+                </select>
+              </app-form-field>
             }
           </div>
-        }
-      </section>
+        </app-form-section>
+
+        <app-form-section title="Notes" description="Add only what this order needs.">
+          <button
+            appButton
+            type="button"
+            variant="outline"
+            size="sm"
+            [attr.aria-expanded]="moreDetailsOpen()"
+            (click)="moreDetailsOpen.set(!moreDetailsOpen())"
+          >
+            <app-icon [name]="moreDetailsOpen() ? 'heroChevronUp' : 'heroChevronDown'" />
+            {{ moreDetailsOpen() ? 'Hide additional details' : 'More delivery details' }}
+          </button>
+          @if (moreDetailsOpen()) {
+            <div class="mt-3 space-y-3">
+              @if (mode() === 'delivery') {
+                <div class="grid gap-3 md:grid-cols-2">
+                  <app-form-field label="Landmark">
+                    <input
+                      class="input input-bordered min-h-11 w-full"
+                      [ngModel]="landmark()"
+                      (ngModelChange)="landmark.set($event)"
+                    />
+                  </app-form-field>
+                  <app-form-field label="Map link" [error]="validationErrors().mapLink">
+                    <input
+                      data-checkout-field="mapLink"
+                      class="input input-bordered min-h-11 w-full"
+                      type="url"
+                      inputmode="url"
+                      placeholder="https://maps.google.com/..."
+                      [ngModel]="mapLink()"
+                      (ngModelChange)="mapLink.set($event); clearError('mapLink')"
+                    />
+                  </app-form-field>
+                </div>
+                <app-form-field label="Delivery instructions" hint="Shown to the handoff team.">
+                  <textarea
+                    class="textarea textarea-bordered min-h-20 w-full"
+                    [ngModel]="handoffNotes()"
+                    (ngModelChange)="handoffNotes.set($event)"
+                  ></textarea>
+                </app-form-field>
+              }
+              <app-form-field
+                label="Preparation notes"
+                hint="Internal instructions for preparing this order."
+              >
+                <textarea
+                  class="textarea textarea-bordered min-h-20 w-full"
+                  [ngModel]="preparationNotes()"
+                  (ngModelChange)="preparationNotes.set($event)"
+                ></textarea>
+              </app-form-field>
+            </div>
+          }
+        </app-form-section>
+
+        <div taskFooter class="flex items-center justify-end gap-2">
+          <button appButton variant="ghost" type="button" (click)="detailsDialog.requestClose()">
+            Cancel
+          </button>
+          <button appButton type="button" (click)="completeDetails()">Done</button>
+        </div>
+      </app-task-dialog>
     }
   `,
 })
 export class FulfillmentCheckoutFieldsComponent {
   private readonly fulfillment = inject(FulfillmentService);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
   readonly settings = input<FulfillmentSettings | null>(null);
   readonly customer = input<CheckoutCustomerSummary | null>(null);
   readonly modeChanged = output<CheckoutMode>();
   readonly customerSelected = output<string>();
 
+  readonly modeOptions: ReadonlyArray<{ value: CheckoutMode; label: string }> = [
+    { value: 'counter', label: 'Counter' },
+    { value: 'pickup', label: 'Pickup' },
+    { value: 'delivery', label: 'Delivery' },
+  ];
   readonly mode = signal<CheckoutMode>('counter');
+  readonly detailsOpen = signal(false);
+  readonly detailsCommitted = signal(false);
   readonly recipientName = signal('');
   readonly phone = signal('');
   readonly address = signal('');
@@ -253,55 +387,162 @@ export class FulfillmentCheckoutFieldsComponent {
   readonly collectionKind = signal<'none' | 'cod'>('none');
   readonly updatesRequested = signal(true);
   readonly saveAsCustomer = signal(true);
+  readonly saveDeliveryAddress = signal(true);
+  readonly moreDetailsOpen = signal(false);
   readonly customerMatches = signal<Array<{ id: string; display_name: string; phone: string }>>([]);
-  readonly validationMessage = signal<string | null>(null);
+  readonly validationErrors = signal<ValidationErrors>({});
+  readonly validationMessage = computed(() => Object.values(this.validationErrors())[0] ?? null);
   readonly phoneHint = computed(() =>
     this.mode() === 'pickup' && !this.updatesRequested()
-      ? 'Optional when tracking updates are off'
-      : 'Used for tracking and delivery contact'
+      ? 'Optional when status updates are off.'
+      : 'Used for delivery contact and the initial order link.'
   );
+  readonly showAddressSavePreference = computed(() => {
+    const saved = this.clean(this.customer()?.delivery_address ?? '');
+    const entered = this.clean(this.address());
+    return !!this.customer() && !!saved && !!entered && saved !== entered;
+  });
+  readonly addressHint = computed(() => {
+    const customer = this.customer();
+    if (!customer || this.showAddressSavePreference()) return undefined;
+    return customer.delivery_address
+      ? `Saved delivery address for ${customer.name}.`
+      : `Saved for ${customer.name} when this order is placed.`;
+  });
+  readonly promiseLabel = computed(() => {
+    const value = this.promisedAt();
+    if (!value) return null;
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return null;
+    return new Intl.DateTimeFormat('en-KE', { hour: 'numeric', minute: '2-digit' }).format(date);
+  });
+  readonly detailsDirty = computed(() => {
+    if (!this.detailsOpen() || !this.dialogBaseline) return false;
+    return JSON.stringify(this.captureState()) !== JSON.stringify(this.dialogBaseline);
+  });
 
+  private readonly detailsDialog = viewChild(TaskDialogComponent);
   private matchTimer: ReturnType<typeof setTimeout> | null = null;
+  private matchSequence = 0;
   private lastCustomerId: string | null = null;
+  private dialogBaseline: DraftState | null = null;
 
   constructor() {
     effect(() => {
       const customer = this.customer();
-      if (!customer || customer.id === this.lastCustomerId) return;
+      if (!customer) {
+        if (this.lastCustomerId !== null) {
+          untracked(() => {
+            this.recipientName.set('');
+            this.phone.set('');
+            this.address.set('');
+            this.saveAsCustomer.set(true);
+            this.saveDeliveryAddress.set(true);
+            this.customerMatches.set([]);
+            this.validationErrors.set({});
+            this.detailsCommitted.set(false);
+            this.matchSequence++;
+          });
+        }
+        this.lastCustomerId = null;
+        return;
+      }
+      if (customer.id === this.lastCustomerId) return;
       this.lastCustomerId = customer.id;
       untracked(() => {
         this.recipientName.set(customer.name);
         this.phone.set(customer.phone ?? '');
+        if (this.mode() === 'delivery') this.address.set(customer.delivery_address ?? '');
+        this.saveDeliveryAddress.set(true);
         this.customerMatches.set([]);
+        this.detailsCommitted.set(false);
+        this.matchSequence++;
       });
     });
   }
 
+  modeEnabled(mode: CheckoutMode): boolean {
+    if (mode === 'pickup') return !!this.settings()?.pickup_enabled;
+    if (mode === 'delivery') return !!this.settings()?.delivery_enabled;
+    return true;
+  }
+
   selectMode(mode: CheckoutMode): void {
-    if (mode === 'pickup' && !this.settings()?.pickup_enabled) return;
-    if (mode === 'delivery' && !this.settings()?.delivery_enabled) return;
+    if (!this.modeEnabled(mode)) return;
+    if (mode === 'counter') {
+      this.mode.set('counter');
+      this.detailsCommitted.set(false);
+      this.collectionKind.set('none');
+      this.validationErrors.set({});
+      this.modeChanged.emit('counter');
+      return;
+    }
+    if (mode === this.mode() && this.detailsCommitted()) {
+      this.openDetails();
+      return;
+    }
+    this.dialogBaseline = this.captureState();
     this.mode.set(mode);
+    this.detailsCommitted.set(false);
     if (mode !== 'delivery') this.collectionKind.set('none');
-    if (mode !== 'counter' && !this.promisedAt()) this.setDefaultPromise(mode);
+    if (!this.promisedAt()) this.setDefaultPromise(mode);
     const customer = this.customer();
-    if (mode !== 'counter' && customer && !this.recipientName()) {
+    if (customer) {
       this.recipientName.set(customer.name);
       this.phone.set(customer.phone ?? '');
+      if (mode === 'delivery') this.address.set(customer.delivery_address ?? '');
     }
-    this.validationMessage.set(null);
+    this.validationErrors.set({});
+    this.detailsOpen.set(true);
     this.modeChanged.emit(mode);
+  }
+
+  openDetails(): void {
+    this.dialogBaseline = this.captureState();
+    this.validationErrors.set({});
+    this.detailsOpen.set(true);
+  }
+
+  cancelDetails(): void {
+    if (this.dialogBaseline) this.restoreState(this.dialogBaseline);
+    this.dialogBaseline = null;
+    this.validationErrors.set({});
+    this.detailsOpen.set(false);
+    this.modeChanged.emit(this.mode());
+  }
+
+  completeDetails(): void {
+    const errors = this.validate();
+    this.validationErrors.set(errors);
+    const first = Object.keys(errors)[0] as ValidationKey | undefined;
+    if (first) {
+      requestAnimationFrame(() =>
+        this.host.nativeElement
+          .querySelector<HTMLElement>(`[data-checkout-field="${first}"]`)
+          ?.focus({ preventScroll: false })
+      );
+      return;
+    }
+    this.detailsCommitted.set(true);
+    this.dialogBaseline = null;
+    this.detailsOpen.set(false);
   }
 
   phoneChanged(value: string): void {
     this.phone.set(value);
     this.customerMatches.set([]);
+    const sequence = ++this.matchSequence;
     if (this.matchTimer) clearTimeout(this.matchTimer);
     if (this.customer() || !this.normalizedPhone(value)) return;
     this.matchTimer = setTimeout(() => {
       void this.fulfillment
         .matchCustomers(value)
-        .then(matches => this.customerMatches.set(matches))
-        .catch(() => this.customerMatches.set([]));
+        .then(matches => {
+          if (sequence === this.matchSequence) this.customerMatches.set(matches);
+        })
+        .catch(() => {
+          if (sequence === this.matchSequence) this.customerMatches.set([]);
+        });
     }, 250);
   }
 
@@ -309,38 +550,66 @@ export class FulfillmentCheckoutFieldsComponent {
     this.recipientName.set(match.display_name);
     this.phone.set(match.phone);
     this.customerMatches.set([]);
+    this.matchSequence++;
     this.customerSelected.emit(match.id);
   }
 
+  setCollectionKind(kind: 'none' | 'cod'): void {
+    this.collectionKind.set(kind);
+    if (kind === 'cod') {
+      this.saveAsCustomer.set(true);
+      this.saveDeliveryAddress.set(true);
+    }
+  }
+
   chooseCod(): void {
-    this.collectionKind.set('cod');
-    this.saveAsCustomer.set(true);
-    this.updatesRequested.set(true);
+    this.setCollectionKind('cod');
+  }
+
+  addressChanged(): void {
+    if (this.showAddressSavePreference()) this.saveDeliveryAddress.set(true);
   }
 
   build(): FulfillmentCheckoutDraft | null {
     const mode = this.mode();
     if (mode === 'counter') return null;
-    const error = this.validate();
-    this.validationMessage.set(error);
-    if (error) return null;
+    const errors = this.validate();
+    if (!this.detailsCommitted() || Object.keys(errors).length > 0) {
+      this.openDetails();
+      this.validationErrors.set(errors);
+      const first = Object.keys(errors)[0] as ValidationKey | undefined;
+      if (first) {
+        requestAnimationFrame(() =>
+          this.host.nativeElement
+            .querySelector<HTMLElement>(`[data-checkout-field="${first}"]`)
+            ?.focus()
+        );
+      }
+      return null;
+    }
     const customer = this.customer();
     const promisedAt = this.promisedAt() ? new Date(this.promisedAt()).toISOString() : null;
+    const address = this.clean(this.address());
+    const mustSaveCustomer = this.collectionKind() === 'cod';
     return {
       customer: {
         customer_id: customer?.id ?? null,
         name: customer?.name ?? this.recipientName().trim(),
         phone: this.normalizedPhone(this.phone()),
-        save_as_customer: customer
-          ? false
-          : this.saveAsCustomer() || this.collectionKind() === 'cod',
+        save_as_customer: customer ? false : this.saveAsCustomer() || mustSaveCustomer,
+        delivery_address: mode === 'delivery' ? address : null,
+        save_delivery_address:
+          mode === 'delivery' &&
+          (mustSaveCustomer ||
+            (!!customer && (!customer.delivery_address || this.saveDeliveryAddress())) ||
+            (!customer && this.saveAsCustomer())),
       },
       fulfillment: {
         type: mode,
         collection_kind: this.collectionKind(),
         recipient_name: this.recipientName().trim(),
         phone: this.normalizedPhone(this.phone()),
-        address: this.clean(this.address()),
+        address,
         landmark: this.clean(this.landmark()),
         map_link: this.clean(this.mapLink()),
         preparation_notes: this.clean(this.preparationNotes()),
@@ -352,36 +621,57 @@ export class FulfillmentCheckoutFieldsComponent {
   }
 
   reset(): void {
-    this.mode.set('counter');
-    this.recipientName.set('');
-    this.phone.set('');
-    this.address.set('');
-    this.landmark.set('');
-    this.mapLink.set('');
-    this.preparationNotes.set('');
-    this.handoffNotes.set('');
-    this.promisedAt.set('');
-    this.collectionKind.set('none');
-    this.updatesRequested.set(true);
-    this.saveAsCustomer.set(true);
+    this.restoreState({
+      mode: 'counter',
+      recipientName: '',
+      phone: '',
+      address: '',
+      landmark: '',
+      mapLink: '',
+      preparationNotes: '',
+      handoffNotes: '',
+      promisedAt: '',
+      collectionKind: 'none',
+      updatesRequested: true,
+      saveAsCustomer: true,
+      saveDeliveryAddress: true,
+      moreDetailsOpen: false,
+      committed: false,
+    });
+    this.detailsOpen.set(false);
     this.customerMatches.set([]);
-    this.validationMessage.set(null);
+    this.validationErrors.set({});
     this.lastCustomerId = null;
+    this.dialogBaseline = null;
     this.modeChanged.emit('counter');
   }
 
-  private validate(): string | null {
-    if (!this.recipientName().trim()) return 'Enter the recipient name.';
+  clearError(key: ValidationKey): void {
+    if (!this.validationErrors()[key]) return;
+    const errors = { ...this.validationErrors() };
+    delete errors[key];
+    this.validationErrors.set(errors);
+  }
+
+  private validate(): ValidationErrors {
+    const errors: ValidationErrors = {};
+    if (!this.recipientName().trim()) errors.recipient = 'Enter the recipient name.';
     const phone = this.normalizedPhone(this.phone());
     if ((this.mode() === 'delivery' || this.updatesRequested()) && !phone) {
-      return 'Enter a valid Kenyan mobile number.';
+      errors.phone = 'Enter a valid Kenyan mobile number.';
     }
-    if (this.mode() === 'delivery' && !this.address().trim()) return 'Enter a delivery address.';
-    if (this.collectionKind() === 'cod' && !phone) return 'COD requires a customer phone number.';
+    if (this.mode() === 'delivery' && !this.address().trim()) {
+      errors.address = 'Enter a delivery address.';
+    } else if (this.address().trim().length > 500) {
+      errors.address = 'Keep the delivery address under 500 characters.';
+    }
     if (this.mapLink().trim() && !/^https:\/\//i.test(this.mapLink().trim())) {
-      return 'Map link must start with https://.';
+      errors.mapLink = 'Map link must start with https://.';
     }
-    return null;
+    if (this.promisedAt() && Number.isNaN(new Date(this.promisedAt()).getTime())) {
+      errors.promisedAt = 'Enter a valid promised time.';
+    }
+    return errors;
   }
 
   private setDefaultPromise(mode: Exclude<CheckoutMode, 'counter'>): void {
@@ -392,6 +682,44 @@ export class FulfillmentCheckoutFieldsComponent {
     const date = new Date(Date.now() + minutes * 60_000);
     const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
     this.promisedAt.set(local.toISOString().slice(0, 16));
+  }
+
+  private captureState(): DraftState {
+    return {
+      mode: this.mode(),
+      recipientName: this.recipientName(),
+      phone: this.phone(),
+      address: this.address(),
+      landmark: this.landmark(),
+      mapLink: this.mapLink(),
+      preparationNotes: this.preparationNotes(),
+      handoffNotes: this.handoffNotes(),
+      promisedAt: this.promisedAt(),
+      collectionKind: this.collectionKind(),
+      updatesRequested: this.updatesRequested(),
+      saveAsCustomer: this.saveAsCustomer(),
+      saveDeliveryAddress: this.saveDeliveryAddress(),
+      moreDetailsOpen: this.moreDetailsOpen(),
+      committed: this.detailsCommitted(),
+    };
+  }
+
+  private restoreState(state: DraftState): void {
+    this.mode.set(state.mode);
+    this.recipientName.set(state.recipientName);
+    this.phone.set(state.phone);
+    this.address.set(state.address);
+    this.landmark.set(state.landmark);
+    this.mapLink.set(state.mapLink);
+    this.preparationNotes.set(state.preparationNotes);
+    this.handoffNotes.set(state.handoffNotes);
+    this.promisedAt.set(state.promisedAt);
+    this.collectionKind.set(state.collectionKind);
+    this.updatesRequested.set(state.updatesRequested);
+    this.saveAsCustomer.set(state.saveAsCustomer);
+    this.saveDeliveryAddress.set(state.saveDeliveryAddress);
+    this.moreDetailsOpen.set(state.moreDetailsOpen);
+    this.detailsCommitted.set(state.committed);
   }
 
   private normalizedPhone(value: string): string | null {

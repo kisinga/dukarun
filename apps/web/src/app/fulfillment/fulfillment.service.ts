@@ -84,6 +84,8 @@ export interface CheckoutCustomerInput {
   name: string;
   phone?: string | null;
   save_as_customer: boolean;
+  delivery_address?: string | null;
+  save_delivery_address?: boolean;
 }
 
 export interface FulfillmentCheckoutInput {
@@ -394,6 +396,7 @@ export class FulfillmentService {
   async creditCheckout(input: {
     locationId: string;
     customerId: string;
+    customer: CheckoutCustomerInput;
     lines: SaleLineInput[];
     fulfillment: FulfillmentCheckoutInput;
     clientRef: string;
@@ -410,6 +413,7 @@ export class FulfillmentService {
     }>('post_fulfillment_credit_sale_at_location', {
       p_location_id: input.locationId,
       p_customer_id: input.customerId,
+      p_customer: input.customer as unknown as Json,
       p_lines: input.lines as unknown as Json,
       p_fulfillment: input.fulfillment as unknown as Json,
       p_client_ref: input.clientRef,

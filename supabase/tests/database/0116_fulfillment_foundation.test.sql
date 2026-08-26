@@ -1,10 +1,12 @@
 begin;
-select plan(72);
+select plan(88);
 
 select has_table('public','fulfillment_settings','location fulfillment settings exist');
 select has_table('public','order_fulfillments','one fulfillment record can own an order');
 select has_table('public','fulfillment_events','fulfillment history is durable');
 select has_table('public','cash_custody_remittances','cash custody handoffs are durable');
+select has_column('public','customers','delivery_address',
+  'customers have one reusable delivery address');
 select hasnt_function('public','transition_fulfillment',
   array['uuid','text','bigint','jsonb'],'generic state transitions are not a client API');
 select has_function('public','start_fulfillment_preparation',array['uuid','bigint'],
@@ -13,6 +15,8 @@ select has_function('public','cancel_fulfillment',array['uuid','bigint','text'],
   'cancellation coordinates fulfillment with the commercial lifecycle');
 select has_function('public','public_fulfillment_tracking',array['text'],
   'anonymous tracking uses a narrow RPC');
+select has_function('public','save_customer_profile',array['jsonb','uuid'],
+  'customer profile editing is one transactional command');
 
 select testkit.create_user('f1160000-0000-4000-8000-000000000001','fulfillment-admin@test.local');
 select testkit.create_user('f1160000-0000-4000-8000-000000000002','fulfillment-process@test.local');
@@ -136,6 +140,11 @@ select is((select jsonb_build_object(
   'a partial operations update preserves notification settings');
 
 select testkit.as_user((select company_id from fulfillment_fixture),
+  'f1160000-0000-4000-8000-000000000001','Admin');
+select public.update_fulfillment_settings((select location_id from fulfillment_fixture),
+  '{"notify_ready":true}'::jsonb);
+
+select testkit.as_user((select company_id from fulfillment_fixture),
   'f1160000-0000-4000-8000-000000000002','Fulfillment processor');
 select throws_ok('select * from public.order_fulfillments','42501',
   'permission denied for table order_fulfillments','fulfillment tables have no broad member read');
@@ -144,6 +153,38 @@ select testkit.as_user((select company_id from fulfillment_fixture),
   'f1160000-0000-4000-8000-000000000001','Admin');
 select is(public.normalize_fulfillment_phone('0712 345 678'),'+254712345678',
   'checkout phone normalization is canonical');
+create temp table profile_customer as
+select public.save_customer_profile(jsonb_build_object(
+  'first_name','Profile','last_name','Customer','phone','0712000010',
+  'email','profile@example.test','delivery_address','  Ngong Road, Nairobi  ',
+  'tax_registration_number','P000010','notes','Call first',
+  'notifications_enabled',true,'sms_notifications_enabled',true,
+  'whatsapp_notifications_enabled',false
+)) id;
+select is((select jsonb_build_object('address',delivery_address,'phone',phone_normalized,
+    'tax_pin',tax_registration_number) from public.customers
+    where id=(select id from profile_customer)),
+  '{"address":"Ngong Road, Nairobi","phone":"+254712000010","tax_pin":"P000010"}'::jsonb,
+  'the profile command creates and normalizes one complete customer profile');
+select public.save_customer_profile(jsonb_build_object(
+  'first_name','Profile','last_name','','phone','','email','','delivery_address','',
+  'tax_registration_number','','notes','','notifications_enabled',false,
+  'sms_notifications_enabled',false,'whatsapp_notifications_enabled',false
+),(select id from profile_customer));
+select is((select jsonb_build_object('last_name',last_name,'phone',phone,'email',email,
+    'address',delivery_address,'tax_pin',tax_registration_number,'notes',notes,
+    'notifications',notifications_enabled) from public.customers
+    where id=(select id from profile_customer)),
+  '{"last_name":null,"phone":null,"email":null,"address":null,"tax_pin":null,
+    "notes":null,"notifications":false}'::jsonb,
+  'the profile command intentionally clears optional values');
+select throws_ok($sql$select public.save_customer_profile(jsonb_build_object(
+    'first_name','Invalid Profile','delivery_address',repeat('x',501)))$sql$,
+  'P0001','delivery_address_too_long','an invalid profile is rejected atomically');
+select is((select count(*)::int from public.customers
+    where company_id=(select company_id from fulfillment_fixture)
+      and first_name='Invalid Profile'),0,
+  'a rejected profile command leaves no partial customer');
 select testkit.ensure_open_session();
 
 create temp table pickup_checkout as
@@ -173,6 +214,18 @@ select is((select jsonb_build_object('notifications',notifications_enabled,
   'checkout customers are normalized and excluded from promotional messaging');
 select is((select count(*)::int from public.match_checkout_customers('254712345678')),1,
   'exact normalized phone matching suggests the saved customer');
+select public.update_customer(
+  p_customer_id=>(select (result->>'customer_id')::uuid from pickup_checkout),
+  p_delivery_address=>'Ngong Road, Nairobi');
+select is((select delivery_address from public.customers where id=
+  (select (result->>'customer_id')::uuid from pickup_checkout)),'Ngong Road, Nairobi',
+  'customer editing stores a trimmed reusable delivery address');
+select public.update_customer(
+  p_customer_id=>(select (result->>'customer_id')::uuid from pickup_checkout),
+  p_delivery_address=>'');
+select is((select delivery_address from public.customers where id=
+  (select (result->>'customer_id')::uuid from pickup_checkout)),null,
+  'customer editing can intentionally clear the delivery address');
 reset role;
 update public.customers set phone='0733 000 001' where id=
   (select (result->>'customer_id')::uuid from pickup_checkout);
@@ -216,6 +269,10 @@ select throws_ok(format($sql$select public.mark_fulfillment_ready(%L,1)$sql$,
 select is((public.mark_fulfillment_ready(
   (select (result->>'fulfillment_id')::uuid from pickup_checkout),2)->>'state_version')::int,
   3,'processor marks prepared work ready');
+reset role;
+select is((select count(*)::int from public.outbox where fulfillment_id=
+  (select (result->>'fulfillment_id')::uuid from pickup_checkout)),1,
+  'milestone messages stay off when the checkout disables status updates');
 
 select testkit.as_user((select company_id from fulfillment_fixture),
   'f1160000-0000-4000-8000-000000000003','Fulfillment completer');
@@ -230,6 +287,17 @@ select is((select count(*)::int from public.products),0,
 select throws_ok($sql$select public.save_draft(null,'[]'::jsonb,null)$sql$,'P0001',
   'permission_denied: SettleOrder required',
   'a delivery-only role cannot create a sale through the shared order core');
+select throws_ok($sql$select public.create_customer('Delivery Mutation')$sql$,'P0001',
+  'permission_denied: ManageCustomers required',
+  'a delivery-only role cannot create customers through a security-definer RPC');
+select throws_ok(format($sql$select public.update_customer(%L,p_first_name=>'Changed')$sql$,
+    (select result->>'customer_id' from pickup_checkout)),'P0001',
+  'permission_denied: ManageCustomers required',
+  'a delivery-only role cannot update customers through a security-definer RPC');
+select throws_ok($sql$select public.save_customer_profile(
+    '{"first_name":"Delivery Mutation"}'::jsonb)$sql$,'P0001',
+  'permission_denied: ManageCustomers required',
+  'a delivery-only role cannot invoke the profile command');
 select is((select count(*)::int from public.fulfillment_board(
   (select location_id from fulfillment_fixture),array['ready'],false,null,20)
   where id=(select (result->>'fulfillment_id')::uuid from pickup_checkout)),1,
@@ -262,7 +330,8 @@ select testkit.as_user((select company_id from fulfillment_fixture),
 create temp table mpesa_fulfillment_checkout as
 select public.prepare_mpesa_fulfillment_checkout(
   (select location_id from fulfillment_fixture),
-  '{"name":"Mary Mpesa","phone":"0711000000","save_as_customer":true}'::jsonb,
+  '{"name":"Mary Mpesa","phone":"0711000000","save_as_customer":true,
+    "delivery_address":"Riverside Drive, Nairobi","save_delivery_address":true}'::jsonb,
   '[{"variant_id":"f1160000-0000-4000-8000-000000000021","quantity":1,"unit_price":200}]'::jsonb,
   '{"type":"pickup","collection_kind":"none","recipient_name":"Mary Mpesa",
     "phone":"0711000000","transactional_message_consent":false}'::jsonb,
@@ -272,6 +341,11 @@ grant select on pg_temp.mpesa_fulfillment_checkout to authenticated;
 select is((select result->>'fulfillment_id' from mpesa_fulfillment_checkout),null,
   'M-PESA preparation does not create accepted fulfillment work');
 reset role;
+select is((select delivery_address from public.customers where id=
+  (select (result->>'customer_id')::uuid from mpesa_fulfillment_checkout)),null,
+  'M-PESA preparation does not update the reusable customer address early');
+update public.customers set deleted_at=now() where id=
+  (select (result->>'customer_id')::uuid from mpesa_fulfillment_checkout);
 select is((select count(*)::int from public.order_fulfillments where order_id=
   (select (result->>'subject_id')::uuid from mpesa_fulfillment_checkout)),0,
   'an unpaid M-PESA order has no fulfillment row');
@@ -313,6 +387,10 @@ select is((select jsonb_build_object('order_status',o.status,'fulfillment_count'
   where o.id=(select (result->>'subject_id')::uuid from mpesa_fulfillment_checkout)
   group by o.id),'{"order_status":"completed","fulfillment_count":1}'::jsonb,
   'provider-confirmed M-PESA atomically accepts the order and creates fulfillment');
+select is((select delivery_address from public.customers where id=
+  (select (result->>'customer_id')::uuid from mpesa_fulfillment_checkout)),
+  'Riverside Drive, Nairobi',
+  'provider-confirmed M-PESA settles and persists the address for an archived customer');
 
 reset role;
 update public.customers set is_credit_approved=true,credit_limit=10000
@@ -326,7 +404,10 @@ select public.post_fulfillment_credit_sale_at_location(
   '[{"variant_id":"f1160000-0000-4000-8000-000000000021","quantity":1,"unit_price":200}]'::jsonb,
   '{"type":"delivery","collection_kind":"none","recipient_name":"Alice Credit",
     "phone":"0712345678","address":"Upper Hill, Nairobi"}'::jsonb,
-  'fulfillment-credit-delivery-1',null,null
+  'fulfillment-credit-delivery-1',null,null,
+  jsonb_build_object('customer_id',(select result->>'customer_id' from pickup_checkout),
+    'name','Alice Pickup','phone','0712345678','save_as_customer',false,
+    'delivery_address','Upper Hill, Nairobi','save_delivery_address',true)
 ) result;
 grant select on pg_temp.credit_delivery_checkout to authenticated;
 reset role;
@@ -337,6 +418,9 @@ select is((select jsonb_build_object('order_status',o.status,'receivable_kind',o
   '{"order_status":"completed","receivable_kind":"credit","credit":true,
     "collection_kind":"none"}'::jsonb,
   'ordinary customer credit remains canonical while the order is delivered');
+select is((select delivery_address from public.customers where id=
+  (select (result->>'customer_id')::uuid from pickup_checkout)),'Upper Hill, Nairobi',
+  'credit delivery persists the customer address in the same checkout transaction');
 select testkit.as_user((select company_id from fulfillment_fixture),
   'f1160000-0000-4000-8000-000000000001','Admin');
 select public.start_fulfillment_preparation(
@@ -407,7 +491,8 @@ select testkit.close_open_session();
 create temp table cod_checkout as
 select public.post_fulfillment_sale_at_location(
   (select location_id from fulfillment_fixture),
-  '{"name":"David Delivery","phone":"0722000000","save_as_customer":true}'::jsonb,
+  '{"name":"David Delivery","phone":"0722000000","save_as_customer":true,
+    "delivery_address":"Westlands, Nairobi","save_delivery_address":true}'::jsonb,
   '[{"variant_id":"f1160000-0000-4000-8000-000000000020","quantity":1,"unit_price":500},
     {"variant_id":"f1160000-0000-4000-8000-000000000021","quantity":1,"unit_price":200}]'::jsonb,
   '[]'::jsonb,
@@ -419,6 +504,15 @@ select public.post_fulfillment_sale_at_location(
 grant select on pg_temp.cod_checkout to authenticated;
 select is((select status from public.orders where id=(select (result->>'order_id')::uuid from cod_checkout)),
   'pending_payment','COD checkout creates one unpaid order without consuming stock');
+reset role;
+select is((select jsonb_build_object('customer_address',c.delivery_address,
+    'order_address',f.address_line) from public.customers c
+    join public.order_fulfillments f on f.customer_id=c.id
+    where f.id=(select (result->>'fulfillment_id')::uuid from cod_checkout)),
+  '{"customer_address":"Westlands, Nairobi","order_address":"Westlands, Nairobi"}'::jsonb,
+  'COD stores a reusable customer address and an immutable order snapshot');
+select testkit.as_user((select company_id from fulfillment_fixture),
+  'f1160000-0000-4000-8000-000000000001','Admin');
 
 create temp table cancelled_checkout as
 select public.post_fulfillment_sale_at_location(

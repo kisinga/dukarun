@@ -3000,6 +3000,7 @@ export type Database = {
           customer_origin: string
           deleted_at: string | null
           deleted_by: string | null
+          delivery_address: string | null
           email: string | null
           first_name: string
           id: string
@@ -3030,6 +3031,7 @@ export type Database = {
           customer_origin?: string
           deleted_at?: string | null
           deleted_by?: string | null
+          delivery_address?: string | null
           email?: string | null
           first_name: string
           id?: string
@@ -3060,6 +3062,7 @@ export type Database = {
           customer_origin?: string
           deleted_at?: string | null
           deleted_by?: string | null
+          delivery_address?: string | null
           email?: string | null
           first_name?: string
           id?: string
@@ -5531,6 +5534,7 @@ export type Database = {
         Row: {
           amount: number
           cash_amount: number
+          checkout_customer_request: Json | null
           client_ref: string
           company_id: string
           completed_at: string | null
@@ -5562,6 +5566,7 @@ export type Database = {
         Insert: {
           amount: number
           cash_amount?: number
+          checkout_customer_request?: Json | null
           client_ref: string
           company_id: string
           completed_at?: string | null
@@ -5593,6 +5598,7 @@ export type Database = {
         Update: {
           amount?: number
           cash_amount?: number
+          checkout_customer_request?: Json | null
           client_ref?: string
           company_id?: string
           completed_at?: string | null
@@ -12795,6 +12801,10 @@ export type Database = {
         Returns: string
       }
       apply_catalog_price_updates: { Args: { p_changes: Json }; Returns: Json }
+      apply_checkout_customer_address_core: {
+        Args: { p_company_id: string; p_customer: Json; p_customer_id: string }
+        Returns: undefined
+      }
       apply_customer_deposit: {
         Args: { p_amount: number; p_client_ref?: string; p_order_id: string }
         Returns: string
@@ -13409,6 +13419,7 @@ export type Database = {
       }
       create_customer: {
         Args: {
+          p_delivery_address?: string
           p_email?: string
           p_first_name: string
           p_is_supplier?: boolean
@@ -14823,6 +14834,7 @@ export type Database = {
         Args: {
           p_approval_reason?: string
           p_client_ref: string
+          p_customer?: Json
           p_customer_id: string
           p_draft_id?: string
           p_fulfillment: Json
@@ -15705,6 +15717,7 @@ export type Database = {
       }
       resolve_checkout_customer_core: {
         Args: {
+          p_apply_address?: boolean
           p_company_id: string
           p_customer: Json
           p_require_customer?: boolean
@@ -15909,6 +15922,10 @@ export type Database = {
           order_id: string
           staff_user_id: string
         }[]
+      }
+      save_customer_profile: {
+        Args: { p_customer_id?: string; p_profile: Json }
+        Returns: string
       }
       save_draft: {
         Args: { p_customer_id: string; p_draft_id?: string; p_lines: Json }
@@ -16425,6 +16442,7 @@ export type Database = {
       update_customer: {
         Args: {
           p_customer_id: string
+          p_delivery_address?: string
           p_email?: string
           p_first_name?: string
           p_last_name?: string
@@ -16846,3 +16864,4 @@ export const Constants = {
     Enums: {},
   },
 } as const
+

@@ -145,7 +145,7 @@ type CatalogView = 'grid' | 'list' | 'categories';
         <app-session-required-notice action="taking payment or completing a sale" />
       }
 
-      <div class="pb-24 lg:pb-0">
+      <div class="pb-24 lg:pb-24 xl:pb-0">
         @if (success(); as s) {
           <section class="card mb-4 bg-base-100" aria-live="polite">
             <div class="card-body flex-row flex-wrap items-center gap-4 p-4">
@@ -274,8 +274,10 @@ type CatalogView = 'grid' | 'list' | 'categories';
           </div>
         }
 
-        <div class="grid items-start gap-4 lg:grid-cols-4 lg:items-stretch">
-          <section class="card min-w-0 bg-base-100 lg:col-span-3 lg:h-full">
+        <div
+          class="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(20rem,22rem)] xl:items-stretch"
+        >
+          <section class="card order-1 min-w-0 bg-base-100 xl:col-start-1 xl:row-start-1 xl:h-full">
             <div class="card-body p-4">
               <div class="flex items-start justify-between gap-3">
                 <div>
@@ -612,7 +614,7 @@ type CatalogView = 'grid' | 'list' | 'categories';
 
           <section
             id="current-sale"
-            class="card min-w-0 scroll-mt-4 overflow-hidden bg-base-100 lg:col-span-3"
+            class="card order-3 min-w-0 scroll-mt-4 overflow-hidden bg-base-100 xl:col-start-1 xl:row-start-2"
           >
             <div
               class="flex items-center justify-between gap-3 border-b border-base-content/15 px-3 py-2.5 sm:px-4 sm:py-3"
@@ -758,7 +760,7 @@ type CatalogView = 'grid' | 'list' | 'categories';
             }
           </section>
 
-          <aside class="min-w-0 lg:sticky lg:top-4 lg:col-start-4 lg:row-start-1 lg:h-full">
+          <aside class="order-2 min-w-0 xl:sticky xl:top-4 xl:col-start-2 xl:row-start-1 xl:h-full">
             <div class="card h-full overflow-hidden bg-base-100" aria-label="Sale summary">
               <section class="p-4">
                 <p class="type-caption">Customer</p>
@@ -864,7 +866,7 @@ type CatalogView = 'grid' | 'list' | 'categories';
               />
 
               <section class="mt-auto border-t border-base-300/60 p-4">
-                <div class="hidden items-end justify-between gap-3 lg:flex">
+                <div class="hidden items-end justify-between gap-3 xl:flex">
                   <div>
                     <p class="type-caption">Amount due</p>
                     <p class="mt-1 type-hero"><app-money [amount]="cart.total()" /></p>
@@ -877,7 +879,7 @@ type CatalogView = 'grid' | 'list' | 'categories';
                 <button
                   appButton
                   size="md"
-                  class="mt-4 hidden w-full lg:flex"
+                  class="mt-4 hidden w-full xl:flex"
                   [disabled]="
                     cart.isEmpty() ||
                     busy() ||
@@ -894,7 +896,7 @@ type CatalogView = 'grid' | 'list' | 'categories';
                     appButton
                     variant="secondary"
                     size="md"
-                    class="mt-2 hidden min-h-11 w-full lg:flex"
+                    class="mt-2 hidden min-h-11 w-full xl:flex"
                     [disabled]="cart.isEmpty() || busy() || !cashierSession.canTakePayment()"
                     (click)="openCreditConfirmation()"
                   >
@@ -935,7 +937,8 @@ type CatalogView = 'grid' | 'list' | 'categories';
       </div>
 
       <div
-        class="shadow-overlay fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom,0px))] z-30 border-t border-base-300/60 bg-base-100 p-3 lg:hidden"
+        data-testid="sell-payment-dock"
+        class="shadow-overlay fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom,0px))] z-30 border-t border-base-300/60 bg-base-100 p-3 lg:bottom-0 lg:left-64 xl:hidden"
       >
         <div class="flex w-full flex-wrap items-center gap-3">
           <a href="#current-sale" class="min-w-0 flex-1 rounded-field focus:outline-primary">
@@ -1334,6 +1337,7 @@ export class SellComponent implements OnInit {
           id: customer.id,
           name: this.customerName(customer),
           phone: customer.phone,
+          delivery_address: customer.delivery_address,
         }
       : null;
   });
@@ -2407,6 +2411,7 @@ export class SellComponent implements OnInit {
         ? await this.fulfillment.creditCheckout({
             locationId: this.locations.requireActiveId(),
             customerId,
+            customer: fulfillmentDraft.customer,
             lines,
             fulfillment: fulfillmentDraft.fulfillment,
             clientRef: this.saleAttempt.clientRef,

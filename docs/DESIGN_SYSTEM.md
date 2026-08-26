@@ -255,12 +255,18 @@ Compose pages from these — never hand-roll what a primitive owns:
     `tabular-nums`), not wide tables; long lists cap at `max-h-80 overflow-y-auto`; empty
     sections use `app-empty-state` compact. Detail fetches show a centered
     `loading-spinner` block until data arrives.
-  - Editing a record happens **inside the drawer** in edit mode (see "Detail & edit
-    surfaces" below): the parent swaps the projected body to the form on an `editing`
-    signal and flips `title` to "Edit {entity}"; save returns to the detail view, cancel
-    returns without saving. Create uses the same form with a "New {entity}" title. Never
-    layer edit UI over the drawer, never bounce to a top-of-page panel. Editors that are
-    surface 3 (line-item grids, multi-step) close the drawer first and open the modal.
+  - Only short, single-section edits happen inside the drawer. Multi-section or conditional
+    forms close the drawer first and use `app-task-dialog`; save or cancel may then return to
+    the refreshed detail drawer. Never stack two overlays or widen a drawer to fit a task.
+- **`<app-task-dialog>`** — the shared blocking task surface: full-screen on phones and a
+  bounded 672/768px dialog on desktop, with a fixed header and action footer around one
+  scrollable body. It owns focus trapping/restoration, background scroll lock, Escape,
+  safe-area padding, dirty-change confirmation, and a fixed task-level error region.
+  Bind command failures to its `[error]` input so feedback remains visible inside the active
+  modal; keep field validation beside the affected field and never send modal errors to a
+  page banner behind the backdrop. Compose forms with unframed `app-form-section` groups and
+  `app-preference-row` switches. Use it for multi-section, conditional, or transactional
+  work; do not reproduce hand-rolled modal chrome.
 - Plus the existing shells: `app-page-header` (inside `app-page`), `app-stat-bar`,
   `app-stat-card`, `app-status-badge`, `app-empty-state`, `app-list-search-bar`,
   `app-pagination`, `app-data-table-shell`, `app-entity-avatar`, `app-mobile-fab`,
@@ -310,16 +316,16 @@ elsewhere (sales from the POS) omit the create action.
 
 ### Create and edit panels
 
-Create/edit placement follows the three-surface rule (see "Detail & edit surfaces"
-below). Simple entity forms live in the drawer's edit mode; complex editors use the
-shared modal shell or a dedicated route. Inline top-of-page panels are retired for
+Create/edit placement follows the four-surface rule (see "Detail & edit surfaces"
+below). Short single-section forms may live in drawer edit mode; multi-section forms use
+the shared task dialog, and complex editors use a dedicated route. Inline top-of-page panels are retired for
 drawer-backed entities; where one remains, it opens immediately below the page header
 and uses the same card for both modes: full-width title and one-line context,
 responsive 2/4-column field grid, primary save + ghost cancel on one full-width row.
 The same header action opens create on desktop and mobile; do not duplicate it as a
 FAB or move it into the list toolbar.
 
-## Detail & edit surfaces (the three surfaces)
+## Detail & edit surfaces (the four surfaces)
 
 Every entity gets **one** detail surface and **one** edit surface, chosen by content
 weight — never improvised per page. The four legacy idioms (inline `tr.row-detail`
@@ -332,18 +338,16 @@ complete; use the rules and explicit exceptions below for all new work.
    while open. The drawer holds the stat summary, history lists, and **lightweight
    single-entity flows** — repay, pay, refund, void, credit-terms edit. Content is
    one column per the drawer section patterns above.
-2. **Simple edit → drawer edit mode.** Forms of roughly ≤ 6 flat fields with no
-   line-item grid (customer, supplier, team member) edit **in place inside the same
-   drawer**: the header flips to "Edit {entity}", the body swaps to the form, save
-   returns to the detail view, cancel returns without saving. Create uses the same
-   form with a "New {entity}" title, opened from the standard header action. One
-   surface per entity — no separate inline create card, no route hop.
-3. **Complex or blocking work → shared modal or dedicated route.** Editors with
+2. **Simple edit → drawer edit mode.** A short form with one semantic section and no
+   conditional branches may edit in place. Field count is a warning, not the deciding rule:
+   if the action footer regularly scrolls away or the form needs section navigation, move it.
+3. **Multi-section or blocking work → task dialog.** Customer profiles, checkout details,
+   session actions, and similar focused tasks use `app-task-dialog`. Close an inspector before
+   opening the task; save or cancel may restore it, but overlays are never stacked.
+4. **Complex work → dedicated route.** Editors with
    line-item grids, multi-step wizards, or blocking transactional steps (product
-   editor with its variant grid, purchase recording, checkout, till count) never
-   squeeze into 480px. They use the `.modal-box` contract or a full page. Modals
-   converge on one shared component; hand-rolled `div.modal` / `<dialog>` markup is
-   not added to new work.
+   editor with its variant grid, purchase recording) never squeeze into an overlay.
+   They use a full page or workspace.
 
 Scoping rules:
 

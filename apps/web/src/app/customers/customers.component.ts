@@ -65,6 +65,9 @@ import { CustomerStatementSendComponent } from '../communications/customer-state
 import { MpesaService } from '../core/mpesa.service';
 import { MpesaCheckoutCoordinator } from '../core/mpesa-checkout-coordinator.service';
 import { LocationContextService } from '../core/location-context.service';
+import { TaskDialogComponent } from '../shared/ui/task-dialog.component';
+import { FormSectionComponent } from '../shared/ui/form-section.component';
+import { PreferenceRowComponent } from '../shared/ui/preference-row.component';
 
 type CustomerWithAr = MoneyCustomer & {
   ar_balance: number;
@@ -106,6 +109,9 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
     MobileListComponent,
     PageActionsComponent,
     CustomerStatementSendComponent,
+    TaskDialogComponent,
+    FormSectionComponent,
+    PreferenceRowComponent,
   ],
   template: `
     <app-page
@@ -127,9 +133,11 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
         >
           <app-icon name="heroArrowPath" />
         </button>
-        <button primaryAction appButton type="button" (click)="startCreate()">
-          <app-icon name="heroPlus" /> Add customer
-        </button>
+        @if (perms.has('ManageCustomers')) {
+          <button primaryAction appButton type="button" (click)="startCreate()">
+            <app-icon name="heroPlus" /> Add customer
+          </button>
+        }
       </app-page-actions>
 
       @if (error()) {
@@ -289,17 +297,19 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
                           </button>
                         }
                       } @else {
-                        <button
-                          appButton
-                          variant="ghost"
-                          [iconOnly]="true"
-                          type="button"
-                          title="Edit customer"
-                          aria-label="Edit customer"
-                          (click)="startEdit(c)"
-                        >
-                          <app-icon name="heroPencilSquare" />
-                        </button>
+                        @if (perms.has('ManageCustomers')) {
+                          <button
+                            appButton
+                            variant="ghost"
+                            [iconOnly]="true"
+                            type="button"
+                            title="Edit customer"
+                            aria-label="Edit customer"
+                            (click)="startEdit(c)"
+                          >
+                            <app-icon name="heroPencilSquare" />
+                          </button>
+                        }
                         @if (perms.has('ManageCustomers')) {
                           <button
                             appButton
@@ -372,7 +382,7 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
         </app-mobile-list>
 
         <!-- Customer detail/edit drawer -->
-        @if (selectedCustomerId() !== null || creating()) {
+        @if (selectedCustomerId() !== null && !drawerEditing()) {
           <app-drawer
             [open]="true"
             (closed)="closeCustomerDrawer()"
@@ -401,18 +411,20 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
                   </button>
                 }
               } @else {
-                <button
-                  actions
-                  appButton
-                  variant="ghost"
-                  [iconOnly]="true"
-                  type="button"
-                  title="Edit customer"
-                  aria-label="Edit customer"
-                  (click)="editFromDrawer(c)"
-                >
-                  <app-icon name="heroPencilSquare" />
-                </button>
+                @if (perms.has('ManageCustomers')) {
+                  <button
+                    actions
+                    appButton
+                    variant="ghost"
+                    [iconOnly]="true"
+                    type="button"
+                    title="Edit customer"
+                    aria-label="Edit customer"
+                    (click)="editFromDrawer(c)"
+                  >
+                    <app-icon name="heroPencilSquare" />
+                  </button>
+                }
                 @if (perms.has('ManageCustomers')) {
                   <button actions appButton variant="ghost" type="button" (click)="startDelete(c)">
                     <app-icon name="heroArchiveBox" /> Delete
@@ -421,108 +433,7 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
               }
             }
 
-            @if (creating() || drawerEditing()) {
-              <!-- Create / edit mode: the same 5-field form, in place -->
-              <form (submit)="$event.preventDefault(); save()" class="flex flex-col gap-3">
-                <p class="type-caption">
-                  Contact details are kept separate from credit, sales, and repayment history.
-                </p>
-                <app-form-field label="First name" [required]="true">
-                  <input
-                    type="text"
-                    class="input input-bordered input-sm w-full"
-                    autocomplete="given-name"
-                    [formControl]="firstName"
-                  />
-                </app-form-field>
-                <app-form-field label="Last name">
-                  <input
-                    type="text"
-                    class="input input-bordered input-sm w-full"
-                    autocomplete="family-name"
-                    [formControl]="lastName"
-                  />
-                </app-form-field>
-                <app-form-field label="Phone">
-                  <input
-                    type="tel"
-                    class="input input-bordered input-sm w-full"
-                    autocomplete="tel"
-                    [formControl]="phone"
-                  />
-                </app-form-field>
-                <app-form-field label="Email">
-                  <input
-                    type="email"
-                    class="input input-bordered input-sm w-full"
-                    autocomplete="email"
-                    [formControl]="email"
-                  />
-                </app-form-field>
-                <app-form-field
-                  label="Customer tax PIN"
-                  hint="Optional. Snapshotted on future VAT invoices for business customers."
-                >
-                  <input
-                    type="text"
-                    class="input input-bordered input-sm w-full"
-                    autocomplete="off"
-                    [formControl]="taxRegistrationNumber"
-                  />
-                </app-form-field>
-                <app-form-field label="Notes">
-                  <input
-                    type="text"
-                    class="input input-bordered input-sm w-full"
-                    placeholder="Preferences, delivery notes, or context…"
-                    [formControl]="notes"
-                  />
-                </app-form-field>
-                <fieldset class="rounded-box border border-base-300 p-3">
-                  <legend class="px-1 text-sm font-medium">Customer messages</legend>
-                  <label class="label cursor-pointer justify-start gap-2">
-                    <input
-                      type="checkbox"
-                      class="checkbox checkbox-sm"
-                      [formControl]="notificationsEnabled"
-                    />
-                    <span class="label-text">Allow customer notifications</span>
-                  </label>
-                  <div
-                    class="ml-6 flex flex-wrap gap-4"
-                    [class.opacity-40]="!notificationsEnabled.value"
-                  >
-                    <label class="label cursor-pointer gap-2"
-                      ><input
-                        type="checkbox"
-                        class="checkbox checkbox-sm"
-                        [formControl]="smsNotificationsEnabled"
-                      /><span class="label-text">SMS</span></label
-                    >
-                    <label class="label cursor-pointer gap-2"
-                      ><input
-                        type="checkbox"
-                        class="checkbox checkbox-sm"
-                        [formControl]="whatsappNotificationsEnabled"
-                      /><span class="label-text">WhatsApp</span></label
-                    >
-                  </div>
-                </fieldset>
-                <div class="flex gap-2">
-                  <button
-                    appButton
-                    type="submit"
-                    [loading]="busy()"
-                    [disabled]="firstName.value.trim().length === 0"
-                  >
-                    {{ editing() ? 'Save changes' : 'Create customer' }}
-                  </button>
-                  <button appButton variant="ghost" type="button" (click)="closeForm()">
-                    Cancel
-                  </button>
-                </div>
-              </form>
-            } @else if (selectedCustomer(); as c) {
+            @if (selectedCustomer(); as c) {
               @if (c.deleted_at) {
                 <div role="status" class="alert alert-warning mb-3 text-sm">
                   <app-icon name="heroArchiveBox" />
@@ -563,6 +474,17 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
                 <div class="mt-3 rounded-field border border-base-300 px-3 py-2">
                   <p class="type-caption">Customer tax PIN</p>
                   <p class="text-sm font-medium">{{ c.tax_registration_number }}</p>
+                </div>
+              }
+              @if (c.delivery_address) {
+                <div class="mt-3 flex items-start gap-3 border-y border-base-300/60 py-3">
+                  <app-icon name="heroMapPin" class="mt-0.5 shrink-0 text-base-content/55" />
+                  <div class="min-w-0">
+                    <p class="type-caption">Delivery address</p>
+                    <p class="mt-0.5 text-sm font-medium whitespace-pre-line">
+                      {{ c.delivery_address }}
+                    </p>
+                  </div>
                 </div>
               }
 
@@ -1243,6 +1165,155 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
             }
           </app-drawer>
         }
+
+        <app-task-dialog
+          #customerEditor
+          [open]="creating() || drawerEditing()"
+          [title]="editing() ? 'Edit ' + name(editing()!) : 'New customer'"
+          subtitle="Customer profile"
+          size="lg"
+          [dirty]="editorDirty()"
+          [error]="editorError()"
+          (closed)="closeForm()"
+        >
+          <form
+            id="customer-profile-form"
+            (submit)="$event.preventDefault(); save()"
+            (input)="editorDirty.set(true)"
+            (change)="editorDirty.set(true)"
+          >
+            <app-form-section title="Contact" description="The person or business buying from you.">
+              <div class="grid gap-3 md:grid-cols-2">
+                <app-form-field label="First name" [required]="true">
+                  <input
+                    type="text"
+                    class="input input-bordered min-h-11 w-full"
+                    autocomplete="given-name"
+                    [formControl]="firstName"
+                  />
+                </app-form-field>
+                <app-form-field label="Last name">
+                  <input
+                    type="text"
+                    class="input input-bordered min-h-11 w-full"
+                    autocomplete="family-name"
+                    [formControl]="lastName"
+                  />
+                </app-form-field>
+                <app-form-field label="Phone">
+                  <input
+                    type="tel"
+                    class="input input-bordered min-h-11 w-full"
+                    autocomplete="tel"
+                    [formControl]="phone"
+                  />
+                </app-form-field>
+                <app-form-field label="Email">
+                  <input
+                    type="email"
+                    class="input input-bordered min-h-11 w-full"
+                    autocomplete="email"
+                    [formControl]="email"
+                  />
+                </app-form-field>
+              </div>
+            </app-form-section>
+
+            <app-form-section
+              title="Delivery"
+              description="Used to prefill future delivery orders; each order keeps its own copy."
+            >
+              <app-form-field label="Delivery address">
+                <textarea
+                  class="textarea textarea-bordered min-h-24 w-full"
+                  autocomplete="street-address"
+                  maxlength="500"
+                  [formControl]="deliveryAddress"
+                ></textarea>
+              </app-form-field>
+            </app-form-section>
+
+            <app-form-section title="Tax and notes">
+              <div class="grid gap-3 md:grid-cols-2">
+                <app-form-field
+                  label="Customer tax PIN"
+                  hint="Snapshotted on future VAT invoices for business customers."
+                >
+                  <input
+                    type="text"
+                    class="input input-bordered min-h-11 w-full"
+                    autocomplete="off"
+                    [formControl]="taxRegistrationNumber"
+                  />
+                </app-form-field>
+                <app-form-field label="Notes">
+                  <textarea
+                    class="textarea textarea-bordered min-h-24 w-full"
+                    placeholder="Preferences or useful account context"
+                    [formControl]="notes"
+                  ></textarea>
+                </app-form-field>
+              </div>
+            </app-form-section>
+
+            <app-form-section
+              title="Messages"
+              description="Choose which non-order customer messages are allowed."
+            >
+              <app-preference-row
+                label="Allow customer messages"
+                description="Statements, reminders and other account communication."
+              >
+                <input
+                  type="checkbox"
+                  class="toggle toggle-primary toggle-sm"
+                  [formControl]="notificationsEnabled"
+                />
+              </app-preference-row>
+              <div
+                class="mt-3 grid gap-2 md:grid-cols-2"
+                [class.opacity-40]="!notificationsEnabled.value"
+              >
+                <app-preference-row label="SMS">
+                  <input
+                    type="checkbox"
+                    class="checkbox checkbox-sm"
+                    [formControl]="smsNotificationsEnabled"
+                  />
+                </app-preference-row>
+                <app-preference-row label="WhatsApp">
+                  <input
+                    type="checkbox"
+                    class="checkbox checkbox-sm"
+                    [formControl]="whatsappNotificationsEnabled"
+                  />
+                </app-preference-row>
+              </div>
+            </app-form-section>
+          </form>
+
+          <div taskFooter class="flex items-center justify-end gap-2">
+            <button
+              appButton
+              variant="ghost"
+              type="button"
+              [disabled]="busy()"
+              (click)="customerEditor.requestClose()"
+            >
+              Cancel
+            </button>
+            <button
+              appButton
+              type="submit"
+              form="customer-profile-form"
+              [loading]="busy()"
+              [disabled]="firstName.value.trim().length === 0"
+            >
+              {{ editing() ? 'Save changes' : 'Create customer' }}
+            </button>
+          </div>
+        </app-task-dialog>
+
         <div class="mt-3">
           <app-pagination
             [currentPage]="customerPage()"
@@ -1346,6 +1417,7 @@ export class CustomersComponent implements OnInit {
   protected readonly lastName = new FormControl('', { nonNullable: true });
   protected readonly phone = new FormControl('', { nonNullable: true });
   protected readonly email = new FormControl('', { nonNullable: true });
+  protected readonly deliveryAddress = new FormControl('', { nonNullable: true });
   protected readonly taxRegistrationNumber = new FormControl('', { nonNullable: true });
   protected readonly notes = new FormControl('', { nonNullable: true });
   protected readonly notificationsEnabled = new FormControl(true, { nonNullable: true });
@@ -1369,6 +1441,8 @@ export class CustomersComponent implements OnInit {
   protected readonly creditReason = new FormControl('', { nonNullable: true });
 
   protected readonly busy = signal(false);
+  protected readonly editorDirty = signal(false);
+  protected readonly editorError = signal<string | null>(null);
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
@@ -1521,11 +1595,12 @@ export class CustomersComponent implements OnInit {
     await this.load();
   }
 
-  protected async load(): Promise<void> {
+  protected async load(forceRefresh = false): Promise<void> {
     this.loading.set(true);
     this.error.set(null);
     try {
-      await this.partyCache.ensureLoaded();
+      if (forceRefresh) await this.partyCache.refresh();
+      else await this.partyCache.ensureLoaded();
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Failed to load customers');
     } finally {
@@ -1655,6 +1730,8 @@ export class CustomersComponent implements OnInit {
     this.creating.set(false);
     this.drawerEditing.set(false);
     this.editing.set(null);
+    this.editorDirty.set(false);
+    this.editorError.set(null);
     this.orders.set([]);
     this.creditOrders.set([]);
     this.statement.set([]);
@@ -1671,38 +1748,46 @@ export class CustomersComponent implements OnInit {
     });
   }
 
-  /** Edit in place: flip the open drawer to its form without closing it. */
+  /** Move editing into the focused task surface; the inspector returns on close. */
   protected editFromDrawer(c: CustomerWithAr): void {
+    if (!this.perms.has('ManageCustomers')) return;
     this.editing.set(c);
     this.firstName.setValue(c.first_name);
     this.lastName.setValue(c.last_name ?? '');
     this.phone.setValue(c.phone ?? '');
     this.email.setValue(c.email ?? '');
+    this.deliveryAddress.setValue(c.delivery_address ?? '');
     this.taxRegistrationNumber.setValue(c.tax_registration_number ?? '');
     this.notes.setValue(c.notes ?? '');
     this.notificationsEnabled.setValue(c.notifications_enabled);
     this.smsNotificationsEnabled.setValue(c.sms_notifications_enabled);
     this.whatsappNotificationsEnabled.setValue(c.whatsapp_notifications_enabled);
+    this.editorDirty.set(false);
+    this.editorError.set(null);
     this.drawerEditing.set(true);
   }
 
   protected startCreate(): void {
+    if (!this.perms.has('ManageCustomers')) return;
     this.editing.set(null);
     this.firstName.setValue('');
     this.lastName.setValue('');
     this.phone.setValue('');
     this.email.setValue('');
+    this.deliveryAddress.setValue('');
     this.taxRegistrationNumber.setValue('');
     this.notes.setValue('');
     this.notificationsEnabled.setValue(true);
     this.smsNotificationsEnabled.setValue(true);
     this.whatsappNotificationsEnabled.setValue(true);
+    this.editorDirty.set(false);
+    this.editorError.set(null);
     this.drawerEditing.set(false);
     this.creating.set(true);
   }
 
   protected startEdit(c: CustomerWithAr): void {
-    if (c.deleted_at) return;
+    if (c.deleted_at || !this.perms.has('ManageCustomers')) return;
     void this.openCustomer(c.id);
     this.editFromDrawer(c);
   }
@@ -1764,6 +1849,8 @@ export class CustomersComponent implements OnInit {
 
   protected closeForm(): void {
     this.editing.set(null);
+    this.editorDirty.set(false);
+    this.editorError.set(null);
     if (this.creating()) {
       this.creating.set(false);
     } else {
@@ -1788,58 +1875,40 @@ export class CustomersComponent implements OnInit {
   }
 
   protected async save(): Promise<void> {
-    if (this.firstName.value.trim().length === 0) return;
+    if (!this.perms.has('ManageCustomers') || this.firstName.value.trim().length === 0) return;
     this.busy.set(true);
     this.error.set(null);
+    this.editorError.set(null);
     this.notice.set(null);
     try {
       const editing = this.editing();
-      let savedId: string;
-      if (editing) {
-        await this.money.updateCustomer(editing.id, {
-          first_name: this.firstName.value.trim(),
-          last_name: this.lastName.value.trim() || undefined,
-          phone: this.phone.value.trim() || undefined,
-          email: this.email.value.trim() || undefined,
-          notes: this.notes.value.trim() || undefined,
-        });
-        savedId = editing.id;
-        this.notice.set(`Updated ${this.firstName.value.trim()}`);
-      } else {
-        const customerId = await this.money.createCustomer(
-          this.firstName.value.trim(),
-          this.lastName.value.trim() || undefined,
-          this.phone.value.trim() || undefined,
-          this.email.value.trim() || undefined
-        );
-        if (this.notes.value.trim()) {
-          await this.money.updateCustomer(customerId, { notes: this.notes.value.trim() });
-        }
-        savedId = customerId;
-        this.notice.set(`Created ${this.firstName.value.trim()}`);
-      }
-      await this.money.updateCustomerTaxRegistration(
-        savedId,
-        this.taxRegistrationNumber.value.trim()
-      );
-      await this.money.updateCustomerCommunicationPreferences(
-        savedId,
-        this.notificationsEnabled.value,
-        this.smsNotificationsEnabled.value,
-        this.whatsappNotificationsEnabled.value
-      );
+      const savedId = await this.money.saveCustomerProfile({
+        customerId: editing?.id,
+        firstName: this.firstName.value.trim(),
+        lastName: this.lastName.value.trim(),
+        phone: this.phone.value.trim(),
+        email: this.email.value.trim(),
+        deliveryAddress: this.deliveryAddress.value.trim(),
+        taxRegistrationNumber: this.taxRegistrationNumber.value.trim(),
+        notes: this.notes.value.trim(),
+        notificationsEnabled: this.notificationsEnabled.value,
+        smsNotificationsEnabled: this.smsNotificationsEnabled.value,
+        whatsappNotificationsEnabled: this.whatsappNotificationsEnabled.value,
+      });
+      this.notice.set(`${editing ? 'Updated' : 'Created'} ${this.firstName.value.trim()}`);
       if (editing) {
         // Return to the drawer's detail view with fresh data.
         this.drawerEditing.set(false);
+        this.editorDirty.set(false);
         this.editing.set(null);
-        await this.load();
-        await this.openCustomer(editing.id);
+        await this.load(true);
+        await this.openCustomer(savedId);
       } else {
         this.closeForm();
-        await this.load();
+        await this.load(true);
       }
     } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Save failed');
+      this.editorError.set(err instanceof Error ? err.message : 'Customer could not be saved');
     } finally {
       this.busy.set(false);
     }
