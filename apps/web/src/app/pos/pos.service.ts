@@ -583,7 +583,9 @@ export class PosService {
         name: method.name,
         is_cashier_controlled: method.is_cashier_controlled,
         reconciliation_type: method.reconciliation_type ?? null,
-        default_account_code: method.ledger_account_code,
+        default_account_code:
+          accounts.find(account => account.method_code === method.code && account.is_default)
+            ?.account_code ?? method.ledger_account_code,
         accounts: accounts
           .filter(account => account.method_code === method.code)
           .map(account => ({

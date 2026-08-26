@@ -75,6 +75,17 @@ describe('TaskDialogComponent', () => {
     expect(fixture.nativeElement.querySelector('[role="alertdialog"]')).not.toBeNull();
   });
 
+  it('keeps the panel mounted while closed so the backdrop cannot outlive it', async () => {
+    const fixture = await render();
+    const dialog = fixture.nativeElement.querySelector('dialog') as HTMLDialogElement;
+
+    fixture.componentInstance.open = false;
+    fixture.detectChanges();
+
+    expect(dialog.open).toBe(false);
+    expect(fixture.nativeElement.querySelector('.task-dialog-panel')).not.toBeNull();
+  });
+
   it('closes with Escape and restores focus to the launching control', async () => {
     const launcher = document.createElement('button');
     document.body.append(launcher);

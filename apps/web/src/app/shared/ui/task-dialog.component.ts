@@ -28,88 +28,86 @@ import { IconComponent } from './icon.component';
       (cancel)="onNativeCancel($event)"
       (close)="onNativeClose()"
     >
-      @if (open()) {
-        <section
-          #panel
-          tabindex="-1"
-          class="modal-box modal-box-task task-dialog-panel"
-          [class.task-dialog-panel-lg]="size() === 'lg'"
+      <section
+        #panel
+        tabindex="-1"
+        class="modal-box modal-box-task task-dialog-panel"
+        [class.task-dialog-panel-lg]="size() === 'lg'"
+      >
+        <header
+          class="flex min-h-14 shrink-0 items-center justify-between gap-3 border-b border-base-300/70 px-4 py-3 md:px-6"
         >
-          <header
-            class="flex min-h-14 shrink-0 items-center justify-between gap-3 border-b border-base-300/70 px-4 py-3 md:px-6"
-          >
-            <div class="flex min-w-0 items-center gap-3">
-              <ng-content select="[leading]" />
-              <div class="min-w-0">
-                <h2 class="type-title truncate">{{ title() }}</h2>
-                @if (subtitle()) {
-                  <p class="type-caption mt-0.5 truncate">{{ subtitle() }}</p>
-                }
-              </div>
+          <div class="flex min-w-0 items-center gap-3">
+            <ng-content select="[leading]" />
+            <div class="min-w-0">
+              <h2 class="type-title truncate">{{ title() }}</h2>
+              @if (subtitle()) {
+                <p class="type-caption mt-0.5 truncate">{{ subtitle() }}</p>
+              }
             </div>
-            <div class="flex shrink-0 items-center gap-1">
-              <ng-content select="[actions]" />
-              <button
-                appButton
-                variant="ghost"
-                [iconOnly]="true"
-                type="button"
-                title="Close"
-                aria-label="Close"
-                (click)="requestClose()"
-              >
-                <app-icon name="heroXMark" />
-              </button>
-            </div>
-          </header>
-
-          @if (error()) {
-            <div
-              role="alert"
-              class="mx-4 mt-3 flex shrink-0 items-start gap-2 rounded-field border border-error/35 bg-error/10 px-3 py-2.5 text-sm text-error md:mx-6"
-            >
-              <app-icon name="heroExclamationTriangle" class="mt-0.5 shrink-0" />
-              <span class="min-w-0">{{ error() }}</span>
-            </div>
-          }
-
-          <div class="modal-body px-4 py-1 md:px-6">
-            <ng-content />
           </div>
-
-          <footer
-            class="shrink-0 border-t border-base-300/70 bg-base-100 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:px-6"
-          >
-            <ng-content select="[taskFooter]" />
-          </footer>
-
-          @if (confirmDiscard()) {
-            <div
-              class="absolute inset-0 z-20 flex items-end bg-base-content/45 p-3 md:items-center md:justify-center"
+          <div class="flex shrink-0 items-center gap-1">
+            <ng-content select="[actions]" />
+            <button
+              appButton
+              variant="ghost"
+              [iconOnly]="true"
+              type="button"
+              title="Close"
+              aria-label="Close"
+              (click)="requestClose()"
             >
-              <div
-                #discardDialog
-                role="alertdialog"
-                aria-modal="true"
-                aria-label="Discard changes?"
-                tabindex="-1"
-                class="w-full rounded-box border border-base-300 bg-base-100 p-4 shadow-overlay md:max-w-sm"
-              >
-                <h3 class="section-title">Discard changes?</h3>
-                <p class="mt-1 text-sm text-base-content/65">Your unsaved changes will be lost.</p>
-                <div class="mt-4 flex justify-end gap-2">
-                  <button appButton variant="ghost" type="button" (click)="cancelDiscard()">
-                    Keep editing
-                  </button>
-                  <button appButton variant="error" type="button" (click)="discardAndClose()">
-                    Discard
-                  </button>
-                </div>
+              <app-icon name="heroXMark" />
+            </button>
+          </div>
+        </header>
+
+        @if (error()) {
+          <div
+            role="alert"
+            class="mx-4 mt-3 flex shrink-0 items-start gap-2 rounded-field border border-error/35 bg-error/10 px-3 py-2.5 text-sm text-error md:mx-6"
+          >
+            <app-icon name="heroExclamationTriangle" class="mt-0.5 shrink-0" />
+            <span class="min-w-0">{{ error() }}</span>
+          </div>
+        }
+
+        <div class="modal-body px-4 py-1 md:px-6">
+          <ng-content />
+        </div>
+
+        <footer
+          class="shrink-0 border-t border-base-300/70 bg-base-100 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:px-6"
+        >
+          <ng-content select="[taskFooter]" />
+        </footer>
+
+        @if (confirmDiscard()) {
+          <div
+            class="overlay-backdrop absolute inset-0 z-20 flex items-end p-3 md:items-center md:justify-center"
+          >
+            <div
+              #discardDialog
+              role="alertdialog"
+              aria-modal="true"
+              aria-label="Discard changes?"
+              tabindex="-1"
+              class="w-full rounded-box border border-base-300 bg-base-100 p-4 shadow-overlay md:max-w-sm"
+            >
+              <h3 class="section-title">Discard changes?</h3>
+              <p class="mt-1 text-sm text-base-content/65">Your unsaved changes will be lost.</p>
+              <div class="mt-4 flex justify-end gap-2">
+                <button appButton variant="ghost" type="button" (click)="cancelDiscard()">
+                  Keep editing
+                </button>
+                <button appButton variant="error" type="button" (click)="discardAndClose()">
+                  Discard
+                </button>
               </div>
             </div>
-          }
-        </section>
-      }
+          </div>
+        }
+      </section>
     </dialog>
   `,
   styles: `
@@ -122,7 +120,9 @@ import { IconComponent } from './icon.component';
       margin: 0;
       padding: 0;
       border: 0;
-      background: transparent;
+      background: var(--overlay-backdrop-bg);
+      -webkit-backdrop-filter: var(--overlay-backdrop-filter);
+      backdrop-filter: var(--overlay-backdrop-filter);
       overflow: hidden;
     }
 
@@ -132,15 +132,13 @@ import { IconComponent } from './icon.component';
       justify-content: center;
     }
 
-    .task-dialog-root::backdrop {
-      background: color-mix(in oklab, var(--color-base-content) 50%, transparent);
-    }
-
     .task-dialog-panel {
       position: relative;
       padding: 0;
       background: var(--color-base-100);
-      box-shadow: var(--shadow-overlay);
+      box-shadow:
+        0 24px 72px -24px rgb(0 0 0 / 0.7),
+        0 0 0 1px color-mix(in oklab, var(--color-base-300) 82%, transparent);
       outline: none;
     }
 
@@ -200,21 +198,21 @@ export class TaskDialogComponent implements OnDestroy {
         this.previousFocus ??= document.activeElement as HTMLElement | null;
         this.focused = false;
         this.lockBodyScroll();
-      } else {
-        this.unlockBodyScroll();
-        const target = this.previousFocus;
-        this.previousFocus = null;
-        this.focused = false;
-        requestAnimationFrame(() => target?.focus({ preventScroll: true }));
+        return;
       }
+      const dialog = this.nativeDialog()?.nativeElement;
+      if (dialog?.open) this.closeNativeDialog(dialog);
+      this.confirmDiscard.set(false);
+      this.unlockBodyScroll();
+      const target = this.previousFocus;
+      this.previousFocus = null;
+      this.focused = false;
+      requestAnimationFrame(() => target?.focus({ preventScroll: true }));
     });
     afterRenderEffect(() => {
       const dialog = this.nativeDialog()?.nativeElement;
       if (!dialog) return;
-      if (!this.open()) {
-        if (dialog.open) this.closeNativeDialog(dialog);
-        return;
-      }
+      if (!this.open()) return;
       if (!dialog.open) this.showNativeDialog(dialog);
       const target = this.confirmDiscard()
         ? this.discardDialog()?.nativeElement
@@ -253,7 +251,6 @@ export class TaskDialogComponent implements OnDestroy {
   }
 
   protected discardAndClose(): void {
-    this.confirmDiscard.set(false);
     this.close();
   }
 

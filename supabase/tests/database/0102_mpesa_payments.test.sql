@@ -1,11 +1,13 @@
 begin;
 -- Provider timestamps and period locks are compared in the Kenyan business day.
 set local timezone to 'Africa/Nairobi';
-select plan(59);
+select plan(62);
 
 select has_table('public','mpesa_onboarding_requests','onboarding is durable');
 select has_table('public','mpesa_daraja_apps','Daraja apps are separate from merchant accounts');
 select has_table('public','payment_provider_accounts','provider-neutral accounts exist');
+select has_column('public','payment_provider_accounts','ledger_account_code',
+  'provider accounts point at the money account they post into');
 select has_table('public','payment_collections','actual money is recorded as collections');
 select has_table('public','payment_collection_allocations','accounting allocations exist');
 select has_table('public','mpesa_connections','merchant connections exist');
@@ -48,6 +50,8 @@ grant select on pg_temp.mpesa_request to authenticated;
 select ok((select request_id from mpesa_request) is not null,'merchant can request setup');
 select is(public.mpesa_setup_status()->'onboarding_requests'->0->>'status',
   'requested','request starts as requested');
+select is(public.mpesa_setup_status()->'onboarding_requests'->0->>'ledger_account_code',
+  'MPESA','setup request is tied to a M-PESA money account');
 select ok(position('consumer_key' in public.mpesa_setup_status()::text)=0
   and position('passkey' in public.mpesa_setup_status()::text)=0,
   'merchant setup status exposes no credential fields');
@@ -70,8 +74,11 @@ with app as (
       'M-PESA test consumer secret'),'verified'
   from mpesa_fixture returning id,company_id
 ), account as (
-  insert into public.payment_provider_accounts(company_id,provider,environment,display_name,status)
-  select company_id,'mpesa','production','Till 555555','active' from app returning id,company_id
+  insert into public.payment_provider_accounts(
+    company_id,provider,environment,display_name,status,ledger_account_code
+  )
+  select company_id,'mpesa','production','Till 555555','active','MPESA' from app
+  returning id,company_id
 ), connection as (
   insert into public.mpesa_connections(provider_account_id,company_id,onboarding_request_id,
     daraja_app_id,shortcode_type,organization_shortcode,business_shortcode,party_b,passkey_secret_id)
@@ -91,6 +98,9 @@ select c.provider_account_id account_id,c.company_id,l.location_id
 from connection c join mapped l
   on l.provider_account_id=c.provider_account_id;
 grant select on pg_temp.mpesa_account to authenticated;
+select is((select ledger_account_code from public.payment_provider_accounts
+  where id=(select account_id from mpesa_account)),
+  'MPESA','active provider account has a durable money-account link');
 
 insert into public.orders(id,company_id,location_id,code,status,total)
 select 'b2000000-0000-4000-8000-000000000120',a.company_id,l.location_id,

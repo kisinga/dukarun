@@ -1,4 +1,5 @@
-import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
+import { Component, OnDestroy, OnInit, inject, input, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { formatKes } from '../core/money';
 import { normalizeKenyanPhone } from '../core/phone';
@@ -28,9 +29,23 @@ const POLL_TIMEOUT_MS = 60_000;
 
 @Component({
   selector: 'app-billing',
-  imports: [ReactiveFormsModule, PageLayoutComponent, EmptyStateComponent, StatusBadgeComponent],
+  imports: [
+    NgTemplateOutlet,
+    ReactiveFormsModule,
+    PageLayoutComponent,
+    EmptyStateComponent,
+    StatusBadgeComponent,
+  ],
   template: `
-    <app-page title="Billing" backLink="/settings" backLabel="Settings">
+    @if (embedded()) {
+      <ng-container [ngTemplateOutlet]="billingContent" />
+    } @else {
+      <app-page title="Billing" backLink="/settings" backLabel="Settings">
+        <ng-container [ngTemplateOutlet]="billingContent" />
+      </app-page>
+    }
+
+    <ng-template #billingContent>
       @if (loadError()) {
         <p class="mb-2 text-sm text-error">{{ loadError() }}</p>
       }
@@ -337,7 +352,7 @@ const POLL_TIMEOUT_MS = 60_000;
       @if (error()) {
         <p class="mt-3 text-sm text-error">{{ error() }}</p>
       }
-    </app-page>
+    </ng-template>
   `,
 })
 export class BillingComponent implements OnInit, OnDestroy {
@@ -345,6 +360,7 @@ export class BillingComponent implements OnInit, OnDestroy {
   private readonly billingConfigService = inject(BillingConfigService);
   private readonly entitlements = inject(EntitlementsService);
 
+  readonly embedded = input(false);
   protected readonly fmt = formatKes;
   protected readonly billing = signal<CompanyBilling | null>(null);
   protected readonly tiers = signal<Tier[]>([]);

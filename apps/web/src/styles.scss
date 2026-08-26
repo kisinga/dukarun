@@ -61,12 +61,25 @@ input.search-with-custom-clear::-ms-clear {
 }
 
 @layer components {
+  :root {
+    --overlay-backdrop-bg: color-mix(in oklab, var(--color-base-content) 56%, transparent);
+    --overlay-backdrop-filter: blur(6px) saturate(0.9);
+  }
+
   /* ONE card recipe: hairline border + whisper shadow, never shadow alone. */
   .card {
     border-width: 1px;
     border-style: solid;
     border-color: color-mix(in oklab, var(--color-base-300) 60%, transparent);
     box-shadow: var(--shadow-card);
+  }
+
+  dialog::backdrop,
+  .modal-backdrop,
+  .overlay-backdrop {
+    background-color: var(--overlay-backdrop-bg);
+    -webkit-backdrop-filter: var(--overlay-backdrop-filter);
+    backdrop-filter: var(--overlay-backdrop-filter);
   }
 
   /* Modals are full-screen on phones; desktop restores the floating box. */

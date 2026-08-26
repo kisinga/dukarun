@@ -168,7 +168,7 @@ export type ListSortDirection = 'asc' | 'desc';
         @if (filtersOpen()) {
           <button
             type="button"
-            class="fixed inset-0 z-[65] bg-base-content/50 md:hidden"
+            class="overlay-backdrop fixed inset-0 z-[65] md:hidden"
             aria-label="Close filters"
             (click)="filtersOpen.set(false)"
           ></button>

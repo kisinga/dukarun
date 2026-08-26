@@ -86,8 +86,8 @@ select company_id,'f1160000-0000-4000-8000-000000000020',location_id,
 create temp table fulfillment_mpesa_account as
 with account as (
   insert into public.payment_provider_accounts(
-    company_id,provider,environment,display_name,status,activated_at
-  ) select company_id,'mpesa','production','Fulfillment test till','active',now()
+    company_id,provider,environment,display_name,status,activated_at,ledger_account_code
+  ) select company_id,'mpesa','production','Fulfillment test till','active',now(),'MPESA'
     from fulfillment_fixture returning id,company_id
 ), mapped as (
   insert into public.location_payment_provider_accounts(

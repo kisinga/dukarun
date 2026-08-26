@@ -1,5 +1,5 @@
 begin;
-select plan(16);
+select plan(17);
 
 select testkit.create_user('c1200000-0000-4000-8000-000000000001','money-account-admin@test.local');
 select testkit.create_user('c1200000-0000-4000-8000-000000000002','money-account-cashier@test.local');
@@ -74,6 +74,42 @@ select is(
    where lpm.location_id=(select id from money_account_location) and pm.code='mpesa'),
   (select code from public.ledger_accounts where id=(select mpesa_id from created_money_accounts)),
   'changing method availability preserves its location default'
+);
+
+reset role;
+create temp table linked_mpesa_provider as
+with provider_account as (
+  insert into public.payment_provider_accounts(
+    company_id,provider,environment,display_name,status,ledger_account_code
+  )
+  select company_id,'mpesa','production','Seed M-PESA till','active','MPESA'
+  from money_account_fixture
+  returning id,company_id
+), mapped as (
+  insert into public.location_payment_provider_accounts(
+    location_id,company_id,provider,provider_account_id
+  )
+  select (select id from money_account_location),company_id,'mpesa',id
+  from provider_account
+)
+select id from provider_account;
+grant select on pg_temp.linked_mpesa_provider to authenticated;
+select testkit.as_user(
+  (select company_id from money_account_fixture),
+  'c1200000-0000-4000-8000-000000000001','Admin'
+);
+select is(
+  (select account_code from public.available_tender_accounts((select id from money_account_location))
+   where method_code='mpesa' and is_default),
+  'MPESA','active M-PESA provider link becomes the checkout default'
+);
+reset role;
+update public.payment_provider_accounts
+set status='disabled',disabled_at=now()
+where id=(select id from linked_mpesa_provider);
+select testkit.as_user(
+  (select company_id from money_account_fixture),
+  'c1200000-0000-4000-8000-000000000001','Admin'
 );
 
 select throws_ok(
