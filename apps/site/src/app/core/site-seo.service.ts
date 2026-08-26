@@ -35,6 +35,14 @@ const FAQ_ENTITIES = [
   },
   {
     '@type': 'Question',
+    name: 'Can I manage pickup and delivery orders?',
+    acceptedAnswer: {
+      '@type': 'Answer',
+      text: 'Yes. Choose pickup or delivery at checkout, move the order through preparation and handoff, assign a delivery person, and share a private tracking link and PIN. Cash on delivery can be enabled per location.',
+    },
+  },
+  {
+    '@type': 'Question',
     name: 'Can customers pay straight into dukarun by M-Pesa?',
     acceptedAnswer: {
       '@type': 'Answer',

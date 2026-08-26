@@ -363,7 +363,7 @@ interface Testimonial {
             Here are some featured capabilities of dukarun.
           </p>
         </div>
-        <div class="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div class="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           @for (feature of features; track feature.title) {
             <a
               routerLink="/docs"
@@ -757,6 +757,7 @@ export class HomeComponent implements OnInit {
       features.push(`${plan.sms_per_period.toLocaleString('en-KE')} SMS per month`);
     if (plan.whatsapp_per_period !== null)
       features.push(`${plan.whatsapp_per_period.toLocaleString('en-KE')} WhatsApp per month`);
+    if (plan.fulfillment_available) features.push('Pickup & delivery');
     if (plan.storefront_available) features.push('Public storefront');
     if (plan.payment_reminders_available) features.push('Payment reminders');
     if (plan.staff_performance_enabled) features.push('Staff performance reports');
@@ -835,6 +836,18 @@ export class HomeComponent implements OnInit {
       docId: 'pos',
     },
     {
+      icon: 'heroCube',
+      title: 'Inventory & batches',
+      copy: 'Keep stock current with every sale and purchase, including costs, batches and expiry dates.',
+      docId: 'inventory',
+    },
+    {
+      icon: 'heroMapPin',
+      title: 'Pickup & delivery',
+      copy: 'Prepare orders, assign handoffs, collect COD and let customers follow progress from a private link.',
+      docId: 'pickup-delivery',
+    },
+    {
       icon: 'heroSignalSlash',
       title: 'Offline selling',
       copy: 'Keep selling when the network drops. Sales wait safely and sync on their own when you are back online.',
@@ -890,6 +903,11 @@ export class HomeComponent implements OnInit {
       question: 'How do my customers pay?',
       answer:
         'Cash or M-Pesa, recorded at the till. You can also sell on credit to customers you trust, with balances and limits tracked per person.',
+    },
+    {
+      question: 'Can I manage pickup and delivery orders?',
+      answer:
+        'Yes. Choose pickup or delivery at checkout, move the order through preparation and handoff, assign a delivery person, and share a private tracking link and PIN. Cash on delivery can be enabled per location.',
     },
     {
       question: 'Can customers pay straight into dukarun by M-Pesa?',

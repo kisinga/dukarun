@@ -228,6 +228,17 @@ export class DocsComponent {
       ],
     },
     {
+      id: 'pickup-delivery',
+      icon: 'heroMapPin',
+      title: 'Pickup & delivery',
+      summary: 'From order received to safely handed over.',
+      details: [
+        'Choose Counter, Pickup, or Delivery at checkout. Pickup and delivery orders keep their recipient, contact, address, promised time, preparation notes, and handoff instructions with the sale.',
+        'The team moves work from pending to processing and ready. An assigned delivery person takes over when the order is ready, then records dispatch, delivery, failure, or retry without gaining access to unrelated business data.',
+        'Customers can follow progress from a private tracking link and confirm delivery with a six-digit PIN. Prepaid, customer-credit, and cash-on-delivery orders are supported where the location and subscription plan allow them.',
+      ],
+    },
+    {
       id: 'inventory',
       icon: 'heroCube',
       title: 'Inventory & batches',
