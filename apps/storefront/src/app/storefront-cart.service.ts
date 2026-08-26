@@ -1,74 +1,22 @@
 import { Injectable, PLATFORM_ID, computed, effect, inject, signal } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import { environment } from '../environments/environment';
+import {
+  buildStorefrontCartMessage,
+  formatCartKes,
+  sanitizeCartQuantity,
+  storefrontCartCount,
+  storefrontCartLineLabel,
+  storefrontCartTotal,
+  type StorefrontCartLine,
+  type StorefrontCartShop,
+} from './storefront-cart.models';
 
 const CART_KEY_PREFIX = 'dukarun.storefront.cart:';
 const MAX_CART_LINES = 64;
 
-export interface StorefrontCartLine {
-  shopSlug: string;
-  productId: string;
-  variantId: string;
-  productName: string;
-  variantName: string;
-  price: number;
-  quantity: number;
-  imagePath: string | null;
-  productUrl: string;
-}
-
-export interface StorefrontCartShop {
-  slug: string;
-  name: string;
-  whatsappNumber: string | null;
-}
-
 function cartKey(slug: string): string {
   return `${CART_KEY_PREFIX}${slug}`;
-}
-
-function formatKes(amount: number): string {
-  return `KES ${Math.round(amount).toLocaleString('en-KE')}`;
-}
-
-function lineLabel(line: Pick<StorefrontCartLine, 'productName' | 'variantName'>): string {
-  return !line.variantName || line.variantName === 'Default'
-    ? line.productName
-    : `${line.productName} · ${line.variantName}`;
-}
-
-function sanitizeQuantity(quantity: number): number {
-  return Math.max(1, Math.min(999, Math.round(quantity)));
-}
-
-export function storefrontCartTotal(lines: readonly StorefrontCartLine[]): number {
-  return lines.reduce((sum, line) => sum + Math.round(line.price * line.quantity), 0);
-}
-
-export function storefrontCartCount(lines: readonly StorefrontCartLine[]): number {
-  return lines.reduce((sum, line) => sum + line.quantity, 0);
-}
-
-export function buildStorefrontCartMessage(
-  shopName: string,
-  lines: readonly StorefrontCartLine[],
-  shopUrl: string
-): string {
-  const summary = lines
-    .map((line, index) => {
-      const total = Math.round(line.price * line.quantity);
-      return `${index + 1}. ${lineLabel(line)}\n   Qty: ${line.quantity}\n   Price: ${formatKes(line.price)} each\n   Line: ${formatKes(total)}`;
-    })
-    .join('\n\n');
-  return [
-    `Hello ${shopName}! I'd like to order:`,
-    '',
-    summary,
-    '',
-    `Estimated total: ${formatKes(storefrontCartTotal(lines))}`,
-    '',
-    `Catalogue: ${shopUrl}`,
-  ].join('\n');
 }
 
 @Injectable({ providedIn: 'root' })
@@ -111,7 +59,7 @@ export class StorefrontCartService {
   add(line: StorefrontCartLine, quantity = 1): boolean {
     const shop = this.activeShop();
     if (!shop || line.shopSlug !== shop.slug) return false;
-    const amount = sanitizeQuantity(quantity);
+    const amount = sanitizeCartQuantity(quantity);
     const existing = this.lines().find(item => item.variantId === line.variantId);
     if (existing) {
       this.setQuantity(line.variantId, existing.quantity + amount);
@@ -123,7 +71,7 @@ export class StorefrontCartService {
   }
 
   setQuantity(variantId: string, quantity: number): void {
-    const normalized = sanitizeQuantity(quantity);
+    const normalized = sanitizeCartQuantity(quantity);
     this.lines.update(lines =>
       lines.map(line => (line.variantId === variantId ? { ...line, quantity: normalized } : line))
     );
@@ -138,11 +86,11 @@ export class StorefrontCartService {
   }
 
   lineLabel(line: Pick<StorefrontCartLine, 'productName' | 'variantName'>): string {
-    return lineLabel(line);
+    return storefrontCartLineLabel(line);
   }
 
   formatKes(amount: number): string {
-    return formatKes(amount);
+    return formatCartKes(amount);
   }
 
   whatsappLink(): string | null {
@@ -164,7 +112,7 @@ export class StorefrontCartService {
       if (!Array.isArray(parsed)) return [];
       return parsed
         .filter((line): line is StorefrontCartLine => this.isCartLine(line, slug))
-        .map(line => ({ ...line, quantity: sanitizeQuantity(line.quantity) }))
+        .map(line => ({ ...line, quantity: sanitizeCartQuantity(line.quantity) }))
         .slice(0, MAX_CART_LINES);
     } catch {
       return [];

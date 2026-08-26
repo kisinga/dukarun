@@ -1,6 +1,7 @@
 import { Component, input, signal } from '@angular/core';
 import { NgIcon } from '@ng-icons/core';
-import { StorefrontCartService, type StorefrontCartShop } from './storefront-cart.service';
+import { StorefrontCartService } from './storefront-cart.service';
+import type { StorefrontCartShop } from './storefront-cart.models';
 import { StorefrontService } from './storefront.service';
 
 @Component({
@@ -32,7 +33,7 @@ import { StorefrontService } from './storefront.service';
           (click)="close()"
         ></button>
         <aside
-          class="absolute right-0 bottom-0 left-0 max-h-[88vh] overflow-hidden rounded-t-3xl border border-base-300 bg-base-100 shadow-2xl sm:top-0 sm:left-auto sm:h-full sm:max-h-none sm:w-[26rem] sm:rounded-none"
+          class="absolute right-0 bottom-0 left-0 max-h-[88vh] overflow-hidden rounded-t-3xl border border-base-300 bg-base-100 shadow-lg sm:top-0 sm:left-auto sm:h-full sm:max-h-none sm:w-[26rem] sm:rounded-none"
         >
           <div class="flex h-full flex-col">
             <header class="flex items-start gap-3 border-b border-base-300 px-5 py-4">

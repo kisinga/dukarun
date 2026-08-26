@@ -4,7 +4,7 @@ import {
   storefrontCartCount,
   storefrontCartTotal,
   type StorefrontCartLine,
-} from './storefront-cart.service';
+} from './storefront-cart.models';
 
 const lines: StorefrontCartLine[] = [
   {
