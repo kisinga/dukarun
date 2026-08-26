@@ -110,6 +110,7 @@ async function authenticateAccountUser(page: Page): Promise<{ creditRequest: () 
         company_id: companyId,
         user_id: userId,
         permissions,
+        workspaces: ['dashboard', 'customers'],
         actions: {
           'sale.credit_over_limit': 'execute',
           'customer.credit.update': 'execute',
@@ -117,8 +118,49 @@ async function authenticateAccountUser(page: Page): Promise<{ creditRequest: () 
         },
       });
     }
+    if (path.endsWith('/rest/v1/rpc/current_entitlements')) {
+      return json({
+        companyId,
+        status: 'active',
+        tierCode: 'standard',
+        tierName: 'Standard',
+        features: {
+          multipleLocations: false,
+          staffPerformance: false,
+          commissions: false,
+          storefront: false,
+          paymentReminders: false,
+          fulfillment: true,
+        },
+        settings: {},
+        limits: {},
+        usage: {},
+      });
+    }
     if (path.endsWith('/rest/v1/rpc/accessible_business_locations')) {
       return json([{ id: locationId, code: 'MAIN', name: 'Main shop', is_default: true }]);
+    }
+    if (path.endsWith('/rest/v1/rpc/fulfillment_settings_at_location')) {
+      return json({
+        company_id: companyId,
+        location_id: locationId,
+        enabled: false,
+        feature_available: true,
+        pickup_enabled: true,
+        delivery_enabled: true,
+        cod_enabled: false,
+        default_delivery_fee_variant_id: null,
+        pickup_sla_minutes: 30,
+        delivery_sla_minutes: 60,
+        notification_channel: 'whatsapp',
+        sms_fallback: true,
+        notify_initial: true,
+        notify_ready: true,
+        notify_in_transit: true,
+        notify_failed: true,
+        notify_fulfilled: false,
+        tracking_token_ttl_days: 14,
+      });
     }
     if (path.endsWith('/rest/v1/rpc/available_payment_methods')) {
       return json([

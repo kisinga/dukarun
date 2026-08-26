@@ -29,9 +29,22 @@ export const ALL_PERMISSIONS = [
   'ViewAuditTrail',
   'ViewStaffPerformance',
   'ManageCommissions',
+  'ProcessFulfillments',
+  'CompleteFulfillments',
+  'ManageFulfillments',
 ] as const;
 
 export type Permission = (typeof ALL_PERMISSIONS)[number];
+export const WORKSPACE_ACCESS_KEYS = [
+  'dashboard',
+  'sell',
+  'sales',
+  'inventory',
+  'customers',
+  'purchasing',
+  'fulfillment',
+] as const;
+export type WorkspaceAccessKey = (typeof WORKSPACE_ACCESS_KEYS)[number];
 export type ActionKey =
   | 'sale.void'
   | 'sale.refund'
@@ -45,6 +58,7 @@ type AccessSnapshot = {
   company_id: string;
   user_id: string;
   permissions: Permission[];
+  workspaces: WorkspaceAccessKey[];
   actions: Record<ActionKey, ActionMode>;
 };
 
@@ -71,6 +85,9 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   ViewAuditTrail: 'View audit trail',
   ViewStaffPerformance: 'View staff performance',
   ManageCommissions: 'Manage commissions',
+  ProcessFulfillments: 'Prepare pickup and delivery orders',
+  CompleteFulfillments: 'Complete pickup and delivery handoffs',
+  ManageFulfillments: 'Manage pickup and delivery',
 };
 
 /**
@@ -85,6 +102,7 @@ export class PermissionsService {
   private readonly journal = inject(CacheJournalService);
 
   private readonly granted = signal<ReadonlySet<Permission>>(new Set());
+  private readonly accessibleWorkspaces = signal<ReadonlySet<WorkspaceAccessKey>>(new Set());
   private readonly actions = signal<Readonly<Record<ActionKey, ActionMode>>>({
     'sale.void': 'blocked',
     'sale.refund': 'blocked',
@@ -118,6 +136,16 @@ export class PermissionsService {
 
   has(permission: Permission): boolean {
     return this.ready() && this.granted().has(permission);
+  }
+
+  canAccessWorkspace(workspace: WorkspaceAccessKey): boolean {
+    return this.ready() && this.accessibleWorkspaces().has(workspace);
+  }
+
+  landingRoute(): string {
+    if (this.canAccessWorkspace('dashboard')) return '/dashboard';
+    if (this.canAccessWorkspace('fulfillment')) return '/fulfillment';
+    return '/profile';
   }
 
   actionMode(action: ActionKey): ActionMode {
@@ -184,6 +212,7 @@ export class PermissionsService {
 
   private clear(): void {
     this.granted.set(new Set());
+    this.accessibleWorkspaces.set(new Set());
     this.actions.set({
       'sale.void': 'blocked',
       'sale.refund': 'blocked',
@@ -240,6 +269,7 @@ export class PermissionsService {
 
   private commit(snapshot: AccessSnapshot): void {
     this.granted.set(new Set(snapshot.permissions));
+    this.accessibleWorkspaces.set(new Set(snapshot.workspaces));
     this.actions.set(snapshot.actions);
     this.error.set(null);
     this.state.set('ready');
@@ -326,6 +356,7 @@ function validAccessSnapshot(
     snapshot.company_id === identity.companyId &&
     snapshot.user_id === identity.userId &&
     Array.isArray(snapshot.permissions) &&
+    Array.isArray(snapshot.workspaces) &&
     !!snapshot.actions
   );
 }

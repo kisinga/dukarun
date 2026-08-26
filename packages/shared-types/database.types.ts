@@ -614,6 +614,106 @@ export type Database = {
           },
         ]
       }
+      cash_custody_remittances: {
+        Row: {
+          accepted_at: string | null
+          accepted_by: string | null
+          accepting_cashier_session_id: string | null
+          company_id: string
+          created_at: string
+          custodian_membership_id: string
+          expected_amount: number
+          id: string
+          location_id: string
+          received_amount: number | null
+          rejected_at: string | null
+          status: string
+          submitted_at: string
+          submitted_by: string
+          updated_at: string
+          variance_reason: string | null
+        }
+        Insert: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          accepting_cashier_session_id?: string | null
+          company_id: string
+          created_at?: string
+          custodian_membership_id: string
+          expected_amount: number
+          id?: string
+          location_id: string
+          received_amount?: number | null
+          rejected_at?: string | null
+          status?: string
+          submitted_at?: string
+          submitted_by: string
+          updated_at?: string
+          variance_reason?: string | null
+        }
+        Update: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          accepting_cashier_session_id?: string | null
+          company_id?: string
+          created_at?: string
+          custodian_membership_id?: string
+          expected_amount?: number
+          id?: string
+          location_id?: string
+          received_amount?: number | null
+          rejected_at?: string | null
+          status?: string
+          submitted_at?: string
+          submitted_by?: string
+          updated_at?: string
+          variance_reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cash_custody_remittances_accepting_cashier_session_id_fkey"
+            columns: ["accepting_cashier_session_id"]
+            isOneToOne: false
+            referencedRelation: "cashier_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cash_custody_remittances_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cash_custody_remittances_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cash_custody_remittances_custodian_membership_id_fkey"
+            columns: ["custodian_membership_id"]
+            isOneToOne: false
+            referencedRelation: "company_memberships"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cash_custody_remittances_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "low_stock_variants_by_location"
+            referencedColumns: ["location_id"]
+          },
+          {
+            foreignKeyName: "cash_custody_remittances_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "stock_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cash_drawer_counts: {
         Row: {
           company_id: string
@@ -2897,6 +2997,7 @@ export type Database = {
           credit_approved_by: string | null
           credit_limit: number
           credit_terms_days: number | null
+          customer_origin: string
           deleted_at: string | null
           deleted_by: string | null
           email: string | null
@@ -2911,6 +3012,7 @@ export type Database = {
           notifications_enabled: boolean
           payment_terms: string | null
           phone: string | null
+          phone_normalized: string | null
           sms_notifications_enabled: boolean
           supplier_active: boolean
           supplier_credit_limit: number
@@ -2925,6 +3027,7 @@ export type Database = {
           credit_approved_by?: string | null
           credit_limit?: number
           credit_terms_days?: number | null
+          customer_origin?: string
           deleted_at?: string | null
           deleted_by?: string | null
           email?: string | null
@@ -2939,6 +3042,7 @@ export type Database = {
           notifications_enabled?: boolean
           payment_terms?: string | null
           phone?: string | null
+          phone_normalized?: string | null
           sms_notifications_enabled?: boolean
           supplier_active?: boolean
           supplier_credit_limit?: number
@@ -2953,6 +3057,7 @@ export type Database = {
           credit_approved_by?: string | null
           credit_limit?: number
           credit_terms_days?: number | null
+          customer_origin?: string
           deleted_at?: string | null
           deleted_by?: string | null
           email?: string | null
@@ -2967,6 +3072,7 @@ export type Database = {
           notifications_enabled?: boolean
           payment_terms?: string | null
           phone?: string | null
+          phone_normalized?: string | null
           sms_notifications_enabled?: boolean
           supplier_active?: boolean
           supplier_credit_limit?: number
@@ -3364,6 +3470,213 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "supplier_ap_balances"
             referencedColumns: ["supplier_id"]
+          },
+        ]
+      }
+      fulfillment_events: {
+        Row: {
+          actor_membership_id: string | null
+          actor_user_id: string | null
+          company_id: string
+          created_at: string
+          event_kind: string
+          from_status: string | null
+          fulfillment_id: string
+          id: string
+          metadata: Json
+          note: string | null
+          source_kind: string
+          source_reference: string | null
+          to_status: string | null
+        }
+        Insert: {
+          actor_membership_id?: string | null
+          actor_user_id?: string | null
+          company_id: string
+          created_at?: string
+          event_kind: string
+          from_status?: string | null
+          fulfillment_id: string
+          id?: string
+          metadata?: Json
+          note?: string | null
+          source_kind?: string
+          source_reference?: string | null
+          to_status?: string | null
+        }
+        Update: {
+          actor_membership_id?: string | null
+          actor_user_id?: string | null
+          company_id?: string
+          created_at?: string
+          event_kind?: string
+          from_status?: string | null
+          fulfillment_id?: string
+          id?: string
+          metadata?: Json
+          note?: string | null
+          source_kind?: string
+          source_reference?: string | null
+          to_status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fulfillment_events_actor_membership_id_fkey"
+            columns: ["actor_membership_id"]
+            isOneToOne: false
+            referencedRelation: "company_memberships"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fulfillment_events_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fulfillment_events_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fulfillment_events_fulfillment_id_fkey"
+            columns: ["fulfillment_id"]
+            isOneToOne: false
+            referencedRelation: "order_fulfillments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fulfillment_settings: {
+        Row: {
+          cod_enabled: boolean
+          company_id: string
+          created_at: string
+          default_delivery_fee_variant_id: string | null
+          delivery_enabled: boolean
+          delivery_sla_minutes: number
+          enabled: boolean
+          location_id: string
+          notification_channel: string
+          notify_failed: boolean
+          notify_fulfilled: boolean
+          notify_in_transit: boolean
+          notify_initial: boolean
+          notify_ready: boolean
+          pickup_enabled: boolean
+          pickup_sla_minutes: number
+          sms_fallback: boolean
+          tracking_token_ttl_days: number
+          updated_at: string
+        }
+        Insert: {
+          cod_enabled?: boolean
+          company_id: string
+          created_at?: string
+          default_delivery_fee_variant_id?: string | null
+          delivery_enabled?: boolean
+          delivery_sla_minutes?: number
+          enabled?: boolean
+          location_id: string
+          notification_channel?: string
+          notify_failed?: boolean
+          notify_fulfilled?: boolean
+          notify_in_transit?: boolean
+          notify_initial?: boolean
+          notify_ready?: boolean
+          pickup_enabled?: boolean
+          pickup_sla_minutes?: number
+          sms_fallback?: boolean
+          tracking_token_ttl_days?: number
+          updated_at?: string
+        }
+        Update: {
+          cod_enabled?: boolean
+          company_id?: string
+          created_at?: string
+          default_delivery_fee_variant_id?: string | null
+          delivery_enabled?: boolean
+          delivery_sla_minutes?: number
+          enabled?: boolean
+          location_id?: string
+          notification_channel?: string
+          notify_failed?: boolean
+          notify_fulfilled?: boolean
+          notify_in_transit?: boolean
+          notify_initial?: boolean
+          notify_ready?: boolean
+          pickup_enabled?: boolean
+          pickup_sla_minutes?: number
+          sms_fallback?: boolean
+          tracking_token_ttl_days?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fulfillment_settings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fulfillment_settings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fulfillment_settings_default_delivery_fee_variant_id_fkey"
+            columns: ["default_delivery_fee_variant_id"]
+            isOneToOne: false
+            referencedRelation: "low_stock_variants"
+            referencedColumns: ["variant_id"]
+          },
+          {
+            foreignKeyName: "fulfillment_settings_default_delivery_fee_variant_id_fkey"
+            columns: ["default_delivery_fee_variant_id"]
+            isOneToOne: false
+            referencedRelation: "low_stock_variants_by_location"
+            referencedColumns: ["variant_id"]
+          },
+          {
+            foreignKeyName: "fulfillment_settings_default_delivery_fee_variant_id_fkey"
+            columns: ["default_delivery_fee_variant_id"]
+            isOneToOne: false
+            referencedRelation: "product_stock"
+            referencedColumns: ["variant_id"]
+          },
+          {
+            foreignKeyName: "fulfillment_settings_default_delivery_fee_variant_id_fkey"
+            columns: ["default_delivery_fee_variant_id"]
+            isOneToOne: false
+            referencedRelation: "product_variants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fulfillment_settings_default_delivery_fee_variant_id_fkey"
+            columns: ["default_delivery_fee_variant_id"]
+            isOneToOne: false
+            referencedRelation: "variant_catalog"
+            referencedColumns: ["variant_id"]
+          },
+          {
+            foreignKeyName: "fulfillment_settings_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: true
+            referencedRelation: "low_stock_variants_by_location"
+            referencedColumns: ["location_id"]
+          },
+          {
+            foreignKeyName: "fulfillment_settings_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: true
+            referencedRelation: "stock_locations"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -5227,6 +5540,9 @@ export type Database = {
           current_attempt_id: string | null
           expires_at: string
           fulfilled_collection_id: string | null
+          fulfillment_id: string | null
+          fulfillment_request: Json | null
+          fulfillment_request_fingerprint: string | null
           id: string
           initiating_cashier_session_id: string | null
           location_id: string
@@ -5255,6 +5571,9 @@ export type Database = {
           current_attempt_id?: string | null
           expires_at?: string
           fulfilled_collection_id?: string | null
+          fulfillment_id?: string | null
+          fulfillment_request?: Json | null
+          fulfillment_request_fingerprint?: string | null
           id?: string
           initiating_cashier_session_id?: string | null
           location_id: string
@@ -5283,6 +5602,9 @@ export type Database = {
           current_attempt_id?: string | null
           expires_at?: string
           fulfilled_collection_id?: string | null
+          fulfillment_id?: string | null
+          fulfillment_request?: Json | null
+          fulfillment_request_fingerprint?: string | null
           id?: string
           initiating_cashier_session_id?: string | null
           location_id?: string
@@ -5326,6 +5648,13 @@ export type Database = {
             columns: ["fulfilled_collection_id"]
             isOneToOne: false
             referencedRelation: "payment_collections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mpesa_payment_intents_fulfillment_id_fkey"
+            columns: ["fulfillment_id"]
+            isOneToOne: false
+            referencedRelation: "order_fulfillments"
             referencedColumns: ["id"]
           },
           {
@@ -5685,6 +6014,196 @@ export type Database = {
           },
         ]
       }
+      order_fulfillments: {
+        Row: {
+          address_line: string | null
+          assigned_membership_id: string | null
+          cancelled_at: string | null
+          claimed_at: string | null
+          collection_kind: string
+          company_id: string
+          created_at: string
+          created_by: string | null
+          customer_id: string | null
+          fulfilled_at: string | null
+          fulfillment_type: string
+          handoff_notes: string | null
+          id: string
+          landmark: string | null
+          location_id: string
+          map_link: string | null
+          order_id: string
+          phone_normalized: string | null
+          pin_failed_attempts: number
+          pin_generated_at: string
+          pin_hash: string
+          pin_locked_until: string | null
+          preparation_notes: string | null
+          promised_at: string | null
+          recipient_name: string
+          request_fingerprint: string | null
+          state_version: number
+          status: string
+          tracking_expires_at: string
+          tracking_token_hash: string
+          transactional_message_consent: boolean
+          updated_at: string
+        }
+        Insert: {
+          address_line?: string | null
+          assigned_membership_id?: string | null
+          cancelled_at?: string | null
+          claimed_at?: string | null
+          collection_kind?: string
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string | null
+          fulfilled_at?: string | null
+          fulfillment_type: string
+          handoff_notes?: string | null
+          id?: string
+          landmark?: string | null
+          location_id: string
+          map_link?: string | null
+          order_id: string
+          phone_normalized?: string | null
+          pin_failed_attempts?: number
+          pin_generated_at?: string
+          pin_hash: string
+          pin_locked_until?: string | null
+          preparation_notes?: string | null
+          promised_at?: string | null
+          recipient_name: string
+          request_fingerprint?: string | null
+          state_version?: number
+          status?: string
+          tracking_expires_at: string
+          tracking_token_hash: string
+          transactional_message_consent?: boolean
+          updated_at?: string
+        }
+        Update: {
+          address_line?: string | null
+          assigned_membership_id?: string | null
+          cancelled_at?: string | null
+          claimed_at?: string | null
+          collection_kind?: string
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string | null
+          fulfilled_at?: string | null
+          fulfillment_type?: string
+          handoff_notes?: string | null
+          id?: string
+          landmark?: string | null
+          location_id?: string
+          map_link?: string | null
+          order_id?: string
+          phone_normalized?: string | null
+          pin_failed_attempts?: number
+          pin_generated_at?: string
+          pin_hash?: string
+          pin_locked_until?: string | null
+          preparation_notes?: string | null
+          promised_at?: string | null
+          recipient_name?: string
+          request_fingerprint?: string | null
+          state_version?: number
+          status?: string
+          tracking_expires_at?: string
+          tracking_token_hash?: string
+          transactional_message_consent?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_fulfillments_assigned_membership_id_fkey"
+            columns: ["assigned_membership_id"]
+            isOneToOne: false
+            referencedRelation: "company_memberships"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_fulfillments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_fulfillments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_fulfillments_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_account_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "order_fulfillments_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_ar_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "order_fulfillments_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_deposit_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "order_fulfillments_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_fulfillments_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_advance_balances"
+            referencedColumns: ["supplier_id"]
+          },
+          {
+            foreignKeyName: "order_fulfillments_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_ap_balances"
+            referencedColumns: ["supplier_id"]
+          },
+          {
+            foreignKeyName: "order_fulfillments_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "low_stock_variants_by_location"
+            referencedColumns: ["location_id"]
+          },
+          {
+            foreignKeyName: "order_fulfillments_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "stock_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_fulfillments_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_lines: {
         Row: {
           cogs_total: number | null
@@ -5847,6 +6366,7 @@ export type Database = {
           net_total: number
           posting_source: string | null
           quantity_total: number
+          receivable_kind: string | null
           status: string
           tax_document_id: string | null
           tax_point_at: string | null
@@ -5883,6 +6403,7 @@ export type Database = {
           net_total?: number
           posting_source?: string | null
           quantity_total?: number
+          receivable_kind?: string | null
           status?: string
           tax_document_id?: string | null
           tax_point_at?: string | null
@@ -5919,6 +6440,7 @@ export type Database = {
           net_total?: number
           posting_source?: string | null
           quantity_total?: number
+          receivable_kind?: string | null
           status?: string
           tax_document_id?: string | null
           tax_point_at?: string | null
@@ -6040,6 +6562,8 @@ export type Database = {
           fallback_body: string | null
           fallback_channel: string | null
           fallback_for_outbox_id: string | null
+          fulfillment_event_id: string | null
+          fulfillment_id: string | null
           id: string
           max_attempts: number
           quota_state: string
@@ -6075,6 +6599,8 @@ export type Database = {
           fallback_body?: string | null
           fallback_channel?: string | null
           fallback_for_outbox_id?: string | null
+          fulfillment_event_id?: string | null
+          fulfillment_id?: string | null
           id?: string
           max_attempts?: number
           quota_state?: string
@@ -6110,6 +6636,8 @@ export type Database = {
           fallback_body?: string | null
           fallback_channel?: string | null
           fallback_for_outbox_id?: string | null
+          fulfillment_event_id?: string | null
+          fulfillment_id?: string | null
           id?: string
           max_attempts?: number
           quota_state?: string
@@ -6221,6 +6749,20 @@ export type Database = {
             columns: ["fallback_for_outbox_id"]
             isOneToOne: false
             referencedRelation: "outbox"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "outbox_fulfillment_event_id_fkey"
+            columns: ["fulfillment_event_id"]
+            isOneToOne: false
+            referencedRelation: "fulfillment_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "outbox_fulfillment_id_fkey"
+            columns: ["fulfillment_id"]
+            isOneToOne: false
+            referencedRelation: "order_fulfillments"
             referencedColumns: ["id"]
           },
           {
@@ -6681,6 +7223,8 @@ export type Database = {
       payments: {
         Row: {
           amount: number
+          cash_custodian_membership_id: string | null
+          cash_remittance_id: string | null
           cashier_session_id: string | null
           collection_allocation_id: string | null
           company_id: string
@@ -6699,6 +7243,8 @@ export type Database = {
         }
         Insert: {
           amount: number
+          cash_custodian_membership_id?: string | null
+          cash_remittance_id?: string | null
           cashier_session_id?: string | null
           collection_allocation_id?: string | null
           company_id: string
@@ -6717,6 +7263,8 @@ export type Database = {
         }
         Update: {
           amount?: number
+          cash_custodian_membership_id?: string | null
+          cash_remittance_id?: string | null
           cashier_session_id?: string | null
           collection_allocation_id?: string | null
           company_id?: string
@@ -6734,6 +7282,20 @@ export type Database = {
           status?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "payments_cash_custodian_membership_id_fkey"
+            columns: ["cash_custodian_membership_id"]
+            isOneToOne: false
+            referencedRelation: "company_memberships"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_cash_remittance_id_fkey"
+            columns: ["cash_remittance_id"]
+            isOneToOne: false
+            referencedRelation: "cash_custody_remittances"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "payments_cashier_session_id_fkey"
             columns: ["cashier_session_id"]
@@ -8912,6 +9474,7 @@ export type Database = {
           commissions_available: boolean
           created_at: string
           customer_campaigns_available: boolean
+          fulfillment_available: boolean
           id: string
           is_active: boolean
           max_orders_per_month: number | null
@@ -8934,6 +9497,7 @@ export type Database = {
           commissions_available?: boolean
           created_at?: string
           customer_campaigns_available?: boolean
+          fulfillment_available?: boolean
           id?: string
           is_active?: boolean
           max_orders_per_month?: number | null
@@ -8956,6 +9520,7 @@ export type Database = {
           commissions_available?: boolean
           created_at?: string
           customer_campaigns_available?: boolean
+          fulfillment_available?: boolean
           id?: string
           is_active?: boolean
           max_orders_per_month?: number | null
@@ -10741,6 +11306,66 @@ export type Database = {
           },
         ]
       }
+      trial_access_requests: {
+        Row: {
+          company_id: string
+          created_at: string
+          decision_note: string | null
+          granted_until: string | null
+          id: string
+          reason: string
+          requested_by: string
+          requested_days: number
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          decision_note?: string | null
+          granted_until?: string | null
+          id?: string
+          reason: string
+          requested_by: string
+          requested_days: number
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          decision_note?: string | null
+          granted_until?: string | null
+          id?: string
+          reason?: string
+          requested_by?: string
+          requested_days?: number
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trial_access_requests_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trial_access_requests_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_preferences: {
         Row: {
           active_company_id: string | null
@@ -12085,6 +12710,10 @@ export type Database = {
       }
     }
     Functions: {
+      accept_cash_custody_remittance: {
+        Args: { p_remittance_id: string }
+        Returns: Json
+      }
       accept_company_terms: {
         Args: { p_content_sha256: string; p_source?: string; p_version: string }
         Returns: string
@@ -12152,6 +12781,19 @@ export type Database = {
         Args: { p_chunk_index: number; p_import_id: string; p_products: Json }
         Returns: Json
       }
+      append_fulfillment_event_core: {
+        Args: {
+          p_event_kind: string
+          p_from_status: string
+          p_fulfillment_id: string
+          p_metadata?: Json
+          p_note?: string
+          p_source_kind?: string
+          p_source_reference?: string
+          p_to_status: string
+        }
+        Returns: string
+      }
       apply_catalog_price_updates: { Args: { p_changes: Json }; Returns: Json }
       apply_customer_deposit: {
         Args: { p_amount: number; p_client_ref?: string; p_order_id: string }
@@ -12199,6 +12841,117 @@ export type Database = {
         Args: { p_check?: string; p_company_id: string }
         Returns: undefined
       }
+      assert_fulfillment_execution_ready: {
+        Args: {
+          p_fulfillment_id: string
+          p_source_kind?: string
+          p_source_reference?: string
+        }
+        Returns: string
+      }
+      assert_fulfillment_location_ready: {
+        Args: { p_company_id: string; p_location_id: string }
+        Returns: {
+          cod_enabled: boolean
+          company_id: string
+          created_at: string
+          default_delivery_fee_variant_id: string | null
+          delivery_enabled: boolean
+          delivery_sla_minutes: number
+          enabled: boolean
+          location_id: string
+          notification_channel: string
+          notify_failed: boolean
+          notify_fulfilled: boolean
+          notify_in_transit: boolean
+          notify_initial: boolean
+          notify_ready: boolean
+          pickup_enabled: boolean
+          pickup_sla_minutes: number
+          sms_fallback: boolean
+          tracking_token_ttl_days: number
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "fulfillment_settings"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      assert_fulfillment_preparation_ready: {
+        Args: { p_fulfillment_id: string }
+        Returns: {
+          address_line: string | null
+          assigned_membership_id: string | null
+          cancelled_at: string | null
+          claimed_at: string | null
+          collection_kind: string
+          company_id: string
+          created_at: string
+          created_by: string | null
+          customer_id: string | null
+          fulfilled_at: string | null
+          fulfillment_type: string
+          handoff_notes: string | null
+          id: string
+          landmark: string | null
+          location_id: string
+          map_link: string | null
+          order_id: string
+          phone_normalized: string | null
+          pin_failed_attempts: number
+          pin_generated_at: string
+          pin_hash: string
+          pin_locked_until: string | null
+          preparation_notes: string | null
+          promised_at: string | null
+          recipient_name: string
+          request_fingerprint: string | null
+          state_version: number
+          status: string
+          tracking_expires_at: string
+          tracking_token_hash: string
+          transactional_message_consent: boolean
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "order_fulfillments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      assert_order_fulfillment_request: {
+        Args: { p_customer_id: string; p_order_id: string; p_payload: Json }
+        Returns: {
+          cod_enabled: boolean
+          company_id: string
+          created_at: string
+          default_delivery_fee_variant_id: string | null
+          delivery_enabled: boolean
+          delivery_sla_minutes: number
+          enabled: boolean
+          location_id: string
+          notification_channel: string
+          notify_failed: boolean
+          notify_fulfilled: boolean
+          notify_in_transit: boolean
+          notify_initial: boolean
+          notify_ready: boolean
+          pickup_enabled: boolean
+          pickup_sla_minutes: number
+          sms_fallback: boolean
+          tracking_token_ttl_days: number
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "fulfillment_settings"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       assert_platform_admin: { Args: never; Returns: undefined }
       assert_supplier_account_consistent: {
         Args: { p_company_id: string; p_supplier_id: string }
@@ -12227,6 +12980,14 @@ export type Database = {
         }
         Returns: string
       }
+      assign_fulfillment: {
+        Args: {
+          p_expected_version: number
+          p_fulfillment_id: string
+          p_membership_id: string
+        }
+        Returns: Json
+      }
       assign_missing_variant_barcodes: {
         Args: { p_assignments: Json }
         Returns: {
@@ -12234,6 +12995,15 @@ export type Database = {
           barcode: string
           variant_id: string
         }[]
+      }
+      attach_order_fulfillment_core: {
+        Args: {
+          p_allow_pending?: boolean
+          p_customer_id: string
+          p_payload: Json
+          p_sale: Json
+        }
+        Returns: Json
       }
       available_payment_methods: {
         Args: { p_location_id?: string }
@@ -12294,6 +13064,14 @@ export type Database = {
         }
         Returns: number
       }
+      cancel_fulfillment: {
+        Args: {
+          p_expected_version: number
+          p_fulfillment_id: string
+          p_reason: string
+        }
+        Returns: Json
+      }
       cancel_purchase_draft: { Args: { p_draft_id: string }; Returns: string }
       cancel_scheduled_company_tax_profile: {
         Args: { p_profile_id: string }
@@ -12302,6 +13080,33 @@ export type Database = {
       cancel_team_invitation: {
         Args: { p_invitation_id: string }
         Returns: string
+      }
+      cash_custody_holdings: {
+        Args: { p_location_id: string }
+        Returns: {
+          amount: number
+          collected_at: string
+          custodian_membership_id: string
+          custodian_name: string
+          fulfillment_id: string
+          order_code: string
+          payment_id: string
+        }[]
+      }
+      cash_custody_remittances: {
+        Args: { p_limit?: number; p_location_id: string; p_status?: string }
+        Returns: {
+          accepted_at: string
+          custodian_membership_id: string
+          custodian_name: string
+          expected_amount: number
+          id: string
+          payment_count: number
+          received_amount: number
+          status: string
+          submitted_at: string
+          variance_reason: string
+        }[]
       }
       cashier_controlled_accounts: {
         Args: {
@@ -12407,6 +13212,10 @@ export type Database = {
         }
         Returns: Json
       }
+      claim_fulfillment: {
+        Args: { p_expected_version: number; p_fulfillment_id: string }
+        Returns: Json
+      }
       claim_platform_sales_invitation_send: {
         Args: {
           p_actor: string
@@ -12445,6 +13254,11 @@ export type Database = {
         Returns: string
       }
       closed_period_pack: { Args: { p_period_id: string }; Returns: Json }
+      cod_pending_split: { Args: { p_fulfillment_id: string }; Returns: Json }
+      collect_cod_cash: {
+        Args: { p_expected_version: number; p_fulfillment_id: string }
+        Returns: Json
+      }
       commission_period_statement: {
         Args: { p_period_id: string }
         Returns: {
@@ -12471,6 +13285,15 @@ export type Database = {
       company_terms_access_allowed: {
         Args: { p_company_id: string }
         Returns: boolean
+      }
+      complete_fulfillment: {
+        Args: {
+          p_expected_version: number
+          p_fulfillment_id: string
+          p_override_reason?: string
+          p_pin: string
+        }
+        Returns: Json
       }
       complete_order: {
         Args: { p_actor: string; p_order_id: string; p_payments: Json }
@@ -12574,6 +13397,16 @@ export type Database = {
         }
         Returns: string
       }
+      create_cod_mpesa_intent: {
+        Args: {
+          p_amount: number
+          p_cash_amount: number
+          p_client_ref: string
+          p_fulfillment_id: string
+          p_phone: string
+        }
+        Returns: string
+      }
       create_customer: {
         Args: {
           p_email?: string
@@ -12607,6 +13440,10 @@ export type Database = {
         }
         Returns: string
       }
+      create_order_fulfillment_core: {
+        Args: { p_customer_id: string; p_order_id: string; p_payload: Json }
+        Returns: Json
+      }
       create_product: {
         Args: { p_barcode?: string; p_image_path?: string; p_name: string }
         Returns: string
@@ -12631,7 +13468,10 @@ export type Database = {
       current_company_id_unchecked: { Args: never; Returns: string }
       current_company_legal_status: { Args: never; Returns: Json }
       current_entitlements: { Args: never; Returns: Json }
-      current_trial_access_request: { Args: never; Returns: Json }
+      current_fulfillment_membership_id: {
+        Args: { p_location_id: string }
+        Returns: string
+      }
       current_published_company_terms: {
         Args: never
         Returns: {
@@ -12658,8 +13498,13 @@ export type Database = {
         }
       }
       current_role_name: { Args: never; Returns: string }
+      current_trial_access_request: { Args: never; Returns: Json }
       current_user_can_access_location: {
         Args: { p_location_id: string }
+        Returns: boolean
+      }
+      current_user_can_access_scope: {
+        Args: { p_scope: string }
         Returns: boolean
       }
       current_user_has_permission: {
@@ -12675,6 +13520,10 @@ export type Database = {
           is_consistent: boolean
           ledger_balance: number
         }[]
+      }
+      customer_credit_exposure: {
+        Args: { p_company_id: string; p_customer_id: string }
+        Returns: number
       }
       customer_deposit_activity: {
         Args: { p_customer_id: string; p_limit?: number }
@@ -12742,6 +13591,10 @@ export type Database = {
         Returns: string
       }
       dispatch_due_platform_campaigns: { Args: never; Returns: number }
+      dispatch_fulfillment: {
+        Args: { p_expected_version: number; p_fulfillment_id: string }
+        Returns: Json
+      }
       dispatch_platform_campaign: {
         Args: { p_campaign_id: string }
         Returns: Json
@@ -12856,6 +13709,10 @@ export type Database = {
         Returns: undefined
       }
       finalize_catalog_import: { Args: { p_import_id: string }; Returns: Json }
+      finalize_cod_mpesa_cash_split: {
+        Args: { p_intent_id: string }
+        Returns: Json
+      }
       finalize_message_quota: {
         Args: { p_accepted: boolean; p_outbox_id: string }
         Returns: undefined
@@ -12889,10 +13746,63 @@ export type Database = {
         }
         Returns: string
       }
+      fulfillment_assignees: {
+        Args: { p_location_id: string }
+        Returns: {
+          display_name: string
+          membership_id: string
+        }[]
+      }
+      fulfillment_board: {
+        Args: {
+          p_cursor?: string
+          p_limit?: number
+          p_location_id: string
+          p_mine?: boolean
+          p_statuses?: string[]
+        }
+        Returns: {
+          address_line: string
+          assigned_membership_id: string
+          assigned_name: string
+          cod_balance: number
+          collection_kind: string
+          fulfillment_type: string
+          handoff_notes: string
+          id: string
+          items: Json
+          landmark: string
+          map_link: string
+          order_code: string
+          order_id: string
+          order_status: string
+          phone_normalized: string
+          preparation_notes: string
+          promised_at: string
+          recipient_name: string
+          state_version: number
+          status: string
+          updated_at: string
+        }[]
+      }
+      fulfillment_cod_balance: {
+        Args: { p_fulfillment_id: string }
+        Returns: number
+      }
+      fulfillment_detail: { Args: { p_fulfillment_id: string }; Returns: Json }
+      fulfillment_has_capability: {
+        Args: { p_permission: string }
+        Returns: boolean
+      }
+      fulfillment_settings_at_location: {
+        Args: { p_location_id: string }
+        Returns: Json
+      }
       generate_commission_period: {
         Args: { p_end_date: string; p_start_date: string }
         Returns: string
       }
+      generate_fulfillment_pin: { Args: never; Returns: string }
       increment_sms_usage: {
         Args: { p_company_id: string }
         Returns: undefined
@@ -13100,6 +14010,19 @@ export type Database = {
         Args: { p_company_id: string; p_customer_id: string }
         Returns: undefined
       }
+      mark_fulfillment_ready: {
+        Args: { p_expected_version: number; p_fulfillment_id: string }
+        Returns: Json
+      }
+      match_checkout_customers: {
+        Args: { p_phone: string }
+        Returns: {
+          display_name: string
+          id: string
+          phone: string
+          phone_normalized: string
+        }[]
+      }
       mpesa_apply_collection_to_intent: {
         Args: {
           p_attempt_id: string
@@ -13283,6 +14206,10 @@ export type Database = {
         }
         Returns: string
       }
+      normalize_fulfillment_phone: {
+        Args: { p_phone: string }
+        Returns: string
+      }
       normalize_legal_markdown: { Args: { p_content: string }; Returns: string }
       normalize_team_phone: { Args: { p_phone: string }; Returns: string }
       notify: {
@@ -13321,6 +14248,18 @@ export type Database = {
         Args: { p_declarations: Json; p_location_id: string }
         Returns: string
       }
+      order_fulfillment_summaries: {
+        Args: { p_order_ids: string[] }
+        Returns: {
+          cod_balance: number
+          collection_kind: string
+          fulfillment_id: string
+          fulfillment_status: string
+          fulfillment_type: string
+          order_id: string
+        }[]
+      }
+      order_open_balance_core: { Args: { p_order_id: string }; Returns: number }
       order_posting_context: {
         Args: { p_order_id: string; p_source?: string }
         Returns: Database["public"]["CompositeTypes"]["posting_context"]
@@ -13435,16 +14374,6 @@ export type Database = {
         }
         Returns: string
       }
-      platform_prepare_mpesa_daraja_app: {
-        Args: {
-          p_app_name: string
-          p_consumer_key: string
-          p_consumer_secret: string
-          p_environment: string
-          p_request_id: string
-        }
-        Returns: string
-      }
       platform_create_mpesa_test_attempt: {
         Args: {
           p_amount: number
@@ -13513,6 +14442,16 @@ export type Database = {
         Args: { p_callback_token_hash: string; p_connection_id: string }
         Returns: string
       }
+      platform_prepare_mpesa_daraja_app: {
+        Args: {
+          p_app_name: string
+          p_consumer_key: string
+          p_consumer_secret: string
+          p_environment: string
+          p_request_id: string
+        }
+        Returns: string
+      }
       platform_publish_blog_post: { Args: { p_post_id: string }; Returns: Json }
       platform_publish_legal_document: {
         Args: { p_expected_sha256: string; p_id: string }
@@ -13559,6 +14498,16 @@ export type Database = {
           p_payout_reference?: string
           p_reason?: string
           p_status: string
+        }
+        Returns: string
+      }
+      platform_review_trial_access_request: {
+        Args: {
+          p_decision: string
+          p_decision_note?: string
+          p_granted_until?: string
+          p_request_id: string
+          p_tier_id?: string
         }
         Returns: string
       }
@@ -13694,16 +14643,6 @@ export type Database = {
         }
         Returns: Json
       }
-      platform_review_trial_access_request: {
-        Args: {
-          p_decision: string
-          p_decision_note?: string
-          p_granted_until?: string
-          p_request_id: string
-          p_tier_id?: string
-        }
-        Returns: string
-      }
       platform_update_registration_config: {
         Args: {
           p_automatic_company_approval_enabled: boolean
@@ -13801,6 +14740,14 @@ export type Database = {
         Args: { p_amount: number; p_customer_id: string; p_reason: string }
         Returns: string
       }
+      post_cod_payments_core: {
+        Args: {
+          p_context: Database["public"]["CompositeTypes"]["posting_context"]
+          p_fulfillment_id: string
+          p_payments: Json
+        }
+        Returns: number
+      }
       post_credit_sale_at_location: {
         Args: {
           p_approval_reason?: string
@@ -13872,6 +14819,31 @@ export type Database = {
         }
         Returns: string
       }
+      post_fulfillment_credit_sale_at_location: {
+        Args: {
+          p_approval_reason?: string
+          p_client_ref: string
+          p_customer_id: string
+          p_draft_id?: string
+          p_fulfillment: Json
+          p_lines: Json
+          p_location_id: string
+        }
+        Returns: Json
+      }
+      post_fulfillment_sale_at_location: {
+        Args: {
+          p_approval_reason?: string
+          p_client_ref: string
+          p_customer: Json
+          p_draft_id?: string
+          p_fulfillment: Json
+          p_lines: Json
+          p_location_id: string
+          p_payments: Json
+        }
+        Returns: Json
+      }
       post_full_refund: {
         Args: {
           p_method_code: string
@@ -13929,6 +14901,21 @@ export type Database = {
           p_reconciliation_id: string
         }
         Returns: string
+      }
+      post_offline_fulfillment_sale_at_location: {
+        Args: {
+          p_client_ref: string
+          p_customer: Json
+          p_device_key: string
+          p_draft_id?: string
+          p_fulfillment: Json
+          p_lines: Json
+          p_location_id: string
+          p_occurred_at: string
+          p_payments: Json
+          p_pending_count?: number
+        }
+        Returns: Json
       }
       post_offline_sale_at_location: {
         Args: {
@@ -14080,6 +15067,17 @@ export type Database = {
         }
         Returns: string
       }
+      prepare_cod_mpesa_checkout: {
+        Args: {
+          p_amount: number
+          p_cash_amount: number
+          p_client_ref: string
+          p_fulfillment_id: string
+          p_phone: string
+          p_retry?: boolean
+        }
+        Returns: Json
+      }
       prepare_controlled_outbox_delivery: {
         Args: { p_outbox_id: string }
         Returns: boolean
@@ -14097,6 +15095,21 @@ export type Database = {
           p_phone: string
           p_retry?: boolean
           p_workflow: string
+        }
+        Returns: Json
+      }
+      prepare_mpesa_fulfillment_checkout: {
+        Args: {
+          p_amount: number
+          p_cash_amount: number
+          p_client_ref: string
+          p_customer: Json
+          p_draft_id?: string
+          p_fulfillment: Json
+          p_lines: Json
+          p_location_id: string
+          p_phone: string
+          p_retry?: boolean
         }
         Returns: Json
       }
@@ -14193,6 +15206,7 @@ export type Database = {
       }
       public_external_document: { Args: { p_token: string }; Returns: Json }
       public_featured_blog_post: { Args: never; Returns: Json }
+      public_fulfillment_tracking: { Args: { p_token: string }; Returns: Json }
       public_storefront_sitemap: { Args: never; Returns: Json }
       publish_due_blog_posts: { Args: never; Returns: number }
       published_legal_document: {
@@ -14236,6 +15250,16 @@ export type Database = {
       purge_mpesa_raw_payloads: { Args: never; Returns: number }
       queue_cashier_session_notification: {
         Args: { p_event: string; p_session_id: string }
+        Returns: string
+      }
+      queue_fulfillment_message_core: {
+        Args: {
+          p_event_id: string
+          p_fulfillment_id: string
+          p_milestone: string
+          p_pin?: string
+          p_tracking_token?: string
+        }
         Returns: string
       }
       queue_manual_document_message: {
@@ -14518,6 +15542,18 @@ export type Database = {
         }
         Returns: string
       }
+      regenerate_fulfillment_access: {
+        Args: {
+          p_expected_version: number
+          p_fulfillment_id: string
+          p_regenerate_pin?: boolean
+        }
+        Returns: Json
+      }
+      reject_cash_custody_remittance: {
+        Args: { p_reason: string; p_remittance_id: string }
+        Returns: Json
+      }
       remove_team_member: { Args: { p_membership_id: string }; Returns: string }
       render_customer_statement_message: {
         Args: { p_context: Json; p_url: string }
@@ -14531,6 +15567,14 @@ export type Database = {
         Args: { p_body: string; p_values: Json }
         Returns: string
       }
+      report_fulfillment_failure: {
+        Args: {
+          p_expected_version: number
+          p_fulfillment_id: string
+          p_reason: string
+        }
+        Returns: Json
+      }
       request_mpesa_onboarding: {
         Args: {
           p_contact_email: string
@@ -14539,7 +15583,7 @@ export type Database = {
           p_existing_c2b_integration?: boolean
           p_existing_c2b_notes?: string
           p_legal_name: string
-          p_location_ids?: string[]
+          p_location_ids: string[]
           p_mpesa_username: string
           p_notes?: string
           p_shortcode: string
@@ -14566,6 +15610,10 @@ export type Database = {
         }
         Returns: string
       }
+      request_trial_access: {
+        Args: { p_reason: string; p_requested_days: number }
+        Returns: string
+      }
       require_asset_leaf_account: {
         Args: { p_code: string; p_company_id: string }
         Returns: string
@@ -14581,10 +15629,6 @@ export type Database = {
       resend_team_invitation: {
         Args: { p_invitation_id: string }
         Returns: Json
-      }
-      request_trial_access: {
-        Args: { p_reason: string; p_requested_days: number }
-        Returns: string
       }
       reserve_initial_subscription_payment: {
         Args: {
@@ -14607,6 +15651,14 @@ export type Database = {
       resolve_business_location: {
         Args: { p_location_id?: string }
         Returns: string
+      }
+      resolve_cash_custody_shortage: {
+        Args: {
+          p_reason: string
+          p_received_amount: number
+          p_remittance_id: string
+        }
+        Returns: Json
       }
       resolve_catalog_barcode: {
         Args: { p_barcode: string; p_location_id?: string }
@@ -14650,6 +15702,14 @@ export type Database = {
           tax_total: number
           vat_registered: boolean
         }[]
+      }
+      resolve_checkout_customer_core: {
+        Args: {
+          p_company_id: string
+          p_customer: Json
+          p_require_customer?: boolean
+        }
+        Returns: string
       }
       resolve_configured_category_tax: {
         Args: {
@@ -14794,6 +15854,10 @@ export type Database = {
       retire_pos_device: {
         Args: { p_device_id: string; p_reason: string }
         Returns: string
+      }
+      retry_fulfillment: {
+        Args: { p_expected_version: number; p_fulfillment_id: string }
+        Returns: Json
       }
       retry_mpesa_collection_posting: {
         Args: { p_collection_id: string }
@@ -15134,6 +16198,10 @@ export type Database = {
         }[]
       }
       start_catalog_export: { Args: never; Returns: Json }
+      start_fulfillment_preparation: {
+        Args: { p_expected_version: number; p_fulfillment_id: string }
+        Returns: Json
+      }
       start_tax_submission_job: { Args: { p_job_id: string }; Returns: string }
       stock_adjustment_history: {
         Args: {
@@ -15236,6 +16304,10 @@ export type Database = {
           variant_name: string
         }[]
       }
+      submit_cash_custody_remittance: {
+        Args: { p_location_id: string; p_payment_ids: string[] }
+        Returns: Json
+      }
       subscription_expiry_scan: { Args: never; Returns: number }
       supplier_account_status: {
         Args: { p_supplier_id: string }
@@ -15302,6 +16374,17 @@ export type Database = {
           p_to_location_id: string
         }
         Returns: string
+      }
+      transition_fulfillment_core: {
+        Args: {
+          p_expected_version: number
+          p_fulfillment_id: string
+          p_payload?: Json
+          p_source_kind?: string
+          p_source_reference?: string
+          p_target: string
+        }
+        Returns: Json
       }
       trigger_public_site_deploy: { Args: never; Returns: undefined }
       update_catalog_product: {
@@ -15371,6 +16454,10 @@ export type Database = {
       update_customer_tax_registration: {
         Args: { p_customer_id: string; p_tax_registration_number: string }
         Returns: string
+      }
+      update_fulfillment_settings: {
+        Args: { p_location_id: string; p_settings: Json }
+        Returns: Json
       }
       update_location_tax_branch_code: {
         Args: { p_branch_code: string; p_location_id: string }

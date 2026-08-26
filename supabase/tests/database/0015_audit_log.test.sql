@@ -46,19 +46,7 @@ select is(
   'variant update captured with old_data snapshot'
 );
 
--- 4. Deletes captured (via superuser path — proves no path bypasses it).
-reset role;
-delete from public.roles where company_id = (select company_id from au_company) and name = 'Admin';
-
-select ok(
-  exists (
-    select 1 from public.audit_log
-    where table_name = 'roles' and operation = 'DELETE'
-  ),
-  'delete captured even from a non-RPC path'
-);
-
--- 5. Journal tables are NOT audited (immutable — they are the audit).
+-- 4. Journal tables are NOT audited (immutable — they are the audit).
 select testkit.as_user((select company_id from au_company), '11111111-1111-1111-1111-111111111111', 'Admin');
 
 create temp table au_svc as
@@ -72,9 +60,22 @@ select public.post_sale(null,
   '[{"method":"cash","amount":5000}]');
 
 select is(
-  (select count(*)::int from public.audit_log where table_name like 'ledger%'),
+  (select count(*)::int from public.audit_log
+   where table_name in ('ledger_journal_entries', 'ledger_journal_lines')),
   0,
   'ledger tables excluded from audit (they are immutable records themselves)'
+);
+
+-- 5. Deletes captured (via superuser path — proves no path bypasses it).
+reset role;
+delete from public.roles where company_id = (select company_id from au_company) and name = 'Admin';
+
+select ok(
+  exists (
+    select 1 from public.audit_log
+    where table_name = 'roles' and operation = 'DELETE'
+  ),
+  'delete captured even from a non-RPC path'
 );
 
 -- 6-7. RLS: member reads their company audit; second company sees nothing of it.

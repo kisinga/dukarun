@@ -150,6 +150,7 @@ async function mockOperationsApp(page: Page): Promise<void> {
         company_id: companyId,
         user_id: userId,
         permissions: ['ManageCatalog', 'ManageStockAdjustments'],
+        workspaces: ['dashboard', 'inventory', 'purchasing'],
         actions: {},
       });
     }

@@ -29,19 +29,46 @@ Deno.serve(async req => {
     const input = await req.json();
     const manual = input.mode === 'manual';
     const phone = manual ? null : normalizePhone(input.phone);
-    const { data: prepared, error: intentError } = await userClient.rpc('prepare_mpesa_checkout', {
-      p_workflow: input.workflow,
-      p_location_id: input.location_id,
-      p_phone: phone,
-      p_amount: Math.round(Number(input.amount)),
-      p_cash_amount: Math.round(Number(input.cash_amount ?? 0)),
-      p_client_ref: input.client_ref ?? null,
-      p_customer_id: input.customer_id ?? null,
-      p_lines: input.lines ?? null,
-      p_order_id: input.order_id ?? null,
-      p_draft_id: input.draft_id ?? null,
-      p_retry: input.retry === true,
-    });
+    if (manual && input.workflow === 'cod_order') {
+      throw new Error('manual_fallback_not_available');
+    }
+    const preparedRequest =
+      input.workflow === 'cod_order'
+        ? userClient.rpc('prepare_cod_mpesa_checkout', {
+            p_fulfillment_id: input.fulfillment_id,
+            p_phone: phone,
+            p_amount: Math.round(Number(input.amount)),
+            p_cash_amount: Math.round(Number(input.cash_amount ?? 0)),
+            p_client_ref: input.client_ref ?? null,
+            p_retry: input.retry === true,
+          })
+        : input.workflow === 'fulfillment_sale'
+          ? userClient.rpc('prepare_mpesa_fulfillment_checkout', {
+              p_location_id: input.location_id,
+              p_customer: input.customer ?? {},
+              p_lines: input.lines ?? null,
+              p_fulfillment: input.fulfillment ?? {},
+              p_phone: phone,
+              p_amount: Math.round(Number(input.amount)),
+              p_cash_amount: Math.round(Number(input.cash_amount ?? 0)),
+              p_client_ref: input.client_ref ?? null,
+              p_draft_id: input.draft_id ?? null,
+              p_retry: input.retry === true,
+            })
+          : userClient.rpc('prepare_mpesa_checkout', {
+              p_workflow: input.workflow,
+              p_location_id: input.location_id,
+              p_phone: phone,
+              p_amount: Math.round(Number(input.amount)),
+              p_cash_amount: Math.round(Number(input.cash_amount ?? 0)),
+              p_client_ref: input.client_ref ?? null,
+              p_customer_id: input.customer_id ?? null,
+              p_lines: input.lines ?? null,
+              p_order_id: input.order_id ?? null,
+              p_draft_id: input.draft_id ?? null,
+              p_retry: input.retry === true,
+            });
+    const { data: prepared, error: intentError } = await preparedRequest;
     if (intentError) throw new Error(intentError.message);
     const checkout = prepared as {
       intent_id: string;

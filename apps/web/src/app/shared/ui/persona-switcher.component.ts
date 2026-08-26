@@ -12,6 +12,7 @@ const PERSONAS: Persona[] = [
   { label: 'Admin', phone: '254700000001' },
   { label: 'Cashier', phone: '254700000002' },
   { label: 'Manager', phone: '254700000003' },
+  { label: 'Delivery person', phone: '254700000004' },
 ];
 
 const TEST_OTP = '123456';

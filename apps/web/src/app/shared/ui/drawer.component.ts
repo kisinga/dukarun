@@ -80,11 +80,11 @@ const CLOSE_MS = 150;
 
           <footer
             class="shrink-0 border-t border-base-300/70 bg-base-100 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:px-6"
-            [class.task-sheet-default-footer]="!hasFooter()"
+            [class.task-sheet-default-footer]="!hasActionFooter() && !hasFooter()"
           >
             <!-- Keep projection unconditional: hasFooter() is detected from this rendered slot. -->
             <ng-content select="[drawerFooter]" />
-            @if (!hasFooter()) {
+            @if (!hasActionFooter() && !hasFooter()) {
               <button appButton type="button" class="w-full" (click)="requestClose()">
                 {{ mobileDismissLabel() }}
               </button>
@@ -184,6 +184,7 @@ export class DrawerComponent implements OnDestroy {
   readonly subtitle = input<string>();
   readonly mobileDismissLabel = input('Done');
   readonly dirty = input(false);
+  readonly hasActionFooter = input(false);
   readonly closed = output<void>();
 
   protected readonly rendered = signal(false);

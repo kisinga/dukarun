@@ -107,6 +107,18 @@ export interface ExternalDocument {
   }>;
 }
 
+export interface PublicFulfillmentTracking {
+  merchant_name: string;
+  merchant_phone: string | null;
+  order_code: string;
+  fulfillment_type: 'pickup' | 'delivery';
+  status: 'pending' | 'processing' | 'ready' | 'in_transit' | 'fulfilled' | 'failed' | 'cancelled';
+  promised_at: string | null;
+  updated_at: string;
+  items: Array<{ name: string; quantity: number }>;
+  milestones: Array<{ status: string; at: string }>;
+}
+
 const DIRECTORY_KEY = makeStateKey<StorefrontInfo[]>('storefront:directory');
 const shopKey = (slug: string) => makeStateKey<StorefrontInfo | null>(`storefront:shop:${slug}`);
 const catalogPageKey = (slug: string, limit: number, offset: number) =>
@@ -472,6 +484,18 @@ export class StorefrontService {
       if (error) throw error;
       return data as unknown as ExternalDocument | null;
     });
+  }
+
+  async fulfillmentTracking(token: string): Promise<PublicFulfillmentTracking | null> {
+    const client = this.client as unknown as {
+      rpc: (
+        name: string,
+        args: Record<string, unknown>
+      ) => Promise<{ data: unknown; error: Error | null }>;
+    };
+    const { data, error } = await client.rpc('public_fulfillment_tracking', { p_token: token });
+    if (error) throw error;
+    return data as PublicFulfillmentTracking | null;
   }
 
   private track<T>(task: () => Promise<T>): Promise<T> {

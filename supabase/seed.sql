@@ -136,7 +136,8 @@ set permissions = array[
   'ManageMpesaIntegration','ManageCompanySettings','ReverseOrder','OverrideCustomerBalance','SettleOrder',
   'ManageSupplierCreditPurchases','ViewFinancials','ManageReconciliation',
   'CloseAccountingPeriod','CreateInterAccountTransfer','ManageTeam','ViewAuditTrail',
-  'ViewStaffPerformance','ManageCommissions'
+  'ViewStaffPerformance','ManageCommissions','ProcessFulfillments','CompleteFulfillments',
+  'ManageFulfillments'
 ]::text[]
 from public.companies c
 where r.company_id = c.id and c.name = 'Mama Mboga Stores' and r.name = 'Admin';
@@ -149,8 +150,8 @@ where m.user_id = '5877ac73-ff8d-457c-afcd-791e66229d17'
   and r.company_id = c.id and r.name = 'Admin';
 
 -- ---------------------------------------------------------------------------
--- Test personas: Cashier + Manager sharing the demo company.
--- Phones 254700000002/3 with OTP 123456 (config.toml test_otp). Used by the
+-- Test personas: Cashier, Manager, and Delivery person sharing the demo company.
+-- Phones 254700000002/3/4 with OTP 123456 (config.toml test_otp). Used by the
 -- dev-only persona switcher in apps/web.
 -- ---------------------------------------------------------------------------
 insert into auth.users (
@@ -164,6 +165,22 @@ values (
   '00000000-0000-0000-0000-000000000000',
   'authenticated', 'authenticated',
   'cashier@dukarun.local', '254700000002', now(), '',
+  '', '', '', '', '', '', '', '',
+  now(), now()
+)
+on conflict (id) do nothing;
+
+insert into auth.users (
+  id, instance_id, aud, role, email, phone, phone_confirmed_at, encrypted_password,
+  confirmation_token, recovery_token, email_change, email_change_token_current,
+  email_change_token_new, phone_change, phone_change_token, reauthentication_token,
+  created_at, updated_at
+)
+values (
+  '5877ac73-ff8d-457c-afcd-791e66229d04',
+  '00000000-0000-0000-0000-000000000000',
+  'authenticated', 'authenticated',
+  'delivery@dukarun.local', '254700000004', now(), '',
   '', '', '', '', '', '', '', '',
   now(), now()
 )
@@ -194,7 +211,8 @@ select c.id, 'Manager', array[
   'ApproveCustomerCredit', 'ManageCustomerCreditLimit', 'ManageCatalog', 'ReverseOrder',
   'SettleOrder', 'ManageSupplierCreditPurchases',
   'ViewFinancials', 'ManageReconciliation',
-  'CreateInterAccountTransfer', 'ManageTeam'
+  'CreateInterAccountTransfer', 'ManageTeam',
+  'ProcessFulfillments', 'CompleteFulfillments', 'ManageFulfillments'
 ]::text[]
 from public.companies c
 where c.name = 'Mama Mboga Stores'
@@ -207,7 +225,8 @@ from public.companies c
 cross join (
   values
     ('5877ac73-ff8d-457c-afcd-791e66229d02', 'Cashier'),
-    ('5877ac73-ff8d-457c-afcd-791e66229d03', 'Manager')
+    ('5877ac73-ff8d-457c-afcd-791e66229d03', 'Manager'),
+    ('5877ac73-ff8d-457c-afcd-791e66229d04', 'Delivery person')
 ) as persona(user_id, role_name)
 join public.roles r on r.company_id = c.id and r.name = persona.role_name
 where c.name = 'Mama Mboga Stores'
@@ -215,6 +234,17 @@ on conflict (company_id, user_id) do update
 set role_id = excluded.role_id,
     authorization_status = excluded.authorization_status,
     updated_at = now();
+
+insert into public.company_membership_locations(
+  company_id,membership_id,location_id,is_primary
+)
+select c.id,m.id,l.id,true
+from public.companies c
+join public.company_memberships m on m.company_id=c.id
+join public.stock_locations l on l.company_id=c.id and l.is_default
+where c.name='Mama Mboga Stores'
+  and m.user_id='5877ac73-ff8d-457c-afcd-791e66229d04'
+on conflict(membership_id,location_id) do update set is_primary=true;
 
 -- Provisioning creates MAIN/Kiosk 1. Add two non-default locations so purchase,
 -- stock, and reporting screens can exercise real location selection.
@@ -230,6 +260,12 @@ where c.name = 'Mama Mboga Stores'
 on conflict (company_id, code) do update
 set name = excluded.name,
     updated_at = now();
+
+delete from public.company_membership_locations ml
+using public.company_memberships m,public.companies c,public.stock_locations l
+where ml.membership_id=m.id and ml.company_id=c.id and ml.location_id=l.id
+  and m.company_id=c.id and l.company_id=c.id and c.name='Mama Mboga Stores'
+  and m.user_id='5877ac73-ff8d-457c-afcd-791e66229d04' and not l.is_default;
 
 -- ---------------------------------------------------------------------------
 -- Demo catalog: family + variants + stock

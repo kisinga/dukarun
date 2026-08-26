@@ -9,21 +9,21 @@ create temp table tm_company as
 select testkit.provision('11111111-1111-1111-1111-111111111111', 'Tmpl Co') as company_id;
 grant select on pg_temp.tm_company to authenticated;
 
--- 1. Four platform templates exist.
+-- 1. Five platform templates exist.
 reset role;
 select is(
   (select count(*)::int from public.roles where is_template),
-  4,
-  'four platform templates seeded (Admin, Manager, Cashier, Stock Clerk)'
+  5,
+  'five platform templates include the delivery handoff role'
 );
 
 -- 2. Provisioning seeds the complete operational role set.
 select is(
   (select count(*)::int from public.roles
    where company_id = (select company_id from tm_company)
-     and name in ('Admin', 'Manager', 'Cashier', 'Stock Clerk')),
-  4,
-  'provisioning creates Admin, Manager, Cashier, and Stock Clerk roles'
+     and name in ('Admin', 'Manager', 'Cashier', 'Stock Clerk', 'Delivery person')),
+  5,
+  'provisioning creates all standard operational roles'
 );
 
 -- 3. Template permissions are valid per the constraint (spot-check Manager).
@@ -35,7 +35,8 @@ select ok(
     'OverrideCustomerBalance', 'SettleOrder', 'ManageSupplierCreditPurchases',
     'ViewFinancials', 'ManageReconciliation', 'CloseAccountingPeriod',
     'CreateInterAccountTransfer', 'ManageTeam', 'ViewAuditTrail',
-    'ViewStaffPerformance', 'ManageCommissions'
+    'ViewStaffPerformance', 'ManageCommissions', 'ProcessFulfillments',
+    'CompleteFulfillments', 'ManageFulfillments'
   ]::text[] from public.roles where is_template and name = 'Manager'),
   'Manager template permissions are a valid subset'
 );

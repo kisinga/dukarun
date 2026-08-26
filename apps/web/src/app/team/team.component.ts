@@ -856,6 +856,10 @@ export class TeamComponent implements OnInit {
       permissions: ['ManageCatalog', 'ManageStockAdjustments'],
     },
     {
+      label: 'Pickup & Delivery',
+      permissions: ['ProcessFulfillments', 'CompleteFulfillments', 'ManageFulfillments'],
+    },
+    {
       label: 'Customers / Suppliers',
       permissions: [
         'ApproveCustomerCredit',

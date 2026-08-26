@@ -12,6 +12,10 @@ import type {
   SaleLineInput,
   Variant,
 } from '../pos.service';
+import type {
+  CheckoutCustomerInput,
+  FulfillmentCheckoutInput,
+} from '../../fulfillment/fulfillment.service';
 
 type CashierSession = Database['public']['Tables']['cashier_sessions']['Row'];
 type Customer = Database['public']['Tables']['customers']['Row'];
@@ -48,6 +52,9 @@ export interface OutboxEntry extends ScopedRecord {
   customer_id: string | null;
   lines: SaleLineInput[];
   payments: PaymentInput[];
+  /** Present for pickup/delivery sales; replay creates the fulfillment atomically. */
+  checkout_customer?: CheckoutCustomerInput;
+  fulfillment?: FulfillmentCheckoutInput;
   /** Proforma being converted — passed as p_draft_id on replay so it retires with the sale. */
   draft_id?: string | null;
   /** Original tax point, captured before the browser queues the sale. */

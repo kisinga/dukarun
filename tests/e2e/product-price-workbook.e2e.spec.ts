@@ -124,6 +124,7 @@ async function mockPriceWorkbookFlow(page: Page) {
         company_id: companyId,
         user_id: userId,
         permissions: ['ManageCatalog', 'ManageStockAdjustments', 'ManageCompanySettings'],
+        workspaces: ['dashboard', 'inventory', 'purchasing'],
         actions: {},
       });
     }

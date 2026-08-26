@@ -45,6 +45,15 @@ import { MpesaService } from '../../core/mpesa.service';
 import { MpesaCheckoutCoordinator } from '../../core/mpesa-checkout-coordinator.service';
 import { LocationContextService } from '../../core/location-context.service';
 import {
+  FulfillmentCheckoutFieldsComponent,
+  type CheckoutMode,
+  type FulfillmentCheckoutDraft,
+} from '../../fulfillment/fulfillment-checkout-fields.component';
+import {
+  FulfillmentService,
+  type FulfillmentSettings,
+} from '../../fulfillment/fulfillment.service';
+import {
   Customer,
   CustomerWithCredit,
   PaymentInput,
@@ -86,6 +95,7 @@ type CatalogView = 'grid' | 'list' | 'categories';
     SessionRequiredNoticeComponent,
     BarcodeScannerComponent,
     PageActionsComponent,
+    FulfillmentCheckoutFieldsComponent,
   ],
   template: `
     <app-page
@@ -846,6 +856,13 @@ type CatalogView = 'grid' | 'list' | 'categories';
                 }
               </section>
 
+              <app-fulfillment-checkout-fields
+                [settings]="fulfillmentSettings()"
+                [customer]="checkoutCustomer()"
+                (modeChanged)="fulfillmentModeChanged($event)"
+                (customerSelected)="selectMatchedCustomer($event)"
+              />
+
               <section class="mt-auto border-t border-base-300/60 p-4">
                 <div class="hidden items-end justify-between gap-3 lg:flex">
                   <div>
@@ -864,13 +881,13 @@ type CatalogView = 'grid' | 'list' | 'categories';
                   [disabled]="
                     cart.isEmpty() ||
                     busy() ||
-                    !cashierSession.canTakePayment() ||
+                    (!isCodCheckout() && !cashierSession.canTakePayment()) ||
                     !perms.has('SettleOrder')
                   "
                   (click)="openCheckout()"
                 >
-                  <app-icon name="heroBanknotes" />
-                  Take payment
+                  <app-icon [name]="isCodCheckout() ? 'heroTruck' : 'heroBanknotes'" />
+                  {{ isCodCheckout() ? 'Place COD order' : 'Take payment' }}
                 </button>
                 @if (creditAllowed()) {
                   <button
@@ -879,36 +896,38 @@ type CatalogView = 'grid' | 'list' | 'categories';
                     size="md"
                     class="mt-2 hidden min-h-11 w-full lg:flex"
                     [disabled]="cart.isEmpty() || busy() || !cashierSession.canTakePayment()"
-                    (click)="creditConfirmOpen.set(true)"
+                    (click)="openCreditConfirmation()"
                   >
                     Sell on credit
                   </button>
                 }
 
-                <div class="flex flex-wrap gap-2 lg:mt-2 lg:flex-col">
-                  @if (cashierSession.cashierFlowEnabled()) {
+                @if (fulfillmentMode() === 'counter') {
+                  <div class="flex flex-wrap gap-2 lg:mt-2 lg:flex-col">
+                    @if (cashierSession.cashierFlowEnabled()) {
+                      <button
+                        appButton
+                        variant="secondary"
+                        size="md"
+                        class="flex-1"
+                        [disabled]="cart.isEmpty() || busy()"
+                        (click)="sendToCashier()"
+                      >
+                        Send to cashier
+                      </button>
+                    }
                     <button
                       appButton
                       variant="secondary"
                       size="md"
                       class="flex-1"
                       [disabled]="cart.isEmpty() || busy()"
-                      (click)="sendToCashier()"
+                      (click)="saveProforma()"
                     >
-                      Send to cashier
+                      Save proforma
                     </button>
-                  }
-                  <button
-                    appButton
-                    variant="secondary"
-                    size="md"
-                    class="flex-1"
-                    [disabled]="cart.isEmpty() || busy()"
-                    (click)="saveProforma()"
-                  >
-                    Save proforma
-                  </button>
-                </div>
+                  </div>
+                }
               </section>
             </div>
           </aside>
@@ -932,7 +951,7 @@ type CatalogView = 'grid' | 'list' | 'categories';
               size="md"
               class="min-h-11 flex-1"
               [disabled]="cart.isEmpty() || busy() || !cashierSession.canTakePayment()"
-              (click)="creditConfirmOpen.set(true)"
+              (click)="openCreditConfirmation()"
             >
               Sell on credit
             </button>
@@ -944,12 +963,12 @@ type CatalogView = 'grid' | 'list' | 'categories';
             [disabled]="
               cart.isEmpty() ||
               busy() ||
-              !cashierSession.canTakePayment() ||
+              (!isCodCheckout() && !cashierSession.canTakePayment()) ||
               !perms.has('SettleOrder')
             "
             (click)="openCheckout()"
           >
-            Take payment
+            {{ isCodCheckout() ? 'Place COD order' : 'Take payment' }}
             <app-icon name="heroChevronRight" />
           </button>
         </div>
@@ -960,11 +979,13 @@ type CatalogView = 'grid' | 'list' | 'categories';
           [total]="cart.total()"
           [methods]="panelMethods()"
           [canUseDirectAccounts]="canUseDirectAccounts()"
-          [customerDepositAvailable]="customerDepositBalance()"
-          [allowCredit]="mixedCreditAllowed()"
+          [customerDepositAvailable]="
+            fulfillmentMode() === 'counter' ? customerDepositBalance() : 0
+          "
+          [allowCredit]="fulfillmentMode() === 'counter' && mixedCreditAllowed()"
           [mpesaStkEnabled]="mpesa.availability().active"
           [mpesaManualFallback]="mpesa.availability().manualFallback"
-          [defaultPayerPhone]="selectedCustomer()?.phone ?? ''"
+          [defaultPayerPhone]="fulfillmentPayerPhone()"
           [busy]="busy()"
           heading="Take payment"
           (confirmed)="completeSale($event)"
@@ -1197,6 +1218,7 @@ export class SellComponent implements OnInit {
   protected readonly mpesa = inject(MpesaService);
   private readonly mpesaCheckout = inject(MpesaCheckoutCoordinator);
   private readonly locations = inject(LocationContextService);
+  private readonly fulfillment = inject(FulfillmentService);
 
   protected readonly search = new FormControl('', { nonNullable: true });
   private readonly productSearch = viewChild<ElementRef<HTMLInputElement>>('productSearch');
@@ -1302,6 +1324,27 @@ export class SellComponent implements OnInit {
   protected readonly customerSearchHasMore = signal(false);
   protected readonly selectedCustomer = signal<CustomerWithCredit | null>(null);
   protected readonly customerDropdownOpen = signal(false);
+  protected readonly fulfillmentSettings = signal<FulfillmentSettings | null>(null);
+  protected readonly fulfillmentMode = signal<CheckoutMode>('counter');
+  protected readonly fulfillmentFields = viewChild(FulfillmentCheckoutFieldsComponent);
+  protected readonly checkoutCustomer = computed(() => {
+    const customer = this.selectedCustomer();
+    return customer
+      ? {
+          id: customer.id,
+          name: this.customerName(customer),
+          phone: customer.phone,
+        }
+      : null;
+  });
+  protected readonly isCodCheckout = computed(
+    () =>
+      this.fulfillmentMode() !== 'counter' && this.fulfillmentFields()?.collectionKind() === 'cod'
+  );
+  protected readonly fulfillmentPayerPhone = computed(
+    () => this.fulfillmentFields()?.phone() || this.selectedCustomer()?.phone || ''
+  );
+  private autoDeliveryFeeVariantId: string | null = null;
 
   protected readonly overrideFor = signal<string | null>(null);
   protected readonly overridePrice = new FormControl('', { nonNullable: true });
@@ -1344,6 +1387,7 @@ export class SellComponent implements OnInit {
   protected readonly printerEnabled = signal(false);
   protected readonly brokenImages = signal<Set<string>>(new Set());
   protected readonly creditAllowed = computed(() => {
+    if (this.isCodCheckout()) return false;
     const customer = this.selectedCustomer();
     if (!customer || (!customer.is_credit_approved && this.automaticCreditAmount() > 0))
       return false;
@@ -1411,6 +1455,21 @@ export class SellComponent implements OnInit {
       const query = this.debouncedCustomerSearch();
       if (query === undefined) return;
       untracked(() => void this.onCustomerSearch(query));
+    });
+    let fulfillmentLocationId: string | null = null;
+    effect(() => {
+      const locationId = this.locations.activeId();
+      if (!locationId || locationId === fulfillmentLocationId) return;
+      const locationChanged = fulfillmentLocationId !== null;
+      fulfillmentLocationId = locationId;
+      untracked(() => {
+        if (locationChanged) {
+          if (this.autoDeliveryFeeVariantId) this.cart.removeLine(this.autoDeliveryFeeVariantId);
+          this.resetFulfillmentCheckout();
+        }
+        this.fulfillmentSettings.set(null);
+        void this.loadFulfillmentSettings();
+      });
     });
   }
 
@@ -1859,9 +1918,73 @@ export class SellComponent implements OnInit {
     return [customer.first_name, customer.last_name].filter(Boolean).join(' ');
   }
 
+  private async loadFulfillmentSettings(): Promise<void> {
+    const locationId = this.locations.activeId();
+    if (!locationId) return;
+    try {
+      this.fulfillmentSettings.set(await this.fulfillment.settings(locationId));
+    } catch {
+      this.fulfillmentSettings.set(null);
+    }
+  }
+
+  protected async fulfillmentModeChanged(mode: CheckoutMode): Promise<void> {
+    this.fulfillmentMode.set(mode);
+    this.error.set(null);
+    if (mode === 'delivery') {
+      await this.ensureDeliveryFee();
+      return;
+    }
+    if (this.autoDeliveryFeeVariantId) {
+      this.cart.removeLine(this.autoDeliveryFeeVariantId);
+      this.autoDeliveryFeeVariantId = null;
+    }
+  }
+
+  protected async selectMatchedCustomer(customerId: string): Promise<void> {
+    try {
+      const customer = await this.pos.customerWithCredit(customerId);
+      if (!customer) throw new Error('Customer not found');
+      this.selectCustomer(customer);
+    } catch (error) {
+      this.error.set(error instanceof Error ? error.message : 'Could not select customer');
+    }
+  }
+
+  private async ensureDeliveryFee(): Promise<boolean> {
+    if (this.fulfillmentMode() !== 'delivery') return true;
+    const variantId = this.fulfillmentSettings()?.default_delivery_fee_variant_id;
+    if (!variantId) {
+      this.error.set(
+        'Set a delivery fee product in fulfillment settings before taking delivery orders.'
+      );
+      return false;
+    }
+    if (this.cart.lines().some(line => line.variant.variant_id === variantId)) return true;
+    try {
+      const variant = await this.pos.variantById(variantId);
+      if (!variant || !variant.variant_active || !variant.product_active) {
+        throw new Error('The configured delivery fee product is unavailable.');
+      }
+      if (!this.cart.addVariant(variant)) throw new Error('The sale has too many lines.');
+      this.autoDeliveryFeeVariantId = variantId;
+      return true;
+    } catch (error) {
+      this.error.set(error instanceof Error ? error.message : 'Could not add the delivery fee');
+      return false;
+    }
+  }
+
   protected async openCheckout(): Promise<void> {
     if (!this.perms.has('SettleOrder')) return;
     this.error.set(null);
+    if (!(await this.ensureDeliveryFee())) return;
+    const fulfillmentDraft = this.currentFulfillmentDraft();
+    if (this.fulfillmentMode() !== 'counter' && !fulfillmentDraft) return;
+    if (fulfillmentDraft?.fulfillment.collection_kind === 'cod') {
+      await this.placeCodOrder(fulfillmentDraft);
+      return;
+    }
     try {
       await this.cashierSession.assertOpen('taking payment');
       const customerId = this.cart.customerId();
@@ -1869,6 +1992,57 @@ export class SellComponent implements OnInit {
       this.checkoutOpen.set(true);
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Open a cashier session first');
+    }
+  }
+
+  private currentFulfillmentDraft(): FulfillmentCheckoutDraft | null {
+    return this.fulfillmentMode() === 'counter'
+      ? null
+      : (this.fulfillmentFields()?.build() ?? null);
+  }
+
+  private async placeCodOrder(draft: FulfillmentCheckoutDraft): Promise<void> {
+    if (!this.connectivity.online()) {
+      this.error.set('COD orders require an internet connection.');
+      return;
+    }
+    this.busy.set(true);
+    this.error.set(null);
+    this.notice.set(null);
+    const lines = this.cart.toSaleLines();
+    const fingerprint = JSON.stringify({ lines, draft, kind: 'cod' });
+    if (this.saleAttempt?.fingerprint !== fingerprint) {
+      this.saleAttempt = {
+        fingerprint,
+        clientRef: crypto.randomUUID(),
+        mpesaRetryAllowed: false,
+      };
+    }
+    try {
+      const result = await this.fulfillment.checkout({
+        locationId: this.locations.requireActiveId(),
+        customer: draft.customer,
+        lines,
+        payments: [],
+        fulfillment: draft.fulfillment,
+        clientRef: this.saleAttempt.clientRef,
+        draftId: this.cart.draftId() ?? undefined,
+      });
+      this.checkoutOpen.set(false);
+      this.cart.clear();
+      this.saleAttempt = null;
+      this.selectedCustomer.set(null);
+      this.customerDepositBalance.set(0);
+      this.resetFulfillmentCheckout();
+      this.success.set({
+        text: result.pin ? `COD order placed · delivery PIN ${result.pin}` : 'COD order placed',
+        tone: 'success',
+        orderId: result.order_id,
+      });
+    } catch (error) {
+      this.error.set(error instanceof Error ? error.message : 'COD order could not be placed');
+    } finally {
+      this.busy.set(false);
     }
   }
 
@@ -1894,9 +2068,20 @@ export class SellComponent implements OnInit {
     this.busy.set(true);
     const customerId = this.cart.customerId();
     const lines = this.cart.toSaleLines();
+    const fulfillmentDraft = this.currentFulfillmentDraft();
+    if (this.fulfillmentMode() !== 'counter' && !fulfillmentDraft) {
+      this.busy.set(false);
+      return;
+    }
     // Retain one key across ambiguous retries, but rotate it when the sale
     // payload changes so an edited cart cannot replay an earlier completion.
-    const fingerprint = JSON.stringify({ customerId, lines, payments, settlement });
+    const fingerprint = JSON.stringify({
+      customerId,
+      lines,
+      payments,
+      settlement,
+      fulfillmentDraft,
+    });
     if (this.saleAttempt?.fingerprint !== fingerprint) {
       this.saleAttempt = {
         fingerprint,
@@ -1922,7 +2107,7 @@ export class SellComponent implements OnInit {
         return;
       }
       try {
-        await this.queueSale(customerId, lines, payments, clientRef);
+        await this.queueSale(customerId, lines, payments, clientRef, fulfillmentDraft);
         this.saleAttempt = null;
       } catch (err) {
         this.error.set(err instanceof Error ? err.message : 'Could not safely queue the sale');
@@ -1938,7 +2123,14 @@ export class SellComponent implements OnInit {
     );
     if (mpesaPayment && !settlement) {
       try {
-        await this.completeMpesaSale(mpesaPayment, payments, customerId, lines, clientRef);
+        await this.completeMpesaSale(
+          mpesaPayment,
+          payments,
+          customerId,
+          lines,
+          clientRef,
+          fulfillmentDraft
+        );
       } catch (err) {
         this.error.set(
           err instanceof Error ? err.message : 'M-PESA payment could not be completed'
@@ -1955,25 +2147,40 @@ export class SellComponent implements OnInit {
       // the outbox entry and use the same mechanism on replay.
       const completedDraftId = this.cart.draftId() ?? undefined;
       let result;
-      try {
-        result = settlement
-          ? await this.pos.postSaleWithPrepayment(
-              customerId!,
-              lines,
-              settlement,
-              clientRef,
-              completedDraftId
-            )
-          : await this.pos.postSale(
+      const post = async (draftId?: string) => {
+        if (fulfillmentDraft) {
+          const checkout = await this.fulfillment.checkout({
+            locationId: this.locations.requireActiveId(),
+            customer: fulfillmentDraft.customer,
+            lines,
+            payments,
+            fulfillment: fulfillmentDraft.fulfillment,
+            clientRef,
+            draftId,
+            approvalReason,
+          });
+          return {
+            status: checkout.status,
+            orderId: checkout.order_id,
+            approvalId: undefined,
+            pin: checkout.pin,
+          };
+        }
+        return settlement
+          ? this.pos.postSaleWithPrepayment(customerId!, lines, settlement, clientRef, draftId)
+          : this.pos.postSale(
               customerId,
               lines,
               payments,
               false,
               clientRef,
               undefined,
-              completedDraftId,
+              draftId,
               approvalReason
             );
+      };
+      try {
+        result = await post(completedDraftId);
       } catch (err) {
         // The loaded proforma expired or was retired on another device: drop
         // the link and retry once as a plain sale. The same client_ref keeps
@@ -1986,33 +2193,28 @@ export class SellComponent implements OnInit {
           throw err;
         }
         this.cart.draftId.set(null);
-        result = settlement
-          ? await this.pos.postSaleWithPrepayment(customerId!, lines, settlement, clientRef)
-          : await this.pos.postSale(
-              customerId,
-              lines,
-              payments,
-              false,
-              clientRef,
-              undefined,
-              undefined,
-              approvalReason
-            );
+        result = await post();
       }
       this.checkoutOpen.set(false);
       this.cart.clear();
       this.saleAttempt = null;
       this.selectedCustomer.set(null);
       this.customerDepositBalance.set(0);
+      this.resetFulfillmentCheckout();
       if (result.status === 'approval_required') {
         this.showApprovalSent();
       } else {
-        this.success.set({ text: 'Sale completed', tone: 'success', orderId: result.orderId });
+        const handoffPin = 'pin' in result ? result.pin : null;
+        this.success.set({
+          text: handoffPin ? `Sale completed · handoff PIN ${handoffPin}` : 'Sale completed',
+          tone: 'success',
+          orderId: result.orderId,
+        });
       }
     } catch (err) {
       if (!(err instanceof PosRpcError) && !settlement) {
         try {
-          await this.queueSale(customerId, lines, payments, clientRef);
+          await this.queueSale(customerId, lines, payments, clientRef, fulfillmentDraft);
           this.saleAttempt = null;
         } catch (queueError) {
           this.error.set(
@@ -2033,7 +2235,8 @@ export class SellComponent implements OnInit {
     payments: PaymentInput[],
     customerId: string | null,
     lines: ReturnType<CartService['toSaleLines']>,
-    clientRef: string
+    clientRef: string,
+    fulfillmentDraft: FulfillmentCheckoutDraft | null
   ): Promise<void> {
     const cashPayments = payments
       .filter(payment => payment !== mpesaPayment)
@@ -2046,19 +2249,34 @@ export class SellComponent implements OnInit {
     );
     const outcome = await this.mpesaCheckout.run(
       retry =>
-        this.mpesa.initiateSale({
-          locationId: this.locations.requireActiveId(),
-          customerId,
-          lines,
-          mpesaAmount: mpesaPayment.amount,
-          cashAmount: cashPayments.reduce((sum, payment) => sum + payment.amount, 0),
-          clientRef,
-          draftId: this.cart.draftId() ?? undefined,
-          retry,
-          ...(mpesaPayment.phone
-            ? { phone: mpesaPayment.phone }
-            : { receipt: mpesaPayment.reference! }),
-        }),
+        fulfillmentDraft
+          ? this.fulfillment.prepareMpesaCheckout({
+              locationId: this.locations.requireActiveId(),
+              customer: fulfillmentDraft.customer,
+              lines,
+              fulfillment: fulfillmentDraft.fulfillment,
+              mpesaAmount: mpesaPayment.amount,
+              cashAmount: cashPayments.reduce((sum, payment) => sum + payment.amount, 0),
+              clientRef,
+              draftId: this.cart.draftId() ?? undefined,
+              retry,
+              ...(mpesaPayment.phone
+                ? { phone: mpesaPayment.phone }
+                : { receipt: mpesaPayment.reference! }),
+            })
+          : this.mpesa.initiateSale({
+              locationId: this.locations.requireActiveId(),
+              customerId,
+              lines,
+              mpesaAmount: mpesaPayment.amount,
+              cashAmount: cashPayments.reduce((sum, payment) => sum + payment.amount, 0),
+              clientRef,
+              draftId: this.cart.draftId() ?? undefined,
+              retry,
+              ...(mpesaPayment.phone
+                ? { phone: mpesaPayment.phone }
+                : { receipt: mpesaPayment.reference! }),
+            }),
       this.saleAttempt?.mpesaRetryAllowed ?? false
     );
     if (outcome.kind === 'completed') {
@@ -2116,6 +2334,7 @@ export class SellComponent implements OnInit {
     this.saleAttempt = null;
     this.selectedCustomer.set(null);
     this.customerDepositBalance.set(0);
+    this.resetFulfillmentCheckout();
     this.success.set({
       text: warning ? 'Payment received — review needed' : 'Sale completed',
       tone: warning ? 'warning' : 'success',
@@ -2143,6 +2362,12 @@ export class SellComponent implements OnInit {
     this.creditApprovalReason.setValue('');
   }
 
+  protected async openCreditConfirmation(): Promise<void> {
+    if (!this.creditAllowed() || !(await this.ensureDeliveryFee())) return;
+    if (this.fulfillmentMode() !== 'counter' && !this.currentFulfillmentDraft()) return;
+    this.creditConfirmOpen.set(true);
+  }
+
   private async completeCreditSale(approvalReason?: string): Promise<void> {
     const customerId = this.cart.customerId();
     if (!customerId) return;
@@ -2159,8 +2384,16 @@ export class SellComponent implements OnInit {
       this.error.set(error instanceof Error ? error.message : 'Open a cashier session first');
       return;
     }
+    if (!(await this.ensureDeliveryFee())) return;
+    const fulfillmentDraft = this.currentFulfillmentDraft();
+    if (this.fulfillmentMode() !== 'counter' && !fulfillmentDraft) return;
     const lines = this.cart.toSaleLines();
-    const fingerprint = JSON.stringify({ customerId, lines, kind: 'automatic-credit' });
+    const fingerprint = JSON.stringify({
+      customerId,
+      lines,
+      fulfillmentDraft,
+      kind: 'automatic-credit',
+    });
     if (this.saleAttempt?.fingerprint !== fingerprint) {
       this.saleAttempt = {
         fingerprint,
@@ -2170,25 +2403,37 @@ export class SellComponent implements OnInit {
     }
     this.busy.set(true);
     try {
-      const result = await this.pos.postCreditSale(
-        customerId,
-        lines,
-        this.saleAttempt.clientRef,
-        this.cart.draftId() ?? undefined,
-        approvalReason
-      );
+      const result = fulfillmentDraft
+        ? await this.fulfillment.creditCheckout({
+            locationId: this.locations.requireActiveId(),
+            customerId,
+            lines,
+            fulfillment: fulfillmentDraft.fulfillment,
+            clientRef: this.saleAttempt.clientRef,
+            draftId: this.cart.draftId() ?? undefined,
+            approvalReason,
+          })
+        : await this.pos.postCreditSale(
+            customerId,
+            lines,
+            this.saleAttempt.clientRef,
+            this.cart.draftId() ?? undefined,
+            approvalReason
+          );
       this.cart.clear();
       this.saleAttempt = null;
       this.selectedCustomer.set(null);
       this.customerDepositBalance.set(0);
+      this.resetFulfillmentCheckout();
       if (result.status === 'approval_required') {
         this.showApprovalSent();
       } else {
         const split = result.downpaymentApplied
           ? ` · ${result.downpaymentApplied.toLocaleString('en-KE')} downpayment applied`
           : '';
+        const pin = 'pin' in result && result.pin ? ` · handoff PIN ${result.pin}` : '';
         this.success.set({
-          text: `Sale completed${split}`,
+          text: `Sale completed${split}${pin}`,
           tone: 'success',
           orderId: result.orderId,
         });
@@ -2211,16 +2456,38 @@ export class SellComponent implements OnInit {
     customerId: string | null,
     lines: ReturnType<CartService['toSaleLines']>,
     payments: PaymentInput[],
-    clientRef: string
+    clientRef: string,
+    fulfillmentDraft: FulfillmentCheckoutDraft | null
   ): Promise<void> {
+    if (fulfillmentDraft && !fulfillmentDraft.fulfillment.phone?.trim()) {
+      throw new Error('Offline pickup requires a recipient phone so the tracking PIN is not lost.');
+    }
     await this.sync.enqueue(
-      { customer_id: customerId, lines, payments, draft_id: this.cart.draftId() },
+      {
+        customer_id: customerId,
+        lines,
+        payments,
+        draft_id: this.cart.draftId(),
+        ...(fulfillmentDraft
+          ? {
+              checkout_customer: fulfillmentDraft.customer,
+              fulfillment: fulfillmentDraft.fulfillment,
+            }
+          : {}),
+      },
       clientRef
     );
     this.checkoutOpen.set(false);
     this.cart.clear();
     this.selectedCustomer.set(null);
+    this.resetFulfillmentCheckout();
     this.success.set({ text: 'Sale queued — will sync when online', tone: 'warning' });
+  }
+
+  private resetFulfillmentCheckout(): void {
+    this.autoDeliveryFeeVariantId = null;
+    this.fulfillmentMode.set('counter');
+    this.fulfillmentFields()?.reset();
   }
 
   protected newSale(): void {
@@ -2249,6 +2516,7 @@ export class SellComponent implements OnInit {
   }
 
   protected async sendToCashier(): Promise<void> {
+    if (this.fulfillmentMode() !== 'counter') return;
     if (!this.cashierSession.cashierFlowEnabled()) {
       this.error.set('Cashier workflow is off. Take payment here to complete the sale.');
       return;
@@ -2272,6 +2540,7 @@ export class SellComponent implements OnInit {
   }
 
   protected async saveProforma(): Promise<void> {
+    if (this.fulfillmentMode() !== 'counter') return;
     this.busy.set(true);
     this.error.set(null);
     this.notice.set(null);
@@ -2292,6 +2561,7 @@ export class SellComponent implements OnInit {
 
   protected clearCart(): void {
     this.cart.clear();
+    this.resetFulfillmentCheckout();
     this.clearCartArmed.set(false);
     this.selectedCustomer.set(null);
     this.overrideFor.set(null);

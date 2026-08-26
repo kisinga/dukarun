@@ -102,7 +102,7 @@ interface NavSection {
               </span>
             }
 
-            @if (pendingSyncCount() > 0 || sync.syncing()) {
+            @if (perms.has('SettleOrder') && (pendingSyncCount() > 0 || sync.syncing())) {
               <a
                 routerLink="/pos/sync"
                 class="btn btn-square btn-ghost btn-sm indicator min-h-11 min-w-11"
@@ -150,7 +150,7 @@ interface NavSection {
             </a>
 
             <!-- Global one-click till action -->
-            @if (cashierSession.cashControlEnabled()) {
+            @if (perms.has('SettleOrder') && cashierSession.cashControlEnabled()) {
               <button
                 type="button"
                 class="btn btn-sm min-h-11 gap-2 px-3"
@@ -289,31 +289,47 @@ interface NavSection {
           role="navigation"
         >
           <div class="flex h-16 items-stretch justify-around px-4">
-            <a
-              routerLink="/dashboard"
-              routerLinkActive="bottom-nav-active"
-              [routerLinkActiveOptions]="{ exact: true }"
-              class="bottom-nav-item flex-1 justify-center"
-            >
-              <span class="bottom-nav-ico"><app-icon name="heroHome" size="lg" /></span>
-              <span class="bottom-nav-label">Home</span>
-            </a>
-            <a
-              routerLink="/pos/sell"
-              routerLinkActive="bottom-nav-active"
-              class="bottom-nav-item flex-1 justify-center"
-            >
-              <span class="bottom-nav-ico"><app-icon name="heroShoppingCart" size="lg" /></span>
-              <span class="bottom-nav-label">Sell</span>
-            </a>
-            <a
-              routerLink="/inventory/products"
-              routerLinkActive="bottom-nav-active"
-              class="bottom-nav-item flex-1 justify-center"
-            >
-              <span class="bottom-nav-ico"><app-icon name="heroCube" size="lg" /></span>
-              <span class="bottom-nav-label">Products</span>
-            </a>
+            @if (perms.canAccessWorkspace('dashboard')) {
+              <a
+                routerLink="/dashboard"
+                routerLinkActive="bottom-nav-active"
+                [routerLinkActiveOptions]="{ exact: true }"
+                class="bottom-nav-item flex-1 justify-center"
+              >
+                <span class="bottom-nav-ico"><app-icon name="heroHome" size="lg" /></span>
+                <span class="bottom-nav-label">Home</span>
+              </a>
+            }
+            @if (perms.canAccessWorkspace('sell')) {
+              <a
+                routerLink="/pos/sell"
+                routerLinkActive="bottom-nav-active"
+                class="bottom-nav-item flex-1 justify-center"
+              >
+                <span class="bottom-nav-ico"><app-icon name="heroShoppingCart" size="lg" /></span>
+                <span class="bottom-nav-label">Sell</span>
+              </a>
+            }
+            @if (perms.canAccessWorkspace('fulfillment') && entitlements.enabled('fulfillment')) {
+              <a
+                routerLink="/fulfillment"
+                routerLinkActive="bottom-nav-active"
+                class="bottom-nav-item flex-1 justify-center"
+              >
+                <span class="bottom-nav-ico"><app-icon name="heroMapPin" size="lg" /></span>
+                <span class="bottom-nav-label">Delivery</span>
+              </a>
+            }
+            @if (perms.canAccessWorkspace('inventory')) {
+              <a
+                routerLink="/inventory/products"
+                routerLinkActive="bottom-nav-active"
+                class="bottom-nav-item flex-1 justify-center"
+              >
+                <span class="bottom-nav-ico"><app-icon name="heroCube" size="lg" /></span>
+                <span class="bottom-nav-label">Products</span>
+              </a>
+            }
           </div>
         </nav>
       </div>
@@ -530,12 +546,24 @@ export class ShellComponent implements OnInit {
 
   protected readonly sections: NavSection[] = [
     {
-      items: [{ route: '/dashboard', label: 'Dashboard', icon: 'heroHome' }],
+      items: [
+        {
+          route: '/dashboard',
+          label: 'Dashboard',
+          icon: 'heroHome',
+          visible: () => this.perms.canAccessWorkspace('dashboard'),
+        },
+      ],
     },
     {
       label: 'Operations',
       items: [
-        { route: '/pos/sell', label: 'Sell', icon: 'heroShoppingCart' },
+        {
+          route: '/pos/sell',
+          label: 'Sell',
+          icon: 'heroShoppingCart',
+          visible: () => this.perms.canAccessWorkspace('sell'),
+        },
         {
           route: '/pos/cashier',
           label: 'Cashier Queue',
@@ -549,15 +577,39 @@ export class ShellComponent implements OnInit {
             this.perms.has('SettleOrder') &&
             (this.cashierSession.cashierFlowEnabled() || this.orderQueueCounts.cashierQueue() > 0),
         },
-        { route: '/sales', label: 'Sales', icon: 'heroClipboardDocumentList' },
+        {
+          route: '/sales',
+          label: 'Sales',
+          icon: 'heroClipboardDocumentList',
+          visible: () => this.perms.canAccessWorkspace('sales'),
+        },
+        {
+          route: '/fulfillment',
+          label: 'Pickup & Delivery',
+          icon: 'heroMapPin',
+          visible: () =>
+            this.entitlements.enabled('fulfillment') &&
+            this.perms.canAccessWorkspace('fulfillment'),
+        },
         {
           route: '/pos/proformas',
           label: 'Proformas',
           icon: 'heroDocumentText',
           badge: () => this.orderQueueCounts.proformas(),
+          visible: () => this.perms.canAccessWorkspace('sell'),
         },
-        { route: '/inventory', label: 'Inventory', icon: 'heroCube' },
-        { route: '/purchases', label: 'Purchases', icon: 'heroTruck' },
+        {
+          route: '/inventory',
+          label: 'Inventory',
+          icon: 'heroCube',
+          visible: () => this.perms.canAccessWorkspace('inventory'),
+        },
+        {
+          route: '/purchases',
+          label: 'Purchases',
+          icon: 'heroTruck',
+          visible: () => this.perms.canAccessWorkspace('purchasing'),
+        },
         {
           route: '/activity',
           label: 'Activity',
@@ -593,8 +645,18 @@ export class ShellComponent implements OnInit {
     {
       label: 'People',
       items: [
-        { route: '/customers', label: 'Customers', icon: 'heroUsers' },
-        { route: '/suppliers', label: 'Suppliers', icon: 'heroTruck' },
+        {
+          route: '/customers',
+          label: 'Customers',
+          icon: 'heroUsers',
+          visible: () => this.perms.canAccessWorkspace('customers'),
+        },
+        {
+          route: '/suppliers',
+          label: 'Suppliers',
+          icon: 'heroTruck',
+          visible: () => this.perms.canAccessWorkspace('purchasing'),
+        },
         {
           route: '/team',
           label: 'Team',
@@ -641,9 +703,15 @@ export class ShellComponent implements OnInit {
       console.warn('Company switcher could not load', error);
       this.companySwitchError.set('Company menu could not be loaded. Reload and try again.');
     });
-    await Promise.all([this.locations.load(), this.entitlements.refresh().catch(() => undefined)]);
-    await this.cashierSession.start();
-    await this.orderQueueCounts.refresh();
+    await Promise.all([
+      this.locations.load(),
+      this.entitlements.refresh().catch(() => undefined),
+      this.perms.ensureLoaded(),
+    ]);
+    if (this.perms.has('SettleOrder')) {
+      await this.cashierSession.start();
+      await this.orderQueueCounts.refresh();
+    }
   }
 
   /** Switch active company. CompanyContextService ends this in a full reload. */
@@ -663,8 +731,10 @@ export class ShellComponent implements OnInit {
     const locationId = (event.target as HTMLSelectElement).value;
     if (!locationId || locationId === this.locations.activeId()) return;
     this.locations.select(locationId);
-    void this.cashierSession.start().catch(() => undefined);
-    void this.orderQueueCounts.refresh();
+    if (this.perms.has('SettleOrder')) {
+      void this.cashierSession.start().catch(() => undefined);
+      void this.orderQueueCounts.refresh();
+    }
   }
 
   protected closeDrawer(): void {

@@ -49,16 +49,16 @@ select is(
 
 select is(
   (select count(*)::int from public.ledger_accounts where company_id = (select company_id from provision_result)),
-  24,
-  'provisioning seeds 24 ledger accounts'
+  25,
+  'provisioning seeds 25 ledger accounts'
 );
 
 select is(
   (select count(*)::int from public.ledger_accounts a
    join public.ledger_accounts p on a.parent_id = p.id
    where a.company_id = (select company_id from provision_result) and p.code = 'CASH'),
-  3,
-  'CASH parent has 3 sub-accounts (CASH_ON_HAND, BANK_MAIN, MPESA)'
+  4,
+  'CASH parent includes custody, till, bank, and M-PESA accounts'
 );
 
 select is(
