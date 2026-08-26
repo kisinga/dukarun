@@ -1,5 +1,5 @@
 begin;
-select plan(17);
+select plan(18);
 
 select testkit.create_user('c1200000-0000-4000-8000-000000000001','money-account-admin@test.local');
 select testkit.create_user('c1200000-0000-4000-8000-000000000002','money-account-cashier@test.local');
@@ -85,12 +85,6 @@ with provider_account as (
   select company_id,'mpesa','production','Seed M-PESA till','active','MPESA'
   from money_account_fixture
   returning id,company_id
-), mapped as (
-  insert into public.location_payment_provider_accounts(
-    location_id,company_id,provider,provider_account_id
-  )
-  select (select id from money_account_location),company_id,'mpesa',id
-  from provider_account
 )
 select id from provider_account;
 grant select on pg_temp.linked_mpesa_provider to authenticated;
@@ -101,7 +95,13 @@ select testkit.as_user(
 select is(
   (select account_code from public.available_tender_accounts((select id from money_account_location))
    where method_code='mpesa' and is_default),
-  'MPESA','active M-PESA provider link becomes the checkout default'
+  (select code from public.ledger_accounts where id=(select mpesa_id from created_money_accounts)),
+  'an active provider connection does not override the Money location default'
+);
+select is(
+  (public.mpesa_availability((select id from money_account_location))->>'active')::boolean,
+  false,
+  'M-PESA is unavailable until the location default matches the connected account'
 );
 reset role;
 update public.payment_provider_accounts

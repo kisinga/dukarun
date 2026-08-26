@@ -915,6 +915,7 @@ export class PlatformService {
     price_monthly: number;
     price_yearly: number;
     multiple_locations_enabled: boolean;
+    fulfillment_available: boolean;
     staff_performance_enabled: boolean;
     commissions_available: boolean;
     max_team_members: number | null;
@@ -938,6 +939,7 @@ export class PlatformService {
       p_price_monthly: input.price_monthly,
       p_price_yearly: input.price_yearly,
       p_multiple_locations_enabled: input.multiple_locations_enabled,
+      p_fulfillment_available: input.fulfillment_available,
       p_staff_performance_enabled: input.staff_performance_enabled,
       p_commissions_available: input.commissions_available,
       p_storefront_available: input.storefront_available,

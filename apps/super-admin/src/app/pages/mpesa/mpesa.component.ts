@@ -803,7 +803,6 @@ export class MpesaComponent implements OnInit {
         consumer_key: this.consumerKey.value,
         consumer_secret: this.consumerSecret.value,
         passkey: this.passkey.value,
-        location_ids: request.requested_location_ids,
         daraja_app_id: this.darajaAppId.value || null,
       },
       'Connection saved. Continue with the highlighted go-live step below.'

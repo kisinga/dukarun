@@ -39,6 +39,11 @@ const FEATURE_FIELDS = [
     help: 'Create and manage more than the default location.',
   },
   {
+    key: 'fulfillment_available',
+    label: 'Pickup & delivery',
+    help: 'Accept pickup and delivery orders with preparation, tracking, handoff and COD workflows.',
+  },
+  {
     key: 'staff_performance_enabled',
     label: 'Staff performance',
     help: 'Staff sales attribution and performance reports.',
@@ -356,20 +361,23 @@ type TierEditorSection = 'basics' | 'limits' | 'capabilities';
           @if (editorSection() === 'capabilities') {
             <fieldset class="space-y-2">
               <legend class="section-title mb-2">Capabilities</legend>
+              <p class="type-caption mb-3">
+                Companies on this tier can use the capabilities selected here.
+              </p>
               @for (field of featureFields; track field.key) {
                 <label
-                  class="flex min-h-11 cursor-pointer items-start gap-3 rounded-field px-2 py-2 hover:bg-base-200/60"
+                  class="flex min-h-14 cursor-pointer items-center justify-between gap-4 border-b border-base-300/60 px-1 py-3 last:border-b-0"
                 >
-                  <input
-                    type="checkbox"
-                    class="checkbox checkbox-primary checkbox-sm mt-0.5"
-                    [checked]="features()[field.key] === true"
-                    (change)="setFeature(field.key, $any($event.target).checked)"
-                  />
-                  <span>
+                  <span class="min-w-0">
                     <span class="block text-sm font-medium">{{ field.label }}</span>
                     <span class="type-caption mt-0.5 block">{{ field.help }}</span>
                   </span>
+                  <input
+                    type="checkbox"
+                    class="toggle toggle-primary toggle-sm shrink-0"
+                    [checked]="features()[field.key] === true"
+                    (change)="setFeature(field.key, $any($event.target).checked)"
+                  />
                 </label>
               }
             </fieldset>
@@ -531,6 +539,7 @@ export class TiersComponent implements OnInit {
     });
     this.features.set({
       multiple_locations_enabled: tier.multiple_locations_enabled,
+      fulfillment_available: tier.fulfillment_available,
       staff_performance_enabled: tier.staff_performance_enabled,
       commissions_available: tier.commissions_available,
       storefront_available: tier.storefront_available,
@@ -585,6 +594,7 @@ export class TiersComponent implements OnInit {
         price_monthly: monthly,
         price_yearly: yearly,
         multiple_locations_enabled: this.features()['multiple_locations_enabled'] === true,
+        fulfillment_available: this.features()['fulfillment_available'] === true,
         staff_performance_enabled: this.features()['staff_performance_enabled'] === true,
         commissions_available: this.features()['commissions_available'] === true,
         max_team_members: this.limits()['max_team_members'] ?? null,

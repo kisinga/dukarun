@@ -1,5 +1,5 @@
 begin;
-select plan(88);
+select plan(92);
 
 select has_table('public','fulfillment_settings','location fulfillment settings exist');
 select has_table('public','order_fulfillments','one fulfillment record can own an order');
@@ -17,6 +17,59 @@ select has_function('public','public_fulfillment_tracking',array['text'],
   'anonymous tracking uses a narrow RPC');
 select has_function('public','save_customer_profile',array['jsonb','uuid'],
   'customer profile editing is one transactional command');
+select has_function('public','platform_save_tier',array[
+  'text','text','bigint','bigint','boolean','boolean','boolean','boolean','boolean','boolean',
+  'integer','integer','integer','integer','integer','integer','uuid','boolean','boolean'
+], 'tier management owns the fulfillment entitlement gate');
+
+set local role authenticated;
+set local request.jwt.claims =
+  '{"sub":"f1160000-0000-4000-8000-000000000099","role":"authenticated","is_platform_admin":true}';
+select public.platform_save_tier(
+  p_code=>'fulfillment-managed',p_name=>'Fulfillment Managed',
+  p_price_monthly=>0,p_price_yearly=>0,
+  p_multiple_locations_enabled=>false,p_staff_performance_enabled=>false,
+  p_commissions_available=>false,p_storefront_available=>false,
+  p_customer_campaigns_available=>false,p_payment_reminders_available=>false,
+  p_fulfillment_available=>true
+);
+reset role;
+select is((select fulfillment_available from public.subscription_tiers
+  where code='fulfillment-managed'),true,
+  'platform tier management can enable pickup and delivery');
+
+set local role authenticated;
+set local request.jwt.claims =
+  '{"sub":"f1160000-0000-4000-8000-000000000099","role":"authenticated","is_platform_admin":true}';
+select public.platform_save_tier(
+  p_code=>'fulfillment-managed',p_name=>'Fulfillment Managed Legacy',
+  p_price_monthly=>0,p_price_yearly=>0,
+  p_multiple_locations_enabled=>false,p_staff_performance_enabled=>false,
+  p_commissions_available=>false,p_storefront_available=>false,
+  p_customer_campaigns_available=>false,p_payment_reminders_available=>false,
+  p_tier_id=>(select id from public.subscription_tiers where code='fulfillment-managed')
+);
+reset role;
+select is((select fulfillment_available from public.subscription_tiers
+  where code='fulfillment-managed'),true,
+  'older tier clients preserve the existing pickup and delivery gate');
+
+set local role authenticated;
+set local request.jwt.claims =
+  '{"sub":"f1160000-0000-4000-8000-000000000099","role":"authenticated","is_platform_admin":true}';
+select public.platform_save_tier(
+  p_code=>'fulfillment-managed',p_name=>'Fulfillment Managed',
+  p_price_monthly=>0,p_price_yearly=>0,
+  p_multiple_locations_enabled=>false,p_staff_performance_enabled=>false,
+  p_commissions_available=>false,p_storefront_available=>false,
+  p_customer_campaigns_available=>false,p_payment_reminders_available=>false,
+  p_tier_id=>(select id from public.subscription_tiers where code='fulfillment-managed'),
+  p_fulfillment_available=>false
+);
+reset role;
+select is((select fulfillment_available from public.subscription_tiers
+  where code='fulfillment-managed'),false,
+  'platform tier management can disable pickup and delivery');
 
 select testkit.create_user('f1160000-0000-4000-8000-000000000001','fulfillment-admin@test.local');
 select testkit.create_user('f1160000-0000-4000-8000-000000000002','fulfillment-process@test.local');
@@ -89,15 +142,9 @@ with account as (
     company_id,provider,environment,display_name,status,activated_at,ledger_account_code
   ) select company_id,'mpesa','production','Fulfillment test till','active',now(),'MPESA'
     from fulfillment_fixture returning id,company_id
-), mapped as (
-  insert into public.location_payment_provider_accounts(
-    location_id,company_id,provider,provider_account_id
-  ) select f.location_id,a.company_id,'mpesa',a.id
-    from account a join fulfillment_fixture f on f.company_id=a.company_id
-  returning location_id,provider_account_id
 )
-select a.id account_id,a.company_id,m.location_id
-from account a join mapped m on m.provider_account_id=a.id;
+select a.id account_id,a.company_id,f.location_id
+from account a join fulfillment_fixture f on f.company_id=a.company_id;
 grant select on pg_temp.fulfillment_mpesa_account to authenticated;
 
 select is((select count(*)::int from public.roles where is_template and name in('Admin','Manager')

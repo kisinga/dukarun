@@ -44,8 +44,7 @@ select ok(public.current_user_has_permission('ManageMpesaIntegration'),
   'company Admin gets setup permission');
 create temp table mpesa_request as select public.request_mpesa_onboarding(
   'M-PESA Test Store Ltd','555555','till','business-admin','Test Owner',
-  '0712345678','owner@example.test',array[(select id from public.stock_locations
-    where company_id=(select company_id from mpesa_fixture) and is_default)],'Pilot') request_id;
+  '0712345678','owner@example.test','Pilot') request_id;
 grant select on pg_temp.mpesa_request to authenticated;
 select ok((select request_id from mpesa_request) is not null,'merchant can request setup');
 select is(public.mpesa_setup_status()->'onboarding_requests'->0->>'status',
@@ -88,25 +87,20 @@ with app as (
       'M-PESA test passkey')
   from account join app using(company_id)
   returning provider_account_id,company_id
-), mapped as (
-  insert into public.location_payment_provider_accounts(location_id,company_id,provider,provider_account_id)
-  select l.id,c.company_id,'mpesa',c.provider_account_id from connection c
-  join public.stock_locations l on l.company_id=c.company_id and l.is_default
-  returning location_id,provider_account_id
 )
-select c.provider_account_id account_id,c.company_id,l.location_id
-from connection c join mapped l
-  on l.provider_account_id=c.provider_account_id;
+select c.provider_account_id account_id,c.company_id,
+  (select l.id from public.stock_locations l
+    where l.company_id=c.company_id and l.is_default) location_id
+from connection c;
 grant select on pg_temp.mpesa_account to authenticated;
 select is((select ledger_account_code from public.payment_provider_accounts
   where id=(select account_id from mpesa_account)),
   'MPESA','active provider account has a durable money-account link');
 
 insert into public.orders(id,company_id,location_id,code,status,total)
-select 'b2000000-0000-4000-8000-000000000120',a.company_id,l.location_id,
+select 'b2000000-0000-4000-8000-000000000120',a.company_id,a.location_id,
   'MP-RESUME','pending_payment',60
-from mpesa_account a join public.location_payment_provider_accounts l
-  on l.provider_account_id=a.account_id;
+from mpesa_account a;
 select testkit.as_user((select company_id from mpesa_fixture),
   'b2000000-0000-4000-8000-000000000001','Admin');
 select testkit.ensure_open_session();
@@ -260,11 +254,10 @@ select is((public.review_mpesa_late_posting(
 
 insert into public.mpesa_payment_intents(id,company_id,provider_account_id,location_id,workflow,
   subject_type,subject_id,client_ref,request_fingerprint,payer_phone,amount,status,created_by)
-select 'b2000000-0000-4000-8000-000000000201',a.company_id,a.account_id,l.location_id,
+select 'b2000000-0000-4000-8000-000000000201',a.company_id,a.account_id,a.location_id,
   'order','order','b2000000-0000-4000-8000-000000000101','unknown-response','unknown-response',
   '254712345678',60,'requesting','b2000000-0000-4000-8000-000000000001'
-from mpesa_account a join public.location_payment_provider_accounts l
-  on l.provider_account_id=a.account_id;
+from mpesa_account a;
 insert into public.mpesa_payment_attempts(id,intent_id,company_id,attempt_number)
 select 'b2000000-0000-4000-8000-000000000211',
   'b2000000-0000-4000-8000-000000000201',company_id,1 from mpesa_account;
@@ -272,11 +265,10 @@ update public.mpesa_payment_intents set current_attempt_id='b2000000-0000-4000-8
 where id='b2000000-0000-4000-8000-000000000201';
 insert into public.mpesa_payment_intents(id,company_id,provider_account_id,location_id,workflow,
   subject_type,subject_id,client_ref,request_fingerprint,payer_phone,amount,status,created_by)
-select 'b2000000-0000-4000-8000-000000000202',a.company_id,a.account_id,l.location_id,
+select 'b2000000-0000-4000-8000-000000000202',a.company_id,a.account_id,a.location_id,
   'order','order','b2000000-0000-4000-8000-000000000102','terminal-response','terminal-response',
   '254712345678',50,'requesting','b2000000-0000-4000-8000-000000000001'
-from mpesa_account a join public.location_payment_provider_accounts l
-  on l.provider_account_id=a.account_id;
+from mpesa_account a;
 insert into public.mpesa_payment_attempts(id,intent_id,company_id,attempt_number)
 select 'b2000000-0000-4000-8000-000000000212',
   'b2000000-0000-4000-8000-000000000202',company_id,1 from mpesa_account;
@@ -372,8 +364,6 @@ select set_config('request.jwt.claims',format(
 select throws_ok($$select public.platform_configure_mpesa_connection(
     (select request_id from mpesa_app_boundary_request),'Ignored','production',
     '777777','777777','777777',null,null,'PASSKEY',
-    array[(select id from public.stock_locations
-      where company_id=(select company_id from mpesa_fixture) and is_default)],
     (select other_app_id from mpesa_app_boundary_request))$$,
   'P0001','prepared_daraja_app_mismatch',
   'configured Daraja app must match the tenant-authorized app');
