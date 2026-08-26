@@ -16500,6 +16500,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      update_company_tax_registration_number: {
+        Args: { p_profile_id: string; p_tax_registration_number: string }
+        Returns: string
+      }
       update_customer: {
         Args: {
           p_customer_id: string
@@ -16567,10 +16571,6 @@ export type Database = {
           p_name?: string
           p_product_id: string
         }
-        Returns: string
-      }
-      update_company_tax_registration_number: {
-        Args: { p_profile_id: string; p_tax_registration_number: string }
         Returns: string
       }
       update_staff_display_name: {
@@ -16929,3 +16929,4 @@ export const Constants = {
     Enums: {},
   },
 } as const
+

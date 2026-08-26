@@ -1,5 +1,5 @@
 begin;
-select plan(12);
+select plan(13);
 
 select testkit.create_user(
   '11111111-1111-1111-1111-111111111111',
@@ -192,6 +192,14 @@ select is(
      and title = 'Till variance needs review'),
   1::bigint,
   'closing variance threshold creates one actionable notification'
+);
+
+select ok(
+  (select body like '%shortage of KES 500.%'
+   from public.notifications
+   where company_id = (select company_id from flow_company)
+     and title = 'Till variance needs review'),
+  'closing variance notification keeps the shilling value'
 );
 
 select * from finish();
