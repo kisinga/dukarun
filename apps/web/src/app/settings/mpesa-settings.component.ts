@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, input, output, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { SupabaseService } from '../core/supabase.service';
@@ -35,6 +35,8 @@ type MerchantStatus = {
     prepared_daraja_app_name: string | null;
     prepared_daraja_app_environment: string | null;
     safaricom_authorization_verified_at: string | null;
+    ledger_account_code: string | null;
+    ledger_account_name: string | null;
     commissioning: MpesaCommissioningStatus;
   }>;
   accounts: Array<{
@@ -45,6 +47,8 @@ type MerchantStatus = {
     party_b: string;
     activated_at: string | null;
     manual_fallback_until: string | null;
+    ledger_account_code: string | null;
+    ledger_account_name: string | null;
     oauth_verified: boolean;
     c2b_registered: boolean;
     stk_test_passed: boolean;
@@ -72,29 +76,31 @@ const DEFAULT_MPESA_SETTINGS: MerchantStatus['settings'] = {
   ],
   template: `
     @if (perms.has('ManageMpesaIntegration')) {
-      <section class="card bg-base-100">
-        <div class="card-body p-4">
-          <div class="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h2 class="section-title">M-PESA setup</h2>
-              <p class="type-caption mt-1">
-                Accept STK Push and automatically match Till or Paybill payments.
-              </p>
+      <section [class.card]="!embedded()" [class.bg-base-100]="!embedded()">
+        <div [class.card-body]="!embedded()" [class.p-4]="!embedded()" [class.p-0]="embedded()">
+          @if (!embedded()) {
+            <div class="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 class="section-title">{{ setupTitle() }}</h2>
+                <p class="type-caption mt-1">
+                  {{ setupCaption() }}
+                </p>
+              </div>
+              <button
+                appButton
+                variant="ghost"
+                size="sm"
+                [iconOnly]="true"
+                type="button"
+                [loading]="loading()"
+                title="Refresh M-PESA status"
+                aria-label="Refresh M-PESA status"
+                (click)="load()"
+              >
+                <app-icon name="heroArrowPath" />
+              </button>
             </div>
-            <button
-              appButton
-              variant="ghost"
-              size="sm"
-              [iconOnly]="true"
-              type="button"
-              [loading]="loading()"
-              title="Refresh M-PESA status"
-              aria-label="Refresh M-PESA status"
-              (click)="load()"
-            >
-              <app-icon name="heroArrowPath" />
-            </button>
-          </div>
+          }
 
           @if (loading()) {
             <div class="skeleton mt-4 h-20 w-full"></div>
@@ -358,60 +364,66 @@ const DEFAULT_MPESA_SETTINGS: MerchantStatus['settings'] = {
 
             @if (showRequestForm() || (!connections().length && !pendingRequests().length)) {
               <form
-                class="mt-3 grid gap-3 border-t border-base-300/60 pt-3 sm:grid-cols-2"
+                class="grid gap-3 sm:grid-cols-2"
+                [class.mt-3]="!embedded()"
+                [class.border-t]="!embedded()"
+                [class.border-base-300/60]="!embedded()"
+                [class.pt-3]="!embedded()"
                 (submit)="$event.preventDefault(); submit()"
               >
-                <div class="border-b border-base-300/60 pb-3 sm:col-span-2">
-                  <div class="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <p class="font-medium">Missing Safaricom details?</p>
-                      <p class="type-caption mt-1">
-                        Ask Safaricom to confirm the account facts before sending setup.
+                @if (!embedded()) {
+                  <div class="border-b border-base-300/60 pb-3 sm:col-span-2">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p class="font-medium">Missing Safaricom details?</p>
+                        <p class="type-caption mt-1">
+                          Ask Safaricom to confirm the account facts before sending setup.
+                        </p>
+                      </div>
+                      <div class="flex flex-wrap gap-2">
+                        <button
+                          appButton
+                          type="button"
+                          variant="outline"
+                          [disabled]="!safaricomEmailConfigured()"
+                          (click)="emailSafaricomForIntake()"
+                        >
+                          <app-icon name="heroEnvelope" /> Email
+                        </button>
+                        <button
+                          appButton
+                          type="button"
+                          variant="outline"
+                          (click)="copyIntakeDetailsRequest()"
+                        >
+                          <app-icon name="heroClipboardDocumentList" /> Copy
+                        </button>
+                        <button
+                          appButton
+                          type="button"
+                          variant="outline"
+                          (click)="downloadIntakeDetailsRequest()"
+                        >
+                          <app-icon name="heroArrowDownTray" /> Download
+                        </button>
+                        <button
+                          appButton
+                          type="button"
+                          variant="outline"
+                          (click)="printIntakeDetailsRequest()"
+                        >
+                          <app-icon name="heroPrinter" /> Print
+                        </button>
+                      </div>
+                    </div>
+                    @if (!safaricomEmailConfigured()) {
+                      <p class="mt-2 text-sm text-warning">
+                        Safaricom recipient email is not configured yet. Download or print the
+                        request and use the contact Safaricom gives your business.
                       </p>
-                    </div>
-                    <div class="flex flex-wrap gap-2">
-                      <button
-                        appButton
-                        type="button"
-                        variant="outline"
-                        [disabled]="!safaricomEmailConfigured()"
-                        (click)="emailSafaricomForIntake()"
-                      >
-                        <app-icon name="heroEnvelope" /> Email
-                      </button>
-                      <button
-                        appButton
-                        type="button"
-                        variant="outline"
-                        (click)="copyIntakeDetailsRequest()"
-                      >
-                        <app-icon name="heroClipboardDocumentList" /> Copy
-                      </button>
-                      <button
-                        appButton
-                        type="button"
-                        variant="outline"
-                        (click)="downloadIntakeDetailsRequest()"
-                      >
-                        <app-icon name="heroArrowDownTray" /> Download
-                      </button>
-                      <button
-                        appButton
-                        type="button"
-                        variant="outline"
-                        (click)="printIntakeDetailsRequest()"
-                      >
-                        <app-icon name="heroPrinter" /> Print
-                      </button>
-                    </div>
+                    }
                   </div>
-                  @if (!safaricomEmailConfigured()) {
-                    <p class="mt-2 text-sm text-warning">
-                      Safaricom recipient email is not configured yet. Download or print the request
-                      and use the contact Safaricom gives your business.
-                    </p>
-                  }
-                </div>
+                }
 
                 <app-form-field
                   label="Registered business name"
@@ -511,6 +523,61 @@ const DEFAULT_MPESA_SETTINGS: MerchantStatus['settings'] = {
                   <input class="input input-bordered input-sm w-full" [formControl]="notes" />
                 </app-form-field>
 
+                @if (embedded()) {
+                  <details class="rounded-box border border-base-300/70 p-3 sm:col-span-2">
+                    <summary class="cursor-pointer text-sm font-medium">
+                      Need Safaricom to confirm details?
+                    </summary>
+                    <p class="type-caption mt-2">
+                      Generate a request for the business owner or Safaricom contact.
+                    </p>
+                    @if (!safaricomEmailConfigured()) {
+                      <p class="mt-2 text-sm text-warning">
+                        Safaricom recipient email is not configured yet. Use download or print.
+                      </p>
+                    }
+                    <div class="mt-3 flex flex-wrap gap-2">
+                      <button
+                        appButton
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        [disabled]="!safaricomEmailConfigured()"
+                        (click)="emailSafaricomForIntake()"
+                      >
+                        <app-icon name="heroEnvelope" /> Email
+                      </button>
+                      <button
+                        appButton
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        (click)="copyIntakeDetailsRequest()"
+                      >
+                        <app-icon name="heroClipboardDocumentList" /> Copy
+                      </button>
+                      <button
+                        appButton
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        (click)="downloadIntakeDetailsRequest()"
+                      >
+                        <app-icon name="heroArrowDownTray" /> Download
+                      </button>
+                      <button
+                        appButton
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        (click)="printIntakeDetailsRequest()"
+                      >
+                        <app-icon name="heroPrinter" /> Print
+                      </button>
+                    </div>
+                  </details>
+                }
+
                 <div class="rounded-box bg-base-200/50 p-3 sm:col-span-2">
                   <label class="flex items-start gap-2 text-sm">
                     <input
@@ -599,6 +666,10 @@ const DEFAULT_MPESA_SETTINGS: MerchantStatus['settings'] = {
   `,
 })
 export class MpesaSettingsComponent implements OnInit {
+  readonly accountCode = input<string | null>(null);
+  readonly accountName = input('');
+  readonly embedded = input(false);
+  readonly statusChanged = output<void>();
   private readonly supabase = inject(SupabaseService);
   private readonly print = inject(PrintService);
   protected readonly perms = inject(PermissionsService);
@@ -612,14 +683,33 @@ export class MpesaSettingsComponent implements OnInit {
   protected readonly mpesaSettings = computed(
     () => this.status()?.settings ?? DEFAULT_MPESA_SETTINGS
   );
-  protected readonly connections = computed(() => this.status()?.accounts ?? []);
-  protected readonly pendingRequests = computed(
-    () =>
-      this.status()?.onboarding_requests.filter(request =>
-        ['requested', 'reviewing', 'merchant_verification'].includes(request.status)
+  protected readonly connections = computed(() => {
+    const accountCode = this.accountCode();
+    const accounts = this.status()?.accounts ?? [];
+    return accountCode
+      ? accounts.filter(account => account.ledger_account_code === accountCode)
+      : accounts;
+  });
+  protected readonly pendingRequests = computed(() => {
+    const accountCode = this.accountCode();
+    return (
+      this.status()?.onboarding_requests.filter(
+        request =>
+          ['requested', 'reviewing', 'merchant_verification'].includes(request.status) &&
+          (!accountCode || request.ledger_account_code === accountCode)
       ) ?? []
-  );
+    );
+  });
   protected readonly showRequestForm = signal(false);
+
+  protected readonly setupTitle = computed(() =>
+    this.accountName() ? `${this.accountName()} setup` : 'M-PESA setup'
+  );
+  protected readonly setupCaption = computed(() =>
+    this.accountCode()
+      ? 'Connect this money account to a Safaricom Till or Paybill.'
+      : 'Accept STK Push and automatically match Till or Paybill payments.'
+  );
 
   protected readonly legalName = new FormControl('', {
     nonNullable: true,
@@ -714,6 +804,7 @@ export class MpesaSettingsComponent implements OnInit {
       p_notes: this.notes.value || undefined,
       p_existing_c2b_integration: this.existingC2bIntegration.value,
       p_existing_c2b_notes: this.existingC2bNotes.value || undefined,
+      p_ledger_account_code: this.accountCode() ?? undefined,
     });
     if (error) {
       this.failed.set(true);
@@ -722,6 +813,7 @@ export class MpesaSettingsComponent implements OnInit {
       this.message.set('Setup request sent.');
       this.showRequestForm.set(false);
       await this.load();
+      this.statusChanged.emit();
     }
     this.saving.set(false);
   }

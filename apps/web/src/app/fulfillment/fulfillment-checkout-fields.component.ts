@@ -8,7 +8,6 @@ import {
   output,
   signal,
   untracked,
-  viewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ButtonComponent } from '../shared/ui/button.component';
@@ -72,73 +71,6 @@ type ValidationErrors = Partial<Record<ValidationKey, string>>;
   ],
   template: `
     @if (settings()?.enabled && settings()?.feature_available) {
-      <section class="border-t border-base-300/60 p-4" aria-labelledby="order-method-heading">
-        <p id="order-method-heading" class="type-caption">Order method</p>
-        <div class="mt-2 grid grid-cols-3 rounded-field bg-base-200 p-1">
-          @for (option of modeOptions; track option.value) {
-            <button
-              appButton
-              type="button"
-              size="sm"
-              [variant]="mode() === option.value ? 'secondary' : 'ghost'"
-              [disabled]="!modeEnabled(option.value)"
-              (click)="selectMode(option.value)"
-            >
-              {{ option.label }}
-            </button>
-          }
-        </div>
-
-        @if (mode() !== 'counter') {
-          <div class="mt-4 border-t border-base-300/60 pt-4">
-            <div class="flex items-start justify-between gap-3">
-              <div class="min-w-0">
-                <p class="text-sm font-semibold">
-                  {{ mode() === 'delivery' ? 'Delivery details' : 'Pickup details' }}
-                </p>
-                @if (detailsCommitted()) {
-                  <p class="mt-1 truncate text-sm">{{ recipientName() }}</p>
-                  <p class="type-caption mt-0.5 truncate">
-                    @if (mode() === 'delivery') {
-                      {{ address() }}
-                    } @else {
-                      {{ phone() || 'No phone provided' }}
-                    }
-                  </p>
-                } @else {
-                  <p class="type-caption mt-1">Recipient details still need attention.</p>
-                }
-              </div>
-              <button
-                appButton
-                type="button"
-                variant="ghost"
-                size="sm"
-                [iconOnly]="true"
-                [attr.aria-label]="detailsCommitted() ? 'Edit order details' : 'Add order details'"
-                [title]="detailsCommitted() ? 'Edit details' : 'Add details'"
-                (click)="openDetails()"
-              >
-                <app-icon [name]="detailsCommitted() ? 'heroPencilSquare' : 'heroPlus'" />
-              </button>
-            </div>
-            @if (detailsCommitted()) {
-              <div class="mt-3 flex flex-wrap gap-2">
-                <span class="badge badge-ghost badge-sm">
-                  {{ updatesRequested() ? 'Updates on' : 'Updates off' }}
-                </span>
-                @if (collectionKind() === 'cod') {
-                  <span class="badge badge-warning badge-sm">COD</span>
-                }
-                @if (promiseLabel(); as promise) {
-                  <span class="badge badge-ghost badge-sm">{{ promise }}</span>
-                }
-              </div>
-            }
-          </div>
-        }
-      </section>
-
       <app-task-dialog
         #detailsDialog
         [(open)]="detailsOpen"
@@ -368,11 +300,6 @@ export class FulfillmentCheckoutFieldsComponent {
   readonly modeChanged = output<CheckoutMode>();
   readonly customerSelected = output<string>();
 
-  readonly modeOptions: ReadonlyArray<{ value: CheckoutMode; label: string }> = [
-    { value: 'counter', label: 'Counter' },
-    { value: 'pickup', label: 'Pickup' },
-    { value: 'delivery', label: 'Delivery' },
-  ];
   readonly mode = signal<CheckoutMode>('counter');
   readonly detailsOpen = signal(false);
   readonly detailsCommitted = signal(false);
@@ -421,7 +348,6 @@ export class FulfillmentCheckoutFieldsComponent {
     return JSON.stringify(this.captureState()) !== JSON.stringify(this.dialogBaseline);
   });
 
-  private readonly detailsDialog = viewChild(TaskDialogComponent);
   private matchTimer: ReturnType<typeof setTimeout> | null = null;
   private matchSequence = 0;
   private lastCustomerId: string | null = null;
@@ -494,7 +420,6 @@ export class FulfillmentCheckoutFieldsComponent {
     }
     this.validationErrors.set({});
     this.detailsOpen.set(true);
-    this.modeChanged.emit(mode);
   }
 
   openDetails(): void {
@@ -508,7 +433,6 @@ export class FulfillmentCheckoutFieldsComponent {
     this.dialogBaseline = null;
     this.validationErrors.set({});
     this.detailsOpen.set(false);
-    this.modeChanged.emit(this.mode());
   }
 
   completeDetails(): void {
@@ -526,6 +450,7 @@ export class FulfillmentCheckoutFieldsComponent {
     this.detailsCommitted.set(true);
     this.dialogBaseline = null;
     this.detailsOpen.set(false);
+    this.modeChanged.emit(this.mode());
   }
 
   phoneChanged(value: string): void {

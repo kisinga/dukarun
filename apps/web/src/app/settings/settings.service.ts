@@ -8,6 +8,34 @@ export type StockLocationRow = Database['public']['Tables']['stock_locations']['
 export type LocationPaymentMethodRow =
   Database['public']['Tables']['location_payment_methods']['Row'];
 export type MoneyAccountRow = Database['public']['Tables']['ledger_accounts']['Row'];
+export interface MoneyPaymentAccountOverview {
+  account_id: string;
+  account_code: string;
+  account_name: string;
+  money_account_kind: 'bank' | 'mpesa';
+  is_active: boolean;
+  default_location_ids: string[];
+  default_location_names: string[];
+  mpesa_request: {
+    id: string;
+    status: string;
+    shortcode: string;
+    shortcode_type: string;
+    created_at: string;
+    commissioning: Json;
+  } | null;
+  mpesa_connection: {
+    id: string;
+    status: string;
+    environment: string;
+    display_name: string;
+    manual_fallback_until: string | null;
+    activated_at: string | null;
+    shortcode_type: string;
+    organization_shortcode: string;
+    party_b: string;
+  } | null;
+}
 export type ReminderRule = Database['public']['Tables']['payment_reminder_rules']['Row'];
 export type PrimaryContactNotificationChannel =
   'whatsapp_sms_fallback' | 'whatsapp' | 'sms' | 'none';
@@ -199,6 +227,12 @@ export class SettingsService {
       .order('name');
     if (error) throw error;
     return data;
+  }
+
+  async moneyPaymentAccountsOverview(): Promise<MoneyPaymentAccountOverview[]> {
+    const { data, error } = await this.db.rpc('money_payment_accounts_overview');
+    if (error) throw rpcError(error);
+    return data as unknown as MoneyPaymentAccountOverview[];
   }
 
   async createMoneyAccount(kind: 'bank' | 'mpesa', name: string): Promise<string> {

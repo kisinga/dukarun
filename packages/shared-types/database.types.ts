@@ -2747,6 +2747,7 @@ export type Database = {
           customer_id: string
           downpayment_amount: number
           id: string
+          ledger_account_code: string | null
           location_id: string
           method_code: string
           posted_at: string | null
@@ -2769,6 +2770,7 @@ export type Database = {
           customer_id: string
           downpayment_amount?: number
           id?: string
+          ledger_account_code?: string | null
           location_id: string
           method_code: string
           posted_at?: string | null
@@ -2791,6 +2793,7 @@ export type Database = {
           customer_id?: string
           downpayment_amount?: number
           id?: string
+          ledger_account_code?: string | null
           location_id?: string
           method_code?: string
           posted_at?: string | null
@@ -5359,6 +5362,7 @@ export type Database = {
           existing_c2b_notes: string | null
           handled_by: string | null
           id: string
+          ledger_account_code: string | null
           legal_name: string
           merchant_notes: string | null
           mpesa_username: string
@@ -5383,6 +5387,7 @@ export type Database = {
           existing_c2b_notes?: string | null
           handled_by?: string | null
           id?: string
+          ledger_account_code?: string | null
           legal_name: string
           merchant_notes?: string | null
           mpesa_username: string
@@ -5407,6 +5412,7 @@ export type Database = {
           existing_c2b_notes?: string | null
           handled_by?: string | null
           id?: string
+          ledger_account_code?: string | null
           legal_name?: string
           merchant_notes?: string | null
           mpesa_username?: string
@@ -7131,6 +7137,7 @@ export type Database = {
           display_name: string
           environment: string
           id: string
+          ledger_account_code: string | null
           manual_fallback_until: string | null
           method_code: string
           provider: string
@@ -7147,6 +7154,7 @@ export type Database = {
           display_name: string
           environment: string
           id?: string
+          ledger_account_code?: string | null
           manual_fallback_until?: string | null
           method_code?: string
           provider: string
@@ -7163,6 +7171,7 @@ export type Database = {
           display_name?: string
           environment?: string
           id?: string
+          ledger_account_code?: string | null
           manual_fallback_until?: string | null
           method_code?: string
           provider?: string
@@ -14043,6 +14052,20 @@ export type Database = {
         Returns: Json
       }
       mpesa_availability: { Args: { p_location_id: string }; Returns: Json }
+      money_payment_accounts_overview: {
+        Args: never
+        Returns: {
+          account_code: string
+          account_id: string
+          account_name: string
+          default_location_ids: string[]
+          default_location_names: string[]
+          is_active: boolean
+          money_account_kind: string
+          mpesa_connection: Json
+          mpesa_request: Json
+        }[]
+      }
       mpesa_claim_provider_events: {
         Args: { p_limit?: number }
         Returns: {
@@ -14377,6 +14400,7 @@ export type Database = {
           p_consumer_secret: string
           p_daraja_app_id?: string
           p_environment: string
+          p_ledger_account_code?: string
           p_location_ids?: string[]
           p_organization_shortcode: string
           p_party_b: string
@@ -15594,6 +15618,7 @@ export type Database = {
           p_contact_phone: string
           p_existing_c2b_integration?: boolean
           p_existing_c2b_notes?: string
+          p_ledger_account_code?: string
           p_legal_name: string
           p_location_ids: string[]
           p_mpesa_username: string
@@ -16864,4 +16889,3 @@ export const Constants = {
     Enums: {},
   },
 } as const
-

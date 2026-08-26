@@ -49,6 +49,7 @@ import {
   type CheckoutMode,
   type FulfillmentCheckoutDraft,
 } from '../../fulfillment/fulfillment-checkout-fields.component';
+import { FulfillmentCheckoutMethodComponent } from '../../fulfillment/fulfillment-checkout-method.component';
 import {
   FulfillmentService,
   type FulfillmentSettings,
@@ -96,6 +97,7 @@ type CatalogView = 'grid' | 'list' | 'categories';
     BarcodeScannerComponent,
     PageActionsComponent,
     FulfillmentCheckoutFieldsComponent,
+    FulfillmentCheckoutMethodComponent,
   ],
   template: `
     <app-page
@@ -858,11 +860,18 @@ type CatalogView = 'grid' | 'list' | 'categories';
                 }
               </section>
 
-              <app-fulfillment-checkout-fields
+              <app-fulfillment-checkout-method
                 [settings]="fulfillmentSettings()"
-                [customer]="checkoutCustomer()"
-                (modeChanged)="fulfillmentModeChanged($event)"
-                (customerSelected)="selectMatchedCustomer($event)"
+                [mode]="fulfillmentFields()?.mode() ?? fulfillmentMode()"
+                [detailsCommitted]="fulfillmentFields()?.detailsCommitted() ?? false"
+                [recipientName]="fulfillmentFields()?.recipientName() ?? ''"
+                [phone]="fulfillmentFields()?.phone() ?? ''"
+                [address]="fulfillmentFields()?.address() ?? ''"
+                [collectionKind]="fulfillmentFields()?.collectionKind() ?? 'none'"
+                [updatesRequested]="fulfillmentFields()?.updatesRequested() ?? true"
+                [promiseLabel]="fulfillmentFields()?.promiseLabel() ?? null"
+                (modeSelected)="selectFulfillmentMethod($event)"
+                (detailsRequested)="openFulfillmentDetails()"
               />
 
               <section class="mt-auto border-t border-base-300/60 p-4">
@@ -976,6 +985,13 @@ type CatalogView = 'grid' | 'list' | 'categories';
           </button>
         </div>
       </div>
+
+      <app-fulfillment-checkout-fields
+        [settings]="fulfillmentSettings()"
+        [customer]="checkoutCustomer()"
+        (modeChanged)="fulfillmentModeChanged($event)"
+        (customerSelected)="selectMatchedCustomer($event)"
+      />
 
       @if (checkoutOpen() && cashierSession.canTakePayment() && perms.has('SettleOrder')) {
         <app-checkout-panel
@@ -1930,6 +1946,14 @@ export class SellComponent implements OnInit {
     } catch {
       this.fulfillmentSettings.set(null);
     }
+  }
+
+  protected selectFulfillmentMethod(mode: CheckoutMode): void {
+    this.fulfillmentFields()?.selectMode(mode);
+  }
+
+  protected openFulfillmentDetails(): void {
+    this.fulfillmentFields()?.openDetails();
   }
 
   protected async fulfillmentModeChanged(mode: CheckoutMode): Promise<void> {

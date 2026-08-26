@@ -31,7 +31,7 @@ const CLOSE_MS = 150;
       <div class="fixed inset-0 z-[60]">
         <button
           type="button"
-          class="absolute inset-0 h-full w-full cursor-default bg-base-content/50 transition-opacity duration-200 motion-reduce:transition-none"
+          class="overlay-backdrop absolute inset-0 h-full w-full cursor-default transition-opacity duration-200 motion-reduce:transition-none"
           [class.opacity-0]="!shown()"
           aria-label="Close panel"
           (click)="requestClose()"
@@ -93,7 +93,7 @@ const CLOSE_MS = 150;
 
           @if (confirmDiscard()) {
             <div
-              class="absolute inset-0 z-20 flex items-end bg-base-content/45 p-3 md:items-center md:justify-center"
+              class="overlay-backdrop absolute inset-0 z-20 flex items-end p-3 md:items-center md:justify-center"
             >
               <div
                 #discardDialog

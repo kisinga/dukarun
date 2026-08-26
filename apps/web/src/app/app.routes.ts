@@ -383,9 +383,8 @@ export const routes: Routes = [
       },
       {
         path: 'billing',
-        canActivate: [permissionGuard],
-        data: { permission: 'ManageCompanySettings' },
-        loadComponent: () => import('./billing/billing.component').then(m => m.BillingComponent),
+        pathMatch: 'full',
+        redirectTo: preserveQueryRedirect('/settings', { tab: 'billing' }),
       },
       {
         path: 'notifications',

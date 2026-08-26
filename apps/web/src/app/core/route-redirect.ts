@@ -1,11 +1,14 @@
 import { inject } from '@angular/core';
-import { RedirectFunction, Router } from '@angular/router';
+import { Params, RedirectFunction, Router } from '@angular/router';
 
 /** Build a compatibility redirect that retains deep-link filters and fragments. */
-export function preserveQueryRedirect(target: string): RedirectFunction {
+export function preserveQueryRedirect(
+  target: string,
+  extraQueryParams: Params = {}
+): RedirectFunction {
   return route =>
     inject(Router).createUrlTree([target], {
-      queryParams: route.queryParams,
+      queryParams: { ...route.queryParams, ...extraQueryParams },
       fragment: route.fragment ?? undefined,
     });
 }

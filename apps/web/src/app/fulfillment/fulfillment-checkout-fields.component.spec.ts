@@ -157,6 +157,30 @@ describe('FulfillmentCheckoutFieldsComponent', () => {
     expect(component.detailsCommitted()).toBe(true);
   });
 
+  it('emits pickup or delivery mode only after details are committed', async () => {
+    const component = (await render()).componentInstance;
+    const modeChanges: string[] = [];
+    component.modeChanged.subscribe(mode => modeChanges.push(mode));
+
+    component.selectMode('delivery');
+    expect(component.detailsOpen()).toBe(true);
+    expect(modeChanges).toEqual([]);
+
+    component.recipientName.set('David Delivery');
+    component.phone.set('0722000000');
+    component.address.set('Westlands, Nairobi');
+    component.cancelDetails();
+    expect(modeChanges).toEqual([]);
+    expect(component.mode()).toBe('counter');
+
+    component.selectMode('pickup');
+    component.recipientName.set('Alice Pickup');
+    component.updatesRequested.set(false);
+    component.completeDetails();
+
+    expect(modeChanges).toEqual(['pickup']);
+  });
+
   it('invalidates customer-derived details when the customer is cleared', async () => {
     const fixture = await render();
     fixture.componentRef.setInput('customer', {

@@ -379,6 +379,69 @@ test('credit checkout shows the projected split and confirms the server-owned re
   expect(body).not.toHaveProperty('p_credit_amount');
 });
 
+test('opening fulfillment details does not mutate the current sale card', async ({ page }) => {
+  await authenticateAccountUser(page);
+  await page.setViewportSize({ width: 1100, height: 720 });
+  await page.goto('http://127.0.0.1:4203/pos/sell');
+
+  await page
+    .getByRole('button', { name: /Account item/ })
+    .first()
+    .click();
+  const cartLines = page.locator('#current-sale app-sell-cart-line');
+  await expect(cartLines).toHaveCount(1);
+
+  await page
+    .locator('section[aria-labelledby="order-method-heading"]')
+    .getByRole('button', { name: 'Delivery', exact: true })
+    .click();
+
+  await expect(page.getByRole('dialog', { name: 'Delivery details' })).toBeVisible();
+  await expect(cartLines).toHaveCount(1);
+
+  const sawNakedBackdrop = page.evaluate(
+    () =>
+      new Promise<boolean>(resolve => {
+        let found = false;
+        let frames = 0;
+        const check = () => {
+          const dialog = document.querySelector<HTMLDialogElement>(
+            'dialog[aria-label="Delivery details"]'
+          );
+          const panel = dialog?.querySelector<HTMLElement>('.task-dialog-panel') ?? null;
+          const box = panel?.getBoundingClientRect();
+          if (dialog?.open && (!box || box.width === 0 || box.height === 0)) found = true;
+        };
+        const observer = new MutationObserver(check);
+        observer.observe(document.body, {
+          attributes: true,
+          attributeFilter: ['open'],
+          childList: true,
+          subtree: true,
+        });
+        const tick = () => {
+          check();
+          frames += 1;
+          if (frames >= 8) {
+            observer.disconnect();
+            resolve(found);
+            return;
+          }
+          requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      })
+  );
+  await page
+    .getByRole('dialog', { name: 'Delivery details' })
+    .getByRole('button', { name: 'Cancel' })
+    .click();
+  await page.getByRole('button', { name: 'Discard' }).click();
+  await expect(sawNakedBackdrop).resolves.toBe(false);
+  await expect(page.getByRole('dialog', { name: 'Delivery details' })).toBeHidden();
+  await expect(cartLines).toHaveCount(1);
+});
+
 test('delivery credit checkout keeps a one-off address and suppresses milestone updates', async ({
   page,
 }) => {

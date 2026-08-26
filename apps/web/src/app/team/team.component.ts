@@ -162,7 +162,12 @@ const MEMBER_SORT_OPTIONS: readonly ListSortOption[] = [
                   Your plan allows {{ memberLimit() }} active team member(s). Disable a member or
                   upgrade to add another.
                 </span>
-                <a routerLink="/billing" class="link whitespace-nowrap font-semibold">View plans</a>
+                <a
+                  routerLink="/settings"
+                  [queryParams]="{ tab: 'billing' }"
+                  class="link whitespace-nowrap font-semibold"
+                  >View plans</a
+                >
               </div>
             }
             <form
