@@ -3,7 +3,6 @@ import { DatePipe } from '@angular/common';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { SupabaseService } from '../core/supabase.service';
 import { PermissionsService } from '../core/permissions.service';
-import { LocationContextService } from '../core/location-context.service';
 import { ButtonComponent } from '../shared/ui/button.component';
 import { FormFieldComponent } from '../shared/ui/form-field.component';
 import { IconComponent } from '../shared/ui/icon.component';
@@ -603,27 +602,28 @@ const DEFAULT_MPESA_SETTINGS: MerchantStatus['settings'] = {
                   }
                 </div>
 
-                <fieldset class="border-t border-base-300/60 pt-3 sm:col-span-2">
-                  <legend class="type-heading">Checkout locations</legend>
-                  <p class="type-caption mt-1">Choose where cashiers can use this account.</p>
-                  <div class="mt-2 flex flex-wrap gap-2">
-                    @for (location of locations.locations(); track location.id) {
-                      <label
-                        class="flex min-h-11 cursor-pointer items-center gap-2 rounded-field bg-base-200/50 px-3 py-2 text-sm"
-                      >
-                        <input
-                          type="checkbox"
-                          class="checkbox checkbox-sm checkbox-primary"
-                          [checked]="locationSelected(location.id)"
-                          (change)="toggleLocation(location.id, $any($event.target).checked)"
-                        />
-                        <span>{{ location.name }}</span>
-                      </label>
-                    } @empty {
-                      <p class="type-caption py-2">Loading locations…</p>
+                @if (embedded()) {
+                  <div class="rounded-box border border-base-300/70 p-3 sm:col-span-2">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p class="type-heading">Checkout default</p>
+                        <p class="type-caption mt-1">
+                          This follows the M-PESA account selected in Money location defaults.
+                        </p>
+                      </div>
+                      <span class="badge badge-ghost badge-sm">
+                        {{ checkoutDefaultSummary() }}
+                      </span>
+                    </div>
+                    @if (checkoutLocationNames().length) {
+                      <div class="mt-3 flex flex-wrap gap-2">
+                        @for (name of checkoutLocationNames(); track name) {
+                          <span class="badge badge-neutral badge-sm">{{ name }}</span>
+                        }
+                      </div>
                     }
                   </div>
-                </fieldset>
+                }
 
                 <p class="type-caption flex items-start gap-1.5 sm:col-span-2">
                   <app-icon name="heroLockClosed" size="sm" class="mt-0.5" />
@@ -668,12 +668,12 @@ const DEFAULT_MPESA_SETTINGS: MerchantStatus['settings'] = {
 export class MpesaSettingsComponent implements OnInit {
   readonly accountCode = input<string | null>(null);
   readonly accountName = input('');
+  readonly checkoutLocationNames = input<readonly string[]>([]);
   readonly embedded = input(false);
   readonly statusChanged = output<void>();
   private readonly supabase = inject(SupabaseService);
   private readonly print = inject(PrintService);
   protected readonly perms = inject(PermissionsService);
-  protected readonly locations = inject(LocationContextService);
   protected readonly loading = signal(true);
   protected readonly saving = signal(false);
   protected readonly loadError = signal<string | null>(null);
@@ -710,6 +710,12 @@ export class MpesaSettingsComponent implements OnInit {
       ? 'Connect this money account to a Safaricom Till or Paybill.'
       : 'Accept STK Push and automatically match Till or Paybill payments.'
   );
+  protected readonly checkoutDefaultSummary = computed(() => {
+    const names = this.checkoutLocationNames();
+    if (names.length === 0) return 'Not selected as a checkout default yet.';
+    if (names.length === 1) return `Default at ${names[0]}.`;
+    return `Default at ${names.length} locations.`;
+  });
 
   protected readonly legalName = new FormControl('', {
     nonNullable: true,
@@ -741,23 +747,9 @@ export class MpesaSettingsComponent implements OnInit {
   protected readonly notes = new FormControl('', { nonNullable: true });
   protected readonly existingC2bIntegration = new FormControl(false, { nonNullable: true });
   protected readonly existingC2bNotes = new FormControl('', { nonNullable: true });
-  protected readonly selectedLocationIds = signal<string[]>([]);
 
   ngOnInit(): void {
-    void this.locations.load().then(() => {
-      this.selectedLocationIds.set(this.locations.locations().map(location => location.id));
-    });
     void this.load();
-  }
-
-  protected locationSelected(locationId: string): boolean {
-    return this.selectedLocationIds().includes(locationId);
-  }
-
-  protected toggleLocation(locationId: string, selected: boolean): void {
-    this.selectedLocationIds.update(current =>
-      selected ? [...new Set([...current, locationId])] : current.filter(id => id !== locationId)
-    );
   }
 
   protected async load(): Promise<void> {
@@ -784,11 +776,6 @@ export class MpesaSettingsComponent implements OnInit {
       this.message.set('Complete the required fields and check their format.');
       return;
     }
-    if (this.selectedLocationIds().length === 0) {
-      this.failed.set(true);
-      this.message.set('Select at least one location.');
-      return;
-    }
     this.saving.set(true);
     this.message.set(null);
     this.failed.set(false);
@@ -800,7 +787,6 @@ export class MpesaSettingsComponent implements OnInit {
       p_contact_name: this.contactName.value,
       p_contact_phone: this.contactPhone.value,
       p_contact_email: this.contactEmail.value,
-      p_location_ids: this.selectedLocationIds(),
       p_notes: this.notes.value || undefined,
       p_existing_c2b_integration: this.existingC2bIntegration.value,
       p_existing_c2b_notes: this.existingC2bNotes.value || undefined,

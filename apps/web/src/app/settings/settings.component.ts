@@ -1418,6 +1418,7 @@ const SETTINGS_TABS: ReadonlyArray<{ key: SettingsTab; label: string; descriptio
                       [embedded]="true"
                       [accountCode]="account.code"
                       [accountName]="account.name"
+                      [checkoutLocationNames]="mpesaSetupLocationNames(account.code)"
                       (statusChanged)="refreshMoneyAccounts()"
                     />
                     <button
@@ -2883,6 +2884,13 @@ export class SettingsComponent implements OnInit {
     if (!status || status === 'not_connected') return 'Connect';
     if (status === 'active' || status === 'live') return 'View setup';
     return 'Continue setup';
+  }
+
+  protected mpesaSetupLocationNames(accountCode: string): string[] {
+    return (
+      this.moneyAccountOverview().find(item => item.account_code === accountCode)
+        ?.default_location_names ?? []
+    );
   }
 
   protected openMpesaSetup(accountCode: string): void {

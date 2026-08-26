@@ -89,15 +89,9 @@ with account as (
     company_id,provider,environment,display_name,status,activated_at,ledger_account_code
   ) select company_id,'mpesa','production','Fulfillment test till','active',now(),'MPESA'
     from fulfillment_fixture returning id,company_id
-), mapped as (
-  insert into public.location_payment_provider_accounts(
-    location_id,company_id,provider,provider_account_id
-  ) select f.location_id,a.company_id,'mpesa',a.id
-    from account a join fulfillment_fixture f on f.company_id=a.company_id
-  returning location_id,provider_account_id
 )
-select a.id account_id,a.company_id,m.location_id
-from account a join mapped m on m.provider_account_id=a.id;
+select a.id account_id,a.company_id,f.location_id
+from account a join fulfillment_fixture f on f.company_id=a.company_id;
 grant select on pg_temp.fulfillment_mpesa_account to authenticated;
 
 select is((select count(*)::int from public.roles where is_template and name in('Admin','Manager')

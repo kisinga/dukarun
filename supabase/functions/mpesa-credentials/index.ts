@@ -44,7 +44,6 @@ Deno.serve(async req => {
         p_consumer_key: input.consumer_key ?? null,
         p_consumer_secret: input.consumer_secret ?? null,
         p_passkey: input.passkey,
-        p_location_ids: input.location_ids ?? null,
         p_daraja_app_id: input.daraja_app_id ?? null,
       });
       if (error) throw error;

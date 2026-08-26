@@ -14401,7 +14401,6 @@ export type Database = {
           p_daraja_app_id?: string
           p_environment: string
           p_ledger_account_code?: string
-          p_location_ids?: string[]
           p_organization_shortcode: string
           p_party_b: string
           p_passkey: string
@@ -15620,7 +15619,6 @@ export type Database = {
           p_existing_c2b_notes?: string
           p_ledger_account_code?: string
           p_legal_name: string
-          p_location_ids: string[]
           p_mpesa_username: string
           p_notes?: string
           p_shortcode: string
