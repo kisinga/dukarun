@@ -363,7 +363,7 @@ interface Testimonial {
             Here are some featured capabilities of dukarun.
           </p>
         </div>
-        <div class="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div class="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           @for (feature of features; track feature.title) {
             <a
               routerLink="/docs"
@@ -757,6 +757,7 @@ export class HomeComponent implements OnInit {
       features.push(`${plan.sms_per_period.toLocaleString('en-KE')} SMS per month`);
     if (plan.whatsapp_per_period !== null)
       features.push(`${plan.whatsapp_per_period.toLocaleString('en-KE')} WhatsApp per month`);
+    if (plan.fulfillment_available) features.push('Pickup & delivery');
     if (plan.storefront_available) features.push('Public storefront');
     if (plan.payment_reminders_available) features.push('Payment reminders');
     if (plan.staff_performance_enabled) features.push('Staff performance reports');
@@ -835,6 +836,18 @@ export class HomeComponent implements OnInit {
       docId: 'pos',
     },
     {
+      icon: 'heroCube',
+      title: 'Inventory & batches',
+      copy: 'Keep stock current with every sale and purchase, including costs, batches and expiry dates.',
+      docId: 'inventory',
+    },
+    {
+      icon: 'heroMapPin',
+      title: 'Pickup & delivery',
+      copy: 'Prepare orders, assign handoffs, collect COD and let customers follow progress from a private link.',
+      docId: 'pickup-delivery',
+    },
+    {
       icon: 'heroSignalSlash',
       title: 'Offline selling',
       copy: 'Keep selling when the network drops. Sales wait safely and sync on their own when you are back online.',
@@ -849,7 +862,7 @@ export class HomeComponent implements OnInit {
     {
       icon: 'heroClipboardDocumentList',
       title: 'VAT calculations and double-entry books',
-      copy: 'Extract VAT from inclusive sales and supplier invoices, then track input and output VAT in balanced books.',
+      copy: 'Turn on VAT accounting when your business needs it, then track VAT from inclusive sales and supplier invoices in balanced books.',
       docId: 'vat',
     },
   ];
@@ -892,6 +905,11 @@ export class HomeComponent implements OnInit {
         'Cash or M-Pesa, recorded at the till. You can also sell on credit to customers you trust, with balances and limits tracked per person.',
     },
     {
+      question: 'Can I manage pickup and delivery orders?',
+      answer:
+        'Yes. Choose pickup or delivery at checkout, move the order through preparation and handoff, assign a delivery person, and share a private tracking link and PIN. Cash on delivery can be enabled per location.',
+    },
+    {
       question: 'Can customers pay straight into dukarun by M-Pesa?',
       answer:
         'Not yet. Customer-initiated M-Pesa (an STK push from the buyer) is still in the works. Today you record M-Pesa payments from your existing till, and they post to the books like any other sale.',
@@ -904,7 +922,7 @@ export class HomeComponent implements OnInit {
     {
       question: 'Does Dukarun calculate VAT?',
       answer:
-        'Yes, for a configured VAT-registered shop in a supported jurisdiction. Dukarun extracts VAT from VAT-inclusive sales and eligible supplier invoices, posts input and output VAT to the ledger, and provides VAT breakdowns and reports. It does not submit to eTIMS and is not tax advice or a compliance guarantee.',
+        'Yes. In a supported jurisdiction, a business can turn on VAT accounting when it needs it. Dukarun extracts VAT from VAT-inclusive sales and eligible supplier invoices, posts input and output VAT to the ledger, and provides VAT breakdowns and reports. The business remains responsible for registration, filing, and its tax obligations. eTIMS support is in development; Dukarun does not currently submit invoices.',
     },
     {
       question: 'How is the subscription billed?',

@@ -23,13 +23,13 @@ import { ReceiptDataService } from '../shared/print/receipt-data.service';
           <div>
             <h2 class="section-title">VAT</h2>
             <p class="type-caption mt-1">
-              Prices remain the amount customers pay. VAT is extracted from that amount and never
-              added at checkout.
+              Control how Dukarun calculates and reports VAT. Enabling it does not register the
+              business with a tax authority.
             </p>
           </div>
           @if (settings(); as current) {
             @if (current.active_profile?.vat_registered) {
-              <span class="badge badge-success">VAT active</span>
+              <span class="badge badge-success">VAT on</span>
             } @else if (scheduledVatActivation()) {
               <span class="badge badge-info badge-outline">VAT scheduled</span>
             } @else {
@@ -50,18 +50,15 @@ import { ReceiptDataService } from '../shared/print/receipt-data.service';
             <div class="flex flex-wrap items-center justify-between gap-3">
               <div>
                 @if (current.active_profile?.vat_registered) {
-                  <p class="text-sm font-semibold">
-                    {{ current.active_profile?.jurisdiction_name }} VAT is active
-                  </p>
+                  <p class="text-sm font-semibold">VAT accounting is on</p>
                   <p class="type-caption mt-1">
-                    PIN {{ current.active_profile?.tax_registration_number }} · active since
+                    {{ current.active_profile?.jurisdiction_name }} · on since
                     {{ current.active_profile?.effective_from }} · prices remain VAT-inclusive
                   </p>
                 } @else if (scheduledVatActivation(); as scheduled) {
                   <p class="text-sm font-semibold">VAT activation is scheduled</p>
                   <p class="type-caption mt-1">
-                    {{ scheduled.jurisdiction_name }} · starts {{ scheduled.effective_from }} · PIN
-                    {{ scheduled.tax_registration_number }}
+                    {{ scheduled.jurisdiction_name }} · starts {{ scheduled.effective_from }}
                   </p>
                 } @else {
                   <p class="text-sm font-semibold">VAT is not active</p>
@@ -71,11 +68,52 @@ import { ReceiptDataService } from '../shared/print/receipt-data.service';
                 }
               </div>
               @if (canManage() && !profileEditorOpen() && current.scheduled_profiles.length === 0) {
-                <button appButton type="button" variant="outline" size="sm" (click)="openEditor()">
-                  {{ current.active_profile?.vat_registered ? 'Schedule a change' : 'Set up VAT' }}
+                <button
+                  appButton
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  (click)="openEditor(!current.active_profile?.vat_registered)"
+                >
+                  {{ current.active_profile?.vat_registered ? 'Turn VAT off' : 'Turn VAT on' }}
                 </button>
               }
             </div>
+
+            @if (registrationProfile(); as profile) {
+              <div class="mt-3 border-t border-base-300 pt-3">
+                <div class="grid items-end gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+                  <app-form-field
+                    label="KRA PIN for invoices (optional)"
+                    hint="Shown on printed tax documents and used by tax integrations. You can add or change it later."
+                  >
+                    <input
+                      class="input input-bordered input-sm w-full"
+                      autocomplete="off"
+                      [formControl]="documentPin"
+                      [disabled]="!canManage() || savingPin()"
+                    />
+                  </app-form-field>
+                  <button
+                    appButton
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    [loading]="savingPin()"
+                    [disabled]="!canManage() || documentPin.pristine"
+                    (click)="saveDocumentPin(profile.id)"
+                  >
+                    Save PIN
+                  </button>
+                </div>
+                @if (!profile.tax_registration_number) {
+                  <p class="mt-2 text-xs text-warning">
+                    VAT calculations are on. Add a KRA PIN before issuing documents that must show
+                    it.
+                  </p>
+                }
+              </div>
+            }
 
             @if (current.active_profile?.vat_registered || scheduledVatActivation()) {
               <label
@@ -165,7 +203,7 @@ import { ReceiptDataService } from '../shared/print/receipt-data.service';
                   <div class="flex flex-wrap items-center justify-between gap-2 text-sm">
                     <span>
                       {{ profile.jurisdiction_name }} ·
-                      {{ profile.vat_registered ? 'VAT registered' : 'Not VAT registered' }}
+                      {{ profile.vat_registered ? 'VAT will turn on' : 'VAT will turn off' }}
                     </span>
                     <div class="flex items-center gap-2">
                       <span class="badge badge-info badge-outline"
@@ -190,63 +228,31 @@ import { ReceiptDataService } from '../shared/print/receipt-data.service';
 
           @if (canManage() && profileEditorOpen()) {
             <form
-              class="mt-5 border-t border-base-300/70 pt-4"
+              class="mt-4 rounded-box border border-primary/20 bg-base-200/40 p-4"
               (submit)="$event.preventDefault(); saveProfile()"
             >
-              <div class="flex items-center justify-between gap-3">
+              <div class="flex items-start justify-between gap-3">
                 <div>
-                  <h3 class="text-sm font-semibold">
-                    {{
-                      current.active_profile?.vat_registered ? 'Schedule VAT change' : 'Set up VAT'
-                    }}
+                  <h3 class="font-semibold">
+                    {{ registered.value ? 'Turn VAT accounting on' : 'Turn VAT accounting off' }}
                   </h3>
-                  <p class="type-caption mt-1">Step {{ onboardingStep() }} of 4</p>
-                </div>
-                <ul class="steps steps-horizontal hidden text-xs sm:flex">
-                  @for (step of [1, 2, 3, 4]; track step) {
-                    <li class="step" [class.step-primary]="onboardingStep() >= step"></li>
-                  }
-                </ul>
-              </div>
-              <p class="type-caption mt-1">
-                Prices stay gross: enabling VAT extracts tax from the selling price and never adds
-                it at checkout. Historical transactions never change.
-              </p>
-              <div class="mt-4 min-h-40 rounded-box border border-base-300 p-4">
-                @if (onboardingStep() === 1) {
-                  <h4 class="font-semibold">Is this shop VAT registered?</h4>
                   <p class="type-caption mt-1">
                     {{
-                      current.active_profile?.vat_registered
-                        ? 'Choose deregister only when the shop is legally ending its VAT registration.'
-                        : 'VAT registration is required before Dukarun can calculate output VAT.'
+                      registered.value
+                        ? 'Choose when Dukarun should begin calculating and reporting VAT.'
+                        : 'Choose when new sales should stop recording output VAT.'
                     }}
                   </p>
-                  <div class="mt-4 grid gap-2 sm:grid-cols-2">
-                    <button
-                      type="button"
-                      class="btn"
-                      [class.btn-primary]="registered.value"
-                      (click)="registered.setValue(true)"
-                    >
-                      Yes, VAT registered
-                    </button>
-                    <button
-                      type="button"
-                      class="btn"
-                      [class.btn-primary]="!registered.value"
-                      (click)="registered.setValue(false)"
-                    >
-                      {{
-                        current.active_profile?.vat_registered
-                          ? 'Deregister from VAT'
-                          : 'Keep VAT off'
-                      }}
-                    </button>
-                  </div>
-                } @else if (onboardingStep() === 2) {
+                </div>
+                <button type="button" class="btn btn-ghost btn-sm" (click)="closeEditor()">
+                  Cancel
+                </button>
+              </div>
+
+              <div class="mt-4 grid gap-4" [class.sm:grid-cols-2]="registered.value">
+                @if (registered.value) {
                   <app-form-field
-                    label="VAT country"
+                    label="Tax country"
                     hint="Only reviewed, published country packages are shown."
                     [required]="true"
                   >
@@ -260,87 +266,73 @@ import { ReceiptDataService } from '../shared/print/receipt-data.service';
                       }
                     </select>
                   </app-form-field>
-                  <p class="mt-3 text-sm">
-                    The standard country treatment is selected automatically. Product exceptions can
-                    be set in the catalog.
-                  </p>
-                } @else if (onboardingStep() === 3) {
-                  <div class="grid gap-3 sm:grid-cols-2">
-                    @if (registered.value) {
-                      <app-form-field label="VAT registration PIN" [required]="true">
-                        <input
-                          class="input input-bordered w-full"
-                          autocomplete="off"
-                          [formControl]="pin"
-                        />
-                      </app-form-field>
-                    }
-                    <app-form-field
-                      label="First taxable business date"
-                      [hint]="
-                        current.activation.has_financial_activity_today
-                          ? 'Today already has finalized activity, so the earliest safe date is tomorrow.'
-                          : 'Today is available because no financial activity has finalized yet.'
-                      "
-                      [required]="true"
-                    >
-                      <input
-                        type="date"
-                        class="input input-bordered w-full"
-                        [min]="current.activation.earliest_effective_from"
-                        [formControl]="effectiveFrom"
-                      />
-                    </app-form-field>
-                  </div>
-                } @else {
-                  <h4 class="font-semibold">Review</h4>
-                  <dl class="mt-3 grid gap-2 text-sm sm:grid-cols-2">
-                    <div>
-                      <dt class="type-caption">Status</dt>
-                      <dd class="font-medium">
-                        {{ registered.value ? 'VAT registered' : 'Not VAT registered' }}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt class="type-caption">Country</dt>
-                      <dd class="font-medium">{{ jurisdictionName() }}</dd>
-                    </div>
-                    <div>
-                      <dt class="type-caption">First business date</dt>
-                      <dd class="font-medium">{{ effectiveFrom.value }}</dd>
-                    </div>
-                    <div>
-                      <dt class="type-caption">Default treatment</dt>
-                      <dd class="font-medium">{{ defaultCategoryName() }}</dd>
-                    </div>
-                  </dl>
-                  <div class="alert alert-info mt-4 text-sm">
-                    Selling prices remain unchanged. VAT is extracted at the transaction tax point;
-                    accounting-period closing is separate.
+                }
+
+                <app-form-field
+                  [label]="
+                    registered.value ? 'First VAT business date' : 'First non-VAT business date'
+                  "
+                  [hint]="
+                    current.activation.has_financial_activity_today
+                      ? 'Today has finalized activity. The earliest safe date is tomorrow.'
+                      : 'Today is available because no financial activity has finalized yet.'
+                  "
+                  [required]="true"
+                >
+                  <input
+                    type="date"
+                    class="input input-bordered w-full"
+                    [min]="current.activation.earliest_effective_from"
+                    [formControl]="effectiveFrom"
+                  />
+                </app-form-field>
+
+                @if (registered.value) {
+                  <app-form-field
+                    label="KRA PIN for invoices (optional)"
+                    hint="Used on tax documents and integrations. It does not control VAT calculation."
+                  >
+                    <input
+                      class="input input-bordered w-full"
+                      autocomplete="off"
+                      [formControl]="pin"
+                    />
+                  </app-form-field>
+                  <div class="rounded-box border border-base-300 bg-base-100 p-3 text-sm">
+                    <p class="font-medium">{{ defaultCategoryName() }}</p>
+                    <p class="type-caption mt-1">
+                      Default country treatment. Product exceptions stay configurable in the
+                      catalog.
+                    </p>
                   </div>
                 }
               </div>
-              <div class="mt-4 flex justify-between gap-2">
-                <button
-                  type="button"
-                  class="btn btn-ghost"
-                  (click)="onboardingStep() === 1 ? closeEditor() : previousStep()"
-                >
-                  {{ onboardingStep() === 1 ? 'Cancel' : 'Back' }}
+
+              <div
+                class="mt-4 rounded-box p-3 text-sm"
+                [class.bg-info/10]="registered.value"
+                [class.text-info-content]="registered.value"
+                [class.bg-warning/10]="!registered.value"
+              >
+                {{
+                  registered.value
+                    ? 'Prices stay unchanged. Dukarun extracts VAT from them from the selected date. The business remains responsible for its tax obligations.'
+                    : 'New sales from the selected date will not record output VAT. Historical transactions remain unchanged.'
+                }}
+              </div>
+
+              <div class="mt-4 flex justify-end">
+                <button appButton type="submit" [loading]="saving()">
+                  {{
+                    registered.value
+                      ? effectiveFrom.value === current.activation.business_date
+                        ? 'Turn on VAT now'
+                        : 'Schedule VAT on'
+                      : effectiveFrom.value === current.activation.business_date
+                        ? 'Turn off VAT now'
+                        : 'Schedule VAT off'
+                  }}
                 </button>
-                @if (onboardingStep() < 4) {
-                  <button type="button" class="btn btn-primary" (click)="nextStep()">
-                    Continue
-                  </button>
-                } @else {
-                  <button appButton type="submit" [loading]="saving()">
-                    {{
-                      effectiveFrom.value === current.activation.business_date
-                        ? 'Activate now'
-                        : 'Schedule VAT'
-                    }}
-                  </button>
-                }
               </div>
             </form>
           } @else if (!canManage()) {
@@ -363,16 +355,22 @@ export class TaxSettingsComponent implements OnInit {
   protected readonly loading = signal(true);
   protected readonly saving = signal(false);
   protected readonly savingPrint = signal(false);
+  protected readonly savingPin = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
   protected readonly integrationLocations = signal<TaxIntegrationLocation[]>([]);
   protected readonly branchCodes = signal<Record<string, string>>({});
   protected readonly savingBranchId = signal<string | null>(null);
-  protected readonly onboardingStep = signal(1);
   protected readonly profileEditorOpen = signal(false);
   protected readonly canManage = computed(() => this.permissions.has('CloseAccountingPeriod'));
   protected readonly scheduledVatActivation = computed(
     () => this.settings()?.scheduled_profiles.find(profile => profile.vat_registered) ?? null
+  );
+  protected readonly registrationProfile = computed(
+    () =>
+      (this.settings()?.active_profile?.vat_registered
+        ? this.settings()?.active_profile
+        : this.scheduledVatActivation()) ?? null
   );
   protected readonly kenyaVatConfigured = computed(() => {
     const current = this.settings();
@@ -399,6 +397,7 @@ export class TaxSettingsComponent implements OnInit {
   });
   protected readonly registered = new FormControl(false, { nonNullable: true });
   protected readonly pin = new FormControl('', { nonNullable: true });
+  protected readonly documentPin = new FormControl('', { nonNullable: true });
   protected readonly defaultCategory = new FormControl('', {
     nonNullable: true,
     validators: Validators.required,
@@ -443,10 +442,6 @@ export class TaxSettingsComponent implements OnInit {
   protected async saveProfile(): Promise<void> {
     if (this.jurisdiction.invalid || this.effectiveFrom.invalid || this.defaultCategory.invalid)
       return;
-    if (this.registered.value && !this.pin.value.trim()) {
-      this.error.set('Enter the shop tax registration PIN.');
-      return;
-    }
     this.saving.set(true);
     this.error.set(null);
     this.notice.set(null);
@@ -459,14 +454,35 @@ export class TaxSettingsComponent implements OnInit {
         defaultTaxCategoryId: this.defaultCategory.value,
       });
       this.receiptData.invalidateCompanyInfo();
-      this.notice.set(`VAT treatment will start on ${this.effectiveFrom.value}.`);
-      this.onboardingStep.set(1);
+      this.notice.set(
+        this.registered.value
+          ? `VAT accounting will turn on from ${this.effectiveFrom.value}.`
+          : `VAT accounting will turn off from ${this.effectiveFrom.value}.`
+      );
       this.profileEditorOpen.set(false);
       await this.load();
     } catch (error) {
       this.error.set(error instanceof Error ? error.message : 'Could not schedule VAT treatment');
     } finally {
       this.saving.set(false);
+    }
+  }
+
+  protected async saveDocumentPin(profileId: string): Promise<void> {
+    this.savingPin.set(true);
+    this.error.set(null);
+    this.notice.set(null);
+    try {
+      const value = this.documentPin.value.trim();
+      await this.tax.updateRegistrationNumber(profileId, value || null);
+      this.receiptData.invalidateCompanyInfo();
+      this.documentPin.markAsPristine();
+      this.notice.set(value ? 'KRA PIN saved for future tax documents.' : 'KRA PIN removed.');
+      await this.load();
+    } catch (error) {
+      this.error.set(error instanceof Error ? error.message : 'Could not update the KRA PIN');
+    } finally {
+      this.savingPin.set(false);
     }
   }
 
@@ -497,37 +513,14 @@ export class TaxSettingsComponent implements OnInit {
     }
   }
 
-  protected nextStep(): void {
-    if (this.onboardingStep() === 2 && !this.jurisdiction.value) return;
-    if (
-      this.onboardingStep() === 3 &&
-      (!this.effectiveFrom.value || (this.registered.value && !this.pin.value.trim()))
-    )
-      return;
-    this.onboardingStep.update(step => Math.min(step + 1, 4));
-  }
-
-  protected previousStep(): void {
-    this.onboardingStep.update(step => Math.max(step - 1, 1));
-  }
-
-  protected openEditor(): void {
-    this.onboardingStep.set(1);
+  protected openEditor(enabled: boolean): void {
     this.notice.set(null);
-    this.registered.setValue(true);
+    this.registered.setValue(enabled);
     this.profileEditorOpen.set(true);
   }
 
   protected closeEditor(): void {
-    this.onboardingStep.set(1);
     this.profileEditorOpen.set(false);
-  }
-
-  protected jurisdictionName(): string {
-    return (
-      this.settings()?.jurisdictions.find(item => item.id === this.jurisdiction.value)?.name ??
-      'Not selected'
-    );
   }
 
   protected async cancelScheduled(profileId: string): Promise<void> {
@@ -567,6 +560,11 @@ export class TaxSettingsComponent implements OnInit {
       this.jurisdiction.setValue(jurisdictionId);
       this.registered.setValue(profile?.vat_registered ?? false);
       this.pin.setValue(profile?.tax_registration_number ?? '');
+      const registrationProfile = profile?.vat_registered
+        ? profile
+        : settings.scheduled_profiles.find(item => item.vat_registered);
+      this.documentPin.setValue(registrationProfile?.tax_registration_number ?? '');
+      this.documentPin.markAsPristine();
       this.categories.set(jurisdictionId ? await this.tax.categories(jurisdictionId) : []);
       this.defaultCategory.setValue(
         profile?.default_tax_category_id ??

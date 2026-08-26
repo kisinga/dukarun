@@ -138,6 +138,18 @@ export class TaxService {
     return data;
   }
 
+  async updateRegistrationNumber(
+    profileId: string,
+    registrationNumber: string | null
+  ): Promise<string> {
+    const { data, error } = await this.db.rpc('update_company_tax_registration_number', {
+      p_profile_id: profileId,
+      p_tax_registration_number: registrationNumber ?? '',
+    });
+    if (error) throw rpcError(error);
+    return data;
+  }
+
   async integrationLocations(): Promise<TaxIntegrationLocation[]> {
     const { data, error } = await this.db.rpc('tax_integration_locations');
     if (error) throw rpcError(error);

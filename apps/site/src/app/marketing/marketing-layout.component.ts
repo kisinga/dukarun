@@ -108,8 +108,8 @@ interface NavLink {
               dukarun
             </span>
             <p class="mb-0 max-w-xs text-sm text-base-content/70">
-              Point of sale and books for Kenyan businesses. Sell online or off; every shilling
-              lands in the ledger.
+              Point of sale, pickup, delivery and books for Kenyan businesses. Every order and
+              shilling stays connected.
             </p>
           </div>
           <nav class="flex flex-col gap-1" aria-label="Pages">

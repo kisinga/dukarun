@@ -39,6 +39,7 @@ export const FIXTURE_PLANS: PublicSubscriptionPlan[] = [
     sms_per_period: 500,
     whatsapp_per_period: null,
     storefront_available: true,
+    fulfillment_available: true,
     payment_reminders_available: true,
     multiple_locations_enabled: true,
     staff_performance_enabled: true,

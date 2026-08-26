@@ -35,6 +35,14 @@ const FAQ_ENTITIES = [
   },
   {
     '@type': 'Question',
+    name: 'Can I manage pickup and delivery orders?',
+    acceptedAnswer: {
+      '@type': 'Answer',
+      text: 'Yes. Choose pickup or delivery at checkout, move the order through preparation and handoff, assign a delivery person, and share a private tracking link and PIN. Cash on delivery can be enabled per location.',
+    },
+  },
+  {
+    '@type': 'Question',
     name: 'Can customers pay straight into dukarun by M-Pesa?',
     acceptedAnswer: {
       '@type': 'Answer',
@@ -54,7 +62,7 @@ const FAQ_ENTITIES = [
     name: 'Does Dukarun calculate VAT?',
     acceptedAnswer: {
       '@type': 'Answer',
-      text: 'Yes, for a configured VAT-registered shop in a supported jurisdiction. Dukarun extracts VAT from VAT-inclusive sales and eligible supplier invoices, posts input and output VAT to the ledger, and provides VAT breakdowns and reports. It does not submit to eTIMS and is not tax advice or a compliance guarantee.',
+      text: 'Yes. In a supported jurisdiction, a business can turn on VAT accounting when it needs it. Dukarun extracts VAT from VAT-inclusive sales and eligible supplier invoices, posts input and output VAT to the ledger, and provides VAT breakdowns and reports. The business remains responsible for registration, filing, and its tax obligations. eTIMS support is in development; Dukarun does not currently submit invoices.',
     },
   },
   {

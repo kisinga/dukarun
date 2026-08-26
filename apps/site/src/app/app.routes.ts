@@ -42,10 +42,10 @@ export const routes: Routes = [
       {
         path: '',
         pathMatch: 'full',
-        title: 'Dukarun | POS and books for Kenyan businesses',
+        title: 'Dukarun | POS, pickup, delivery and books',
         data: {
           description:
-            'Sell online or offline, manage stock, calculate VAT, and keep balanced double-entry books with Dukarun.',
+            'Run counter, pickup and delivery sales, manage stock, calculate VAT, and keep balanced double-entry books with Dukarun.',
         },
         loadComponent: () => import('./marketing/home/home.component').then(m => m.HomeComponent),
       },
@@ -80,7 +80,10 @@ export const routes: Routes = [
       {
         path: 'docs',
         title: 'Getting started | Dukarun',
-        data: { description: 'Learn how to set up Dukarun, sell, sync, and close the day.' },
+        data: {
+          description:
+            'Learn how to set up Dukarun, sell, manage pickup and delivery, sync, and close the day.',
+        },
         loadComponent: () => import('./marketing/docs/docs.component').then(m => m.DocsComponent),
       },
       {

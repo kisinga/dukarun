@@ -228,6 +228,17 @@ export class DocsComponent {
       ],
     },
     {
+      id: 'pickup-delivery',
+      icon: 'heroMapPin',
+      title: 'Pickup & delivery',
+      summary: 'From order received to safely handed over.',
+      details: [
+        'Choose Counter, Pickup, or Delivery at checkout. Pickup and delivery orders keep their recipient, contact, address, promised time, preparation notes, and handoff instructions with the sale.',
+        'The team moves work from pending to processing and ready. An assigned delivery person takes over when the order is ready, then records dispatch, delivery, failure, or retry without gaining access to unrelated business data.',
+        'Customers can follow progress from a private tracking link and confirm delivery with a six-digit PIN. Prepaid, customer-credit, and cash-on-delivery orders are supported where the location and subscription plan allow them.',
+      ],
+    },
+    {
       id: 'inventory',
       icon: 'heroCube',
       title: 'Inventory & batches',
@@ -265,9 +276,10 @@ export class DocsComponent {
       title: 'VAT calculations',
       summary: 'Input and output VAT connected to the books.',
       details: [
-        'For a configured VAT-registered shop in a supported jurisdiction, Dukarun extracts VAT from VAT-inclusive sales and supplier invoices. Entered prices stay gross, so VAT is never added unexpectedly at checkout or purchase confirmation.',
+        'In a supported jurisdiction, a business can turn on VAT accounting in Dukarun when it needs it. Dukarun extracts VAT from VAT-inclusive sales and supplier invoices. Entered prices stay gross, so VAT is never added unexpectedly at checkout or purchase confirmation.',
         'Eligible supplier invoices record their invoice number, date, and supplier tax PIN. Recoverable input VAT posts to the VAT control account while inventory and supplier-bill expenses are valued at net cost.',
-        'VAT breakdowns and reports show gross sales, net revenue, output VAT, claimed input VAT, and net VAT payable. These tools do not submit invoices to eTIMS and are not tax advice or a guarantee of statutory compliance.',
+        'A business can add its tax PIN when it needs the number on tax documents or integrations; the PIN does not control VAT calculation. VAT breakdowns and reports show gross sales, net revenue, output VAT, claimed input VAT, and net VAT payable.',
+        'The business remains responsible for registration, filing, and meeting its tax obligations. eTIMS support is in development; Dukarun does not currently submit invoices or guarantee statutory compliance.',
       ],
     },
     {

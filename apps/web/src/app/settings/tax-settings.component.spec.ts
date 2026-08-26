@@ -45,6 +45,8 @@ describe('TaxSettingsComponent', () => {
         },
       }),
       integrationLocations: vi.fn().mockResolvedValue([]),
+      scheduleProfile: vi.fn().mockResolvedValue('profile-2'),
+      updateRegistrationNumber: vi.fn().mockResolvedValue('profile-1'),
       categories: vi.fn().mockResolvedValue([
         {
           id: 'category-standard',
@@ -75,32 +77,63 @@ describe('TaxSettingsComponent', () => {
       fixture.detectChanges();
       expect(fixture.nativeElement.textContent).not.toContain('Loading VAT settings');
     });
-    return fixture;
+    return { fixture, tax };
   }
 
   it('shows active VAT as management state without reopening onboarding', async () => {
-    const fixture = await render(true);
+    const { fixture } = await render(true);
     const text = fixture.nativeElement.textContent;
 
-    expect(text).toContain('VAT active');
-    expect(text).toContain('Kenya VAT is active');
-    expect(text).toContain('Schedule a change');
-    expect(text).not.toContain('Is this shop VAT registered?');
+    expect(text).toContain('VAT on');
+    expect(text).toContain('VAT accounting is on');
+    expect(text).toContain('Turn VAT off');
+    expect(text).not.toContain('Turn VAT accounting off');
   });
 
-  it('reveals onboarding only after an explicit setup action', async () => {
-    const fixture = await render(false);
+  it('opens the single-panel VAT form only after an explicit action', async () => {
+    const { fixture } = await render(false);
     expect(fixture.nativeElement.textContent).toContain('VAT is not active');
-    expect(fixture.nativeElement.textContent).not.toContain('Is this shop VAT registered?');
+    expect(fixture.nativeElement.textContent).not.toContain('Turn VAT accounting on');
 
     const setup = [...fixture.nativeElement.querySelectorAll('button')].find(button =>
-      (button.textContent ?? '').includes('Set up VAT')
+      (button.textContent ?? '').includes('Turn VAT on')
     );
     setup?.click();
     fixture.detectChanges();
 
-    expect(fixture.nativeElement.textContent).toContain('Is this shop VAT registered?');
+    expect(fixture.nativeElement.textContent).toContain('Turn VAT accounting on');
     expect((fixture.componentInstance as any).registered.value).toBe(true);
-    expect(fixture.nativeElement.textContent).toContain('Keep VAT off');
+    expect(fixture.nativeElement.textContent).not.toContain('Step 1 of 4');
+  });
+
+  it('allows VAT accounting to be enabled without a KRA PIN', async () => {
+    const { fixture, tax } = await render(false);
+    const component = fixture.componentInstance as any;
+    component.openEditor(true);
+    component.pin.setValue('');
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('KRA PIN for invoices (optional)');
+
+    await component.saveProfile();
+
+    expect(tax.scheduleProfile).toHaveBeenCalledWith({
+      jurisdictionId: jurisdiction.id,
+      vatRegistered: true,
+      taxRegistrationNumber: '',
+      effectiveFrom: '2026-08-21',
+      defaultTaxCategoryId: 'category-standard',
+    });
+  });
+
+  it('updates invoice PIN metadata without rescheduling VAT', async () => {
+    const { fixture, tax } = await render(true);
+    const component = fixture.componentInstance as any;
+    component.documentPin.setValue('P000000001A');
+
+    await component.saveDocumentPin(activeProfile.id);
+
+    expect(tax.updateRegistrationNumber).toHaveBeenCalledWith(activeProfile.id, 'P000000001A');
+    expect(tax.scheduleProfile).not.toHaveBeenCalled();
   });
 });
