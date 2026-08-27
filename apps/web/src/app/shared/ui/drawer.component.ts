@@ -18,7 +18,9 @@ const CLOSE_MS = 150;
 
 /**
  * Responsive record surface: bottom task sheet on phones, right drawer on larger screens.
- * Close remains two-phase so parents keep the selected record through the exit motion.
+ * Project record-level header controls through `[drawerActions]`; `[actions]` belongs to the
+ * page header contract. Close remains two-phase so parents keep the selected record through the
+ * exit motion.
  */
 @Component({
   selector: 'app-drawer',
@@ -59,7 +61,7 @@ const CLOSE_MS = 150;
               </div>
             </div>
             <div class="flex shrink-0 items-center gap-1">
-              <ng-content select="[actions]" />
+              <ng-content select="[drawerActions]" />
               <button
                 appButton
                 variant="ghost"

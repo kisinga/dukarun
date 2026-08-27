@@ -59,7 +59,7 @@ type ApprovalMetadata = {
       [subtitle]="linkedSubtitle()"
     >
       <app-status-badge
-        actions
+        drawerActions
         size="xs"
         [type]="statusTone(approval().status)"
         [label]="approval().status"

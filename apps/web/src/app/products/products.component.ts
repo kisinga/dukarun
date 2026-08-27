@@ -1,32 +1,11 @@
-import {
-  Component,
-  OnInit,
-  computed,
-  effect,
-  inject,
-  signal,
-  untracked,
-  viewChild,
-} from '@angular/core';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { Component, OnInit, computed, effect, inject, signal, untracked } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
 import { EmptyStateComponent } from '../shared/ui/empty-state.component';
 import { PageLayoutComponent } from '../shared/ui/page-layout.component';
-import { FormControl, FormsModule, ReactiveFormsModule } from '@angular/forms';
-import { formatKes, formatKesInput, parseKes } from '../core/money';
+import { formatKes } from '../core/money';
 import { SupabaseService } from '../core/supabase.service';
-import {
-  CatalogVariantInput,
-  CategoryWithCount,
-  InventoryBatch,
-  PosService,
-  Product,
-  ProductVariant,
-  SupplierStockRow,
-  Variant,
-} from '../pos/pos.service';
+import { PosService, Product, SupplierStockRow, Variant } from '../pos/pos.service';
 import { matchesCatalogQuery } from '../pos/catalog-search';
-import { imageExtension, resizeImage } from '../shared/ui/image.util';
-import { DeleteConfirmationModalComponent } from '../shared/ui/delete-confirmation-modal.component';
 import {
   ListSearchBarComponent,
   type ListSortDirection,
@@ -37,12 +16,9 @@ import { StatusBadgeComponent } from '../shared/ui/status-badge.component';
 import { PaginationComponent } from '../shared/ui/pagination.component';
 import { DataTableShellComponent } from '../shared/ui/data-table-shell.component';
 import { ButtonComponent } from '../shared/ui/button.component';
-import { FormFieldComponent } from '../shared/ui/form-field.component';
 import { IconComponent } from '../shared/ui/icon.component';
 import { MoneyComponent } from '../shared/ui/money.component';
 import { StatBarComponent } from '../shared/ui/stat-bar.component';
-import { StatCardComponent } from '../shared/ui/stat-card.component';
-import { DrawerComponent } from '../shared/ui/drawer.component';
 import { MobileListComponent } from '../shared/ui/mobile-list.component';
 import { PageActionsComponent } from '../shared/ui/page-actions.component';
 import { WorkspaceNavigationComponent } from '../shared/ui/workspace-navigation.component';
@@ -51,27 +27,33 @@ import { PermissionsService } from '../core/permissions.service';
 import { CatalogCacheService } from '../core/catalog-cache.service';
 import { LocationContextService } from '../core/location-context.service';
 import { ConnectivityService } from '../pos/offline/connectivity.service';
-import { BarcodeScannerComponent } from '../shared/ui/barcode-scanner.component';
 import { BarcodeLabelDialogComponent } from './barcode-label-dialog.component';
 import { BatchProductCategoriesDialogComponent } from './batch-product-categories-dialog.component';
-import { BARCODE_MAX_LENGTH, generateDukarunBarcode } from './barcode-labels';
 import {
   SearchableFilterComponent,
   type SearchableFilterOption,
 } from '../shared/ui/searchable-filter.component';
-import { PublicProductLinkService } from './public-product-link.service';
 import { TaxService } from '../core/tax.service';
 import type { TaxCategory } from '@dukarun/tax-types';
 import { variantNeedsRestock } from './product-stock-status';
 import { PartyCacheService } from '../core/party-cache.service';
-import { MoneyService, type VariantPurchaseHistoryRow } from '../money/money.service';
+import {
+  ProductCategoriesPanelComponent,
+  type ProductCategoryChangedResult,
+} from './product-categories-panel.component';
+import { ProductDetailDrawerComponent } from './product-detail-drawer.component';
+import { ProductEditorComponent } from './product-editor.component';
+import type {
+  ProductEditorCloseResult,
+  ProductEditorRequest,
+  ProductEditorResult,
+} from './product-editor.types';
 
 type StockInfo = { stock: number; stock_value: number };
 type ProductStatusFilter = 'all' | 'active' | 'inactive';
 type StockStatusFilter = 'all' | 'needs_restock' | 'in_stock' | 'out_of_stock' | 'not_tracked';
 type ManagementVariant = Variant & { stock_value?: number | null };
 type ProductGroup = { family: Product; variants: ManagementVariant[] };
-type ShareFeedback = { kind: 'success' | 'error'; message: string };
 const DEFAULT_PRODUCT_STATUS_FILTER: ProductStatusFilter = 'active';
 
 const PRODUCT_SORT_OPTIONS: readonly ListSortOption[] = [
@@ -84,62 +66,28 @@ const PRODUCT_SORT_OPTIONS: readonly ListSortOption[] = [
   { value: 'variants', label: 'Variant count' },
 ];
 
-/** One variant in the coupled create/edit product editor. */
-type DeactivateTarget = { kind: 'category'; category: CategoryWithCount };
-
-interface ProductEditorRow {
-  key: string;
-  variantId: string | null;
-  name: string;
-  price: string; // KES text
-  sku: string;
-  barcode: string;
-  pendingBarcode: string | null;
-  wholesale: string; // KES text
-  kind: string;
-  trackInventory: boolean;
-  allowFractional: boolean;
-  openingQuantity: string;
-  openingUnitCost: string;
-  openingLocationId: string;
-  batchNumber: string;
-  expiryDate: string;
-  active: boolean;
-}
-
-interface PendingProductImage {
-  blob: Blob;
-  extension: string;
-  previewUrl: string;
-}
-
 @Component({
   selector: 'app-products',
   imports: [
-    RouterLink,
-    FormsModule,
-    ReactiveFormsModule,
     EmptyStateComponent,
     PageLayoutComponent,
-    DeleteConfirmationModalComponent,
     StatusBadgeComponent,
     ListSearchBarComponent,
     PaginationComponent,
     DataTableShellComponent,
-    StatCardComponent,
-    DrawerComponent,
     ButtonComponent,
-    FormFieldComponent,
     IconComponent,
     MoneyComponent,
     StatBarComponent,
-    BarcodeScannerComponent,
     BarcodeLabelDialogComponent,
     SearchableFilterComponent,
     BatchProductCategoriesDialogComponent,
     MobileListComponent,
     PageActionsComponent,
     WorkspaceNavigationComponent,
+    ProductCategoriesPanelComponent,
+    ProductDetailDrawerComponent,
+    ProductEditorComponent,
   ],
   template: `
     <app-page
@@ -211,981 +159,23 @@ interface PendingProductImage {
 
       <!-- Categories panel -->
       @if (categoriesOpen()) {
-        <div class="card mb-4 bg-base-100">
-          <div class="card-body p-4">
-            <div class="flex items-center justify-between">
-              <h2 class="card-title text-lg">Categories</h2>
-              @if (perms.has('ManageCatalog')) {
-                <button
-                  appButton
-                  variant="ghost"
-                  size="sm"
-                  [disabled]="!connectivity.online() || !categoryMembershipsComplete()"
-                  (click)="startCategoryCreate()"
-                >
-                  <app-icon name="heroPlus" /> New category
-                </button>
-              }
-            </div>
-
-            @if (categoryForm(); as cf) {
-              <form
-                (submit)="$event.preventDefault(); saveCategory()"
-                class="mt-2 flex flex-wrap items-end gap-3 rounded-field bg-base-200 p-2"
-              >
-                <label class="form-control">
-                  <span class="label-text text-xs">Name *</span>
-                  <input
-                    type="text"
-                    class="input input-bordered input-sm"
-                    [formControl]="categoryName"
-                  />
-                </label>
-                <label class="form-control">
-                  <span class="label-text text-xs">Slug</span>
-                  <input
-                    type="text"
-                    class="input input-bordered input-sm"
-                    placeholder="auto"
-                    [formControl]="categorySlug"
-                  />
-                </label>
-                <label class="form-control flex-1">
-                  <span class="label-text text-xs">Description</span>
-                  <input
-                    type="text"
-                    class="input input-bordered input-sm"
-                    [formControl]="categoryDescription"
-                  />
-                </label>
-                <button
-                  type="submit"
-                  class="btn btn-primary btn-sm"
-                  [disabled]="
-                    busy() ||
-                    !connectivity.online() ||
-                    !categoryMembershipsComplete() ||
-                    categoryName.value.trim().length === 0
-                  "
-                >
-                  {{ busy() ? 'Saving…' : cf.editing ? 'Save' : 'Create' }}
-                </button>
-                <button type="button" class="btn btn-ghost btn-sm" (click)="categoryForm.set(null)">
-                  Cancel
-                </button>
-              </form>
-            }
-
-            @if (!categoryMembershipsComplete()) {
-              <div role="status" class="alert alert-warning mt-3 text-sm">
-                <app-icon name="heroSignalSlash" />
-                <span>{{ categoryDataStatusLabel() }}</span>
-              </div>
-            } @else if (categories().length === 0) {
-              <p class="mt-2 text-sm text-base-content/60">
-                No categories yet — group products for the storefront or reports.
-              </p>
-            } @else {
-              <app-mobile-list class="mt-3">
-                @for (c of categories(); track c.id) {
-                  <div mobileListRow>
-                    <div class="flex min-h-16 items-center gap-3 p-3">
-                      <button
-                        type="button"
-                        class="min-w-0 flex-1 text-left"
-                        [disabled]="!perms.has('ManageCatalog') || !connectivity.online()"
-                        (click)="startCategoryEdit(c)"
-                      >
-                        <span class="block truncate font-semibold">{{ c.name }}</span>
-                        <span class="type-caption mt-0.5 block truncate">
-                          {{ c.slug }} · {{ c.product_count }} products
-                        </span>
-                      </button>
-                      <app-status-badge
-                        size="xs"
-                        [type]="c.active ? 'neutral' : 'warning'"
-                        [label]="c.active ? 'active' : 'inactive'"
-                      />
-                      @if (perms.has('ManageCatalog')) {
-                        @if (c.active) {
-                          <button
-                            appButton
-                            variant="ghost"
-                            size="sm"
-                            [disabled]="busy() || !connectivity.online()"
-                            (click)="confirmDeactivate({ kind: 'category', category: c })"
-                          >
-                            Deactivate
-                          </button>
-                        } @else {
-                          <button
-                            appButton
-                            variant="outline"
-                            size="sm"
-                            [disabled]="busy() || !connectivity.online()"
-                            (click)="setCategoryActive(c, true)"
-                          >
-                            Reactivate
-                          </button>
-                        }
-                      }
-                    </div>
-                  </div>
-                }
-              </app-mobile-list>
-              <div class="mt-2 hidden lg:block">
-                <table class="table table-sm">
-                  <thead>
-                    <tr>
-                      <th>Name</th>
-                      <th>Slug</th>
-                      <th class="text-right">Products</th>
-                      <th>Status</th>
-                      <th></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    @for (c of categories(); track c.id) {
-                      <tr>
-                        <td class="text-sm font-medium">{{ c.name }}</td>
-                        <td class="font-mono text-xs">{{ c.slug }}</td>
-                        <td class="text-right">{{ c.product_count }}</td>
-                        <td>
-                          @if (!c.active) {
-                            <app-status-badge size="xs" type="neutral" label="inactive" />
-                          }
-                        </td>
-                        <td class="whitespace-nowrap text-right">
-                          @if (perms.has('ManageCatalog')) {
-                            <button
-                              appButton
-                              variant="ghost"
-                              size="sm"
-                              [disabled]="!connectivity.online()"
-                              (click)="startCategoryEdit(c)"
-                            >
-                              Edit
-                            </button>
-                            @if (c.active) {
-                              <button
-                                appButton
-                                variant="error"
-                                size="sm"
-                                [disabled]="busy() || !connectivity.online()"
-                                (click)="confirmDeactivate({ kind: 'category', category: c })"
-                              >
-                                Deactivate
-                              </button>
-                            } @else {
-                              <button
-                                appButton
-                                variant="outline"
-                                size="sm"
-                                [disabled]="busy() || !connectivity.online()"
-                                (click)="setCategoryActive(c, true)"
-                              >
-                                Reactivate
-                              </button>
-                            }
-                          }
-                        </td>
-                      </tr>
-                    }
-                  </tbody>
-                </table>
-              </div>
-            }
-          </div>
-        </div>
+        <app-product-categories-panel
+          [categories]="categories()"
+          [canManageCatalog]="perms.has('ManageCatalog')"
+          [online]="connectivity.online()"
+          [membershipComplete]="categoryMembershipsComplete()"
+          [dataStatusLabel]="categoryDataStatusLabel()"
+          (changed)="categoryChanged($event)"
+          (failed)="error.set($event)"
+        />
       }
 
-      <!-- Coupled product editor: details and every variant save together. -->
-      @if (editorMode(); as mode) {
-        <dialog class="modal modal-open" (cancel)="$event.preventDefault(); closeProductEditor()">
-          <form
-            class="modal-box modal-box-task p-0 md:w-full md:max-w-3xl"
-            (submit)="$event.preventDefault(); saveProductEditor()"
-          >
-            <header
-              class="flex shrink-0 items-start justify-between gap-3 border-b border-base-300 px-4 py-3 sm:px-6 sm:py-4"
-            >
-              <div class="min-w-0">
-                <h2 class="type-title truncate">
-                  {{ mode === 'create' ? 'New product' : 'Edit ' + editingFamily()!.name }}
-                </h2>
-                <p class="type-caption mt-0.5">Details and variants save together.</p>
-              </div>
-              <button
-                appButton
-                type="button"
-                variant="ghost"
-                [iconOnly]="true"
-                aria-label="Close product editor"
-                (click)="closeProductEditor()"
-              >
-                <app-icon name="heroXMark" />
-              </button>
-            </header>
-
-            <nav
-              class="grid shrink-0 grid-cols-2 border-b border-base-300 px-4 sm:px-6"
-              aria-label="Product editor steps"
-            >
-              <button
-                type="button"
-                class="flex min-h-11 items-center justify-center gap-2 border-b-2 px-2 text-sm font-semibold transition-colors"
-                [class.border-primary]="editorStep() === 1"
-                [class.text-primary]="editorStep() === 1"
-                [class.border-transparent]="editorStep() !== 1"
-                [attr.aria-current]="editorStep() === 1 ? 'step' : null"
-                (click)="editorStep.set(1)"
-              >
-                <span
-                  class="flex h-6 w-6 items-center justify-center rounded-full text-xs"
-                  [class.bg-primary]="editorStep() === 1"
-                  [class.text-primary-content]="editorStep() === 1"
-                  [class.bg-base-200]="editorStep() !== 1"
-                  >1</span
-                >
-                Details
-              </button>
-              <button
-                type="button"
-                class="flex min-h-11 items-center justify-center gap-2 border-b-2 px-2 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40"
-                [class.border-primary]="editorStep() === 2"
-                [class.text-primary]="editorStep() === 2"
-                [class.border-transparent]="editorStep() !== 2"
-                [disabled]="familyName.value.trim().length === 0"
-                [attr.aria-current]="editorStep() === 2 ? 'step' : null"
-                (click)="editorStep.set(2)"
-              >
-                <span
-                  class="flex h-6 w-6 items-center justify-center rounded-full text-xs"
-                  [class.bg-primary]="editorStep() === 2"
-                  [class.text-primary-content]="editorStep() === 2"
-                  [class.bg-base-200]="editorStep() !== 2"
-                  >2</span
-                >
-                Variants
-                <span class="type-caption">{{ editorRows.length }}</span>
-              </button>
-            </nav>
-
-            <div class="modal-body product-editor-body p-4 pb-6 sm:p-6">
-              @if (error()) {
-                <div role="alert" class="alert alert-error mb-4 py-2 text-sm">
-                  <app-icon name="heroExclamationTriangle" />
-                  <span>{{ error() }}</span>
-                </div>
-              }
-
-              @if (editorStep() === 1) {
-                <section class="grid gap-5 sm:grid-cols-2">
-                  <app-form-field label="Product name" [required]="true">
-                    <input
-                      type="text"
-                      class="input input-bordered w-full"
-                      autocomplete="off"
-                      [formControl]="familyName"
-                    />
-                  </app-form-field>
-                  <app-form-field
-                    label="Manufacturer"
-                    hint="Optional. Select an existing manufacturer or type a new one."
-                  >
-                    <input
-                      type="text"
-                      class="input input-bordered w-full"
-                      autocomplete="off"
-                      list="manufacturer-options"
-                      placeholder="Optional"
-                      [formControl]="familyManufacturer"
-                    />
-                    <datalist id="manufacturer-options">
-                      @for (manufacturer of manufacturers(); track manufacturer.id) {
-                        <option [value]="manufacturer.name"></option>
-                      }
-                    </datalist>
-                  </app-form-field>
-                  <app-form-field
-                    label="Shared barcode"
-                    hint="Scan the package barcode or enter it manually. Only suitable for products with one variant."
-                  >
-                    <div class="flex gap-2">
-                      <input
-                        type="text"
-                        class="input input-bordered min-w-0 flex-1 font-mono"
-                        autocomplete="off"
-                        placeholder="Scan or enter barcode"
-                        [maxLength]="barcodeMaxLength"
-                        [formControl]="familyBarcode"
-                        (keydown.enter)="$event.preventDefault()"
-                      />
-                      <button
-                        appButton
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        class="shrink-0"
-                        title="Scan barcode with camera"
-                        aria-label="Scan shared product barcode"
-                        (click)="scanFamilyBarcode()"
-                      >
-                        <app-icon name="heroCamera" />
-                        Scan
-                      </button>
-                    </div>
-                  </app-form-field>
-                  <app-form-field
-                    label="VAT treatment"
-                    hint="Use the shop default unless this product is zero-rated, exempt, or uses a special rate."
-                  >
-                    <select
-                      class="select select-bordered w-full"
-                      [formControl]="familyTaxCategory"
-                      [disabled]="!perms.has('ManageCatalog')"
-                    >
-                      <option value="">Use shop default</option>
-                      @for (category of taxCategories(); track category.id) {
-                        <option [value]="category.id">{{ category.name }}</option>
-                      }
-                    </select>
-                  </app-form-field>
-                </section>
-
-                @if (pendingFamilyBarcode(); as replacement) {
-                  <div class="mt-4 rounded-field border border-warning/50 bg-warning/5 p-3">
-                    <p class="text-sm font-medium">Replace the shared barcode?</p>
-                    <p class="mt-1 break-all text-xs">
-                      <span class="font-mono">{{ familyBarcode.value.trim() }}</span>
-                      <span class="mx-1.5">→</span>
-                      <span class="font-mono">{{ replacement }}</span>
-                    </p>
-                    <div class="mt-2 flex gap-2">
-                      <button
-                        appButton
-                        type="button"
-                        variant="primary"
-                        size="sm"
-                        (click)="confirmFamilyBarcode()"
-                      >
-                        Replace
-                      </button>
-                      <button
-                        appButton
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        (click)="cancelFamilyBarcode()"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                }
-
-                @if (familyBarcode.value.trim() && editorRows.length > 1) {
-                  <div class="alert alert-warning mt-4 text-sm">
-                    <app-icon name="heroExclamationTriangle" />
-                    <span>
-                      A shared barcode can be ambiguous across multiple variants. Assign a barcode
-                      to each variant instead.
-                    </span>
-                  </div>
-                }
-
-                <section class="mt-5 border-t border-base-300 pt-4">
-                  <div>
-                    <h3 class="section-title">Product photo</h3>
-                    <p id="product-photo-help" class="type-caption mt-0.5">
-                      A clear, well-lit photo makes the product easier to find while selling.
-                    </p>
-                  </div>
-
-                  <div
-                    class="mt-3 rounded-box border border-base-300 bg-base-200/40 p-3 sm:flex sm:items-center sm:gap-4"
-                  >
-                    <div
-                      class="mx-auto flex h-36 w-36 shrink-0 items-center justify-center overflow-hidden rounded-box border border-base-300 bg-base-100 sm:mx-0 sm:h-28 sm:w-28"
-                    >
-                      @if (productImagePreview(); as preview) {
-                        <img
-                          [src]="preview"
-                          [alt]="familyName.value.trim() || 'Product photo preview'"
-                          class="h-full w-full object-cover"
-                          (error)="markCurrentProductImageBroken()"
-                        />
-                      } @else {
-                        <div class="px-3 text-center text-base-content/45">
-                          <app-icon name="heroCamera" size="xl" />
-                          <p class="mt-1 text-xs">No photo yet</p>
-                        </div>
-                      }
-                    </div>
-
-                    <div class="mt-3 min-w-0 flex-1 sm:mt-0">
-                      <input
-                        #productCameraInput
-                        type="file"
-                        accept="image/*"
-                        capture="environment"
-                        class="hidden"
-                        aria-describedby="product-photo-help"
-                        [disabled]="imageBusy() || busy()"
-                        (change)="selectProductImage($event)"
-                      />
-                      <input
-                        #productPhotoInput
-                        type="file"
-                        accept="image/*"
-                        class="hidden"
-                        aria-describedby="product-photo-help"
-                        [disabled]="imageBusy() || busy()"
-                        (change)="selectProductImage($event)"
-                      />
-
-                      <div class="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-                        <button
-                          appButton
-                          type="button"
-                          variant="soft"
-                          class="w-full sm:w-auto"
-                          [disabled]="imageBusy() || busy()"
-                          (click)="productCameraInput.click()"
-                        >
-                          <app-icon name="heroCamera" />
-                          Take photo
-                        </button>
-                        <button
-                          appButton
-                          type="button"
-                          variant="outline"
-                          class="w-full sm:w-auto"
-                          [disabled]="imageBusy() || busy()"
-                          (click)="productPhotoInput.click()"
-                        >
-                          <app-icon name="heroArrowUpTray" />
-                          Choose photo
-                        </button>
-                      </div>
-
-                      @if (pendingProductImage() && mode === 'edit' && !imageBusy()) {
-                        <button
-                          appButton
-                          type="button"
-                          variant="outline"
-                          class="mt-2 w-full sm:w-auto"
-                          (click)="retryProductImageUpload()"
-                        >
-                          Retry upload
-                        </button>
-                      }
-
-                      @if (productImagePreview()) {
-                        <button
-                          appButton
-                          type="button"
-                          variant="ghost"
-                          class="mt-2 w-full text-error sm:w-auto"
-                          [disabled]="imageBusy() || busy()"
-                          (click)="removeImage()"
-                        >
-                          <app-icon name="heroXMark" />
-                          Remove photo
-                        </button>
-                      }
-
-                      <p class="type-caption mt-2" aria-live="polite">
-                        @if (imageBusy()) {
-                          {{ mode === 'create' ? 'Preparing photo…' : 'Uploading photo…' }}
-                        } @else if (pendingProductImage() && mode === 'create') {
-                          Ready — the photo will upload when you create the product.
-                        } @else if (pendingProductImage()) {
-                          Upload paused. Check your connection and retry.
-                        } @else {
-                          Photos are resized for faster uploads. You can replace them anytime.
-                        }
-                      </p>
-                    </div>
-                  </div>
-                </section>
-
-                @if (mode === 'create') {
-                  <div
-                    class="mt-5 flex items-start gap-3 rounded-field border border-base-300/70 bg-base-200/60 p-3"
-                  >
-                    <span
-                      class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-base-100 text-primary"
-                      aria-hidden="true"
-                    >
-                      <app-icon name="heroQueueList" />
-                    </span>
-                    <div>
-                      <p class="text-sm font-semibold">Next: pricing and stock</p>
-                      <p class="type-caption mt-0.5">
-                        Add a selling price, SKU, and opening stock for the first variant.
-                      </p>
-                    </div>
-                  </div>
-                }
-
-                @if (mode === 'edit') {
-                  <section class="mt-5 border-t border-base-300 pt-4">
-                    <label class="flex min-h-11 cursor-pointer items-center justify-between gap-4">
-                      <span>
-                        <span class="type-heading block">Product available for sale</span>
-                        <span class="type-caption block"
-                          >Turn this off to hide every variant from Sell.</span
-                        >
-                      </span>
-                      <input
-                        type="checkbox"
-                        class="toggle toggle-primary"
-                        [formControl]="familyActive"
-                      />
-                    </label>
-                  </section>
-
-                  <section class="mt-5 border-t border-base-300 pt-4">
-                    <h3 class="section-title">Categories</h3>
-                    @if (
-                      perms.has('ManageCatalog') &&
-                      connectivity.online() &&
-                      categoryMembershipsComplete()
-                    ) {
-                      <label class="input input-bordered input-sm mt-3 flex items-center gap-2">
-                        <app-icon name="heroMagnifyingGlass" class="text-base-content/50" />
-                        <input
-                          type="search"
-                          class="min-w-0 grow"
-                          placeholder="Search categories…"
-                          [value]="familyCategoryQuery()"
-                          (input)="familyCategoryQuery.set($any($event.target).value)"
-                        />
-                      </label>
-                      <div class="mt-2 max-h-56 overflow-y-auto rounded-box border border-base-300">
-                        @for (c of visibleFamilyCategories(); track c.id) {
-                          <label
-                            class="flex min-h-11 cursor-pointer items-center gap-3 border-b border-base-200 px-3 last:border-0 hover:bg-base-200"
-                          >
-                            <input
-                              type="checkbox"
-                              class="checkbox checkbox-sm"
-                              [checked]="familyCategories().has(c.id)"
-                              (change)="toggleFamilyCategory(c.id)"
-                            />
-                            <span class="min-w-0 flex-1 truncate text-sm">{{ c.name }}</span>
-                          </label>
-                        } @empty {
-                          <p class="p-4 text-center text-sm text-base-content/60">
-                            No categories match.
-                          </p>
-                        }
-                      </div>
-                      @if (matchingFamilyCategories().length > visibleFamilyCategories().length) {
-                        <p class="type-caption mt-2">
-                          Keep typing to narrow
-                          {{ matchingFamilyCategories().length }} categories.
-                        </p>
-                      }
-                    } @else if (categoryMembershipsComplete()) {
-                      <div class="mt-2 flex flex-wrap gap-1.5">
-                        @for (name of productCategoryNames(editingFamily()!.id); track name) {
-                          <span class="badge badge-ghost">{{ name }}</span>
-                        } @empty {
-                          <p class="type-caption">Uncategorized</p>
-                        }
-                      </div>
-                      @if (perms.has('ManageCatalog') && !connectivity.online()) {
-                        <p class="type-caption mt-2">Reconnect to change categories.</p>
-                      }
-                    } @else {
-                      <p class="type-caption mt-2">{{ categoryDataStatusLabel() }}</p>
-                    }
-                  </section>
-                }
-              } @else {
-                <section>
-                  <div class="mb-4">
-                    <h3 class="section-title">Sellable variants</h3>
-                    <p class="type-caption mt-1">
-                      Use one variant for a simple item, or add sizes and pack options.
-                    </p>
-                  </div>
-
-                  @if (editorLoading()) {
-                    <div
-                      class="flex min-h-32 items-center justify-center gap-2 text-sm text-base-content/60"
-                    >
-                      <span class="loading loading-spinner loading-sm"></span>
-                      Loading variants…
-                    </div>
-                  } @else {
-                    <div class="space-y-2">
-                      @for (row of editorRows; track row.key; let index = $index) {
-                        <section class="rounded-box bg-base-200/60 p-3">
-                          <div class="mb-3 flex min-h-11 items-center justify-between gap-3">
-                            <h4 class="type-heading">
-                              {{
-                                row.name.trim() ||
-                                  (editorRows.length === 1
-                                    ? 'Default variant'
-                                    : 'Variant ' + (index + 1))
-                              }}
-                            </h4>
-                            @if (row.variantId) {
-                              <label class="flex cursor-pointer items-center gap-2">
-                                <span class="type-caption">
-                                  {{ row.active ? 'Available' : 'Hidden' }}
-                                </span>
-                                <input
-                                  type="checkbox"
-                                  class="toggle toggle-primary toggle-sm"
-                                  [(ngModel)]="row.active"
-                                  [ngModelOptions]="{ standalone: true }"
-                                />
-                              </label>
-                            } @else {
-                              <button
-                                appButton
-                                type="button"
-                                variant="ghost"
-                                [iconOnly]="true"
-                                [disabled]="editorRows.length === 1"
-                                aria-label="Remove variant"
-                                (click)="removeEditorRow(index)"
-                              >
-                                <app-icon name="heroXMark" />
-                              </button>
-                            }
-                          </div>
-
-                          <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                            <app-form-field label="Variant label">
-                              <input
-                                type="text"
-                                class="input input-bordered w-full"
-                                placeholder="{{
-                                  editorRows.length === 1 ? 'Default' : 'e.g. 1 kg'
-                                }}"
-                                [(ngModel)]="row.name"
-                                [ngModelOptions]="{ standalone: true }"
-                              />
-                            </app-form-field>
-                            <app-form-field label="Retail price (KES)" [required]="true">
-                              <input
-                                type="text"
-                                inputmode="numeric"
-                                class="input input-bordered w-full"
-                                placeholder="0"
-                                [(ngModel)]="row.price"
-                                [ngModelOptions]="{ standalone: true }"
-                              />
-                            </app-form-field>
-                            <app-form-field label="Item type">
-                              <select
-                                class="select select-bordered w-full"
-                                [(ngModel)]="row.kind"
-                                [ngModelOptions]="{ standalone: true }"
-                              >
-                                <option value="good">Physical good</option>
-                                <option value="service">Service</option>
-                              </select>
-                            </app-form-field>
-                          </div>
-
-                          <details class="mt-3 border-t border-base-300/70">
-                            <summary
-                              class="flex min-h-11 cursor-pointer flex-wrap items-center gap-2 py-2 text-sm font-medium"
-                            >
-                              More options
-                              <span class="type-caption font-mono">
-                                SKU {{ row.sku || 'auto' }}
-                                @if (row.barcode) {
-                                  · barcode set
-                                }
-                                @if (row.wholesale) {
-                                  · wholesale set
-                                }
-                              </span>
-                            </summary>
-                            <div class="grid gap-3 pb-3 sm:grid-cols-2 lg:grid-cols-3">
-                              <app-form-field label="SKU" hint="Leave blank to generate one.">
-                                <input
-                                  type="text"
-                                  class="input input-bordered w-full font-mono"
-                                  placeholder="Auto"
-                                  [(ngModel)]="row.sku"
-                                  [ngModelOptions]="{ standalone: true }"
-                                />
-                              </app-form-field>
-                              <app-form-field
-                                label="Variant barcode"
-                                hint="Overrides the shared barcode."
-                              >
-                                <div class="flex gap-1.5">
-                                  <input
-                                    type="text"
-                                    class="input input-bordered min-w-0 flex-1 font-mono"
-                                    placeholder="Optional"
-                                    [maxLength]="barcodeMaxLength"
-                                    [(ngModel)]="row.barcode"
-                                    [ngModelOptions]="{ standalone: true }"
-                                    (keydown.enter)="$event.preventDefault()"
-                                  />
-                                  <button
-                                    appButton
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    title="Scan barcode"
-                                    aria-label="Scan variant barcode"
-                                    (click)="scanEditorBarcode(index)"
-                                  >
-                                    <app-icon name="heroCamera" />
-                                  </button>
-                                  <button
-                                    appButton
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    (click)="generateEditorBarcode(index)"
-                                  >
-                                    Generate
-                                  </button>
-                                </div>
-                              </app-form-field>
-                              <app-form-field label="Wholesale price (KES)" hint="Optional">
-                                <input
-                                  type="text"
-                                  inputmode="numeric"
-                                  class="input input-bordered w-full"
-                                  placeholder="0"
-                                  [(ngModel)]="row.wholesale"
-                                  [ngModelOptions]="{ standalone: true }"
-                                />
-                              </app-form-field>
-                            </div>
-                            @if (row.pendingBarcode; as replacement) {
-                              <div
-                                class="mt-2 rounded-field border border-warning/50 bg-warning/5 p-3"
-                              >
-                                <p class="text-sm font-medium">Replace this variant's barcode?</p>
-                                <p class="mt-1 break-all text-xs">
-                                  <span class="font-mono">{{ effectiveEditorBarcode(row) }}</span>
-                                  <span class="mx-1.5">→</span>
-                                  <span class="font-mono">{{ replacement }}</span>
-                                </p>
-                                <div class="mt-2 flex gap-2">
-                                  <button
-                                    appButton
-                                    type="button"
-                                    variant="primary"
-                                    size="sm"
-                                    (click)="confirmEditorBarcode(index)"
-                                  >
-                                    Replace
-                                  </button>
-                                  <button
-                                    appButton
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    (click)="cancelEditorBarcode(index)"
-                                  >
-                                    Cancel
-                                  </button>
-                                </div>
-                              </div>
-                            }
-                          </details>
-
-                          @if (row.kind !== 'service') {
-                            <div
-                              class="flex flex-wrap gap-x-6 gap-y-1 border-t border-base-300/70 pt-2"
-                            >
-                              <label class="flex min-h-11 cursor-pointer items-center gap-2">
-                                <input
-                                  type="checkbox"
-                                  class="checkbox checkbox-sm"
-                                  [(ngModel)]="row.trackInventory"
-                                  [ngModelOptions]="{ standalone: true }"
-                                />
-                                <span class="text-sm">Track stock</span>
-                              </label>
-                              <label class="flex min-h-11 cursor-pointer items-center gap-2">
-                                <input
-                                  type="checkbox"
-                                  class="checkbox checkbox-sm"
-                                  [(ngModel)]="row.allowFractional"
-                                  [ngModelOptions]="{ standalone: true }"
-                                />
-                                <span class="text-sm">Allow fractional quantities</span>
-                              </label>
-                              @if (row.variantId && row.trackInventory) {
-                                <span class="ml-auto self-center text-sm text-base-content/60">
-                                  Current stock {{ stockOf(row.variantId)?.stock ?? 0 }}
-                                </span>
-                              }
-                            </div>
-                          }
-
-                          @if (!row.variantId && row.kind !== 'service' && row.trackInventory) {
-                            <details class="mt-3 border-t border-base-300 pt-3">
-                              <summary class="min-h-11 cursor-pointer py-3 text-sm font-medium">
-                                Opening stock
-                                <span class="font-normal text-base-content/60">(optional)</span>
-                              </summary>
-                              <div class="grid gap-4 pt-2 sm:grid-cols-2 lg:grid-cols-3">
-                                <app-form-field label="Quantity">
-                                  <input
-                                    type="text"
-                                    inputmode="decimal"
-                                    class="input input-bordered w-full"
-                                    placeholder="0"
-                                    [(ngModel)]="row.openingQuantity"
-                                    [ngModelOptions]="{ standalone: true }"
-                                  />
-                                </app-form-field>
-                                <app-form-field label="Unit cost (KES)">
-                                  <input
-                                    type="text"
-                                    inputmode="numeric"
-                                    class="input input-bordered w-full"
-                                    placeholder="0"
-                                    [(ngModel)]="row.openingUnitCost"
-                                    [ngModelOptions]="{ standalone: true }"
-                                  />
-                                </app-form-field>
-                                <app-form-field label="Stock location">
-                                  <select
-                                    class="select select-bordered w-full"
-                                    [(ngModel)]="row.openingLocationId"
-                                    [ngModelOptions]="{ standalone: true }"
-                                  >
-                                    @for (location of stockLocations(); track location.id) {
-                                      <option [value]="location.id">{{ location.name }}</option>
-                                    }
-                                  </select>
-                                </app-form-field>
-                                <app-form-field label="Batch number" hint="Optional">
-                                  <input
-                                    type="text"
-                                    class="input input-bordered w-full"
-                                    [(ngModel)]="row.batchNumber"
-                                    [ngModelOptions]="{ standalone: true }"
-                                  />
-                                </app-form-field>
-                                @if (preferences.batchExpiryEnabled()) {
-                                  <app-form-field label="Expiry date" hint="Optional">
-                                    <input
-                                      type="date"
-                                      class="input input-bordered w-full"
-                                      [(ngModel)]="row.expiryDate"
-                                      [ngModelOptions]="{ standalone: true }"
-                                    />
-                                  </app-form-field>
-                                }
-                                @if (row.openingQuantity && row.openingUnitCost) {
-                                  <div class="self-end pb-3 text-sm text-base-content/60">
-                                    Opening value
-                                    <strong class="ml-1 text-base-content">
-                                      <app-money
-                                        [amount]="
-                                          +row.openingQuantity *
-                                          (parseAmount(row.openingUnitCost) ?? 0)
-                                        "
-                                      />
-                                    </strong>
-                                  </div>
-                                }
-                              </div>
-                            </details>
-                          }
-                        </section>
-                      }
-                    </div>
-                    <button
-                      appButton
-                      type="button"
-                      variant="outline"
-                      class="mt-3 w-full"
-                      [disabled]="editorLoading()"
-                      (click)="addEditorRow()"
-                    >
-                      <app-icon name="heroPlus" /> Add variant
-                    </button>
-                    @if (duplicateLabels()) {
-                      <p class="mt-3 text-sm text-warning">Variant labels must be unique.</p>
-                    }
-                    @if (effectiveBarcodeConflict()) {
-                      <p class="mt-3 text-sm text-warning">
-                        Each variant needs a unique effective barcode. Clear the shared barcode or
-                        assign individual variant barcodes before saving.
-                      </p>
-                    }
-                  }
-                </section>
-              }
-            </div>
-
-            <footer
-              class="grid shrink-0 grid-cols-[minmax(0,.75fr)_minmax(0,1.25fr)] gap-2 border-t border-base-300 bg-base-100 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:flex sm:items-center sm:justify-between sm:px-6 sm:py-4"
-            >
-              @if (editorStep() === 1) {
-                <button
-                  appButton
-                  type="button"
-                  variant="outline"
-                  class="w-full sm:w-auto"
-                  (click)="closeProductEditor()"
-                >
-                  Cancel
-                </button>
-                <button
-                  appButton
-                  type="button"
-                  variant="primary"
-                  class="w-full sm:w-auto"
-                  [disabled]="familyName.value.trim().length === 0"
-                  (click)="editorStep.set(2)"
-                >
-                  <span class="sm:hidden">Next: variants</span>
-                  <span class="hidden sm:inline">Continue to variants</span>
-                </button>
-              } @else {
-                <button
-                  appButton
-                  type="button"
-                  variant="outline"
-                  class="w-full sm:w-auto"
-                  (click)="editorStep.set(1)"
-                >
-                  <span class="sm:hidden">Details</span>
-                  <span class="hidden sm:inline">Back to details</span>
-                </button>
-                <button
-                  appButton
-                  type="submit"
-                  variant="primary"
-                  class="w-full sm:w-auto"
-                  [loading]="busy()"
-                  [disabled]="
-                    editorLoading() ||
-                    duplicateLabels() ||
-                    familyName.value.trim().length === 0 ||
-                    effectiveBarcodeConflict()
-                  "
-                >
-                  {{ mode === 'create' ? 'Create product' : 'Save product' }}
-                </button>
-              }
-            </footer>
-          </form>
-          <form method="dialog" class="modal-backdrop">
-            <button type="button" aria-label="Close" (click)="closeProductEditor()">close</button>
-          </form>
-        </dialog>
+      @if (editorRequest(); as request) {
+        <app-product-editor
+          [request]="request"
+          (saved)="productEditorSaved($event)"
+          (closed)="productEditorClosed($event)"
+        />
       }
 
       <!-- Search -->
@@ -1585,376 +575,18 @@ interface PendingProductImage {
           />
         </div>
       }
-      <!-- Product detail drawer -->
-      @if (selectedGroup(); as group) {
-        <app-drawer
-          [open]="true"
-          (closed)="closeProductDrawer()"
-          [title]="group.family.name"
-          [subtitle]="
-            group.variants.length + (group.variants.length === 1 ? ' variant' : ' variants')
-          "
-        >
-          @if (canShareProduct(group)) {
-            <button
-              actions
-              appButton
-              variant="ghost"
-              [iconOnly]="true"
-              [loading]="shareBusy()"
-              type="button"
-              title="Share product"
-              aria-label="Share product"
-              (click)="shareProduct(group)"
-            >
-              <app-icon name="heroShare" />
-            </button>
-          }
-          @if (perms.has('ManageStockAdjustments')) {
-            <button
-              actions
-              appButton
-              variant="ghost"
-              [iconOnly]="true"
-              type="button"
-              title="Edit product"
-              aria-label="Edit product"
-              (click)="editFromDrawer(group.family)"
-            >
-              <app-icon name="heroPencilSquare" />
-            </button>
-          }
-
-          <div class="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <p class="type-caption">Manufacturer</p>
-              <p class="mt-0.5 text-sm font-semibold">
-                {{ manufacturerName(group.family.manufacturer_id) || 'Manufacturer not set' }}
-              </p>
-            </div>
-            <div class="text-right">
-              <p class="type-caption">Product status</p>
-              <app-status-badge
-                size="xs"
-                [type]="group.family.active ? 'neutral' : 'warning'"
-                [label]="group.family.active ? 'active' : 'inactive'"
-              />
-            </div>
-          </div>
-
-          <div class="mt-3 grid grid-cols-2 gap-2">
-            <app-stat-card label="Variants" [value]="group.variants.length + ''" />
-            <app-stat-card
-              label="Stock"
-              [value]="
-                group.variants.length === 0
-                  ? 'No variants'
-                  : familyTracksInventory(group.variants)
-                    ? familyStock(group.variants) + ' units'
-                    : 'Not tracked'
-              "
-              [sub]="
-                familyTracksInventory(group.variants)
-                  ? fmt(familyRetailStockValue(group.variants)) + ' retail value'
-                  : undefined
-              "
-            />
-          </div>
-
-          <section class="mt-4 border-t border-base-300/60 pt-4">
-            <h3 class="section-title">Categories</h3>
-            @if (!categoryMembershipsComplete()) {
-              <p class="type-caption mt-2">{{ categoryDataStatusLabel() }}</p>
-            } @else if (productCategoryNames(group.family.id); as categoryNames) {
-              @if (categoryNames.length > 0) {
-                <div class="mt-2 flex flex-wrap gap-1.5">
-                  @for (name of categoryNames; track name) {
-                    <span class="badge badge-ghost">{{ name }}</span>
-                  }
-                </div>
-              } @else {
-                <p class="type-caption mt-2">Uncategorized</p>
-              }
-            }
-          </section>
-
-          @if (familyBarcodeAmbiguous(group)) {
-            <div class="alert alert-warning mt-4 text-sm">
-              <app-icon name="heroExclamationTriangle" />
-              <span>
-                The shared barcode <span class="font-mono">{{ group.family.barcode }}</span>
-                resolves to multiple variants. Assign individual variant barcodes before scanning or
-                printing it.
-              </span>
-            </div>
-          }
-
-          <div class="mt-4 border-t border-base-300/60 pt-4">
-            <div class="mb-2 flex items-end justify-between gap-3">
-              <div>
-                <h3 class="section-title">Variants</h3>
-                <p class="type-caption mt-0.5">Pricing, identifiers, and inventory</p>
-              </div>
-              <span class="type-caption tabular-nums"> {{ group.variants.length }} total </span>
-            </div>
-            @if (group.variants.length === 0) {
-              <app-empty-state
-                [compact]="true"
-                icon="heroCube"
-                title="No variants yet"
-                description="Edit the product to add one before selling it."
-              />
-            } @else {
-              <ul
-                class="overflow-hidden rounded-box border border-base-300/60 bg-base-100 shadow-sm"
-              >
-                @for (v of group.variants; track v.variant_id) {
-                  <li
-                    class="p-3 [&:not(:last-child)]:border-b [&:not(:last-child)]:border-base-200"
-                    [id]="'product-variant-' + v.variant_id"
-                    [class.bg-base-200]="selectedVariantId() === v.variant_id"
-                    [class.outline]="selectedVariantId() === v.variant_id"
-                    [class.outline-1]="selectedVariantId() === v.variant_id"
-                    [class.outline-primary]="selectedVariantId() === v.variant_id"
-                  >
-                    <div class="flex items-start justify-between gap-3">
-                      <div class="min-w-0">
-                        <div class="flex min-w-0 flex-wrap items-center gap-1.5">
-                          <p class="truncate text-sm font-semibold">{{ v.variant_name }}</p>
-                          @if (!v.variant_active) {
-                            <app-status-badge size="xs" type="warning" label="inactive" />
-                          }
-                        </div>
-                        <p class="type-caption mt-0.5">
-                          SKU <span class="font-mono text-base-content/80">{{ v.sku }}</span>
-                        </p>
-                      </div>
-                      <div class="shrink-0 text-right">
-                        <p class="type-caption">Retail price</p>
-                        <p class="mt-0.5 text-sm font-semibold tabular-nums">
-                          <app-money [amount]="v.price ?? 0" [showCurrency]="true" />
-                        </p>
-                      </div>
-                    </div>
-
-                    <div class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1">
-                      @if (v.barcode) {
-                        <p class="type-caption">
-                          Barcode
-                          <span class="font-mono text-base-content/80">{{ v.barcode }}</span>
-                        </p>
-                      } @else {
-                        <p class="type-caption text-warning">
-                          No barcode · edit this variant or generate one from Print labels
-                        </p>
-                      }
-                      @if (v.kind === 'service') {
-                        <p class="type-caption">Service · Inventory not tracked</p>
-                      } @else if (v.track_inventory) {
-                        <p class="type-caption tabular-nums">
-                          <span class="font-semibold text-base-content/80">
-                            {{ stockOf(v.variant_id!)?.stock ?? 0 }} in stock
-                          </span>
-                          @if (supplierFilter() !== 'all') {
-                            · {{ supplierStockOf(v.variant_id!)?.stock ?? 0 }} sourced from
-                            {{ selectedSupplierName() }}
-                          }
-                          · <app-money [amount]="variantRetailStockValue(v)" /> retail value
-                        </p>
-                      } @else {
-                        <p class="type-caption">Inventory not tracked</p>
-                      }
-                    </div>
-
-                    <div class="mt-3 flex flex-wrap gap-1.5 border-t border-base-200 pt-2">
-                      <button
-                        appButton
-                        variant="outline"
-                        size="sm"
-                        type="button"
-                        [disabled]="!v.variant_active || !v.product_active"
-                        (click)="openSingleLabel(v.variant_id!)"
-                      >
-                        <app-icon name="heroPrinter" /> Print label
-                      </button>
-                      @if (perms.has('ManageStockAdjustments')) {
-                        <button
-                          appButton
-                          variant="outline"
-                          size="sm"
-                          (click)="editVariantFromDrawer(group.family.id)"
-                        >
-                          <app-icon name="heroPencilSquare" /> Edit
-                        </button>
-                      }
-                      @if (v.kind !== 'service' && v.track_inventory) {
-                        @if (perms.has('ManageStockAdjustments')) {
-                          <a
-                            appButton
-                            variant="soft"
-                            size="sm"
-                            routerLink="/inventory/adjustments"
-                            [queryParams]="{ variant: v.variant_id }"
-                          >
-                            <app-icon name="heroArrowsRightLeft" /> Adjust stock
-                          </a>
-                        }
-                        <button
-                          appButton
-                          variant="ghost"
-                          size="sm"
-                          (click)="toggleBatches(v.variant_id!)"
-                        >
-                          <app-icon name="heroQueueList" />
-                          {{ batchesFor() === v.variant_id ? 'Hide stock lots' : 'Stock lots' }}
-                        </button>
-                      }
-                      <button
-                        appButton
-                        variant="ghost"
-                        size="sm"
-                        (click)="togglePurchaseHistory(v.variant_id!)"
-                      >
-                        <app-icon name="heroDocumentText" />
-                        {{ purchaseHistoryFor() === v.variant_id ? 'Hide purchases' : 'Purchases' }}
-                      </button>
-                    </div>
-                    @if (batchesFor() === v.variant_id) {
-                      <div class="mt-3 rounded-field bg-base-200/70 p-3">
-                        <div class="mb-2 flex items-center justify-between gap-2">
-                          <h4 class="type-caption">Stock lots</h4>
-                          <a routerLink="/suppliers" class="link text-xs">Restock</a>
-                        </div>
-                        <ul class="divide-y divide-base-200">
-                          @for (b of batches(); track b.id) {
-                            <li class="py-1.5">
-                              <div class="flex items-center gap-2 text-xs">
-                                <span class="font-medium">{{ b.batch_number || 'Batch' }}</span>
-                                <span class="text-base-content/60">{{ date(b.purchased_at) }}</span>
-                                <span class="ml-auto tabular-nums"
-                                  >{{ b.remaining }} of {{ b.quantity }} left</span
-                                >
-                              </div>
-                              <p class="type-caption mt-0.5">
-                                Cost
-                                <app-money
-                                  [amount]="b.unit_cost"
-                                  [masked]="!perms.has('ViewFinancials')"
-                                />
-                                @if (preferences.batchExpiryEnabled()) {
-                                  · {{ b.expiry_date ? 'Expires ' + b.expiry_date : 'No expiry' }}
-                                }
-                              </p>
-                            </li>
-                          } @empty {
-                            <p class="type-caption py-1">No stock batches yet.</p>
-                          }
-                        </ul>
-                      </div>
-                    }
-                    @if (purchaseHistoryFor() === v.variant_id) {
-                      <div class="mt-3 rounded-field border border-base-300 p-3">
-                        <div class="mb-2 flex items-center justify-between gap-2">
-                          <h4 class="type-caption">Purchase history</h4>
-                          <span class="type-caption">{{ purchaseHistoryTotal() }} records</span>
-                        </div>
-                        @if (purchaseHistoryLoading() && purchaseHistory().length === 0) {
-                          <div class="flex items-center gap-2 py-3 text-sm text-base-content/60">
-                            <span class="loading loading-spinner loading-sm"></span>
-                            Loading purchases
-                          </div>
-                        } @else {
-                          <ul class="divide-y divide-base-200">
-                            @for (row of purchaseHistory(); track row.id) {
-                              <li class="py-2">
-                                <div class="flex flex-wrap items-start justify-between gap-2">
-                                  <div class="min-w-0">
-                                    <a
-                                      class="link text-sm font-medium"
-                                      routerLink="/purchases"
-                                      [queryParams]="{ purchase: row.purchase.id }"
-                                      >{{ row.purchase.reference || 'Purchase' }}</a
-                                    >
-                                    <p class="type-caption">
-                                      {{ supplierName(row.purchase.supplier_id) }} ·
-                                      {{ date(row.purchase.purchase_date) }} ·
-                                      {{ row.purchase.status }}
-                                    </p>
-                                  </div>
-                                  <div class="text-right text-sm">
-                                    <p>
-                                      {{ row.quantity }} ×
-                                      <app-money
-                                        [amount]="row.unit_cost"
-                                        [masked]="!perms.has('ViewFinancials')"
-                                      />
-                                    </p>
-                                    <p class="type-caption">
-                                      Total
-                                      <app-money
-                                        [amount]="row.line_total"
-                                        [masked]="!perms.has('ViewFinancials')"
-                                      />
-                                    </p>
-                                  </div>
-                                </div>
-                              </li>
-                            } @empty {
-                              <p class="type-caption py-2">
-                                No purchases recorded for this variant.
-                              </p>
-                            }
-                          </ul>
-                          @if (purchaseHistory().length < purchaseHistoryTotal()) {
-                            <button
-                              appButton
-                              variant="ghost"
-                              size="sm"
-                              type="button"
-                              class="mt-2"
-                              [loading]="purchaseHistoryLoading()"
-                              (click)="loadMorePurchaseHistory(v.variant_id!)"
-                            >
-                              Load more
-                            </button>
-                          }
-                        }
-                      </div>
-                    }
-                  </li>
-                }
-              </ul>
-            }
-          </div>
-        </app-drawer>
-      }
-
-      @if (shareFeedback(); as feedback) {
-        <div
-          class="toast toast-bottom toast-end z-[70]"
-          [attr.aria-live]="feedback.kind === 'error' ? 'assertive' : 'polite'"
-        >
-          <div
-            class="alert max-w-sm shadow-overlay"
-            [class.alert-error]="feedback.kind === 'error'"
-            [class.alert-success]="feedback.kind === 'success'"
-            [attr.role]="feedback.kind === 'error' ? 'alert' : 'status'"
-          >
-            <app-icon
-              [name]="feedback.kind === 'error' ? 'heroExclamationTriangle' : 'heroCheckCircle'"
-            />
-            <span>{{ feedback.message }}</span>
-          </div>
-        </div>
-      }
-
-      <app-delete-confirmation-modal
-        [data]="deactivateData()"
-        title="Deactivate?"
-        verb="deactivate"
-        confirmButtonText="Deactivate"
-        (confirm)="executeDeactivate()"
+      <app-product-detail-drawer
+        [productId]="selectedProductId()"
+        [selectedVariantId]="selectedVariantId()"
+        [supplierFilter]="supplierFilter()"
+        [supplierStock]="supplierStock()"
+        [selectedSupplierName]="selectedSupplierName()"
+        (closed)="closeProductDrawer()"
+        (editProduct)="editFromDrawer($event)"
+        (editVariant)="editVariantFromDrawer($event)"
+        (printLabel)="openSingleLabel($event)"
       />
+
       @if (batchCategoriesOpen() && categoryMembershipsComplete()) {
         <app-batch-product-categories-dialog
           [productIds]="selectedProductIdList()"
@@ -1962,12 +594,6 @@ interface PendingProductImage {
           [links]="productCategories()"
           (closed)="batchCategoriesOpen.set(false)"
           (applied)="batchCategoriesApplied($event)"
-        />
-      }
-      @if (editorScannerTarget() !== null) {
-        <app-barcode-scanner
-          (scanned)="editorBarcodeScanned($event)"
-          (close)="editorScannerTarget.set(null)"
         />
       }
       @defer (when labelDialogMode() !== null) {
@@ -1982,25 +608,9 @@ interface PendingProductImage {
       }
     </app-page>
   `,
-  styles: `
-    .product-editor-body {
-      scrollbar-width: thin;
-      scrollbar-color: color-mix(in oklab, var(--color-base-content) 22%, transparent) transparent;
-    }
-
-    .product-editor-body::-webkit-scrollbar {
-      width: 0.375rem;
-    }
-
-    .product-editor-body::-webkit-scrollbar-thumb {
-      border-radius: var(--radius-selector);
-      background: color-mix(in oklab, var(--color-base-content) 22%, transparent);
-    }
-  `,
 })
 export class ProductsComponent implements OnInit {
   private readonly pos = inject(PosService);
-  private readonly money = inject(MoneyService);
   private readonly supabase = inject(SupabaseService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
@@ -2008,13 +618,11 @@ export class ProductsComponent implements OnInit {
   private readonly parties = inject(PartyCacheService);
   private readonly locationContext = inject(LocationContextService);
   protected readonly connectivity = inject(ConnectivityService);
-  private readonly publicProductLinks = inject(PublicProductLinkService);
   private readonly tax = inject(TaxService);
   protected readonly preferences = inject(CompanyPreferencesService);
   protected readonly perms = inject(PermissionsService);
 
   protected readonly fmt = formatKes;
-  protected readonly barcodeMaxLength = BARCODE_MAX_LENGTH;
   protected readonly families = this.catalogCache.families;
   /** Live view of the shared realtime-backed catalog cache (works offline). */
   protected readonly catalog = this.catalogCache.catalog;
@@ -2022,13 +630,6 @@ export class ProductsComponent implements OnInit {
   protected readonly stock = this.catalogCache.stock;
   protected readonly selectedProductId = signal<string | null>(null);
   protected readonly selectedVariantId = signal<string | null>(null);
-  private readonly selectedGroupOverride = signal<ProductGroup | null>(null);
-  protected readonly batchesFor = signal<string | null>(null);
-  protected readonly batches = signal<InventoryBatch[]>([]);
-  protected readonly purchaseHistoryFor = signal<string | null>(null);
-  protected readonly purchaseHistory = signal<VariantPurchaseHistoryRow[]>([]);
-  protected readonly purchaseHistoryTotal = signal(0);
-  protected readonly purchaseHistoryLoading = signal(false);
 
   protected readonly query = signal('');
   protected readonly productStatusFilter = signal<ProductStatusFilter>(
@@ -2045,31 +646,15 @@ export class ProductsComponent implements OnInit {
   protected readonly productSort = signal('name');
   protected readonly productSortDirection = signal<ListSortDirection>('asc');
 
-  protected readonly editingFamily = signal<Product | null>(null);
-  protected readonly familyName = new FormControl('', { nonNullable: true });
-  protected readonly familyManufacturer = new FormControl('', { nonNullable: true });
-  protected readonly familyBarcode = new FormControl('', { nonNullable: true });
-  protected readonly familyActive = new FormControl(true, { nonNullable: true });
-  protected readonly familyTaxCategory = new FormControl('', { nonNullable: true });
   protected readonly taxCategories = signal<TaxCategory[]>([]);
 
-  /** Coupled create/edit flow: product details and every variant share one editor. */
-  protected readonly editorMode = signal<'create' | 'edit' | null>(null);
-  protected readonly editorStep = signal<1 | 2>(1);
-  protected readonly editorLoading = signal(false);
-  private editorRowSequence = 0;
-  protected editorRows: ProductEditorRow[] = [];
-  protected readonly editorScannerTarget = signal<'family' | number | null>(null);
-  protected readonly pendingFamilyBarcode = signal<string | null>(null);
+  protected readonly editorRequest = signal<ProductEditorRequest | null>(null);
   protected readonly labelDialogMode = signal<'catalogue' | 'single' | null>(null);
   protected readonly labelVariantId = signal<string | null>(null);
 
-  protected readonly busy = signal(false);
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
-  protected readonly shareBusy = signal(false);
-  protected readonly shareFeedback = signal<ShareFeedback | null>(null);
   protected readonly page = signal(1);
   protected readonly pageSize = signal(25);
   private readonly serverGroups = signal<ProductGroup[]>([]);
@@ -2078,10 +663,7 @@ export class ProductsComponent implements OnInit {
   private readonly serverLoaded = signal(false);
   private serverRequest = 0;
   private serverSearchTimer: ReturnType<typeof setTimeout> | null = null;
-  private shareFeedbackTimer: ReturnType<typeof setTimeout> | null = null;
   private supplierStockRequest = 0;
-  private productRouteRequest = 0;
-  private purchaseHistoryRequest = 0;
   protected readonly serverMode = computed(() => this.productStatusFilter() !== 'active');
   protected readonly supplierOptions = computed<readonly SearchableFilterOption[]>(() =>
     this.parties
@@ -2105,16 +687,7 @@ export class ProductsComponent implements OnInit {
         ?.name ?? 'Active location'
   );
 
-  /** Camera/gallery state shared by product create and edit. */
-  protected readonly imageBusy = signal(false);
-  protected readonly pendingProductImage = signal<PendingProductImage | null>(null);
   protected readonly brokenImages = signal<Set<string>>(new Set());
-  protected readonly productImagePreview = computed(() => {
-    const pending = this.pendingProductImage();
-    if (pending) return pending.previewUrl;
-    const path = this.editingFamily()?.image_path;
-    return path && !this.brokenImages().has(path) ? this.imageUrl(path) : null;
-  });
 
   /** Categories panel + per-family checkbox editor. */
   protected readonly categoriesOpen = signal(false);
@@ -2151,22 +724,6 @@ export class ProductsComponent implements OnInit {
     }
     return result;
   });
-  protected readonly stockLocations = this.locationContext.locations;
-  protected readonly categoryForm = signal<{ editing: CategoryWithCount | null } | null>(null);
-  protected readonly categoryName = new FormControl('', { nonNullable: true });
-  protected readonly categorySlug = new FormControl('', { nonNullable: true });
-  protected readonly categoryDescription = new FormControl('', { nonNullable: true });
-  protected readonly familyCategories = signal<Set<string>>(new Set());
-  protected readonly familyCategoryQuery = signal('');
-  protected readonly matchingFamilyCategories = computed(() => {
-    const query = this.familyCategoryQuery().trim().toLocaleLowerCase();
-    return this.categories().filter(
-      category => category.active && (!query || category.name.toLocaleLowerCase().includes(query))
-    );
-  });
-  protected readonly visibleFamilyCategories = computed(() =>
-    this.matchingFamilyCategories().slice(0, 50)
-  );
   protected readonly selectedProductIds = signal<Set<string>>(new Set());
   protected readonly batchCategoriesOpen = signal(false);
   protected readonly selectedProductIdList = computed(() => [...this.selectedProductIds()]);
@@ -2180,10 +737,6 @@ export class ProductsComponent implements OnInit {
     ).length;
     return selected > 0 && selected < this.pagedGroups().length;
   });
-
-  /** Deactivate confirmation (family or variant). */
-  protected readonly deactivateTarget = signal<DeactivateTarget | null>(null);
-  private readonly deleteModal = viewChild(DeleteConfirmationModalComponent);
 
   /** Families with their variants; search filters the cached catalog client-side. */
   protected readonly grouped = computed(() => {
@@ -2361,21 +914,6 @@ export class ProductsComponent implements OnInit {
     const start = (page - 1) * this.pageSize();
     return this.grouped().slice(start, start + this.pageSize());
   });
-  /** Product family shown in the detail drawer (live — derived from loaded signals). */
-  protected readonly selectedGroup = computed(() => {
-    const id = this.selectedProductId();
-    if (!id) return null;
-    const visible = this.grouped().find(group => group.family.id === id);
-    if (visible) return visible;
-    const family = this.families().find(item => item.id === id);
-    if (family) {
-      return {
-        family,
-        variants: this.catalog().filter(variant => variant.product_id === id),
-      };
-    }
-    return this.selectedGroupOverride()?.family.id === id ? this.selectedGroupOverride() : null;
-  });
   protected readonly needsRestockSummary = computed(() => {
     const groups = this.grouped();
     const variants = groups.reduce(
@@ -2454,7 +992,6 @@ export class ProductsComponent implements OnInit {
       const selectedCategory = this.categoryFilter();
       if (!complete) {
         this.categoryFilter.set('all');
-        this.categoryForm.set(null);
         this.clearSelection();
         return;
       }
@@ -2608,7 +1145,6 @@ export class ProductsComponent implements OnInit {
       this.stockStatusFilter.set(requestedStock as StockStatusFilter);
     }
     this.loading.set(true);
-    void this.publicProductLinks.load().catch(() => undefined);
     void this.loadTaxCategories();
     const [hydrated] = await Promise.all([
       this.catalogCache.ensureLoaded(),
@@ -2631,7 +1167,7 @@ export class ProductsComponent implements OnInit {
     }
     const requestedProduct = params.get('product');
     if (requestedProduct) {
-      await this.showProduct(requestedProduct, params.get('variant'), false);
+      this.showProduct(requestedProduct, params.get('variant'), false);
     }
   }
 
@@ -2759,207 +1295,11 @@ export class ProductsComponent implements OnInit {
     this.brokenImages.update(set => new Set(set).add(path));
   }
 
-  protected markCurrentProductImageBroken(): void {
-    const path = this.editingFamily()?.image_path;
-    if (path && !this.pendingProductImage()) this.markBroken(path);
-  }
-
-  protected async selectProductImage(event: Event): Promise<void> {
-    const input = event.target as HTMLInputElement;
-    const file = input.files?.[0];
-    if (!file) return;
-    this.imageBusy.set(true);
-    this.error.set(null);
-    try {
-      if (!file.type.startsWith('image/')) throw new Error('Choose a valid image file.');
-      const resized = await resizeImage(file, 800);
-      this.clearPendingProductImage();
-      this.pendingProductImage.set({
-        blob: resized,
-        extension: imageExtension(resized),
-        previewUrl: URL.createObjectURL(resized),
-      });
-
-      const family = this.editingFamily();
-      if (this.editorMode() === 'edit' && family) {
-        await this.persistPendingProductImage(family.id, family.image_path);
-        this.notice.set('Product photo uploaded');
-        await this.load();
-      }
-    } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Could not use that photo');
-    } finally {
-      this.imageBusy.set(false);
-      input.value = '';
-    }
-  }
-
-  protected async retryProductImageUpload(): Promise<void> {
-    const family = this.editingFamily();
-    if (!family || !this.pendingProductImage() || this.imageBusy()) return;
-    this.imageBusy.set(true);
-    this.error.set(null);
-    try {
-      await this.persistPendingProductImage(family.id, family.image_path);
-      this.notice.set('Product photo uploaded');
-      await this.load();
-    } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Photo upload failed');
-    } finally {
-      this.imageBusy.set(false);
-    }
-  }
-
-  protected async removeImage(): Promise<void> {
-    if (this.pendingProductImage()) {
-      this.clearPendingProductImage();
-      this.error.set(null);
-      return;
-    }
-    const family = this.editingFamily();
-    if (!family?.image_path) return;
-    this.imageBusy.set(true);
-    this.error.set(null);
-    try {
-      await this.pos.updateProduct(family.id, { image_path: '' });
-      await this.pos.removeProductImage(family.image_path).catch(() => undefined);
-      this.editingFamily.set({ ...family, image_path: null });
-      this.notice.set('Product photo removed');
-      await this.load();
-    } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Remove failed');
-    } finally {
-      this.imageBusy.set(false);
-    }
-  }
-
-  private async persistPendingProductImage(
-    productId: string,
-    previousPath: string | null
-  ): Promise<void> {
-    const pending = this.pendingProductImage();
-    if (!pending) return;
-    const companyId = this.supabase.claims()?.company_id;
-    if (!companyId) throw new Error('No company in session — re-login');
-
-    let path: string | null = null;
-    try {
-      path = await this.pos.uploadProductImage(companyId, pending.blob, pending.extension);
-      await this.pos.updateProduct(productId, { image_path: path });
-    } catch (error) {
-      if (path) await this.pos.removeProductImage(path).catch(() => undefined);
-      throw error;
-    }
-
-    const family = this.editingFamily();
-    if (family?.id === productId) this.editingFamily.set({ ...family, image_path: path });
-    this.clearPendingProductImage();
-    if (previousPath && previousPath !== path) {
-      await this.pos.removeProductImage(previousPath).catch(() => undefined);
-    }
-  }
-
-  private clearPendingProductImage(): void {
-    const pending = this.pendingProductImage();
-    if (pending) URL.revokeObjectURL(pending.previewUrl);
-    this.pendingProductImage.set(null);
-  }
-
   // --- Categories ---
 
-  protected startCategoryCreate(): void {
-    if (
-      !this.perms.has('ManageCatalog') ||
-      !this.connectivity.online() ||
-      !this.categoryMembershipsComplete()
-    )
-      return;
-    this.categoryForm.set({ editing: null });
-    this.categoryName.setValue('');
-    this.categorySlug.setValue('');
-    this.categoryDescription.setValue('');
-  }
-
-  protected startCategoryEdit(c: CategoryWithCount): void {
-    if (
-      !this.perms.has('ManageCatalog') ||
-      !this.connectivity.online() ||
-      !this.categoryMembershipsComplete()
-    )
-      return;
-    this.categoryForm.set({ editing: c });
-    this.categoryName.setValue(c.name);
-    this.categorySlug.setValue(c.slug);
-    this.categoryDescription.setValue(c.description ?? '');
-  }
-
-  protected async saveCategory(): Promise<void> {
-    if (
-      !this.perms.has('ManageCatalog') ||
-      !this.connectivity.online() ||
-      !this.categoryMembershipsComplete() ||
-      this.categoryName.value.trim().length === 0
-    )
-      return;
-    const cf = this.categoryForm();
-    this.busy.set(true);
-    this.error.set(null);
-    this.notice.set(null);
-    try {
-      await this.pos.upsertCategory({
-        name: this.categoryName.value.trim(),
-        slug: this.categorySlug.value.trim() || undefined,
-        description: this.categoryDescription.value.trim() || undefined,
-        ...(cf?.editing ? { category_id: cf.editing.id } : {}),
-      });
-      this.notice.set(cf?.editing ? 'Category updated' : 'Category created');
-      this.categoryForm.set(null);
-      await this.load();
-    } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Save failed');
-    } finally {
-      this.busy.set(false);
-    }
-  }
-
-  protected async setCategoryActive(c: CategoryWithCount, active: boolean): Promise<void> {
-    if (
-      !this.perms.has('ManageCatalog') ||
-      !this.connectivity.online() ||
-      !this.categoryMembershipsComplete()
-    )
-      return;
-    this.busy.set(true);
-    this.error.set(null);
-    try {
-      await this.pos.upsertCategory({
-        name: c.name,
-        slug: c.slug,
-        category_id: c.id,
-        active,
-      });
-      this.notice.set(`${c.name} ${active ? 'reactivated' : 'deactivated'}`);
-      await this.load();
-    } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Update failed');
-    } finally {
-      this.busy.set(false);
-    }
-  }
-
-  protected toggleFamilyCategory(categoryId: string): void {
-    if (
-      !this.perms.has('ManageCatalog') ||
-      !this.connectivity.online() ||
-      !this.categoryMembershipsComplete()
-    )
-      return;
-    this.familyCategories.update(set => {
-      const next = new Set(set);
-      if (next.has(categoryId)) next.delete(categoryId);
-      else next.add(categoryId);
-      return next;
-    });
+  protected async categoryChanged(result: ProductCategoryChangedResult): Promise<void> {
+    this.notice.set(result.message);
+    await this.load();
   }
 
   protected stockOf(variantId: string): StockInfo | undefined {
@@ -3023,39 +1363,12 @@ export class ProductsComponent implements OnInit {
   }
 
   protected openProduct(productId: string): void {
-    void this.showProduct(productId, null, true);
+    this.showProduct(productId, null, true);
   }
 
-  private async showProduct(
-    productId: string,
-    variantId: string | null,
-    updateUrl: boolean
-  ): Promise<void> {
-    const request = ++this.productRouteRequest;
-    void this.publicProductLinks.load().catch(() => undefined);
+  private showProduct(productId: string, variantId: string | null, updateUrl: boolean): void {
     this.selectedProductId.set(productId);
     this.selectedVariantId.set(variantId);
-    this.selectedGroupOverride.set(null);
-    this.batchesFor.set(null);
-    this.batches.set([]);
-    this.purchaseHistoryFor.set(null);
-    this.purchaseHistory.set([]);
-    this.purchaseHistoryTotal.set(0);
-    const loaded = this.grouped().find(group => group.family.id === productId);
-    if (!loaded) {
-      try {
-        const group = await this.pos.productGroupById(productId, variantId);
-        if (request !== this.productRouteRequest) return;
-        if (!group) throw new Error('Product not found');
-        this.selectedGroupOverride.set(group);
-      } catch (error) {
-        if (request !== this.productRouteRequest) return;
-        this.selectedProductId.set(null);
-        this.selectedVariantId.set(null);
-        this.error.set(error instanceof Error ? error.message : 'Could not load product');
-        return;
-      }
-    }
     if (updateUrl) {
       void this.router.navigate([], {
         relativeTo: this.route,
@@ -3064,55 +1377,12 @@ export class ProductsComponent implements OnInit {
         replaceUrl: true,
       });
     }
-    if (variantId) {
-      setTimeout(() =>
-        document
-          .getElementById(`product-variant-${variantId}`)
-          ?.scrollIntoView({ block: 'nearest' })
-      );
-    }
-  }
-
-  protected canShareProduct(group: ProductGroup): boolean {
-    return group.family.active && group.variants.some(variant => variant.variant_active);
-  }
-
-  protected async shareProduct(group: ProductGroup): Promise<void> {
-    if (this.shareBusy()) return;
-    this.shareBusy.set(true);
-    this.clearShareFeedback();
-    try {
-      const url = await this.publicProductLinks.productUrl(group.family.id);
-      if (!url) throw new Error('This product is not available on the public storefront.');
-      if (navigator.share) {
-        // URL-only lets WhatsApp build the current preview through the public renderer.
-        await navigator.share({ url });
-      } else {
-        await navigator.clipboard.writeText(url);
-        this.showShareFeedback('success', 'Product link copied');
-      }
-    } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') return;
-      this.showShareFeedback(
-        'error',
-        error instanceof Error ? error.message : 'Could not share product'
-      );
-    } finally {
-      this.shareBusy.set(false);
-    }
   }
 
   /** Called by the drawer after its close transition finishes. */
   protected closeProductDrawer(): void {
-    this.productRouteRequest++;
     this.selectedProductId.set(null);
     this.selectedVariantId.set(null);
-    this.selectedGroupOverride.set(null);
-    this.batchesFor.set(null);
-    this.batches.set([]);
-    this.purchaseHistoryFor.set(null);
-    this.purchaseHistory.set([]);
-    this.purchaseHistoryTotal.set(0);
     void this.router.navigate([], {
       relativeTo: this.route,
       queryParams: { product: null, variant: null },
@@ -3121,19 +1391,6 @@ export class ProductsComponent implements OnInit {
     });
   }
 
-  private showShareFeedback(kind: ShareFeedback['kind'], message: string): void {
-    this.clearShareFeedback();
-    this.shareFeedback.set({ kind, message });
-    this.shareFeedbackTimer = setTimeout(() => this.clearShareFeedback(), 4_000);
-  }
-
-  private clearShareFeedback(): void {
-    if (this.shareFeedbackTimer) clearTimeout(this.shareFeedbackTimer);
-    this.shareFeedbackTimer = null;
-    this.shareFeedback.set(null);
-  }
-
-  /** The product editor is a two-step modal (surface 3) — close the drawer first. */
   protected editFromDrawer(family: Product): void {
     this.closeProductDrawer();
     this.startFamilyEdit(family);
@@ -3144,273 +1401,36 @@ export class ProductsComponent implements OnInit {
     this.startVariantEdit(productId);
   }
 
-  protected async toggleBatches(variantId: string): Promise<void> {
-    if (this.batchesFor() === variantId) {
-      this.batchesFor.set(null);
-      return;
-    }
-    this.batchesFor.set(variantId);
-    try {
-      this.batches.set(await this.pos.variantBatches(variantId));
-    } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Failed to load batches');
-    }
-  }
-
-  protected async togglePurchaseHistory(variantId: string): Promise<void> {
-    if (this.purchaseHistoryFor() === variantId) {
-      this.purchaseHistoryRequest++;
-      this.purchaseHistoryFor.set(null);
-      this.purchaseHistoryLoading.set(false);
-      return;
-    }
-    this.purchaseHistoryRequest++;
-    this.purchaseHistoryLoading.set(false);
-    this.purchaseHistoryFor.set(variantId);
-    this.purchaseHistory.set([]);
-    this.purchaseHistoryTotal.set(0);
-    await this.loadMorePurchaseHistory(variantId);
-  }
-
-  protected async loadMorePurchaseHistory(variantId: string): Promise<void> {
-    if (this.purchaseHistoryLoading() || this.purchaseHistoryFor() !== variantId) return;
-    const request = ++this.purchaseHistoryRequest;
-    this.purchaseHistoryLoading.set(true);
-    try {
-      const result = await this.money.variantPurchaseHistory(
-        variantId,
-        this.purchaseHistory().length,
-        25
-      );
-      if (request !== this.purchaseHistoryRequest || this.purchaseHistoryFor() !== variantId)
-        return;
-      this.purchaseHistory.update(rows => [...rows, ...result.rows]);
-      this.purchaseHistoryTotal.set(result.total);
-    } catch (error) {
-      if (request === this.purchaseHistoryRequest && this.purchaseHistoryFor() === variantId) {
-        this.error.set(error instanceof Error ? error.message : 'Could not load purchase history');
-      }
-    } finally {
-      if (request === this.purchaseHistoryRequest) this.purchaseHistoryLoading.set(false);
-    }
-  }
-
-  protected supplierName(supplierId: string): string {
-    const supplier = this.parties.suppliers().find(item => item.id === supplierId);
-    return supplier
-      ? [supplier.first_name, supplier.last_name].filter(Boolean).join(' ')
-      : 'Unknown supplier';
-  }
-
-  // --- Coupled product editor ---
-
+  // The page composes the editor through request/result values; editor state never leaks here.
   protected startFamilyCreate(): void {
     if (!this.perms.has('ManageStockAdjustments')) return;
-    this.clearPendingProductImage();
     this.error.set(null);
-    this.editorLoading.set(false);
-    this.editingFamily.set(null);
-    this.familyName.setValue('');
-    this.familyManufacturer.setValue('');
-    this.familyBarcode.setValue('');
-    this.familyTaxCategory.setValue('');
-    this.pendingFamilyBarcode.set(null);
-    this.familyActive.setValue(true);
-    this.familyCategories.set(new Set());
-    this.familyCategoryQuery.set('');
-    this.editorRows = [this.emptyEditorRow()];
-    this.editorStep.set(1);
-    this.editorMode.set('create');
+    this.editorRequest.set({ mode: 'create' });
   }
 
-  protected startFamilyEdit(family: Product, step: 1 | 2 = 1): void {
+  protected startFamilyEdit(family: Product, initialStep: 1 | 2 = 1): void {
     if (!this.perms.has('ManageStockAdjustments')) return;
-    this.clearPendingProductImage();
+    const stock = new Map<string, StockInfo>(this.stock());
+    for (const [variantId, value] of this.serverStock()) stock.set(variantId, value);
     this.error.set(null);
-    this.editingFamily.set(family);
-    this.familyName.setValue(family.name);
-    this.familyManufacturer.setValue(this.manufacturerName(family.manufacturer_id) ?? '');
-    this.familyBarcode.setValue(family.barcode ?? '');
-    this.familyTaxCategory.setValue(family.tax_category_id ?? '');
-    this.pendingFamilyBarcode.set(null);
-    this.familyActive.setValue(family.active);
-    this.familyCategories.set(new Set());
-    this.familyCategoryQuery.set('');
-    this.editorRows = [];
-    this.editorStep.set(step);
-    this.editorLoading.set(true);
-    this.editorMode.set('edit');
-
-    void Promise.all([
-      this.pos.variantsForProduct(family.id),
-      this.pos.productCategoryIds(family.id),
-    ])
-      .then(([variants, categoryIds]) => {
-        if (this.editingFamily()?.id !== family.id || this.editorMode() !== 'edit') return;
-        this.editorRows = variants.map(variant =>
-          this.editorRowFromVariant(variant, variants.length)
-        );
-        if (this.editorRows.length === 0) this.addEditorRow();
-        this.familyCategories.set(new Set(categoryIds));
-      })
-      .catch(err => {
-        if (this.editingFamily()?.id !== family.id || this.editorMode() !== 'edit') return;
-        this.error.set(err instanceof Error ? err.message : 'Failed to load product variants');
-      })
-      .finally(() => {
-        if (this.editingFamily()?.id === family.id) this.editorLoading.set(false);
-      });
+    this.editorRequest.set({ mode: 'edit', product: family, initialStep, stock });
   }
 
-  protected closeProductEditor(): void {
-    if (this.busy()) return;
-    this.clearPendingProductImage();
-    this.editorLoading.set(false);
-    this.editorMode.set(null);
-    this.editingFamily.set(null);
-    this.editorScannerTarget.set(null);
-    this.pendingFamilyBarcode.set(null);
-    this.error.set(null);
-  }
-
-  protected addEditorRow(): void {
-    this.editorRows = [...this.editorRows, this.emptyEditorRow()];
-  }
-
-  protected removeEditorRow(index: number): void {
-    if (this.editorRows.length === 1 || this.editorRows[index]?.variantId) return;
-    this.editorRows = this.editorRows.filter((_, rowIndex) => rowIndex !== index);
-  }
-
-  protected duplicateLabels(): boolean {
-    const labels = this.editorRows
-      .map(row => row.name.trim().toLowerCase())
-      .filter(label => label.length > 0);
-    return new Set(labels).size !== labels.length;
-  }
-
-  protected effectiveBarcodeConflict(): boolean {
-    return this.editorBarcodeConflictValue() !== null;
-  }
-
-  private editorBarcodeConflictValue(): string | null {
-    if (!this.familyActive.value) return null;
-    const seen = new Set<string>();
-    const editingProductId = this.editingFamily()?.id ?? null;
-    const existing = new Set(
-      this.catalog()
-        .filter(
-          variant =>
-            variant.product_id !== editingProductId &&
-            variant.variant_active &&
-            variant.product_active &&
-            !!variant.barcode?.trim()
-        )
-        .map(variant => variant.barcode!.trim())
+  protected async productEditorSaved(result: ProductEditorResult): Promise<void> {
+    this.editorRequest.set(null);
+    this.notice.set(
+      result.photoWarning ??
+        (result.mode === 'created'
+          ? `Created ${result.name}`
+          : `Updated ${result.name} and ${result.variantCount} variant${result.variantCount === 1 ? '' : 's'}`)
     );
-    for (const row of this.editorRows) {
-      if (!row.active) continue;
-      const barcode = this.effectiveEditorBarcode(row);
-      if (!barcode) continue;
-      if (seen.has(barcode) || existing.has(barcode)) return barcode;
-      seen.add(barcode);
-    }
-    return null;
+    await this.load();
   }
 
-  protected effectiveEditorBarcode(row: ProductEditorRow): string {
-    return row.barcode.trim() || this.familyBarcode.value.trim();
+  protected async productEditorClosed(result: ProductEditorCloseResult): Promise<void> {
+    this.editorRequest.set(null);
+    if (result.refreshCatalog) await this.load();
   }
-
-  protected scanEditorBarcode(index: number): void {
-    this.error.set(null);
-    this.editorScannerTarget.set(index);
-  }
-
-  protected scanFamilyBarcode(): void {
-    this.error.set(null);
-    this.editorScannerTarget.set('family');
-  }
-
-  protected editorBarcodeScanned(value: string): void {
-    const target = this.editorScannerTarget();
-    this.editorScannerTarget.set(null);
-    if (target === null) return;
-    if (target === 'family') {
-      this.proposeFamilyBarcode(value);
-      return;
-    }
-    this.proposeEditorBarcode(target, value);
-  }
-
-  protected confirmFamilyBarcode(): void {
-    const barcode = this.pendingFamilyBarcode();
-    if (!barcode) return;
-    this.familyBarcode.setValue(barcode);
-    this.pendingFamilyBarcode.set(null);
-  }
-
-  protected cancelFamilyBarcode(): void {
-    this.pendingFamilyBarcode.set(null);
-  }
-
-  private proposeFamilyBarcode(scannedValue: string): void {
-    const barcode = scannedValue.trim();
-    if (!barcode) return;
-    if (barcode.length > BARCODE_MAX_LENGTH) {
-      this.error.set(`Barcodes can be at most ${BARCODE_MAX_LENGTH} characters.`);
-      return;
-    }
-    const current = this.familyBarcode.value.trim();
-    if (barcode === current) {
-      this.pendingFamilyBarcode.set(null);
-      return;
-    }
-    if (current) {
-      this.pendingFamilyBarcode.set(barcode);
-      return;
-    }
-    this.familyBarcode.setValue(barcode);
-    this.pendingFamilyBarcode.set(null);
-  }
-
-  protected generateEditorBarcode(index: number): void {
-    this.proposeEditorBarcode(index, generateDukarunBarcode());
-  }
-
-  protected confirmEditorBarcode(index: number): void {
-    const row = this.editorRows[index];
-    if (!row?.pendingBarcode) return;
-    row.barcode = row.pendingBarcode;
-    row.pendingBarcode = null;
-  }
-
-  protected cancelEditorBarcode(index: number): void {
-    const row = this.editorRows[index];
-    if (row) row.pendingBarcode = null;
-  }
-
-  private proposeEditorBarcode(index: number, scannedValue: string): void {
-    const row = this.editorRows[index];
-    const barcode = scannedValue.trim();
-    if (!row || !barcode) return;
-    if (barcode.length > BARCODE_MAX_LENGTH) {
-      this.error.set(`Barcodes can be at most ${BARCODE_MAX_LENGTH} characters.`);
-      return;
-    }
-    const current = this.effectiveEditorBarcode(row);
-    if (barcode === current) {
-      row.pendingBarcode = null;
-      return;
-    }
-    if (current) {
-      row.pendingBarcode = barcode;
-      return;
-    }
-    row.barcode = barcode;
-    row.pendingBarcode = null;
-  }
-
   protected openCatalogueLabels(): void {
     this.labelVariantId.set(null);
     this.labelDialogMode.set('catalogue');
@@ -3424,251 +1444,6 @@ export class ProductsComponent implements OnInit {
   protected closeLabelDialog(): void {
     this.labelDialogMode.set(null);
     this.labelVariantId.set(null);
-  }
-
-  protected familyBarcodeAmbiguous(group: ProductGroup): boolean {
-    const shared = group.family.barcode?.trim();
-    return !!shared && group.variants.filter(variant => variant.barcode === shared).length > 1;
-  }
-
-  protected async saveProductEditor(): Promise<void> {
-    const mode = this.editorMode();
-    const editing = this.editingFamily();
-    const name = this.familyName.value.trim();
-    if (!mode || !name || this.editorLoading() || this.duplicateLabels()) return;
-    if (this.effectiveBarcodeConflict()) {
-      const barcode = this.editorBarcodeConflictValue();
-      this.error.set(
-        barcode
-          ? `Barcode “${barcode}” is already assigned to another active variant.`
-          : 'Each active variant needs a unique barcode.'
-      );
-      return;
-    }
-    if (this.familyBarcode.value.trim().length > BARCODE_MAX_LENGTH) {
-      this.error.set(`Barcodes can be at most ${BARCODE_MAX_LENGTH} characters.`);
-      return;
-    }
-
-    const variants = this.buildVariantInputs();
-    if (!variants) return;
-
-    this.busy.set(true);
-    this.error.set(null);
-    this.notice.set(null);
-    try {
-      const manufacturerName = this.familyManufacturer.value.trim();
-      const existingManufacturer = this.manufacturers().find(
-        item => item.name.toLocaleLowerCase() === manufacturerName.toLocaleLowerCase()
-      );
-      const manufacturerId = manufacturerName
-        ? (existingManufacturer?.id ?? (await this.pos.upsertManufacturer(manufacturerName)))
-        : null;
-      if (mode === 'create') {
-        const productId = await this.pos.createProductWithVariants({
-          name,
-          barcode: this.familyBarcode.value.trim() || undefined,
-          manufacturer_id: manufacturerId,
-          variants,
-        });
-        if (this.perms.has('ManageCatalog') && this.familyTaxCategory.value) {
-          await this.tax.setProductCategory(productId, this.familyTaxCategory.value);
-        }
-        let photoUploadFailed = false;
-        if (this.pendingProductImage()) {
-          try {
-            await this.persistPendingProductImage(productId, null);
-          } catch {
-            photoUploadFailed = true;
-          }
-        }
-        this.notice.set(
-          photoUploadFailed
-            ? `Created ${name}, but the photo could not upload. You can add it by editing the product.`
-            : `Created ${name}`
-        );
-      } else if (editing) {
-        await this.pos.updateProductWithVariants({
-          product_id: editing.id,
-          name,
-          barcode: this.familyBarcode.value.trim(),
-          active: this.familyActive.value,
-          manufacturer_id: manufacturerId,
-          variants,
-        });
-        if (this.perms.has('ManageCatalog') && this.connectivity.online()) {
-          await this.pos.setProductCategories(editing.id, [...this.familyCategories()]);
-          if ((editing.tax_category_id ?? '') !== this.familyTaxCategory.value) {
-            await this.tax.setProductCategory(editing.id, this.familyTaxCategory.value || null);
-          }
-        }
-        let photoUploadFailed = false;
-        if (this.pendingProductImage()) {
-          try {
-            await this.persistPendingProductImage(editing.id, editing.image_path);
-          } catch {
-            photoUploadFailed = true;
-          }
-        }
-        this.notice.set(
-          photoUploadFailed
-            ? `Updated ${name}, but the photo could not upload. Reopen the product to try again.`
-            : `Updated ${name} and ${variants.length} variant${variants.length === 1 ? '' : 's'}`
-        );
-      }
-      this.clearPendingProductImage();
-      this.editorMode.set(null);
-      this.editingFamily.set(null);
-      await this.load();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Save failed';
-      this.error.set(
-        (message.toLowerCase().includes('duplicate') &&
-          message.toLowerCase().includes('barcode')) ||
-          message.toLowerCase().includes('barcode_conflict')
-          ? 'That barcode is already assigned to another variant.'
-          : message
-      );
-    } finally {
-      this.busy.set(false);
-    }
-  }
-
-  private buildVariantInputs(): CatalogVariantInput[] | null {
-    const variants: CatalogVariantInput[] = [];
-    for (const row of this.editorRows) {
-      if (row.barcode.trim().length > BARCODE_MAX_LENGTH) {
-        this.error.set(`Barcodes can be at most ${BARCODE_MAX_LENGTH} characters.`);
-        return null;
-      }
-      const price = parseKes(row.price);
-      if (price === null) {
-        this.error.set('Every variant needs a valid retail price.');
-        return null;
-      }
-
-      const wholesalePrice = row.wholesale.trim() ? parseKes(row.wholesale) : null;
-      if (row.wholesale.trim() && wholesalePrice === null) {
-        this.error.set('Enter a valid wholesale price on every variant.');
-        return null;
-      }
-
-      const isService = row.kind === 'service';
-      const openingQuantity =
-        !row.variantId && !isService && row.openingQuantity.trim()
-          ? Number(row.openingQuantity)
-          : 0;
-      if (!Number.isFinite(openingQuantity) || openingQuantity < 0) {
-        this.error.set('Opening quantity must be zero or greater.');
-        return null;
-      }
-      if (openingQuantity > 0 && !row.trackInventory) {
-        this.error.set('Opening stock requires stock tracking.');
-        return null;
-      }
-      if (openingQuantity > 0 && !row.allowFractional && !Number.isInteger(openingQuantity)) {
-        this.error.set('Enable fractional quantities or enter a whole opening quantity.');
-        return null;
-      }
-
-      const openingUnitCost = row.openingUnitCost.trim() ? parseKes(row.openingUnitCost) : null;
-      if (openingQuantity > 0 && openingUnitCost === null) {
-        this.error.set('Enter a valid unit cost for opening stock.');
-        return null;
-      }
-
-      variants.push({
-        ...(row.variantId ? { variant_id: row.variantId } : {}),
-        ...(row.name.trim() ? { name: row.name.trim() } : {}),
-        price,
-        ...(row.sku.trim() ? { sku: row.sku.trim() } : {}),
-        barcode: row.barcode.trim() || null,
-        wholesale_price: wholesalePrice,
-        kind: row.kind,
-        track_inventory: isService ? false : row.trackInventory,
-        allow_fractional: isService ? false : row.allowFractional,
-        active: row.active,
-        ...(openingQuantity > 0
-          ? {
-              opening_quantity: openingQuantity,
-              opening_unit_cost: openingUnitCost!,
-              ...(row.openingLocationId ? { opening_location_id: row.openingLocationId } : {}),
-              ...(row.batchNumber.trim() ? { batch_number: row.batchNumber.trim() } : {}),
-              ...(this.preferences.batchExpiryEnabled() && row.expiryDate
-                ? { expiry_date: row.expiryDate }
-                : {}),
-            }
-          : {}),
-      });
-    }
-    return variants;
-  }
-
-  private emptyEditorRow(): ProductEditorRow {
-    return {
-      key: `new-${++this.editorRowSequence}`,
-      variantId: null,
-      name: '',
-      price: '',
-      sku: '',
-      barcode: '',
-      pendingBarcode: null,
-      wholesale: '',
-      kind: 'good',
-      trackInventory: true,
-      allowFractional: false,
-      openingQuantity: '',
-      openingUnitCost: '',
-      openingLocationId: this.locationContext.activeId() ?? this.stockLocations()[0]?.id ?? '',
-      batchNumber: '',
-      expiryDate: '',
-      active: true,
-    };
-  }
-
-  private editorRowFromVariant(variant: ProductVariant, variantCount: number): ProductEditorRow {
-    return {
-      ...this.emptyEditorRow(),
-      key: `variant-${variant.id}`,
-      variantId: variant.id,
-      name: variant.name === 'Default' && variantCount === 1 ? '' : variant.name,
-      price: formatKesInput(variant.price),
-      sku: variant.sku,
-      barcode: variant.barcode ?? '',
-      wholesale: variant.wholesale_price === null ? '' : formatKesInput(variant.wholesale_price),
-      kind: variant.kind,
-      trackInventory: variant.track_inventory,
-      allowFractional: variant.allow_fractional,
-      active: variant.active,
-    };
-  }
-
-  protected parseAmount(value: string): number | null {
-    return parseKes(value);
-  }
-
-  protected confirmDeactivate(target: DeactivateTarget): void {
-    this.deactivateTarget.set(target);
-    this.deleteModal()?.show();
-  }
-
-  protected deactivateData() {
-    const t = this.deactivateTarget();
-    if (!t) return { entityName: '' };
-    return {
-      entityName: t.category.name,
-      relatedCount: t.category.product_count,
-      relatedLabel: 'product',
-      warningDetails: ['Products stay; only the category grouping is deactivated.'],
-    };
-  }
-
-  protected async executeDeactivate(): Promise<void> {
-    const t = this.deactivateTarget();
-    if (!t) return;
-    this.deleteModal()?.hide();
-    await this.setCategoryActive(t.category, false);
-    this.deactivateTarget.set(null);
   }
 
   protected startVariantEdit(productId: string): void {

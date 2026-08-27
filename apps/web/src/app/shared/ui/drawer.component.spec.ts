@@ -8,6 +8,7 @@ import { IconComponent } from './icon.component';
   imports: [DrawerComponent],
   template: `
     <app-drawer [(open)]="open" title="Edit expense">
+      <button drawerActions type="button">More expense actions</button>
       <p>Expense form</p>
       <div drawerFooter>
         <button type="button">Save expense</button>
@@ -49,6 +50,14 @@ describe('DrawerComponent', () => {
 
     expect(footer.textContent).toContain('Save expense');
     expect(footer.classList.contains('task-sheet-default-footer')).toBe(false);
+  });
+
+  it('projects record actions into the drawer header', async () => {
+    const fixture = await render(DrawerHostComponent);
+    const dialog = fixture.nativeElement.querySelector('[role="dialog"]') as HTMLElement;
+
+    expect(dialog.textContent).toContain('More expense actions');
+    expect(dialog.querySelector('footer')?.textContent).not.toContain('More expense actions');
   });
 
   it('uses the dismiss fallback only when no action footer is projected', async () => {

@@ -15,21 +15,12 @@
   "pagination-inside-table-shell": {},
   "legacy-table-scroll": {},
   "direct-page-action": {
-    "audit/audit.component.ts": 2,
-    "customers/customers.component.ts": 3,
-    "inventory/stock-transfers.component.ts": 1,
-    "money/credit/money-credit.component.ts": 1,
-    "orders/orders.component.ts": 1,
-    "pos/proformas/proformas.component.ts": 3,
-    "pos/sell/my-pending-sales.component.ts": 1,
-    "products/products.component.ts": 2,
-    "suppliers/suppliers.component.ts": 2
+    "audit/audit.component.ts": 1,
+    "inventory/stock-transfers.component.ts": 1
   },
   "small-interactive-target": {
     "products/products.component.ts": 2,
-    "purchases/purchase-editor.component.ts": 7,
     "purchases/purchase-line-row.component.ts": 7,
-    "settings/settings.component.ts": 1,
     "shared/ui/pagination.component.ts": 1,
     "shell/shell.component.ts": 1,
     "stock-adjustments/stock-adjustments.component.ts": 1

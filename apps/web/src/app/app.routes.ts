@@ -251,9 +251,9 @@ export const routes: Routes = [
       {
         path: 'purchases',
         canActivate: [permissionGuard],
-        data: { purchasePage: true, workspaceAccess: 'purchasing' },
+        data: { workspaceAccess: 'purchasing' },
         loadComponent: () =>
-          import('./suppliers/suppliers.component').then(m => m.SuppliersComponent),
+          import('./purchases/purchases.component').then(m => m.PurchasesComponent),
       },
       {
         path: 'credit',

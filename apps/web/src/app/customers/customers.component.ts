@@ -401,7 +401,7 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
               @if (c.deleted_at) {
                 @if (perms.has('ManageCustomers')) {
                   <button
-                    actions
+                    drawerActions
                     appButton
                     variant="outline"
                     type="button"
@@ -413,7 +413,7 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
               } @else {
                 @if (perms.has('ManageCustomers')) {
                   <button
-                    actions
+                    drawerActions
                     appButton
                     variant="ghost"
                     [iconOnly]="true"
@@ -426,7 +426,13 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
                   </button>
                 }
                 @if (perms.has('ManageCustomers')) {
-                  <button actions appButton variant="ghost" type="button" (click)="startDelete(c)">
+                  <button
+                    drawerActions
+                    appButton
+                    variant="ghost"
+                    type="button"
+                    (click)="startDelete(c)"
+                  >
                     <app-icon name="heroArchiveBox" /> Delete
                   </button>
                 }

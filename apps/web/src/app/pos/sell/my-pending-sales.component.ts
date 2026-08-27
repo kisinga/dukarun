@@ -32,7 +32,7 @@ import { SupabaseService } from '../../core/supabase.service';
       subtitle="Sent to the cashier — follow up at the till if a customer is waiting."
     >
       <button
-        actions
+        drawerActions
         appButton
         variant="ghost"
         [iconOnly]="true"

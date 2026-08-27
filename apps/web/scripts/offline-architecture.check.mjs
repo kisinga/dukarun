@@ -12,7 +12,7 @@ function source(relativePath) {
 
 const db = source('src/app/pos/offline/offline-db.ts');
 const sync = source('src/app/pos/offline/sync.service.ts');
-const sell = source('src/app/pos/sell/sell.component.ts');
+const sellWorkflow = source('src/app/pos/sell/sell-workflow.store.ts');
 const cashier = source('src/app/core/cashier-session.service.ts');
 const shell = source('src/app/shell/shell.component.ts');
 const pos = source('src/app/pos/pos.service.ts');
@@ -38,12 +38,21 @@ const checks = [
   },
   {
     ok:
-      /const clientRef = crypto\.randomUUID\(\)/.test(sell) &&
-      /postSale\(\s*customerId,\s*lines,\s*payments,\s*false,\s*clientRef/.test(sell) &&
+      /resolveSaleAttempt\(this\.saleAttempt, fingerprint, \(\) => crypto\.randomUUID\(\)\)/.test(
+        sellWorkflow
+      ) &&
+      /const clientRef = this\.saleAttempt\.clientRef/.test(sellWorkflow) &&
+      /postSale\(\s*customerId,\s*lines,\s*payments,\s*false,\s*clientRef/.test(sellWorkflow) &&
       /queueSale\(\s*customerId,\s*lines,\s*payments,\s*clientRef(?:,\s*fulfillmentDraft)?\s*\)/.test(
-        sell
+        sellWorkflow
       ),
     message: 'The first sale attempt and every queued replay must reuse one client reference.',
+  },
+  {
+    ok:
+      /kind: 'cashier-handoff'/.test(sellWorkflow) &&
+      /postSale\(customerId, lines, \[\], true, this\.saleAttempt\.clientRef\)/.test(sellWorkflow),
+    message: 'Cashier handoff retries must retain a payload-scoped client reference.',
   },
   {
     ok:
