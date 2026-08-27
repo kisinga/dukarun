@@ -1,0 +1,82 @@
+{
+  "projectId": "guide-generate-barcodes",
+  "title": "Generate product barcodes",
+  "language": "en-KE",
+  "fps": 30,
+  "durationInFrames": 720,
+  "promptVersion": "learning-placeholder-v1",
+  "model": "human-authored",
+  "callToAction": "Generate missing barcodes",
+  "narration": [
+    {
+      "id": "purpose",
+      "text": "A unique barcode helps Dukarun distinguish one sellable product variant from another.",
+      "source": "script",
+      "audioFile": null,
+      "startFrame": 0,
+      "endFrame": 180
+    },
+    {
+      "id": "placeholder",
+      "text": "This walkthrough is being prepared. For now, open Print labels and generate codes only for variants marked Missing.",
+      "source": "script",
+      "audioFile": null,
+      "startFrame": 180,
+      "endFrame": 420
+    },
+    {
+      "id": "next",
+      "text": "Review the ready list, select a label layout, and print the labels before you scan them at checkout.",
+      "source": "script",
+      "audioFile": null,
+      "startFrame": 420,
+      "endFrame": 600
+    }
+  ],
+  "scenes": [
+    {
+      "id": "purpose",
+      "template": "brand-hook",
+      "startFrame": 0,
+      "durationInFrames": 180,
+      "headline": "One variant. One barcode.",
+      "body": "Reliable labels start with unique codes.",
+      "claimIds": [],
+      "narrationSegmentIds": ["purpose"],
+      "data": {}
+    },
+    {
+      "id": "placeholder",
+      "template": "stock-operations",
+      "startFrame": 180,
+      "durationInFrames": 240,
+      "headline": "Full video in production",
+      "body": "The written guide and interactive flow are ready now.",
+      "claimIds": [],
+      "narrationSegmentIds": ["placeholder"],
+      "data": {}
+    },
+    {
+      "id": "next",
+      "template": "records-breakdown",
+      "startFrame": 420,
+      "durationInFrames": 180,
+      "headline": "Missing → Ready → Print",
+      "body": "Review before labels leave the printer.",
+      "claimIds": [],
+      "narrationSegmentIds": ["next"],
+      "data": {}
+    },
+    {
+      "id": "close",
+      "template": "cta",
+      "startFrame": 600,
+      "durationInFrames": 120,
+      "headline": "Generate missing barcodes",
+      "body": "Continue with the interactive guide.",
+      "claimIds": [],
+      "narrationSegmentIds": [],
+      "data": {}
+    }
+  ]
+}

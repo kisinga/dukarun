@@ -33,6 +33,7 @@ type PurchaseSupplier = MoneyCustomer & { ap_balance: number } & AgingInfo;
           <app-form-field label="Supplier" [required]="true">
             <app-searchable-filter
               data-supplier-picker
+              data-learning-anchor="purchase-supplier"
               ariaLabel="Choose supplier"
               placeholder="Choose supplier"
               searchPlaceholder="Search suppliers by name, phone, or email…"

@@ -116,7 +116,11 @@ type DashboardSection = 'sales' | 'attention';
           </div>
         }
 
-        <section aria-labelledby="today-heading" class="space-y-3">
+        <section
+          aria-labelledby="today-heading"
+          data-learning-anchor="financial-dashboard"
+          class="space-y-3"
+        >
           <div class="flex flex-wrap items-end justify-between gap-2">
             <div>
               <h2 id="today-heading" class="section-title">Today</h2>
@@ -489,7 +493,11 @@ type DashboardSection = 'sales' | 'attention';
           </section>
         }
 
-        <section aria-labelledby="attention-heading" class="space-y-3">
+        <section
+          aria-labelledby="attention-heading"
+          data-learning-anchor="financial-stock"
+          class="space-y-3"
+        >
           <div class="flex flex-wrap items-end justify-between gap-2">
             <div>
               <h2 id="attention-heading" class="section-title">Needs attention</h2>

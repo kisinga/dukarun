@@ -9,6 +9,7 @@ import { LocationContextService } from '../core/location-context.service';
 import { PartyCacheService } from '../core/party-cache.service';
 import { PermissionsService } from '../core/permissions.service';
 import { MoneyService } from '../money/money.service';
+import { LearningPlatformService } from '../learning/learning-platform.service';
 import { PosService } from '../pos/pos.service';
 import { IconComponent } from '../shared/ui/icon.component';
 import { PurchaseEditorComponent } from './purchase-editor.component';
@@ -128,11 +129,13 @@ describe('PurchaseEditorComponent input VAT', () => {
       savePurchaseWorkspaceDraft: vi.fn().mockResolvedValue('draft-1'),
       finalizePurchaseDraft: vi.fn().mockResolvedValue('purchase-1'),
     };
+    const learning = { track: vi.fn() };
     await TestBed.configureTestingModule({
       imports: [PurchaseEditorComponent],
       providers: [
         provideRouter([]),
         { provide: MoneyService, useValue: money },
+        { provide: LearningPlatformService, useValue: learning },
         {
           provide: PartyCacheService,
           useValue: {
@@ -199,6 +202,7 @@ describe('PurchaseEditorComponent input VAT', () => {
       pos,
       suppliers,
       activeLocationId,
+      learning,
     };
   }
 
@@ -346,8 +350,9 @@ describe('PurchaseEditorComponent input VAT', () => {
   });
 
   it('persists VAT evidence before invoking the canonical finalizer', async () => {
-    const { component, money } = await render();
+    const { component, money, learning } = await render();
     addValidInvoice(component);
+    component.paymentMode.setValue('later');
     await component.goToReview();
 
     await component.confirmPurchase();
@@ -360,6 +365,7 @@ describe('PurchaseEditorComponent input VAT', () => {
       })
     );
     expect(money.finalizePurchaseDraft).toHaveBeenCalledWith('draft-1');
+    expect(learning.track).toHaveBeenCalledWith('dukarun_credit_purchase_posted');
   });
 
   it('treats entered purchase values using the selected invoice-wide basis', async () => {

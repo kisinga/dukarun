@@ -108,6 +108,7 @@ export interface PurchasePaymentReviewState {
                 </button>
                 <button
                   type="button"
+                  data-learning-anchor="purchase-pay-later"
                   class="min-h-14 rounded-field border px-3 text-left"
                   [class.border-warning]="paymentModeControl().value === 'later'"
                   (click)="paymentModeChange.emit('later')"
@@ -299,6 +300,7 @@ export interface PurchasePaymentReviewState {
             <button
               appButton
               type="button"
+              data-learning-anchor="purchase-confirm"
               class="mt-2 w-full"
               [loading]="state.busy"
               [disabled]="!state.canConfirm"

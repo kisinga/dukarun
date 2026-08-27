@@ -1,0 +1,13 @@
+{
+  "projectId": "guide-credit-purchase",
+  "title": "Buy stock on credit",
+  "audience": "Dukarun owners and administrators completing the first business cycle",
+  "objective": "Explain how a pay-later purchase changes stock and supplier payables.",
+  "language": "en-KE",
+  "targetDurationSeconds": 24,
+  "targetWordRange": [35, 55],
+  "claimIds": ["supplier-purchases", "ledger-posting"],
+  "callToAction": "Record the purchase",
+  "narrationMode": "human",
+  "renderTargets": ["wide"]
+}

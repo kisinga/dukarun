@@ -1,0 +1,13 @@
+{
+  "projectId": "guide-generate-barcodes",
+  "title": "Generate product barcodes",
+  "audience": "Dukarun catalogue managers preparing products for barcode selling",
+  "objective": "Provide a branded topic-specific placeholder until the full barcode-generation walkthrough is recorded.",
+  "language": "en-KE",
+  "targetDurationSeconds": 24,
+  "targetWordRange": [35, 55],
+  "claimIds": ["product-selection"],
+  "callToAction": "Generate missing barcodes",
+  "narrationMode": "silent",
+  "renderTargets": ["wide"]
+}

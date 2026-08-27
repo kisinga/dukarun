@@ -406,6 +406,11 @@ verify_jwt = false
 [functions.mpesa-process]
 verify_jwt = false
 
+# Authenticated app users only. The function also verifies the user and active
+# company before minting a short-lived, company-scoped Usertour identity token.
+[functions.usertour-identity]
+verify_jwt = true
+
 [analytics]
 enabled = true
 port = 54327

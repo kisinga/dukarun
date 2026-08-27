@@ -1,0 +1,82 @@
+{
+  "projectId": "guide-customer-credit",
+  "title": "Create a customer with credit",
+  "language": "en-KE",
+  "fps": 30,
+  "durationInFrames": 720,
+  "promptVersion": "business-cycle-guide-v1",
+  "model": "human-authored",
+  "callToAction": "Create and approve the customer",
+  "narration": [
+    {
+      "id": "goal",
+      "text": "Identify the customer who will take goods now and pay later.",
+      "source": "script",
+      "audioFile": null,
+      "startFrame": 0,
+      "endFrame": 180
+    },
+    {
+      "id": "action",
+      "text": "Create the customer, open their credit controls, approve credit, and set a sensible limit and payment terms.",
+      "source": "script",
+      "audioFile": null,
+      "startFrame": 180,
+      "endFrame": 390
+    },
+    {
+      "id": "result",
+      "text": "The customer is now eligible for a tracked credit sale with balances and repayments kept on their account.",
+      "source": "script",
+      "audioFile": null,
+      "startFrame": 390,
+      "endFrame": 600
+    }
+  ],
+  "scenes": [
+    {
+      "id": "goal",
+      "template": "credit-accounts",
+      "startFrame": 0,
+      "durationInFrames": 180,
+      "headline": "Who will pay later?",
+      "body": "Create the customer first.",
+      "claimIds": ["customer-credit"],
+      "narrationSegmentIds": ["goal"],
+      "data": {}
+    },
+    {
+      "id": "action",
+      "template": "records-breakdown",
+      "startFrame": 180,
+      "durationInFrames": 210,
+      "headline": "Approve suitable terms",
+      "body": "Limit, days, and reason.",
+      "claimIds": ["approval-controls"],
+      "narrationSegmentIds": ["action"],
+      "data": {}
+    },
+    {
+      "id": "result",
+      "template": "customer-comms",
+      "startFrame": 390,
+      "durationInFrames": 210,
+      "headline": "A traceable customer account",
+      "body": "Sales, balances, repayments.",
+      "claimIds": ["customer-credit"],
+      "narrationSegmentIds": ["result"],
+      "data": {}
+    },
+    {
+      "id": "close",
+      "template": "cta",
+      "startFrame": 600,
+      "durationInFrames": 120,
+      "headline": "Create and approve the customer",
+      "body": "Continue in your guide workspace.",
+      "claimIds": [],
+      "narrationSegmentIds": [],
+      "data": {}
+    }
+  ]
+}

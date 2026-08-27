@@ -8,6 +8,7 @@ import { provideRouter, withInMemoryScrolling, withPreloading } from '@angular/r
 import { provideServiceWorker } from '@angular/service-worker';
 import { provideNgIconsConfig, provideIcons } from '@ng-icons/core';
 import {
+  heroAcademicCap,
   heroArchiveBox,
   heroReceiptRefund,
   heroReceiptPercent,
@@ -28,9 +29,11 @@ import {
   heroArrowPath,
   heroArrowDownTray,
   heroArrowUpTray,
+  heroArrowUpRight,
   heroArrowRight,
   heroArrowRightOnRectangle,
   heroBanknotes,
+  heroBookOpen,
   heroBars3,
   heroBarsArrowDown,
   heroBarsArrowUp,
@@ -63,6 +66,7 @@ import {
   heroPencilSquare,
   heroPrinter,
   heroQueueList,
+  heroQuestionMarkCircle,
   heroShare,
   heroShoppingCart,
   heroSignal,
@@ -94,13 +98,16 @@ export const appConfig: ApplicationConfig = {
     // Icon registry (design system: Heroicons outline via <app-icon name="hero…">)
     provideNgIconsConfig({ size: '1rem' }),
     provideIcons({
+      heroAcademicCap,
       heroArrowPath,
       heroArrowDownTray,
       heroArrowUpTray,
+      heroArrowUpRight,
       heroArrowRight,
       heroChatBubbleLeftRight,
       heroDocumentText,
       heroQueueList,
+      heroQuestionMarkCircle,
       heroArchiveBox,
       heroReceiptRefund,
       heroReceiptPercent,
@@ -115,6 +122,7 @@ export const appConfig: ApplicationConfig = {
       heroArrowsRightLeft,
       heroArrowRightOnRectangle,
       heroBanknotes,
+      heroBookOpen,
       heroBars3,
       heroBarsArrowDown,
       heroBarsArrowUp,

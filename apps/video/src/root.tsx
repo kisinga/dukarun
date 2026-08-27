@@ -7,6 +7,15 @@ import creditScriptJson from '../projects/credit-communications/script.json';
 import overviewScriptJson from '../projects/product-overview/script.json';
 import saleRecordsScriptJson from '../projects/sale-records/script.json';
 import stockDecisionsScriptJson from '../projects/stock-decisions/script.json';
+import guideProductScriptJson from '../projects/guide-product/script.json';
+import guideSupplierScriptJson from '../projects/guide-supplier/script.json';
+import guideCreditPurchaseScriptJson from '../projects/guide-credit-purchase/script.json';
+import guideCashSaleScriptJson from '../projects/guide-cash-sale/script.json';
+import guideCustomerCreditScriptJson from '../projects/guide-customer-credit/script.json';
+import guideCreditSaleScriptJson from '../projects/guide-credit-sale/script.json';
+import guideFinanceRecapScriptJson from '../projects/guide-finance-recap/script.json';
+import guideGenerateBarcodesScriptJson from '../projects/guide-generate-barcodes/script.json';
+import guideScanBarcodeScriptJson from '../projects/guide-scan-barcode/script.json';
 import { FORMAT_CONFIG } from './brand';
 import { PilotVideo } from './pilot-video';
 import { CompositionPropsSchema, ScriptManifestSchema, type RenderTarget } from './schema';
@@ -17,6 +26,15 @@ const manifests = [
   saleRecordsScriptJson,
   creditScriptJson,
   stockDecisionsScriptJson,
+  guideProductScriptJson,
+  guideSupplierScriptJson,
+  guideCreditPurchaseScriptJson,
+  guideCashSaleScriptJson,
+  guideCustomerCreditScriptJson,
+  guideCreditSaleScriptJson,
+  guideFinanceRecapScriptJson,
+  guideGenerateBarcodesScriptJson,
+  guideScanBarcodeScriptJson,
 ].map(manifest => ScriptManifestSchema.parse(manifest));
 const targets: RenderTarget[] = ['wide', 'vertical', 'square'];
 

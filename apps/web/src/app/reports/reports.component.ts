@@ -207,7 +207,7 @@ type InventoryRow = {
               </div>
             }
           </app-mobile-list>
-          <div class="card bg-base-100">
+          <div class="card bg-base-100" data-learning-anchor="financial-revenue-margin">
             <div class="hidden lg:block">
               <table class="table table-sm">
                 <thead>

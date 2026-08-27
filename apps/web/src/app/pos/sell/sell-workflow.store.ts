@@ -41,6 +41,8 @@ import {
   salePayloadFingerprint,
   type SaleAttemptState,
 } from './sell-workflow-idempotency';
+import { LEARNING_EVENT_NAMES } from '../../learning/learning-content';
+import { LearningPlatformService } from '../../learning/learning-platform.service';
 
 export interface SellWorkflowInit {
   draftId?: string | null;
@@ -69,6 +71,7 @@ export class SellWorkflowStore implements OnDestroy {
   private readonly mpesaCheckout = inject(MpesaCheckoutCoordinator);
   private readonly locations = inject(LocationContextService);
   private readonly fulfillment = inject(FulfillmentService);
+  private readonly learning = inject(LearningPlatformService);
 
   readonly cartItemCount = computed(() =>
     this.cart.lines().reduce((total, line) => total + line.quantity, 0)
@@ -761,6 +764,13 @@ export class SellWorkflowStore implements OnDestroy {
       if (result.status === 'approval_required') {
         this.showApprovalSent();
       } else {
+        if (
+          !settlement &&
+          payments.length > 0 &&
+          payments.every(payment => payment.method === 'cash')
+        ) {
+          void this.learning.track(LEARNING_EVENT_NAMES.cashSaleCompleted);
+        }
         const handoffPin = 'pin' in result ? result.pin : null;
         this.successState.set({
           text: handoffPin ? `Sale completed · handoff PIN ${handoffPin}` : 'Sale completed',
@@ -989,6 +999,7 @@ export class SellWorkflowStore implements OnDestroy {
       if (result.status === 'approval_required') {
         this.showApprovalSent();
       } else {
+        void this.learning.track(LEARNING_EVENT_NAMES.creditSaleCompleted);
         const split = result.downpaymentApplied
           ? ` · ${result.downpaymentApplied.toLocaleString('en-KE')} downpayment applied`
           : '';

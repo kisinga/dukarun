@@ -1,0 +1,82 @@
+{
+  "projectId": "guide-product",
+  "title": "Create your first product",
+  "language": "en-KE",
+  "fps": 30,
+  "durationInFrames": 720,
+  "promptVersion": "business-cycle-guide-v1",
+  "model": "human-authored",
+  "callToAction": "Create the product",
+  "narration": [
+    {
+      "id": "goal",
+      "text": "Start with one real item your business buys and sells.",
+      "source": "script",
+      "audioFile": null,
+      "startFrame": 0,
+      "endFrame": 180
+    },
+    {
+      "id": "action",
+      "text": "Enter its name, keep inventory tracking on, and set a selling price for an active variant.",
+      "source": "script",
+      "audioFile": null,
+      "startFrame": 180,
+      "endFrame": 390
+    },
+    {
+      "id": "result",
+      "text": "After you save, the product is ready for a supplier purchase and later appears on the sell screen.",
+      "source": "script",
+      "audioFile": null,
+      "startFrame": 390,
+      "endFrame": 600
+    }
+  ],
+  "scenes": [
+    {
+      "id": "goal",
+      "template": "brand-hook",
+      "startFrame": 0,
+      "durationInFrames": 180,
+      "headline": "One product starts the cycle",
+      "body": "Use a real item.",
+      "claimIds": [],
+      "narrationSegmentIds": ["goal"],
+      "data": {}
+    },
+    {
+      "id": "action",
+      "template": "stock-operations",
+      "startFrame": 180,
+      "durationInFrames": 210,
+      "headline": "Name. Price. Track stock.",
+      "body": "Keep the product active.",
+      "claimIds": ["product-selection"],
+      "narrationSegmentIds": ["action"],
+      "data": {}
+    },
+    {
+      "id": "result",
+      "template": "records-breakdown",
+      "startFrame": 390,
+      "durationInFrames": 210,
+      "headline": "Ready to buy and sell",
+      "body": "One shared product record.",
+      "claimIds": ["inventory-updates"],
+      "narrationSegmentIds": ["result"],
+      "data": {}
+    },
+    {
+      "id": "close",
+      "template": "cta",
+      "startFrame": 600,
+      "durationInFrames": 120,
+      "headline": "Create the product",
+      "body": "Continue in your guide workspace.",
+      "claimIds": [],
+      "narrationSegmentIds": [],
+      "data": {}
+    }
+  ]
+}

@@ -57,6 +57,7 @@ import { SellCatalogStore } from './sell-catalog.store';
             <input
               #productSearch
               type="search"
+              data-learning-anchor="sell-product-search"
               class="search-with-custom-clear input input-bordered min-h-11 w-full pr-12 pl-11"
               placeholder="Search or scan barcode..."
               autocomplete="off"
@@ -84,6 +85,7 @@ import { SellCatalogStore } from './sell-catalog.store';
             variant="outline"
             size="md"
             type="button"
+            data-learning-anchor="sell-barcode-scan"
             class="min-h-11"
             (click)="catalog.openScanner()"
           >

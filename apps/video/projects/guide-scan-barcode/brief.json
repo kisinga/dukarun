@@ -1,0 +1,13 @@
+{
+  "projectId": "guide-scan-barcode",
+  "title": "Sell by scanning a barcode",
+  "audience": "Dukarun cashiers and owners using barcode checkout",
+  "objective": "Provide a branded topic-specific placeholder until the full barcode-scanning walkthrough is recorded.",
+  "language": "en-KE",
+  "targetDurationSeconds": 24,
+  "targetWordRange": [35, 55],
+  "claimIds": ["product-selection"],
+  "callToAction": "Scan the next item",
+  "narrationMode": "silent",
+  "renderTargets": ["wide"]
+}

@@ -1,0 +1,82 @@
+{
+  "projectId": "guide-scan-barcode",
+  "title": "Sell by scanning a barcode",
+  "language": "en-KE",
+  "fps": 30,
+  "durationInFrames": 720,
+  "promptVersion": "learning-placeholder-v1",
+  "model": "human-authored",
+  "callToAction": "Scan the next item",
+  "narration": [
+    {
+      "id": "purpose",
+      "text": "Scanning adds a uniquely coded product variant to the current sale without a name search.",
+      "source": "script",
+      "audioFile": null,
+      "startFrame": 0,
+      "endFrame": 180
+    },
+    {
+      "id": "placeholder",
+      "text": "This walkthrough is being prepared. You can already use a connected scanner or choose Scan to open the camera.",
+      "source": "script",
+      "audioFile": null,
+      "startFrame": 180,
+      "endFrame": 420
+    },
+    {
+      "id": "next",
+      "text": "Confirm the correct item and quantity in the cart, then continue to the normal checkout.",
+      "source": "script",
+      "audioFile": null,
+      "startFrame": 420,
+      "endFrame": 600
+    }
+  ],
+  "scenes": [
+    {
+      "id": "purpose",
+      "template": "brand-hook",
+      "startFrame": 0,
+      "durationInFrames": 180,
+      "headline": "Scan. Confirm. Sell.",
+      "body": "Use a unique product barcode.",
+      "claimIds": ["product-selection"],
+      "narrationSegmentIds": ["purpose"],
+      "data": {}
+    },
+    {
+      "id": "placeholder",
+      "template": "barcode-sale",
+      "startFrame": 180,
+      "durationInFrames": 240,
+      "headline": "Full video in production",
+      "body": "The written guide and interactive flow are ready now.",
+      "claimIds": ["product-selection"],
+      "narrationSegmentIds": ["placeholder"],
+      "data": {}
+    },
+    {
+      "id": "next",
+      "template": "phone-pos",
+      "startFrame": 420,
+      "durationInFrames": 180,
+      "headline": "Check the cart",
+      "body": "Right item · right quantity.",
+      "claimIds": ["product-selection"],
+      "narrationSegmentIds": ["next"],
+      "data": {}
+    },
+    {
+      "id": "close",
+      "template": "cta",
+      "startFrame": 600,
+      "durationInFrames": 120,
+      "headline": "Scan the next item",
+      "body": "Continue with the interactive guide.",
+      "claimIds": [],
+      "narrationSegmentIds": [],
+      "data": {}
+    }
+  ]
+}

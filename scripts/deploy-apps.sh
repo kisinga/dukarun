@@ -33,6 +33,9 @@ SITE_PUBLIC_URL="${SITE_PUBLIC_URL:-https://dukarun.com}"
 APP_PUBLIC_URL="${APP_PUBLIC_URL:-https://app.dukarun.com}"
 STOREFRONT_PUBLIC_URL="${STOREFRONT_PUBLIC_URL:-https://store.dukarun.com}"
 MARKETING_VIDEO_BASE_URL="${SITE_PUBLIC_URL%/}/media/video/product-overview"
+GITBOOK_SITE_URL="${GITBOOK_SITE_URL:-https://dukarun.gitbook.io/dukarun-docs}"
+USERTOUR_TOKEN="${USERTOUR_TOKEN:-}"
+USERTOUR_CONTENT_IDS_JSON="${USERTOUR_CONTENT_IDS_JSON:-{}}"
 MARKETING_MEDIA_HOST_DIR="/var/lib/dukarun/marketing-media"
 MARKETING_MEDIA_LOCAL_DIR="apps/video/output/final/product-overview"
 SSH_OPTS=(-o BatchMode=no -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new)
@@ -100,8 +103,17 @@ sync_site_media() {
 
 deploy_one() {
   local app="$1" image="dukarun-$1:deploy"
+  local learning_args=()
   local prefix; prefix=$(container_prefix "$app")
   local domain; domain=$(app_domain "$app")
+
+  if [ "$app" = web ]; then
+    learning_args=(
+      --build-arg "GITBOOK_SITE_URL=$GITBOOK_SITE_URL"
+      --build-arg "USERTOUR_TOKEN=$USERTOUR_TOKEN"
+      --build-arg "USERTOUR_CONTENT_IDS_JSON=$USERTOUR_CONTENT_IDS_JSON"
+    )
+  fi
 
   [ "$app" != site ] || sync_site_media
 
@@ -118,6 +130,7 @@ deploy_one() {
     --build-arg "APP_PUBLIC_URL=$APP_PUBLIC_URL" \
     --build-arg "STOREFRONT_PUBLIC_URL=$STOREFRONT_PUBLIC_URL" \
     --build-arg "MARKETING_VIDEO_BASE_URL=$MARKETING_VIDEO_BASE_URL" \
+    "${learning_args[@]}" \
     --build-arg "PUBLIC_DATA_MODE=live" \
     -t "$image" .
 

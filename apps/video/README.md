@@ -18,6 +18,11 @@ The active projects are:
 - `sale-records`: product selection, payment, record updates, and offline synchronization.
 - `credit-communications`: customer and supplier balances, payment history, SMS, and WhatsApp reminders.
 - `stock-decisions`: margin, stock attention, purchases, adjustments, and location transfers.
+- `guide-product`, `guide-supplier`, `guide-credit-purchase`, `guide-cash-sale`,
+  `guide-customer-credit`, `guide-credit-sale`, and `guide-finance-recap`: the seven
+  initial task explainers shared by GitBook and Usertour.
+- `guide-generate-barcodes` and `guide-scan-barcode`: branded, topic-specific placeholders
+  that can be replaced in GitBook and Usertour when the final walkthroughs are approved.
 
 To render visual regression frames for every CTA-bearing ending and aspect ratio, run `npm run validate:cta -w @dukarun/video`. The ignored PNGs are written to `.cache/cta-validation`.
 
@@ -72,7 +77,9 @@ Manifest audio references are relative to `public/`. Keep canonical recordings l
    npm run video:render-final -- --project product-overview
    ```
 
-Final output includes MP4s, PNG thumbnails, an English SRT caption file, and `delivery-manifest.json` with SHA-256 hashes. Generated media and local approval identities are intentionally gitignored.
+Final output includes MP4s, PNG thumbnails, English SRT and WebVTT captions, a plain-text
+transcript, and `delivery-manifest.json` with SHA-256 hashes. Generated media and local approval
+identities are intentionally gitignored.
 
 The renderer also emits WebVTT captions. `apps/video` is development tooling and is not included in the application image. `scripts/deploy-apps.sh site` uploads the approved wide and square overview assets plus captions to persistent host storage, mounts them at `/media/video`, and builds the homepage against the same-origin public URL. The homepage uses square below 640 px and wide at larger sizes.
 
@@ -81,6 +88,23 @@ The renderer also emits WebVTT captions. `apps/video` is development tooling and
 Once the brief and claim registry are maintained, the machine can validate, normalize supplied voice recordings, render every aspect ratio, generate captions/thumbnails, and package/checksum the delivery. Humans remain responsible for the two explicit gates: factual/script approval and final brand/legal/audio approval. The approved overview is published with the site deployment.
 
 The overview remains the homepage introduction. The focused showcases are separate marketing assets and are not embedded until their scripts, visuals, and audio are approved.
+
+## Publishing learning videos
+
+Each learning video follows the same script, narration, review, and final-approval gates above.
+After all four assets exist in `output/final/<project>`, publish independently of the application:
+
+```bash
+REMOTION_COMMERCIAL_LICENSE_CONFIRMED=true scripts/publish-guide-media.sh all
+```
+
+The script maps project IDs to stable topic URLs below
+`https://dukarun.com/media/video/guides/<topic-slug>/` and publishes the wide MP4, poster,
+WebVTT captions, and transcript. GitBook articles and Usertour flows embed those same URLs. Replacing
+media at a stable URL does not require an application build.
+
+Publishing is deliberately gated by `REMOTION_COMMERCIAL_LICENSE_CONFIRMED=true`. Confirm the
+current Remotion commercial terms for the organisation before producing or publishing final assets.
 
 ## Adding a project
 

@@ -10,6 +10,15 @@ const projects = [
   ['sale-records', 637],
   ['credit-communications', 584],
   ['stock-decisions', 656],
+  ['guide-product', 720],
+  ['guide-supplier', 720],
+  ['guide-credit-purchase', 720],
+  ['guide-cash-sale', 720],
+  ['guide-customer-credit', 720],
+  ['guide-credit-sale', 720],
+  ['guide-finance-recap', 720],
+  ['guide-generate-barcodes', 720],
+  ['guide-scan-barcode', 720],
 ] as const;
 
 async function fixtures(projectId: string) {

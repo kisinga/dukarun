@@ -1,0 +1,13 @@
+{
+  "projectId": "guide-product",
+  "title": "Create your first product",
+  "audience": "Dukarun owners and administrators completing the first business cycle",
+  "objective": "Show the minimum product details needed before buying and selling stock.",
+  "language": "en-KE",
+  "targetDurationSeconds": 24,
+  "targetWordRange": [35, 55],
+  "claimIds": ["product-selection", "inventory-updates"],
+  "callToAction": "Create the product",
+  "narrationMode": "human",
+  "renderTargets": ["wide"]
+}

@@ -1,0 +1,13 @@
+{
+  "projectId": "guide-supplier",
+  "title": "Create your first supplier",
+  "audience": "Dukarun owners and administrators completing the first business cycle",
+  "objective": "Show why a supplier record is created before recording a credit purchase.",
+  "language": "en-KE",
+  "targetDurationSeconds": 24,
+  "targetWordRange": [35, 55],
+  "claimIds": ["supplier-purchases"],
+  "callToAction": "Create the supplier",
+  "narrationMode": "human",
+  "renderTargets": ["wide"]
+}
