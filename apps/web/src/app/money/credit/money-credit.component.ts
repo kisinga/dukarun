@@ -86,6 +86,7 @@ const EMPTY_METRICS: CreditHealthDashboard['metrics'] = {
       } @else if (dashboard(); as data) {
         <section
           aria-label="Credit health summary"
+          data-learning-anchor="financial-credit"
           class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
         >
           <a

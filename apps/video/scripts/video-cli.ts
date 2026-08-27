@@ -293,6 +293,11 @@ async function render(projectId: string, review: boolean, only?: string): Promis
     manifestToVtt(manifest),
     'utf8'
   );
+  await writeFile(
+    path.join(outputDirectory, `${projectId}.en-KE.txt`),
+    `${manifest.narration.map(segment => segment.text).join('\n\n')}\n`,
+    'utf8'
+  );
   await writeJson(path.join(outputDirectory, 'delivery-manifest.json'), {
     projectId,
     review,

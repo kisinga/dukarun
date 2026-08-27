@@ -28,7 +28,7 @@ import {
     IconComponent,
   ],
   template: `
-    <div class="mb-3 flex flex-wrap items-start gap-3">
+    <div class="mb-3 flex flex-wrap items-start gap-3" data-learning-anchor="financial-cash">
       <div>
         <h2 class="section-title">Cashier sessions</h2>
         <p class="type-caption mt-1">Review session history and recent count variances.</p>

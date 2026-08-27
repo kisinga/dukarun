@@ -8,5 +8,8 @@ export const environment = {
   appPublicUrl: 'http://localhost:4203',
   storefrontPublicUrl: 'http://localhost:4204',
   marketingVideoBaseUrl: '',
+  gitbookSiteUrl: 'https://dukarun.gitbook.io/dukarun-docs',
+  usertourToken: '',
+  usertourContentIds: {} as Record<string, string>,
   publicDataMode: 'fixture' as 'fixture' | 'live',
 };

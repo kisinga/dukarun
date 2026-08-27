@@ -1,0 +1,13 @@
+{
+  "projectId": "guide-credit-sale",
+  "title": "Complete a credit sale",
+  "audience": "Dukarun owners and administrators completing the first business cycle",
+  "objective": "Explain how selling on credit changes stock and customer receivables.",
+  "language": "en-KE",
+  "targetDurationSeconds": 24,
+  "targetWordRange": [35, 55],
+  "claimIds": ["product-selection", "customer-credit", "inventory-updates", "ledger-posting"],
+  "callToAction": "Complete the credit sale",
+  "narrationMode": "human",
+  "renderTargets": ["wide"]
+}

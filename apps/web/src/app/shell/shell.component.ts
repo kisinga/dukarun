@@ -22,6 +22,7 @@ import { LegalService } from '../legal/legal.service';
 import { siteUrl } from '../core/public-url';
 import { ConnectivityService } from '../pos/offline/connectivity.service';
 import { WorkspaceNavigationService } from '../core/workspace-navigation.service';
+import { LearningPlatformService } from '../learning/learning-platform.service';
 
 interface NavItem {
   route: string;
@@ -133,6 +134,16 @@ interface NavSection {
                 }
               </a>
             }
+
+            <a
+              routerLink="/help"
+              class="btn btn-ghost btn-sm min-h-11 min-w-11 gap-2 px-2 xl:px-3"
+              title="Help and guides"
+              aria-label="Help and guides"
+            >
+              <app-icon name="heroQuestionMarkCircle" size="lg" />
+              <span class="hidden md:inline">Help</span>
+            </a>
 
             <!-- Notifications -->
             <a
@@ -453,7 +464,6 @@ interface NavSection {
 
       <app-cashier-session-modal />
       <app-persona-switcher />
-
       @if (companySwitchError()) {
         <div class="toast toast-top toast-end z-[60]" aria-live="assertive">
           <div class="alert alert-error max-w-sm text-sm" role="alert">
@@ -522,6 +532,7 @@ export class ShellComponent implements OnInit {
   protected readonly legal = inject(LegalService);
   protected readonly connectivity = inject(ConnectivityService);
   protected readonly workspaces = inject(WorkspaceNavigationService);
+  private readonly learning = inject(LearningPlatformService);
 
   protected readonly myName = computed(() => this.profile.me()?.display_name ?? 'Account');
   protected readonly myAvatarUrl = computed(() =>
@@ -708,6 +719,7 @@ export class ShellComponent implements OnInit {
       this.entitlements.refresh().catch(() => undefined),
       this.perms.ensureLoaded(),
     ]);
+    void this.learning.initialize();
     if (this.perms.has('SettleOrder')) {
       await this.cashierSession.start();
       await this.orderQueueCounts.refresh();
@@ -753,6 +765,7 @@ export class ShellComponent implements OnInit {
 
   protected async signOut(): Promise<void> {
     this.signOutWarning.set(false);
+    this.learning.reset();
     await this.supabase.client.auth.signOut();
     await this.router.navigate(['/login']);
   }

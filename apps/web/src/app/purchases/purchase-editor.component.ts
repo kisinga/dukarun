@@ -118,6 +118,7 @@ import { PurchaseVatPanelComponent } from './purchase-vat-panel.component';
                       </span>
                       <input
                         type="search"
+                        data-learning-anchor="purchase-product-search"
                         class="input input-bordered h-12 w-full pl-9"
                         placeholder="Scan barcode or search product, manufacturer, or SKU…"
                         [value]="store.productQuery()"

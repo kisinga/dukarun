@@ -25,6 +25,8 @@ import type {
   ProductEditorRowMutation,
   ProductEditorStockInfo,
 } from './product-editor.types';
+import { LEARNING_EVENT_NAMES } from '../learning/learning-content';
+import { LearningPlatformService } from '../learning/learning-platform.service';
 
 /**
  * Component-scoped owner for the coupled product aggregate.
@@ -41,6 +43,7 @@ export class ProductEditorStore implements OnDestroy {
   private readonly supabase = inject(SupabaseService);
   private readonly catalog = inject(CatalogCacheService);
   private readonly locations = inject(LocationContextService);
+  private readonly learning = inject(LearningPlatformService);
   readonly preferences = inject(CompanyPreferencesService);
   readonly permissions = inject(PermissionsService);
   readonly connectivity = inject(ConnectivityService);
@@ -453,6 +456,9 @@ export class ProductEditorStore implements OnDestroy {
       }
       this.clearPendingImage();
       this.markPristine();
+      if (request.mode === 'create') {
+        void this.learning.track(LEARNING_EVENT_NAMES.productCreated);
+      }
       return {
         productId,
         mode: request.mode === 'create' ? 'created' : 'updated',

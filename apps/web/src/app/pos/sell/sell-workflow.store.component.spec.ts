@@ -9,6 +9,7 @@ import { PermissionsService } from '../../core/permissions.service';
 import { ReceiptDataService } from '../../shared/print/receipt-data.service';
 import { PrintService } from '../../shared/print/print.service';
 import { FulfillmentService } from '../../fulfillment/fulfillment.service';
+import { LearningPlatformService } from '../../learning/learning-platform.service';
 import { CartService } from '../cart.service';
 import { ConnectivityService } from '../offline/connectivity.service';
 import { SyncService } from '../offline/sync.service';
@@ -73,6 +74,7 @@ describe('SellWorkflowStore', () => {
   let fulfillment: Record<string, ReturnType<typeof vi.fn>>;
   let mpesa: Record<string, unknown>;
   let mpesaCheckout: Record<string, ReturnType<typeof vi.fn>>;
+  let learning: { track: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
     online.set(true);
@@ -139,9 +141,11 @@ describe('SellWorkflowStore', () => {
       }),
       finalizeCash: vi.fn(),
     };
+    learning = { track: vi.fn() };
 
     TestBed.configureTestingModule({
       providers: [
+        { provide: LearningPlatformService, useValue: learning },
         SellWorkflowStore,
         { provide: CartService, useValue: cart },
         { provide: ConnectivityService, useValue: { online } },
@@ -258,6 +262,7 @@ describe('SellWorkflowStore', () => {
     expect(pos['postSale'].mock.calls[1]?.[4]).toBe(pos['postSale'].mock.calls[0]?.[4]);
     expect(pos['postSale'].mock.calls[0]?.[6]).toBe('draft-1');
     expect(pos['postSale'].mock.calls[1]?.[6]).toBeUndefined();
+    expect(learning.track).toHaveBeenCalledWith('dukarun_cash_sale_completed');
   });
 
   it('passes the committed fulfillment snapshot to a COD checkout', async () => {
@@ -294,6 +299,7 @@ describe('SellWorkflowStore', () => {
       })
     );
     expect(cart['clear']).toHaveBeenCalledOnce();
+    expect(learning.track).toHaveBeenCalledWith('dukarun_credit_sale_completed');
   });
 
   it('routes integrated M-PESA through the coordinator before clearing the cart', async () => {

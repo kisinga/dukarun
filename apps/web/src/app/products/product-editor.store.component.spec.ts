@@ -9,6 +9,7 @@ import { SupabaseService } from '../core/supabase.service';
 import { TaxService } from '../core/tax.service';
 import { PosService } from '../pos/pos.service';
 import { ConnectivityService } from '../pos/offline/connectivity.service';
+import { LearningPlatformService } from '../learning/learning-platform.service';
 import { ProductEditorStore } from './product-editor.store';
 
 describe('ProductEditorStore', () => {
@@ -36,6 +37,7 @@ describe('ProductEditorStore', () => {
       catalog: signal([]),
       stock: signal(new Map()),
     };
+    const learning = { track: vi.fn() };
 
     TestBed.configureTestingModule({
       providers: [
@@ -57,13 +59,14 @@ describe('ProductEditorStore', () => {
         },
         { provide: PermissionsService, useValue: { has: () => true } },
         { provide: ConnectivityService, useValue: { online: signal(true) } },
+        { provide: LearningPlatformService, useValue: learning },
       ],
     });
-    return { store: TestBed.inject(ProductEditorStore), pos, tax };
+    return { store: TestBed.inject(ProductEditorStore), pos, tax, learning };
   }
 
   it('applies variant intents immutably and builds the coupled create payload', async () => {
-    const { store, pos } = createStore();
+    const { store, pos, learning } = createStore();
     await store.initialize({ mode: 'create' });
     const original = store.rows()[0];
 
@@ -96,6 +99,7 @@ describe('ProductEditorStore', () => {
       mode: 'created',
       variantCount: 1,
     });
+    expect(learning.track).toHaveBeenCalledWith('dukarun_product_created');
   });
 
   it('reports photo partial success and removes an uploaded file when metadata persistence fails', async () => {

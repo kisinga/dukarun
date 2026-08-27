@@ -68,6 +68,8 @@ import { LocationContextService } from '../core/location-context.service';
 import { TaskDialogComponent } from '../shared/ui/task-dialog.component';
 import { FormSectionComponent } from '../shared/ui/form-section.component';
 import { PreferenceRowComponent } from '../shared/ui/preference-row.component';
+import { LEARNING_EVENT_NAMES } from '../learning/learning-content';
+import { LearningPlatformService } from '../learning/learning-platform.service';
 
 type CustomerWithAr = MoneyCustomer & {
   ar_balance: number;
@@ -134,7 +136,13 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
           <app-icon name="heroArrowPath" />
         </button>
         @if (perms.has('ManageCustomers')) {
-          <button primaryAction appButton type="button" (click)="startCreate()">
+          <button
+            primaryAction
+            appButton
+            type="button"
+            data-learning-anchor="customer-add"
+            (click)="startCreate()"
+          >
             <app-icon name="heroPlus" /> Add customer
           </button>
         }
@@ -556,6 +564,7 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
                         >
                           <input
                             type="text"
+                            data-learning-anchor="customer-credit-limit"
                             inputmode="numeric"
                             class="input input-bordered input-sm w-full"
                             [formControl]="creditLimit"
@@ -571,6 +580,7 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
                         <label class="label cursor-pointer justify-start gap-2">
                           <input
                             type="checkbox"
+                            data-learning-anchor="customer-credit-approved"
                             class="checkbox checkbox-sm"
                             [formControl]="approved"
                           />
@@ -591,6 +601,7 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
                           appButton
                           variant="outline"
                           type="submit"
+                          data-learning-anchor="customer-credit-save"
                           class="self-start"
                           [disabled]="
                             busy() ||
@@ -1312,6 +1323,7 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
               appButton
               type="submit"
               form="customer-profile-form"
+              data-learning-anchor="customer-save"
               [loading]="busy()"
               [disabled]="firstName.value.trim().length === 0"
             >
@@ -1360,6 +1372,7 @@ export class CustomersComponent implements OnInit {
   protected readonly mpesa = inject(MpesaService);
   private readonly mpesaCheckout = inject(MpesaCheckoutCoordinator);
   private readonly locations = inject(LocationContextService);
+  private readonly learning = inject(LearningPlatformService);
   private readonly routeParams = toSignal(this.route.queryParamMap, {
     initialValue: this.route.snapshot.queryParamMap,
   });
@@ -2247,6 +2260,9 @@ export class CustomersComponent implements OnInit {
         Math.max(0, this.termsDays.value),
         this.creditReason.value.trim()
       );
+      if (outcome.status === 'completed' && this.approved.value) {
+        void this.learning.track(LEARNING_EVENT_NAMES.customerCreditEnabled);
+      }
       this.creditReason.setValue('');
       this.notice.set(
         outcome.status === 'approval_required'

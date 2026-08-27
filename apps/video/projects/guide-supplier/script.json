@@ -1,0 +1,82 @@
+{
+  "projectId": "guide-supplier",
+  "title": "Create your first supplier",
+  "language": "en-KE",
+  "fps": 30,
+  "durationInFrames": 720,
+  "promptVersion": "business-cycle-guide-v1",
+  "model": "human-authored",
+  "callToAction": "Create the supplier",
+  "narration": [
+    {
+      "id": "goal",
+      "text": "Next, identify the business or person supplying your stock.",
+      "source": "script",
+      "audioFile": null,
+      "startFrame": 0,
+      "endFrame": 180
+    },
+    {
+      "id": "action",
+      "text": "Add the supplier name and useful contact details. Credit terms help your team understand when payment is expected.",
+      "source": "script",
+      "audioFile": null,
+      "startFrame": 180,
+      "endFrame": 390
+    },
+    {
+      "id": "result",
+      "text": "Saving this record connects future purchases, payments, and the amount your business still owes.",
+      "source": "script",
+      "audioFile": null,
+      "startFrame": 390,
+      "endFrame": 600
+    }
+  ],
+  "scenes": [
+    {
+      "id": "goal",
+      "template": "brand-hook",
+      "startFrame": 0,
+      "durationInFrames": 180,
+      "headline": "Who supplies the stock?",
+      "body": "Create one supplier record.",
+      "claimIds": [],
+      "narrationSegmentIds": ["goal"],
+      "data": {}
+    },
+    {
+      "id": "action",
+      "template": "credit-accounts",
+      "startFrame": 180,
+      "durationInFrames": 210,
+      "headline": "Identity and terms",
+      "body": "Keep purchasing connected.",
+      "claimIds": ["supplier-purchases"],
+      "narrationSegmentIds": ["action"],
+      "data": {}
+    },
+    {
+      "id": "result",
+      "template": "records-breakdown",
+      "startFrame": 390,
+      "durationInFrames": 210,
+      "headline": "Purchases and balances together",
+      "body": "See what is still payable.",
+      "claimIds": ["supplier-purchases"],
+      "narrationSegmentIds": ["result"],
+      "data": {}
+    },
+    {
+      "id": "close",
+      "template": "cta",
+      "startFrame": 600,
+      "durationInFrames": 120,
+      "headline": "Create the supplier",
+      "body": "Continue in your guide workspace.",
+      "claimIds": [],
+      "narrationSegmentIds": [],
+      "data": {}
+    }
+  ]
+}

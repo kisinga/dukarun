@@ -50,6 +50,8 @@ import type {
   PurchaseVatPanelIntent,
   PurchaseVatPanelViewModel,
 } from './purchase-vat-panel.component';
+import { LEARNING_EVENT_NAMES } from '../learning/learning-content';
+import { LearningPlatformService } from '../learning/learning-platform.service';
 
 export type ExpenseSettlement = '' | 'supplier_bill' | 'separate';
 
@@ -97,6 +99,7 @@ export class PurchaseEditorStore implements OnDestroy {
   private readonly pos = inject(PosService);
   private readonly parties = inject(PartyCacheService);
   private readonly locationContext = inject(LocationContextService);
+  private readonly learning = inject(LearningPlatformService);
   readonly perms = inject(PermissionsService);
   readonly cashierSession = inject(CashierSessionService);
   readonly preferences = inject(CompanyPreferencesService);
@@ -1217,6 +1220,9 @@ export class PurchaseEditorStore implements OnDestroy {
       });
       this.draftIdState.set(draftId);
       const purchaseId = await this.money.finalizePurchaseDraft(draftId);
+      if (this.paymentMode.value === 'later') {
+        void this.learning.track(LEARNING_EVENT_NAMES.creditPurchasePosted);
+      }
       this.exitAllowed = true;
       this.dirtyState.set(false);
       return { purchaseId };

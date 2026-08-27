@@ -119,6 +119,7 @@ import type {
               <app-form-field label="Product name" [required]="true">
                 <input
                   data-editor-field="name"
+                  data-learning-anchor="product-name"
                   type="text"
                   class="input input-bordered w-full"
                   autocomplete="off"
@@ -377,6 +378,7 @@ import type {
             <button
               appButton
               type="submit"
+              data-learning-anchor="product-save"
               class="w-full sm:w-auto"
               [loading]="store.busy()"
               [disabled]="store.loading() || store.duplicateLabels() || store.barcodeConflict()"

@@ -127,7 +127,13 @@ const PRODUCT_SORT_OPTIONS: readonly ListSortOption[] = [
           <app-icon name="heroQueueList" /> Categories
         </button>
         @if (perms.has('ManageStockAdjustments')) {
-          <button primaryAction appButton variant="primary" (click)="startFamilyCreate()">
+          <button
+            primaryAction
+            appButton
+            variant="primary"
+            data-learning-anchor="product-add"
+            (click)="startFamilyCreate()"
+          >
             <app-icon name="heroPlus" /> Add product
           </button>
         }

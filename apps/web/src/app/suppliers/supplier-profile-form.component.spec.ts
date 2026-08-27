@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { describe, expect, it, vi } from 'vitest';
 import { MoneyService } from '../money/money.service';
+import { LearningPlatformService } from '../learning/learning-platform.service';
 import { SupplierProfileFormComponent } from './supplier-profile-form.component';
 import type { SupplierWithAp } from './supplier.types';
 
@@ -24,10 +25,14 @@ describe('SupplierProfileFormComponent', () => {
       updateSupplierTaxRegistration: vi.fn().mockResolvedValue('supplier-1'),
       updateSupplierCredit: vi.fn().mockResolvedValue('supplier-1'),
     };
+    const learning = { track: vi.fn() };
 
     await TestBed.configureTestingModule({
       imports: [SupplierProfileFormComponent],
-      providers: [{ provide: MoneyService, useValue: money }],
+      providers: [
+        { provide: MoneyService, useValue: money },
+        { provide: LearningPlatformService, useValue: learning },
+      ],
     }).compileComponents();
 
     const fixture = TestBed.createComponent(SupplierProfileFormComponent);
@@ -38,11 +43,11 @@ describe('SupplierProfileFormComponent', () => {
     fixture.componentRef.setInput('supplier', input);
     fixture.componentRef.setInput('canManageCredit', canManageCredit);
     fixture.detectChanges();
-    return { fixture, money, saved, failed };
+    return { fixture, money, saved, failed, learning };
   }
 
   it('creates a supplier profile and optional credit terms from owned form state', async () => {
-    const { fixture, money, saved } = await render();
+    const { fixture, money, saved, learning } = await render();
     const component = fixture.componentInstance as any;
 
     component.name.setValue('Beta Distributors');
@@ -67,6 +72,7 @@ describe('SupplierProfileFormComponent', () => {
     expect(money.updateSupplierTaxRegistration).toHaveBeenCalledWith('supplier-new', 'P111111111A');
     expect(money.updateSupplierCredit).toHaveBeenCalledWith('supplier-new', 10000, 14);
     expect(saved).toHaveBeenCalledWith({ supplierId: 'supplier-new', mode: 'created' });
+    expect(learning.track).toHaveBeenCalledWith('dukarun_supplier_created');
   });
 
   it('updates an existing supplier profile without parent-owned profile controls', async () => {

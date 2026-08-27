@@ -22,6 +22,27 @@ const appPublicUrl = process.env.APP_PUBLIC_URL?.trim() || 'http://localhost:420
 const storefrontPublicUrl = process.env.STOREFRONT_PUBLIC_URL?.trim() || 'http://localhost:4204';
 const marketingVideoBaseUrl =
   process.env.MARKETING_VIDEO_BASE_URL?.trim().replace(/\/+$/, '') || '';
+const defaultGitbookSiteUrl = 'https://dukarun.gitbook.io/dukarun-docs';
+const gitbookSiteUrl =
+  app === 'web'
+    ? process.env.GITBOOK_SITE_URL?.trim().replace(/\/+$/, '') || defaultGitbookSiteUrl
+    : '';
+const usertourToken = app === 'web' ? process.env.USERTOUR_TOKEN?.trim() || '' : '';
+let usertourContentIds = {};
+if (app === 'web' && process.env.USERTOUR_CONTENT_IDS_JSON?.trim()) {
+  try {
+    const parsed = JSON.parse(process.env.USERTOUR_CONTENT_IDS_JSON);
+    if (!parsed || Array.isArray(parsed) || typeof parsed !== 'object') throw new Error();
+    usertourContentIds = Object.fromEntries(
+      Object.entries(parsed).filter(
+        ([key, value]) => key.trim() && typeof value === 'string' && value.trim()
+      )
+    );
+  } catch {
+    console.error('USERTOUR_CONTENT_IDS_JSON must be a JSON object with string values.');
+    process.exit(2);
+  }
+}
 const publicDataMode =
   process.env.PUBLIC_DATA_MODE === 'fixture' || process.env.PUBLIC_DATA_MODE === 'live'
     ? process.env.PUBLIC_DATA_MODE
@@ -34,8 +55,11 @@ try {
   new URL(appPublicUrl);
   new URL(storefrontPublicUrl);
   if (marketingVideoBaseUrl) new URL(marketingVideoBaseUrl);
+  if (gitbookSiteUrl) new URL(gitbookSiteUrl);
 } catch {
-  console.error('Public app URLs and MARKETING_VIDEO_BASE_URL must be valid absolute URLs.');
+  console.error(
+    'Public app URLs, MARKETING_VIDEO_BASE_URL, and GITBOOK_SITE_URL must be valid absolute URLs.'
+  );
   process.exit(2);
 }
 
@@ -64,6 +88,11 @@ const contents =
   `  appPublicUrl: ${JSON.stringify(appPublicUrl)},\n` +
   `  storefrontPublicUrl: ${JSON.stringify(storefrontPublicUrl)},\n` +
   `  marketingVideoBaseUrl: ${JSON.stringify(marketingVideoBaseUrl)},\n` +
+  (app === 'web'
+    ? `  gitbookSiteUrl: ${JSON.stringify(gitbookSiteUrl)},\n` +
+      `  usertourToken: ${JSON.stringify(usertourToken)},\n` +
+      `  usertourContentIds: ${JSON.stringify(usertourContentIds)} as Record<string, string>,\n`
+    : '') +
   `  publicDataMode: ${JSON.stringify(publicDataMode)} as 'fixture' | 'live',\n` +
   `};\n`;
 

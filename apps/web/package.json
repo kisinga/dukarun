@@ -22,6 +22,7 @@
     "@angular/pwa": "^21.0.5",
     "@angular/router": "^21.0.8",
     "@angular/service-worker": "^21.0.8",
+    "@gitbook/embed": "^0.5.1",
     "@ng-icons/core": "^33.3.0",
     "@ng-icons/heroicons": "^33.3.0",
     "@supabase/supabase-js": "^2.76.1",
@@ -30,7 +31,8 @@
     "exceljs": "^4.4.0",
     "idb": "^8.0.0",
     "rxjs": "~7.8.2",
-    "tslib": "^2.8.1"
+    "tslib": "^2.8.1",
+    "usertour.js": "^0.0.24"
   },
   "devDependencies": {
     "@angular/build": "^21.0.5",

@@ -1,0 +1,82 @@
+{
+  "projectId": "guide-credit-sale",
+  "title": "Complete a credit sale",
+  "language": "en-KE",
+  "fps": 30,
+  "durationInFrames": 720,
+  "promptVersion": "business-cycle-guide-v1",
+  "model": "human-authored",
+  "callToAction": "Complete the credit sale",
+  "narration": [
+    {
+      "id": "goal",
+      "text": "Make the second sale without collecting payment today.",
+      "source": "script",
+      "audioFile": null,
+      "startFrame": 0,
+      "endFrame": 180
+    },
+    {
+      "id": "action",
+      "text": "Confirm the selected customer, add the highlighted product, choose Sell on credit, and review the amount before confirming.",
+      "source": "script",
+      "audioFile": null,
+      "startFrame": 180,
+      "endFrame": 390
+    },
+    {
+      "id": "result",
+      "text": "Completion reduces stock, records revenue and cost, and adds the unpaid amount to that customer's receivable balance.",
+      "source": "script",
+      "audioFile": null,
+      "startFrame": 390,
+      "endFrame": 600
+    }
+  ],
+  "scenes": [
+    {
+      "id": "goal",
+      "template": "credit-accounts",
+      "startFrame": 0,
+      "durationInFrames": 180,
+      "headline": "Goods now. Payment later.",
+      "body": "Use the approved customer.",
+      "claimIds": ["customer-credit"],
+      "narrationSegmentIds": ["goal"],
+      "data": {}
+    },
+    {
+      "id": "action",
+      "template": "barcode-sale",
+      "startFrame": 180,
+      "durationInFrames": 210,
+      "headline": "Customer + product + credit",
+      "body": "Review before confirming.",
+      "claimIds": ["product-selection", "customer-credit"],
+      "narrationSegmentIds": ["action"],
+      "data": { "total": 185 }
+    },
+    {
+      "id": "result",
+      "template": "transaction-flow",
+      "startFrame": 390,
+      "durationInFrames": 210,
+      "headline": "Stock down. Receivable up.",
+      "body": "Revenue and cost recorded.",
+      "claimIds": ["inventory-updates", "ledger-posting"],
+      "narrationSegmentIds": ["result"],
+      "data": {}
+    },
+    {
+      "id": "close",
+      "template": "cta",
+      "startFrame": 600,
+      "durationInFrames": 120,
+      "headline": "Complete the credit sale",
+      "body": "Continue in your guide workspace.",
+      "claimIds": [],
+      "narrationSegmentIds": [],
+      "data": {}
+    }
+  ]
+}

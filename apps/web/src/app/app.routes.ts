@@ -60,6 +60,35 @@ export const routes: Routes = [
     loadComponent: () => import('./shell/shell.component').then(m => m.ShellComponent),
     children: [
       {
+        path: 'help/journeys/first-business-cycle',
+        redirectTo: '/learn/first-business-cycle',
+      },
+      {
+        path: 'help/categories/:domain',
+        loadComponent: () =>
+          import('./learning/help-embed.component').then(m => m.HelpEmbedComponent),
+      },
+      {
+        path: 'help/topics/:topic',
+        loadComponent: () =>
+          import('./learning/help-embed.component').then(m => m.HelpEmbedComponent),
+      },
+      {
+        path: 'help',
+        loadComponent: () =>
+          import('./learning/help-embed.component').then(m => m.HelpEmbedComponent),
+      },
+      {
+        path: 'help/:topic',
+        loadComponent: () =>
+          import('./learning/help-embed.component').then(m => m.HelpEmbedComponent),
+      },
+      {
+        path: 'learn/:contentKey',
+        loadComponent: () =>
+          import('./learning/learning-launch.component').then(m => m.LearningLaunchComponent),
+      },
+      {
         path: 'dashboard',
         canActivate: [permissionGuard],
         data: { preload: true, workspaceAccess: 'dashboard' },

@@ -1,0 +1,13 @@
+{
+  "projectId": "guide-customer-credit",
+  "title": "Create a customer with credit",
+  "audience": "Dukarun owners and administrators completing the first business cycle",
+  "objective": "Show why customer identity and approved credit terms precede a credit sale.",
+  "language": "en-KE",
+  "targetDurationSeconds": 24,
+  "targetWordRange": [35, 55],
+  "claimIds": ["customer-credit", "approval-controls"],
+  "callToAction": "Create and approve the customer",
+  "narrationMode": "human",
+  "renderTargets": ["wide"]
+}

@@ -5,6 +5,8 @@ import { MoneyService } from '../money/money.service';
 import { ButtonComponent } from '../shared/ui/button.component';
 import { FormFieldComponent } from '../shared/ui/form-field.component';
 import type { SupplierWithAp } from './supplier.types';
+import { LEARNING_EVENT_NAMES } from '../learning/learning-content';
+import { LearningPlatformService } from '../learning/learning-platform.service';
 
 export type SupplierProfileFormResult = {
   supplierId: string;
@@ -51,6 +53,7 @@ export type SupplierProfileFormResult = {
         <app-form-field label="Supplier name" [required]="true" class="sm:col-span-2">
           <input
             type="text"
+            data-learning-anchor="supplier-name"
             class="input input-bordered input-sm w-full"
             autocomplete="organization"
             [formControl]="name"
@@ -125,6 +128,7 @@ export type SupplierProfileFormResult = {
         <button
           appButton
           type="submit"
+          data-learning-anchor="supplier-save"
           [loading]="busy()"
           [disabled]="name.value.trim().length === 0"
         >
@@ -145,6 +149,7 @@ export type SupplierProfileFormResult = {
 })
 export class SupplierProfileFormComponent {
   private readonly money = inject(MoneyService);
+  private readonly learning = inject(LearningPlatformService);
   private appliedSupplierId: string | null | undefined;
 
   readonly supplier = input<SupplierWithAp | null>(null);
@@ -228,6 +233,7 @@ export class SupplierProfileFormComponent {
         if (this.canManageCredit()) {
           await this.money.updateSupplierCredit(supplierId, creditLimit!, this.termsDays.value);
         }
+        void this.learning.track(LEARNING_EVENT_NAMES.supplierCreated);
         this.reset();
         this.saved.emit({ supplierId, mode: 'created' });
       }

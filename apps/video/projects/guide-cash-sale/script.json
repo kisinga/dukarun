@@ -1,0 +1,82 @@
+{
+  "projectId": "guide-cash-sale",
+  "title": "Complete a cash sale",
+  "language": "en-KE",
+  "fps": 30,
+  "durationInFrames": 720,
+  "promptVersion": "business-cycle-guide-v1",
+  "model": "human-authored",
+  "callToAction": "Complete the cash sale",
+  "narration": [
+    {
+      "id": "goal",
+      "text": "Sell part of the stock and receive the full amount in cash.",
+      "source": "script",
+      "audioFile": null,
+      "startFrame": 0,
+      "endFrame": 180
+    },
+    {
+      "id": "action",
+      "text": "Open the till if required, add the highlighted product, take payment, and choose Cash for the whole sale.",
+      "source": "script",
+      "audioFile": null,
+      "startFrame": 180,
+      "endFrame": 390
+    },
+    {
+      "id": "result",
+      "text": "Completion reduces stock and records cash received, revenue, cost of sales, and gross margin together.",
+      "source": "script",
+      "audioFile": null,
+      "startFrame": 390,
+      "endFrame": 600
+    }
+  ],
+  "scenes": [
+    {
+      "id": "goal",
+      "template": "barcode-sale",
+      "startFrame": 0,
+      "durationInFrames": 180,
+      "headline": "Turn stock into cash",
+      "body": "Sell the guide product.",
+      "claimIds": ["product-selection"],
+      "narrationSegmentIds": ["goal"],
+      "data": { "total": 185 }
+    },
+    {
+      "id": "action",
+      "template": "phone-pos",
+      "startFrame": 180,
+      "durationInFrames": 210,
+      "headline": "Take the full payment",
+      "body": "Choose Cash.",
+      "claimIds": ["cash-mpesa"],
+      "narrationSegmentIds": ["action"],
+      "data": { "total": 185 }
+    },
+    {
+      "id": "result",
+      "template": "transaction-flow",
+      "startFrame": 390,
+      "durationInFrames": 210,
+      "headline": "Cash, stock, and books update",
+      "body": "One completed sale.",
+      "claimIds": ["inventory-updates", "ledger-posting"],
+      "narrationSegmentIds": ["result"],
+      "data": {}
+    },
+    {
+      "id": "close",
+      "template": "cta",
+      "startFrame": 600,
+      "durationInFrames": 120,
+      "headline": "Complete the cash sale",
+      "body": "Continue in your guide workspace.",
+      "claimIds": [],
+      "narrationSegmentIds": [],
+      "data": {}
+    }
+  ]
+}

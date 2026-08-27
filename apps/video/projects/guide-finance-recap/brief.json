@@ -1,0 +1,13 @@
+{
+  "projectId": "guide-finance-recap",
+  "title": "Review what changed",
+  "audience": "Dukarun owners and administrators completing the first business cycle",
+  "objective": "Connect the completed operational actions to stock, cash, payables, receivables, and margin.",
+  "language": "en-KE",
+  "targetDurationSeconds": 24,
+  "targetWordRange": [35, 55],
+  "claimIds": ["owner-dashboard", "supplier-purchases", "customer-credit", "business-reporting"],
+  "callToAction": "Review your live recap",
+  "narrationMode": "human",
+  "renderTargets": ["wide"]
+}

@@ -1,0 +1,82 @@
+{
+  "projectId": "guide-credit-purchase",
+  "title": "Buy stock on credit",
+  "language": "en-KE",
+  "fps": 30,
+  "durationInFrames": 720,
+  "promptVersion": "business-cycle-guide-v1",
+  "model": "human-authored",
+  "callToAction": "Record the purchase",
+  "narration": [
+    {
+      "id": "goal",
+      "text": "Now bring the product into stock without paying the supplier today.",
+      "source": "script",
+      "audioFile": null,
+      "startFrame": 0,
+      "endFrame": 180
+    },
+    {
+      "id": "action",
+      "text": "Confirm the supplier and location, add the guide product, enter quantity and unit cost, then choose Pay later.",
+      "source": "script",
+      "audioFile": null,
+      "startFrame": 180,
+      "endFrame": 390
+    },
+    {
+      "id": "result",
+      "text": "When you confirm, stock increases and the unpaid invoice becomes an amount owed to the supplier.",
+      "source": "script",
+      "audioFile": null,
+      "startFrame": 390,
+      "endFrame": 600
+    }
+  ],
+  "scenes": [
+    {
+      "id": "goal",
+      "template": "stock-operations",
+      "startFrame": 0,
+      "durationInFrames": 180,
+      "headline": "Stock in now",
+      "body": "Pay the supplier later.",
+      "claimIds": ["supplier-purchases"],
+      "narrationSegmentIds": ["goal"],
+      "data": {}
+    },
+    {
+      "id": "action",
+      "template": "transaction-flow",
+      "startFrame": 180,
+      "durationInFrames": 210,
+      "headline": "Supplier → product → location",
+      "body": "Quantity, cost, Pay later.",
+      "claimIds": ["supplier-purchases"],
+      "narrationSegmentIds": ["action"],
+      "data": {}
+    },
+    {
+      "id": "result",
+      "template": "ledger-posting",
+      "startFrame": 390,
+      "durationInFrames": 210,
+      "headline": "Stock up. Payable recorded.",
+      "body": "One confirmed purchase.",
+      "claimIds": ["ledger-posting"],
+      "narrationSegmentIds": ["result"],
+      "data": {}
+    },
+    {
+      "id": "close",
+      "template": "cta",
+      "startFrame": 600,
+      "durationInFrames": 120,
+      "headline": "Record the credit purchase",
+      "body": "Continue in your guide workspace.",
+      "claimIds": [],
+      "narrationSegmentIds": [],
+      "data": {}
+    }
+  ]
+}

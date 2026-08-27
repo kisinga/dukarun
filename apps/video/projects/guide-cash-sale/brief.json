@@ -1,0 +1,13 @@
+{
+  "projectId": "guide-cash-sale",
+  "title": "Complete a cash sale",
+  "audience": "Dukarun owners and administrators completing the first business cycle",
+  "objective": "Show how a full cash sale changes stock, cash, revenue, and cost of sales.",
+  "language": "en-KE",
+  "targetDurationSeconds": 24,
+  "targetWordRange": [35, 55],
+  "claimIds": ["product-selection", "cash-mpesa", "inventory-updates", "ledger-posting"],
+  "callToAction": "Complete the cash sale",
+  "narrationMode": "human",
+  "renderTargets": ["wide"]
+}

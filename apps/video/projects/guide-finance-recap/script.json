@@ -1,0 +1,82 @@
+{
+  "projectId": "guide-finance-recap",
+  "title": "Review what changed",
+  "language": "en-KE",
+  "fps": 30,
+  "durationInFrames": 720,
+  "promptVersion": "business-cycle-guide-v1",
+  "model": "human-authored",
+  "callToAction": "Review your live recap",
+  "narration": [
+    {
+      "id": "goal",
+      "text": "Finish by connecting each business action to its financial result.",
+      "source": "script",
+      "audioFile": null,
+      "startFrame": 0,
+      "endFrame": 180
+    },
+    {
+      "id": "action",
+      "text": "Compare stock remaining and cash received, then review the separate amounts owed to the supplier and by the customer.",
+      "source": "script",
+      "audioFile": null,
+      "startFrame": 180,
+      "endFrame": 390
+    },
+    {
+      "id": "result",
+      "text": "Revenue less cost of sales gives gross margin. Open each linked record whenever you need the full detail.",
+      "source": "script",
+      "audioFile": null,
+      "startFrame": 390,
+      "endFrame": 600
+    }
+  ],
+  "scenes": [
+    {
+      "id": "goal",
+      "template": "dashboard-summary",
+      "startFrame": 0,
+      "durationInFrames": 180,
+      "headline": "See the whole cycle",
+      "body": "Operations become financial records.",
+      "claimIds": ["owner-dashboard"],
+      "narrationSegmentIds": ["goal"],
+      "data": {}
+    },
+    {
+      "id": "action",
+      "template": "credit-accounts",
+      "startFrame": 180,
+      "durationInFrames": 210,
+      "headline": "Payable is not receivable",
+      "body": "Supplier owed · customer owes.",
+      "claimIds": ["supplier-purchases", "customer-credit"],
+      "narrationSegmentIds": ["action"],
+      "data": {}
+    },
+    {
+      "id": "result",
+      "template": "records-breakdown",
+      "startFrame": 390,
+      "durationInFrames": 210,
+      "headline": "Revenue − cost = margin",
+      "body": "Trace every number to its record.",
+      "claimIds": ["business-reporting"],
+      "narrationSegmentIds": ["result"],
+      "data": {}
+    },
+    {
+      "id": "close",
+      "template": "cta",
+      "startFrame": 600,
+      "durationInFrames": 120,
+      "headline": "Review your live recap",
+      "body": "Finish the first business cycle.",
+      "claimIds": [],
+      "narrationSegmentIds": [],
+      "data": {}
+    }
+  ]
+}

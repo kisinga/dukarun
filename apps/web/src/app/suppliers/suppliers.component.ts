@@ -54,7 +54,13 @@ import type { SupplierWithAp } from './supplier.types';
         <a overflowAction appButton variant="secondary" routerLink="/purchases/new">
           <app-icon name="heroShoppingCart" /> New purchase
         </a>
-        <button primaryAction appButton type="button" (click)="startCreate()">
+        <button
+          primaryAction
+          appButton
+          type="button"
+          data-learning-anchor="supplier-add"
+          (click)="startCreate()"
+        >
           <app-icon name="heroPlus" /> Add supplier
         </button>
       </app-page-actions>

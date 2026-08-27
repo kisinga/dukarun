@@ -32,6 +32,7 @@ type PaymentActionsMode = 'sidebar' | 'dock';
               appButton
               variant="secondary"
               size="md"
+              data-learning-anchor="sell-on-credit"
               class="min-h-11 flex-1"
               [disabled]="secondaryDisabled()"
               (click)="sellOnCredit.emit()"
@@ -42,6 +43,7 @@ type PaymentActionsMode = 'sidebar' | 'dock';
           <button
             appButton
             size="md"
+            data-learning-anchor="sell-checkout"
             class="min-w-40 flex-1"
             [disabled]="primaryDisabled()"
             (click)="checkout.emit()"
@@ -63,6 +65,7 @@ type PaymentActionsMode = 'sidebar' | 'dock';
       <button
         appButton
         size="md"
+        data-learning-anchor="sell-checkout"
         class="mt-4 hidden w-full xl:flex"
         [disabled]="primaryDisabled()"
         (click)="checkout.emit()"
@@ -75,6 +78,7 @@ type PaymentActionsMode = 'sidebar' | 'dock';
           appButton
           variant="secondary"
           size="md"
+          data-learning-anchor="sell-on-credit"
           class="mt-2 hidden min-h-11 w-full xl:flex"
           [disabled]="secondaryDisabled()"
           (click)="sellOnCredit.emit()"
