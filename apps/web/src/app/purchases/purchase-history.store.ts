@@ -1,22 +1,9 @@
 import { Injectable, OnDestroy, computed, inject, signal } from '@angular/core';
-import { FormControl } from '@angular/forms';
-import { CashierSessionService } from '../core/cashier-session.service';
 import { LocationContextService } from '../core/location-context.service';
-import { formatKes, formatKesInput, parseKes } from '../core/money';
+import { formatKes } from '../core/money';
 import { PartyCacheService } from '../core/party-cache.service';
 import { PermissionsService } from '../core/permissions.service';
-import {
-  LedgerAccount,
-  MoneyService,
-  PurchaseDraft,
-  PurchaseExpense,
-  PurchaseHistoryRow,
-  PurchaseLine,
-  PurchasePayment,
-} from '../money/money.service';
-import { PosService, Variant, variantLabel } from '../pos/pos.service';
-import { PrintService } from '../shared/print/print.service';
-import { ReceiptDataService } from '../shared/print/receipt-data.service';
+import { MoneyService, PurchaseDraft, PurchaseHistoryRow } from '../money/money.service';
 import type { ListSortDirection, ListSortOption } from '../shared/ui/list-search-bar.component';
 import type { SearchableFilterOption } from '../shared/ui/searchable-filter.component';
 import type { BadgeType } from '../shared/ui/status-badge.component';
@@ -40,22 +27,18 @@ export interface PurchaseHistoryUrlRequest {
 const SUPPLIER_SEARCH_ID_LIMIT = 50;
 
 /**
- * Route-scoped owner for purchase history and one open purchase aggregate.
+ * Route-scoped owner for purchase-history list, filters, drafts and selection.
  *
- * Purchase creation deliberately lives in PurchaseEditorStore. This store owns only history,
- * detail inspection and post-purchase AP corrections. Payment client references stay here so a
- * retry cannot accidentally post the same supplier payment twice.
+ * Purchase creation lives in PurchaseEditorStore; one purchase's detail and financial commands
+ * live in the component-scoped PurchaseDetailStore. Keeping those aggregates separate prevents
+ * drawer retries and refreshes from mutating route-level list state implicitly.
  */
 @Injectable()
 export class PurchaseHistoryStore implements OnDestroy {
   private readonly money = inject(MoneyService);
-  private readonly pos = inject(PosService);
   private readonly parties = inject(PartyCacheService);
   private readonly locationsContext = inject(LocationContextService);
-  private readonly receiptData = inject(ReceiptDataService);
-  private readonly print = inject(PrintService);
   readonly permissions = inject(PermissionsService);
-  readonly cashierSession = inject(CashierSessionService);
 
   private readonly purchasesState = signal<PurchaseRow[]>([]);
   readonly purchases = this.purchasesState.asReadonly();
@@ -63,22 +46,12 @@ export class PurchaseHistoryStore implements OnDestroy {
   readonly total = this.totalState.asReadonly();
   private readonly draftsState = signal<PurchaseDraft[]>([]);
   readonly drafts = this.draftsState.asReadonly();
-  private readonly accountsState = signal<LedgerAccount[]>([]);
-  readonly accounts = this.accountsState.asReadonly();
   private readonly loadingState = signal(false);
   readonly loading = this.loadingState.asReadonly();
-  private readonly detailLoadingState = signal(false);
-  readonly detailLoading = this.detailLoadingState.asReadonly();
-  private readonly busyState = signal(false);
-  readonly busy = this.busyState.asReadonly();
   private readonly errorState = signal<string | null>(null);
   readonly error = this.errorState.asReadonly();
   private readonly noticeState = signal<string | null>(null);
   readonly notice = this.noticeState.asReadonly();
-  private readonly accountsErrorState = signal<string | null>(null);
-  readonly accountsError = this.accountsErrorState.asReadonly();
-  private readonly printerEnabledState = signal(false);
-  readonly printerEnabled = this.printerEnabledState.asReadonly();
   private readonly urlRequestState = signal<PurchaseHistoryUrlRequest | null>(null);
   readonly urlRequest = this.urlRequestState.asReadonly();
 
@@ -106,23 +79,6 @@ export class PurchaseHistoryStore implements OnDestroy {
 
   private readonly selectedPurchaseState = signal<PurchaseRow | null>(null);
   readonly selectedPurchase = this.selectedPurchaseState.asReadonly();
-  private readonly linesState = signal<PurchaseLine[]>([]);
-  readonly lines = this.linesState.asReadonly();
-  private readonly expensesState = signal<PurchaseExpense[]>([]);
-  readonly expenses = this.expensesState.asReadonly();
-  private readonly paymentsState = signal<PurchasePayment[]>([]);
-  readonly payments = this.paymentsState.asReadonly();
-  private readonly variantsState = signal<Map<string, Variant>>(new Map());
-  private readonly supplierAdvanceState = signal(0);
-  readonly supplierAdvance = this.supplierAdvanceState.asReadonly();
-
-  private readonly paymentOpenState = signal(false);
-  readonly paymentOpen = this.paymentOpenState.asReadonly();
-  readonly paymentAmount = new FormControl('', { nonNullable: true });
-  readonly paymentAccount = new FormControl('', { nonNullable: true });
-  readonly reversalReason = new FormControl('', { nonNullable: true });
-  private readonly reversingState = signal(false);
-  readonly reversing = this.reversingState.asReadonly();
 
   readonly suppliers = computed(() => this.parties.suppliers());
   readonly supplierOptions = computed<readonly SearchableFilterOption[]>(() =>
@@ -178,18 +134,9 @@ export class PurchaseHistoryStore implements OnDestroy {
         !this.monthActive(),
       ].filter(Boolean).length
   );
-  readonly accountSelectionError = computed(() =>
-    this.accounts().length > 0 || this.loading()
-      ? null
-      : (this.accountsError() ?? 'No payment accounts are configured.')
-  );
-
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
   private listRequest = 0;
-  private detailRequest = 0;
   private nextUrlRequestId = 0;
-  private paymentAttempt: { fingerprint: string; clientRef: string } | null = null;
-  private advanceAttempt: { purchaseId: string; clientRef: string } | null = null;
 
   async initialize(request: PurchaseHistoryInit): Promise<void> {
     this.supplierFilterState.set(request.supplierId ?? 'all');
@@ -205,13 +152,7 @@ export class PurchaseHistoryStore implements OnDestroy {
       this.noticeState.set('Purchase recorded successfully. Stock and accounting are up to date.');
     }
 
-    await Promise.all([
-      this.parties.ensureLoaded(),
-      this.receiptData
-        .printerEnabled()
-        .then(enabled => this.printerEnabledState.set(enabled))
-        .catch(() => this.printerEnabledState.set(false)),
-    ]);
+    await this.parties.ensureLoaded();
     await this.load();
 
     if (request.purchaseId) await this.openById(request.purchaseId, false);
@@ -225,10 +166,9 @@ export class PurchaseHistoryStore implements OnDestroy {
     const request = ++this.listRequest;
     if (!silent) this.loadingState.set(true);
     this.errorState.set(null);
-    const [purchases, drafts, accounts] = await Promise.allSettled([
+    const [purchases, drafts] = await Promise.allSettled([
       this.money.purchasesPage(this.pageInput()),
       this.money.purchaseDrafts(),
-      this.money.transactableAccounts(),
     ]);
     if (request !== this.listRequest) return false;
 
@@ -241,22 +181,9 @@ export class PurchaseHistoryStore implements OnDestroy {
     }
     if (drafts.status === 'fulfilled') this.draftsState.set(drafts.value);
     else errors.push(this.message(drafts.reason, 'Failed to load purchase drafts'));
-    if (accounts.status === 'fulfilled') {
-      this.accountsState.set(accounts.value);
-      this.accountsErrorState.set(null);
-      if (!this.paymentAccount.value && accounts.value.length > 0) {
-        this.paymentAccount.setValue(accounts.value[0].code);
-      }
-    } else {
-      this.accountsErrorState.set(this.message(accounts.reason, 'Failed to load payment accounts'));
-    }
     this.errorState.set(errors.length > 0 ? errors.join('. ') : null);
     this.loadingState.set(false);
-    return (
-      purchases.status === 'fulfilled' &&
-      drafts.status === 'fulfilled' &&
-      accounts.status === 'fulfilled'
-    );
+    return purchases.status === 'fulfilled' && drafts.status === 'fulfilled';
   }
 
   search(value: string): void {
@@ -343,43 +270,8 @@ export class PurchaseHistoryStore implements OnDestroy {
     }
   }
 
-  closePayment(): void {
-    this.paymentOpenState.set(false);
-  }
-
-  async openPurchase(purchase: PurchaseRow, updateUrl = true): Promise<void> {
-    const request = ++this.detailRequest;
+  openPurchase(purchase: PurchaseRow, updateUrl = true): void {
     this.selectedPurchaseState.set(purchase);
-    this.clearDetail();
-    this.detailLoadingState.set(true);
-    this.errorState.set(null);
-    try {
-      const [lines, expenses, payments, advance] = await Promise.all([
-        this.money.purchaseLines(purchase.id),
-        this.money.purchaseExpenses(purchase.id),
-        this.money.purchasePayments(purchase.id),
-        this.money.supplierAdvanceAvailable(purchase.supplier_id),
-      ]);
-      const variants = await this.pos.variantsByIds([
-        ...new Set(lines.map(line => line.variant_id)),
-      ]);
-      if (request !== this.detailRequest || this.selectedPurchase()?.id !== purchase.id) return;
-      this.linesState.set(lines);
-      this.expensesState.set(expenses);
-      this.paymentsState.set(payments);
-      this.supplierAdvanceState.set(advance);
-      this.variantsState.set(
-        new Map(
-          variants.flatMap(variant => (variant.variant_id ? [[variant.variant_id, variant]] : []))
-        )
-      );
-    } catch (error) {
-      if (request === this.detailRequest) {
-        this.errorState.set(this.message(error, 'Failed to load purchase details'));
-      }
-    } finally {
-      if (request === this.detailRequest) this.detailLoadingState.set(false);
-    }
     if (updateUrl) this.requestPurchaseUrl(purchase.id);
   }
 
@@ -390,132 +282,12 @@ export class PurchaseHistoryStore implements OnDestroy {
       this.errorState.set('The linked purchase was not found');
       return;
     }
-    await this.openPurchase(purchase as PurchaseRow, updateUrl);
+    this.openPurchase(purchase as PurchaseRow, updateUrl);
   }
 
   closePurchase(): void {
-    this.detailRequest++;
     this.selectedPurchaseState.set(null);
-    this.clearDetail();
-    this.detailLoadingState.set(false);
-    this.reversalReason.setValue('');
-    this.reversingState.set(false);
     this.requestPurchaseUrl(null);
-  }
-
-  startPayment(): void {
-    const purchase = this.selectedPurchase();
-    if (!purchase) return;
-    this.paymentAmount.setValue(formatKesInput(Math.max(0, purchase.total_cost - purchase.paid)));
-    this.paymentOpenState.set(true);
-  }
-
-  async paySelectedPurchase(): Promise<void> {
-    const purchase = this.selectedPurchase();
-    const amount = parseKes(this.paymentAmount.value);
-    if (!purchase || amount === null || amount <= 0) {
-      this.errorState.set('Enter a valid payment amount');
-      return;
-    }
-    const fingerprint = [purchase.supplier_id, purchase.id, amount, this.paymentAccount.value].join(
-      ':'
-    );
-    if (this.paymentAttempt?.fingerprint !== fingerprint) {
-      this.paymentAttempt = { fingerprint, clientRef: crypto.randomUUID() };
-    }
-    try {
-      await this.cashierSession.assertOpen('paying a supplier');
-      this.busyState.set(true);
-      this.errorState.set(null);
-      await this.money.payPurchase(
-        purchase.supplier_id,
-        purchase.id,
-        amount,
-        this.paymentAccount.value,
-        this.paymentAttempt.clientRef
-      );
-      this.paymentAttempt = null;
-      this.paymentOpenState.set(false);
-      this.noticeState.set('Purchase payment recorded');
-      await this.refreshAfterCommit(purchase.id);
-    } catch (error) {
-      this.errorState.set(this.message(error, 'Payment failed'));
-    } finally {
-      this.busyState.set(false);
-    }
-  }
-
-  async applyAdvance(): Promise<void> {
-    const purchase = this.selectedPurchase();
-    if (!purchase) return;
-    const amount = Math.min(this.supplierAdvance(), purchase.total_cost - purchase.paid);
-    if (amount <= 0) return;
-    if (this.advanceAttempt?.purchaseId !== purchase.id) {
-      this.advanceAttempt = { purchaseId: purchase.id, clientRef: crypto.randomUUID() };
-    }
-    this.busyState.set(true);
-    this.errorState.set(null);
-    try {
-      await this.money.applySupplierAdvance(purchase.id, amount, this.advanceAttempt.clientRef);
-      this.advanceAttempt = null;
-      this.noticeState.set(`${formatKes(amount)} supplier advance applied`);
-      await this.refreshAfterCommit(purchase.id);
-    } catch (error) {
-      this.errorState.set(this.message(error, 'Could not apply supplier advance'));
-    } finally {
-      this.busyState.set(false);
-    }
-  }
-
-  async reversePurchase(): Promise<void> {
-    const purchase = this.selectedPurchase();
-    const reason = this.reversalReason.value.trim();
-    if (!purchase || !reason) {
-      this.errorState.set('Explain why this purchase is being reversed');
-      return;
-    }
-    try {
-      await this.cashierSession.assertOpen('reversing a purchase');
-      this.busyState.set(true);
-      this.reversingState.set(true);
-      this.errorState.set(null);
-      await this.money.reverseCreditPurchase(purchase.id, reason);
-      this.closePurchase();
-      this.noticeState.set('Purchase reversed. Stock, supplier balance, and ledger were restored.');
-      await this.load(true);
-    } catch (error) {
-      const message = this.message(error, 'Purchase could not be reversed');
-      this.errorState.set(
-        message.includes('purchase_stock_already_moved')
-          ? 'This purchase cannot be reversed because some stock was sold, adjusted, or moved.'
-          : message.includes('purchase_has_payments')
-            ? 'Reverse this purchase’s supplier payments first.'
-            : message.includes('purchase_has_separate_expenses')
-              ? 'Finance must reverse this purchase’s separately paid expenses first.'
-              : message
-      );
-    } finally {
-      this.reversingState.set(false);
-      this.busyState.set(false);
-    }
-  }
-
-  async printPurchase(id: string): Promise<void> {
-    try {
-      const [purchase, company] = await Promise.all([
-        this.receiptData.buildPurchaseData(id),
-        this.receiptData.companyPrintInfo(),
-      ]);
-      await this.print.printPurchase(
-        purchase,
-        company.name,
-        company.logoUrl,
-        undefined,
-        company.address
-      );
-    } catch (error) {
-      this.errorState.set(this.message(error, 'Print failed'));
-    }
   }
 
   setNotice(message: string): void {
@@ -551,15 +323,6 @@ export class PurchaseHistoryStore implements OnDestroy {
   settlementLabel(purchase: PurchaseRow): string {
     if (purchase.paid >= purchase.total_cost) return 'Paid';
     return purchase.paid > 0 ? 'Part paid' : 'Unpaid';
-  }
-
-  variant(variantId: string): Variant | null {
-    return this.variantsState().get(variantId) ?? null;
-  }
-
-  lineLabel(variantId: string): string {
-    const variant = this.variant(variantId);
-    return variant ? variantLabel(variant) : 'Item';
   }
 
   date(value: string): string {
@@ -621,46 +384,6 @@ export class PurchaseHistoryStore implements OnDestroy {
       id: ++this.nextUrlRequestId,
       queryParams,
     });
-  }
-
-  /** A committed payment is successful even when one of the read models fails to refresh. */
-  private async refreshAfterCommit(purchaseId: string): Promise<void> {
-    const detailRequest = this.detailRequest;
-    const selected = this.selectedPurchase();
-    const supplierId = selected?.id === purchaseId ? selected.supplier_id : null;
-    const results = await Promise.allSettled([
-      this.load(true),
-      this.money.purchasePayments(purchaseId),
-      this.money.purchaseById(purchaseId),
-      supplierId ? this.money.supplierAdvanceAvailable(supplierId) : Promise.resolve(0),
-    ]);
-    const detailStillCurrent =
-      detailRequest === this.detailRequest && this.selectedPurchase()?.id === purchaseId;
-    if (!detailStillCurrent) return;
-    if (results[1].status === 'fulfilled') {
-      this.paymentsState.set(results[1].value);
-    }
-    if (results[2].status === 'fulfilled' && results[2].value?.id === purchaseId) {
-      this.selectedPurchaseState.set(results[2].value as PurchaseRow);
-    }
-    if (results[3].status === 'fulfilled') this.supplierAdvanceState.set(results[3].value);
-    const listRefreshFailed = results[0].status === 'rejected' || !results[0].value;
-    if (listRefreshFailed || results.slice(1).some(result => result.status === 'rejected')) {
-      this.errorState.set(
-        'The transaction was recorded, but the latest purchase details could not be refreshed.'
-      );
-    }
-  }
-
-  private clearDetail(): void {
-    this.linesState.set([]);
-    this.expensesState.set([]);
-    this.paymentsState.set([]);
-    this.variantsState.set(new Map());
-    this.supplierAdvanceState.set(0);
-    this.paymentOpenState.set(false);
-    this.paymentAmount.setValue('');
-    this.reversalReason.setValue('');
   }
 
   private todayIso(): string {

@@ -20,7 +20,8 @@ const CLOSE_MS = 150;
  * Responsive record surface: bottom task sheet on phones, right drawer on larger screens.
  * Project record-level header controls through `[drawerActions]`; `[actions]` belongs to the
  * page header contract. Close remains two-phase so parents keep the selected record through the
- * exit motion.
+ * exit motion. Financial/task owners may opt into `[closeDisabled]` while a non-cancellable command
+ * is in flight so the owning component remains alive to publish its committed result.
  */
 @Component({
   selector: 'app-drawer',
@@ -36,6 +37,7 @@ const CLOSE_MS = 150;
           class="overlay-backdrop absolute inset-0 h-full w-full cursor-default transition-opacity duration-200 motion-reduce:transition-none"
           [class.opacity-0]="!shown()"
           aria-label="Close panel"
+          [disabled]="closeDisabled()"
           (click)="requestClose()"
         ></button>
 
@@ -69,6 +71,7 @@ const CLOSE_MS = 150;
                 type="button"
                 title="Close"
                 aria-label="Close"
+                [disabled]="closeDisabled()"
                 (click)="requestClose()"
               >
                 <app-icon name="heroXMark" />
@@ -87,7 +90,13 @@ const CLOSE_MS = 150;
             <!-- Keep projection unconditional: hasFooter() is detected from this rendered slot. -->
             <ng-content select="[drawerFooter]" />
             @if (!hasActionFooter() && !hasFooter()) {
-              <button appButton type="button" class="w-full" (click)="requestClose()">
+              <button
+                appButton
+                type="button"
+                class="w-full"
+                [disabled]="closeDisabled()"
+                (click)="requestClose()"
+              >
                 {{ mobileDismissLabel() }}
               </button>
             }
@@ -186,6 +195,7 @@ export class DrawerComponent implements OnDestroy {
   readonly subtitle = input<string>();
   readonly mobileDismissLabel = input('Done');
   readonly dirty = input(false);
+  readonly closeDisabled = input(false);
   readonly hasActionFooter = input(false);
   readonly closed = output<void>();
 
@@ -262,6 +272,7 @@ export class DrawerComponent implements OnDestroy {
   }
 
   requestClose(): void {
+    if (this.closeDisabled()) return;
     if (this.dirty()) {
       this.showDiscardConfirmation();
       return;

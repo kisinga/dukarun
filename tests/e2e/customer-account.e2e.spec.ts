@@ -63,6 +63,7 @@ const deliveryFeeVariant = {
 
 async function authenticateAccountUser(page: Page): Promise<{
   creditRequest: () => unknown;
+  directSaleRequest: () => unknown;
   fulfillmentCreditRequest: () => unknown;
   customerProfileRequest: () => unknown;
 }> {
@@ -95,6 +96,7 @@ async function authenticateAccountUser(page: Page): Promise<{
     },
   };
   let postedCreditRequest: unknown;
+  let postedDirectSaleRequest: unknown;
   let postedFulfillmentCreditRequest: unknown;
   let postedCustomerProfileRequest: unknown;
   await page.addInitScript(
@@ -240,6 +242,10 @@ async function authenticateAccountUser(page: Page): Promise<{
         credit_amount: 200,
       });
     }
+    if (path.endsWith('/rest/v1/rpc/post_sale_at_location')) {
+      postedDirectSaleRequest = request.postDataJSON();
+      return json({ status: 'completed', order_id: orderId });
+    }
     if (path.endsWith('/rest/v1/rpc/post_fulfillment_credit_sale_at_location')) {
       postedFulfillmentCreditRequest = request.postDataJSON();
       return json({
@@ -332,10 +338,33 @@ async function authenticateAccountUser(page: Page): Promise<{
   });
   return {
     creditRequest: () => postedCreditRequest,
+    directSaleRequest: () => postedDirectSaleRequest,
     fulfillmentCreditRequest: () => postedFulfillmentCreditRequest,
     customerProfileRequest: () => postedCustomerProfileRequest,
   };
 }
+
+test('direct checkout posts the cart and clears it only after completion', async ({ page }) => {
+  const capture = await authenticateAccountUser(page);
+  await page.goto('http://127.0.0.1:4203/pos/sell');
+
+  await page
+    .getByRole('button', { name: /Account item/ })
+    .first()
+    .click();
+  await page.getByRole('button', { name: 'Take payment' }).first().click();
+  const checkout = page.getByRole('dialog', { name: 'Take payment' });
+  await checkout.getByRole('button', { name: 'Exact' }).click();
+  await checkout.getByRole('button', { name: 'Complete sale' }).click();
+
+  await expect(page.getByText('Sale completed')).toBeVisible();
+  await expect(page.locator('#current-sale app-sell-cart-line')).toHaveCount(0);
+  expect(capture.directSaleRequest()).toMatchObject({
+    p_customer_id: null,
+    p_lines: [expect.objectContaining({ variant_id: variantId, quantity: 1 })],
+    p_payments: [expect.objectContaining({ method: 'cash', amount: 500 })],
+  });
+});
 
 test('overpayment preview explains FIFO allocations and the resulting downpayment', async ({
   page,
