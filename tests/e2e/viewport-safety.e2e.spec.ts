@@ -4,6 +4,8 @@ const companyId = '96000000-0000-4000-8000-000000000001';
 const userId = '96000000-0000-4000-8000-000000000002';
 const locationId = '96000000-0000-4000-8000-000000000003';
 const campaignId = '96000000-0000-4000-8000-000000000004';
+const productId = '96000000-0000-4000-8000-000000000005';
+const variantId = '96000000-0000-4000-8000-000000000006';
 
 type ViewportCase = {
   name: string;
@@ -126,8 +128,44 @@ async function assertTaskModalGeometry(page: Page, shell: Locator): Promise<void
   expect(horizontalOverflow).toBeLessThanOrEqual(1);
 }
 
-async function mockOperationsApp(page: Page): Promise<void> {
+async function mockOperationsApp(page: Page): Promise<{
+  createdProduct: () => unknown;
+  updatedProduct: () => unknown;
+}> {
   const storedSession = await installSession(page);
+  let createdProduct: unknown = null;
+  let updatedProduct: unknown = null;
+  const product = {
+    id: productId,
+    company_id: companyId,
+    name: 'Breakfast tea',
+    barcode: null,
+    active: true,
+    image_path: null,
+    manufacturer_id: null,
+    tax_category_id: null,
+    created_at: '2026-08-19T00:00:00Z',
+    updated_at: '2026-08-19T00:00:00Z',
+  };
+  const variant = {
+    variant_id: variantId,
+    variant_name: 'Default',
+    product_id: productId,
+    product_name: product.name,
+    product_active: true,
+    variant_active: true,
+    kind: 'good',
+    sku: 'TEA-1',
+    barcode: null,
+    price: 125,
+    wholesale_price: 100,
+    allow_fractional: false,
+    track_inventory: true,
+    stock: 12,
+    image_path: null,
+    manufacturer_id: null,
+    manufacturer_name: null,
+  };
   await page.route('http://127.0.0.1:54321/**', async route => {
     const request = route.request();
     const url = new URL(request.url());
@@ -202,12 +240,53 @@ async function mockOperationsApp(page: Page): Promise<void> {
           : [{ id: companyId, name: 'Viewport shop', code: 'VIEWPORT' }]
       );
     }
-    if (path.endsWith('/rest/v1/rpc/catalog_cache_page')) return json([]);
-    if (path.endsWith('/rest/v1/rpc/catalog_cache_families')) return json([]);
-    if (path.endsWith('/rest/v1/rpc/location_stock_for_variants')) return json([]);
+    if (path.endsWith('/rest/v1/products')) {
+      return request.headers()['accept']?.includes('application/vnd.pgrst.object')
+        ? json(product)
+        : json([product]);
+    }
+    if (path.endsWith('/rest/v1/product_variants')) {
+      return json([
+        {
+          id: variantId,
+          company_id: companyId,
+          product_id: productId,
+          name: 'Default',
+          sku: 'TEA-1',
+          barcode: null,
+          kind: 'good',
+          price: 125,
+          wholesale_price: 100,
+          track_inventory: true,
+          allow_fractional: false,
+          active: true,
+          created_at: '2026-08-19T00:00:00Z',
+          updated_at: '2026-08-19T00:00:00Z',
+        },
+      ]);
+    }
+    if (path.endsWith('/rest/v1/product_category_links')) return json([]);
+    if (path.endsWith('/rest/v1/variant_catalog')) return json([variant]);
+    if (path.endsWith('/rest/v1/rpc/catalog_cache_page')) return json([variant]);
+    if (path.endsWith('/rest/v1/rpc/catalog_cache_families')) return json([product]);
+    if (path.endsWith('/rest/v1/rpc/location_stock_for_variants')) {
+      return json([{ variant_id: variantId, stock: 12, stock_value: 1_200 }]);
+    }
+    if (path.endsWith('/rest/v1/rpc/create_catalog_product_with_manufacturer')) {
+      createdProduct = request.postDataJSON();
+      return json(productId);
+    }
+    if (path.endsWith('/rest/v1/rpc/update_catalog_product_with_manufacturer')) {
+      updatedProduct = request.postDataJSON();
+      return json(productId);
+    }
     if (path.includes('/rest/v1/rpc/')) return json([]);
     return json([]);
   });
+  return {
+    createdProduct: () => createdProduct,
+    updatedProduct: () => updatedProduct,
+  };
 }
 
 async function mockSuperAdmin(page: Page): Promise<void> {
@@ -316,6 +395,45 @@ test('product editor keeps task chrome reachable across the viewport contract', 
     await assertTaskModalGeometry(page, editor);
     await editor.getByRole('button', { name: 'Close product editor' }).click();
   }
+});
+
+test('product editor creates the coupled product and variant payload', async ({ page }) => {
+  const capture = await mockOperationsApp(page);
+  await page.goto('http://127.0.0.1:4203/inventory/products');
+  await page.getByRole('button', { name: 'Add product' }).click();
+
+  const editor = page.locator('dialog.modal-open .modal-box-task');
+  await editor.getByLabel('Product name').fill('Breakfast tea');
+  await editor.getByRole('button', { name: /Continue to variants|Next: variants/ }).click();
+  await editor.getByLabel('Retail price (KES)').fill('125');
+  await editor.getByRole('button', { name: 'Create product' }).click();
+
+  await expect(page.getByText('Created Breakfast tea')).toBeVisible();
+  expect(capture.createdProduct()).toMatchObject({
+    p_name: 'Breakfast tea',
+    p_variants: [expect.objectContaining({ price: 125, kind: 'good' })],
+  });
+});
+
+test('product editor updates the coupled product and variant payload', async ({ page }) => {
+  const capture = await mockOperationsApp(page);
+  await page.goto(`http://127.0.0.1:4203/inventory/products?product=${productId}`);
+
+  const drawer = page.getByRole('dialog', { name: 'Breakfast tea' });
+  await expect(drawer).toBeVisible();
+  await drawer.getByRole('button', { name: 'Edit product' }).click();
+  const editor = page.locator('dialog.modal-open .modal-box-task');
+  await editor.getByLabel('Product name').fill('Breakfast tea premium');
+  await editor.getByRole('button', { name: /Variants/ }).click();
+  await editor.getByLabel('Retail price (KES)').fill('140');
+  await editor.getByRole('button', { name: 'Save product' }).click();
+
+  await expect(page.getByText('Updated Breakfast tea premium and 1 variant')).toBeVisible();
+  expect(capture.updatedProduct()).toMatchObject({
+    p_product_id: productId,
+    p_name: 'Breakfast tea premium',
+    p_variants: [expect.objectContaining({ variant_id: variantId, price: 140 })],
+  });
 });
 
 test('super-admin campaign dialogs keep their actions inside a short viewport', async ({

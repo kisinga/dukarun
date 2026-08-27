@@ -32,6 +32,18 @@ class DrawerWithoutFooterHostComponent {
   open = true;
 }
 
+@Component({
+  imports: [DrawerComponent],
+  template: `
+    <app-drawer [(open)]="open" title="Post payment" [closeDisabled]="true">
+      <p>Posting payment</p>
+    </app-drawer>
+  `,
+})
+class LockedDrawerHostComponent {
+  open = true;
+}
+
 describe('DrawerComponent', () => {
   async function render<T>(host: Type<T>): Promise<ComponentFixture<T>> {
     await TestBed.configureTestingModule({ imports: [host] })
@@ -66,5 +78,19 @@ describe('DrawerComponent', () => {
 
     expect(footer.textContent).toContain('Done');
     expect(footer.classList.contains('task-sheet-default-footer')).toBe(true);
+  });
+
+  it('keeps a non-cancellable command owner mounted while close is disabled', async () => {
+    const fixture = await render(LockedDrawerHostComponent);
+    const drawer = fixture.debugElement.children[0].componentInstance as DrawerComponent;
+
+    drawer.requestClose();
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.open).toBe(true);
+    expect(
+      (fixture.nativeElement.querySelector('button[aria-label="Close"]') as HTMLButtonElement)
+        .disabled
+    ).toBe(true);
   });
 });
