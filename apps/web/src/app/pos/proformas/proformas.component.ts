@@ -403,7 +403,7 @@ const PROFORMA_SORT_OPTIONS: readonly ListSortOption[] = [
         >
           @if (draft.status === 'draft') {
             <button
-              actions
+              drawerActions
               appButton
               variant="ghost"
               [iconOnly]="true"
@@ -417,7 +417,7 @@ const PROFORMA_SORT_OPTIONS: readonly ListSortOption[] = [
           }
           @if (draft.status === 'draft' && printerEnabled()) {
             <button
-              actions
+              drawerActions
               appButton
               variant="ghost"
               [iconOnly]="true"
@@ -431,7 +431,7 @@ const PROFORMA_SORT_OPTIONS: readonly ListSortOption[] = [
             </button>
           }
           <button
-            actions
+            drawerActions
             appButton
             variant="ghost"
             [iconOnly]="true"

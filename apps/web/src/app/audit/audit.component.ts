@@ -341,7 +341,7 @@ const REASON_FIELDS = new Set(['decision_reason', 'void_reason', 'reason', 'note
           >
             @if (areaRoute(event.area); as route) {
               <a
-                actions
+                drawerActions
                 appButton
                 variant="ghost"
                 [iconOnly]="true"

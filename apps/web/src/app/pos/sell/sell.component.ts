@@ -1,15 +1,4 @@
-import {
-  Component,
-  ElementRef,
-  HostListener,
-  OnInit,
-  computed,
-  effect,
-  inject,
-  signal,
-  untracked,
-  viewChild,
-} from '@angular/core';
+import { Component, OnInit, computed, effect, inject, untracked, viewChild } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { debounceTime, distinctUntilChanged } from 'rxjs';
@@ -25,31 +14,19 @@ import {
 import { ConnectivityService } from '../offline/connectivity.service';
 import { SyncService } from '../offline/sync.service';
 import { ButtonComponent } from '../../shared/ui/button.component';
-import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
 import { FormFieldComponent } from '../../shared/ui/form-field.component';
 import { IconComponent } from '../../shared/ui/icon.component';
 import { MoneyComponent } from '../../shared/ui/money.component';
 import { PageLayoutComponent } from '../../shared/ui/page-layout.component';
-import { PrintService, type PrintFormat } from '../../shared/print/print.service';
+import { PrintService } from '../../shared/print/print.service';
 import { ReceiptDataService } from '../../shared/print/receipt-data.service';
-import { SellCartLineComponent } from './sell-cart-line.component';
 import { MyPendingSalesComponent } from './my-pending-sales.component';
 import { SessionRequiredNoticeComponent } from '../../shared/ui/session-required-notice.component';
-import { BarcodeScannerComponent } from '../../shared/ui/barcode-scanner.component';
 import { PageActionsComponent } from '../../shared/ui/page-actions.component';
-import { ScanFeedbackService } from '../../shared/ui/scan-feedback.service';
-import { isRapidScannerBurst, isTextEntryTarget } from '../keyboard-wedge';
-import { CatalogCacheService } from '../../core/catalog-cache.service';
-import { SupabaseService } from '../../core/supabase.service';
 import { MpesaService } from '../../core/mpesa.service';
 import { MpesaCheckoutCoordinator } from '../../core/mpesa-checkout-coordinator.service';
 import { LocationContextService } from '../../core/location-context.service';
-import {
-  FulfillmentCheckoutFieldsComponent,
-  type CheckoutMode,
-  type FulfillmentCheckoutDraft,
-} from '../../fulfillment/fulfillment-checkout-fields.component';
-import { FulfillmentCheckoutMethodComponent } from '../../fulfillment/fulfillment-checkout-method.component';
+import type { FulfillmentCheckoutDraft } from '../../fulfillment/fulfillment-checkout-fields.component';
 import {
   FulfillmentService,
   type FulfillmentSettings,
@@ -61,43 +38,37 @@ import {
   SaleSettlementInput,
   PosRpcError,
   PosService,
-  Variant,
   variantLabel,
 } from '../pos.service';
-
-/** One load-time proforma warning (see loadDraft). All numeric fields are
- *  kind-specific; unused ones stay 0. */
-interface DraftFlag {
-  kind: 'price' | 'override' | 'override-blocked' | 'stock' | 'unavailable';
-  label: string;
-  was: number;
-  now: number;
-  overridePrice: number;
-  available: number;
-  needed: number;
-  count: number;
-}
-
-type CatalogView = 'grid' | 'list' | 'categories';
+import { SellStatusMessagesComponent } from './sell-status-messages.component';
+import { SellCatalogPanelComponent } from './sell-catalog-panel.component';
+import { SellCatalogStore } from './sell-catalog.store';
+import { SellCartPanelComponent } from './sell-cart-panel.component';
+import {
+  SellCheckoutWorkspaceComponent,
+  type SellCheckoutWorkspaceIntent,
+} from './sell-checkout-workspace.component';
+import type { DraftFlag, SaleSuccessMessage } from './sell.types';
+import { SellWorkflowStore } from './sell-workflow.store';
 
 @Component({
   selector: 'app-sell',
+  providers: [SellCatalogStore, SellWorkflowStore],
   imports: [
     ReactiveFormsModule,
     CheckoutPanelComponent,
     ButtonComponent,
-    EmptyStateComponent,
     FormFieldComponent,
     IconComponent,
     MoneyComponent,
     PageLayoutComponent,
-    SellCartLineComponent,
     MyPendingSalesComponent,
     SessionRequiredNoticeComponent,
-    BarcodeScannerComponent,
     PageActionsComponent,
-    FulfillmentCheckoutFieldsComponent,
-    FulfillmentCheckoutMethodComponent,
+    SellStatusMessagesComponent,
+    SellCatalogPanelComponent,
+    SellCartPanelComponent,
+    SellCheckoutWorkspaceComponent,
   ],
   template: `
     <app-page
@@ -118,8 +89,8 @@ type CatalogView = 'grid' | 'list' | 'categories';
             appButton
             variant="ghost"
             size="sm"
-            [loading]="catalogRefreshing()"
-            (click)="refreshCatalog()"
+            [loading]="catalog.catalogRefreshing()"
+            (click)="catalog.refreshCatalog()"
           >
             Refresh catalog
           </button>
@@ -148,850 +119,47 @@ type CatalogView = 'grid' | 'list' | 'categories';
       }
 
       <div class="pb-24 lg:pb-24 xl:pb-0">
-        @if (success(); as s) {
-          <section class="card mb-4 bg-base-100" aria-live="polite">
-            <div class="card-body flex-row flex-wrap items-center gap-4 p-4">
-              <app-icon
-                name="heroCheckCircle"
-                size="xl"
-                [class.text-success]="s.tone === 'success'"
-                [class.text-warning]="s.tone === 'warning'"
-              />
-              <div class="min-w-48 flex-1">
-                <p class="type-heading">{{ s.text }}</p>
-                @if (s.tone === 'warning') {
-                  <p class="text-sm text-base-content/60">
-                    It is safely queued and will appear in Today's Sales after syncing.
-                  </p>
-                }
-              </div>
-              @if (s.tone === 'success' && s.orderId && printerEnabled()) {
-                <select
-                  class="select select-bordered select-sm min-h-11"
-                  [value]="print.format()"
-                  (change)="onFormatChange($event)"
-                  title="Receipt format"
-                >
-                  @for (t of print.getAvailableTemplates(); track t.id) {
-                    <option [value]="t.id" [selected]="t.id === print.format()">
-                      {{ t.name }}
-                    </option>
-                  }
-                </select>
-                <button
-                  appButton
-                  variant="outline"
-                  size="md"
-                  [disabled]="busy()"
-                  (click)="printReceipt(s.orderId)"
-                >
-                  <app-icon name="heroPrinter" />
-                  Print receipt
-                </button>
-              }
-              <button appButton size="md" (click)="newSale()">
-                <app-icon name="heroPlus" />
-                New sale
-              </button>
-            </div>
-          </section>
-        }
-
-        @if (error()) {
-          <div class="alert alert-error mb-4 py-3" role="alert">
-            <app-icon name="heroExclamationTriangle" />
-            <span>{{ error() }}</span>
-            <button
-              appButton
-              variant="ghost"
-              size="sm"
-              [iconOnly]="true"
-              aria-label="Dismiss error"
-              (click)="error.set(null)"
-            >
-              <app-icon name="heroXMark" />
-            </button>
-          </div>
-        }
-        @if (notice()) {
-          <div class="alert alert-success mb-4 py-3" aria-live="polite">
-            <app-icon name="heroCheckCircle" />
-            <span>{{ notice() }}</span>
-            <button
-              appButton
-              variant="ghost"
-              size="sm"
-              [iconOnly]="true"
-              aria-label="Dismiss notice"
-              (click)="notice.set(null)"
-            >
-              <app-icon name="heroXMark" />
-            </button>
-          </div>
-        }
-        @if (cart.draftId() && draftFlags().length > 0 && !draftFlagsDismissed()) {
-          <div class="alert alert-warning mb-4 py-3" role="status">
-            <app-icon name="heroExclamationTriangle" />
-            <div class="flex flex-col gap-1">
-              <span class="font-semibold">This proforma changed since it was saved</span>
-              @for (flag of draftFlags(); track $index) {
-                <span class="text-sm">
-                  @switch (flag.kind) {
-                    @case ('price') {
-                      {{ flag.label }} — quoted <app-money [amount]="flag.was" />, now
-                      <app-money [amount]="flag.now" />
-                    }
-                    @case ('override') {
-                      {{ flag.label }} — list was <app-money [amount]="flag.was" />, now
-                      <app-money [amount]="flag.now" /> (override
-                      <app-money [amount]="flag.overridePrice" /> kept)
-                    }
-                    @case ('override-blocked') {
-                      {{ flag.label }} — override <app-money [amount]="flag.overridePrice" /> needs
-                      a manager (list now <app-money [amount]="flag.now" />) — checkout will be
-                      rejected
-                    }
-                    @case ('stock') {
-                      {{ flag.label }} — only {{ flag.available }} in stock, proforma needs
-                      {{ flag.needed }}
-                    }
-                    @case ('unavailable') {
-                      {{ flag.count }} {{ flag.count === 1 ? 'line is' : 'lines are' }} no longer
-                      available and were skipped
-                    }
-                  }
-                </span>
-              }
-            </div>
-            <button
-              appButton
-              variant="ghost"
-              size="sm"
-              [iconOnly]="true"
-              aria-label="Dismiss proforma warnings"
-              (click)="draftFlagsDismissed.set(true)"
-            >
-              <app-icon name="heroXMark" />
-            </button>
-          </div>
-        }
+        <app-sell-status-messages
+          [success]="success()"
+          [error]="displayError()"
+          [notice]="notice()"
+          [draftId]="cart.draftId()"
+          [draftFlags]="draftFlags()"
+          [draftFlagsDismissed]="draftFlagsDismissed()"
+          [printerEnabled]="printerEnabled()"
+          [busy]="busy()"
+          [printFormat]="print.format()"
+          [printTemplates]="print.getAvailableTemplates()"
+          (printFormatChange)="print.setFormat($event)"
+          (printReceipt)="printReceipt($event)"
+          (newSale)="newSale()"
+          (dismissError)="dismissError()"
+          (dismissNotice)="workflow.dismissNotice()"
+          (dismissDraftWarnings)="workflow.dismissDraftWarnings()"
+        />
 
         <div
           class="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(20rem,22rem)] xl:items-stretch"
         >
-          <section class="card order-1 min-w-0 bg-base-100 xl:col-start-1 xl:row-start-1 xl:h-full">
-            <div class="card-body p-4">
-              <div class="flex items-start justify-between gap-3">
-                <div>
-                  <h2 class="type-heading">Add products</h2>
-                  <p class="mt-0.5 text-sm text-base-content/60">
-                    Search by product, manufacturer, or SKU, or scan a barcode.
-                  </p>
-                </div>
-                @if (!cart.isEmpty()) {
-                  <span class="badge badge-primary shrink-0"> {{ cartItemCount() }} in cart </span>
-                }
-              </div>
+          <app-sell-catalog-panel
+            [itemCount]="cartItemCount()"
+            [wedgeBlocked]="checkoutOpen() || creditConfirmOpen() || mpesaSplitReady() !== null"
+          />
 
-              <div class="mt-3 flex gap-2">
-                <div class="relative min-w-0 flex-1">
-                  <span
-                    class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-base-content/50"
-                  >
-                    <app-icon name="heroMagnifyingGlass" size="lg" />
-                  </span>
-                  <input
-                    #productSearch
-                    type="search"
-                    class="search-with-custom-clear input input-bordered min-h-11 w-full pr-12 pl-11"
-                    placeholder="Search or scan barcode…"
-                    autocomplete="off"
-                    aria-label="Search products or scan barcode"
-                    [formControl]="search"
-                    (keydown)="onSearchKeydown($event)"
-                  />
-                  @if (search.value) {
-                    <button
-                      appButton
-                      variant="ghost"
-                      size="md"
-                      [iconOnly]="true"
-                      type="button"
-                      class="absolute inset-y-0 right-0 my-auto mr-1"
-                      aria-label="Clear product search"
-                      (click)="clearSearch()"
-                    >
-                      <app-icon name="heroXMark" />
-                    </button>
-                  }
-                </div>
-                <button
-                  appButton
-                  variant="outline"
-                  size="md"
-                  type="button"
-                  class="min-h-11"
-                  (click)="scannerOpen.set(true)"
-                >
-                  <app-icon name="heroCamera" /> <span class="hidden sm:inline">Scan</span>
-                </button>
-              </div>
+          <app-sell-cart-panel
+            [viewModel]="workflow.cartViewModel()"
+            [overridePrice]="workflow.overridePrice"
+            [overrideReason]="workflow.overrideReason"
+            (intent)="workflow.handleCartIntent($event)"
+          />
 
-              <div class="mt-4 flex flex-wrap items-center justify-between gap-2">
-                <div class="min-w-0">
-                  <p class="type-caption">
-                    {{ catalogSectionLabel() }}
-                  </p>
-                  @if (selectedCategory(); as category) {
-                    @if (!searchMode()) {
-                      <p class="truncate text-sm font-semibold">{{ category.name }}</p>
-                    }
-                  }
-                </div>
-                <div class="join shrink-0" role="group" aria-label="Product catalogue view">
-                  <button
-                    appButton
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    class="join-item"
-                    aria-label="Grid view"
-                    title="Grid view"
-                    [attr.aria-pressed]="catalogView() === 'grid'"
-                    [class.btn-active]="catalogView() === 'grid'"
-                    (click)="setCatalogView('grid')"
-                  >
-                    <app-icon name="heroSquares2x2" />
-                    <span class="hidden sm:inline">Grid</span>
-                  </button>
-                  <button
-                    appButton
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    class="join-item"
-                    aria-label="List view"
-                    title="List view"
-                    [attr.aria-pressed]="catalogView() === 'list'"
-                    [class.btn-active]="catalogView() === 'list'"
-                    (click)="setCatalogView('list')"
-                  >
-                    <app-icon name="heroBars3" />
-                    <span class="hidden sm:inline">List</span>
-                  </button>
-                  <button
-                    appButton
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    class="join-item"
-                    aria-label="Categories view"
-                    title="Categories view"
-                    [attr.aria-pressed]="catalogView() === 'categories'"
-                    [class.btn-active]="catalogView() === 'categories'"
-                    (click)="setCatalogView('categories')"
-                  >
-                    <app-icon name="heroQueueList" />
-                    <span class="hidden sm:inline">Categories</span>
-                  </button>
-                </div>
-              </div>
-
-              @if (catalogView() === 'categories' && !searchMode()) {
-                @if (!catalogCache.categoryMembershipsComplete()) {
-                  <div role="status" class="alert alert-warning mt-3 text-sm">
-                    <app-icon name="heroSignalSlash" />
-                    <span>
-                      {{
-                        connectivity.online()
-                          ? 'Refreshing category browsing…'
-                          : 'Reconnect to load category browsing for this catalogue.'
-                      }}
-                    </span>
-                  </div>
-                } @else if (selectedCategory(); as category) {
-                  <div class="mt-3 flex items-center justify-between gap-2">
-                    <button
-                      appButton
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      (click)="leaveCategory()"
-                    >
-                      <app-icon name="heroChevronLeft" /> All categories
-                    </button>
-                    <span class="type-caption">{{ categoryItems().length }} options</span>
-                  </div>
-                } @else {
-                  <label class="input input-bordered input-sm mt-3 flex items-center gap-2">
-                    <app-icon name="heroMagnifyingGlass" class="text-base-content/50" />
-                    <input
-                      type="search"
-                      class="min-w-0 grow"
-                      placeholder="Search categories…"
-                      [value]="categorySearch()"
-                      (input)="categorySearch.set($any($event.target).value)"
-                    />
-                  </label>
-                  <div class="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
-                    @for (category of categoryDirectory(); track category.id) {
-                      <button
-                        type="button"
-                        class="min-h-24 rounded-box border border-base-300/70 bg-base-100 p-3 text-left transition-colors hover:border-primary/50 hover:bg-primary/5"
-                        (click)="openCategory(category.id)"
-                      >
-                        <span class="line-clamp-2 text-sm font-semibold">{{ category.name }}</span>
-                        <span class="type-caption mt-3 block">
-                          {{ category.productCount }}
-                          {{ category.productCount === 1 ? 'product' : 'products' }} ·
-                          {{ category.optionCount }} options
-                        </span>
-                      </button>
-                    } @empty {
-                      <div class="col-span-full py-6 text-center">
-                        <p class="text-sm font-medium">No categories found</p>
-                        <p class="mt-1 text-sm text-base-content/60">
-                          {{
-                            categorySearch().trim()
-                              ? 'Try another category name.'
-                              : 'Active categories with products appear here.'
-                          }}
-                        </p>
-                      </div>
-                    }
-                  </div>
-                }
-              }
-
-              @if (showProductResults()) {
-                @if (resultPresentation() === 'list') {
-                  <div class="mt-2 overflow-hidden rounded-box border border-base-300/70">
-                    @for (v of visibleCatalogItems(); track v.variant_id) {
-                      <button
-                        type="button"
-                        class="flex min-h-16 w-full items-center gap-3 border-b border-base-200 px-3 py-2 text-left transition-colors last:border-0 hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-45"
-                        [disabled]="unavailable(v)"
-                        (click)="addVariant(v)"
-                      >
-                        @if (imageUrl(v.image_path); as thumb) {
-                          @if (!brokenImages().has(v.image_path!)) {
-                            <img
-                              [src]="thumb"
-                              alt=""
-                              class="h-11 w-11 shrink-0 rounded-field object-cover"
-                              (error)="markBroken(v.image_path!)"
-                            />
-                          } @else {
-                            <span
-                              class="flex h-11 w-11 shrink-0 items-center justify-center rounded-field bg-base-200"
-                              ><app-icon name="heroCube" size="lg"
-                            /></span>
-                          }
-                        } @else {
-                          <span
-                            class="flex h-11 w-11 shrink-0 items-center justify-center rounded-field bg-base-200"
-                            ><app-icon name="heroCube" size="lg"
-                          /></span>
-                        }
-                        <span class="min-w-0 flex-1">
-                          <span class="block truncate text-xs text-base-content/55">{{
-                            v.manufacturer_name || 'Manufacturer not set'
-                          }}</span>
-                          <span class="line-clamp-2 text-sm font-semibold">{{ label(v) }}</span>
-                        </span>
-                        <span class="shrink-0 text-right">
-                          @if (quantityInCart(v.variant_id) > 0) {
-                            <span class="badge badge-primary badge-sm mb-1">{{
-                              quantityInCart(v.variant_id)
-                            }}</span>
-                          } @else if (unavailable(v)) {
-                            <span class="badge badge-error badge-sm mb-1">Out</span>
-                          }
-                          <span class="block text-sm font-bold"
-                            ><app-money [amount]="v.price ?? 0"
-                          /></span>
-                          <span class="block text-xs text-base-content/50">{{
-                            stockLabel(v)
-                          }}</span>
-                        </span>
-                      </button>
-                    }
-                  </div>
-                } @else {
-                  <div
-                    class="mt-2 snap-x gap-2 overflow-x-auto pb-2 sm:grid sm:grid-cols-3 sm:overflow-visible sm:pb-0 xl:grid-cols-4"
-                    [class.flex]="quickAddMode()"
-                    [class.grid]="!quickAddMode()"
-                    [class.grid-cols-2]="!quickAddMode()"
-                  >
-                    @for (v of visibleCatalogItems(); track v.variant_id) {
-                      <button
-                        type="button"
-                        class="group relative flex h-32 min-h-32 shrink-0 snap-start flex-col items-start gap-1 overflow-hidden rounded-box border border-base-300/70 bg-base-100 p-3 text-left transition-colors hover:border-primary/50 hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-45 sm:w-auto"
-                        [class.w-36]="quickAddMode()"
-                        [class.w-full]="!quickAddMode()"
-                        [disabled]="unavailable(v)"
-                        (click)="addVariant(v)"
-                      >
-                        <div class="flex w-full min-w-0 items-start gap-2">
-                          @if (imageUrl(v.image_path); as thumb) {
-                            @if (!brokenImages().has(v.image_path!)) {
-                              <img
-                                [src]="thumb"
-                                alt=""
-                                class="h-10 w-10 shrink-0 rounded-field object-cover"
-                                (error)="markBroken(v.image_path!)"
-                              />
-                            } @else {
-                              <span
-                                class="flex h-10 w-10 shrink-0 items-center justify-center rounded-field bg-base-200"
-                                ><app-icon name="heroCube" size="lg"
-                              /></span>
-                            }
-                          } @else {
-                            <span
-                              class="flex h-10 w-10 shrink-0 items-center justify-center rounded-field bg-base-200"
-                              ><app-icon name="heroCube" size="lg"
-                            /></span>
-                          }
-                          <span
-                            class="min-w-0 flex-1 truncate pt-0.5 text-xs text-base-content/55"
-                            >{{ v.manufacturer_name || 'Manufacturer not set' }}</span
-                          >
-                          @if (quantityInCart(v.variant_id) > 0) {
-                            <span class="badge badge-primary badge-sm shrink-0">{{
-                              quantityInCart(v.variant_id)
-                            }}</span>
-                          } @else if (unavailable(v)) {
-                            <span class="badge badge-error badge-sm shrink-0">Out</span>
-                          }
-                        </div>
-                        <span class="line-clamp-2 text-sm leading-tight font-semibold">{{
-                          label(v)
-                        }}</span>
-                        <span class="mt-auto flex w-full items-end justify-between gap-1">
-                          <span class="text-sm font-bold whitespace-nowrap"
-                            ><app-money [amount]="v.price ?? 0"
-                          /></span>
-                          <span
-                            class="text-right text-xs whitespace-nowrap"
-                            [class.text-error]="unavailable(v)"
-                            [class.text-base-content/50]="!unavailable(v)"
-                            >{{ stockLabel(v) }}</span
-                          >
-                        </span>
-                      </button>
-                    }
-                  </div>
-                }
-
-                @if (visibleCatalogItems().length === 0) {
-                  <div class="py-6 text-center">
-                    <p class="text-sm font-medium">No matching products</p>
-                    <p class="mt-1 text-sm text-base-content/60">
-                      {{
-                        searchMode()
-                          ? "Check the spelling or scan the item's barcode."
-                          : 'This category has no sellable options.'
-                      }}
-                    </p>
-                  </div>
-                }
-                @if (canShowMoreCategoryItems()) {
-                  <div class="mt-3 flex justify-center">
-                    <button
-                      appButton
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      (click)="showMoreCategoryItems()"
-                    >
-                      Show more
-                    </button>
-                  </div>
-                }
-              }
-            </div>
-          </section>
-
-          <section
-            id="current-sale"
-            class="card order-3 min-w-0 scroll-mt-4 overflow-hidden bg-base-100 xl:col-start-1 xl:row-start-2"
-          >
-            <div
-              class="flex items-center justify-between gap-3 border-b border-base-content/15 px-3 py-2.5 sm:px-4 sm:py-3"
-            >
-              <div>
-                <h2 class="type-heading">Current sale</h2>
-                @if (!cart.isEmpty()) {
-                  <p class="type-caption">
-                    {{ cart.lines().length }}
-                    {{ cart.lines().length === 1 ? 'product' : 'products' }}
-                  </p>
-                }
-              </div>
-              @if (!cart.isEmpty()) {
-                @if (clearCartArmed()) {
-                  <div
-                    class="flex items-center gap-1"
-                    role="group"
-                    aria-label="Confirm clearing the current sale"
-                  >
-                    <button
-                      appButton
-                      variant="ghost"
-                      size="sm"
-                      [disabled]="busy()"
-                      (click)="clearCartArmed.set(false)"
-                    >
-                      Keep sale
-                    </button>
-                    <button
-                      appButton
-                      variant="error"
-                      size="sm"
-                      [disabled]="busy()"
-                      (click)="clearCart()"
-                    >
-                      Clear all
-                    </button>
-                  </div>
-                } @else {
-                  <button
-                    appButton
-                    variant="ghost"
-                    size="sm"
-                    class="text-base-content/60 hover:text-error"
-                    [disabled]="busy()"
-                    (click)="clearCartArmed.set(true)"
-                  >
-                    Clear cart
-                  </button>
-                }
-              }
-            </div>
-
-            @if (cart.isEmpty()) {
-              <div class="p-4">
-                <app-empty-state
-                  [embedded]="true"
-                  [compact]="true"
-                  icon="heroShoppingCart"
-                  title="Cart is empty"
-                  description="Tap a quick product or search above to start the sale."
-                />
-              </div>
-            } @else {
-              <div>
-                @for (line of cart.lines(); track line.variant.variant_id) {
-                  <div
-                    class="border-b border-base-content/15 bg-base-100 last:border-b-0 even:bg-base-200/20"
-                  >
-                    <app-sell-cart-line
-                      [line]="line"
-                      [label]="cart.lineLabel(line)"
-                      [canOverridePrice]="canOverridePrices()"
-                      [floorRejected]="priceFloorFeedback()?.variantId === line.variant.variant_id"
-                      (quantityStep)="stepQty(line.variant.variant_id!, $event)"
-                      (quantityChanged)="onQtyInput(line.variant.variant_id!, $event)"
-                      (priceStep)="adjustPrice(line, $event)"
-                      (priceEdit)="startOverride(line)"
-                      (priceReset)="resetPrice(line)"
-                      (removed)="cart.removeLine(line.variant.variant_id!)"
-                    />
-
-                    @if (overrideFor() === line.variant.variant_id) {
-                      <div class="border-t border-base-content/15 bg-base-200/70 p-3 sm:p-4">
-                        <div class="flex items-start justify-between gap-3">
-                          <div>
-                            <p class="text-sm font-semibold">Set exact unit price</p>
-                            <p class="mt-0.5 text-xs text-base-content/60">
-                              Whole KES only. Quick arrows remain the fastest option.
-                            </p>
-                          </div>
-                          <button
-                            appButton
-                            variant="ghost"
-                            size="sm"
-                            [iconOnly]="true"
-                            aria-label="Close price editor"
-                            (click)="overrideFor.set(null)"
-                          >
-                            <app-icon name="heroXMark" />
-                          </button>
-                        </div>
-                        <div class="mt-3 grid gap-3 sm:grid-cols-2">
-                          <app-form-field label="Unit price (KES)" [required]="true">
-                            <input
-                              type="text"
-                              inputmode="numeric"
-                              class="input input-bordered min-h-11 w-full"
-                              [formControl]="overridePrice"
-                            />
-                          </app-form-field>
-                          <app-form-field label="Reason" hint="Optional; saved on the sale line.">
-                            <input
-                              type="text"
-                              class="input input-bordered min-h-11 w-full"
-                              placeholder="e.g. Damaged packaging"
-                              [formControl]="overrideReason"
-                            />
-                          </app-form-field>
-                        </div>
-                        <div class="mt-3 flex flex-wrap justify-end gap-2">
-                          @if (line.customPrice !== null) {
-                            <button appButton variant="ghost" size="md" (click)="resetPrice(line)">
-                              Use base price
-                            </button>
-                          }
-                          <button
-                            appButton
-                            variant="outline"
-                            size="md"
-                            (click)="overrideFor.set(null)"
-                          >
-                            Cancel
-                          </button>
-                          <button appButton size="md" (click)="applyOverride()">Apply price</button>
-                        </div>
-                      </div>
-                    }
-                  </div>
-                }
-              </div>
-            }
-          </section>
-
-          <aside class="order-2 min-w-0 xl:sticky xl:top-4 xl:col-start-2 xl:row-start-1 xl:h-full">
-            <div class="card h-full overflow-hidden bg-base-100" aria-label="Sale summary">
-              <section class="p-4">
-                <p class="type-caption">Customer</p>
-                @if (selectedCustomer(); as customer) {
-                  <div class="mt-1 flex items-center gap-1">
-                    <p class="min-w-0 flex-1 truncate font-semibold">
-                      {{ customerName(customer) }}
-                    </p>
-                    <button
-                      appButton
-                      variant="ghost"
-                      size="sm"
-                      [iconOnly]="true"
-                      type="button"
-                      aria-label="Clear customer (back to Walk-in)"
-                      (click)="clearCustomer()"
-                    >
-                      <app-icon name="heroXMark" />
-                    </button>
-                  </div>
-                  <p class="mt-0.5 text-xs text-base-content/60 sm:text-sm">
-                    @if (!customer.is_credit_approved) {
-                      Credit not approved
-                    } @else if (customer.credit_limit > 0) {
-                      Limit <app-money [amount]="customer.credit_limit" /> · Owed
-                      <app-money [amount]="customer.ar_balance" /> · Available
-                      <app-money [amount]="customerCreditAvailable(customer)" />
-                    } @else {
-                      Credit approved · no cap
-                    }
-                  </p>
-                } @else {
-                  <div class="relative mt-1">
-                    <input
-                      type="search"
-                      class="input input-bordered min-h-11 w-full"
-                      placeholder="Walk-in"
-                      autocomplete="off"
-                      aria-label="Search customers"
-                      [formControl]="customerSearch"
-                      (focus)="onCustomerFocus()"
-                      (blur)="onCustomerBlur()"
-                    />
-                    @if (customerDropdownOpen() && customerResults().length > 0) {
-                      <ul
-                        class="menu absolute inset-x-0 z-20 mt-1 max-h-64 flex-nowrap overflow-y-auto rounded-box border border-base-300/60 bg-base-100 p-1 shadow-overlay"
-                      >
-                        @for (c of customerResults(); track c.id) {
-                          <li>
-                            <button
-                              type="button"
-                              class="min-h-11"
-                              (mousedown)="$event.preventDefault(); selectCustomer(c)"
-                            >
-                              <span class="min-w-0 flex-1 truncate text-left">
-                                {{ customerName(c) }}
-                              </span>
-                              <span class="text-xs text-base-content/60">{{ c.phone }}</span>
-                              <span class="text-xs" [class.text-error]="!c.is_credit_approved">
-                                @if (!c.is_credit_approved) {
-                                  No credit
-                                } @else if (c.credit_limit > 0) {
-                                  <app-money [amount]="customerCreditAvailable(c)" /> left
-                                } @else {
-                                  No cap
-                                }
-                              </span>
-                            </button>
-                          </li>
-                        }
-                      </ul>
-                    }
-                    @if (
-                      customerDropdownOpen() &&
-                      customerSearch.value.trim().length >= 2 &&
-                      customerResults().length === 0
-                    ) {
-                      <p class="mt-1 text-xs text-base-content/60">
-                        {{
-                          customerSearchExhaustive()
-                            ? 'No customers found'
-                            : 'No cached matches — more may be available online'
-                        }}
-                      </p>
-                    } @else if (customerDropdownOpen() && !customerSearchExhaustive()) {
-                      <p class="mt-1 text-xs text-base-content/60">
-                        {{
-                          customerSearchHasMore()
-                            ? 'Refine search for more matches'
-                            : 'Cached results may be incomplete'
-                        }}
-                      </p>
-                    }
-                  </div>
-                }
-              </section>
-
-              <app-fulfillment-checkout-method
-                [settings]="fulfillmentSettings()"
-                [mode]="fulfillmentFields()?.mode() ?? fulfillmentMode()"
-                [detailsCommitted]="fulfillmentFields()?.detailsCommitted() ?? false"
-                [recipientName]="fulfillmentFields()?.recipientName() ?? ''"
-                [phone]="fulfillmentFields()?.phone() ?? ''"
-                [address]="fulfillmentFields()?.address() ?? ''"
-                [collectionKind]="fulfillmentFields()?.collectionKind() ?? 'none'"
-                [updatesRequested]="fulfillmentFields()?.updatesRequested() ?? true"
-                [promiseLabel]="fulfillmentFields()?.promiseLabel() ?? null"
-                (modeSelected)="selectFulfillmentMethod($event)"
-                (detailsRequested)="openFulfillmentDetails()"
-              />
-
-              <section class="mt-auto border-t border-base-300/60 p-4">
-                <div class="hidden items-end justify-between gap-3 xl:flex">
-                  <div>
-                    <p class="type-caption">Amount due</p>
-                    <p class="mt-1 type-hero"><app-money [amount]="cart.total()" /></p>
-                  </div>
-                  <span class="badge badge-ghost whitespace-nowrap">
-                    {{ cartItemCount() }} {{ cartItemCount() === 1 ? 'item' : 'items' }}
-                  </span>
-                </div>
-
-                <button
-                  appButton
-                  size="md"
-                  class="mt-4 hidden w-full xl:flex"
-                  [disabled]="
-                    cart.isEmpty() ||
-                    busy() ||
-                    (!isCodCheckout() && !cashierSession.canTakePayment()) ||
-                    !perms.has('SettleOrder')
-                  "
-                  (click)="openCheckout()"
-                >
-                  <app-icon [name]="isCodCheckout() ? 'heroTruck' : 'heroBanknotes'" />
-                  {{ isCodCheckout() ? 'Place COD order' : 'Take payment' }}
-                </button>
-                @if (creditAllowed()) {
-                  <button
-                    appButton
-                    variant="secondary"
-                    size="md"
-                    class="mt-2 hidden min-h-11 w-full xl:flex"
-                    [disabled]="cart.isEmpty() || busy() || !cashierSession.canTakePayment()"
-                    (click)="openCreditConfirmation()"
-                  >
-                    Sell on credit
-                  </button>
-                }
-
-                @if (fulfillmentMode() === 'counter') {
-                  <div class="flex flex-wrap gap-2 lg:mt-2 lg:flex-col">
-                    @if (cashierSession.cashierFlowEnabled()) {
-                      <button
-                        appButton
-                        variant="secondary"
-                        size="md"
-                        class="flex-1"
-                        [disabled]="cart.isEmpty() || busy()"
-                        (click)="sendToCashier()"
-                      >
-                        Send to cashier
-                      </button>
-                    }
-                    <button
-                      appButton
-                      variant="secondary"
-                      size="md"
-                      class="flex-1"
-                      [disabled]="cart.isEmpty() || busy()"
-                      (click)="saveProforma()"
-                    >
-                      Save proforma
-                    </button>
-                  </div>
-                }
-              </section>
-            </div>
-          </aside>
+          <app-sell-checkout-workspace
+            [viewModel]="workflow.checkoutWorkspaceViewModel()"
+            [customerSearch]="workflow.customerSearch"
+            (intent)="handleCheckoutWorkspaceIntent($event)"
+          />
         </div>
       </div>
-
-      <div
-        data-testid="sell-payment-dock"
-        class="shadow-overlay fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom,0px))] z-30 border-t border-base-300/60 bg-base-100 p-3 lg:bottom-0 lg:left-64 xl:hidden"
-      >
-        <div class="flex w-full flex-wrap items-center gap-3">
-          <a href="#current-sale" class="min-w-0 flex-1 rounded-field focus:outline-primary">
-            <p class="type-caption">
-              {{ cartItemCount() }} {{ cartItemCount() === 1 ? 'item' : 'items' }}
-            </p>
-            <p class="type-hero truncate"><app-money [amount]="cart.total()" /></p>
-          </a>
-          @if (creditAllowed()) {
-            <button
-              appButton
-              variant="secondary"
-              size="md"
-              class="min-h-11 flex-1"
-              [disabled]="cart.isEmpty() || busy() || !cashierSession.canTakePayment()"
-              (click)="openCreditConfirmation()"
-            >
-              Sell on credit
-            </button>
-          }
-          <button
-            appButton
-            size="md"
-            class="min-w-40 flex-1"
-            [disabled]="
-              cart.isEmpty() ||
-              busy() ||
-              (!isCodCheckout() && !cashierSession.canTakePayment()) ||
-              !perms.has('SettleOrder')
-            "
-            (click)="openCheckout()"
-          >
-            {{ isCodCheckout() ? 'Place COD order' : 'Take payment' }}
-            <app-icon name="heroChevronRight" />
-          </button>
-        </div>
-      </div>
-
-      <app-fulfillment-checkout-fields
-        [settings]="fulfillmentSettings()"
-        [customer]="checkoutCustomer()"
-        (modeChanged)="fulfillmentModeChanged($event)"
-        (customerSelected)="selectMatchedCustomer($event)"
-      />
 
       @if (checkoutOpen() && cashierSession.canTakePayment() && perms.has('SettleOrder')) {
         <app-checkout-panel
@@ -1010,7 +178,7 @@ type CatalogView = 'grid' | 'list' | 'categories';
           (confirmed)="completeSale($event)"
           (approvalRequested)="completeSale($event)"
           (settlementConfirmed)="completeSaleWithSettlement($event)"
-          (cancelled)="checkoutOpen.set(false)"
+          (cancelled)="workflow.closeCheckout()"
         />
       }
       @if (mpesaSplitReady(); as split) {
@@ -1042,7 +210,7 @@ type CatalogView = 'grid' | 'list' | 'categories';
         <dialog
           class="modal modal-bottom modal-open md:modal-middle"
           aria-labelledby="credit-confirm-heading"
-          (cancel)="$event.preventDefault(); creditConfirmOpen.set(false)"
+          (cancel)="$event.preventDefault(); workflow.closeCreditConfirmation()"
         >
           <div
             class="modal-box modal-box-compact modal-box-task border border-base-300/60 bg-base-100 p-0"
@@ -1067,7 +235,7 @@ type CatalogView = 'grid' | 'list' | 'categories';
                 [iconOnly]="true"
                 aria-label="Close credit confirmation"
                 [disabled]="busy()"
-                (click)="creditConfirmOpen.set(false)"
+                (click)="workflow.closeCreditConfirmation()"
               >
                 <app-icon name="heroXMark" />
               </button>
@@ -1158,7 +326,7 @@ type CatalogView = 'grid' | 'list' | 'categories';
                 class="w-full"
                 type="button"
                 [disabled]="busy()"
-                (click)="creditConfirmOpen.set(false)"
+                (click)="workflow.closeCreditConfirmation()"
               >
                 Cancel
               </button>
@@ -1182,7 +350,7 @@ type CatalogView = 'grid' | 'list' | 'categories';
             </footer>
           </div>
           <form method="dialog" class="modal-backdrop">
-            <button type="button" aria-label="Cancel" (click)="creditConfirmOpen.set(false)">
+            <button type="button" aria-label="Cancel" (click)="workflow.closeCreditConfirmation()">
               close
             </button>
           </form>
@@ -1198,9 +366,6 @@ type CatalogView = 'grid' | 'list' | 'categories';
             </div>
           </div>
         </div>
-      }
-      @if (scannerOpen()) {
-        <app-barcode-scanner (scanned)="barcodeScanned($event)" (close)="scannerOpen.set(false)" />
       }
       @if (priceFloorFeedback(); as feedback) {
         <div class="toast toast-bottom toast-end z-50" aria-live="assertive">
@@ -1222,1498 +387,189 @@ type CatalogView = 'grid' | 'list' | 'categories';
   `,
 })
 export class SellComponent implements OnInit {
-  protected readonly cart = inject(CartService);
-  protected readonly connectivity = inject(ConnectivityService);
-  protected readonly sync = inject(SyncService);
-  protected readonly print = inject(PrintService);
-  protected readonly perms = inject(PermissionsService);
-  protected readonly cashierSession = inject(CashierSessionService);
-  private readonly receiptData = inject(ReceiptDataService);
-  private readonly pos = inject(PosService);
+  protected readonly workflow = inject(SellWorkflowStore);
   private readonly route = inject(ActivatedRoute);
-  private readonly scanFeedback = inject(ScanFeedbackService);
-  protected readonly catalogCache = inject(CatalogCacheService);
-  private readonly supabase = inject(SupabaseService);
-  protected readonly mpesa = inject(MpesaService);
-  private readonly mpesaCheckout = inject(MpesaCheckoutCoordinator);
-  private readonly locations = inject(LocationContextService);
-  private readonly fulfillment = inject(FulfillmentService);
+  protected readonly cart = this.workflow.cart;
+  protected readonly connectivity = this.workflow.connectivity;
+  protected readonly sync = this.workflow.sync;
+  protected readonly print = this.workflow.print;
+  protected readonly perms = this.workflow.perms;
+  protected readonly cashierSession = this.workflow.cashierSession;
+  protected readonly catalog = this.workflow.catalog;
+  protected readonly mpesa = this.workflow.mpesa;
 
-  protected readonly search = new FormControl('', { nonNullable: true });
-  private readonly productSearch = viewChild<ElementRef<HTMLInputElement>>('productSearch');
-  protected readonly searchQuery = signal('');
-  protected readonly scannerOpen = signal(false);
-  protected readonly results = signal<Variant[]>([]);
-  protected readonly topVariants = signal<Variant[]>([]);
-  protected readonly searchMode = computed(() => this.searchQuery().trim().length >= 2);
-  protected readonly catalogView = signal<CatalogView>('list');
-  protected readonly selectedCategoryId = signal<string | null>(null);
-  protected readonly categorySearch = signal('');
-  protected readonly categoryVisibleLimit = signal(24);
-  protected readonly selectedCategory = computed(() => {
-    const id = this.selectedCategoryId();
-    return id
-      ? (this.catalogCache.categories().find(category => category.id === id && category.active) ??
-          null)
-      : null;
-  });
-  private readonly activeCatalog = computed(() =>
-    this.catalogCache
-      .catalog()
-      .filter(variant => variant.variant_active && variant.product_active && variant.product_id)
-  );
-  protected readonly categoryDirectory = computed(() => {
-    const query = this.categorySearch().trim().toLocaleLowerCase();
-    const optionCountByProduct = new Map<string, number>();
-    for (const variant of this.activeCatalog()) {
-      const productId = variant.product_id!;
-      optionCountByProduct.set(productId, (optionCountByProduct.get(productId) ?? 0) + 1);
-    }
-    const productIdsByCategory = new Map<string, Set<string>>();
-    for (const link of this.catalogCache.productCategories()) {
-      const productIds = productIdsByCategory.get(link.category_id) ?? new Set<string>();
-      productIds.add(link.product_id);
-      productIdsByCategory.set(link.category_id, productIds);
-    }
-    return this.catalogCache
-      .categories()
-      .filter(
-        category => category.active && (!query || category.name.toLocaleLowerCase().includes(query))
-      )
-      .map(category => {
-        const linked = productIdsByCategory.get(category.id) ?? new Set<string>();
-        const productIds = new Set(
-          [...linked].filter(productId => optionCountByProduct.has(productId))
-        );
-        return {
-          ...category,
-          productCount: productIds.size,
-          optionCount: [...productIds].reduce(
-            (count, productId) => count + (optionCountByProduct.get(productId) ?? 0),
-            0
-          ),
-        };
-      })
-      .filter(category => category.productCount > 0);
-  });
-  protected readonly categoryItems = computed(() => {
-    const categoryId = this.selectedCategoryId();
-    if (!categoryId) return [];
-    const productIds = new Set(
-      this.catalogCache
-        .productCategories()
-        .filter(link => link.category_id === categoryId)
-        .map(link => link.product_id)
-    );
-    return this.activeCatalog().filter(variant => productIds.has(variant.product_id!));
-  });
-  protected readonly visibleCatalogItems = computed(() => {
-    if (this.searchMode()) return this.results();
-    if (this.catalogView() === 'categories') {
-      return this.categoryItems().slice(0, this.categoryVisibleLimit());
-    }
-    return this.topVariants();
-  });
-  protected readonly showProductResults = computed(
-    () =>
-      this.searchMode() ||
-      this.catalogView() !== 'categories' ||
-      (this.catalogCache.categoryMembershipsComplete() && this.selectedCategory() !== null)
-  );
-  protected readonly resultPresentation = computed<'grid' | 'list'>(() =>
-    this.catalogView() === 'list' ? 'list' : 'grid'
-  );
-  protected readonly quickAddMode = computed(
-    () => !this.searchMode() && this.catalogView() === 'grid'
-  );
-  protected readonly canShowMoreCategoryItems = computed(
-    () =>
-      !this.searchMode() &&
-      this.catalogView() === 'categories' &&
-      this.categoryVisibleLimit() < this.categoryItems().length
-  );
-  protected readonly cartItemCount = computed(() =>
-    this.cart.lines().reduce((total, line) => total + line.quantity, 0)
-  );
-  protected readonly canOverridePrices = computed(() => this.perms.has('OverridePrice'));
+  protected readonly cartItemCount = this.workflow.cartItemCount;
+  protected readonly canOverridePrices = this.workflow.canOverridePrices;
+  protected readonly customerSearch = this.workflow.customerSearch;
+  protected readonly customerResults = this.workflow.customerResults;
+  protected readonly customerSearchExhaustive = this.workflow.customerSearchExhaustive;
+  protected readonly customerSearchHasMore = this.workflow.customerSearchHasMore;
+  protected readonly selectedCustomer = this.workflow.selectedCustomer;
+  protected readonly customerDropdownOpen = this.workflow.customerDropdownOpen;
+  protected readonly fulfillmentSettings = this.workflow.fulfillmentSettings;
+  protected readonly fulfillmentMode = this.workflow.fulfillmentMode;
+  protected readonly checkoutCustomer = this.workflow.checkoutCustomer;
+  protected readonly overrideFor = this.workflow.overrideFor;
+  protected readonly overridePrice = this.workflow.overridePrice;
+  protected readonly overrideReason = this.workflow.overrideReason;
+  protected readonly priceFloorFeedback = this.workflow.priceFloorFeedback;
+  protected readonly checkoutOpen = this.workflow.checkoutOpen;
+  protected readonly mpesaSplitReady = this.workflow.mpesaSplitReady;
+  protected readonly customerDepositBalance = this.workflow.customerDepositBalance;
+  protected readonly clearCartArmed = this.workflow.clearCartArmed;
+  protected readonly creditConfirmOpen = this.workflow.creditConfirmOpen;
+  protected readonly creditApprovalReason = this.workflow.creditApprovalReason;
+  protected readonly busy = this.workflow.busy;
+  protected readonly displayError = this.workflow.displayError;
+  protected readonly notice = this.workflow.notice;
+  protected readonly draftFlags = this.workflow.draftFlags;
+  protected readonly draftFlagsDismissed = this.workflow.draftFlagsDismissed;
+  protected readonly success = this.workflow.success;
+  protected readonly printerEnabled = this.workflow.printerEnabled;
+  protected readonly automaticDownpayment = this.workflow.automaticDownpayment;
+  protected readonly automaticCreditAmount = this.workflow.automaticCreditAmount;
+  protected readonly creditExceedsLimit = this.workflow.creditExceedsLimit;
+  protected readonly creditApprovalRequired = this.workflow.creditApprovalRequired;
+  protected readonly panelMethods = this.workflow.panelMethods;
+  protected readonly canUseDirectAccounts = this.workflow.canUseDirectAccounts;
+  protected readonly mixedCreditAllowed = this.workflow.mixedCreditAllowed;
+  protected readonly approvalSent = this.workflow.approvalSent;
 
-  protected readonly customerSearch = new FormControl('', { nonNullable: true });
-  protected readonly customerResults = signal<CustomerWithCredit[]>([]);
-  protected readonly customerSearchExhaustive = signal(true);
-  protected readonly customerSearchHasMore = signal(false);
-  protected readonly selectedCustomer = signal<CustomerWithCredit | null>(null);
-  protected readonly customerDropdownOpen = signal(false);
-  protected readonly fulfillmentSettings = signal<FulfillmentSettings | null>(null);
-  protected readonly fulfillmentMode = signal<CheckoutMode>('counter');
-  protected readonly fulfillmentFields = viewChild(FulfillmentCheckoutFieldsComponent);
-  protected readonly checkoutCustomer = computed(() => {
-    const customer = this.selectedCustomer();
-    return customer
-      ? {
-          id: customer.id,
-          name: this.customerName(customer),
-          phone: customer.phone,
-          delivery_address: customer.delivery_address,
-        }
-      : null;
-  });
+  protected readonly checkoutWorkspace = viewChild(SellCheckoutWorkspaceComponent);
   protected readonly isCodCheckout = computed(
-    () =>
-      this.fulfillmentMode() !== 'counter' && this.fulfillmentFields()?.collectionKind() === 'cod'
+    () => this.checkoutWorkspace()?.isCodCheckout() ?? false
   );
   protected readonly fulfillmentPayerPhone = computed(
-    () => this.fulfillmentFields()?.phone() || this.selectedCustomer()?.phone || ''
+    () => this.checkoutWorkspace()?.payerPhone() || this.selectedCustomer()?.phone || ''
   );
-  private autoDeliveryFeeVariantId: string | null = null;
-
-  protected readonly overrideFor = signal<string | null>(null);
-  protected readonly overridePrice = new FormControl('', { nonNullable: true });
-  protected readonly overrideReason = new FormControl('', { nonNullable: true });
-  protected readonly priceFloorFeedback = signal<{
-    variantId: string;
-    label: string;
-    floor: number;
-    wholesale: boolean;
-  } | null>(null);
-
-  protected readonly checkoutOpen = signal(false);
-  protected readonly mpesaSplitReady = signal<{
-    intentId: string;
-    orderId: string;
-    cashPayments: PaymentInput[];
-    cashAmount: number;
-  } | null>(null);
-  protected readonly customerDepositBalance = signal(0);
-  protected readonly clearCartArmed = signal(false);
-  protected readonly creditConfirmOpen = signal(false);
-  protected readonly creditApprovalReason = new FormControl('', { nonNullable: true });
-  protected readonly methods = signal<PaymentMethodOption[]>([]);
-  protected readonly catalogRefreshing = signal(false);
-  protected readonly busy = signal(false);
-  protected readonly error = signal<string | null>(null);
-  protected readonly notice = signal<string | null>(null);
-  /**
-   * Load-time warnings for a proforma being edited: price drift since it was
-   * saved, overrides this user cannot keep, stock shortfalls, dropped lines.
-   * Shown only while a proforma is loaded (cart.draftId set).
-   */
-  protected readonly draftFlags = signal<DraftFlag[]>([]);
-  protected readonly draftFlagsDismissed = signal(false);
-  protected readonly success = signal<{
-    text: string;
-    tone: 'success' | 'warning';
-    orderId?: string;
-  } | null>(null);
-  protected readonly printerEnabled = signal(false);
-  protected readonly brokenImages = signal<Set<string>>(new Set());
-  protected readonly creditAllowed = computed(() => {
-    if (this.isCodCheckout()) return false;
-    const customer = this.selectedCustomer();
-    if (!customer || (!customer.is_credit_approved && this.automaticCreditAmount() > 0))
-      return false;
-    return (
-      !this.creditExceedsLimit() || this.perms.actionMode('sale.credit_over_limit') !== 'blocked'
-    );
-  });
-  protected readonly automaticDownpayment = computed(() =>
-    Math.min(this.customerDepositBalance(), this.cart.total())
-  );
-  protected readonly automaticCreditAmount = computed(() =>
-    Math.max(this.cart.total() - this.automaticDownpayment(), 0)
-  );
-  protected readonly creditExceedsLimit = computed(() => {
-    const customer = this.selectedCustomer();
-    return (
-      !!customer &&
-      customer.credit_limit > 0 &&
-      customer.ar_balance + this.automaticCreditAmount() > customer.credit_limit
-    );
-  });
-  protected readonly creditApprovalRequired = computed(
-    () => this.creditExceedsLimit() && this.perms.actionMode('sale.credit_over_limit') === 'request'
-  );
-  /** Backend-derived tender methods; walk-ins may only use till-controlled accounts. */
-  protected readonly panelMethods = computed<PaymentMethodOption[]>(() => {
-    const methods = this.methods();
-    return this.cart.customerId() ? methods : methods.filter(m => m.isCashierControlled);
-  });
-  protected readonly canUseDirectAccounts = computed(() => this.perms.has('ViewFinancials'));
-  protected readonly mixedCreditAllowed = computed(
-    () => !!this.selectedCustomer()?.is_credit_approved
-  );
-  protected readonly approvalSent = signal(false);
-  private approvalSentTimer: ReturnType<typeof setTimeout> | null = null;
-  private saleAttempt: {
-    fingerprint: string;
-    clientRef: string;
-    mpesaRetryAllowed: boolean;
-  } | null = null;
-  private searchSeq = 0;
-  private barcodeQueue: Promise<void> = Promise.resolve();
-  private searchKeystrokes: number[] = [];
-  private customerSearchSeq = 0;
-  private priceFloorTimer: ReturnType<typeof setTimeout> | null = null;
-  private readonly debouncedSearch = toSignal(
-    this.search.valueChanges.pipe(debounceTime(200), distinctUntilChanged()),
-    { initialValue: undefined }
-  );
-  private readonly debouncedCustomerSearch = toSignal(
-    this.customerSearch.valueChanges.pipe(debounceTime(200), distinctUntilChanged()),
-    { initialValue: undefined }
+  protected readonly creditAllowed = computed(
+    () => this.workflow.creditAllowed() && !this.isCodCheckout()
   );
 
   constructor() {
+    let handledResetVersion = 0;
     effect(() => {
-      const query = this.debouncedSearch();
-      if (query === undefined) return;
-      untracked(() => {
-        this.searchQuery.set(query);
-        void this.onSearch(query);
-      });
-    });
-    effect(() => {
-      const query = this.debouncedCustomerSearch();
-      if (query === undefined) return;
-      untracked(() => void this.onCustomerSearch(query));
-    });
-    let fulfillmentLocationId: string | null = null;
-    effect(() => {
-      const locationId = this.locations.activeId();
-      if (!locationId || locationId === fulfillmentLocationId) return;
-      const locationChanged = fulfillmentLocationId !== null;
-      fulfillmentLocationId = locationId;
-      untracked(() => {
-        if (locationChanged) {
-          if (this.autoDeliveryFeeVariantId) this.cart.removeLine(this.autoDeliveryFeeVariantId);
-          this.resetFulfillmentCheckout();
-        }
-        this.fulfillmentSettings.set(null);
-        void this.loadFulfillmentSettings();
-      });
+      const resetVersion = this.workflow.fulfillmentResetVersion();
+      if (resetVersion === handledResetVersion) return;
+      handledResetVersion = resetVersion;
+      untracked(() => queueMicrotask(() => this.checkoutWorkspace()?.resetFulfillment()));
     });
   }
 
   async ngOnInit(): Promise<void> {
-    this.restoreCatalogView();
-    void this.sync.paymentMethods().then(methods => this.methods.set(methods));
-    void this.receiptData.printerEnabled().then(enabled => this.printerEnabled.set(enabled));
-    void this.mpesa.refreshAvailability();
-    void this.sync
-      .topVariants(8)
-      .then(variants => this.topVariants.set(variants))
-      .catch(() => undefined);
     const params = this.route.snapshot.queryParamMap;
-    const draftId = params.get('draft');
-    if (draftId) await this.loadDraft(draftId);
-    const routedCustomerId = params.get('customer');
-    const customerId = routedCustomerId ?? this.cart.customerId();
-    if (customerId) {
-      try {
-        const customer = await this.pos.customerWithCredit(customerId);
-        if (!customer) throw new Error('Customer not found');
-        this.selectedCustomer.set(customer);
-        if (routedCustomerId) {
-          this.cart.setCustomer(customer.id, this.customerName(customer));
-        }
-        await this.refreshCustomerDeposit(customerId);
-      } catch {
-        this.selectedCustomer.set(null);
-        this.customerDepositBalance.set(0);
-        if (routedCustomerId) this.cart.setCustomer(null, 'Walk-in');
-      }
-    }
-  }
-
-  /** USB scanners normally behave like fast keyboards. Type-to-search also helps physical tills. */
-  @HostListener('window:keydown', ['$event'])
-  protected captureWedgeInput(event: KeyboardEvent): void {
-    if (
-      event.defaultPrevented ||
-      event.isComposing ||
-      event.ctrlKey ||
-      event.metaKey ||
-      event.altKey ||
-      isTextEntryTarget(event.target) ||
-      event.key.length !== 1 ||
-      this.checkoutOpen() ||
-      this.creditConfirmOpen() ||
-      this.scannerOpen()
-    ) {
-      return;
-    }
-    event.preventDefault();
-    this.search.setValue(this.search.value + event.key);
-    this.productSearch()?.nativeElement.focus({ preventScroll: true });
-    this.recordSearchKeystroke(event.timeStamp);
-  }
-
-  protected async refreshCatalog(): Promise<void> {
-    if (this.catalogRefreshing()) return;
-    this.catalogRefreshing.set(true);
-    this.error.set(null);
-    try {
-      const refreshed = await this.sync.refreshProductSnapshot();
-      this.topVariants.set(await this.sync.topVariants(8));
-      if (!refreshed) this.error.set('Could not refresh the catalog; using the last saved copy.');
-    } finally {
-      this.catalogRefreshing.set(false);
-    }
-  }
-
-  protected setCatalogView(view: CatalogView): void {
-    this.catalogView.set(view);
-    this.persistCatalogView(view);
-  }
-
-  protected openCategory(categoryId: string): void {
-    this.selectedCategoryId.set(categoryId);
-    this.categoryVisibleLimit.set(24);
-  }
-
-  protected leaveCategory(): void {
-    this.selectedCategoryId.set(null);
-    this.categoryVisibleLimit.set(24);
-  }
-
-  protected showMoreCategoryItems(): void {
-    this.categoryVisibleLimit.update(limit => limit + 24);
-  }
-
-  protected catalogSectionLabel(): string {
-    if (this.searchMode()) return 'Search results';
-    if (this.catalogView() === 'categories') {
-      return this.selectedCategory() ? 'Category' : 'Browse categories';
-    }
-    return 'Quick add';
-  }
-
-  private catalogViewStorageKey(): string | null {
-    const identity = this.supabase.offlineIdentity();
-    return identity ? `dukarun:catalog-view:${identity.companyId}:${identity.userId}` : null;
-  }
-
-  private restoreCatalogView(): void {
-    const key = this.catalogViewStorageKey();
-    if (!key || typeof localStorage === 'undefined') return;
-    try {
-      const stored = localStorage.getItem(key);
-      if (stored === 'grid' || stored === 'list' || stored === 'categories') {
-        this.catalogView.set(stored);
-      }
-    } catch {
-      // Restricted storage must not prevent the POS from starting.
-    }
-  }
-
-  private persistCatalogView(view: CatalogView): void {
-    const key = this.catalogViewStorageKey();
-    if (!key || typeof localStorage === 'undefined') return;
-    try {
-      localStorage.setItem(key, view);
-    } catch {
-      // Keep the in-memory selection when storage is unavailable or full.
-    }
-  }
-
-  protected imageUrl(path: string | null | undefined): string | null {
-    return this.pos.imageUrl(path);
-  }
-
-  protected markBroken(path: string): void {
-    this.brokenImages.update(set => new Set(set).add(path));
-  }
-
-  protected async onSearch(query: string): Promise<void> {
-    const q = query.trim();
-    // Sequence guard: a slower earlier response must not overwrite newer results.
-    const seq = ++this.searchSeq;
-    // A scanner Enter clears the control before a pending debounce emits. Do
-    // not resurrect or resolve that stale value as a second scan.
-    if (this.search.value.trim() !== q) return;
-    if (q.length < 2) {
-      this.results.set([]);
-      return;
-    }
-    try {
-      const variants = await this.sync.searchProducts(q);
-      if (seq !== this.searchSeq || this.search.value.trim() !== q) return;
-      if (variants.some(v => v.barcode === q)) {
-        // Clear first so a scanner-sent Enter cannot enqueue the same physical
-        // read while this exact search result is waiting in the queue.
-        this.clearSearch();
-        this.enqueueBarcode(q);
-        return;
-      }
-      this.results.set(variants);
-    } catch (err) {
-      if (seq !== this.searchSeq) return;
-      this.error.set(err instanceof Error ? err.message : 'Product search failed');
-    }
-  }
-
-  protected clearSearch(): void {
-    this.searchSeq++;
-    this.search.setValue('', { emitEvent: false });
-    this.searchQuery.set('');
-    this.results.set([]);
-  }
-
-  protected barcodeScanned(value: string): void {
-    this.scannerOpen.set(false);
-    this.clearSearch();
-    this.enqueueBarcode(value);
-  }
-
-  protected onSearchKeydown(event: KeyboardEvent): void {
-    if (event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
-      this.recordSearchKeystroke(event.timeStamp);
-      return;
-    }
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      this.scanTypedBarcode();
-      return;
-    }
-    if (event.key === 'Tab' && isRapidScannerBurst(this.searchKeystrokes)) {
-      event.preventDefault();
-      this.scanTypedBarcode();
-    }
-  }
-
-  private recordSearchKeystroke(time: number): void {
-    const previous = this.searchKeystrokes.at(-1);
-    if (previous === undefined || time - previous <= 80) this.searchKeystrokes.push(time);
-    else this.searchKeystrokes = [time];
-    if (this.searchKeystrokes.length > 64) this.searchKeystrokes.shift();
-  }
-
-  protected scanTypedBarcode(): void {
-    const barcode = this.search.value.trim();
-    if (!barcode) return;
-    // Invalidates any pending debounced search before queueing this Enter event.
-    this.clearSearch();
-    this.enqueueBarcode(barcode);
-  }
-
-  private enqueueBarcode(value: string): void {
-    const barcode = value.trim();
-    if (!barcode) return;
-    const resolve = () => this.resolveScannedBarcode(barcode);
-    // Keep the queue usable even if an unforeseen UI-side exception escapes a
-    // previous lookup; one failed read must not disable later scans.
-    this.barcodeQueue = this.barcodeQueue.then(resolve, resolve);
-  }
-
-  private async resolveScannedBarcode(value: string): Promise<void> {
-    const barcode = value.trim();
-    if (!barcode) return;
-    this.error.set(null);
-    try {
-      const result = await this.sync.resolveBarcode(barcode);
-      if (result.status === 'unknown') {
-        this.error.set(`No active product or service uses barcode “${barcode}”.`);
-        return;
-      }
-      if (result.status === 'ambiguous') {
-        this.error.set(
-          `Barcode “${barcode}” belongs to more than one variant. Assign individual barcodes before selling it.`
-        );
-        return;
-      }
-      if (result.status === 'incomplete') {
-        this.error.set(
-          'This offline catalogue is incomplete, so barcode matching is disabled. Reconnect and refresh the catalogue.'
-        );
-        return;
-      }
-      if (this.unavailable(result.variant)) {
-        this.error.set(`${this.label(result.variant)} is out of stock at this location.`);
-        return;
-      }
-      if (this.addVariant(result.variant)) this.scanFeedback.playSuccess();
-    } catch (error) {
-      this.error.set(error instanceof Error ? error.message : 'Barcode lookup failed.');
-    } finally {
-      this.searchKeystrokes = [];
-      queueMicrotask(() => this.productSearch()?.nativeElement.focus({ preventScroll: true }));
-    }
-  }
-
-  protected addVariant(variant: Variant): boolean {
-    if (this.unavailable(variant)) return false;
-    if (this.cart.addVariant(variant)) return true;
-    this.error.set(
-      `An order can contain at most ${MAX_SALE_LINES} different items. Complete this order, then start another.`
-    );
-    return false;
-  }
-
-  protected label(variant: Variant): string {
-    return variantLabel(variant);
-  }
-
-  protected quantityInCart(variantId: string | null): number {
-    if (!variantId) return 0;
-    return this.cart.lines().find(line => line.variant.variant_id === variantId)?.quantity ?? 0;
-  }
-
-  protected unavailable(variant: Variant): boolean {
-    return variant.kind !== 'service' && !!variant.track_inventory && (variant.stock ?? 0) <= 0;
-  }
-
-  protected stockLabel(variant: Variant): string {
-    if (variant.kind === 'service') return 'Service';
-    if (!variant.track_inventory) return 'In stock';
-    const stock = variant.stock ?? 0;
-    return stock > 0 ? `${stock} left` : 'Out of stock';
+    await this.workflow.initialize({
+      draftId: params.get('draft'),
+      customerId: params.get('customer'),
+    });
   }
 
   protected stepQty(variantId: string, direction: 1 | -1): void {
-    const line = this.cart.lines().find(l => l.variant.variant_id === variantId);
-    if (!line) return;
-    this.cart.setQuantity(
-      variantId,
-      line.quantity + direction * this.cart.quantityStep(line.variant)
-    );
+    this.workflow.stepQty(variantId, direction);
   }
 
   protected onQtyInput(variantId: string, value: number | string): void {
-    const quantity = Number(value);
-    if (Number.isFinite(quantity)) this.cart.setQuantity(variantId, quantity);
+    this.workflow.onQtyInput(variantId, value);
   }
 
-  /**
-   * Adjust by a stable ~3% of the base unit price, rounded to whole KES.
-   * A fixed step makes up/down reversible and avoids the decimal drift in the old POS.
-   */
   protected adjustPrice(line: CartLine, direction: 1 | -1): void {
-    if (!this.canOverridePrices()) return;
-    const baseWhole = line.unitPrice;
-    const currentWhole = line.customPrice ?? line.unitPrice;
-    const step = Math.max(1, Math.round(line.unitPrice * 0.03));
-    const wholesaleFloor = this.wholesaleFloor(line);
-    if (direction < 0 && currentWhole <= wholesaleFloor) {
-      this.rejectBelowWholesale(line, wholesaleFloor);
-      return;
-    }
-    const next = Math.max(wholesaleFloor, currentWhole + direction * step);
-
-    if (next === currentWhole) return;
-    this.clearPriceFloorFeedback();
-    const customPrice = next === line.unitPrice ? null : next;
-    const verb = direction > 0 ? 'increased' : 'reduced';
-    this.cart.setCustomPrice(
-      line.variant.variant_id!,
-      customPrice,
-      customPrice === null ? '' : `Quick price ${verb} by KES ${step}`
-    );
-
-    // When a whole-KES base is reached, remove the override entirely.
-    if (next === baseWhole && baseWhole === line.unitPrice) {
-      this.cart.setCustomPrice(line.variant.variant_id!, null, '');
-    }
+    this.workflow.adjustPrice(line, direction);
   }
 
   protected startOverride(line: CartLine): void {
-    if (!this.canOverridePrices()) return;
-    const effectivePrice = line.customPrice ?? line.unitPrice;
-    this.overrideFor.set(line.variant.variant_id!);
-    this.overridePrice.setValue(String(effectivePrice));
-    this.overrideReason.setValue(line.overrideReason);
+    this.workflow.startOverride(line);
   }
 
   protected applyOverride(): void {
-    if (!this.canOverridePrices()) return;
-    const variantId = this.overrideFor();
-    if (!variantId) return;
-    const enteredAmount = parseKes(this.overridePrice.value);
-    if (enteredAmount === null || enteredAmount <= 0) {
-      this.error.set('Enter a valid price greater than zero');
-      return;
-    }
-
-    const line = this.cart.lines().find(item => item.variant.variant_id === variantId);
-    if (!line) return;
-    const wholesaleFloor = this.wholesaleFloor(line);
-    if (enteredAmount < wholesaleFloor) {
-      this.rejectBelowWholesale(line, wholesaleFloor);
-      return;
-    }
-
-    const customPrice = enteredAmount === line.unitPrice ? null : enteredAmount;
-    this.clearPriceFloorFeedback();
-    this.cart.setCustomPrice(
-      variantId,
-      customPrice,
-      customPrice === null ? '' : this.overrideReason.value.trim() || 'Manual price adjustment'
-    );
-    this.overrideFor.set(null);
-    this.error.set(null);
+    this.workflow.applyOverride();
   }
 
   protected resetPrice(line: CartLine): void {
-    this.clearPriceFloorFeedback();
-    this.cart.setCustomPrice(line.variant.variant_id!, null, '');
-    if (this.overrideFor() === line.variant.variant_id) this.overrideFor.set(null);
-  }
-
-  private wholesaleFloor(line: CartLine): number {
-    return Math.max(1, line.variant.wholesale_price ?? 0);
-  }
-
-  private rejectBelowWholesale(line: CartLine, floor: number): void {
-    this.clearPriceFloorFeedback();
-    requestAnimationFrame(() => {
-      this.priceFloorFeedback.set({
-        variantId: line.variant.variant_id!,
-        label: this.cart.lineLabel(line),
-        floor,
-        wholesale: (line.variant.wholesale_price ?? 0) > 0,
-      });
-      this.priceFloorTimer = setTimeout(() => this.priceFloorFeedback.set(null), 3000);
-    });
-  }
-
-  private clearPriceFloorFeedback(): void {
-    if (this.priceFloorTimer) {
-      clearTimeout(this.priceFloorTimer);
-      this.priceFloorTimer = null;
-    }
-    this.priceFloorFeedback.set(null);
-  }
-
-  protected onCustomerFocus(): void {
-    this.customerSearch.setValue('', { emitEvent: false });
-    this.customerResults.set([]);
-    this.customerDropdownOpen.set(true);
-  }
-
-  protected onCustomerBlur(): void {
-    this.customerDropdownOpen.set(false);
-    // No selection made: the field reverts to the Walk-in placeholder.
-    this.customerSearch.setValue('', { emitEvent: false });
-    this.customerResults.set([]);
-  }
-
-  protected clearCustomer(): void {
-    this.selectCustomer(null);
-  }
-
-  protected async onCustomerSearch(query: string): Promise<void> {
-    const q = query.trim();
-    const seq = ++this.customerSearchSeq;
-    if (q.length < 2) {
-      this.customerResults.set([]);
-      this.customerSearchExhaustive.set(true);
-      this.customerSearchHasMore.set(false);
-      return;
-    }
-    try {
-      const result = await this.pos.searchCustomers(q);
-      if (seq !== this.customerSearchSeq) return;
-      this.customerResults.set(result.items);
-      this.customerSearchExhaustive.set(result.exhaustive);
-      this.customerSearchHasMore.set(result.hasMore);
-      this.customerDropdownOpen.set(true);
-    } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Customer search failed');
-    }
-  }
-
-  protected selectCustomer(customer: CustomerWithCredit | null): void {
-    this.selectedCustomer.set(customer);
-    this.cart.setCustomer(customer?.id ?? null, customer ? this.customerName(customer) : 'Walk-in');
-    this.customerDropdownOpen.set(false);
-    this.customerSearch.setValue('', { emitEvent: false });
-    this.customerResults.set([]);
-    if (customer) void this.refreshCustomerDeposit(customer.id);
-    else this.customerDepositBalance.set(0);
-  }
-
-  protected customerCreditAvailable(customer: CustomerWithCredit): number {
-    return Math.max(0, customer.credit_limit - customer.ar_balance);
-  }
-
-  protected customerName(customer: Customer): string {
-    return [customer.first_name, customer.last_name].filter(Boolean).join(' ');
-  }
-
-  private async loadFulfillmentSettings(): Promise<void> {
-    const locationId = this.locations.activeId();
-    if (!locationId) return;
-    try {
-      this.fulfillmentSettings.set(await this.fulfillment.settings(locationId));
-    } catch {
-      this.fulfillmentSettings.set(null);
-    }
-  }
-
-  protected selectFulfillmentMethod(mode: CheckoutMode): void {
-    this.fulfillmentFields()?.selectMode(mode);
-  }
-
-  protected openFulfillmentDetails(): void {
-    this.fulfillmentFields()?.openDetails();
-  }
-
-  protected async fulfillmentModeChanged(mode: CheckoutMode): Promise<void> {
-    this.fulfillmentMode.set(mode);
-    this.error.set(null);
-    if (mode === 'delivery') {
-      await this.ensureDeliveryFee();
-      return;
-    }
-    if (this.autoDeliveryFeeVariantId) {
-      this.cart.removeLine(this.autoDeliveryFeeVariantId);
-      this.autoDeliveryFeeVariantId = null;
-    }
-  }
-
-  protected async selectMatchedCustomer(customerId: string): Promise<void> {
-    try {
-      const customer = await this.pos.customerWithCredit(customerId);
-      if (!customer) throw new Error('Customer not found');
-      this.selectCustomer(customer);
-    } catch (error) {
-      this.error.set(error instanceof Error ? error.message : 'Could not select customer');
-    }
-  }
-
-  private async ensureDeliveryFee(): Promise<boolean> {
-    if (this.fulfillmentMode() !== 'delivery') return true;
-    const variantId = this.fulfillmentSettings()?.default_delivery_fee_variant_id;
-    if (!variantId) {
-      this.error.set(
-        'Set a delivery fee product in fulfillment settings before taking delivery orders.'
-      );
-      return false;
-    }
-    if (this.cart.lines().some(line => line.variant.variant_id === variantId)) return true;
-    try {
-      const variant = await this.pos.variantById(variantId);
-      if (!variant || !variant.variant_active || !variant.product_active) {
-        throw new Error('The configured delivery fee product is unavailable.');
-      }
-      if (!this.cart.addVariant(variant)) throw new Error('The sale has too many lines.');
-      this.autoDeliveryFeeVariantId = variantId;
-      return true;
-    } catch (error) {
-      this.error.set(error instanceof Error ? error.message : 'Could not add the delivery fee');
-      return false;
-    }
-  }
-
-  protected async openCheckout(): Promise<void> {
-    if (!this.perms.has('SettleOrder')) return;
-    this.error.set(null);
-    if (!(await this.ensureDeliveryFee())) return;
-    const fulfillmentDraft = this.currentFulfillmentDraft();
-    if (this.fulfillmentMode() !== 'counter' && !fulfillmentDraft) return;
-    if (fulfillmentDraft?.fulfillment.collection_kind === 'cod') {
-      await this.placeCodOrder(fulfillmentDraft);
-      return;
-    }
-    try {
-      await this.cashierSession.assertOpen('taking payment');
-      const customerId = this.cart.customerId();
-      if (customerId) await this.refreshCustomerDeposit(customerId);
-      this.checkoutOpen.set(true);
-    } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Open a cashier session first');
-    }
-  }
-
-  private currentFulfillmentDraft(): FulfillmentCheckoutDraft | null {
-    return this.fulfillmentMode() === 'counter'
-      ? null
-      : (this.fulfillmentFields()?.build() ?? null);
-  }
-
-  private async placeCodOrder(draft: FulfillmentCheckoutDraft): Promise<void> {
-    if (!this.connectivity.online()) {
-      this.error.set('COD orders require an internet connection.');
-      return;
-    }
-    this.busy.set(true);
-    this.error.set(null);
-    this.notice.set(null);
-    const lines = this.cart.toSaleLines();
-    const fingerprint = JSON.stringify({ lines, draft, kind: 'cod' });
-    if (this.saleAttempt?.fingerprint !== fingerprint) {
-      this.saleAttempt = {
-        fingerprint,
-        clientRef: crypto.randomUUID(),
-        mpesaRetryAllowed: false,
-      };
-    }
-    try {
-      const result = await this.fulfillment.checkout({
-        locationId: this.locations.requireActiveId(),
-        customer: draft.customer,
-        lines,
-        payments: [],
-        fulfillment: draft.fulfillment,
-        clientRef: this.saleAttempt.clientRef,
-        draftId: this.cart.draftId() ?? undefined,
-      });
-      this.checkoutOpen.set(false);
-      this.cart.clear();
-      this.saleAttempt = null;
-      this.selectedCustomer.set(null);
-      this.customerDepositBalance.set(0);
-      this.resetFulfillmentCheckout();
-      this.success.set({
-        text: result.pin ? `COD order placed · delivery PIN ${result.pin}` : 'COD order placed',
-        tone: 'success',
-        orderId: result.order_id,
-      });
-    } catch (error) {
-      this.error.set(error instanceof Error ? error.message : 'COD order could not be placed');
-    } finally {
-      this.busy.set(false);
-    }
-  }
-
-  protected completeSaleWithSettlement(settlement: SaleSettlementInput): void {
-    void this.completeSale(settlement.payments, undefined, settlement);
-  }
-
-  protected async completeSale(
-    payments: PaymentInput[],
-    approvalReason?: string,
-    settlement?: SaleSettlementInput
-  ): Promise<void> {
-    this.error.set(null);
-    this.notice.set(null);
-    this.success.set(null);
-    try {
-      await this.cashierSession.assertOpen('completing a sale');
-    } catch (err) {
-      this.checkoutOpen.set(false);
-      this.error.set(err instanceof Error ? err.message : 'Open a cashier session first');
-      return;
-    }
-    this.busy.set(true);
-    const customerId = this.cart.customerId();
-    const lines = this.cart.toSaleLines();
-    const fulfillmentDraft = this.currentFulfillmentDraft();
-    if (this.fulfillmentMode() !== 'counter' && !fulfillmentDraft) {
-      this.busy.set(false);
-      return;
-    }
-    // Retain one key across ambiguous retries, but rotate it when the sale
-    // payload changes so an edited cart cannot replay an earlier completion.
-    const fingerprint = JSON.stringify({
-      customerId,
-      lines,
-      payments,
-      settlement,
-      fulfillmentDraft,
-    });
-    if (this.saleAttempt?.fingerprint !== fingerprint) {
-      this.saleAttempt = {
-        fingerprint,
-        clientRef: crypto.randomUUID(),
-        mpesaRetryAllowed: false,
-      };
-    }
-    const clientRef = this.saleAttempt.clientRef;
-    if (!this.connectivity.online()) {
-      if (
-        payments.some(payment => payment.method === 'mpesa') &&
-        (this.mpesa.availability().active || this.mpesa.availability().manualFallback)
-      ) {
-        this.error.set('Integrated M-PESA payment requires an internet connection.');
-        this.checkoutOpen.set(false);
-        this.busy.set(false);
-        return;
-      }
-      if (settlement) {
-        this.error.set('Customer deposits and mixed credit require an online connection.');
-        this.checkoutOpen.set(false);
-        this.busy.set(false);
-        return;
-      }
-      try {
-        await this.queueSale(customerId, lines, payments, clientRef, fulfillmentDraft);
-        this.saleAttempt = null;
-      } catch (err) {
-        this.error.set(err instanceof Error ? err.message : 'Could not safely queue the sale');
-      } finally {
-        this.busy.set(false);
-      }
-      return;
-    }
-    const mpesaPayment = payments.find(
-      payment =>
-        payment.method === 'mpesa' &&
-        (payment.phone || (this.mpesa.availability().manualFallback && payment.reference))
-    );
-    if (mpesaPayment && !settlement) {
-      try {
-        await this.completeMpesaSale(
-          mpesaPayment,
-          payments,
-          customerId,
-          lines,
-          clientRef,
-          fulfillmentDraft
-        );
-      } catch (err) {
-        this.error.set(
-          err instanceof Error ? err.message : 'M-PESA payment could not be completed'
-        );
-      } finally {
-        this.busy.set(false);
-      }
-      return;
-    }
-    try {
-      // Completing from a loaded proforma: pass the draft id so the backend
-      // retires it in the same transaction as the sale — no separate delete
-      // call that could be lost. Offline-queued sales carry the draft id in
-      // the outbox entry and use the same mechanism on replay.
-      const completedDraftId = this.cart.draftId() ?? undefined;
-      let result;
-      const post = async (draftId?: string) => {
-        if (fulfillmentDraft) {
-          const checkout = await this.fulfillment.checkout({
-            locationId: this.locations.requireActiveId(),
-            customer: fulfillmentDraft.customer,
-            lines,
-            payments,
-            fulfillment: fulfillmentDraft.fulfillment,
-            clientRef,
-            draftId,
-            approvalReason,
-          });
-          return {
-            status: checkout.status,
-            orderId: checkout.order_id,
-            approvalId: undefined,
-            pin: checkout.pin,
-          };
-        }
-        return settlement
-          ? this.pos.postSaleWithPrepayment(customerId!, lines, settlement, clientRef, draftId)
-          : this.pos.postSale(
-              customerId,
-              lines,
-              payments,
-              false,
-              clientRef,
-              undefined,
-              draftId,
-              approvalReason
-            );
-      };
-      try {
-        result = await post(completedDraftId);
-      } catch (err) {
-        // The loaded proforma expired or was retired on another device: drop
-        // the link and retry once as a plain sale. The same client_ref keeps
-        // the retry idempotent if the first attempt somehow committed.
-        if (
-          !completedDraftId ||
-          !(err instanceof PosRpcError) ||
-          !err.message.startsWith('draft_not_found')
-        ) {
-          throw err;
-        }
-        this.cart.draftId.set(null);
-        result = await post();
-      }
-      this.checkoutOpen.set(false);
-      this.cart.clear();
-      this.saleAttempt = null;
-      this.selectedCustomer.set(null);
-      this.customerDepositBalance.set(0);
-      this.resetFulfillmentCheckout();
-      if (result.status === 'approval_required') {
-        this.showApprovalSent();
-      } else {
-        const handoffPin = 'pin' in result ? result.pin : null;
-        this.success.set({
-          text: handoffPin ? `Sale completed · handoff PIN ${handoffPin}` : 'Sale completed',
-          tone: 'success',
-          orderId: result.orderId,
-        });
-      }
-    } catch (err) {
-      if (!(err instanceof PosRpcError) && !settlement) {
-        try {
-          await this.queueSale(customerId, lines, payments, clientRef, fulfillmentDraft);
-          this.saleAttempt = null;
-        } catch (queueError) {
-          this.error.set(
-            queueError instanceof Error ? queueError.message : 'Could not safely queue the sale'
-          );
-        }
-      } else {
-        this.error.set(err instanceof Error ? err.message : 'Sale could not be completed');
-        this.checkoutOpen.set(false);
-      }
-    } finally {
-      this.busy.set(false);
-    }
-  }
-
-  private async completeMpesaSale(
-    mpesaPayment: PaymentInput,
-    payments: PaymentInput[],
-    customerId: string | null,
-    lines: ReturnType<CartService['toSaleLines']>,
-    clientRef: string,
-    fulfillmentDraft: FulfillmentCheckoutDraft | null
-  ): Promise<void> {
-    const cashPayments = payments
-      .filter(payment => payment !== mpesaPayment)
-      .map(({ phone: _phone, ...payment }) => payment);
-    this.checkoutOpen.set(false);
-    this.notice.set(
-      mpesaPayment.phone
-        ? 'STK prompt sent. Waiting for M-PESA confirmation.'
-        : 'Checking the M-PESA receipt.'
-    );
-    const outcome = await this.mpesaCheckout.run(
-      retry =>
-        fulfillmentDraft
-          ? this.fulfillment.prepareMpesaCheckout({
-              locationId: this.locations.requireActiveId(),
-              customer: fulfillmentDraft.customer,
-              lines,
-              fulfillment: fulfillmentDraft.fulfillment,
-              mpesaAmount: mpesaPayment.amount,
-              cashAmount: cashPayments.reduce((sum, payment) => sum + payment.amount, 0),
-              clientRef,
-              draftId: this.cart.draftId() ?? undefined,
-              retry,
-              ...(mpesaPayment.phone
-                ? { phone: mpesaPayment.phone }
-                : { receipt: mpesaPayment.reference! }),
-            })
-          : this.mpesa.initiateSale({
-              locationId: this.locations.requireActiveId(),
-              customerId,
-              lines,
-              mpesaAmount: mpesaPayment.amount,
-              cashAmount: cashPayments.reduce((sum, payment) => sum + payment.amount, 0),
-              clientRef,
-              draftId: this.cart.draftId() ?? undefined,
-              retry,
-              ...(mpesaPayment.phone
-                ? { phone: mpesaPayment.phone }
-                : { receipt: mpesaPayment.reference! }),
-            }),
-      this.saleAttempt?.mpesaRetryAllowed ?? false
-    );
-    if (outcome.kind === 'completed') {
-      this.finishMpesaSale(outcome.subjectId);
-      return;
-    }
-    if (outcome.kind === 'awaiting_cash') {
-      this.mpesaSplitReady.set({
-        intentId: outcome.intentId,
-        orderId: outcome.subjectId,
-        cashPayments,
-        cashAmount: outcome.cashAmount,
-      });
-      this.notice.set('M-PESA received. Confirm the cash side to finish the sale.');
-      return;
-    }
-    if (outcome.kind === 'manual_review') {
-      this.finishMpesaSale(outcome.subjectId, true);
-      this.error.set(outcome.message);
-      return;
-    }
-    if (outcome.kind === 'failed' && outcome.retryAllowed && this.saleAttempt) {
-      this.saleAttempt.mpesaRetryAllowed = true;
-    }
-    throw new Error(outcome.message);
-  }
-
-  protected async confirmMpesaSplitCash(): Promise<void> {
-    const split = this.mpesaSplitReady();
-    if (!split) return;
-    this.busy.set(true);
-    this.error.set(null);
-    try {
-      await this.mpesaCheckout.finalizeCash(split.intentId);
-      this.mpesaSplitReady.set(null);
-      this.finishMpesaSale(split.orderId);
-    } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Could not finish split payment');
-    } finally {
-      this.busy.set(false);
-    }
-  }
-
-  protected keepMpesaSplitPending(): void {
-    const split = this.mpesaSplitReady();
-    if (!split) return;
-    this.mpesaSplitReady.set(null);
-    this.finishMpesaSale(split.orderId, true);
-    this.notice.set('M-PESA is recorded. The cash balance remains in pending sales.');
-  }
-
-  private finishMpesaSale(orderId: string, warning = false): void {
-    this.checkoutOpen.set(false);
-    this.cart.clear();
-    this.saleAttempt = null;
-    this.selectedCustomer.set(null);
-    this.customerDepositBalance.set(0);
-    this.resetFulfillmentCheckout();
-    this.success.set({
-      text: warning ? 'Payment received — review needed' : 'Sale completed',
-      tone: warning ? 'warning' : 'success',
-      orderId,
-    });
-  }
-
-  private async refreshCustomerDeposit(customerId: string): Promise<void> {
-    if (!this.connectivity.online()) {
-      this.customerDepositBalance.set(0);
-      return;
-    }
-    try {
-      this.customerDepositBalance.set(await this.pos.customerDepositAvailable(customerId));
-    } catch {
-      this.customerDepositBalance.set(0);
-    }
-  }
-
-  protected confirmCreditSale(): void {
-    const reason = this.creditApprovalReason.value.trim();
-    if (this.creditApprovalRequired() && !reason) return;
-    this.creditConfirmOpen.set(false);
-    void this.completeCreditSale(reason || undefined);
-    this.creditApprovalReason.setValue('');
-  }
-
-  protected async openCreditConfirmation(): Promise<void> {
-    if (!this.creditAllowed() || !(await this.ensureDeliveryFee())) return;
-    if (this.fulfillmentMode() !== 'counter' && !this.currentFulfillmentDraft()) return;
-    this.creditConfirmOpen.set(true);
-  }
-
-  private async completeCreditSale(approvalReason?: string): Promise<void> {
-    const customerId = this.cart.customerId();
-    if (!customerId) return;
-    this.error.set(null);
-    this.notice.set(null);
-    this.success.set(null);
-    if (!this.connectivity.online()) {
-      this.error.set('Credit sales require an online balance check.');
-      return;
-    }
-    try {
-      await this.cashierSession.assertOpen('completing a credit sale');
-    } catch (error) {
-      this.error.set(error instanceof Error ? error.message : 'Open a cashier session first');
-      return;
-    }
-    if (!(await this.ensureDeliveryFee())) return;
-    const fulfillmentDraft = this.currentFulfillmentDraft();
-    if (this.fulfillmentMode() !== 'counter' && !fulfillmentDraft) return;
-    const lines = this.cart.toSaleLines();
-    const fingerprint = JSON.stringify({
-      customerId,
-      lines,
-      fulfillmentDraft,
-      kind: 'automatic-credit',
-    });
-    if (this.saleAttempt?.fingerprint !== fingerprint) {
-      this.saleAttempt = {
-        fingerprint,
-        clientRef: crypto.randomUUID(),
-        mpesaRetryAllowed: false,
-      };
-    }
-    this.busy.set(true);
-    try {
-      const result = fulfillmentDraft
-        ? await this.fulfillment.creditCheckout({
-            locationId: this.locations.requireActiveId(),
-            customerId,
-            customer: fulfillmentDraft.customer,
-            lines,
-            fulfillment: fulfillmentDraft.fulfillment,
-            clientRef: this.saleAttempt.clientRef,
-            draftId: this.cart.draftId() ?? undefined,
-            approvalReason,
-          })
-        : await this.pos.postCreditSale(
-            customerId,
-            lines,
-            this.saleAttempt.clientRef,
-            this.cart.draftId() ?? undefined,
-            approvalReason
-          );
-      this.cart.clear();
-      this.saleAttempt = null;
-      this.selectedCustomer.set(null);
-      this.customerDepositBalance.set(0);
-      this.resetFulfillmentCheckout();
-      if (result.status === 'approval_required') {
-        this.showApprovalSent();
-      } else {
-        const split = result.downpaymentApplied
-          ? ` · ${result.downpaymentApplied.toLocaleString('en-KE')} downpayment applied`
-          : '';
-        const pin = 'pin' in result && result.pin ? ` · handoff PIN ${result.pin}` : '';
-        this.success.set({
-          text: `Sale completed${split}${pin}`,
-          tone: 'success',
-          orderId: result.orderId,
-        });
-      }
-    } catch (error) {
-      this.error.set(error instanceof Error ? error.message : 'Credit sale could not complete');
-    } finally {
-      this.busy.set(false);
-    }
-  }
-
-  /** Timed toast for approval-held orders (mirrors the price-floor toast). */
-  private showApprovalSent(): void {
-    if (this.approvalSentTimer) clearTimeout(this.approvalSentTimer);
-    this.approvalSent.set(true);
-    this.approvalSentTimer = setTimeout(() => this.approvalSent.set(false), 5000);
-  }
-
-  private async queueSale(
-    customerId: string | null,
-    lines: ReturnType<CartService['toSaleLines']>,
-    payments: PaymentInput[],
-    clientRef: string,
-    fulfillmentDraft: FulfillmentCheckoutDraft | null
-  ): Promise<void> {
-    if (fulfillmentDraft && !fulfillmentDraft.fulfillment.phone?.trim()) {
-      throw new Error('Offline pickup requires a recipient phone so the tracking PIN is not lost.');
-    }
-    await this.sync.enqueue(
-      {
-        customer_id: customerId,
-        lines,
-        payments,
-        draft_id: this.cart.draftId(),
-        ...(fulfillmentDraft
-          ? {
-              checkout_customer: fulfillmentDraft.customer,
-              fulfillment: fulfillmentDraft.fulfillment,
-            }
-          : {}),
-      },
-      clientRef
-    );
-    this.checkoutOpen.set(false);
-    this.cart.clear();
-    this.selectedCustomer.set(null);
-    this.resetFulfillmentCheckout();
-    this.success.set({ text: 'Sale queued — will sync when online', tone: 'warning' });
-  }
-
-  private resetFulfillmentCheckout(): void {
-    this.autoDeliveryFeeVariantId = null;
-    this.fulfillmentMode.set('counter');
-    this.fulfillmentFields()?.reset();
-  }
-
-  protected newSale(): void {
-    this.success.set(null);
-    this.error.set(null);
-    this.notice.set(null);
-  }
-
-  protected onFormatChange(event: Event): void {
-    this.print.setFormat((event.target as HTMLSelectElement).value as PrintFormat);
-  }
-
-  protected async printReceipt(orderId: string): Promise<void> {
-    this.busy.set(true);
-    try {
-      const [{ order, meta }, company] = await Promise.all([
-        this.receiptData.buildReceiptData(orderId),
-        this.receiptData.companyPrintInfo(),
-      ]);
-      await this.print.printOrder(order, company.name, company.logoUrl, meta, company.address);
-    } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Print failed');
-    } finally {
-      this.busy.set(false);
-    }
-  }
-
-  protected async sendToCashier(): Promise<void> {
-    if (this.fulfillmentMode() !== 'counter') return;
-    if (!this.cashierSession.cashierFlowEnabled()) {
-      this.error.set('Cashier workflow is off. Take payment here to complete the sale.');
-      return;
-    }
-    this.busy.set(true);
-    this.error.set(null);
-    this.notice.set(null);
-    // Same idempotency reference as completeSale: a lost response followed by a
-    // retry must not park the sale twice.
-    const clientRef = crypto.randomUUID();
-    try {
-      await this.pos.postSale(this.cart.customerId(), this.cart.toSaleLines(), [], true, clientRef);
-      this.cart.clear();
-      this.selectedCustomer.set(null);
-      this.notice.set('Sent to the cashier queue');
-    } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Failed to send sale to cashier');
-    } finally {
-      this.busy.set(false);
-    }
-  }
-
-  protected async saveProforma(): Promise<void> {
-    if (this.fulfillmentMode() !== 'counter') return;
-    this.busy.set(true);
-    this.error.set(null);
-    this.notice.set(null);
-    try {
-      const id = await this.pos.saveDraft(
-        this.cart.customerId(),
-        this.cart.toSaleLines(),
-        this.cart.draftId()
-      );
-      this.cart.draftId.set(id);
-      this.notice.set('Proforma saved');
-    } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Save failed');
-    } finally {
-      this.busy.set(false);
-    }
+    this.workflow.resetPrice(line);
   }
 
   protected clearCart(): void {
-    this.cart.clear();
-    this.resetFulfillmentCheckout();
-    this.clearCartArmed.set(false);
-    this.selectedCustomer.set(null);
-    this.overrideFor.set(null);
-    this.error.set(null);
-    this.notice.set(null);
+    this.workflow.clearCart();
   }
 
-  private async loadDraft(orderId: string): Promise<void> {
-    this.draftFlags.set([]);
-    this.draftFlagsDismissed.set(false);
-    try {
-      const order = await this.pos.getOrder(orderId);
-      if (order.status !== 'draft') {
-        this.error.set(`Order ${order.code} is not a proforma (status: ${order.status})`);
-        return;
-      }
-      const lines = await this.pos.orderLines(orderId);
-      if (lines.length > MAX_SALE_LINES) {
-        this.error.set(
-          `${order.code} contains ${lines.length} lines. Orders are now limited to ${MAX_SALE_LINES}; split it before checkout.`
-        );
-        return;
-      }
-      // Location-resolved stock so the shortfall flags match what the server
-      // will enforce at completion.
-      const variants = await this.pos.variantsByIdsWithStock(lines.map(line => line.variant_id));
-      const byId = new Map(variants.map(variant => [variant.variant_id, variant]));
-      const flags: DraftFlag[] = [];
-      let unavailable = 0;
-      this.cart.clear();
-      for (const savedLine of lines) {
-        const variant = byId.get(savedLine.variant_id);
-        if (!variant) {
-          unavailable++;
-          continue;
-        }
-        const label = variantLabel(variant);
-        const was = Number(savedLine.unit_price);
-        const now = variant.price ?? 0;
-        const override = savedLine.custom_price;
-        // The server rejects a custom_price that differs from the CURRENT list
-        // price when the user lacks OverridePrice — flag it now, not at checkout.
-        const blocked = override !== null && override !== now && !this.canOverridePrices();
-        if (blocked) {
-          flags.push({
-            kind: 'override-blocked',
-            label,
-            was,
-            now,
-            overridePrice: override ?? 0,
-            available: 0,
-            needed: 0,
-            count: 0,
-          });
-        } else if (was !== now && override !== null) {
-          flags.push({
-            kind: 'override',
-            label,
-            was,
-            now,
-            overridePrice: override,
-            available: 0,
-            needed: 0,
-            count: 0,
-          });
-        } else if (was !== now) {
-          flags.push({
-            kind: 'price',
-            label,
-            was,
-            now,
-            overridePrice: 0,
-            available: 0,
-            needed: 0,
-            count: 0,
-          });
-        }
-        const needed = Number(savedLine.quantity);
-        const available = Number(variant.stock ?? 0);
-        if (variant.track_inventory && available < needed) {
-          flags.push({
-            kind: 'stock',
-            label,
-            was: 0,
-            now: 0,
-            overridePrice: 0,
-            available,
-            needed,
-            count: 0,
-          });
-        }
-        this.cart.addVariant(variant);
-        this.cart.setQuantity(variant.variant_id!, needed);
-        if (override !== null) {
-          this.cart.setCustomPrice(
-            variant.variant_id!,
-            override,
-            savedLine.price_override_reason ?? ''
-          );
-        }
-      }
-      if (unavailable > 0) {
-        flags.push({
-          kind: 'unavailable',
-          label: '',
-          was: 0,
-          now: 0,
-          overridePrice: 0,
-          available: 0,
-          needed: 0,
-          count: unavailable,
-        });
-      }
-      this.draftFlags.set(flags);
-      if (order.customer_id && order.customers) {
-        this.cart.setCustomer(
-          order.customer_id,
-          [order.customers.first_name, order.customers.last_name].filter(Boolean).join(' ')
-        );
-      }
-      this.cart.draftId.set(orderId);
-    } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Failed to load proforma');
-    }
+  protected onCustomerFocus(): void {
+    this.workflow.onCustomerFocus();
+  }
+
+  protected onCustomerBlur(): void {
+    this.workflow.onCustomerBlur();
+  }
+
+  protected clearCustomer(): void {
+    this.workflow.clearCustomer();
+  }
+
+  protected selectCustomer(customer: CustomerWithCredit): void {
+    this.workflow.selectCustomer(customer);
+  }
+
+  protected customerCreditAvailable(customer: CustomerWithCredit): number {
+    return this.workflow.customerCreditAvailable(customer);
+  }
+
+  protected customerName(customer: Customer): string {
+    return this.workflow.customerName(customer);
+  }
+
+  protected handleCheckoutWorkspaceIntent(intent: SellCheckoutWorkspaceIntent): void {
+    if (intent.type === 'customer') this.workflow.handleCustomerIntent(intent.intent);
+    else if (intent.type === 'mode-changed') void this.workflow.fulfillmentModeChanged(intent.mode);
+    else if (intent.type === 'customer-selected')
+      void this.workflow.selectMatchedCustomer(intent.customerId);
+    else if (intent.type === 'checkout')
+      void this.workflow.openCheckout(this.fulfillmentSnapshot());
+    else if (intent.type === 'credit')
+      void this.workflow.openCreditConfirmation(this.fulfillmentSnapshot());
+    else if (intent.type === 'send-to-cashier') void this.workflow.sendToCashier();
+    else void this.workflow.saveProforma();
+  }
+
+  protected completeSaleWithSettlement(settlement: SaleSettlementInput): void {
+    this.workflow.completeSaleWithSettlement(settlement);
+  }
+
+  protected async completeSale(payments: PaymentInput[], approvalReason?: string): Promise<void> {
+    await this.workflow.completeSale(payments, approvalReason);
+  }
+
+  protected async confirmMpesaSplitCash(): Promise<void> {
+    await this.workflow.confirmMpesaSplitCash();
+  }
+
+  protected keepMpesaSplitPending(): void {
+    this.workflow.keepMpesaSplitPending();
+  }
+
+  protected confirmCreditSale(): void {
+    this.workflow.confirmCreditSale();
+  }
+
+  protected async printReceipt(orderId: string): Promise<void> {
+    await this.workflow.printReceipt(orderId);
+  }
+
+  protected newSale(): void {
+    this.workflow.newSale();
+  }
+
+  protected dismissError(): void {
+    this.workflow.dismissError();
+  }
+
+  protected async sendToCashier(): Promise<void> {
+    await this.workflow.sendToCashier();
+  }
+
+  protected async saveProforma(): Promise<void> {
+    await this.workflow.saveProforma();
+  }
+
+  private fulfillmentSnapshot(): FulfillmentCheckoutDraft | null {
+    return this.checkoutWorkspace()?.buildFulfillmentSnapshot() ?? null;
   }
 }

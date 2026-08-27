@@ -12,6 +12,7 @@ import { MoneyService } from '../money/money.service';
 import { PosService } from '../pos/pos.service';
 import { IconComponent } from '../shared/ui/icon.component';
 import { PurchaseEditorComponent } from './purchase-editor.component';
+import { PurchaseEditorStore } from './purchase-editor.store';
 
 const variant = {
   variant_id: 'variant-1',
@@ -193,7 +194,7 @@ describe('PurchaseEditorComponent input VAT', () => {
     });
     return {
       fixture,
-      component: fixture.componentInstance as any,
+      component: fixture.debugElement.injector.get(PurchaseEditorStore) as any,
       money,
       pos,
       suppliers,
@@ -204,7 +205,7 @@ describe('PurchaseEditorComponent input VAT', () => {
   function addValidInvoice(component: any): void {
     component.onSupplierChange('supplier-1');
     component.reference.setValue('SUP-INV-1');
-    component.lines.set([
+    component.linesState.set([
       {
         key: 1,
         variantId: 'variant-1',
@@ -265,7 +266,7 @@ describe('PurchaseEditorComponent input VAT', () => {
 
     expect(money.supplierVariantPerformance).not.toHaveBeenCalled();
     component.onSupplierChange('supplier-1');
-    component.lines.set([{ variantId: 'variant-1' }]);
+    component.linesState.set([{ variantId: 'variant-1' }]);
     await component.loadSelectedSupplierPerformance();
 
     expect(money.supplierVariantPerformance).toHaveBeenCalledWith('supplier-1', ['variant-1']);
@@ -328,13 +329,13 @@ describe('PurchaseEditorComponent input VAT', () => {
 
     const secondPrice = deferred<ReturnType<typeof supplierPerformance>[]>();
     money.supplierVariantPerformance.mockReturnValueOnce(secondPrice.promise);
-    component.performance.set([]);
+    component.performanceState.set([]);
     component.performanceLoadedKeys.clear();
     const secondAdd = component.addVariant(variant);
     const secondLine = component.lines()[1];
     secondLine.unitCost = '109';
     secondLine.lineTotal = '109';
-    component.lines.update((items: unknown[]) => [...items]);
+    component.linesState.update((items: unknown[]) => [...items]);
     secondPrice.resolve([supplierPerformance('variant-1', 101)]);
     await secondAdd;
     await secondPrice.promise;
@@ -446,24 +447,40 @@ describe('PurchaseEditorComponent input VAT', () => {
 
     component.addExpense();
     fixture.detectChanges();
-    const expense = component.expenses()[0];
-    expense.amount = '116';
-    component.expenseAmountChanged(expense);
+    const expenseKey = component.expenses()[0].key;
+    component.handleExpenseIntent({
+      type: 'update',
+      key: expenseKey,
+      field: 'amount',
+      value: '116',
+    });
 
     expect(fixture.nativeElement.textContent).toContain('This cost is');
     expect(fixture.nativeElement.textContent).not.toContain('Expense 1');
-    expect(expense.settlement).toBe('');
+    expect(component.expenses()[0].settlement).toBe('');
 
-    component.setExpenseSettlement(expense, 'supplier_bill');
-    expect(expense.amount).toBe('100');
+    component.handleExpenseIntent({
+      type: 'set-settlement',
+      key: expenseKey,
+      settlement: 'supplier_bill',
+    });
+    expect(component.expenses()[0].amount).toBe('100');
     expect(component.supplierExpenseTotal()).toBe(116);
 
-    component.setExpenseSettlement(expense, 'separate');
-    expect(expense.amount).toBe('116');
+    component.handleExpenseIntent({
+      type: 'set-settlement',
+      key: expenseKey,
+      settlement: 'separate',
+    });
+    expect(component.expenses()[0].amount).toBe('116');
     expect(component.separateExpenseTotal()).toBe(116);
 
-    component.setExpenseSettlement(expense, 'supplier_bill');
-    expect(expense.amount).toBe('100');
+    component.handleExpenseIntent({
+      type: 'set-settlement',
+      key: expenseKey,
+      settlement: 'supplier_bill',
+    });
+    expect(component.expenses()[0].amount).toBe('100');
   });
 
   it('restores VAT evidence from a draft and preserves it when saving again', async () => {

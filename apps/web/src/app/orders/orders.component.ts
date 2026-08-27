@@ -474,7 +474,7 @@ const SALE_SORT_OPTIONS: readonly ListSortOption[] = [
           >
             @if (printerEnabled() && order.status === 'completed') {
               <button
-                actions
+                drawerActions
                 appButton
                 variant="ghost"
                 [iconOnly]="true"
