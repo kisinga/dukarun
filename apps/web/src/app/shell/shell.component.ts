@@ -142,7 +142,7 @@ interface NavSection {
               aria-label="Help and guides"
             >
               <app-icon name="heroQuestionMarkCircle" size="lg" />
-              <span class="hidden md:inline">Help</span>
+              <span class="hidden xl:inline">Help</span>
             </a>
 
             <!-- Notifications -->
