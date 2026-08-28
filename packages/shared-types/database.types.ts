@@ -13543,6 +13543,19 @@ export type Database = {
         Args: { p_customer_id: string; p_order_id: string; p_payload: Json }
         Returns: Json
       }
+      create_product: {
+        Args: { p_barcode?: string; p_image_path?: string; p_name: string }
+        Returns: string
+      }
+      create_product_with_variants: {
+        Args: {
+          p_barcode?: string
+          p_image_path?: string
+          p_name: string
+          p_variants: Json
+        }
+        Returns: string
+      }
       create_stock_location: {
         Args: { p_code: string; p_is_default?: boolean; p_name: string }
         Returns: string
@@ -16640,6 +16653,16 @@ export type Database = {
         }
         Returns: string
       }
+      update_product: {
+        Args: {
+          p_active?: boolean
+          p_barcode?: string
+          p_image_path?: string
+          p_name?: string
+          p_product_id: string
+        }
+        Returns: string
+      }
       update_staff_display_name: {
         Args: { p_display_name: string; p_membership_id: string }
         Returns: string
@@ -16743,6 +16766,22 @@ export type Database = {
           p_internal_method_code: string
           p_jurisdiction_id: string
           p_provider_code: string
+        }
+        Returns: string
+      }
+      upsert_variant: {
+        Args: {
+          p_active?: boolean
+          p_allow_fractional?: boolean
+          p_barcode?: string
+          p_kind?: string
+          p_name: string
+          p_price: number
+          p_product_id: string
+          p_sku?: string
+          p_track_inventory?: boolean
+          p_variant_id?: string
+          p_wholesale_price?: number
         }
         Returns: string
       }

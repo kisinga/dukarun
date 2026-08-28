@@ -29,6 +29,11 @@ select
 from image_companies;
 grant select on pg_temp.image_paths to authenticated;
 
+insert into storage.objects(bucket_id, name, metadata)
+select 'product-images', first_path, '{"mimetype":"image/webp"}'::jsonb from image_paths
+union all
+select 'product-images', second_path, '{"mimetype":"image/jpeg"}'::jsonb from image_paths;
+
 select ok(
   to_regprocedure('public.set_product_image(uuid,text,text)') is not null,
   'guarded product image mutation exists'

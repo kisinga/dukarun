@@ -107,7 +107,9 @@ end;
 $$;
 
 revoke execute on function public.set_product_image(uuid, text, text)
-  from public, anon, authenticated;
+  from public, anon;
+grant execute on function public.set_product_image(uuid, text, text)
+  to authenticated;
 
 create or replace function public.queue_product_image_cleanup(p_object_path text)
 returns void
@@ -274,9 +276,13 @@ end;
 $$;
 
 revoke execute on function public.create_catalog_product(text, jsonb, text, text)
-  from authenticated;
+  from public, anon;
 revoke execute on function public.update_catalog_product(uuid, text, jsonb, text, boolean)
-  from authenticated;
+  from public, anon;
+grant execute on function public.create_catalog_product(text, jsonb, text, text)
+  to authenticated;
+grant execute on function public.update_catalog_product(uuid, text, jsonb, text, boolean)
+  to authenticated;
 revoke execute on function public.update_catalog_product_with_manufacturer(
   uuid, text, jsonb, text, boolean, uuid, boolean, text, text
 ) from public, anon;
@@ -284,14 +290,8 @@ grant execute on function public.update_catalog_product_with_manufacturer(
   uuid, text, jsonb, text, boolean, uuid, boolean, text, text
 ) to authenticated;
 
--- Retire pre-aggregate mutation APIs. No compatibility aliases remain: callers
--- must submit the complete product family through the canonical RPCs above.
-drop function if exists public.create_product(text, text, text);
-drop function if exists public.update_product(uuid, text, text, text, boolean);
-drop function if exists public.upsert_variant(
-  uuid, text, bigint, uuid, text, text, bigint, boolean, boolean, boolean, text
-);
-drop function if exists public.create_product_with_variants(text, jsonb, text, text);
+-- Existing integrations and historical migrations still use the legacy catalog
+-- RPCs. Keep them available while application writes move to the aggregate APIs.
 
 drop policy if exists "members write their company image prefix" on storage.objects;
 create policy "members write their company image prefix"
