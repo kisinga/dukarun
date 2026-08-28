@@ -51,6 +51,20 @@ describe('DailyShopCashUpComponent', () => {
     expect(text).not.toContain('—');
   });
 
+  it('uses specific product, WhatsApp, and related-guide calls to action', async () => {
+    const fixture = await render();
+    const anchors = [...fixture.nativeElement.querySelectorAll('a')] as HTMLAnchorElement[];
+    const findLink = (label: string) =>
+      anchors.find(anchor => anchor.textContent.includes(label)) as HTMLAnchorElement;
+
+    expect(findLink('See how Dukarun closes the day').href).toContain('/docs#cashier-sessions');
+    expect(findLink('Talk through my shop closing').href).toContain('wa.me/254788922222');
+    expect(findLink('Talk through my shop closing').href).toContain('shop%20closing');
+    expect(findLink('how to tell whether the shop made money today').href).toContain(
+      '/blog/how-to-know-shop-profit-kenya'
+    );
+  });
+
   it('updates the closing summary and labels an overage without assigning a cause', async () => {
     const fixture = await render();
     enter(fixture, 'cash-up-openingCash', '1000');

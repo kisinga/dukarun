@@ -251,5 +251,6 @@ export class MarketingLayoutComponent {
     { label: 'Product help', href: DUKARUN_GUIDES_URL },
     { label: 'First business cycle', href: dukarunGuideUrl('journeys/first-business-cycle') },
     { label: 'Hardware setup', path: '/docs/hardware' },
+    { label: 'Daily shop cash-up', path: '/tools/daily-shop-cash-up' },
   ];
 }

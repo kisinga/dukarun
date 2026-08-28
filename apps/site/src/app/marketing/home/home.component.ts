@@ -451,6 +451,30 @@ interface LearningStep {
       </div>
     </section>
 
+    <!-- Daily cash-up tool -->
+    <section class="bg-neutral text-neutral-content" aria-labelledby="cash-up-heading">
+      <div
+        class="mkt-container grid items-center gap-7 py-10 sm:py-12 lg:grid-cols-[1fr_auto] lg:gap-12"
+      >
+        <div class="max-w-3xl">
+          <span class="text-xs font-semibold uppercase tracking-[0.14em] text-primary"
+            >Free closing tool</span
+          >
+          <h2 id="cash-up-heading" class="mt-2 text-3xl font-bold tracking-tight">
+            Count the drawer. Check M-Pesa. See the difference.
+          </h2>
+          <p class="mt-3 mb-0 max-w-2xl leading-relaxed text-neutral-content/70">
+            Enter the shop record and the money received. The daily cash-up tool shows what should
+            be there without saving your figures or asking you to create an account.
+          </p>
+        </div>
+        <a routerLink="/tools/daily-shop-cash-up" class="btn btn-primary min-h-12 px-6">
+          Check today’s closing
+          <app-icon name="heroArrowRight" size="sm" />
+        </a>
+      </div>
+    </section>
+
     <!-- Features -->
     <section class="bg-base-200/60 py-14 sm:py-20" aria-labelledby="features-heading">
       <div class="mkt-container">
@@ -634,7 +658,7 @@ interface LearningStep {
     </section>
 
     @if (featuredPost(); as post) {
-      <!-- Featured journal story -->
+      <!-- Featured guide -->
       <section class="bg-base-100 py-14 sm:py-20" aria-labelledby="journal-heading">
         <div class="mkt-container">
           <article
@@ -659,7 +683,7 @@ interface LearningStep {
               }
             </a>
             <div class="flex flex-col justify-center p-7 sm:p-10 lg:p-12">
-              <span class="mkt-eyebrow">From the Dukarun journal</span>
+              <span class="mkt-eyebrow">From the Dukarun guides</span>
               <h2 id="journal-heading" class="mt-3 text-3xl font-bold leading-tight tracking-tight">
                 <a [routerLink]="['/blog', post.slug]" class="hover:text-primary">{{
                   post.title
@@ -676,7 +700,7 @@ interface LearningStep {
                 [routerLink]="['/blog', post.slug]"
                 class="mt-7 inline-flex min-h-11 items-center gap-2 self-start font-semibold text-primary"
               >
-                Read the story
+                Read the guide
                 <app-icon name="heroArrowRight" size="sm" />
               </a>
             </div>
