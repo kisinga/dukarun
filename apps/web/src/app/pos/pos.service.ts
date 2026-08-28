@@ -307,16 +307,6 @@ export class PosService {
     }));
   }
 
-  /** Create a product family (variants are added via upsertVariant). */
-  async createProduct(input: { name: string; barcode?: string }): Promise<string> {
-    const { data, error } = await this.client.rpc('create_product', {
-      p_name: input.name,
-      ...(input.barcode ? { p_barcode: input.barcode } : {}),
-    });
-    if (error) throw rpcError(error);
-    return data;
-  }
-
   /**
    * Coupled create: family + >= 1 variant in one transaction.
    * A single unlabeled variant becomes 'Default' server-side; sku auto-generates when blank.
@@ -325,6 +315,7 @@ export class PosService {
     name: string;
     barcode?: string;
     manufacturer_id?: string | null;
+    image_path?: string;
     variants: CatalogVariantInput[];
   }): Promise<string> {
     const { data, error } = await this.client.rpc('create_catalog_product_with_manufacturer', {
@@ -332,6 +323,7 @@ export class PosService {
       p_variants: input.variants as never,
       p_manufacturer_id: input.manufacturer_id ?? undefined,
       ...(input.barcode ? { p_barcode: input.barcode } : {}),
+      ...(input.image_path ? { p_image_path: input.image_path } : {}),
     });
     if (error) throw rpcError(error);
     return data;
@@ -344,6 +336,9 @@ export class PosService {
     barcode: string;
     active: boolean;
     manufacturer_id?: string | null;
+    image_changed?: boolean;
+    image_path?: string | null;
+    expected_image_path?: string | null;
     variants: CatalogVariantInput[];
   }): Promise<string> {
     const { data, error } = await this.client.rpc('update_catalog_product_with_manufacturer', {
@@ -353,55 +348,13 @@ export class PosService {
       p_active: input.active,
       p_manufacturer_id: input.manufacturer_id ?? undefined,
       p_variants: input.variants as never,
-    });
-    if (error) throw rpcError(error);
-    return data;
-  }
-
-  /** null/undefined fields are left unchanged by the backend. */
-  async updateProduct(
-    productId: string,
-    changes: { name?: string; barcode?: string; active?: boolean; image_path?: string }
-  ): Promise<string> {
-    const { data, error } = await this.client.rpc('update_product', {
-      p_product_id: productId,
-      ...(changes.name !== undefined ? { p_name: changes.name } : {}),
-      ...(changes.barcode !== undefined ? { p_barcode: changes.barcode } : {}),
-      ...(changes.active !== undefined ? { p_active: changes.active } : {}),
-      ...(changes.image_path !== undefined ? { p_image_path: changes.image_path } : {}),
-    });
-    if (error) throw rpcError(error);
-    return data;
-  }
-
-  /** Create (no variantId) or update a variant. */
-  async upsertVariant(input: {
-    product_id: string;
-    name: string;
-    price: number;
-    variant_id?: string;
-    sku?: string;
-    barcode?: string;
-    wholesale_price?: number;
-    allow_fractional?: boolean;
-    track_inventory?: boolean;
-    active?: boolean;
-    kind?: string;
-  }): Promise<string> {
-    const { data, error } = await this.client.rpc('upsert_variant', {
-      p_product_id: input.product_id,
-      p_name: input.name,
-      p_price: input.price,
-      ...(input.variant_id ? { p_variant_id: input.variant_id } : {}),
-      ...(input.sku ? { p_sku: input.sku } : {}),
-      ...(input.barcode ? { p_barcode: input.barcode } : {}),
-      ...(input.wholesale_price !== undefined ? { p_wholesale_price: input.wholesale_price } : {}),
-      ...(input.allow_fractional !== undefined
-        ? { p_allow_fractional: input.allow_fractional }
+      ...(input.image_changed
+        ? {
+            p_image_changed: true,
+            p_image_path: input.image_path ?? null,
+            p_expected_image_path: input.expected_image_path ?? null,
+          }
         : {}),
-      ...(input.track_inventory !== undefined ? { p_track_inventory: input.track_inventory } : {}),
-      ...(input.active !== undefined ? { p_active: input.active } : {}),
-      ...(input.kind ? { p_kind: input.kind } : {}),
     });
     if (error) throw rpcError(error);
     return data;
@@ -466,6 +419,44 @@ export class PosService {
   async removeProductImage(path: string): Promise<void> {
     const { error } = await this.client.storage.from('product-images').remove([path]);
     if (error) throw new Error(error.message);
+  }
+
+  /** Persist cleanup before attempting Storage so a failed deletion remains retryable. */
+  async scheduleProductImageCleanup(path: string): Promise<void> {
+    const { error } = await this.client.rpc('queue_product_image_cleanup', {
+      p_object_path: path,
+    });
+    if (error) {
+      await this.removeProductImage(path).catch(() => undefined);
+      return;
+    }
+    await this.cleanupProductImage(path);
+  }
+
+  /** Attempts one queued deletion and records its outcome without failing the product save. */
+  async cleanupProductImage(path: string): Promise<void> {
+    try {
+      await this.removeProductImage(path);
+      const { error } = await this.client.rpc('record_product_image_cleanup', {
+        p_object_path: path,
+        p_error: null,
+      });
+      if (error) throw rpcError(error);
+    } catch (error) {
+      await this.client.rpc('record_product_image_cleanup', {
+        p_object_path: path,
+        p_error: error instanceof Error ? error.message : 'Storage deletion failed',
+      });
+    }
+  }
+
+  /** Opportunistically drains durable cleanup left by earlier interrupted saves. */
+  async retryProductImageCleanup(limit = 20): Promise<void> {
+    const { data, error } = await this.client.rpc('pending_product_image_cleanup', {
+      p_limit: limit,
+    });
+    if (error) throw rpcError(error);
+    for (const item of data ?? []) await this.cleanupProductImage(item.object_path);
   }
 
   // --- Categories ---

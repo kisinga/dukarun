@@ -43,11 +43,7 @@ import {
 } from './product-categories-panel.component';
 import { ProductDetailDrawerComponent } from './product-detail-drawer.component';
 import { ProductEditorComponent } from './product-editor.component';
-import type {
-  ProductEditorCloseResult,
-  ProductEditorRequest,
-  ProductEditorResult,
-} from './product-editor.types';
+import type { ProductEditorRequest, ProductEditorResult } from './product-editor.types';
 
 type StockInfo = { stock: number; stock_value: number };
 type ProductStatusFilter = 'all' | 'active' | 'inactive';
@@ -181,7 +177,7 @@ const PRODUCT_SORT_OPTIONS: readonly ListSortOption[] = [
         <app-product-editor
           [request]="request"
           (saved)="productEditorSaved($event)"
-          (closed)="productEditorClosed($event)"
+          (closed)="productEditorClosed()"
         />
       }
 
@@ -1426,17 +1422,15 @@ export class ProductsComponent implements OnInit {
   protected async productEditorSaved(result: ProductEditorResult): Promise<void> {
     this.editorRequest.set(null);
     this.notice.set(
-      result.photoWarning ??
-        (result.mode === 'created'
-          ? `Created ${result.name}`
-          : `Updated ${result.name} and ${result.variantCount} variant${result.variantCount === 1 ? '' : 's'}`)
+      result.mode === 'created'
+        ? `Created ${result.name}`
+        : `Updated ${result.name} and ${result.variantCount} variant${result.variantCount === 1 ? '' : 's'}`
     );
     await this.load();
   }
 
-  protected async productEditorClosed(result: ProductEditorCloseResult): Promise<void> {
+  protected productEditorClosed(): void {
     this.editorRequest.set(null);
-    if (result.refreshCatalog) await this.load();
   }
   protected openCatalogueLabels(): void {
     this.labelVariantId.set(null);

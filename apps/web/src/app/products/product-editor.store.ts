@@ -31,10 +31,9 @@ import { LearningPlatformService } from '../learning/learning-platform.service';
 /**
  * Component-scoped owner for the coupled product aggregate.
  *
- * The service order below is deliberate: manufacturer, product/variants, tax/category links,
- * then image metadata. Product and variant persistence is transactional in the backend; image
- * storage is not, so a photo failure is returned as partial success and uploaded orphan files are
- * removed before the error is surfaced.
+ * The aggregate RPC commits product, variants, manufacturer, and image metadata together.
+ * Storage remains external to that transaction, so uploads happen first and every unattached or
+ * superseded object is durably queued for deletion.
  */
 @Injectable()
 export class ProductEditorStore implements OnDestroy {
@@ -71,8 +70,6 @@ export class ProductEditorStore implements OnDestroy {
   readonly loading = this.loadingState.asReadonly();
   private readonly busyState = signal(false);
   readonly busy = this.busyState.asReadonly();
-  private readonly imageBusyState = signal(false);
-  readonly imageBusy = this.imageBusyState.asReadonly();
   private readonly errorState = signal<string | null>(null);
   readonly error = this.errorState.asReadonly();
   private readonly noticeState = signal<string | null>(null);
@@ -91,11 +88,11 @@ export class ProductEditorStore implements OnDestroy {
   readonly pendingImage = this.pendingImageState.asReadonly();
   private readonly imagePathState = signal<string | null>(null);
   readonly imagePath = this.imagePathState.asReadonly();
+  private readonly imageRemovalPendingState = signal(false);
+  readonly imageRemovalPending = this.imageRemovalPendingState.asReadonly();
   private readonly brokenImageState = signal(false);
   private readonly rowsDirtyState = signal(false);
   private readonly categoriesDirtyState = signal(false);
-  private readonly photoPersistedState = signal(false);
-  readonly photoPersisted = this.photoPersistedState.asReadonly();
   private readonly validationTargetState = signal<'details' | 'variants' | null>(null);
   readonly validationTarget = this.validationTargetState.asReadonly();
 
@@ -121,6 +118,7 @@ export class ProductEditorStore implements OnDestroy {
   readonly imagePreview = computed(() => {
     const pending = this.pendingImage();
     if (pending) return pending.previewUrl;
+    if (this.imageRemovalPending()) return null;
     const path = this.imagePath();
     return path && !this.brokenImageState() ? this.pos.imageUrl(path) : null;
   });
@@ -134,6 +132,7 @@ export class ProductEditorStore implements OnDestroy {
     this.requestState.set(request);
     this.stepState.set(request.initialStep ?? 1);
     void this.loadTaxCategories(loadRequest);
+    void this.pos.retryProductImageCleanup().catch(() => undefined);
 
     if (request.mode === 'create') {
       this.rowsState.set([this.emptyRow()]);
@@ -146,7 +145,7 @@ export class ProductEditorStore implements OnDestroy {
     this.barcode.setValue(product.barcode ?? '');
     this.active.setValue(product.active);
     this.taxCategory.setValue(product.tax_category_id ?? '');
-    this.imagePathState.set(product.image_path);
+    this.imagePathState.set(product.image_path || null);
     this.loadingState.set(true);
     try {
       const [variants, categoryIds] = await Promise.all([
@@ -297,67 +296,30 @@ export class ProductEditorStore implements OnDestroy {
     return row.barcode.trim() || this.barcode.value.trim();
   }
 
-  async selectImage(pending: PendingProductImage): Promise<void> {
+  selectImage(pending: PendingProductImage): void {
     this.errorState.set(null);
+    this.noticeState.set(null);
     this.clearPendingImage();
     this.pendingImageState.set(pending);
-    const product = this.product();
-    if (!product) return;
-
-    this.imageBusyState.set(true);
-    try {
-      await this.persistPendingImage(product.id, this.imagePath());
-      this.noticeState.set('Product photo uploaded');
-      this.photoPersistedState.set(true);
-    } catch (error) {
-      this.errorState.set(this.message(error, 'Photo upload failed'));
-    } finally {
-      this.imageBusyState.set(false);
-    }
+    this.imageRemovalPendingState.set(false);
   }
 
   imageSelectionFailed(message: string): void {
     this.errorState.set(message);
   }
 
-  async retryImageUpload(): Promise<void> {
-    const product = this.product();
-    if (!product || !this.pendingImage() || this.imageBusy()) return;
-    this.imageBusyState.set(true);
+  removeImage(): void {
     this.errorState.set(null);
-    try {
-      await this.persistPendingImage(product.id, this.imagePath());
-      this.noticeState.set('Product photo uploaded');
-      this.photoPersistedState.set(true);
-    } catch (error) {
-      this.errorState.set(this.message(error, 'Photo upload failed'));
-    } finally {
-      this.imageBusyState.set(false);
-    }
-  }
-
-  async removeImage(): Promise<void> {
+    this.noticeState.set(null);
     if (this.pendingImage()) {
       this.clearPendingImage();
-      this.errorState.set(null);
       return;
     }
-    const product = this.product();
-    const path = this.imagePath();
-    if (!product || !path) return;
-    this.imageBusyState.set(true);
-    this.errorState.set(null);
-    try {
-      await this.pos.updateProduct(product.id, { image_path: '' });
-      await this.pos.removeProductImage(path).catch(() => undefined);
-      this.imagePathState.set(null);
-      this.photoPersistedState.set(true);
-      this.noticeState.set('Product photo removed');
-    } catch (error) {
-      this.errorState.set(this.message(error, 'Remove failed'));
-    } finally {
-      this.imageBusyState.set(false);
+    if (this.imageRemovalPending()) {
+      this.imageRemovalPendingState.set(false);
+      return;
     }
+    if (this.imagePath()) this.imageRemovalPendingState.set(true);
   }
 
   markImageBroken(): void {
@@ -373,7 +335,8 @@ export class ProductEditorStore implements OnDestroy {
       this.taxCategory.dirty ||
       this.rowsDirtyState() ||
       this.categoriesDirtyState() ||
-      this.pendingImage() !== null
+      this.pendingImage() !== null ||
+      this.imageRemovalPending()
     );
   }
 
@@ -402,7 +365,21 @@ export class ProductEditorStore implements OnDestroy {
     this.busyState.set(true);
     this.errorState.set(null);
     this.noticeState.set(null);
+    let unattachedImagePath: string | null = null;
     try {
+      const pendingImage = this.pendingImage();
+      const previousImagePath = request.mode === 'edit' ? this.imagePath() : null;
+      const imageChanged = pendingImage !== null || this.imageRemovalPending();
+      if (pendingImage) {
+        const companyId = this.supabase.claims()?.company_id;
+        if (!companyId) throw new Error('No company in session - re-login');
+        unattachedImagePath = await this.pos.uploadProductImage(
+          companyId,
+          pendingImage.blob,
+          pendingImage.extension
+        );
+      }
+
       const manufacturerName = this.manufacturer.value.trim();
       const existingManufacturer = this.manufacturers().find(
         item => item.name.toLocaleLowerCase() === manufacturerName.toLocaleLowerCase()
@@ -417,8 +394,15 @@ export class ProductEditorStore implements OnDestroy {
           name,
           barcode: this.barcode.value.trim() || undefined,
           manufacturer_id: manufacturerId,
+          ...(unattachedImagePath ? { image_path: unattachedImagePath } : {}),
           variants,
         });
+        if (unattachedImagePath) {
+          this.imagePathState.set(unattachedImagePath);
+          this.brokenImageState.set(false);
+          this.clearPendingImage();
+          unattachedImagePath = null;
+        }
         if (this.permissions.has('ManageCatalog') && this.taxCategory.value) {
           await this.tax.setProductCategory(productId, this.taxCategory.value);
         }
@@ -430,8 +414,19 @@ export class ProductEditorStore implements OnDestroy {
           barcode: this.barcode.value.trim(),
           active: this.active.value,
           manufacturer_id: manufacturerId,
+          image_changed: imageChanged,
+          image_path: unattachedImagePath,
+          expected_image_path: previousImagePath,
           variants,
         });
+        if (imageChanged) {
+          this.imagePathState.set(unattachedImagePath);
+          this.brokenImageState.set(false);
+          this.clearPendingImage();
+          this.imageRemovalPendingState.set(false);
+          unattachedImagePath = null;
+          if (previousImagePath) void this.pos.cleanupProductImage(previousImagePath);
+        }
         if (this.permissions.has('ManageCatalog') && this.connectivity.online()) {
           await this.pos.setProductCategories(productId, [...this.familyCategories()]);
           if ((request.product.tax_category_id ?? '') !== this.taxCategory.value) {
@@ -440,21 +435,8 @@ export class ProductEditorStore implements OnDestroy {
         }
       }
 
-      let photoWarning: string | undefined;
-      if (this.pendingImage()) {
-        try {
-          await this.persistPendingImage(
-            productId,
-            request.mode === 'edit' ? this.imagePath() : null
-          );
-        } catch {
-          photoWarning =
-            request.mode === 'create'
-              ? 'The product was created, but its photo could not be uploaded.'
-              : 'The product was updated, but its photo could not be uploaded.';
-        }
-      }
       this.clearPendingImage();
+      this.imageRemovalPendingState.set(false);
       this.markPristine();
       if (request.mode === 'create') {
         void this.learning.track(LEARNING_EVENT_NAMES.productCreated);
@@ -464,16 +446,20 @@ export class ProductEditorStore implements OnDestroy {
         mode: request.mode === 'create' ? 'created' : 'updated',
         name,
         variantCount: variants.length,
-        ...(photoWarning ? { photoWarning } : {}),
       };
     } catch (error) {
+      if (unattachedImagePath) {
+        await this.pos.scheduleProductImageCleanup(unattachedImagePath).catch(() => undefined);
+      }
       const message = this.message(error, 'Save failed');
       this.errorState.set(
         (message.toLocaleLowerCase().includes('duplicate') &&
           message.toLocaleLowerCase().includes('barcode')) ||
           message.toLocaleLowerCase().includes('barcode_conflict')
           ? 'That barcode is already assigned to another variant.'
-          : message
+          : message.toLocaleLowerCase().includes('product_image_conflict')
+            ? 'The product photo changed elsewhere. Reload the product and try again.'
+            : message
       );
       return null;
     } finally {
@@ -644,27 +630,6 @@ export class ProductEditorStore implements OnDestroy {
     };
   }
 
-  private async persistPendingImage(productId: string, previousPath: string | null): Promise<void> {
-    const pending = this.pendingImage();
-    if (!pending) return;
-    const companyId = this.supabase.claims()?.company_id;
-    if (!companyId) throw new Error('No company in session - re-login');
-    let path: string | null = null;
-    try {
-      path = await this.pos.uploadProductImage(companyId, pending.blob, pending.extension);
-      await this.pos.updateProduct(productId, { image_path: path });
-    } catch (error) {
-      if (path) await this.pos.removeProductImage(path).catch(() => undefined);
-      throw error;
-    }
-    this.imagePathState.set(path);
-    this.brokenImageState.set(false);
-    this.clearPendingImage();
-    if (previousPath && previousPath !== path) {
-      await this.pos.removeProductImage(previousPath).catch(() => undefined);
-    }
-  }
-
   private clearPendingImage(): void {
     const pending = this.pendingImage();
     if (pending) URL.revokeObjectURL(pending.previewUrl);
@@ -713,7 +678,6 @@ export class ProductEditorStore implements OnDestroy {
     this.rowsState.set([]);
     this.loadingState.set(false);
     this.busyState.set(false);
-    this.imageBusyState.set(false);
     this.errorState.set(null);
     this.noticeState.set(null);
     this.familyCategoriesState.set(new Set());
@@ -721,10 +685,10 @@ export class ProductEditorStore implements OnDestroy {
     this.pendingBarcodeState.set(null);
     this.scannerTargetState.set(null);
     this.imagePathState.set(null);
+    this.imageRemovalPendingState.set(false);
     this.brokenImageState.set(false);
     this.rowsDirtyState.set(false);
     this.categoriesDirtyState.set(false);
-    this.photoPersistedState.set(false);
     this.validationTargetState.set(null);
   }
 

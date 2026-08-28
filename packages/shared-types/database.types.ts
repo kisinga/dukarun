@@ -7871,6 +7871,41 @@ export type Database = {
           },
         ]
       }
+      product_image_cleanup_queue: {
+        Row: {
+          attempts: number
+          company_id: string
+          last_attempt_at: string | null
+          last_error: string | null
+          object_path: string
+          queued_at: string
+        }
+        Insert: {
+          attempts?: number
+          company_id: string
+          last_attempt_at?: string | null
+          last_error?: string | null
+          object_path: string
+          queued_at?: string
+        }
+        Update: {
+          attempts?: number
+          company_id?: string
+          last_attempt_at?: string | null
+          last_error?: string | null
+          object_path?: string
+          queued_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_image_cleanup_queue_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_tax_treatment_versions: {
         Row: {
           changed_by: string | null
@@ -12779,6 +12814,10 @@ export type Database = {
           name: string
         }[]
       }
+      assert_product_image_object: {
+        Args: { p_company_id: string; p_image_path: string }
+        Returns: undefined
+      }
       account_balance: {
         Args: { p_code: string; p_company_id: string }
         Returns: number
@@ -13503,19 +13542,6 @@ export type Database = {
       create_order_fulfillment_core: {
         Args: { p_customer_id: string; p_order_id: string; p_payload: Json }
         Returns: Json
-      }
-      create_product: {
-        Args: { p_barcode?: string; p_image_path?: string; p_name: string }
-        Returns: string
-      }
-      create_product_with_variants: {
-        Args: {
-          p_barcode?: string
-          p_image_path?: string
-          p_name: string
-          p_variants: Json
-        }
-        Returns: string
       }
       create_stock_location: {
         Args: { p_code: string; p_is_default?: boolean; p_name: string }
@@ -15344,6 +15370,10 @@ export type Database = {
         Args: { p_tax_date?: string; p_variant_ids: string[] }
         Returns: Json
       }
+      pending_product_image_cleanup: {
+        Args: { p_limit?: number }
+        Returns: { object_path: string }[]
+      }
       purge_mpesa_raw_payloads: { Args: never; Returns: number }
       queue_cashier_session_notification: {
         Args: { p_event: string; p_session_id: string }
@@ -15381,6 +15411,10 @@ export type Database = {
         Returns: string
       }
       queue_mpesa_processor: { Args: never; Returns: undefined }
+      queue_product_image_cleanup: {
+        Args: { p_object_path: string }
+        Returns: undefined
+      }
       queue_sms_fallback: { Args: { p_outbox_id: string }; Returns: string }
       queue_tax_document_submission: {
         Args: {
@@ -15467,6 +15501,10 @@ export type Database = {
       record_notification_click: {
         Args: { p_notification_id: string }
         Returns: boolean
+      }
+      record_product_image_cleanup: {
+        Args: { p_error?: string | null; p_object_path: string }
+        Returns: undefined
       }
       record_purchase: {
         Args: {
@@ -16239,6 +16277,14 @@ export type Database = {
         Args: { p_category_ids: string[]; p_product_id: string }
         Returns: string
       }
+      set_product_image: {
+        Args: {
+          p_expected_image_path: string | null
+          p_image_path: string | null
+          p_product_id: string
+        }
+        Returns: string | null
+      }
       set_product_tax_category: {
         Args: { p_product_id: string; p_tax_category_id?: string }
         Returns: string
@@ -16507,6 +16553,9 @@ export type Database = {
         Args: {
           p_active?: boolean
           p_barcode?: string
+          p_expected_image_path?: string | null
+          p_image_changed?: boolean
+          p_image_path?: string | null
           p_manufacturer_id?: string
           p_name: string
           p_product_id: string
@@ -16588,16 +16637,6 @@ export type Database = {
           p_enabled?: boolean
           p_is_cashier_controlled?: boolean
           p_requires_reconciliation?: boolean
-        }
-        Returns: string
-      }
-      update_product: {
-        Args: {
-          p_active?: boolean
-          p_barcode?: string
-          p_image_path?: string
-          p_name?: string
-          p_product_id: string
         }
         Returns: string
       }
@@ -16704,22 +16743,6 @@ export type Database = {
           p_internal_method_code: string
           p_jurisdiction_id: string
           p_provider_code: string
-        }
-        Returns: string
-      }
-      upsert_variant: {
-        Args: {
-          p_active?: boolean
-          p_allow_fractional?: boolean
-          p_barcode?: string
-          p_kind?: string
-          p_name: string
-          p_price: number
-          p_product_id: string
-          p_sku?: string
-          p_track_inventory?: boolean
-          p_variant_id?: string
-          p_wholesale_price?: number
         }
         Returns: string
       }
@@ -16957,4 +16980,3 @@ export const Constants = {
     Enums: {},
   },
 } as const
-
