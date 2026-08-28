@@ -12,6 +12,12 @@ right person or business.
 Have the supplier's trading name and useful contact details. Add the tax PIN, credit limit, and
 payment terms when the supplier has provided them.
 
+## Video
+
+The task-specific walkthrough is being prepared. For now, watch this Dukarun overview.
+
+{% embed url="https://youtu.be/dfykDyK6Fs8" %}
+
 ## Steps
 
 1. Open **Suppliers**, then choose **Add supplier**.

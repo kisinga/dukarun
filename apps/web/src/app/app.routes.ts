@@ -60,8 +60,9 @@ export const routes: Routes = [
     loadComponent: () => import('./shell/shell.component').then(m => m.ShellComponent),
     children: [
       {
-        path: 'help/journeys/first-business-cycle',
-        redirectTo: '/learn/first-business-cycle',
+        path: 'help/journeys/:topic',
+        loadComponent: () =>
+          import('./learning/help-embed.component').then(m => m.HelpEmbedComponent),
       },
       {
         path: 'help/categories/:domain',

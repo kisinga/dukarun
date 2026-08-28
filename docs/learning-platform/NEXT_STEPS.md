@@ -1,17 +1,23 @@
 # Learning platform next steps
 
-This plan takes the polished written help into GitBook, then proves the real-app video approach with
-one task before the remaining guides are produced.
+This plan publishes Dukarun Guide in GitBook, then proves the real-app video approach with one task
+before the remaining guides are produced.
 
-## 1. Publish and verify the written help
+## 1. Publish and verify Dukarun Guide
 
 1. Import or sync `gitbook-import` to the public GitBook space.
 2. Check every page in GitBook at desktop and mobile widths.
 3. Confirm search finds task names and glossary terms using common wording such as "pay supplier",
    "customer owes me", "scan barcode", and "profit".
-4. Verify every Dukarun button and field name against the current application.
-5. Keep articles complete without a video. Add a video only after its approved YouTube upload is
-   available.
+4. Confirm Search question suggestions open Assistant instead of stopping on an inert result.
+5. Confirm every task article and journey displays the temporary Dukarun video as a playable embed.
+6. Set GitBook external links to open in the same tab, then verify every article CTA reaches its
+   matching `/learn/<content-key>` route.
+7. Open exact topic and journey URLs inside Dukarun and verify their launch actions start the same
+   interactive content without leaving the current tab. Repeat this on `npm run dev:web:https` to
+   test against localhost.
+8. Verify every Dukarun button and field name against the current application.
+9. Keep each placeholder until its task-specific YouTube upload is approved and embedded.
 
 Exit condition: all pages are public, searchable, correctly linked, and understandable without an
 interactive guide or video.
@@ -50,7 +56,8 @@ three formats, including mobile navigation, light mode, caption clearance, and c
 2. Check factual accuracy, privacy, caption timing, transcript quality, and audio clarity.
 3. Upload the approved video to YouTube with captions and a useful title and description.
 4. Embed that same upload in the GitBook article and reference it from the matching Usertour flow.
-5. Test the public article, embedded help, and interactive guide before announcing the video.
+5. Test the public article, embedded Dukarun Guide, and interactive guide before announcing the
+   video.
 
 Exit condition: one approved upload works everywhere without an application deployment.
 

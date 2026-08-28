@@ -20,7 +20,7 @@ describe('learning content registry', () => {
 
   it('resolves only canonical topic routes', () => {
     expect(gitBookPathForTopic('creating-a-product')).toBe('/products/creating-a-product');
-    expect(gitBookPathForTopic('first-business-cycle')).toBeNull();
+    expect(gitBookPathForTopic('first-business-cycle')).toBe('/journeys/first-business-cycle');
     expect(gitBookPathForTopic('unknown')).toBeNull();
   });
 });

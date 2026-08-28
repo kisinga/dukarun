@@ -13,6 +13,12 @@ nearby. Use a customer you know well enough to make a sensible credit decision.
 Do not use invented balances in a live business account. If you only want to practise, use a test
 company.
 
+## Video
+
+The task-specific walkthrough is being prepared. For now, watch this Dukarun overview.
+
+{% embed url="https://youtu.be/dfykDyK6Fs8" %}
+
 ## Follow these six tasks
 
 1. [Create a product](../products/creating-a-product.md).

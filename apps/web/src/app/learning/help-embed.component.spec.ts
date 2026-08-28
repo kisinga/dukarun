@@ -1,6 +1,6 @@
 import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
+import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { environment } from '../../environments/environment';
@@ -100,7 +100,7 @@ describe('HelpEmbedComponent', () => {
     expect(external.href).toBe('https://docs.example.test/products/creating-a-product');
   });
 
-  it('opens the exact category in a responsive docs-and-search frame', async () => {
+  it('opens the exact category in a responsive Assistant, search, and docs frame', async () => {
     environment.gitbookSiteUrl = 'https://docs.example.test';
     const fixture = await render({
       routePattern: 'help/categories/:domain',
@@ -119,8 +119,10 @@ describe('HelpEmbedComponent', () => {
 
     expect(gitbook.createFrame).toHaveBeenCalledWith(iframe);
     expect(gitbook.configure).toHaveBeenCalledWith(
-      expect.objectContaining({ tabs: ['docs', 'search'], tools: [] })
+      expect.objectContaining({ tabs: ['assistant', 'search', 'docs'] })
     );
+    expect(gitbook.configure.mock.calls.at(-1)?.[0]).not.toHaveProperty('suggestions');
+    expect(gitbook.configure.mock.calls.at(-1)?.[0]).not.toHaveProperty('tools');
     expect(gitbook.navigateToPage).toHaveBeenCalledWith('/products');
     expect(fixture.nativeElement.textContent).not.toContain('Opening Dukarun Guide');
     expect(fixture.nativeElement.textContent).not.toContain('Articles, search, relationships');
@@ -147,6 +149,23 @@ describe('HelpEmbedComponent', () => {
         ],
       })
     );
+  });
+
+  it('opens the written journey and launches its interactive action in the same tab', async () => {
+    environment.gitbookSiteUrl = 'https://docs.example.test';
+    await render({
+      routePattern: 'help/journeys/:topic',
+      params: { topic: 'first-business-cycle' },
+    });
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+
+    expect(gitbook.navigateToPage).toHaveBeenCalledWith('/journeys/first-business-cycle');
+    const settings = gitbook.configure.mock.calls.at(-1)?.[0] as
+      { actions?: Array<{ label: string; onClick: () => void | Promise<void> }> } | undefined;
+    const action = settings?.actions?.[0];
+    expect(action?.label).toBe('Start your first business cycle');
+    await action?.onClick();
+    expect(navigate).toHaveBeenCalledWith(['/learn', 'first-business-cycle']);
   });
 
   it('replaces GitBook frame refusal with a first-party fallback on HTTP previews', async () => {

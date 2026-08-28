@@ -11,6 +11,12 @@ A unique barcode lets a scanner or device camera add the correct product variant
 Create the product and its variants first. If the supplier already prints a reliable barcode on the
 item, use that code instead of generating another one.
 
+## Video
+
+The task-specific walkthrough is being prepared. For now, watch this Dukarun overview.
+
+{% embed url="https://youtu.be/dfykDyK6Fs8" %}
+
 ## Steps
 
 1. Open **Products**, then choose **Print labels**.

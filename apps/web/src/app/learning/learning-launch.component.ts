@@ -23,9 +23,9 @@ import { LearningPlatformService, type LearningLaunchResult } from './learning-p
           <p class="mt-3 text-sm text-base-content/65">{{ resultMessage() }}</p>
           <div class="mt-5 flex flex-wrap justify-center gap-2">
             @if (destination()) {
-              <a class="btn btn-primary" [routerLink]="destination()">Continue without guide</a>
+              <a class="btn btn-primary" [routerLink]="destination()">Continue in Dukarun</a>
             }
-            <a class="btn btn-ghost" routerLink="/help">Open Dukarun Guide</a>
+            <a class="btn btn-ghost" [routerLink]="helpDestination()">Read the written guide</a>
           </div>
         }
       </div>
@@ -38,6 +38,7 @@ export class LearningLaunchComponent implements OnInit {
 
   protected readonly title = signal('Learning guide');
   protected readonly destination = signal('/dashboard');
+  protected readonly helpDestination = signal('/help');
   protected readonly result = signal<LearningLaunchResult | 'not-found' | null>(null);
 
   async ngOnInit(): Promise<void> {
@@ -49,6 +50,9 @@ export class LearningLaunchComponent implements OnInit {
     const definition = LEARNING_CONTENT_REGISTRY[key];
     this.title.set(definition.title);
     this.destination.set(definition.destinationRoute);
+    this.helpDestination.set(
+      definition.type === 'journey' ? `/help/journeys/${key}` : `/help/topics/${key}`
+    );
     const result = await this.learning.launch(key, { continue: definition.type === 'journey' });
     if (result !== 'started') this.result.set(result);
   }
@@ -56,15 +60,15 @@ export class LearningLaunchComponent implements OnInit {
   protected resultMessage(): string {
     switch (this.result()) {
       case 'permission-denied':
-        return 'Your current role cannot perform every action in this guide.';
+        return 'Your current role cannot perform every action here. You can still read the written guide.';
       case 'not-found':
-        return 'That learning guide does not exist.';
+        return 'We could not find that guide. Open Dukarun Guide to choose another topic.';
       case 'navigation-failed':
-        return 'The guide destination could not be opened.';
+        return 'We could not open the task. Your work in Dukarun is not affected.';
       case 'content-unconfigured':
-        return 'This guide is being prepared. You can continue with the task without it.';
+        return 'The interactive guide is not available yet. The written guide is ready to use.';
       default:
-        return 'Interactive guides are not enabled here yet. You can continue with the task.';
+        return 'The interactive guide could not start. You can continue in Dukarun or read the written guide.';
     }
   }
 }

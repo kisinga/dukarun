@@ -93,10 +93,11 @@ test('custom business-cycle progress storage and query-driven guide routing stay
   assert.doesNotMatch(source, /params\.get\(['"]guide['"]\)/);
 });
 
-test('Dukarun Guide exposes docs and full-text search without the AI assistant', async () => {
+test('Dukarun Guide exposes Assistant, search, docs, and same-tab guide actions', async () => {
   const source = await readFile('apps/web/src/app/learning/help-embed.component.ts', 'utf8');
-  assert.match(source, /tabs: \['docs', 'search'\]/);
-  assert.doesNotMatch(source, /tabs: \[[^\]]*'assistant'/);
+  assert.match(source, /tabs: \['assistant', 'search', 'docs'\]/);
+  assert.match(source, /this\.router\.navigate\(\['\/learn', actionKey\]\)/);
+  assert.doesNotMatch(source, /suggestions: \[\]|tools: \[\]/);
   assert.match(source, /Dukarun Guide needs an internet connection/);
   assert.match(source, /Open in new tab/);
 });
@@ -120,17 +121,20 @@ test('GitBook import keeps task articles clear, repeatable, and honest about ava
   const requiredSections = [
     'Why this matters',
     'Before you start',
+    'Video',
     'Steps',
     'What changes in Dukarun',
     'Related terms',
     'If something does not look right',
   ];
+  const temporaryVideo = '{% embed url="https://youtu.be/dfykDyK6Fs8" %}';
 
   for (const article of taskArticles) {
     const source = await readFile(`${root}/${article}`, 'utf8');
     for (const section of requiredSections) {
       assert.match(source, new RegExp(`^## ${section}$`, 'm'), `${article}: ${section}`);
     }
+    assert.match(source, new RegExp(temporaryVideo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
     assert.doesNotMatch(source, /\/media\/video\/guides\//, `${article}: no unpublished media`);
   }
 
@@ -153,6 +157,8 @@ test('GitBook import keeps task articles clear, repeatable, and honest about ava
     'utf8'
   );
   assert.match(recap, /^## Follow one transaction at a time$/m);
+  assert.match(recap, /^## Video$/m);
+  assert.match(recap, /\{% embed url="https:\/\/youtu\.be\/dfykDyK6Fs8" %\}/);
   assert.match(recap, /Customer payment \| No change \| Increases/);
   assert.match(recap, /Supplier payment \| No change \| Decreases/);
   assert.doesNotMatch(recap, /\/media\/video\/guides\//);
@@ -204,6 +210,8 @@ test('GitBook import seeds the canonical business glossary and journey', async (
   }
 
   const journey = await readFile(`${root}/journeys/first-business-cycle.md`, 'utf8');
+  assert.match(journey, /^## Video$/m);
+  assert.match(journey, /\{% embed url="https:\/\/youtu\.be\/dfykDyK6Fs8" %\}/);
   assert.equal(
     (journey.match(/\/learn\/first-business-cycle/g) ?? []).length,
     1,
@@ -256,4 +264,9 @@ test('the public site treats GitBook as an acquisition and trust surface', async
   assert.match(home, /Open Dukarun Guide/);
   assert.match(home, /Your first business cycle/);
   assert.match(layout, /label: 'Dukarun Guide', href: DUKARUN_GUIDES_URL/);
+  const primaryLinks = layout.match(
+    /protected readonly links: NavLink\[\] = \[([\s\S]*?)\n  \];/
+  )?.[1];
+  assert.match(primaryLinks ?? '', /label: 'Blog', path: '\/blog'/);
+  assert.doesNotMatch(primaryLinks ?? '', /Dukarun Guide|label: 'Guides'/);
 });
