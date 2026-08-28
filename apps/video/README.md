@@ -1,8 +1,18 @@
 # Dukarun video pipeline
 
-This workspace produces pragmatic-replica product videos without screen recordings. The primary production is an 87-second Dukarun overview. Three focused 20-second showcases cover sale records, credit and customer communication, and stock decisions. Every video supports 16:9, 9:16, and 1:1.
+This workspace produces two kinds of video. Marketing videos use purpose-built product scenes. Learning
+videos use recordings of the running Dukarun app, then use Remotion for editing and delivery. The
+primary marketing production is an 87-second Dukarun overview. Three focused 20-second showcases
+cover sale records, credit and customer communication, and stock decisions. Every video supports
+16:9, 9:16, and 1:1.
 
 The visual timeline is deterministic React/Remotion code. Scripts and narration are local inputs; the pipeline has no hosted AI or API-key dependency.
+
+## Learning-video design language
+
+Task guides record the real Dukarun workflow at each target viewport. Wide, vertical, and square
+videos must use the app's actual responsive layout. Follow the compact rules in
+[`GUIDE_DESIGN_LANGUAGE.md`](./GUIDE_DESIGN_LANGUAGE.md).
 
 ## Quick start
 
@@ -19,10 +29,11 @@ The active projects are:
 - `credit-communications`: customer and supplier balances, payment history, SMS, and WhatsApp reminders.
 - `stock-decisions`: margin, stock attention, purchases, adjustments, and location transfers.
 - `guide-product`, `guide-supplier`, `guide-credit-purchase`, `guide-cash-sale`,
-  `guide-customer-credit`, `guide-credit-sale`, and `guide-finance-recap`: the seven
-  initial task explainers shared by GitBook and Usertour.
-- `guide-generate-barcodes` and `guide-scan-barcode`: branded, topic-specific placeholders
-  that can be replaced in GitBook and Usertour when the final walkthroughs are approved.
+  `guide-customer-credit`, `guide-credit-sale`, and `guide-finance-recap`: the seven initial guide
+  packages. Their scripts and delivery metadata remain useful, but their visuals are not approved
+  until they use recordings of the real app.
+- `guide-generate-barcodes` and `guide-scan-barcode`: two additional guide packages to record after
+  the core workflow is approved.
 
 To render visual regression frames for every CTA-bearing ending and aspect ratio, run `npm run validate:cta -w @dukarun/video`. The ignored PNGs are written to `.cache/cta-validation`.
 
@@ -91,8 +102,17 @@ The overview remains the homepage introduction. The focused showcases are separa
 
 ## Publishing learning videos
 
+Use the [guide video baseline](GUIDE_DESIGN_LANGUAGE.md) before producing another learning video.
+The running Dukarun app is the visual source. Remotion edits the real recording and must not redraw
+the application interface. Follow the
+[learning platform next steps](../../docs/learning-platform/NEXT_STEPS.md) to prove the capture and
+publishing workflow with one pilot before scaling it.
+
 Each learning video follows the same script, narration, review, and final-approval gates above.
-After all four assets exist in `output/final/<project>`, publish independently of the application:
+After the approved assets exist in `output/final/<project>`, publish independently of the
+application. YouTube is the preferred public host so GitBook and Usertour can reference the same
+approved upload. The existing media publishing script remains available when a stable first-party
+download URL is also required:
 
 ```bash
 REMOTION_COMMERCIAL_LICENSE_CONFIRMED=true scripts/publish-guide-media.sh all
@@ -100,14 +120,18 @@ REMOTION_COMMERCIAL_LICENSE_CONFIRMED=true scripts/publish-guide-media.sh all
 
 The script maps project IDs to stable topic URLs below
 `https://dukarun.com/media/video/guides/<topic-slug>/` and publishes the wide MP4, poster,
-WebVTT captions, and transcript. GitBook articles and Usertour flows embed those same URLs. Replacing
-media at a stable URL does not require an application build.
+WebVTT captions, and transcript. Do not add a GitBook video block until the approved YouTube or
+first-party URL is reachable. Updating that embed does not require an application build.
 
 Publishing is deliberately gated by `REMOTION_COMMERCIAL_LICENSE_CONFIRMED=true`. Confirm the
 current Remotion commercial terms for the organisation before producing or publishing final assets.
 
 ## Adding a project
 
-Create `projects/<project-id>/brief.json` and `script.json`, register the manifest in `src/root.tsx`, and implement any new scene template in `src/scenes.tsx`. Keep product assertions in `projects/claims.json` tied to source paths. `npm run check:video` validates types, manifests, brand-token alignment, and composition discovery.
+Create `projects/<project-id>/brief.json` and `script.json`, then register the manifest in
+`src/root.tsx`. Marketing projects can add scene templates in `src/scenes.tsx`. Learning projects
+must start from real app recordings and the guide video baseline. Keep product assertions in
+`projects/claims.json` tied to source paths. `npm run check:video` validates types, manifests,
+brand-token alignment, and composition discovery.
 
 Remotion usage may require a company licence depending on organisation size and use; confirm the current terms before commercial production.

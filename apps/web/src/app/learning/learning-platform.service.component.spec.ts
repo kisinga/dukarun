@@ -104,6 +104,7 @@ describe('LearningPlatformService', () => {
 
     expect(usertour.init).toHaveBeenCalledWith('public-environment-token');
     expect(usertour.disableEvalJs).toHaveBeenCalledOnce();
+    expect(usertour.setBaseZIndex).toHaveBeenCalledWith(1_000_000);
     expect(usertour.setUrlFilter).toHaveBeenCalledOnce();
     expect(invoke).toHaveBeenCalledWith('usertour-identity');
     expect(usertour.identify).toHaveBeenCalledWith(userId, {}, { token: 'signed-token' });
@@ -130,6 +131,16 @@ describe('LearningPlatformService', () => {
     const { service, router } = setup(false);
 
     await expect(service.launch('creating-a-product')).resolves.toBe('permission-denied');
+    expect(router.navigateByUrl).not.toHaveBeenCalled();
+    expect(usertour.start).not.toHaveBeenCalled();
+  });
+
+  it('does not leave the launch page when the walkthrough has no Usertour content', async () => {
+    LEARNING_CONTENT_REGISTRY['creating-a-product'].usertourContentId = '';
+    const { service, router } = setup();
+
+    await expect(service.launch('creating-a-product')).resolves.toBe('content-unconfigured');
+
     expect(router.navigateByUrl).not.toHaveBeenCalled();
     expect(usertour.start).not.toHaveBeenCalled();
   });

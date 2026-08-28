@@ -94,10 +94,22 @@ export const routes: Routes = [
       },
       {
         path: 'blog/:slug',
-        title: 'Dukarun journal',
+        title: 'Dukarun guides',
         data: { description: 'A practical business guide from Dukarun.' },
         loadComponent: () =>
           import('./blog/blog-article.component').then(m => m.BlogArticleComponent),
+      },
+      {
+        path: 'tools/daily-shop-cash-up',
+        title: 'Daily Shop Cash-Up Tool | Dukarun',
+        data: {
+          description:
+            'Check expected cash, M-Pesa receipts and closing differences with a free daily cash-up tool for Kenyan shops.',
+        },
+        loadComponent: () =>
+          import('./tools/daily-shop-cash-up/daily-shop-cash-up.component').then(
+            m => m.DailyShopCashUpComponent
+          ),
       },
       {
         path: 'privacy',

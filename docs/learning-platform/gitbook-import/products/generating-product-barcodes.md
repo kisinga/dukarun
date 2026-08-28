@@ -1,42 +1,41 @@
 # Generating product barcodes
 
-## Purpose
+## Why this matters
 
-Give each sellable variant an unambiguous barcode that can be printed and scanned.
+A unique barcode lets a scanner or device camera add the correct product variant to a sale quickly.
 
-## Prerequisites
+[Open the interactive guide in Dukarun](https://app.dukarun.com/learn/generating-product-barcodes)
 
-Create the product first and ensure its variants are active.
+## Before you start
 
-## Video
+Create the product and its variants first. If the supplier already prints a reliable barcode on the
+item, use that code instead of generating another one.
 
-[Watch: Generating product barcodes](https://dukarun.com/media/video/guides/generating-product-barcodes/generating-product-barcodes.mp4)
-([captions](https://dukarun.com/media/video/guides/generating-product-barcodes/generating-product-barcodes.en-KE.vtt) ·
-[transcript](https://dukarun.com/media/video/guides/generating-product-barcodes/generating-product-barcodes.en-KE.txt))
+## Steps
 
-## Repeatable steps
+1. Open **Products**, then choose **Print labels**.
+2. Review variants marked **Missing** or **Ambiguous**.
+3. Choose **Generate missing barcodes**.
+4. Confirm the variants that need a Dukarun barcode.
+5. Review the generated codes, choose the label layout, and print.
+6. Attach each label to the matching item or shelf position.
 
-1. Open **Products**, choose **Print labels**, and review variants marked Missing or Ambiguous.
-2. Choose **Generate missing barcodes** and confirm the variants that need Dukarun codes.
-3. Select a label layout, then print the ready barcode labels.
+## What changes in Dukarun
 
-## Expected result
+Each selected variant receives a unique code. Scanning that code on the Sell screen can add the
+matching variant to the cart.
 
-Each selected variant has a unique code that can be printed and resolved during checkout.
-
-[Start the interactive guide](https://app.dukarun.com/learn/generating-product-barcodes)
-
-## Glossary
+## Related terms
 
 [Barcode](../glossary.md#barcode), [variant](../glossary.md#variant), and
 [stock location](../glossary.md#stock-location).
 
-## Related articles
+## Continue the workflow
 
-[Creating a product](creating-a-product.md) ·
-[Selling by scanning a barcode](../selling/selling-by-scanning-a-barcode.md)
+[Sell by scanning the barcode](../selling/selling-by-scanning-a-barcode.md).
 
-## Troubleshooting
+## If something does not look right
 
-Do not print an ambiguous barcode. Generate a unique code or correct the duplicated supplier code
-before using the label.
+- Do not print a barcode marked **Ambiguous**. The same code is linked to more than one variant.
+- Correct a duplicate code or generate a unique Dukarun barcode before printing.
+- Test one label on the Sell screen before printing a large batch.

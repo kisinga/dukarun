@@ -8,6 +8,7 @@ export const serverRoutes: ServerRoute[] = [
   { path: 'docs/hardware', renderMode: RenderMode.Prerender },
   { path: 'blog', renderMode: RenderMode.Client },
   { path: 'blog/:slug', renderMode: RenderMode.Client },
+  { path: 'tools/daily-shop-cash-up', renderMode: RenderMode.Prerender },
   { path: 'privacy', renderMode: RenderMode.Prerender },
   { path: 'terms', renderMode: RenderMode.Prerender },
   { path: 'dpa', renderMode: RenderMode.Prerender },

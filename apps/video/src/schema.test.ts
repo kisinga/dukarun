@@ -21,6 +21,8 @@ const projects = [
   ['guide-scan-barcode', 720],
 ] as const;
 
+const guideProjects = projects.filter(([projectId]) => projectId.startsWith('guide-'));
+
 async function fixtures(projectId: string) {
   const directory = projectDirectory(projectId);
   const brief = VideoBriefSchema.parse(await readJson(path.join(directory, 'brief.json')));
@@ -64,6 +66,47 @@ describe('video manifest validation', () => {
       'operations-snapshot',
       'cta',
     ]);
+  });
+
+  it('keeps the next guide-video pass on the real-app capture baseline', async () => {
+    const [baseline, nextSteps] = await Promise.all([
+      readFile(path.join(import.meta.dirname, '..', 'GUIDE_DESIGN_LANGUAGE.md'), 'utf8'),
+      readFile(
+        path.join(
+          import.meta.dirname,
+          '..',
+          '..',
+          '..',
+          'docs',
+          'learning-platform',
+          'NEXT_STEPS.md'
+        ),
+        'utf8'
+      ),
+    ]);
+    expect(baseline).toContain('The running Dukarun app supplies the interface and interactions.');
+    expect(baseline).toContain('Do not rebuild Dukarun screens in Remotion');
+    expect(baseline).toContain('wide, vertical, and square viewports');
+    expect(baseline).toContain('Use light mode for the full guide set');
+    expect(baseline).toContain('Never use static percentages.');
+    expect(baseline).toContain('Approve **Creating a product** in all three formats');
+    expect(nextSteps).toContain('Use **Creating a product** as the pilot.');
+    expect(nextSteps).toContain('Do not crop the wide recording into');
+    expect(nextSteps).toContain('Do not merge a reconstructed Dukarun interface');
+  });
+
+  it('does not ship the rejected reconstructed learning interface', async () => {
+    const sources = await Promise.all(
+      ['schema.ts', 'scenes.tsx', 'styles.css'].map(file =>
+        readFile(path.join(import.meta.dirname, file), 'utf8')
+      )
+    );
+    expect(sources.join('\n')).not.toMatch(/GuideAppScene|guide-app|guide-scene/);
+  });
+
+  it.each(guideProjects)('keeps %s guide copy free of em dashes', async projectId => {
+    const { brief, manifest } = await fixtures(projectId);
+    expect(JSON.stringify({ brief, manifest })).not.toContain('—');
   });
 
   it('rejects unsupported marketing claims', async () => {

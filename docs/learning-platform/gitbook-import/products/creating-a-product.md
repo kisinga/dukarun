@@ -1,44 +1,51 @@
 # Creating a product
 
-## Purpose
+## Why this matters
 
-Create something the business can buy, stock, and sell.
+A product gives your team one reliable record for an item or service. Its variants hold the selling
+price, stock setting, SKU, and barcode used in purchases and sales.
 
-## Prerequisites
+[Open the interactive guide in Dukarun](https://app.dukarun.com/learn/creating-a-product)
 
-You need permission to manage the product catalogue. Decide the product name, selling price, and
-whether inventory should be tracked.
+## Before you start
 
-## Video
+You need permission to manage the product catalogue. Know the product name and selling price.
+Decide whether you are creating a physical good or a service, and whether Dukarun should track its
+stock quantity.
 
-[Watch: Creating a product](https://dukarun.com/media/video/guides/creating-a-product/creating-a-product.mp4)
-([captions](https://dukarun.com/media/video/guides/creating-a-product/creating-a-product.en-KE.vtt) ·
-[transcript](https://dukarun.com/media/video/guides/creating-a-product/creating-a-product.en-KE.txt))
+## Steps
 
-## Repeatable steps
+1. Open **Products**, then choose **Add product**.
+2. Enter the product name and any useful shared details.
+3. Choose **Continue to variants**. On a small screen, the button says **Next: variants**.
+4. Keep one active variant for a simple item. Add labels such as size or pack only when the product
+   genuinely has different sellable versions.
+5. Enter the **Retail price (KES)**.
+6. Keep **Track stock** on for a physical item whose quantity Dukarun should update after purchases
+   and sales.
+7. Choose **Create product**.
 
-1. Open **Products** and choose **Add product**.
-2. Enter the real product name.
-3. Keep at least one active, inventory-tracked variant.
-4. Set its selling price, then create the product.
+## What changes in Dukarun
 
-## Expected result
+The product and its active variants become available to purchases and the Sell screen. A
+stock-tracked variant starts using quantities at each stock location.
 
-The product becomes available to purchases and the sell screen.
+## Related terms
 
-[Start the interactive guide](https://app.dukarun.com/learn/creating-a-product)
-
-## Glossary
-
-[Product](../glossary.md#product), [variant](../glossary.md#variant), and
+[Product](../glossary.md#product), [variant](../glossary.md#variant),
+[selling price](../glossary.md#selling-price), and
 [inventory tracking](../glossary.md#inventory-tracking).
 
-## Related articles
+## Continue the workflow
 
-[Generating product barcodes](generating-product-barcodes.md) ·
-[Recording a credit purchase](../purchases/recording-a-credit-purchase.md)
+[Generate a barcode](generating-product-barcodes.md) or
+[record a credit purchase](../purchases/recording-a-credit-purchase.md).
 
-## Troubleshooting
+## If something does not look right
 
-If the product is missing from Sell, confirm that both the product and variant are active and that
-the variant is available at the working stock location.
+- If the product does not appear on the Sell screen, check that both the product and variant are
+  active.
+- If a physical item shows the wrong quantity, confirm that **Track stock** is on and that you are
+  viewing the correct stock location.
+- Use variants only for versions customers choose between. Do not create a second product record for
+  every pack size of the same product.

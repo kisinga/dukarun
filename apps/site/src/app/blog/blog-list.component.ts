@@ -19,13 +19,11 @@ import { BlogPostSummary, BlogService } from './blog.service';
     <section class="journal-hero overflow-hidden border-b border-base-300/60">
       <div class="mkt-container relative py-16 sm:py-24">
         <div class="max-w-4xl">
-          <p class="mkt-eyebrow">The Dukarun journal</p>
-          <h1 class="mkt-display mt-4 max-w-4xl">
-            Clear thinking for the people building everyday business.
-          </h1>
+          <p class="mkt-eyebrow">Dukarun guides</p>
+          <h1 class="mkt-display mt-4 max-w-4xl">Practical answers for running a Kenyan shop.</h1>
           <p class="mkt-lead mt-6 max-w-2xl">
-            Practical field notes on selling, stock, cash flow, customers, and the books behind a
-            healthy duka.
+            Clear guides on stock, cash, customer credit, staff controls and the books behind a
+            healthy business.
           </p>
         </div>
         <div class="mt-10 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-base-content/50">
@@ -61,7 +59,7 @@ import { BlogPostSummary, BlogService } from './blog.service';
               >
                 <span
                   class="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-content/55"
-                  >Field note · 01</span
+                  >Shop guide · 01</span
                 >
                 <div>
                   <span class="block text-7xl font-bold tracking-[-0.07em] text-primary sm:text-9xl"
@@ -78,7 +76,7 @@ import { BlogPostSummary, BlogService } from './blog.service';
             <div
               class="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-primary"
             >
-              <span>{{ lead.tags[0] || 'Field notes' }}</span>
+              <span>{{ lead.tags[0] || 'Shop guide' }}</span>
               <span class="text-base-content/25">/</span>
               <span class="text-base-content/45">Featured</span>
             </div>
@@ -100,7 +98,7 @@ import { BlogPostSummary, BlogService } from './blog.service';
               [routerLink]="['/blog', lead.slug]"
               class="mt-8 inline-flex min-h-11 items-center gap-2 self-start font-semibold text-primary"
             >
-              Read the story
+              Read the guide
               <app-icon name="heroArrowRight" size="sm" />
             </a>
           </div>
@@ -109,8 +107,8 @@ import { BlogPostSummary, BlogService } from './blog.service';
         @if (morePosts().length) {
           <div class="mb-6 mt-16 flex items-end justify-between border-b border-base-300/70 pb-4">
             <div>
-              <p class="mkt-eyebrow">Latest notes</p>
-              <h2 class="mt-1 text-2xl font-bold tracking-tight">More from the journal</h2>
+              <p class="mkt-eyebrow">Latest guides</p>
+              <h2 class="mt-1 text-2xl font-bold tracking-tight">More practical answers</h2>
             </div>
           </div>
           <div class="grid gap-x-7 gap-y-10 md:grid-cols-2 lg:grid-cols-3">
@@ -136,14 +134,14 @@ import { BlogPostSummary, BlogService } from './blog.service';
                       }}</span>
                       <span
                         class="max-w-24 text-right text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-neutral-content/50"
-                        >Dukarun journal</span
+                        >Dukarun guide</span
                       >
                     </div>
                   }
                 </a>
                 <div class="mt-5 flex items-center gap-3 text-xs font-medium text-base-content/45">
                   <span class="uppercase tracking-wider text-primary">{{
-                    post.tags[0] || 'Field notes'
+                    post.tags[0] || 'Shop guide'
                   }}</span>
                   <span>{{ post.reading_minutes }} min</span>
                 </div>
@@ -177,8 +175,8 @@ import { BlogPostSummary, BlogService } from './blog.service';
         }
       } @else if (!loading()) {
         <div class="rounded-[1.25rem] border border-dashed border-base-300 px-6 py-24 text-center">
-          <p class="mkt-eyebrow">The journal</p>
-          <h2 class="mt-3 text-2xl font-bold">The first story is on its way.</h2>
+          <p class="mkt-eyebrow">Dukarun guides</p>
+          <h2 class="mt-3 text-2xl font-bold">The first guide is on its way.</h2>
           <p class="mt-2 text-base-content/60">Check back soon for practical business guides.</p>
         </div>
       } @else {

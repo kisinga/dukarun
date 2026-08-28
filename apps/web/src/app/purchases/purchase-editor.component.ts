@@ -279,6 +279,7 @@ import { PurchaseVatPanelComponent } from './purchase-vat-panel.component';
                 <button
                   appButton
                   type="button"
+                  data-learning-anchor="purchase-review"
                   class="mt-2 w-full"
                   (click)="store.goToReview()"
                   [disabled]="store.lines().length === 0"
@@ -329,6 +330,7 @@ import { PurchaseVatPanelComponent } from './purchase-vat-panel.component';
               <button
                 appButton
                 type="button"
+                data-learning-anchor="purchase-review"
                 (click)="store.goToReview()"
                 [disabled]="store.lines().length === 0"
               >

@@ -357,6 +357,7 @@ import type {
             <button
               appButton
               type="button"
+              data-learning-anchor="product-continue-variants"
               class="w-full sm:w-auto"
               [disabled]="store.name.value.trim().length === 0"
               (click)="store.setStep(2)"

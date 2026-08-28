@@ -1,42 +1,43 @@
 # Making a cash sale
 
-## Purpose
+## Why this matters
 
-Turn stocked products into cash revenue.
+A completed cash sale records the products sold and the full payment received at the same time.
 
-## Prerequisites
+[Open the interactive guide in Dukarun](https://app.dukarun.com/learn/making-a-cash-sale)
 
-The product must be active and stocked. If cash control is enabled, open the till first.
+## Before you start
 
-## Video
+The product must be active and available at the current location. If your business uses till
+control, open your till before taking payment.
 
-[Watch: Making a cash sale](https://dukarun.com/media/video/guides/making-a-cash-sale/making-a-cash-sale.mp4)
-([captions](https://dukarun.com/media/video/guides/making-a-cash-sale/making-a-cash-sale.en-KE.vtt) ·
-[transcript](https://dukarun.com/media/video/guides/making-a-cash-sale/making-a-cash-sale.en-KE.txt))
+## Steps
 
-## Repeatable steps
+1. Open **Sell**.
+2. Search, scan, or browse for each product and add it to the sale.
+3. Check the item, quantity, price, and total.
+4. Choose **Take payment**.
+5. Select **Cash** or the immediate payment method the customer used.
+6. For cash, choose **Exact** or enter the amount received.
+7. Check the payment, then choose **Complete sale**.
 
-1. Open the till when prompted, then open **Sell**.
-2. Search, scan, or browse to add the products.
-3. Continue to checkout, choose **Cash**, and record the full payment.
-4. Complete the sale.
+## What changes in Dukarun
 
-## Expected result
+Stock falls by the quantity sold. Dukarun records the completed sale, payment received, revenue,
+cost of goods sold, and margin.
 
-Stock falls; cash, revenue, cost of sales, and gross margin are recorded.
+## Related terms
 
-[Start the interactive guide](https://app.dukarun.com/learn/making-a-cash-sale)
+[Cash sale](../glossary.md#cash-sale), [cash received](../glossary.md#cash-received),
+[COGS](../glossary.md#cogs), and [gross margin](../glossary.md#gross-margin).
 
-## Glossary
+## Continue the workflow
 
-[Cash received](../glossary.md#cash-received), [COGS](../glossary.md#cogs), and
-[gross margin](../glossary.md#gross-margin).
+[Understand the financial result](../money-and-reporting/understanding-the-financial-result.md).
 
-## Related articles
+## If something does not look right
 
-[Selling by scanning a barcode](selling-by-scanning-a-barcode.md) ·
-[Understanding the financial result](../money-and-reporting/understanding-the-financial-result.md)
-
-## Troubleshooting
-
-If checkout is disabled, confirm there is at least one cart item and an open till when required.
+- If **Take payment** is unavailable, make sure the sale contains at least one item.
+- If Dukarun asks for a till, open it before taking payment.
+- Check the quantity and price before completing the sale. Correcting a completed sale is different
+  from editing the current cart.

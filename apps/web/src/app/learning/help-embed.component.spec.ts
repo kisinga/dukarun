@@ -4,6 +4,7 @@ import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/route
 import { of } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { environment } from '../../environments/environment';
+import { ThemeService } from '../core/theme.service';
 import { ConnectivityService } from '../pos/offline/connectivity.service';
 import { IconComponent } from '../shared/ui/icon.component';
 import { GITBOOK_PARENT_PROTOCOL, HelpEmbedComponent } from './help-embed.component';
@@ -81,7 +82,7 @@ describe('HelpEmbedComponent', () => {
     const fixture = await render({ routePattern: 'help' });
 
     expect(fixture.nativeElement.textContent).toContain('The knowledge hub is being connected');
-    expect(fixture.nativeElement.querySelector('iframe')?.title).toBe('Dukarun knowledge hub');
+    expect(fixture.nativeElement.querySelector('iframe')?.title).toBe('Dukarun Help');
   });
 
   it('maps an exact topic URL and keeps an external fallback while offline', async () => {
@@ -104,10 +105,13 @@ describe('HelpEmbedComponent', () => {
       params: { domain: 'products' },
     });
     const iframe = fixture.nativeElement.querySelector('iframe') as HTMLIFrameElement;
+    const surface = fixture.nativeElement.querySelector('section') as HTMLElement;
 
     expect(gitbook.getFrameURL).toHaveBeenCalledWith({});
+    expect(surface.className).toContain('100dvh');
     expect(iframe.className).toContain('h-full');
     expect(iframe.className).toContain('w-full');
+    expect(iframe.style.colorScheme).toBe(TestBed.inject(ThemeService).theme());
     (fixture.componentInstance as any).frameLoaded();
     fixture.detectChanges();
 
@@ -117,14 +121,38 @@ describe('HelpEmbedComponent', () => {
     );
     expect(gitbook.navigateToPage).toHaveBeenCalledWith('/products');
     expect(fixture.nativeElement.textContent).not.toContain('Opening Dukarun Help');
+    expect(fixture.nativeElement.textContent).not.toContain('Articles, search, relationships');
+
+    (fixture.componentInstance as any).frameLoaded();
+    expect(gitbook.createFrame).toHaveBeenCalledOnce();
+  });
+
+  it('adds a same-tab walkthrough action to an exact GitBook topic', async () => {
+    environment.gitbookSiteUrl = 'https://docs.example.test';
+    await render({
+      routePattern: 'help/topics/:topic',
+      params: { topic: 'creating-a-product' },
+    });
+
+    expect(gitbook.configure).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actions: [
+          expect.objectContaining({
+            icon: 'play',
+            label: 'Start creating a product',
+            onClick: expect.any(Function),
+          }),
+        ],
+      })
+    );
   });
 
   it('replaces GitBook frame refusal with a first-party fallback on HTTP previews', async () => {
     environment.gitbookSiteUrl = 'https://docs.example.test';
     const fixture = await render({ routePattern: 'help', protocol: 'http:' });
 
-    expect(fixture.nativeElement.textContent).toContain('Open Help in a secure window');
-    expect(fixture.nativeElement.textContent).toContain('This preview uses HTTP');
+    expect(fixture.nativeElement.textContent).toContain('GitBook needs HTTPS');
+    expect(fixture.nativeElement.textContent).toContain('npm run dev:web:https');
     expect(gitbook.createGitBook).not.toHaveBeenCalled();
     const external = fixture.nativeElement.querySelector(
       'a.btn-primary[target="_blank"]'

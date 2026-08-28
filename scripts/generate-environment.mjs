@@ -22,22 +22,39 @@ const appPublicUrl = process.env.APP_PUBLIC_URL?.trim() || 'http://localhost:420
 const storefrontPublicUrl = process.env.STOREFRONT_PUBLIC_URL?.trim() || 'http://localhost:4204';
 const marketingVideoBaseUrl =
   process.env.MARKETING_VIDEO_BASE_URL?.trim().replace(/\/+$/, '') || '';
-const defaultGitbookSiteUrl = 'https://dukarun.gitbook.io/dukarun-docs';
+const defaultGitbookSiteUrl = 'https://dukarun.gitbook.io/docs';
+const defaultUsertourToken = 'cmtc4ejtu01yw72cdf7nfwhil';
+const defaultUsertourContentIds = {
+  'creating-a-product': 'cmtc5qcow02c572cdldtbl7d8',
+  'generating-product-barcodes': 'cmtc5qs7z02ca72cdskz46ynv',
+  'creating-a-supplier': 'cmtc5qt4v026ku14oolhncw01',
+  'recording-a-credit-purchase': 'cmtc5qttm02cg72cdubbspg3c',
+  'making-a-cash-sale': 'cmtc5quih026pu14oun4n8kqx',
+  'selling-by-scanning-a-barcode': 'cmtc5qva002cx72cd1bnkvswi',
+  'creating-a-customer-with-credit': 'cmtc5qvx5026vu14o768c7zps',
+  'making-a-credit-sale': 'cmtc5qwni0270u14ozmiyln6l',
+  'understanding-the-financial-result': 'cmtc5qxh2027au14o7p1kvq29',
+  'first-business-cycle': 'cmtc5v7mm028tu14omfxzifaq',
+};
 const gitbookSiteUrl =
   app === 'web'
     ? process.env.GITBOOK_SITE_URL?.trim().replace(/\/+$/, '') || defaultGitbookSiteUrl
     : '';
-const usertourToken = app === 'web' ? process.env.USERTOUR_TOKEN?.trim() || '' : '';
-let usertourContentIds = {};
+const usertourToken =
+  app === 'web' ? process.env.USERTOUR_TOKEN?.trim() || defaultUsertourToken : '';
+let usertourContentIds = app === 'web' ? defaultUsertourContentIds : {};
 if (app === 'web' && process.env.USERTOUR_CONTENT_IDS_JSON?.trim()) {
   try {
     const parsed = JSON.parse(process.env.USERTOUR_CONTENT_IDS_JSON);
     if (!parsed || Array.isArray(parsed) || typeof parsed !== 'object') throw new Error();
-    usertourContentIds = Object.fromEntries(
-      Object.entries(parsed).filter(
-        ([key, value]) => key.trim() && typeof value === 'string' && value.trim()
-      )
-    );
+    usertourContentIds = {
+      ...defaultUsertourContentIds,
+      ...Object.fromEntries(
+        Object.entries(parsed).filter(
+          ([key, value]) => key.trim() && typeof value === 'string' && value.trim()
+        )
+      ),
+    };
   } catch {
     console.error('USERTOUR_CONTENT_IDS_JSON must be a JSON object with string values.');
     process.exit(2);

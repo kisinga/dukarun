@@ -20,6 +20,7 @@ import {
 } from '../public-pricing.service';
 import { appUrl } from '../../core/public-url';
 import { dukarunWhatsAppUrl } from '../../core/public-contact';
+import { DUKARUN_GUIDES_URL, dukarunGuideUrl } from '../../core/public-learning';
 
 interface DemoProduct {
   readonly id: string;
@@ -49,6 +50,11 @@ interface Testimonial {
   readonly quote: string;
   readonly author: string;
   readonly title: string;
+}
+
+interface LearningStep {
+  readonly title: string;
+  readonly href: string;
 }
 
 /**
@@ -282,6 +288,98 @@ interface Testimonial {
             Nothing to type. The sale is already in the books.
           </p>
         </div>
+      </div>
+    </section>
+
+    <!-- Public guides -->
+    <section
+      id="guides"
+      class="scroll-mt-20 bg-base-200/60 py-14 sm:py-20"
+      aria-labelledby="guides-heading"
+    >
+      <div class="mkt-container grid items-start gap-8 lg:grid-cols-[0.8fr_1.2fr] lg:gap-12">
+        <div class="lg:sticky lg:top-24">
+          <span class="mkt-eyebrow">Public guides</span>
+          <h2 id="guides-heading" class="mkt-h2 mt-2">See how the work gets done</h2>
+          <p class="mkt-lead mt-3 max-w-xl">
+            Read Dukarun's complete help documentation before you sign up. Learn the workflow,
+            understand the business terms, and see how each action reaches the books.
+          </p>
+          <ul class="mt-6 flex flex-col gap-3 text-sm text-base-content/75">
+            <li class="flex items-start gap-2">
+              <app-icon name="heroCheckCircle" size="md" class="mt-0.5 text-primary" />
+              No account required to read or search
+            </li>
+            <li class="flex items-start gap-2">
+              <app-icon name="heroCheckCircle" size="md" class="mt-0.5 text-primary" />
+              Written around real shop workflows, not feature lists
+            </li>
+            <li class="flex items-start gap-2">
+              <app-icon name="heroCheckCircle" size="md" class="mt-0.5 text-primary" />
+              Interactive walkthroughs are available when you log in
+            </li>
+          </ul>
+          <div class="mt-7 flex flex-col gap-3 sm:flex-row lg:flex-col xl:flex-row">
+            <a [href]="guidesUrl" class="btn btn-primary min-h-11">
+              Browse all guides
+              <app-icon name="heroArrowRight" size="md" />
+            </a>
+            <a [href]="glossaryUrl" class="btn btn-outline min-h-11">Business glossary</a>
+          </div>
+        </div>
+
+        <article class="mkt-card overflow-hidden">
+          <div class="border-b border-base-300/70 bg-base-100 p-5 sm:p-6">
+            <div class="flex items-start gap-3">
+              <span
+                class="flex h-11 w-11 shrink-0 items-center justify-center rounded-field bg-primary/10 text-primary"
+              >
+                <app-icon name="heroClipboardDocumentList" size="lg" />
+              </span>
+              <div class="min-w-0">
+                <span class="mkt-eyebrow">Recommended starting point</span>
+                <h3 class="mt-1 text-xl font-semibold">Your first business cycle</h3>
+                <p class="mt-1 mb-0 text-sm text-base-content/70">
+                  Follow one normal sequence from creating stock to understanding the financial
+                  result.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <ol class="divide-y divide-base-300/60 bg-base-100">
+            @for (step of learningSteps; track step.href; let index = $index) {
+              <li>
+                <a
+                  [href]="step.href"
+                  class="group flex min-h-14 items-center gap-3 px-5 py-3 transition-colors hover:bg-base-200/60 sm:px-6"
+                >
+                  <span
+                    class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold tabular-nums text-primary"
+                  >
+                    {{ index + 1 }}
+                  </span>
+                  <span class="min-w-0 flex-1 text-sm font-medium">{{ step.title }}</span>
+                  <app-icon
+                    name="heroArrowRight"
+                    size="sm"
+                    class="text-base-content/35 transition-transform group-hover:translate-x-0.5 group-hover:text-primary"
+                  />
+                </a>
+              </li>
+            }
+          </ol>
+
+          <div class="border-t border-base-300/70 bg-base-200/40 p-5 sm:px-6">
+            <a
+              [href]="firstBusinessCycleUrl"
+              class="inline-flex min-h-11 items-center gap-2 font-semibold text-primary"
+            >
+              Read the complete learning journey
+              <app-icon name="heroArrowRight" size="sm" />
+            </a>
+          </div>
+        </article>
       </div>
     </section>
 
@@ -610,7 +708,7 @@ interface Testimonial {
         </div>
         <p class="mt-8 text-center text-sm text-base-content/70">
           Still curious? Read the
-          <a routerLink="/docs" class="link link-primary font-medium">getting-started guide</a>
+          <a [href]="guidesUrl" class="link link-primary font-medium">public guides</a>
           or
           <a
             [href]="whatsappUrl"
@@ -657,6 +755,9 @@ interface Testimonial {
 })
 export class HomeComponent implements OnInit {
   protected readonly appUrl = appUrl;
+  protected readonly guidesUrl = DUKARUN_GUIDES_URL;
+  protected readonly glossaryUrl = dukarunGuideUrl('glossary');
+  protected readonly firstBusinessCycleUrl = dukarunGuideUrl('journeys/first-business-cycle');
   protected readonly whatsappUrl = dukarunWhatsAppUrl(
     'Hello Dukarun, I would like to know whether Dukarun is right for my business.'
   );
@@ -696,6 +797,33 @@ export class HomeComponent implements OnInit {
   }
 
   protected readonly trustPoints = ['No hardware needed', 'Works offline', 'Cancel anytime'];
+
+  protected readonly learningSteps: LearningStep[] = [
+    {
+      title: 'Create a product',
+      href: dukarunGuideUrl('products/creating-a-product'),
+    },
+    {
+      title: 'Create a supplier',
+      href: dukarunGuideUrl('suppliers/creating-a-supplier'),
+    },
+    {
+      title: 'Record a credit purchase',
+      href: dukarunGuideUrl('purchases/recording-a-credit-purchase'),
+    },
+    {
+      title: 'Complete a cash sale',
+      href: dukarunGuideUrl('selling/making-a-cash-sale'),
+    },
+    {
+      title: 'Create a customer and set credit',
+      href: dukarunGuideUrl('customers-and-credit/creating-a-customer-with-credit'),
+    },
+    {
+      title: 'Complete a credit sale',
+      href: dukarunGuideUrl('selling/making-a-credit-sale'),
+    },
+  ];
 
   protected readonly products: DemoProduct[] = [
     { id: 'unga', name: 'Unga wa Dola 2kg', price: 185, initials: 'UD' },

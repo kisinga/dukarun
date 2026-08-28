@@ -11,6 +11,10 @@ import {
 } from './learning-content';
 import { sanitizeLearningUrl } from './learning-url';
 
+// DaisyUI dialogs use z-index 999. Keep learning prompts above dialogs so a flow can
+// continue inside decomposed editors instead of disappearing behind their modal layer.
+const LEARNING_OVERLAY_BASE_Z_INDEX = 1_000_000;
+
 export interface LearningLaunchContext {
   key: LearningContentKey;
   startedAt: number;
@@ -71,24 +75,14 @@ export class LearningPlatformService {
     await this.permissions.ensureLoaded();
     if (!this.canLaunch(key)) return 'permission-denied';
 
-    this.launchContext.set({ key, startedAt: Date.now() });
-    const navigated = await this.router.navigateByUrl(definition.destinationRoute);
-    if (!navigated) {
-      this.launchContext.set(null);
-      return 'navigation-failed';
-    }
-
-    if (!environment.usertourToken.trim()) {
-      this.launchContext.set(null);
-      return 'vendor-disabled';
-    }
-    if (!definition.usertourContentId) {
-      this.launchContext.set(null);
-      return 'content-unconfigured';
-    }
+    if (!environment.usertourToken.trim()) return 'vendor-disabled';
+    if (!definition.usertourContentId) return 'content-unconfigured';
 
     try {
       if (!(await this.initialize())) return 'vendor-disabled';
+      this.launchContext.set({ key, startedAt: Date.now() });
+      const navigated = await this.router.navigateByUrl(definition.destinationRoute);
+      if (!navigated) return 'navigation-failed';
       await usertour.start(definition.usertourContentId, {
         continue: options.continue ?? definition.type === 'journey',
       });
@@ -124,7 +118,7 @@ export class LearningPlatformService {
     if (this.sdkInitialized) return;
     usertour.init(environment.usertourToken.trim());
     usertour.disableEvalJs();
-    usertour.setBaseZIndex(70);
+    usertour.setBaseZIndex(LEARNING_OVERLAY_BASE_Z_INDEX);
     usertour.setUrlFilter(url => sanitizeLearningUrl(url));
     usertour.setCustomNavigate(url => this.navigateFromGuide(url));
     this.sdkInitialized = true;
