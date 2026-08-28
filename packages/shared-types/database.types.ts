@@ -7904,6 +7904,13 @@ export type Database = {
             referencedRelation: "companies"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "product_image_cleanup_queue_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
         ]
       }
       product_tax_treatment_versions: {
@@ -12814,10 +12821,6 @@ export type Database = {
           name: string
         }[]
       }
-      assert_product_image_object: {
-        Args: { p_company_id: string; p_image_path: string }
-        Returns: undefined
-      }
       account_balance: {
         Args: { p_code: string; p_company_id: string }
         Returns: number
@@ -13051,6 +13054,10 @@ export type Database = {
         }
       }
       assert_platform_admin: { Args: never; Returns: undefined }
+      assert_product_image_object: {
+        Args: { p_company_id: string; p_image_path: string }
+        Returns: undefined
+      }
       assert_supplier_account_consistent: {
         Args: { p_company_id: string; p_supplier_id: string }
         Returns: undefined
@@ -14423,6 +14430,12 @@ export type Database = {
         }
         Returns: string
       }
+      pending_product_image_cleanup: {
+        Args: { p_limit?: number }
+        Returns: {
+          object_path: string
+        }[]
+      }
       period_close_readiness: { Args: { p_end_date?: string }; Returns: Json }
       platform_acknowledge_registration_alert: {
         Args: { p_alert_id: string }
@@ -15383,10 +15396,6 @@ export type Database = {
         Args: { p_tax_date?: string; p_variant_ids: string[] }
         Returns: Json
       }
-      pending_product_image_cleanup: {
-        Args: { p_limit?: number }
-        Returns: { object_path: string }[]
-      }
       purge_mpesa_raw_payloads: { Args: never; Returns: number }
       queue_cashier_session_notification: {
         Args: { p_event: string; p_session_id: string }
@@ -15516,7 +15525,7 @@ export type Database = {
         Returns: boolean
       }
       record_product_image_cleanup: {
-        Args: { p_error?: string | null; p_object_path: string }
+        Args: { p_error?: string; p_object_path: string }
         Returns: undefined
       }
       record_purchase: {
@@ -16292,11 +16301,11 @@ export type Database = {
       }
       set_product_image: {
         Args: {
-          p_expected_image_path: string | null
-          p_image_path: string | null
+          p_expected_image_path: string
+          p_image_path: string
           p_product_id: string
         }
-        Returns: string | null
+        Returns: string
       }
       set_product_tax_category: {
         Args: { p_product_id: string; p_tax_category_id?: string }
@@ -16566,9 +16575,9 @@ export type Database = {
         Args: {
           p_active?: boolean
           p_barcode?: string
-          p_expected_image_path?: string | null
+          p_expected_image_path?: string
           p_image_changed?: boolean
-          p_image_path?: string | null
+          p_image_path?: string
           p_manufacturer_id?: string
           p_name: string
           p_product_id: string
@@ -17019,3 +17028,4 @@ export const Constants = {
     Enums: {},
   },
 } as const
+
