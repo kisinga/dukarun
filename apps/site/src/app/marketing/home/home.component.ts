@@ -302,8 +302,8 @@ interface LearningStep {
           <span class="mkt-eyebrow">Public guides</span>
           <h2 id="guides-heading" class="mkt-h2 mt-2">See how the work gets done</h2>
           <p class="mkt-lead mt-3 max-w-xl">
-            Read Dukarun's complete help documentation before you sign up. Learn the workflow,
-            understand the business terms, and see how each action reaches the books.
+            Use Dukarun Guide before you sign up. Learn the workflow, understand the business terms,
+            and see how each action reaches the books.
           </p>
           <ul class="mt-6 flex flex-col gap-3 text-sm text-base-content/75">
             <li class="flex items-start gap-2">
@@ -321,7 +321,7 @@ interface LearningStep {
           </ul>
           <div class="mt-7 flex flex-col gap-3 sm:flex-row lg:flex-col xl:flex-row">
             <a [href]="guidesUrl" class="btn btn-primary min-h-11">
-              Browse all guides
+              Open Dukarun Guide
               <app-icon name="heroArrowRight" size="md" />
             </a>
             <a [href]="glossaryUrl" class="btn btn-outline min-h-11">Business glossary</a>

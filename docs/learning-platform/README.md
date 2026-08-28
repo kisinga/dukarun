@@ -1,7 +1,8 @@
 # Learning platform operations
 
-Dukarun is the integration boundary; GitBook owns public knowledge and Usertour owns interactive
-flows and checklist progress. The application never stores guide progress or article copy.
+Dukarun is the integration boundary; GitBook owns Dukarun Guide, the public searchable help
+experience, and Usertour owns interactive flows and checklist progress. The application never
+stores guide progress or article copy.
 
 Use the [learning platform next steps](NEXT_STEPS.md) for the GitBook publication and real-app video
 pilot sequence.
@@ -10,6 +11,7 @@ pilot sequence.
 
 | Name              | Owner    | Meaning                                                     |
 | ----------------- | -------- | ----------------------------------------------------------- |
+| Dukarun Guide     | GitBook  | The public, searchable help experience for Dukarun.         |
 | Category          | GitBook  | A primary business area such as Products or Selling.        |
 | Article           | GitBook  | The canonical explanation of one task, concept, or problem. |
 | Interactive guide | Usertour | An optional in-app companion to a task article.             |
@@ -61,8 +63,8 @@ Import `gitbook-import` into the public, search-indexed `en-KE` space at
 slugs stable. Edit articles, relationships, video embeds, and glossary entries in GitBook after
 import; these changes require no Dukarun deployment.
 
-GitBook serves its embed with `frame-ancestors https:`. Dukarun therefore embeds the hub in the
-deployed HTTPS app and presents a first-party “Open Dukarun Help” fallback in HTTP development
+GitBook serves its embed with `frame-ancestors https:`. Dukarun therefore embeds Dukarun Guide in
+the deployed HTTPS app and presents a first-party “Open Dukarun Guide” fallback in HTTP development
 previews instead of showing the browser's refused-to-connect page. Run `npm run dev:web:https` and
 accept the local development certificate once to exercise the real GitBook frame on localhost.
 Component tests mock only the frame transport; article titles, hierarchy, search results, and videos
@@ -83,6 +85,6 @@ GitBook is live first and remains the canonical content source. For a Usertour c
 version, validate it with internal accounts, then publish it to the production environment. Existing
 content IDs stay stable across versions, so wording, steps, and future YouTube embeds do not require a
 Dukarun deployment. Clear `USERTOUR_TOKEN` in a build to disable all interactive guides without
-affecting GitBook help or ordinary business actions.
+affecting Dukarun Guide or ordinary business actions.
 
 Vendor failures are non-blocking: ordinary business actions must still succeed.

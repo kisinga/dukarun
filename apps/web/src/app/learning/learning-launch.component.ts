@@ -25,7 +25,7 @@ import { LearningPlatformService, type LearningLaunchResult } from './learning-p
             @if (destination()) {
               <a class="btn btn-primary" [routerLink]="destination()">Continue without guide</a>
             }
-            <a class="btn btn-ghost" routerLink="/help">Open Help</a>
+            <a class="btn btn-ghost" routerLink="/help">Open Dukarun Guide</a>
           </div>
         }
       </div>

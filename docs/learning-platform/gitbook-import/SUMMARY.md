@@ -1,6 +1,6 @@
 # Table of contents
 
-- [Dukarun Help](README.md)
+- [Dukarun Guide](README.md)
 - [Products](products/README.md)
   - [Creating a product](products/creating-a-product.md)
   - [Generating product barcodes](products/generating-product-barcodes.md)

@@ -37,12 +37,12 @@ export const GITBOOK_PARENT_PROTOCOL = new InjectionToken<string>('GitBook paren
   template: `
     <section
       class="relative h-[calc(100dvh-7.5rem)] min-h-[32rem] overflow-hidden bg-base-100 lg:h-[calc(100dvh-3.5rem)]"
-      aria-label="Dukarun Help"
+      aria-label="Dukarun Guide"
     >
       <iframe
         #frame
         class="absolute inset-0 h-full w-full border-0 bg-base-100"
-        title="Dukarun Help"
+        title="Dukarun Guide"
         src="about:blank"
         allow="clipboard-write"
         [style.color-scheme]="theme.theme()"
@@ -62,7 +62,7 @@ export const GITBOOK_PARENT_PROTOCOL = new InjectionToken<string>('GitBook paren
             @switch (state()) {
               @case ('loading') {
                 <span class="loading loading-spinner loading-md text-primary"></span>
-                <h1 class="mt-4 text-lg font-semibold">Opening Dukarun Help</h1>
+                <h1 class="mt-4 text-lg font-semibold">Opening Dukarun Guide</h1>
                 <p class="mt-2 text-sm text-base-content/60">
                   Loading the official, searchable documentation…
                 </p>
@@ -71,7 +71,9 @@ export const GITBOOK_PARENT_PROTOCOL = new InjectionToken<string>('GitBook paren
                 <span class="mx-auto grid size-12 place-items-center rounded-2xl bg-warning/10">
                   <app-icon name="heroSignalSlash" size="lg" class="text-warning" />
                 </span>
-                <h1 class="mt-4 text-lg font-semibold">Help needs an internet connection</h1>
+                <h1 class="mt-4 text-lg font-semibold">
+                  Dukarun Guide needs an internet connection
+                </h1>
                 <p class="mt-2 text-sm text-base-content/60">
                   Reconnect, then retry. Your work in Dukarun is not affected.
                 </p>
@@ -94,19 +96,21 @@ export const GITBOOK_PARENT_PROTOCOL = new InjectionToken<string>('GitBook paren
                 <span class="mx-auto grid size-12 place-items-center rounded-2xl bg-primary/10">
                   <app-icon name="heroBookOpen" size="lg" class="text-primary" />
                 </span>
-                <h1 class="mt-4 text-lg font-semibold">The knowledge hub is being connected</h1>
+                <h1 class="mt-4 text-lg font-semibold">Dukarun Guide is being connected</h1>
                 <p class="mt-2 text-sm text-base-content/60">
-                  Set the GitBook site URL to make searchable help available here.
+                  Set the GitBook site URL to make the searchable guide available here.
                 </p>
               }
               @case ('insecure') {
                 <span class="mx-auto grid size-12 place-items-center rounded-2xl bg-warning/10">
                   <app-icon name="heroExclamationTriangle" size="lg" class="text-warning" />
                 </span>
-                <h1 class="mt-4 text-lg font-semibold">GitBook needs HTTPS in local development</h1>
+                <h1 class="mt-4 text-lg font-semibold">
+                  Dukarun Guide needs HTTPS in local development
+                </h1>
                 <p class="mt-2 text-sm text-base-content/60">
                   Start Dukarun with <code>npm run dev:web:https</code> to test the real embedded
-                  hub, or open this page directly in GitBook.
+                  guide, or open this page directly in GitBook.
                 </p>
                 @if (externalUrl()) {
                   <a
@@ -122,9 +126,9 @@ export const GITBOOK_PARENT_PROTOCOL = new InjectionToken<string>('GitBook paren
                 <span class="mx-auto grid size-12 place-items-center rounded-2xl bg-warning/10">
                   <app-icon name="heroExclamationTriangle" size="lg" class="text-warning" />
                 </span>
-                <h1 class="mt-4 text-lg font-semibold">Help could not be loaded</h1>
+                <h1 class="mt-4 text-lg font-semibold">Dukarun Guide could not be loaded</h1>
                 <p class="mt-2 text-sm text-base-content/60">
-                  Retry here or open the knowledge hub in a new tab.
+                  Retry here or open the guide in a new tab.
                 </p>
                 <div class="mt-5 flex justify-center gap-2">
                   <button type="button" class="btn btn-primary btn-sm" (click)="retry()">
@@ -258,7 +262,7 @@ export class HelpEmbedComponent implements AfterViewInit {
         tabs: ['docs', 'search'],
         greeting: {
           title: 'How can we help?',
-          subtitle: 'Search Dukarun tasks and business terms.',
+          subtitle: 'Search Dukarun Guide for tasks and business terms.',
         },
         suggestions: [],
         tools: [],

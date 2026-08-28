@@ -138,8 +138,8 @@ interface NavSection {
             <a
               routerLink="/help"
               class="btn btn-ghost btn-sm min-h-11 min-w-11 gap-2 px-2 xl:px-3"
-              title="Help and guides"
-              aria-label="Help and guides"
+              title="Open Dukarun Guide"
+              aria-label="Help — open Dukarun Guide"
             >
               <app-icon name="heroQuestionMarkCircle" size="lg" />
               <span class="hidden xl:inline">Help</span>

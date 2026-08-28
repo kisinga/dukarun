@@ -1,10 +1,10 @@
-# Dukarun Help
+# Dukarun Guide
 
 Learn how to complete everyday work in Dukarun and understand what each action changes in your
 business. Search for the task you want to complete or browse by business area.
 
-The help centre is public. You only need to sign in when you open Dukarun or start an interactive
-guide.
+Dukarun Guide is public and searchable, so you can use it whenever you need help. You only need to
+sign in when you open Dukarun or start an interactive guide.
 
 ## Start with one business cycle
 

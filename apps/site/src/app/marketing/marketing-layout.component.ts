@@ -242,13 +242,13 @@ export class MarketingLayoutComponent {
   protected readonly links: NavLink[] = [
     { label: 'Home', path: '/' },
     { label: 'Pricing', path: '/', fragment: 'pricing' },
-    { label: 'Product help', href: DUKARUN_GUIDES_URL },
+    { label: 'Dukarun Guide', href: DUKARUN_GUIDES_URL },
     { label: 'Guides', path: '/blog' },
     { label: 'About', path: '/about' },
     { label: 'Contact', path: '/contact' },
   ];
   protected readonly resourceLinks: NavLink[] = [
-    { label: 'Product help', href: DUKARUN_GUIDES_URL },
+    { label: 'Dukarun Guide', href: DUKARUN_GUIDES_URL },
     { label: 'First business cycle', href: dukarunGuideUrl('journeys/first-business-cycle') },
     { label: 'Hardware setup', path: '/docs/hardware' },
     { label: 'Daily shop cash-up', path: '/tools/daily-shop-cash-up' },

@@ -81,8 +81,8 @@ describe('HelpEmbedComponent', () => {
     environment.gitbookSiteUrl = '';
     const fixture = await render({ routePattern: 'help' });
 
-    expect(fixture.nativeElement.textContent).toContain('The knowledge hub is being connected');
-    expect(fixture.nativeElement.querySelector('iframe')?.title).toBe('Dukarun Help');
+    expect(fixture.nativeElement.textContent).toContain('Dukarun Guide is being connected');
+    expect(fixture.nativeElement.querySelector('iframe')?.title).toBe('Dukarun Guide');
   });
 
   it('maps an exact topic URL and keeps an external fallback while offline', async () => {
@@ -93,7 +93,9 @@ describe('HelpEmbedComponent', () => {
       offline: true,
     });
 
-    expect(fixture.nativeElement.textContent).toContain('Help needs an internet connection');
+    expect(fixture.nativeElement.textContent).toContain(
+      'Dukarun Guide needs an internet connection'
+    );
     const external = fixture.nativeElement.querySelector('a[target="_blank"]') as HTMLAnchorElement;
     expect(external.href).toBe('https://docs.example.test/products/creating-a-product');
   });
@@ -120,7 +122,7 @@ describe('HelpEmbedComponent', () => {
       expect.objectContaining({ tabs: ['docs', 'search'], tools: [] })
     );
     expect(gitbook.navigateToPage).toHaveBeenCalledWith('/products');
-    expect(fixture.nativeElement.textContent).not.toContain('Opening Dukarun Help');
+    expect(fixture.nativeElement.textContent).not.toContain('Opening Dukarun Guide');
     expect(fixture.nativeElement.textContent).not.toContain('Articles, search, relationships');
 
     (fixture.componentInstance as any).frameLoaded();
@@ -151,7 +153,7 @@ describe('HelpEmbedComponent', () => {
     environment.gitbookSiteUrl = 'https://docs.example.test';
     const fixture = await render({ routePattern: 'help', protocol: 'http:' });
 
-    expect(fixture.nativeElement.textContent).toContain('GitBook needs HTTPS');
+    expect(fixture.nativeElement.textContent).toContain('Dukarun Guide needs HTTPS');
     expect(fixture.nativeElement.textContent).toContain('npm run dev:web:https');
     expect(gitbook.createGitBook).not.toHaveBeenCalled();
     const external = fixture.nativeElement.querySelector(
