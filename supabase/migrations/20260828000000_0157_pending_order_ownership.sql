@@ -57,6 +57,11 @@ set pending_owner = null,
 where status <> 'pending_payment'
   and (pending_owner is not null or cashier_pending_at is not null);
 
+-- Updating orders queues the deferred account-consistency trigger. PostgreSQL
+-- will not alter the table while those events are pending, so run them before
+-- adding and validating the ownership constraints.
+set constraints public.orders_account_consistency immediate;
+
 alter table public.orders
   add constraint orders_pending_owner_check
     check (pending_owner is null or pending_owner in ('cashier', 'approval', 'payment_provider'))
