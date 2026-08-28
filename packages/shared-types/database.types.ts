@@ -5575,6 +5575,9 @@ export type Database = {
           request_fingerprint: string
           result_code: string | null
           result_description: string | null
+          resume_cashier_pending_at: string | null
+          resume_order_pending_owner: string | null
+          resume_order_status: string | null
           review_reason: string | null
           state_version: number
           status: string
@@ -5607,6 +5610,9 @@ export type Database = {
           request_fingerprint: string
           result_code?: string | null
           result_description?: string | null
+          resume_cashier_pending_at?: string | null
+          resume_order_pending_owner?: string | null
+          resume_order_status?: string | null
           review_reason?: string | null
           state_version?: number
           status?: string
@@ -5639,6 +5645,9 @@ export type Database = {
           request_fingerprint?: string
           result_code?: string | null
           result_description?: string | null
+          resume_cashier_pending_at?: string | null
+          resume_order_pending_owner?: string | null
+          resume_order_status?: string | null
           review_reason?: string | null
           state_version?: number
           status?: string
@@ -6390,9 +6399,11 @@ export type Database = {
           late_posting_reason: string | null
           location_id: string
           net_total: number
+          pending_owner: string | null
           posting_source: string | null
           quantity_total: number
           receivable_kind: string | null
+          sale_request_fingerprint: string | null
           status: string
           tax_document_id: string | null
           tax_point_at: string | null
@@ -6427,9 +6438,11 @@ export type Database = {
           late_posting_reason?: string | null
           location_id: string
           net_total?: number
+          pending_owner?: string | null
           posting_source?: string | null
           quantity_total?: number
           receivable_kind?: string | null
+          sale_request_fingerprint?: string | null
           status?: string
           tax_document_id?: string | null
           tax_point_at?: string | null
@@ -6464,9 +6477,11 @@ export type Database = {
           late_posting_reason?: string | null
           location_id?: string
           net_total?: number
+          pending_owner?: string | null
           posting_source?: string | null
           quantity_total?: number
           receivable_kind?: string | null
+          sale_request_fingerprint?: string | null
           status?: string
           tax_document_id?: string | null
           tax_point_at?: string | null
@@ -13852,6 +13867,10 @@ export type Database = {
         Returns: string
       }
       generate_fulfillment_pin: { Args: never; Returns: string }
+      hold_sale_order_core: {
+        Args: { p_order_id: string; p_owner: string }
+        Returns: string
+      }
       increment_sms_usage: {
         Args: { p_company_id: string }
         Returns: undefined
@@ -15181,6 +15200,15 @@ export type Database = {
           p_retry?: boolean
         }
         Returns: Json
+      }
+      prepare_sale_order_core: {
+        Args: {
+          p_client_ref?: string
+          p_customer_id: string
+          p_draft_id?: string
+          p_lines: Json
+        }
+        Returns: string
       }
       prepayment_money_account: {
         Args: {
