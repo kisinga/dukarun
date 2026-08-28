@@ -13,6 +13,12 @@ You need permission to manage the product catalogue. Know the product name and s
 Decide whether you are creating a physical good or a service, and whether Dukarun should track its
 stock quantity.
 
+## Video
+
+The task-specific walkthrough is being prepared. For now, watch this Dukarun overview.
+
+{% embed url="https://youtu.be/dfykDyK6Fs8" %}
+
 ## Steps
 
 1. Open **Products**, then choose **Add product**.

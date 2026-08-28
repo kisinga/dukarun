@@ -12,6 +12,12 @@ the amount later.
 The products must be active and available at the current location. The customer must be approved
 for credit and have enough available credit for the sale.
 
+## Video
+
+The task-specific walkthrough is being prepared. For now, watch this Dukarun overview.
+
+{% embed url="https://youtu.be/dfykDyK6Fs8" %}
+
 ## Steps
 
 1. Open **Sell** and add the products the customer is taking.

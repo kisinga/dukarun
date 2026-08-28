@@ -42,7 +42,7 @@ const ACQUISITION_CTA_LABELS = new Set([
               class="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-base-content/55 transition-colors hover:text-primary"
             >
               <span aria-hidden="true">←</span>
-              Guides
+              Blog
             </a>
             <div
               class="mt-7 flex flex-wrap items-center gap-3 text-xs font-semibold uppercase tracking-[0.13em]"

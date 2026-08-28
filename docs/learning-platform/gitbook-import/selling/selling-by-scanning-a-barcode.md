@@ -11,6 +11,12 @@ Scanning is faster than searching and reduces the chance of adding the wrong pro
 The variant must be active, available for sale, and linked to one unique barcode. Test newly printed
 labels before using them during a busy shift.
 
+## Video
+
+The task-specific walkthrough is being prepared. For now, watch this Dukarun overview.
+
+{% embed url="https://youtu.be/dfykDyK6Fs8" %}
+
 ## Steps
 
 1. Open **Sell**.

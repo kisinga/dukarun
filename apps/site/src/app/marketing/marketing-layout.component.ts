@@ -242,8 +242,7 @@ export class MarketingLayoutComponent {
   protected readonly links: NavLink[] = [
     { label: 'Home', path: '/' },
     { label: 'Pricing', path: '/', fragment: 'pricing' },
-    { label: 'Dukarun Guide', href: DUKARUN_GUIDES_URL },
-    { label: 'Guides', path: '/blog' },
+    { label: 'Blog', path: '/blog' },
     { label: 'About', path: '/about' },
     { label: 'Contact', path: '/contact' },
   ];

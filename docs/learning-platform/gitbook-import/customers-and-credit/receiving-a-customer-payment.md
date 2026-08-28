@@ -11,6 +11,12 @@ Open the correct customer account. Have the amount, payment method, and referenc
 business uses till control, open the till that received the money. Your role must allow you to settle
 customer orders.
 
+## Video
+
+The task-specific walkthrough is being prepared. For now, watch this Dukarun overview.
+
+{% embed url="https://youtu.be/dfykDyK6Fs8" %}
+
 ## Steps
 
 1. Open **Customers** and select the customer.

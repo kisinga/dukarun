@@ -11,6 +11,12 @@ A completed cash sale records the products sold and the full payment received at
 The product must be active and available at the current location. If your business uses till
 control, open your till before taking payment.
 
+## Video
+
+The task-specific walkthrough is being prepared. For now, watch this Dukarun overview.
+
+{% embed url="https://youtu.be/dfykDyK6Fs8" %}
+
 ## Steps
 
 1. Open **Sell**.

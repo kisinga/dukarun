@@ -23,6 +23,12 @@ An article must stand on its own. An interactive guide may point to the article 
 and the article may launch the guide when one exists. A journey references guides in business order.
 A video supports an article or guide but never replaces the written steps.
 
+Keep both launch paths visible. Every guide-backed GitBook article includes its canonical
+`https://app.dukarun.com/learn/<content-key>` link. When that article is opened through an exact
+`/help/topics/<content-key>` or `/help/journeys/<content-key>` application route, the official
+GitBook embed also shows a launch action. That action uses the Angular router, so it starts the same
+interactive content in the current Dukarun tab and works against localhost.
+
 ## Canonical keys and Usertour setup
 
 The web registry defines nine flow keys (eight task guides plus the financial recap) and the
@@ -74,10 +80,20 @@ The official embed follows Dukarun's light/dark `color-scheme`. Its accent color
 canonical GitBook site's customization rather than app CSS (the frame is cross-origin); set the
 GitBook primary color to Dukarun orange `#e85d2f` so both the public and embedded docs match.
 
+Expose GitBook's Assistant, Search, and Docs tabs. Search includes question suggestions that hand
+off to the Assistant; hiding that tab leaves those suggestions visibly clickable but inert. Keep
+Assistant suggestions and tools site-owned instead of overriding them with empty application
+configuration. In the GitBook site settings, set external links to open in the same tab so article
+CTAs do not create a second Dukarun tab. The application cannot override this site-level behavior
+inside GitBook's cross-origin frame. On localhost, use the embed's first-party launch action to stay
+on the local origin; the article link remains the canonical production URL.
+
 Before publishing, verify every external link and use a non-production app origin when importing
-into a non-production space. Add a video block only after the approved YouTube or first-party media
-URL is reachable. Until then, the written steps remain complete without a placeholder or broken
-player.
+into a non-production space. Keep the `## Video` section in every task article and journey. Until a
+task-specific walkthrough is ready, use the approved Dukarun overview at
+<https://youtu.be/dfykDyK6Fs8> as an explicitly labelled placeholder. Use GitBook's native embed
+block so the video plays on the page. Replace the URL in GitBook when the task-specific YouTube
+upload is approved; this does not require a Dukarun deployment.
 
 ## Rollout and future edits
 

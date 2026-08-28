@@ -10,6 +10,12 @@ shows what remains before general business expenses.
 Your role must allow you to view reports. Decide which location and date range you want to review.
 Use the same range whenever you compare figures.
 
+## Video
+
+The task-specific walkthrough is being prepared. For now, watch this Dukarun overview.
+
+{% embed url="https://youtu.be/dfykDyK6Fs8" %}
+
 ## Steps
 
 1. Open **Reports**.

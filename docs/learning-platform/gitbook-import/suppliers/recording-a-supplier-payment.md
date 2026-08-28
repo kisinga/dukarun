@@ -11,6 +11,12 @@ Open the correct supplier account. Have the amount and the account used to pay. 
 uses till control, open the till used for the payment. Your role must allow supplier credit
 purchases and payments.
 
+## Video
+
+The task-specific walkthrough is being prepared. For now, watch this Dukarun overview.
+
+{% embed url="https://youtu.be/dfykDyK6Fs8" %}
+
 ## Steps
 
 1. Open **Suppliers** and select the supplier.

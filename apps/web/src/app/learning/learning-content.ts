@@ -151,7 +151,5 @@ export function isLearningContentKey(value: string | null): value is LearningCon
 }
 
 export function gitBookPathForTopic(topic: string | null): string | null {
-  return isLearningContentKey(topic) && topic !== 'first-business-cycle'
-    ? LEARNING_CONTENT_REGISTRY[topic].gitbookPath
-    : null;
+  return isLearningContentKey(topic) ? LEARNING_CONTENT_REGISTRY[topic].gitbookPath : null;
 }

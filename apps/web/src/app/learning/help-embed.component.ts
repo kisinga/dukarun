@@ -259,13 +259,11 @@ export class HelpEmbedComponent implements AfterViewInit {
       this.frameClient = client.createFrame(this.frame.nativeElement);
       const actionKey = this.contentKey();
       this.frameClient.configure({
-        tabs: ['docs', 'search'],
+        tabs: ['assistant', 'search', 'docs'],
         greeting: {
           title: 'How can we help?',
           subtitle: 'Search Dukarun Guide for tasks and business terms.',
         },
-        suggestions: [],
-        tools: [],
         actions: actionKey
           ? [
               {

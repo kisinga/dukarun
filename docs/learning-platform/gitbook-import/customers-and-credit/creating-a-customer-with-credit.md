@@ -12,6 +12,12 @@ credit policy controls how much the customer may owe and when payment is expecte
 Know the customer's name and useful contact details. Decide the credit limit, payment terms, and
 reason for the decision. Your role must allow you to manage customers and customer credit.
 
+## Video
+
+The task-specific walkthrough is being prepared. For now, watch this Dukarun overview.
+
+{% embed url="https://youtu.be/dfykDyK6Fs8" %}
+
 ## Steps
 
 1. Open **Customers**, then choose **Add customer**.

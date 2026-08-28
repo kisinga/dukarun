@@ -13,6 +13,12 @@ profit.
 Complete at least one purchase and one sale. Use the same company, location, and date range when
 comparing figures. Your role must allow you to view financial information.
 
+## Video
+
+The task-specific walkthrough is being prepared. For now, watch this Dukarun overview.
+
+{% embed url="https://youtu.be/dfykDyK6Fs8" %}
+
 ## Follow one transaction at a time
 
 | Business action  | Stock     | Cash                               | Credit balance                | Sales result              |
