@@ -351,8 +351,8 @@ export class PosService {
       ...(input.image_changed
         ? {
             p_image_changed: true,
-            p_image_path: input.image_path ?? null,
-            p_expected_image_path: input.expected_image_path ?? null,
+            p_image_path: input.image_path ?? undefined,
+            p_expected_image_path: input.expected_image_path ?? undefined,
           }
         : {}),
     });
@@ -439,7 +439,6 @@ export class PosService {
       await this.removeProductImage(path);
       const { error } = await this.client.rpc('record_product_image_cleanup', {
         p_object_path: path,
-        p_error: null,
       });
       if (error) throw rpcError(error);
     } catch (error) {
