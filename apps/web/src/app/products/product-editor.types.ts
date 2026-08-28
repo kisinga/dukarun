@@ -36,11 +36,6 @@ export interface ProductEditorResult {
   mode: 'created' | 'updated';
   name: string;
   variantCount: number;
-  photoWarning?: string;
-}
-
-export interface ProductEditorCloseResult {
-  refreshCatalog: boolean;
 }
 
 /** Immutable intent emitted by the dense variant form surface. */

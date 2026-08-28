@@ -54,16 +54,14 @@ describe('ProductPhotoControlComponent', () => {
     const fixture = TestBed.createComponent(ProductPhotoControlComponent);
     const selected = vi.fn();
     const failed = vi.fn();
-    const retry = vi.fn();
     const remove = vi.fn();
     fixture.componentInstance.imageSelected.subscribe(selected);
     fixture.componentInstance.selectionFailed.subscribe(failed);
-    fixture.componentInstance.retryUpload.subscribe(retry);
     fixture.componentInstance.removePhoto.subscribe(remove);
     fixture.componentRef.setInput('mode', mode);
     fixture.componentRef.setInput('alt', 'Widget photo');
     fixture.detectChanges();
-    return { fixture, selected, failed, retry, remove, createObjectUrl };
+    return { fixture, selected, failed, remove, createObjectUrl };
   }
 
   it('resizes and emits a pending product image from a selected file', async () => {
@@ -95,17 +93,36 @@ describe('ProductPhotoControlComponent', () => {
     expect(failed).toHaveBeenCalledWith('Choose a valid image file.');
   });
 
-  it('exposes retry and remove actions for parent-owned persistence', async () => {
-    const { fixture, retry, remove } = await render('edit');
-    fixture.componentRef.setInput('previewUrl', 'blob:preview');
+  it('makes a staged replacement explicit and allows it to be cancelled', async () => {
+    const { fixture, remove } = await render('edit');
+    fixture.componentRef.setInput('previewUrl', 'blob:new-preview');
     fixture.componentRef.setInput('pending', true);
+    fixture.componentRef.setInput('hasStoredPhoto', true);
     fixture.detectChanges();
 
     const buttons = [...(fixture.nativeElement as HTMLElement).querySelectorAll('button')];
-    buttons.find(button => button.textContent?.includes('Retry upload'))?.click();
-    buttons.find(button => button.textContent?.includes('Remove photo'))?.click();
+    expect(fixture.nativeElement.textContent).toContain(
+      'The current photo stays in place until you save.'
+    );
+    expect(fixture.nativeElement.textContent).toContain('Replace photo');
+    buttons.find(button => button.textContent?.includes('Cancel new photo'))?.click();
 
-    expect(retry).toHaveBeenCalledOnce();
+    expect(remove).toHaveBeenCalledOnce();
+  });
+
+  it('offers an undo while a stored photo is marked for removal', async () => {
+    const { fixture, remove } = await render('edit');
+    fixture.componentRef.setInput('hasStoredPhoto', true);
+    fixture.componentRef.setInput('removalPending', true);
+    fixture.detectChanges();
+
+    const undo = [...(fixture.nativeElement as HTMLElement).querySelectorAll('button')].find(
+      button => button.textContent?.includes('Undo removal')
+    );
+    expect(fixture.nativeElement.textContent).toContain(
+      'The current photo will be removed when you save.'
+    );
+    undo?.click();
     expect(remove).toHaveBeenCalledOnce();
   });
 });

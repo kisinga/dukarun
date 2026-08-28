@@ -95,7 +95,9 @@ select is(public.customer_deposit_available('89000000-0000-4000-8000-00000000000
   300::bigint,'unapplied customer money remains separate');
 select is((public.post_sale_with_prepayment_at_location(
   (select id from public.stock_locations where company_id=(select company_id from prepayment_fixture)
-    and is_default limit 1),'89000000-0000-4000-8000-000000000002','[]','[]',700,300,
+    and is_default limit 1),'89000000-0000-4000-8000-000000000002',
+  '[{"variant_id":"89000000-0000-4000-8000-000000000005","quantity":1,"unit_price":1000}]',
+  '[]',700,300,
   'mixed-sale-1')->>'order_id'),(select result->>'order_id' from mixed_sale),
   'mixed sale replay is idempotent');
 select throws_ok(format('select public.apply_customer_deposit(%L,301)',

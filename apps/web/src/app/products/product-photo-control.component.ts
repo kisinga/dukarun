@@ -25,7 +25,8 @@ export interface PendingProductImage {
       <div>
         <h3 class="section-title">Product photo</h3>
         <p id="product-photo-help" class="type-caption mt-0.5">
-          A clear, well-lit photo makes the product easier to find while selling.
+          A clear, well-lit photo makes the product easier to find while selling. Changes apply when
+          you save the product.
         </p>
       </div>
 
@@ -45,7 +46,9 @@ export interface PendingProductImage {
           } @else {
             <div class="px-3 text-center text-base-content/45">
               <app-icon name="heroCamera" size="xl" />
-              <p class="mt-1 text-xs">No photo yet</p>
+              <p class="mt-1 text-xs">
+                {{ removalPending() ? 'Photo marked for removal' : 'No photo yet' }}
+              </p>
             </div>
           }
         </div>
@@ -81,7 +84,7 @@ export interface PendingProductImage {
               (click)="productCameraInput.click()"
             >
               <app-icon name="heroCamera" />
-              Take photo
+              {{ hasStoredPhoto() || pending() ? 'Take new photo' : 'Take photo' }}
             </button>
             <button
               appButton
@@ -92,33 +95,28 @@ export interface PendingProductImage {
               (click)="productPhotoInput.click()"
             >
               <app-icon name="heroArrowUpTray" />
-              Choose photo
+              {{ hasStoredPhoto() || pending() ? 'Replace photo' : 'Choose photo' }}
             </button>
           </div>
 
-          @if (pending() && mode() === 'edit' && !controlBusy()) {
-            <button
-              appButton
-              type="button"
-              variant="outline"
-              class="mt-2 w-full sm:w-auto"
-              (click)="retryUpload.emit()"
-            >
-              Retry upload
-            </button>
-          }
-
-          @if (previewUrl()) {
+          @if (previewUrl() || removalPending()) {
             <button
               appButton
               type="button"
               variant="ghost"
-              class="mt-2 w-full text-error sm:w-auto"
+              class="mt-2 w-full sm:w-auto"
+              [class.text-error]="!pending() && !removalPending()"
               [disabled]="actionDisabled()"
               (click)="removePhoto.emit()"
             >
               <app-icon name="heroXMark" />
-              Remove photo
+              @if (pending()) {
+                Cancel new photo
+              } @else if (removalPending()) {
+                Undo removal
+              } @else {
+                Remove photo
+              }
             </button>
           }
 
@@ -128,9 +126,13 @@ export interface PendingProductImage {
             } @else if (pending() && mode() === 'create') {
               Ready - the photo will upload when you create the product.
             } @else if (pending()) {
-              Upload paused. Check your connection and retry.
+              New photo selected. The current photo stays in place until you save.
+            } @else if (removalPending()) {
+              The current photo will be removed when you save.
+            } @else if (hasStoredPhoto()) {
+              This is the current photo. Choose another to replace it when you save.
             } @else {
-              Photos are resized for faster uploads. You can replace them anytime.
+              Photos are resized for faster uploads.
             }
           </p>
         </div>
@@ -145,10 +147,11 @@ export class ProductPhotoControlComponent {
   readonly busy = input(false);
   readonly disabled = input(false);
   readonly pending = input(false);
+  readonly hasStoredPhoto = input(false);
+  readonly removalPending = input(false);
 
   readonly imageSelected = output<PendingProductImage>();
   readonly selectionFailed = output<string>();
-  readonly retryUpload = output<void>();
   readonly removePhoto = output<void>();
   readonly imageBroken = output<void>();
 
@@ -158,7 +161,7 @@ export class ProductPhotoControlComponent {
 
   protected busyLabel(): string {
     if (this.processing()) return 'Preparing photo...';
-    return this.mode() === 'create' ? 'Preparing photo...' : 'Uploading photo...';
+    return 'Saving photo change...';
   }
 
   protected async selectPhoto(event: Event): Promise<void> {

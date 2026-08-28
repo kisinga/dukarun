@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { SupabaseService } from '../../core/supabase.service';
 import { PosService, variantLabel } from '../../pos/pos.service';
+import { ProfileService } from '../../profile/profile.service';
 import type { OrderData, PrintMeta, PurchaseData } from './print-templates';
 
 export interface CompanyPrintInfo {
@@ -44,6 +45,7 @@ function toLegacyState(status: string): string {
 export class ReceiptDataService {
   private readonly supabase = inject(SupabaseService);
   private readonly pos = inject(PosService);
+  private readonly profile = inject(ProfileService);
 
   private get db() {
     return this.supabase.client;
@@ -118,7 +120,7 @@ export class ReceiptDataService {
     orderId: string,
     documentType: 'receipt' | 'proforma'
   ): Promise<{ order: OrderData; meta: PrintMeta }> {
-    const [order, lines, payments, company, taxDocument] = await Promise.all([
+    const [order, lines, payments, company, taxDocument, servedBy] = await Promise.all([
       this.pos.getOrder(orderId),
       this.pos.orderLines(orderId),
       this.pos.orderPayments(orderId),
@@ -129,6 +131,7 @@ export class ReceiptDataService {
         .eq('source_order_id', orderId)
         .eq('document_kind', 'invoice')
         .maybeSingle(),
+      documentType === 'receipt' ? this.currentStaffFirstName() : Promise.resolve(undefined),
     ]);
     if (taxDocument.error) throw taxDocument.error;
     if (documentType === 'receipt' && order.status !== 'completed') {
@@ -247,6 +250,7 @@ export class ReceiptDataService {
 
     const meta: PrintMeta = {
       documentType,
+      servedBy,
       showVatBreakdown: company.showVatBreakdown,
       vatRegistered: company.vatRegistered,
       taxRegistrationNumber: company.taxRegistrationNumber,
@@ -260,6 +264,11 @@ export class ReceiptDataService {
             : 'N/A',
     };
     return { order: orderData, meta };
+  }
+
+  private async currentStaffFirstName(): Promise<string | undefined> {
+    const staff = this.profile.me() ?? (await this.profile.myProfile().catch(() => null));
+    return staff?.display_name.trim().split(/\s+/, 1)[0] || undefined;
   }
 
   /** Cashier session + drawer counts → a synthetic OrderData for the cashier-slip doc type. */

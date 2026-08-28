@@ -5575,6 +5575,9 @@ export type Database = {
           request_fingerprint: string
           result_code: string | null
           result_description: string | null
+          resume_cashier_pending_at: string | null
+          resume_order_pending_owner: string | null
+          resume_order_status: string | null
           review_reason: string | null
           state_version: number
           status: string
@@ -5607,6 +5610,9 @@ export type Database = {
           request_fingerprint: string
           result_code?: string | null
           result_description?: string | null
+          resume_cashier_pending_at?: string | null
+          resume_order_pending_owner?: string | null
+          resume_order_status?: string | null
           review_reason?: string | null
           state_version?: number
           status?: string
@@ -5639,6 +5645,9 @@ export type Database = {
           request_fingerprint?: string
           result_code?: string | null
           result_description?: string | null
+          resume_cashier_pending_at?: string | null
+          resume_order_pending_owner?: string | null
+          resume_order_status?: string | null
           review_reason?: string | null
           state_version?: number
           status?: string
@@ -6390,9 +6399,11 @@ export type Database = {
           late_posting_reason: string | null
           location_id: string
           net_total: number
+          pending_owner: string | null
           posting_source: string | null
           quantity_total: number
           receivable_kind: string | null
+          sale_request_fingerprint: string | null
           status: string
           tax_document_id: string | null
           tax_point_at: string | null
@@ -6427,9 +6438,11 @@ export type Database = {
           late_posting_reason?: string | null
           location_id: string
           net_total?: number
+          pending_owner?: string | null
           posting_source?: string | null
           quantity_total?: number
           receivable_kind?: string | null
+          sale_request_fingerprint?: string | null
           status?: string
           tax_document_id?: string | null
           tax_point_at?: string | null
@@ -6464,9 +6477,11 @@ export type Database = {
           late_posting_reason?: string | null
           location_id?: string
           net_total?: number
+          pending_owner?: string | null
           posting_source?: string | null
           quantity_total?: number
           receivable_kind?: string | null
+          sale_request_fingerprint?: string | null
           status?: string
           tax_document_id?: string | null
           tax_point_at?: string | null
@@ -7853,6 +7868,48 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "variant_catalog"
             referencedColumns: ["product_id"]
+          },
+        ]
+      }
+      product_image_cleanup_queue: {
+        Row: {
+          attempts: number
+          company_id: string
+          last_attempt_at: string | null
+          last_error: string | null
+          object_path: string
+          queued_at: string
+        }
+        Insert: {
+          attempts?: number
+          company_id: string
+          last_attempt_at?: string | null
+          last_error?: string | null
+          object_path: string
+          queued_at?: string
+        }
+        Update: {
+          attempts?: number
+          company_id?: string
+          last_attempt_at?: string | null
+          last_error?: string | null
+          object_path?: string
+          queued_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_image_cleanup_queue_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_image_cleanup_queue_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -12997,6 +13054,10 @@ export type Database = {
         }
       }
       assert_platform_admin: { Args: never; Returns: undefined }
+      assert_product_image_object: {
+        Args: { p_company_id: string; p_image_path: string }
+        Returns: undefined
+      }
       assert_supplier_account_consistent: {
         Args: { p_company_id: string; p_supplier_id: string }
         Returns: undefined
@@ -13852,6 +13913,10 @@ export type Database = {
         Returns: string
       }
       generate_fulfillment_pin: { Args: never; Returns: string }
+      hold_sale_order_core: {
+        Args: { p_order_id: string; p_owner: string }
+        Returns: string
+      }
       increment_sms_usage: {
         Args: { p_company_id: string }
         Returns: undefined
@@ -14364,6 +14429,12 @@ export type Database = {
           p_supplier_id: string
         }
         Returns: string
+      }
+      pending_product_image_cleanup: {
+        Args: { p_limit?: number }
+        Returns: {
+          object_path: string
+        }[]
       }
       period_close_readiness: { Args: { p_end_date?: string }; Returns: Json }
       platform_acknowledge_registration_alert: {
@@ -15182,6 +15253,15 @@ export type Database = {
         }
         Returns: Json
       }
+      prepare_sale_order_core: {
+        Args: {
+          p_client_ref?: string
+          p_customer_id: string
+          p_draft_id?: string
+          p_lines: Json
+        }
+        Returns: string
+      }
       prepayment_money_account: {
         Args: {
           p_account_code: string
@@ -15353,6 +15433,10 @@ export type Database = {
         Returns: string
       }
       queue_mpesa_processor: { Args: never; Returns: undefined }
+      queue_product_image_cleanup: {
+        Args: { p_object_path: string }
+        Returns: undefined
+      }
       queue_sms_fallback: { Args: { p_outbox_id: string }; Returns: string }
       queue_tax_document_submission: {
         Args: {
@@ -15439,6 +15523,10 @@ export type Database = {
       record_notification_click: {
         Args: { p_notification_id: string }
         Returns: boolean
+      }
+      record_product_image_cleanup: {
+        Args: { p_error?: string; p_object_path: string }
+        Returns: undefined
       }
       record_purchase: {
         Args: {
@@ -16211,6 +16299,14 @@ export type Database = {
         Args: { p_category_ids: string[]; p_product_id: string }
         Returns: string
       }
+      set_product_image: {
+        Args: {
+          p_expected_image_path: string
+          p_image_path: string
+          p_product_id: string
+        }
+        Returns: string
+      }
       set_product_tax_category: {
         Args: { p_product_id: string; p_tax_category_id?: string }
         Returns: string
@@ -16479,6 +16575,9 @@ export type Database = {
         Args: {
           p_active?: boolean
           p_barcode?: string
+          p_expected_image_path?: string
+          p_image_changed?: boolean
+          p_image_path?: string
           p_manufacturer_id?: string
           p_name: string
           p_product_id: string

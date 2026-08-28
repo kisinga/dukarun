@@ -1,7 +1,7 @@
 begin;
 -- Provider timestamps and period locks are compared in the Kenyan business day.
 set local timezone to 'Africa/Nairobi';
-select plan(62);
+select plan(67);
 
 select has_table('public','mpesa_onboarding_requests','onboarding is durable');
 select has_table('public','mpesa_daraja_apps','Daraja apps are separate from merchant accounts');
@@ -97,13 +97,39 @@ select is((select ledger_account_code from public.payment_provider_accounts
   where id=(select account_id from mpesa_account)),
   'MPESA','active provider account has a durable money-account link');
 
-insert into public.orders(id,company_id,location_id,code,status,total)
+insert into public.products(id,company_id,name)
+select 'b2000000-0000-4000-8000-000000000121',company_id,'M-PESA Service'
+from mpesa_account;
+insert into public.product_variants(
+  id,product_id,company_id,name,kind,sku,price,track_inventory
+)
+select 'b2000000-0000-4000-8000-000000000122',
+  'b2000000-0000-4000-8000-000000000121',company_id,
+  'Default','service','MP-SERVICE',70,false
+from mpesa_account;
+
+insert into public.orders(
+  id,company_id,location_id,code,status,total,pending_owner,cashier_pending_at
+)
 select 'b2000000-0000-4000-8000-000000000120',a.company_id,a.location_id,
-  'MP-RESUME','pending_payment',60
+  'MP-RESUME','pending_payment',60,'cashier',now()
 from mpesa_account a;
 select testkit.as_user((select company_id from mpesa_fixture),
   'b2000000-0000-4000-8000-000000000001','Admin');
 select testkit.ensure_open_session();
+update public.companies set cashier_flow_enabled=false
+where id=(select company_id from mpesa_fixture);
+create temp table direct_mpesa_sale as select public.prepare_mpesa_checkout(
+  'sale',(select location_id from mpesa_account),
+  '254712345678',70,0,'direct-mpesa-no-cashier',null,
+  '[{"variant_id":"b2000000-0000-4000-8000-000000000122","quantity":1,"unit_price":70}]',
+  null,null,false
+) result;
+select is((select result->>'action' from direct_mpesa_sale),'send_prompt',
+  'M-PESA sale starts when the cashier queue is disabled');
+select is((select pending_owner from public.orders
+  where id=(select (result->>'subject_id')::uuid from direct_mpesa_sale)),'payment_provider',
+  'direct M-PESA sale waits on the provider instead of the cashier');
 create temp table prepared_checkout as select public.prepare_mpesa_checkout(
   'order',(select location_id from mpesa_account),
   '254712345678',60,0,'resume-checkout',null,null,
@@ -111,6 +137,13 @@ create temp table prepared_checkout as select public.prepare_mpesa_checkout(
 grant select on pg_temp.prepared_checkout to authenticated;
 select is((select result->>'action' from prepared_checkout),'send_prompt',
   'a new checkout asks the edge function to send one prompt');
+select is((select pending_owner from public.orders
+  where id='b2000000-0000-4000-8000-000000000120'),'payment_provider',
+  'an active M-PESA checkout owns the order outside the cashier queue');
+select throws_ok($$select public.settle_order(
+  'b2000000-0000-4000-8000-000000000120','[{"method":"cash","amount":60}]')$$,
+  'P0001','order_not_owned_by_cashier: payment_provider',
+  'cashier settlement cannot race an active provider payment');
 create temp table prepared_attempt as select public.create_mpesa_payment_attempt(
   (select (result->>'intent_id')::uuid from prepared_checkout),repeat('c',64)) attempt_id;
 grant select on pg_temp.prepared_attempt to authenticated;
@@ -209,11 +242,13 @@ insert into public.payment_collections(company_id,provider_account_id,provider,e
   provider_receipt,amount,occurred_at,source,verification_status)
 select company_id,account_id,'mpesa','production','RCT002',100,now(),'c2b','provider_notified'
 from mpesa_account;
-insert into public.orders(id,company_id,code,status,total)
-select 'b2000000-0000-4000-8000-000000000101',company_id,'MP-A','pending_payment',60
+insert into public.orders(id,company_id,code,status,total,pending_owner)
+select 'b2000000-0000-4000-8000-000000000101',company_id,'MP-A','pending_payment',60,
+  'payment_provider'
 from mpesa_account;
-insert into public.orders(id,company_id,code,status,total)
-select 'b2000000-0000-4000-8000-000000000102',company_id,'MP-B','pending_payment',50
+insert into public.orders(id,company_id,code,status,total,pending_owner)
+select 'b2000000-0000-4000-8000-000000000102',company_id,'MP-B','pending_payment',50,
+  'payment_provider'
 from mpesa_account;
 insert into public.payment_collection_allocations(collection_id,company_id,amount,order_id)
 select c.id,c.company_id,60,'b2000000-0000-4000-8000-000000000101'
@@ -228,9 +263,9 @@ insert into public.payment_collections(company_id,provider_account_id,provider,e
   provider_receipt,amount,occurred_at,source,verification_status,classification)
 select company_id,account_id,'mpesa','production','RCT-LATE',75,now()-interval '1 day',
   'c2b','provider_notified','surplus' from mpesa_account;
-insert into public.orders(id,company_id,location_id,code,status,total)
+insert into public.orders(id,company_id,location_id,code,status,total,pending_owner)
 select 'b2000000-0000-4000-8000-000000000103',company_id,location_id,
-  'MP-LATE','pending_payment',75 from mpesa_account;
+  'MP-LATE','pending_payment',75,'payment_provider' from mpesa_account;
 insert into public.period_locks(company_id,lock_end_date,updated_at)
 select company_id,current_date-1,now() from mpesa_account
 on conflict(company_id) do update set lock_end_date=excluded.lock_end_date,updated_at=now();
@@ -291,6 +326,9 @@ select is((select status from public.mpesa_payment_intents
 select is((select status from public.mpesa_payment_attempts
   where id='b2000000-0000-4000-8000-000000000212'),'failed',
   'known terminal request response fails attempt');
+select is((select status from public.orders
+  where id='b2000000-0000-4000-8000-000000000102'),'draft',
+  'a failed provider request releases its order for another payment method');
 
 select testkit.create_user('b2000000-0000-4000-8000-000000000002','mpesa-platform@test.local');
 insert into public.platform_admins(user_id) values('b2000000-0000-4000-8000-000000000002');

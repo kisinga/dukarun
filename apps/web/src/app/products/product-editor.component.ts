@@ -10,11 +10,7 @@ import {
   ProductPhotoControlComponent,
   type PendingProductImage,
 } from './product-photo-control.component';
-import type {
-  ProductEditorCloseResult,
-  ProductEditorRequest,
-  ProductEditorResult,
-} from './product-editor.types';
+import type { ProductEditorRequest, ProductEditorResult } from './product-editor.types';
 
 /** Dialog boundary for the product aggregate; the catalogue page sees only request/result values. */
 @Component({
@@ -42,7 +38,7 @@ import type {
             <h2 class="type-title truncate">
               {{ store.mode() === 'create' ? 'New product' : 'Edit ' + store.product()?.name }}
             </h2>
-            <p class="type-caption mt-0.5">Details and variants save together.</p>
+            <p class="type-caption mt-0.5">Details, variants, and photo save together.</p>
           </div>
           <button
             appButton
@@ -225,12 +221,15 @@ import type {
               [previewUrl]="store.imagePreview()"
               [alt]="store.name.value.trim() || 'Product photo preview'"
               [mode]="store.mode() ?? 'create'"
-              [busy]="store.imageBusy()"
+              [busy]="
+                store.busy() && (store.pendingImage() !== null || store.imageRemovalPending())
+              "
               [disabled]="store.busy()"
               [pending]="store.pendingImage() !== null"
+              [hasStoredPhoto]="store.imagePath() !== null"
+              [removalPending]="store.imageRemovalPending()"
               (imageSelected)="selectImage($event)"
               (selectionFailed)="store.imageSelectionFailed($event)"
-              (retryUpload)="store.retryImageUpload()"
               (removePhoto)="store.removeImage()"
               (imageBroken)="store.markImageBroken()"
             />
@@ -415,7 +414,7 @@ import type {
 export class ProductEditorComponent {
   readonly request = input.required<ProductEditorRequest>();
   readonly saved = output<ProductEditorResult>();
-  readonly closed = output<ProductEditorCloseResult>();
+  readonly closed = output<void>();
   protected readonly store = inject(ProductEditorStore);
   private readonly element = inject<ElementRef<HTMLElement>>(ElementRef);
   protected readonly stockLookup = (variantId: string) => this.store.stockOf(variantId);
@@ -425,9 +424,9 @@ export class ProductEditorComponent {
   }
 
   protected requestClose(): void {
-    if (this.store.busy() || this.store.imageBusy()) return;
+    if (this.store.busy()) return;
     if (this.store.isDirty() && !window.confirm('Discard unsaved product changes?')) return;
-    this.closed.emit({ refreshCatalog: this.store.photoPersisted() });
+    this.closed.emit();
   }
 
   protected async save(): Promise<void> {

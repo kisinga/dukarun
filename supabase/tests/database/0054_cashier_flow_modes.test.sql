@@ -1,5 +1,8 @@
 begin;
-select plan(13);
+select plan(20);
+
+select has_column('public','orders','pending_owner',
+  'pending orders declare which workflow owns the next action');
 
 select testkit.create_user(
   '11111111-1111-1111-1111-111111111111',
@@ -24,6 +27,10 @@ select
   'aa000000-0000-0000-0000-000000000054',
   'a0000000-0000-0000-0000-000000000054',
   company_id, 'Default', 'service', 'DIRECT-54', 10000, false
+from flow_company;
+
+insert into public.customers(id,company_id,first_name)
+select 'aa000000-0000-0000-0000-000000000055',company_id,'Prepaid Customer'
 from flow_company;
 
 update public.companies
@@ -70,6 +77,43 @@ select throws_ok(
   'disabled cashier workflow rejects new queue handoffs'
 );
 
+create temp table offline_sale as
+select public.post_offline_sale_at_location(
+  (select id from public.stock_locations
+   where company_id=(select company_id from flow_company) and is_default),
+  null,
+  '[{"variant_id":"aa000000-0000-0000-0000-000000000054","quantity":1,"unit_price":10000}]',
+  '[{"method":"cash","amount":10000}]',
+  'offline-cashier-disabled',now(),'direct-mode-device',1
+) result;
+
+select is((select result->>'status' from offline_sale),'completed',
+  'offline replay completes when the cashier queue is disabled');
+select is((select posting_source from public.orders
+  where id=(select (result->>'order_id')::uuid from offline_sale)),'offline',
+  'offline replay keeps its posting source');
+select is((select pending_owner from public.orders
+  where id=(select (result->>'order_id')::uuid from offline_sale)),null::text,
+  'completed offline replay is not left in a pending workflow');
+
+select public.record_customer_deposit(
+  'aa000000-0000-0000-0000-000000000055',10000,'cash',null,'direct-mode-deposit'
+);
+create temp table prepaid_sale as
+select public.post_sale_with_prepayment_at_location(
+  (select id from public.stock_locations
+   where company_id=(select company_id from flow_company) and is_default),
+  'aa000000-0000-0000-0000-000000000055',
+  '[{"variant_id":"aa000000-0000-0000-0000-000000000054","quantity":1,"unit_price":10000}]',
+  '[]',10000,0,'prepaid-cashier-disabled'
+) result;
+
+select is((select result->>'status' from prepaid_sale),'completed',
+  'customer prepayment completes when the cashier queue is disabled');
+select is((select pending_owner from public.orders
+  where id=(select (result->>'order_id')::uuid from prepaid_sale)),null::text,
+  'completed prepayment is not left in a pending workflow');
+
 update public.companies
 set cashier_flow_enabled = true
 where id = (select company_id from flow_company);
@@ -85,6 +129,11 @@ select is(
   (select status from public.orders where id = (select order_id from queued_sale)),
   'pending_payment',
   'enabled cashier workflow permits queue handoff'
+);
+select is(
+  (select pending_owner from public.orders where id = (select order_id from queued_sale)),
+  'cashier',
+  'cashier handoff is explicitly cashier-owned'
 );
 
 update public.companies
