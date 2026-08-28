@@ -99,6 +99,7 @@ const LABEL_LAYOUT_KEY = 'dukarun-barcode-label-layout';
                   variant="outline"
                   size="sm"
                   class="mt-3"
+                  data-learning-anchor="barcode-generate"
                   [disabled]="busy()"
                   (click)="confirmGenerate.set(true)"
                 >
@@ -114,6 +115,7 @@ const LABEL_LAYOUT_KEY = 'dukarun-barcode-label-layout';
                     type="button"
                     variant="primary"
                     size="sm"
+                    data-learning-anchor="barcode-generate-confirm"
                     [loading]="busy()"
                     (click)="generateMissing()"
                   >
@@ -194,6 +196,7 @@ const LABEL_LAYOUT_KEY = 'dukarun-barcode-label-layout';
             appButton
             type="button"
             variant="primary"
+            data-learning-anchor="barcode-print"
             [loading]="printing()"
             [disabled]="printBatches().length === 0 || printing()"
             (click)="printCurrentBatch()"

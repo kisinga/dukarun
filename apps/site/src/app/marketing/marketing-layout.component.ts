@@ -3,10 +3,12 @@ import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { IconComponent } from '../shared/ui/icon.component';
 import { appUrl } from '../core/public-url';
 import { DUKARUN_WHATSAPP_DISPLAY, dukarunWhatsAppUrl } from '../core/public-contact';
+import { DUKARUN_GUIDES_URL, dukarunGuideUrl } from '../core/public-learning';
 
 interface NavLink {
   readonly label: string;
-  readonly path: string;
+  readonly path?: string;
+  readonly href?: string;
   readonly fragment?: string;
 }
 
@@ -31,15 +33,23 @@ interface NavLink {
 
           <div class="ml-auto hidden items-center gap-1 md:flex">
             @for (link of links; track link.label) {
-              <a
-                [routerLink]="link.path"
-                [fragment]="link.fragment"
-                routerLinkActive="text-primary"
-                [routerLinkActiveOptions]="linkActiveOptions"
-                class="flex min-h-11 items-center rounded-field px-3 text-sm font-medium text-base-content/70 transition-colors hover:text-base-content"
-              >
-                {{ link.label }}
-              </a>
+              @if (link.href) {
+                <a
+                  [href]="link.href"
+                  class="flex min-h-11 items-center rounded-field px-3 text-sm font-medium text-base-content/70 transition-colors hover:text-base-content"
+                  >{{ link.label }}</a
+                >
+              } @else {
+                <a
+                  [routerLink]="link.path"
+                  [fragment]="link.fragment"
+                  routerLinkActive="text-primary"
+                  [routerLinkActiveOptions]="linkActiveOptions"
+                  class="flex min-h-11 items-center rounded-field px-3 text-sm font-medium text-base-content/70 transition-colors hover:text-base-content"
+                >
+                  {{ link.label }}
+                </a>
+              }
             }
           </div>
 
@@ -71,16 +81,25 @@ interface NavLink {
           <div class="border-t border-base-300/60 bg-base-100 md:hidden">
             <div class="mkt-container flex flex-col py-2">
               @for (link of links; track link.label) {
-                <a
-                  [routerLink]="link.path"
-                  [fragment]="link.fragment"
-                  routerLinkActive="text-primary"
-                  [routerLinkActiveOptions]="linkActiveOptions"
-                  class="flex min-h-11 items-center rounded-field px-3 text-sm font-medium text-base-content/80"
-                  (click)="menuOpen.set(false)"
-                >
-                  {{ link.label }}
-                </a>
+                @if (link.href) {
+                  <a
+                    [href]="link.href"
+                    class="flex min-h-11 items-center rounded-field px-3 text-sm font-medium text-base-content/80"
+                    (click)="menuOpen.set(false)"
+                    >{{ link.label }}</a
+                  >
+                } @else {
+                  <a
+                    [routerLink]="link.path"
+                    [fragment]="link.fragment"
+                    routerLinkActive="text-primary"
+                    [routerLinkActiveOptions]="linkActiveOptions"
+                    class="flex min-h-11 items-center rounded-field px-3 text-sm font-medium text-base-content/80"
+                    (click)="menuOpen.set(false)"
+                  >
+                    {{ link.label }}
+                  </a>
+                }
               }
               <a
                 [href]="appUrl('/login')"
@@ -115,24 +134,40 @@ interface NavLink {
           <nav class="flex flex-col gap-1" aria-label="Pages">
             <span class="mkt-eyebrow mb-1">Pages</span>
             @for (link of links; track link.label) {
-              <a
-                [routerLink]="link.path"
-                [fragment]="link.fragment"
-                class="flex min-h-8 items-center text-sm text-base-content/70 hover:text-base-content"
-              >
-                {{ link.label }}
-              </a>
+              @if (link.href) {
+                <a
+                  [href]="link.href"
+                  class="flex min-h-8 items-center text-sm text-base-content/70 hover:text-base-content"
+                  >{{ link.label }}</a
+                >
+              } @else {
+                <a
+                  [routerLink]="link.path"
+                  [fragment]="link.fragment"
+                  class="flex min-h-8 items-center text-sm text-base-content/70 hover:text-base-content"
+                >
+                  {{ link.label }}
+                </a>
+              }
             }
           </nav>
           <nav class="flex flex-col gap-1" aria-label="Resources">
             <span class="mkt-eyebrow mb-1">Resources</span>
-            @for (link of resourceLinks; track link.path) {
-              <a
-                [routerLink]="link.path"
-                class="flex min-h-8 items-center text-sm text-base-content/70 hover:text-base-content"
-              >
-                {{ link.label }}
-              </a>
+            @for (link of resourceLinks; track link.label) {
+              @if (link.href) {
+                <a
+                  [href]="link.href"
+                  class="flex min-h-8 items-center text-sm text-base-content/70 hover:text-base-content"
+                  >{{ link.label }}</a
+                >
+              } @else {
+                <a
+                  [routerLink]="link.path"
+                  class="flex min-h-8 items-center text-sm text-base-content/70 hover:text-base-content"
+                >
+                  {{ link.label }}
+                </a>
+              }
             }
             <a
               [href]="appUrl('/register')"
@@ -207,12 +242,15 @@ export class MarketingLayoutComponent {
   protected readonly links: NavLink[] = [
     { label: 'Home', path: '/' },
     { label: 'Pricing', path: '/', fragment: 'pricing' },
-    { label: 'Blog', path: '/blog' },
+    { label: 'Dukarun Guide', href: DUKARUN_GUIDES_URL },
+    { label: 'Guides', path: '/blog' },
     { label: 'About', path: '/about' },
     { label: 'Contact', path: '/contact' },
   ];
   protected readonly resourceLinks: NavLink[] = [
-    { label: 'Getting started', path: '/docs' },
+    { label: 'Dukarun Guide', href: DUKARUN_GUIDES_URL },
+    { label: 'First business cycle', href: dukarunGuideUrl('journeys/first-business-cycle') },
     { label: 'Hardware setup', path: '/docs/hardware' },
+    { label: 'Daily shop cash-up', path: '/tools/daily-shop-cash-up' },
   ];
 }

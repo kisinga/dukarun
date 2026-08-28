@@ -1,40 +1,41 @@
 # Creating a supplier
 
-## Purpose
+## Why this matters
 
-Record who supplies the products the business buys.
+One supplier account keeps purchases, payments, terms, and the amount you owe connected to the
+right person or business.
 
-## Prerequisites
+[Open the interactive guide in Dukarun](https://app.dukarun.com/learn/creating-a-supplier)
 
-Have the supplier's trading name and, where available, their contact and credit terms.
+## Before you start
 
-## Video
+Have the supplier's trading name and useful contact details. Add the tax PIN, credit limit, and
+payment terms when the supplier has provided them.
 
-[Watch: Creating a supplier](https://dukarun.com/media/video/guides/creating-a-supplier/creating-a-supplier.mp4)
-([captions](https://dukarun.com/media/video/guides/creating-a-supplier/creating-a-supplier.en-KE.vtt) ·
-[transcript](https://dukarun.com/media/video/guides/creating-a-supplier/creating-a-supplier.en-KE.txt))
+## Steps
 
-## Repeatable steps
-
-1. Open **Suppliers** and choose **Add supplier**.
+1. Open **Suppliers**, then choose **Add supplier**.
 2. Enter the supplier name and useful contact details.
-3. Save the supplier. A zero credit limit means no fixed cap is configured.
+3. Add the supplier tax PIN when it is available.
+4. If you buy on credit, enter the agreed **Credit limit (KES)** and **Credit terms (days)**.
+5. Choose **Create supplier**.
 
-## Expected result
+## What changes in Dukarun
 
-Purchases and amounts owed can be connected to the supplier.
+Future purchases, payments, credit terms, and unpaid balances can use the supplier account.
 
-[Start the interactive guide](https://app.dukarun.com/learn/creating-a-supplier)
+## Related terms
 
-## Glossary
+[Supplier](../glossary.md#supplier), [payment terms](../glossary.md#payment-terms),
+[credit purchase](../glossary.md#credit-purchase), and [payable](../glossary.md#payable).
 
-[Supplier](../glossary.md#supplier), [payable](../glossary.md#payable), and
-[credit purchase](../glossary.md#credit-purchase).
+## Continue the workflow
 
-## Related articles
+[Record a credit purchase](../purchases/recording-a-credit-purchase.md).
 
-[Recording a credit purchase](../purchases/recording-a-credit-purchase.md)
+## If something does not look right
 
-## Troubleshooting
-
-Search before creating a supplier to avoid duplicate balances and purchase histories.
+- Search before creating a supplier. Duplicates can split purchases, payments, and balances across
+  two accounts.
+- A credit limit of zero means no fixed cap is configured.
+- Use the supplier's real trading name so staff can find the correct account later.

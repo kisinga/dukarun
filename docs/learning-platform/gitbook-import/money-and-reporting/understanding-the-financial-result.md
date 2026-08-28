@@ -1,45 +1,58 @@
 # Understanding the financial result
 
-## Purpose
+## Why this matters
 
-Connect daily business actions to the stock and financial records they produce.
+Stock, cash, customer debt, supplier debt, revenue, and margin describe different parts of the same
+business cycle. Reading them together prevents a busy sales day from being mistaken for cash or
+profit.
 
-## Prerequisites
+[Open the interactive recap in Dukarun](https://app.dukarun.com/learn/understanding-the-financial-result)
 
-Complete at least one purchase and one sale. Viewing financial results requires financial access.
+## Before you start
 
-## Video
+Complete at least one purchase and one sale. Use the same company, location, and date range when
+comparing figures. Your role must allow you to view financial information.
 
-[Watch: Understanding the financial result](https://dukarun.com/media/video/guides/understanding-the-financial-result/understanding-the-financial-result.mp4)
-([captions](https://dukarun.com/media/video/guides/understanding-the-financial-result/understanding-the-financial-result.en-KE.vtt) ·
-[transcript](https://dukarun.com/media/video/guides/understanding-the-financial-result/understanding-the-financial-result.en-KE.txt))
+## Follow one transaction at a time
 
-## Repeatable steps
+| Business action  | Stock     | Cash                               | Credit balance                | Sales result              |
+| ---------------- | --------- | ---------------------------------- | ----------------------------- | ------------------------- |
+| Credit purchase  | Increases | No change until payment            | Supplier payable increases    | No sale recorded          |
+| Cash sale        | Decreases | Increases                          | No customer receivable        | Revenue and COGS recorded |
+| Credit sale      | Decreases | Changes only for money applied now | Customer receivable increases | Revenue and COGS recorded |
+| Customer payment | No change | Increases                          | Customer receivable decreases | No new revenue            |
+| Supplier payment | No change | Decreases                          | Supplier payable decreases    | No new purchase or COGS   |
 
-1. Compare quantities purchased and sold with the current stock quantity.
-2. Open **Money → Credit** and review supplier payables and customer receivables.
-3. Review cash received from completed cash sales.
-4. Open Dashboard or Reports and compare revenue, COGS, and gross margin.
+## Where to check
 
-## Expected result
+1. Open the **Dashboard** and review the current business summary.
+2. Open **Money**, then **Credit**, to review customer receivables and supplier payables.
+3. Open **Reports**, choose the same date range and location, then review **Revenue**, **COGS**, and
+   **Margin**.
+4. Open the **Inventory** report when you need stock quantity, stock at cost, potential retail value,
+   or potential margin.
 
-You can explain why stock, cash, payables, receivables, revenue, COGS, and gross margin changed.
+## What you should be able to explain
 
-[Start the interactive recap](https://app.dukarun.com/learn/understanding-the-financial-result)
+You should be able to connect each completed transaction to the stock, cash, credit, revenue, cost,
+or margin figure it changed. You should also be able to explain why a credit sale can increase
+revenue without increasing cash received.
 
-## Glossary
+## Related terms
 
-[Payable](../glossary.md#payable), [receivable](../glossary.md#receivable),
-[cash received](../glossary.md#cash-received), [COGS](../glossary.md#cogs), and
-[gross margin](../glossary.md#gross-margin).
+[Revenue](../glossary.md#revenue), [cash received](../glossary.md#cash-received),
+[payable](../glossary.md#payable), [receivable](../glossary.md#receivable),
+[COGS](../glossary.md#cogs), and [gross margin](../glossary.md#gross-margin).
 
-## Related articles
+## Go deeper
 
-[Recording a credit purchase](../purchases/recording-a-credit-purchase.md) ·
-[Making a cash sale](../selling/making-a-cash-sale.md) ·
-[Making a credit sale](../selling/making-a-credit-sale.md)
+[Review credit health](reviewing-credit-health.md) and
+[read sales, costs, and margin](reading-sales-costs-and-margin.md).
 
-## Troubleshooting
+## If something does not look right
 
-Use the same date range and location when comparing screens. Pending, voided, and draft documents
-do not have the same financial effect as completed transactions.
+- Use the same date range and location on every screen you compare.
+- Draft, pending, and voided records do not affect results like completed transactions.
+- Reports refresh hourly, so a newly completed sale may not appear immediately.
+- A cash movement is not automatically revenue or an expense. Check the business action that caused
+  it.

@@ -7,9 +7,9 @@ import { environment } from '../../environments/environment';
 import { PermissionsService } from '../core/permissions.service';
 import { SupabaseService } from '../core/supabase.service';
 import { LEARNING_CONTENT_REGISTRY } from './learning-content';
-import { LearningPlatformService } from './learning-platform.service';
+import { LearningPlatformService, USERTOUR_CLIENT } from './learning-platform.service';
 
-const usertour = vi.hoisted(() => ({
+const usertour = {
   init: vi.fn(),
   disableEvalJs: vi.fn(),
   setBaseZIndex: vi.fn(),
@@ -20,9 +20,7 @@ const usertour = vi.hoisted(() => ({
   start: vi.fn().mockResolvedValue(undefined),
   track: vi.fn().mockResolvedValue(undefined),
   reset: vi.fn(),
-}));
-
-vi.mock('usertour.js', () => ({ default: usertour }));
+};
 
 const userId = '123e4567-e89b-42d3-a456-426614174000';
 const companyId = '123e4567-e89b-42d3-a456-426614174001';
@@ -80,6 +78,7 @@ describe('LearningPlatformService', () => {
     TestBed.configureTestingModule({
       providers: [
         LearningPlatformService,
+        { provide: USERTOUR_CLIENT, useValue: usertour },
         { provide: Router, useValue: router },
         { provide: PermissionsService, useValue: permissions },
         {
@@ -104,6 +103,7 @@ describe('LearningPlatformService', () => {
 
     expect(usertour.init).toHaveBeenCalledWith('public-environment-token');
     expect(usertour.disableEvalJs).toHaveBeenCalledOnce();
+    expect(usertour.setBaseZIndex).toHaveBeenCalledWith(1_000_000);
     expect(usertour.setUrlFilter).toHaveBeenCalledOnce();
     expect(invoke).toHaveBeenCalledWith('usertour-identity');
     expect(usertour.identify).toHaveBeenCalledWith(userId, {}, { token: 'signed-token' });
@@ -130,6 +130,16 @@ describe('LearningPlatformService', () => {
     const { service, router } = setup(false);
 
     await expect(service.launch('creating-a-product')).resolves.toBe('permission-denied');
+    expect(router.navigateByUrl).not.toHaveBeenCalled();
+    expect(usertour.start).not.toHaveBeenCalled();
+  });
+
+  it('does not leave the launch page when the walkthrough has no Usertour content', async () => {
+    LEARNING_CONTENT_REGISTRY['creating-a-product'].usertourContentId = '';
+    const { service, router } = setup();
+
+    await expect(service.launch('creating-a-product')).resolves.toBe('content-unconfigured');
+
     expect(router.navigateByUrl).not.toHaveBeenCalled();
     expect(usertour.start).not.toHaveBeenCalled();
   });

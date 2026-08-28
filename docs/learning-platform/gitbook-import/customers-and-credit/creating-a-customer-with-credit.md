@@ -1,43 +1,46 @@
-# Creating a customer with credit
+# Creating a customer and setting credit
 
-## Purpose
+## Why this matters
 
-Identify who can receive goods now and pay later.
+A customer account keeps sales, payments, contact details, and credit decisions together. A clear
+credit policy controls how much the customer may owe and when payment is expected.
 
-## Prerequisites
+[Open the interactive guide in Dukarun](https://app.dukarun.com/learn/creating-a-customer-with-credit)
 
-Know the customer's name and the credit limit, terms, and business reason you are prepared to
-approve. Your role must be allowed to manage both customers and their credit policy.
+## Before you start
 
-## Video
+Know the customer's name and useful contact details. Decide the credit limit, payment terms, and
+reason for the decision. Your role must allow you to manage customers and customer credit.
 
-[Watch: Creating a customer with credit](https://dukarun.com/media/video/guides/creating-a-customer-with-credit/creating-a-customer-with-credit.mp4)
-([captions](https://dukarun.com/media/video/guides/creating-a-customer-with-credit/creating-a-customer-with-credit.en-KE.vtt) ·
-[transcript](https://dukarun.com/media/video/guides/creating-a-customer-with-credit/creating-a-customer-with-credit.en-KE.txt))
+## Steps
 
-## Repeatable steps
+1. Open **Customers**, then choose **Add customer**.
+2. Enter the customer's name and useful contact details, then save.
+3. Open the customer account and find the credit settings.
+4. Enter the **Credit limit (KES)** and **Terms (days)**.
+5. Turn on **Approved for credit**.
+6. Enter a clear **Reason** for the policy.
+7. Choose **Save settings**. If the button says **Request change**, submit the request and wait for
+   an authorised person to approve it.
 
-1. Open **Customers**, choose **Add customer**, enter the details, and save.
-2. Open that customer's credit controls.
-3. Set the limit and terms, mark the customer approved for credit, and enter the reason.
-4. Save or submit the policy change for approval, according to your role.
+## What changes in Dukarun
 
-## Expected result
+The customer can be selected on the Sell screen. After the credit policy is approved, credit sales
+can use the saved limit and terms.
 
-The customer can be selected for a tracked credit sale once the policy is approved.
+## Related terms
 
-[Start the interactive guide](https://app.dukarun.com/learn/creating-a-customer-with-credit)
+[Customer](../glossary.md#customer), [credit limit](../glossary.md#credit-limit),
+[available credit](../glossary.md#available-credit), and
+[payment terms](../glossary.md#payment-terms).
 
-## Glossary
+## Continue the workflow
 
-[Customer](../glossary.md#customer), [credit limit](../glossary.md#credit-limit), and
-[receivable](../glossary.md#receivable).
+[Make a credit sale](../selling/making-a-credit-sale.md).
 
-## Related articles
+## If something does not look right
 
-[Making a credit sale](../selling/making-a-credit-sale.md)
-
-## Troubleshooting
-
-An approval request is not the same as an approved policy. Wait for approval before attempting the
-credit sale.
+- A submitted request is not an approval. Wait for an authorised person to approve it.
+- If **Sell on credit** remains unavailable, check the approval, credit limit, current balance, and
+  available credit.
+- Search before creating a customer so sales and payments are not split across duplicate accounts.

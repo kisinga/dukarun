@@ -1,41 +1,45 @@
 # Making a credit sale
 
-## Purpose
+## Why this matters
 
-Give goods now and track what an approved customer owes.
+A credit sale records that an approved customer received the goods now and will pay some or all of
+the amount later.
 
-## Prerequisites
+[Open the interactive guide in Dukarun](https://app.dukarun.com/learn/making-a-credit-sale)
 
-The products must be stocked and the customer must be approved for credit with suitable terms.
+## Before you start
 
-## Video
+The products must be active and available at the current location. The customer must be approved
+for credit and have enough available credit for the sale.
 
-[Watch: Making a credit sale](https://dukarun.com/media/video/guides/making-a-credit-sale/making-a-credit-sale.mp4)
-([captions](https://dukarun.com/media/video/guides/making-a-credit-sale/making-a-credit-sale.en-KE.vtt) ·
-[transcript](https://dukarun.com/media/video/guides/making-a-credit-sale/making-a-credit-sale.en-KE.txt))
+## Steps
 
-## Repeatable steps
+1. Open **Sell** and add the products the customer is taking.
+2. Search for and select the customer.
+3. Check the items, quantities, prices, and total.
+4. Review the customer's available credit and any downpayment that Dukarun will apply.
+5. Choose **Sell on credit**.
+6. Review **Confirm credit sale**, then choose **Confirm sale**.
 
-1. Open **Sell** and select the approved customer.
-2. Add the products the customer is taking.
-3. Choose **Sell on credit**, review the terms, and confirm.
+## What changes in Dukarun
 
-## Expected result
+Stock falls by the quantity sold. Dukarun records revenue and cost of goods sold. The unpaid amount
+becomes a receivable on the customer's account. Cash only changes for any payment or downpayment
+applied to the sale.
 
-Stock falls and the amount due is recorded as a customer receivable.
+## Related terms
 
-[Start the interactive guide](https://app.dukarun.com/learn/making-a-credit-sale)
+[Credit sale](../glossary.md#credit-sale), [receivable](../glossary.md#receivable),
+[available credit](../glossary.md#available-credit), and
+[downpayment](../glossary.md#downpayment).
 
-## Glossary
+## Continue the workflow
 
-[Credit sale](../glossary.md#credit-sale), [receivable](../glossary.md#receivable), and
-[credit limit](../glossary.md#credit-limit).
+[Receive the customer's payment](../customers-and-credit/receiving-a-customer-payment.md) or
+[review credit health](../money-and-reporting/reviewing-credit-health.md).
 
-## Related articles
+## If something does not look right
 
-[Creating a customer with credit](../customers-and-credit/creating-a-customer-with-credit.md) ·
-[Understanding the financial result](../money-and-reporting/understanding-the-financial-result.md)
-
-## Troubleshooting
-
-If **Sell on credit** is unavailable, select a customer and verify their credit approval and limit.
+- If **Sell on credit** is unavailable, make sure a customer is selected and approved for credit.
+- Check that the sale fits within the customer's available credit.
+- A credit sale is already revenue. Do not record a second sale when the customer pays later.

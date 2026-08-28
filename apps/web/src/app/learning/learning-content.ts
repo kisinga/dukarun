@@ -98,7 +98,7 @@ export const LEARNING_CONTENT_REGISTRY: Readonly<
   }),
   'creating-a-customer-with-credit': content({
     key: 'creating-a-customer-with-credit',
-    title: 'Creating a customer with credit',
+    title: 'Creating a customer and setting credit',
     type: 'flow',
     gitbookPath: '/customers-and-credit/creating-a-customer-with-credit',
     destinationRoute: '/customers',

@@ -90,6 +90,7 @@ import type {
                   <input
                     type="text"
                     inputmode="numeric"
+                    data-learning-anchor="product-selling-price"
                     class="input input-bordered w-full"
                     placeholder="0"
                     [ngModel]="row.price"
@@ -219,6 +220,7 @@ import type {
                   <label class="flex min-h-11 cursor-pointer items-center gap-2">
                     <input
                       type="checkbox"
+                      data-learning-anchor="product-inventory-tracking"
                       class="checkbox checkbox-sm"
                       [ngModel]="row.trackInventory"
                       (ngModelChange)="patch(index, { trackInventory: $event })"

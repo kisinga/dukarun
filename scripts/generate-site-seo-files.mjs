@@ -11,6 +11,7 @@ const routes = [
   'docs',
   'docs/hardware',
   'blog',
+  'tools/daily-shop-cash-up',
   'privacy',
   'terms',
   'dpa',

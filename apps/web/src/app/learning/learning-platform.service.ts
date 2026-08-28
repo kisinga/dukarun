@@ -1,4 +1,4 @@
-import { Injectable, effect, inject, signal } from '@angular/core';
+import { Injectable, InjectionToken, effect, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import usertour from 'usertour.js';
 import { environment } from '../../environments/environment';
@@ -10,6 +10,14 @@ import {
   type LearningEventName,
 } from './learning-content';
 import { sanitizeLearningUrl } from './learning-url';
+
+// DaisyUI dialogs use z-index 999. Keep learning prompts above dialogs so a flow can
+// continue inside decomposed editors instead of disappearing behind their modal layer.
+const LEARNING_OVERLAY_BASE_Z_INDEX = 1_000_000;
+
+export const USERTOUR_CLIENT = new InjectionToken<typeof usertour>('Usertour client', {
+  factory: () => usertour,
+});
 
 export interface LearningLaunchContext {
   key: LearningContentKey;
@@ -28,6 +36,7 @@ export class LearningPlatformService {
   private readonly router = inject(Router);
   private readonly supabase = inject(SupabaseService);
   private readonly permissions = inject(PermissionsService);
+  private readonly usertour = inject(USERTOUR_CLIENT);
 
   /** Short-lived hand-off state only; Usertour owns durable flow/checklist progress. */
   readonly launchContext = signal<LearningLaunchContext | null>(null);
@@ -71,25 +80,15 @@ export class LearningPlatformService {
     await this.permissions.ensureLoaded();
     if (!this.canLaunch(key)) return 'permission-denied';
 
-    this.launchContext.set({ key, startedAt: Date.now() });
-    const navigated = await this.router.navigateByUrl(definition.destinationRoute);
-    if (!navigated) {
-      this.launchContext.set(null);
-      return 'navigation-failed';
-    }
-
-    if (!environment.usertourToken.trim()) {
-      this.launchContext.set(null);
-      return 'vendor-disabled';
-    }
-    if (!definition.usertourContentId) {
-      this.launchContext.set(null);
-      return 'content-unconfigured';
-    }
+    if (!environment.usertourToken.trim()) return 'vendor-disabled';
+    if (!definition.usertourContentId) return 'content-unconfigured';
 
     try {
       if (!(await this.initialize())) return 'vendor-disabled';
-      await usertour.start(definition.usertourContentId, {
+      this.launchContext.set({ key, startedAt: Date.now() });
+      const navigated = await this.router.navigateByUrl(definition.destinationRoute);
+      if (!navigated) return 'navigation-failed';
+      await this.usertour.start(definition.usertourContentId, {
         continue: options.continue ?? definition.type === 'journey',
       });
       return 'started';
@@ -105,7 +104,7 @@ export class LearningPlatformService {
     if (!environment.usertourToken.trim()) return;
     try {
       if (!(await this.initialize())) return;
-      await usertour.track(eventName);
+      await this.usertour.track(eventName);
     } catch (error) {
       // Learning telemetry must never make a successful business operation fail.
       console.warn('Learning event could not be sent', error);
@@ -117,16 +116,16 @@ export class LearningPlatformService {
     this.identifiedScope = null;
     this.identification = null;
     this.launchContext.set(null);
-    if (this.sdkInitialized) usertour.reset();
+    if (this.sdkInitialized) this.usertour.reset();
   }
 
   private configureSdk(): void {
     if (this.sdkInitialized) return;
-    usertour.init(environment.usertourToken.trim());
-    usertour.disableEvalJs();
-    usertour.setBaseZIndex(70);
-    usertour.setUrlFilter(url => sanitizeLearningUrl(url));
-    usertour.setCustomNavigate(url => this.navigateFromGuide(url));
+    this.usertour.init(environment.usertourToken.trim());
+    this.usertour.disableEvalJs();
+    this.usertour.setBaseZIndex(LEARNING_OVERLAY_BASE_Z_INDEX);
+    this.usertour.setUrlFilter(url => sanitizeLearningUrl(url));
+    this.usertour.setCustomNavigate(url => this.navigateFromGuide(url));
     this.sdkInitialized = true;
   }
 
@@ -142,7 +141,7 @@ export class LearningPlatformService {
     if (this.identifiedScope && this.identifiedScope !== scope) {
       this.identityGeneration++;
       this.identifiedScope = null;
-      usertour.reset();
+      this.usertour.reset();
     }
     const generation = this.identityGeneration;
 
@@ -158,8 +157,8 @@ export class LearningPlatformService {
         ) {
           return false;
         }
-        await usertour.identify(identity.userId, {}, { token });
-        await usertour.group(
+        await this.usertour.identify(identity.userId, {}, { token });
+        await this.usertour.group(
           identity.companyId,
           {},
           {

@@ -53,7 +53,11 @@ export interface PurchaseLinePriceContext {
   ],
   host: { class: 'block' },
   template: `
-    <article class="bg-base-100" [attr.data-line-key]="line().key">
+    <article
+      data-learning-anchor="purchase-item-row"
+      class="bg-base-100"
+      [attr.data-line-key]="line().key"
+    >
       <div
         class="grid gap-x-3 gap-y-2 p-3 md:grid-cols-6 md:items-center xl:grid-cols-[minmax(14rem,1fr)_7rem_10rem_10rem_3rem]"
       >
@@ -76,6 +80,7 @@ export interface PurchaseLinePriceContext {
         >
           <input
             data-quantity
+            data-learning-anchor="purchase-item-quantity"
             type="number"
             class="input input-bordered h-11 w-full text-right tabular-nums md:h-10"
             min="0.001"
@@ -91,6 +96,7 @@ export interface PurchaseLinePriceContext {
           [desktopLabelHidden]="true"
         >
           <input
+            data-learning-anchor="purchase-item-unit-cost"
             class="input input-bordered h-11 w-full text-right tabular-nums md:h-10"
             inputmode="numeric"
             [ngModel]="line().unitCost"

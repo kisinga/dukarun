@@ -49,6 +49,7 @@ const SITE_ROUTES = [
   'docs',
   'docs/hardware',
   'blog',
+  'tools/daily-shop-cash-up',
   'privacy',
   'terms',
   'dpa',
@@ -302,11 +303,12 @@ export function renderBlogIndex(posts: PublicBlogPost[], origin: string): string
     .join('\n');
   return page({
     title: 'Business guides | Dukarun',
-    description: 'Practical guides for running sales, stock, cash flow, and books.',
+    description:
+      'Clear guides on stock, cash, customer credit, staff controls and the books behind a healthy business.',
     canonical,
     image,
     type: 'website',
-    body: `<main><header><h1>Business guides</h1><p>Practical guides for running a better business.</p></header>${items || '<p>No articles are published yet.</p>'}</main>`,
+    body: `<main><header><h1>Practical answers for running a Kenyan shop.</h1><p>Clear guides on stock, cash, customer credit, staff controls and the books behind a healthy business.</p></header>${items || '<p>No guides are published yet.</p>'}</main>`,
     structuredData: {
       '@context': 'https://schema.org',
       '@type': 'Blog',

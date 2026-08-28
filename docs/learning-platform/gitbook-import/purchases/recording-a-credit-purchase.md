@@ -1,45 +1,45 @@
 # Recording a credit purchase
 
-## Purpose
+## Why this matters
 
-Receive stock now and record that the supplier will be paid later.
+A credit purchase records the stock received and the amount your business still owes the supplier.
 
-## Prerequisites
+[Open the interactive guide in Dukarun](https://app.dukarun.com/learn/recording-a-credit-purchase)
 
-Create the supplier and products first. Know the receiving location, quantities, unit costs, and
-invoice terms.
+## Before you start
 
-## Video
+Create the supplier and products first. Have the supplier invoice or delivery note nearby. Know the
+receiving location, quantities received, unit costs, and payment terms.
 
-[Watch: Recording a credit purchase](https://dukarun.com/media/video/guides/recording-a-credit-purchase/recording-a-credit-purchase.mp4)
-([captions](https://dukarun.com/media/video/guides/recording-a-credit-purchase/recording-a-credit-purchase.en-KE.vtt) ·
-[transcript](https://dukarun.com/media/video/guides/recording-a-credit-purchase/recording-a-credit-purchase.en-KE.txt))
+## Steps
 
-## Repeatable steps
+1. Open **Purchases**, then choose **Record purchase**.
+2. Select the supplier and the location that received the goods.
+3. Add each product that arrived.
+4. Enter the quantity received and the supplier's unit cost for each line.
+5. Add the supplier reference and any useful notes.
+6. Choose **Review purchase** and check the supplier, location, items, quantities, costs, and total.
+7. Under payment, choose **Pay later**.
+8. Choose **Confirm purchase**.
 
-1. Start a new purchase and choose the supplier and receiving stock location.
-2. Add each product with its received quantity and unit cost.
-3. At payment review, choose **Pay later**.
-4. Review and confirm the purchase.
+## What changes in Dukarun
 
-## Expected result
+Tracked stock increases at the selected location. The unpaid total becomes a payable on the
+supplier account. Choosing **Pay later** does not record money leaving the business.
 
-Stock increases and the unpaid invoice becomes a supplier payable.
-
-[Start the interactive guide](https://app.dukarun.com/learn/recording-a-credit-purchase)
-
-## Glossary
+## Related terms
 
 [Credit purchase](../glossary.md#credit-purchase), [payable](../glossary.md#payable),
-[inventory tracking](../glossary.md#inventory-tracking), and
-[stock location](../glossary.md#stock-location).
+[unit cost](../glossary.md#unit-cost), and [stock location](../glossary.md#stock-location).
 
-## Related articles
+## Continue the workflow
 
-[Creating a supplier](../suppliers/creating-a-supplier.md) ·
-[Understanding the financial result](../money-and-reporting/understanding-the-financial-result.md)
+[Record the supplier payment](../suppliers/recording-a-supplier-payment.md) when the bill is paid.
 
-## Troubleshooting
+## If something does not look right
 
-If **Pay later** is unavailable, confirm that a supplier is selected and your role can manage
-supplier credit purchases.
+- If **Pay later** is unavailable, select a supplier and check that your role can record supplier
+  credit purchases.
+- If the stock or total is wrong, review the location, quantity, and unit cost before confirming.
+- Record what was actually received. Do not use the ordered quantity when the delivered quantity was
+  different.

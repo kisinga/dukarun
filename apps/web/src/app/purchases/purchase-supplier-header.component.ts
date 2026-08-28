@@ -34,6 +34,7 @@ type PurchaseSupplier = MoneyCustomer & { ap_balance: number } & AgingInfo;
             <app-searchable-filter
               data-supplier-picker
               data-learning-anchor="purchase-supplier"
+              [attr.data-learning-state]="selectedSupplier() ? 'selected' : null"
               ariaLabel="Choose supplier"
               placeholder="Choose supplier"
               searchPlaceholder="Search suppliers by name, phone, or email…"
@@ -46,6 +47,7 @@ type PurchaseSupplier = MoneyCustomer & { ap_balance: number } & AgingInfo;
           <app-form-field label="Receive into" [required]="true">
             <select
               data-location-picker
+              data-learning-anchor="purchase-location"
               class="select select-bordered h-12 w-full"
               [formControl]="locationControl()"
               (change)="receivingLocationChange.emit()"
@@ -110,6 +112,7 @@ type PurchaseSupplier = MoneyCustomer & { ap_balance: number } & AgingInfo;
         }
         @if (selectedSupplier(); as selected) {
           <section
+            data-learning-anchor="purchase-supplier-selected"
             class="rounded-field border border-base-300 bg-base-200/30 p-3"
             aria-label="Supplier account context"
           >

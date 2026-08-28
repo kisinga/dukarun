@@ -17,6 +17,12 @@ import { SiteSeoService } from '../core/site-seo.service';
 import { IconComponent } from '../shared/ui/icon.component';
 import { BlogService, PublishedBlogPost } from './blog.service';
 
+const ACQUISITION_CTA_LABELS = new Set([
+  'Check today’s closing',
+  'See how Dukarun tracks stock',
+  'Talk through your shop setup',
+]);
+
 @Component({
   selector: 'app-blog-article',
   imports: [RouterLink, DatePipe, IconComponent],
@@ -36,12 +42,12 @@ import { BlogService, PublishedBlogPost } from './blog.service';
               class="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-base-content/55 transition-colors hover:text-primary"
             >
               <span aria-hidden="true">←</span>
-              The journal
+              Guides
             </a>
             <div
               class="mt-7 flex flex-wrap items-center gap-3 text-xs font-semibold uppercase tracking-[0.13em]"
             >
-              <span class="text-primary">{{ article.tags[0] || 'Field notes' }}</span>
+              <span class="text-primary">{{ article.tags[0] || 'Shop guide' }}</span>
               <span class="h-1 w-1 rounded-full bg-base-content/20"></span>
               <span class="text-base-content/45">{{ article.reading_minutes }} minute read</span>
             </div>
@@ -102,7 +108,7 @@ import { BlogService, PublishedBlogPost } from './blog.service';
           </aside>
 
           <div class="min-w-0">
-            <div class="blog-prose" [innerHTML]="html()"></div>
+            <div class="blog-prose" [innerHTML]="html()" (click)="trackContentLink($event)"></div>
 
             <aside
               class="article-cta relative mt-14 overflow-hidden rounded-[1.25rem] bg-neutral p-7 text-neutral-content sm:p-10"
@@ -137,7 +143,7 @@ import { BlogService, PublishedBlogPost } from './blog.service';
                 class="inline-flex min-h-11 items-center gap-2 font-semibold text-primary"
               >
                 <span aria-hidden="true">←</span>
-                More from the journal
+                More guides
               </a>
               <button
                 type="button"
@@ -155,7 +161,7 @@ import { BlogService, PublishedBlogPost } from './blog.service';
       <section class="mkt-container py-24 text-center">
         <h1 class="mkt-display">Article not found</h1>
         <p class="mt-3 text-base-content/65">It may have moved or is no longer published.</p>
-        <a routerLink="/blog" class="btn btn-primary mt-6">Browse articles</a>
+        <a routerLink="/blog" class="btn btn-primary mt-6">Browse guides</a>
       </section>
     } @else {
       <div class="mkt-container max-w-4xl py-16"><div class="skeleton h-96 rounded-box"></div></div>
@@ -360,6 +366,29 @@ export class BlogArticleComponent implements OnInit {
       new Promise(resolve => setTimeout(resolve, 1_200)),
     ]).catch(() => undefined);
     window.location.assign(this.registrationUrl());
+  }
+
+  protected trackContentLink(event: MouseEvent): void {
+    if (!(event.target instanceof Element)) return;
+    const anchor = event.target.closest('a');
+    const article = this.post();
+    const label = anchor?.textContent?.trim() ?? '';
+    if (!anchor || !article || !ACQUISITION_CTA_LABELS.has(label)) return;
+    const url = new URL(anchor.href, environment.sitePublicUrl);
+    void this.blog
+      .recordEvent(
+        article.post_id,
+        'cta_click',
+        {
+          ...this.sourceMetadata(),
+          source: 'article_body',
+          label,
+          destination: `${url.origin}${url.pathname}${url.hash}`,
+        },
+        this.blog.newEventId(),
+        true
+      )
+      .catch(() => undefined);
   }
 
   protected async shareArticle(): Promise<void> {

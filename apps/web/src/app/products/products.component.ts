@@ -114,6 +114,7 @@ const PRODUCT_SORT_OPTIONS: readonly ListSortOption[] = [
           appButton
           variant="secondary"
           type="button"
+          data-learning-anchor="product-print-labels"
           (click)="openCatalogueLabels()"
         >
           <app-icon name="heroPrinter" /> Print labels

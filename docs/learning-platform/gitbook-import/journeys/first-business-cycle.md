@@ -1,22 +1,44 @@
 # Your first business cycle
 
-Follow a realistic business sequence using your own records, then see its financial effect.
+Follow one real product through a normal business cycle. You will set it up, buy stock, sell for
+immediate and later payment, and then review what changed.
 
 [Start or continue this journey](https://app.dukarun.com/learn/first-business-cycle)
 
-## The six tasks
+## Before you start
+
+Choose a product your business genuinely buys and sells. Have one supplier invoice or delivery note
+nearby. Use a customer you know well enough to make a sensible credit decision.
+
+Do not use invented balances in a live business account. If you only want to practise, use a test
+company.
+
+## Follow these six tasks
 
 1. [Create a product](../products/creating-a-product.md).
 2. [Create a supplier](../suppliers/creating-a-supplier.md).
 3. [Record a credit purchase](../purchases/recording-a-credit-purchase.md).
 4. [Complete a cash sale](../selling/making-a-cash-sale.md).
-5. [Create a customer and enable credit](../customers-and-credit/creating-a-customer-with-credit.md).
+5. [Create a customer and set credit](../customers-and-credit/creating-a-customer-with-credit.md).
 6. [Complete a credit sale](../selling/making-a-credit-sale.md).
 
-When the checklist is complete, the financial recap points to real Dashboard, Money/Credit, and
-Reports values for stock, cash, payables, receivables, revenue, COGS, and gross margin.
+## What each task changes
 
-[Start or continue this journey](https://app.dukarun.com/learn/first-business-cycle)
+| Task                     | What changes                                                                              |
+| ------------------------ | ----------------------------------------------------------------------------------------- |
+| Create a product         | The item and its sellable variant become available for purchases and sales.               |
+| Create a supplier        | Purchases, payments, and unpaid supplier balances can use one supplier account.           |
+| Record a credit purchase | Stock increases and the unpaid amount becomes a supplier payable.                         |
+| Complete a cash sale     | Stock falls, cash received increases, and Dukarun records revenue and cost of goods sold. |
+| Set customer credit      | The approved customer can buy within the saved credit policy.                             |
+| Complete a credit sale   | Stock falls and the unpaid amount becomes a customer receivable.                          |
 
-You can dismiss the journey at any time and resume it from this same link. Each task guide can also
-be replayed from its article.
+## Review the result
+
+After the six tasks, open the financial recap. It points to the real Dashboard, **Money > Credit**,
+and **Reports** views for stock, cash, payables, receivables, revenue, cost of goods sold, and margin.
+
+[Understand the financial result](../money-and-reporting/understanding-the-financial-result.md).
+
+You can dismiss the interactive journey at any time. Use the link at the top to continue later. You
+can also reopen any interactive guide from its article.

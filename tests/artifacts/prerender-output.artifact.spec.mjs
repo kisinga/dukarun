@@ -26,6 +26,7 @@ for (const route of [
   'contact',
   'docs',
   'docs/hardware',
+  'tools/daily-shop-cash-up',
   'privacy',
   'terms',
   'dpa',
@@ -85,6 +86,21 @@ for (const marker of ['phone camera', '50 × 30 mm', '52 mm and 80 mm', 'system 
   if (!hardwareDocs.includes(marker)) {
     throw new Error(`Prerendered hardware documentation is missing: ${marker}`);
   }
+}
+
+const cashUpTool = requireFile(resolve(site, 'tools/daily-shop-cash-up/index.html'));
+for (const marker of [
+  'Close the day with the numbers clear.',
+  'Opening cash float',
+  'Actual M-Pesa receipts',
+  'Want every sale and payment connected before closing time?',
+]) {
+  if (!cashUpTool.includes(marker)) {
+    throw new Error(`Prerendered cash-up tool is missing: ${marker}`);
+  }
+}
+if (!siteSitemap.includes(`<loc>${siteOrigin}/tools/daily-shop-cash-up</loc>`)) {
+  throw new Error('Site sitemap is missing the daily shop cash-up tool.');
 }
 
 const privacy = requireFile(resolve(site, 'privacy/index.html'));
