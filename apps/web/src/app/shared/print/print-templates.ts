@@ -373,7 +373,7 @@ export class Receipt52mmTemplate extends PrintTemplate {
                     ? `
                 <div class="payment-section">
                     <p><strong>Payment:</strong> ${paymentMethod}</p>
-                    ${printMeta?.servedBy ? `<p><strong>Served by:</strong> ${printMeta.servedBy}</p>` : ''}
+                    ${printMeta?.servedBy ? `<p>You were served by ${printMeta.servedBy}.</p>` : ''}
                 </div>
                 `
                     : ''
@@ -564,7 +564,7 @@ export class Receipt80mmTemplate extends PrintTemplate {
                     ? `
                 <div class="payment-section">
                     <p><strong>Payment:</strong> ${paymentMethod}</p>
-                    ${printMeta?.servedBy ? `<p><strong>Served by:</strong> ${printMeta.servedBy}</p>` : ''}
+                    ${printMeta?.servedBy ? `<p>You were served by ${printMeta.servedBy}.</p>` : ''}
                 </div>
                 `
                     : ''
@@ -805,7 +805,7 @@ export class A4Template extends PrintTemplate {
                         <h3>Payment Information</h3>
                         <p><strong>Method:</strong> ${paymentMethod}</p>
                         <p><strong>Status:</strong> ${this.getPaymentStatus(order.payments?.[0]?.state || '')}</p>
-                        ${printMeta?.servedBy ? `<p><strong>Served by:</strong> ${printMeta.servedBy}</p>` : ''}
+                        ${printMeta?.servedBy ? `<p>You were served by ${printMeta.servedBy}.</p>` : ''}
                     </div>
                     `
                         : ''
