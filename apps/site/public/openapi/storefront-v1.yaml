@@ -1,0 +1,492 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Dukarun Storefront API",
+    "version": "1.0.0",
+    "summary": "Read public Dukarun storefront catalogues.",
+    "description": "A public, read-only API for storefront identity, categories, products, variants, prices, and availability. It does not create carts, orders, or payments. No API key is required."
+  },
+  "servers": [
+    {
+      "url": "https://store.dukarun.com/api/v1",
+      "description": "Production"
+    }
+  ],
+  "security": [],
+  "tags": [
+    {
+      "name": "Storefronts",
+      "description": "Public catalogue reads."
+    }
+  ],
+  "paths": {
+    "/storefronts/{slug}": {
+      "get": {
+        "operationId": "getStorefrontCatalogue",
+        "summary": "Get a storefront catalogue",
+        "description": "Returns storefront details, active categories, and one page of product summaries. A known storefront whose catalogue is hidden returns 200 with empty category and product arrays. Search responses are not cached.",
+        "tags": ["Storefronts"],
+        "parameters": [
+          { "$ref": "#/components/parameters/StorefrontSlug" },
+          { "$ref": "#/components/parameters/Limit" },
+          { "$ref": "#/components/parameters/Offset" },
+          { "$ref": "#/components/parameters/Search" },
+          { "$ref": "#/components/parameters/Category" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Storefront and catalogue page.",
+            "headers": {
+              "X-Request-Id": { "$ref": "#/components/headers/RequestId" },
+              "Cache-Control": { "$ref": "#/components/headers/CacheControl" }
+            },
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/CatalogueResponse" },
+                "examples": {
+                  "catalogue": {
+                    "value": {
+                      "data": {
+                        "storefront": {
+                          "id": "7e520000-0000-4000-8000-000000000001",
+                          "name": "Example Shop",
+                          "slug": "example-shop",
+                          "logo_url": "https://supa.dukarun.com/storage/v1/object/public/company-logos/example/logo.webp",
+                          "whatsapp_number": "+254700000000",
+                          "catalogue_visible": true,
+                          "currency_code": "KES"
+                        },
+                        "categories": [
+                          {
+                            "id": "7e520000-0000-4000-8000-000000000002",
+                            "name": "Groceries",
+                            "slug": "groceries",
+                            "description": "Everyday food and pantry items."
+                          }
+                        ],
+                        "products": [
+                          {
+                            "id": "7e520000-0000-4000-8000-000000000003",
+                            "name": "Tea Leaves",
+                            "image_url": "https://supa.dukarun.com/storage/v1/object/public/product-images/example/tea.webp",
+                            "manufacturer": {
+                              "id": "7e520000-0000-4000-8000-000000000004",
+                              "name": "Example Foods"
+                            },
+                            "price": { "currency": "KES", "min": 120, "max": 240 },
+                            "variant_count": 2,
+                            "available": true
+                          }
+                        ]
+                      },
+                      "pagination": { "limit": 12, "offset": 0, "has_more": false }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/InvalidRequest" },
+          "429": { "$ref": "#/components/responses/RateLimited" },
+          "404": { "$ref": "#/components/responses/StorefrontNotFound" },
+          "503": { "$ref": "#/components/responses/Unavailable" }
+        }
+      },
+      "head": {
+        "operationId": "headStorefrontCatalogue",
+        "summary": "Check a storefront catalogue",
+        "tags": ["Storefronts"],
+        "parameters": [
+          { "$ref": "#/components/parameters/StorefrontSlug" },
+          { "$ref": "#/components/parameters/Limit" },
+          { "$ref": "#/components/parameters/Offset" },
+          { "$ref": "#/components/parameters/Search" },
+          { "$ref": "#/components/parameters/Category" }
+        ],
+        "responses": {
+          "200": {
+            "description": "The catalogue exists. Response headers match GET; the body is empty.",
+            "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } }
+          },
+          "400": { "$ref": "#/components/responses/InvalidRequest" },
+          "429": { "$ref": "#/components/responses/RateLimited" },
+          "404": { "$ref": "#/components/responses/StorefrontNotFound" },
+          "503": { "$ref": "#/components/responses/Unavailable" }
+        }
+      }
+    },
+    "/storefronts/{slug}/products/{productId}": {
+      "get": {
+        "operationId": "getStorefrontProduct",
+        "summary": "Get one product",
+        "description": "Returns the public product and all active variants. A hidden catalogue, inactive product, unknown product, or unknown storefront returns 404.",
+        "tags": ["Storefronts"],
+        "parameters": [
+          { "$ref": "#/components/parameters/StorefrontSlug" },
+          { "$ref": "#/components/parameters/ProductId" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Product detail.",
+            "headers": {
+              "X-Request-Id": { "$ref": "#/components/headers/RequestId" },
+              "Cache-Control": { "$ref": "#/components/headers/CacheControl" }
+            },
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ProductResponse" },
+                "examples": {
+                  "product": {
+                    "value": {
+                      "data": {
+                        "product": {
+                          "id": "7e520000-0000-4000-8000-000000000003",
+                          "name": "Tea Leaves",
+                          "image_url": "https://supa.dukarun.com/storage/v1/object/public/product-images/example/tea.webp",
+                          "manufacturer": {
+                            "id": "7e520000-0000-4000-8000-000000000004",
+                            "name": "Example Foods"
+                          },
+                          "variants": [
+                            {
+                              "id": "7e520000-0000-4000-8000-000000000005",
+                              "name": "100 g",
+                              "kind": "stock",
+                              "sku": "TEA-100",
+                              "price": { "currency": "KES", "amount": 120 },
+                              "available": true
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/InvalidRequest" },
+          "429": { "$ref": "#/components/responses/RateLimited" },
+          "404": { "$ref": "#/components/responses/ProductNotFound" },
+          "503": { "$ref": "#/components/responses/Unavailable" }
+        }
+      },
+      "head": {
+        "operationId": "headStorefrontProduct",
+        "summary": "Check one product",
+        "tags": ["Storefronts"],
+        "parameters": [
+          { "$ref": "#/components/parameters/StorefrontSlug" },
+          { "$ref": "#/components/parameters/ProductId" }
+        ],
+        "responses": {
+          "200": {
+            "description": "The product exists. Response headers match GET; the body is empty.",
+            "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } }
+          },
+          "400": { "$ref": "#/components/responses/InvalidRequest" },
+          "429": { "$ref": "#/components/responses/RateLimited" },
+          "404": { "$ref": "#/components/responses/ProductNotFound" },
+          "503": { "$ref": "#/components/responses/Unavailable" }
+        }
+      }
+    }
+  },
+  "components": {
+    "parameters": {
+      "StorefrontSlug": {
+        "name": "slug",
+        "in": "path",
+        "required": true,
+        "description": "The public storefront slug.",
+        "schema": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+        "example": "example-shop"
+      },
+      "ProductId": {
+        "name": "productId",
+        "in": "path",
+        "required": true,
+        "description": "The public product UUID.",
+        "schema": { "type": "string", "format": "uuid" }
+      },
+      "Limit": {
+        "name": "limit",
+        "in": "query",
+        "description": "Products to return.",
+        "schema": { "type": "integer", "minimum": 1, "maximum": 48, "default": 12 }
+      },
+      "Offset": {
+        "name": "offset",
+        "in": "query",
+        "description": "Products to skip.",
+        "schema": { "type": "integer", "minimum": 0, "maximum": 10000, "default": 0 }
+      },
+      "Search": {
+        "name": "search",
+        "in": "query",
+        "description": "Search product names, manufacturers, and SKUs. Search responses use no-store caching.",
+        "schema": { "type": "string", "maxLength": 120 }
+      },
+      "Category": {
+        "name": "category",
+        "in": "query",
+        "description": "Only products assigned to this category UUID.",
+        "schema": { "type": "string", "format": "uuid" }
+      }
+    },
+    "headers": {
+      "RequestId": {
+        "description": "ID for tracing this request.",
+        "schema": { "type": "string", "minLength": 1 }
+      },
+      "CacheControl": {
+        "description": "Browser cache policy. Search and error responses are no-store.",
+        "schema": { "type": "string" }
+      }
+    },
+    "responses": {
+      "InvalidRequest": {
+        "description": "A path or query value is invalid.",
+        "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } },
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+            "example": {
+              "error": {
+                "code": "invalid_request",
+                "message": "One or more query parameters are invalid.",
+                "request_id": "7e520000-0000-4000-8000-000000000099"
+              }
+            }
+          }
+        }
+      },
+      "StorefrontNotFound": {
+        "description": "No public storefront has this slug.",
+        "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } },
+        "content": {
+          "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+        }
+      },
+      "ProductNotFound": {
+        "description": "The product is not public in this storefront.",
+        "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } },
+        "content": {
+          "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+        }
+      },
+      "RateLimited": {
+        "description": "The anonymous request limit was exceeded. Retry after the delay in seconds.",
+        "headers": {
+          "X-Request-Id": { "$ref": "#/components/headers/RequestId" },
+          "Retry-After": {
+            "description": "Seconds to wait before retrying.",
+            "schema": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+            "example": {
+              "error": {
+                "code": "rate_limited",
+                "message": "Too many requests.",
+                "request_id": "0123456789abcdef0123456789abcdef"
+              }
+            }
+          }
+        }
+      },
+      "Unavailable": {
+        "description": "The API cannot complete the request right now.",
+        "headers": {
+          "X-Request-Id": { "$ref": "#/components/headers/RequestId" },
+          "Retry-After": {
+            "description": "May be added in a future compatible v1 update.",
+            "schema": { "type": "integer" }
+          }
+        },
+        "content": {
+          "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+        }
+      }
+    },
+    "schemas": {
+      "Storefront": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "logo_url",
+          "whatsapp_number",
+          "catalogue_visible",
+          "currency_code"
+        ],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "slug": { "type": "string" },
+          "logo_url": { "type": ["string", "null"], "format": "uri" },
+          "whatsapp_number": { "type": ["string", "null"] },
+          "catalogue_visible": { "type": "boolean" },
+          "currency_code": { "type": "string", "const": "KES" }
+        }
+      },
+      "Category": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "name", "slug", "description"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "slug": { "type": "string" },
+          "description": { "type": ["string", "null"] }
+        }
+      },
+      "Manufacturer": {
+        "type": ["object", "null"],
+        "additionalProperties": false,
+        "required": ["id", "name"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" }
+        }
+      },
+      "PriceRange": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["currency", "min", "max"],
+        "properties": {
+          "currency": { "type": "string", "const": "KES" },
+          "min": { "type": "integer", "minimum": 0, "description": "Whole Kenyan shillings." },
+          "max": { "type": "integer", "minimum": 0, "description": "Whole Kenyan shillings." }
+        }
+      },
+      "Price": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["currency", "amount"],
+        "properties": {
+          "currency": { "type": "string", "const": "KES" },
+          "amount": { "type": "integer", "minimum": 0, "description": "Whole Kenyan shillings." }
+        }
+      },
+      "CatalogProduct": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "image_url",
+          "manufacturer",
+          "price",
+          "variant_count",
+          "available"
+        ],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "image_url": { "type": ["string", "null"], "format": "uri" },
+          "manufacturer": { "$ref": "#/components/schemas/Manufacturer" },
+          "price": { "$ref": "#/components/schemas/PriceRange" },
+          "variant_count": { "type": "integer", "minimum": 1 },
+          "available": { "type": "boolean" }
+        }
+      },
+      "Variant": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "name", "kind", "sku", "price", "available"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "kind": { "type": "string", "enum": ["stock", "service"] },
+          "sku": { "type": "string" },
+          "price": { "$ref": "#/components/schemas/Price" },
+          "available": { "type": "boolean" }
+        }
+      },
+      "Product": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "name", "image_url", "manufacturer", "variants"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "image_url": { "type": ["string", "null"], "format": "uri" },
+          "manufacturer": { "$ref": "#/components/schemas/Manufacturer" },
+          "variants": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "$ref": "#/components/schemas/Variant" }
+          }
+        }
+      },
+      "CatalogueResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["data", "pagination"],
+        "properties": {
+          "data": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["storefront", "categories", "products"],
+            "properties": {
+              "storefront": { "$ref": "#/components/schemas/Storefront" },
+              "categories": {
+                "type": "array",
+                "items": { "$ref": "#/components/schemas/Category" }
+              },
+              "products": {
+                "type": "array",
+                "items": { "$ref": "#/components/schemas/CatalogProduct" }
+              }
+            }
+          },
+          "pagination": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["limit", "offset", "has_more"],
+            "properties": {
+              "limit": { "type": "integer" },
+              "offset": { "type": "integer" },
+              "has_more": { "type": "boolean" }
+            }
+          }
+        }
+      },
+      "ProductResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["data"],
+        "properties": {
+          "data": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["product"],
+            "properties": { "product": { "$ref": "#/components/schemas/Product" } }
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["error"],
+        "properties": {
+          "error": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["code", "message", "request_id"],
+            "properties": {
+              "code": { "type": "string" },
+              "message": { "type": "string" },
+              "request_id": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      }
+    }
+  }
+}

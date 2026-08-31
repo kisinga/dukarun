@@ -25,14 +25,71 @@ export interface CatalogPageRow {
   variant_count: number;
   available: boolean;
 }
-export type ShopCategory =
-  Database['public']['Functions']['storefront_categories']['Returns'][number];
+export interface ShopCategory {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+}
 export interface CatalogPage {
   storefront: StorefrontInfo | null;
   categories: ShopCategory[];
   rows: CatalogPageRow[];
   offset: number;
   hasMore: boolean;
+}
+
+interface ApiManufacturer {
+  id: string;
+  name: string;
+}
+
+interface ApiStorefront {
+  id: string;
+  name: string;
+  slug: string;
+  logo_url: string | null;
+  whatsapp_number: string | null;
+  catalogue_visible: boolean;
+  currency_code: 'KES';
+}
+
+interface ApiCatalogProduct {
+  id: string;
+  name: string;
+  image_url: string | null;
+  manufacturer: ApiManufacturer | null;
+  price: { currency: 'KES'; min: number; max: number };
+  variant_count: number;
+  available: boolean;
+}
+
+interface ApiCatalogResponse {
+  data: {
+    storefront: ApiStorefront;
+    categories: ShopCategory[];
+    products: ApiCatalogProduct[];
+  };
+  pagination: { limit: number; offset: number; has_more: boolean };
+}
+
+interface ApiProductResponse {
+  data: {
+    product: {
+      id: string;
+      name: string;
+      image_url: string | null;
+      manufacturer: ApiManufacturer | null;
+      variants: Array<{
+        id: string;
+        name: string;
+        kind: string;
+        sku: string;
+        price: { currency: 'KES'; amount: number };
+        available: boolean;
+      }>;
+    };
+  };
 }
 export interface CustomerStatement {
   store_name: string;
@@ -219,24 +276,16 @@ export class StorefrontService {
   ];
   private readonly fixtureCategories: ShopCategory[] = [
     {
-      active: true,
-      company_id: '00000000-0000-0000-0000-000000000001',
-      created_at: '2026-01-01T00:00:00.000Z',
       description: 'Everyday food and pantry essentials.',
       id: '00000000-0000-0000-0000-000000000010',
       name: 'Groceries',
       slug: 'groceries',
-      updated_at: '2026-01-01T00:00:00.000Z',
     },
     {
-      active: true,
-      company_id: '00000000-0000-0000-0000-000000000001',
-      created_at: '2026-01-01T00:00:00.000Z',
       description: 'Useful products for the home.',
       id: '00000000-0000-0000-0000-000000000011',
       name: 'Household',
       slug: 'household',
-      updated_at: '2026-01-01T00:00:00.000Z',
     },
   ];
   private readonly fixtureCategoryIdsByProduct = new Map<string, readonly string[]>([
@@ -369,7 +418,7 @@ export class StorefrontService {
             const search = options.search?.trim();
             const categoryId = options.categoryId;
             const requestUrl = new URL(
-              `/api/storefront/${encodeURIComponent(slug)}`,
+              `/api/v1/storefronts/${encodeURIComponent(slug)}`,
               environment.storefrontPublicUrl
             );
             requestUrl.searchParams.set('limit', String(limit));
@@ -377,11 +426,11 @@ export class StorefrontService {
             if (search) requestUrl.searchParams.set('search', search);
             if (categoryId) requestUrl.searchParams.set('category', categoryId);
             const request = await fetch(requestUrl, { headers: { Accept: 'application/json' } });
-            let response: Partial<CatalogPage> | null;
-            if (request.status === 404) {
-              // Angular's development server and older frontend containers do
-              // not have the Nginx /api/storefront proxy. Keep the bounded RPC
-              // as a rollout-safe fallback; all other HTTP failures stay loud.
+            let response: CatalogPage;
+            if (!environment.production && request.status === 404) {
+              // Angular's development server may not have the Nginx /api/v1
+              // proxy. Keep the bounded RPC as a development-only fallback;
+              // production failures stay visible.
               const { data, error } = await this.client.rpc('storefront_page', {
                 p_slug: slug,
                 p_limit: limit,
@@ -390,18 +439,43 @@ export class StorefrontService {
                 ...(categoryId ? { p_category_id: categoryId } : {}),
               });
               if (error) throw error;
-              response = data as Partial<CatalogPage> | null;
+              const fallback = data as Partial<CatalogPage> | null;
+              response = {
+                storefront: fallback?.storefront ?? null,
+                categories: fallback?.categories ?? [],
+                rows: fallback?.rows ?? [],
+                offset: Number(fallback?.offset ?? requestedOffset),
+                hasMore: fallback?.hasMore === true,
+              };
             } else {
               if (!request.ok) throw new Error(`storefront_page_failed:${request.status}`);
-              response = (await request.json()) as Partial<CatalogPage> | null;
+              const api = (await request.json()) as ApiCatalogResponse;
+              response = {
+                storefront: {
+                  id: api.data.storefront.id,
+                  name: api.data.storefront.name,
+                  slug: api.data.storefront.slug,
+                  logo_path: api.data.storefront.logo_url,
+                  public_whatsapp_number: api.data.storefront.whatsapp_number,
+                  catalogue_visible: api.data.storefront.catalogue_visible,
+                },
+                categories: api.data.categories,
+                rows: api.data.products.map(product => ({
+                  product_id: product.id,
+                  product_name: product.name,
+                  image_path: product.image_url,
+                  manufacturer_id: product.manufacturer?.id ?? null,
+                  manufacturer_name: product.manufacturer?.name ?? null,
+                  min_price: product.price.min,
+                  max_price: product.price.max,
+                  variant_count: product.variant_count,
+                  available: product.available,
+                })),
+                offset: api.pagination.offset,
+                hasMore: api.pagination.has_more,
+              };
             }
-            return {
-              storefront: response?.storefront ?? null,
-              categories: response?.categories ?? [],
-              rows: response?.rows ?? [],
-              offset: Number(response?.offset ?? requestedOffset),
-              hasMore: response?.hasMore === true,
-            };
+            return response;
           });
     if (isPlatformServer(this.platformId) && cacheable) {
       this.transferState.set(key, page);
@@ -419,12 +493,35 @@ export class StorefrontService {
         : [];
     }
     return this.track(async () => {
-      const { data, error } = await this.client.rpc('storefront_product', {
-        p_slug: slug,
-        p_product_id: productId,
-      });
-      if (error) throw error;
-      return data;
+      const requestUrl = new URL(
+        `/api/v1/storefronts/${encodeURIComponent(slug)}/products/${encodeURIComponent(productId)}`,
+        environment.storefrontPublicUrl
+      );
+      const request = await fetch(requestUrl, { headers: { Accept: 'application/json' } });
+      if (!environment.production && request.status === 404) {
+        const { data, error } = await this.client.rpc('storefront_product', {
+          p_slug: slug,
+          p_product_id: productId,
+        });
+        if (error) throw error;
+        return data;
+      }
+      if (!request.ok) throw new Error(`storefront_product_failed:${request.status}`);
+      const product = ((await request.json()) as ApiProductResponse).data.product;
+      return product.variants.map(variant => ({
+        product_id: product.id,
+        product_name: product.name,
+        image_path: product.image_url ?? '',
+        manufacturer_id: product.manufacturer?.id ?? '',
+        manufacturer_name: product.manufacturer?.name ?? '',
+        variant_id: variant.id,
+        variant_name: variant.name,
+        kind: variant.kind,
+        sku: variant.sku,
+        price: variant.price.amount,
+        available: variant.available,
+        total_count: 1,
+      }));
     });
   }
 
@@ -449,6 +546,7 @@ export class StorefrontService {
   /** Public product-image URL from a storage path. */
   imageUrl(path: string | null): string | null {
     if (!path) return null;
+    if (path.startsWith('http')) return path;
     return `${environment.supabaseUrl}/storage/v1/object/public/product-images/${path}`;
   }
 

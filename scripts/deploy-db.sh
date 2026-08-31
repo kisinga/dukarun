@@ -212,7 +212,7 @@ sync_openwa_vault
 
 if [ "$SYNC_FUNCTIONS" = "1" ]; then
   echo "→ syncing edge functions to ${SSH_HOST}:${FUNCTIONS_VOLUME}"
-  for fn in _shared paystack-charge paystack-webhook mpesa-initiate mpesa-callback mpesa-process mpesa-credentials notification-flush platform-message-test platform-sales-invitation-send public-content-renderer site-deploy usertour-identity; do
+  for fn in _shared paystack-charge paystack-webhook mpesa-initiate mpesa-callback mpesa-process mpesa-credentials notification-flush platform-message-test platform-sales-invitation-send public-content-renderer storefront-api site-deploy usertour-identity; do
     rsync -az --delete -e "ssh ${SSH_OPTS[*]}" \
       "supabase/functions/${fn}/" "${SSH_HOST}:${FUNCTIONS_VOLUME}/${fn}/"
   done

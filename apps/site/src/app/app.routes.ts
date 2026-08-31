@@ -87,6 +87,18 @@ export const routes: Routes = [
         loadComponent: () => import('./marketing/docs/docs.component').then(m => m.DocsComponent),
       },
       {
+        path: 'developers/storefront',
+        title: 'Storefront API for developers | Dukarun',
+        data: {
+          description:
+            'Read public Dukarun storefront products, variants, prices, categories, and availability from your own website.',
+        },
+        loadComponent: () =>
+          import('./marketing/developers/storefront-api.component').then(
+            m => m.StorefrontApiComponent
+          ),
+      },
+      {
         path: 'blog',
         title: 'Business guides | Dukarun',
         data: { description: 'Practical guides for running sales, stock, cash flow, and books.' },
