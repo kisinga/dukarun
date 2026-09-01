@@ -33,7 +33,6 @@ RUN HUSKY=0 npm ci --quiet --no-audit --no-fund --include=dev \
 
 # Sources the build needs: the app, the env generator, and shared packages
 COPY scripts/generate-environment.mjs scripts/generate-environment.mjs
-COPY scripts/copy-scalar-reference.mjs scripts/copy-scalar-reference.mjs
 COPY scripts/generate-site-seo-files.mjs scripts/generate-site-seo-files.mjs
 COPY scripts/generate-storefront-sitemap.mjs scripts/generate-storefront-sitemap.mjs
 COPY packages/shared-types packages/shared-types

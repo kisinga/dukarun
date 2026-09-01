@@ -225,10 +225,10 @@ test('product mapper exposes variants without private inventory fields', () => {
 });
 
 test('published OpenAPI document matches the two-route v1 surface', async () => {
-  const [source, reference, scalarCopy] = await Promise.all([
+  const [source, reference, sitePackage] = await Promise.all([
     readFile('apps/site/public/openapi/storefront-v1.yaml', 'utf8'),
     readFile('apps/site/public/developers/storefront/reference/index.html', 'utf8'),
-    readFile('scripts/copy-scalar-reference.mjs', 'utf8'),
+    readFile('apps/site/package.json', 'utf8'),
   ]);
   const document = JSON.parse(source);
   assert.equal(document.openapi, '3.1.0');
@@ -242,10 +242,10 @@ test('published OpenAPI document matches the two-route v1 surface', async () => 
   assert.equal(document.components.schemas.Storefront.properties.currency_code.const, 'KES');
   assert.deepEqual(document.components.schemas.Variant.properties.kind.enum, ['stock', 'service']);
   assert.ok(document.paths['/storefronts/{slug}'].get.responses['429']);
-  assert.match(reference, /\/vendor\/scalar\/1\.67\.0\/standalone\.js/);
-  assert.doesNotMatch(reference, /cdn\.jsdelivr\.net/);
-  assert.match(scalarCopy, /@scalar\/api-reference/);
-  assert.match(scalarCopy, /dist\/browser\/standalone\.js/);
+  assert.match(reference, /https:\/\/cdn\.jsdelivr\.net\/npm\/@scalar\/api-reference/);
+  assert.match(reference, /Scalar\.createApiReference\('#app'/);
+  assert.match(reference, /url: '\/openapi\/storefront-v1\.yaml'/);
+  assert.doesNotMatch(sitePackage, /copy-scalar-reference/);
   assert.equal(
     document.components.schemas.CatalogueResponse.properties.pagination.properties.total,
     undefined
