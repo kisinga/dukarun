@@ -4,7 +4,11 @@
 
 Scanning is faster than searching and reduces the chance of adding the wrong product variant.
 
-[Open the interactive guide in Dukarun](https://app.dukarun.com/learn/selling-by-scanning-a-barcode)
+> **Interactive guide**
+>
+> <a href="https://app.dukarun.com/learn/selling-by-scanning-a-barcode" target="_top">Start the
+> interactive guide in Dukarun</a>. It opens the real sell screen and points to the controls as you
+> work.
 
 ## Before you start
 

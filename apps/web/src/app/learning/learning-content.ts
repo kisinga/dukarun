@@ -34,6 +34,7 @@ export interface LearningContentDefinition {
   type: LearningContentType;
   gitbookPath: string;
   destinationRoute: string;
+  launchAnchor: string | null;
   permissions: readonly Permission[];
   usertourContentId: string;
 }
@@ -54,6 +55,7 @@ export const LEARNING_CONTENT_REGISTRY: Readonly<
     type: 'flow',
     gitbookPath: '/products/creating-a-product',
     destinationRoute: '/inventory/products',
+    launchAnchor: 'product-add',
     permissions: ['ManageStockAdjustments'],
   }),
   'generating-product-barcodes': content({
@@ -62,6 +64,7 @@ export const LEARNING_CONTENT_REGISTRY: Readonly<
     type: 'flow',
     gitbookPath: '/products/generating-product-barcodes',
     destinationRoute: '/inventory/products',
+    launchAnchor: 'product-print-labels',
     permissions: ['ManageStockAdjustments'],
   }),
   'creating-a-supplier': content({
@@ -70,6 +73,7 @@ export const LEARNING_CONTENT_REGISTRY: Readonly<
     type: 'flow',
     gitbookPath: '/suppliers/creating-a-supplier',
     destinationRoute: '/suppliers',
+    launchAnchor: 'supplier-add',
     permissions: ['ManageSupplierCreditPurchases'],
   }),
   'recording-a-credit-purchase': content({
@@ -78,6 +82,7 @@ export const LEARNING_CONTENT_REGISTRY: Readonly<
     type: 'flow',
     gitbookPath: '/purchases/recording-a-credit-purchase',
     destinationRoute: '/purchases/new',
+    launchAnchor: 'purchase-supplier',
     permissions: ['ManageSupplierCreditPurchases'],
   }),
   'making-a-cash-sale': content({
@@ -86,6 +91,7 @@ export const LEARNING_CONTENT_REGISTRY: Readonly<
     type: 'flow',
     gitbookPath: '/selling/making-a-cash-sale',
     destinationRoute: '/pos/sell',
+    launchAnchor: 'sell-product-search',
     permissions: ['SettleOrder'],
   }),
   'selling-by-scanning-a-barcode': content({
@@ -94,6 +100,7 @@ export const LEARNING_CONTENT_REGISTRY: Readonly<
     type: 'flow',
     gitbookPath: '/selling/selling-by-scanning-a-barcode',
     destinationRoute: '/pos/sell',
+    launchAnchor: 'sell-barcode-scan',
     permissions: ['SettleOrder'],
   }),
   'creating-a-customer-with-credit': content({
@@ -102,6 +109,7 @@ export const LEARNING_CONTENT_REGISTRY: Readonly<
     type: 'flow',
     gitbookPath: '/customers-and-credit/creating-a-customer-with-credit',
     destinationRoute: '/customers',
+    launchAnchor: 'customer-add',
     permissions: ['ManageCustomers', 'ManageCustomerCreditLimit'],
   }),
   'making-a-credit-sale': content({
@@ -110,6 +118,7 @@ export const LEARNING_CONTENT_REGISTRY: Readonly<
     type: 'flow',
     gitbookPath: '/selling/making-a-credit-sale',
     destinationRoute: '/pos/sell',
+    launchAnchor: 'sell-product-search',
     permissions: ['SettleOrder'],
   }),
   'understanding-the-financial-result': content({
@@ -118,6 +127,7 @@ export const LEARNING_CONTENT_REGISTRY: Readonly<
     type: 'flow',
     gitbookPath: '/money-and-reporting/understanding-the-financial-result',
     destinationRoute: '/dashboard',
+    launchAnchor: 'financial-dashboard',
     permissions: ['ViewFinancials'],
   }),
   'first-business-cycle': content({
@@ -126,6 +136,7 @@ export const LEARNING_CONTENT_REGISTRY: Readonly<
     type: 'journey',
     gitbookPath: '/journeys/first-business-cycle',
     destinationRoute: '/dashboard',
+    launchAnchor: null,
     permissions: [
       'ManageStockAdjustments',
       'ManageSupplierCreditPurchases',

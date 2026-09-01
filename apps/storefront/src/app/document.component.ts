@@ -140,6 +140,12 @@ import { PoweredByDukarunComponent } from './powered-by-dukarun.component';
                   <p class="mt-1 whitespace-pre-wrap text-base-content/70">{{ d.notes }}</p>
                 </div>
               }
+              @if (d.document_type === 'receipt' || d.document_type === 'invoice') {
+                <app-powered-by-dukarun
+                  appearance="print"
+                  class="mt-6 hidden justify-center print:flex"
+                />
+              }
               <p class="mt-6 text-xs text-base-content/50 print:hidden">
                 Read-only snapshot · secure link expires {{ date(d.expires_at) }}
               </p>

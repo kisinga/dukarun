@@ -48,6 +48,8 @@ const SITE_ROUTES = [
   'contact',
   'docs',
   'docs/hardware',
+  'developers/storefront',
+  'developers/storefront/reference',
   'blog',
   'tools/daily-shop-cash-up',
   'privacy',

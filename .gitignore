@@ -37,6 +37,7 @@ yarn-error.log
 # Generated production frontend configuration (created by each app's prebuild).
 apps/*/src/environments/environment.generated.ts
 apps/storefront/public/sitemap.xml
+apps/site/public/vendor/scalar/
 
 # Locally generated blog cover drafts. Published covers live in Supabase Storage.
 assets/blog/

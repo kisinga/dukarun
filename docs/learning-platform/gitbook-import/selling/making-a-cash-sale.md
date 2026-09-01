@@ -4,7 +4,10 @@
 
 A completed cash sale records the products sold and the full payment received at the same time.
 
-[Open the interactive guide in Dukarun](https://app.dukarun.com/learn/making-a-cash-sale)
+> **Interactive guide**
+>
+> <a href="https://app.dukarun.com/learn/making-a-cash-sale" target="_top">Start the interactive
+> guide in Dukarun</a>. It opens the real sell screen and points to the controls as you work.
 
 ## Before you start
 

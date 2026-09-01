@@ -13,6 +13,7 @@ const usertour = {
   init: vi.fn(),
   disableEvalJs: vi.fn(),
   setBaseZIndex: vi.fn(),
+  setTargetMissingSeconds: vi.fn(),
   setUrlFilter: vi.fn(),
   setCustomNavigate: vi.fn(),
   identify: vi.fn().mockResolvedValue(undefined),
@@ -104,14 +105,35 @@ describe('LearningPlatformService', () => {
     expect(usertour.init).toHaveBeenCalledWith('public-environment-token');
     expect(usertour.disableEvalJs).toHaveBeenCalledOnce();
     expect(usertour.setBaseZIndex).toHaveBeenCalledWith(1_000_000);
+    expect(usertour.setTargetMissingSeconds).toHaveBeenCalledWith(2);
     expect(usertour.setUrlFilter).toHaveBeenCalledOnce();
-    expect(invoke).toHaveBeenCalledWith('usertour-identity');
+    expect(invoke).toHaveBeenCalledWith('usertour-identity', { timeout: 4_000 });
     expect(usertour.identify).toHaveBeenCalledWith(userId, {}, { token: 'signed-token' });
-    expect(usertour.group).toHaveBeenCalledWith(
-      companyId,
-      {},
-      expect.objectContaining({ token: 'signed-token' })
-    );
+    await vi.waitFor(() => {
+      expect(usertour.group).toHaveBeenCalledWith(
+        companyId,
+        {},
+        expect.objectContaining({ token: 'signed-token' })
+      );
+    });
+  });
+
+  it('preloads the SDK before the first guide launch', () => {
+    setup();
+
+    expect(usertour.init).toHaveBeenCalledWith('public-environment-token');
+    expect(usertour.disableEvalJs).toHaveBeenCalledOnce();
+  });
+
+  it('keeps production-authored guide destinations in the local app router', async () => {
+    const { service, router } = setup();
+    await service.initialize();
+    const customNavigate = usertour.setCustomNavigate.mock.calls.at(-1)?.[0] as
+      ((url: string) => void) | undefined;
+
+    customNavigate?.('https://app.dukarun.com/inventory/products');
+
+    expect(router.navigateByUrl).toHaveBeenCalledWith('/inventory/products');
   });
 
   it('uses explicit destinations and resumes journeys', async () => {
@@ -119,11 +141,69 @@ describe('LearningPlatformService', () => {
 
     await expect(service.launch('creating-a-product')).resolves.toBe('started');
     expect(router.navigateByUrl).toHaveBeenCalledWith('/inventory/products');
-    expect(usertour.start).toHaveBeenCalledWith('flow-product', { continue: false });
+    await vi.waitFor(() => {
+      expect(usertour.start).toHaveBeenCalledWith('flow-product', { continue: false });
+    });
 
     await expect(service.launch('first-business-cycle')).resolves.toBe('started');
     expect(router.navigateByUrl).toHaveBeenLastCalledWith('/dashboard');
-    expect(usertour.start).toHaveBeenLastCalledWith('checklist-cycle', { continue: true });
+    await vi.waitFor(() => {
+      expect(usertour.start).toHaveBeenLastCalledWith('checklist-cycle', { continue: true });
+    });
+  });
+
+  it('starts explicit content before sending nonessential company metadata', async () => {
+    const callOrder: string[] = [];
+    usertour.start.mockImplementationOnce(async () => {
+      callOrder.push('start');
+    });
+    usertour.group.mockImplementationOnce(async () => {
+      callOrder.push('group');
+    });
+    const { service } = setup();
+
+    await expect(service.launch('creating-a-product')).resolves.toBe('started');
+    await vi.waitFor(() => expect(callOrder).toContain('group'));
+
+    expect(callOrder).toEqual(['start', 'group']);
+  });
+
+  it('opens the task before waiting for the external guide services', async () => {
+    const { service, router, invoke } = setup();
+    const pending = deferred<{
+      data: { token: string; companyId: string };
+      error: null;
+    }>();
+    invoke.mockImplementationOnce(() => pending.promise);
+
+    await expect(service.launch('creating-a-product')).resolves.toBe('started');
+    expect(router.navigateByUrl).toHaveBeenCalledWith('/inventory/products');
+    expect(usertour.start).not.toHaveBeenCalled();
+
+    pending.resolve({ data: { token: 'signed-token', companyId }, error: null });
+
+    await vi.waitFor(() => {
+      expect(usertour.start).toHaveBeenCalledWith('flow-product', { continue: false });
+    });
+  });
+
+  it('leaves a retryable failure after navigation when Usertour is unavailable', async () => {
+    const { service, router } = setup();
+    usertour.start.mockRejectedValueOnce(new Error('vendor unavailable'));
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    await expect(service.launch('creating-a-product')).resolves.toBe('started');
+
+    expect(router.navigateByUrl).toHaveBeenCalledWith('/inventory/products');
+    await vi.waitFor(() => {
+      expect(service.launchFailure()).toEqual({
+        key: 'creating-a-product',
+        result: 'vendor-disabled',
+      });
+    });
+    service.dismissLaunchFailure();
+    expect(service.launchFailure()).toBeNull();
+    warning.mockRestore();
   });
 
   it('fails closed on permissions before navigating or starting content', async () => {
@@ -192,5 +272,56 @@ describe('LearningPlatformService', () => {
 
     await expect(initialization).resolves.toBe(false);
     expect(usertour.identify).not.toHaveBeenCalled();
+  });
+
+  it('starts vendor identification before navigation completes', async () => {
+    const { service, router, invoke } = setup();
+    const navigation = deferred<boolean>();
+    router.navigateByUrl.mockReturnValueOnce(navigation.promise);
+
+    const launch = service.launch('creating-a-product');
+    await vi.waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith('usertour-identity', expect.anything())
+    );
+
+    navigation.resolve(true);
+    await expect(launch).resolves.toBe('started');
+    await vi.waitFor(() => {
+      expect(usertour.start).toHaveBeenCalledWith('flow-product', { continue: false });
+    });
+  });
+
+  it('stays quiet when learning timing is disabled', async () => {
+    localStorage.setItem('dukarun:learning-timing', '0');
+    const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+    try {
+      const { service } = setup();
+
+      await expect(service.launch('creating-a-product')).resolves.toBe('started');
+      await vi.waitFor(() => expect(usertour.start).toHaveBeenCalled());
+
+      expect(info).not.toHaveBeenCalled();
+    } finally {
+      localStorage.removeItem('dukarun:learning-timing');
+      info.mockRestore();
+    }
+  });
+
+  it('logs phase timings by default', async () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+    try {
+      const { service } = setup();
+
+      await expect(service.launch('creating-a-product')).resolves.toBe('started');
+      await vi.waitFor(() => expect(usertour.start).toHaveBeenCalled());
+
+      const logged = info.mock.calls.map(call => String(call[0])).join('\n');
+      expect(logged).toContain('[learning] launch creating-a-product navigate');
+      expect(logged).toContain('[learning] signed-identity');
+      expect(logged).toContain('[learning] sdk-identify');
+      expect(logged).toContain('[learning] launch creating-a-product start');
+    } finally {
+      info.mockRestore();
+    }
   });
 });

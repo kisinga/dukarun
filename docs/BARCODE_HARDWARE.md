@@ -24,8 +24,14 @@ If a scan fails:
 
 DukaRun supports these fixed layouts:
 
+- **80 mm roll:** 80 × 40 mm
+- **58 mm roll:** 58 × 30 mm
 - **Compact roll:** 50 × 30 mm
 - **A4 sheet:** 3 columns × 7 rows
+
+Barcodes are sized so each bar spans a whole number of printer dots (203 dpi), which keeps
+thermal output crisp and scannable. Very long codes that cannot fit at the minimum module width
+are scaled down to fit the label as a best effort.
 
 1. Install the printer using its operating-system driver.
 2. Open **Products → Print labels**.
@@ -40,6 +46,6 @@ of this integration.
 ### Troubleshooting
 
 - Wrong label position: verify paper size and disable browser scaling or fit-to-page.
-- Blank or clipped label: install the manufacturer driver and confirm 50 × 30 mm media there.
+- Blank or clipped label: install the manufacturer driver and confirm the media size there matches the chosen layout.
 - Barcode will not scan: clean the print head, increase driver print density, and print at 100%.
 - Labels skip: calibrate the printer's gap/black-mark sensor using its hardware controls.

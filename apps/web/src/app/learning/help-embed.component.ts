@@ -9,7 +9,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute } from '@angular/router';
 import { createGitBook, type GitBookFrameClient } from '@gitbook/embed';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { environment } from '../../environments/environment';
@@ -23,6 +23,7 @@ import {
   isLearningContentKey,
   type LearningContentKey,
 } from './learning-content';
+import { LearningPlatformService } from './learning-platform.service';
 
 type EmbedState = 'loading' | 'ready' | 'error' | 'offline' | 'insecure' | 'unconfigured';
 
@@ -36,119 +37,160 @@ export const GITBOOK_PARENT_PROTOCOL = new InjectionToken<string>('GitBook paren
   imports: [IconComponent],
   template: `
     <section
-      class="relative h-[calc(100dvh-7.5rem)] min-h-[32rem] overflow-hidden bg-base-100 lg:h-[calc(100dvh-3.5rem)]"
+      class="flex h-[calc(100dvh-7.5rem)] min-h-[32rem] flex-col overflow-hidden bg-base-100 lg:h-[calc(100dvh-3.5rem)]"
       aria-label="Dukarun Guide"
     >
-      <iframe
-        #frame
-        class="absolute inset-0 h-full w-full border-0 bg-base-100"
-        title="Dukarun Guide"
-        src="about:blank"
-        allow="clipboard-write"
-        [style.color-scheme]="theme.theme()"
-        (load)="frameLoaded()"
-        (error)="frameFailed()"
-      ></iframe>
-
-      @if (state() !== 'ready') {
+      <header class="shrink-0 border-b border-base-300 bg-base-100 px-3 py-3 sm:px-5 sm:py-4">
         <div
-          class="absolute inset-0 grid place-items-center bg-base-200/40 p-5"
-          role="status"
-          aria-live="polite"
+          class="mx-auto flex max-w-6xl flex-col gap-4 rounded-2xl border border-primary/25 bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5"
         >
-          <div
-            class="w-full max-w-md rounded-2xl border border-base-300 bg-base-100 px-6 py-8 text-center shadow-sm sm:px-10"
-          >
-            @switch (state()) {
-              @case ('loading') {
-                <span class="loading loading-spinner loading-md text-primary"></span>
-                <h1 class="mt-4 text-lg font-semibold">Opening Dukarun Guide</h1>
-                <p class="mt-2 text-sm text-base-content/60">
-                  Loading the official, searchable documentation…
-                </p>
-              }
-              @case ('offline') {
-                <span class="mx-auto grid size-12 place-items-center rounded-2xl bg-warning/10">
-                  <app-icon name="heroSignalSlash" size="lg" class="text-warning" />
-                </span>
-                <h1 class="mt-4 text-lg font-semibold">
-                  Dukarun Guide needs an internet connection
+          <div class="flex min-w-0 gap-3 sm:gap-4">
+            <span
+              class="grid size-11 shrink-0 place-items-center rounded-xl bg-primary text-primary-content shadow-sm"
+            >
+              <app-icon name="heroBookOpen" size="md" />
+            </span>
+            <div class="min-w-0">
+              <p class="text-xs font-bold uppercase tracking-[0.12em] text-primary">
+                Learn by doing
+              </p>
+              @if (contentKey(); as key) {
+                <h1 class="mt-1 text-base font-bold text-base-content sm:text-lg">
+                  Try {{ LEARNING_CONTENT_REGISTRY[key].title.toLocaleLowerCase() }} in Dukarun
                 </h1>
-                <p class="mt-2 text-sm text-base-content/60">
-                  Reconnect, then retry. Your work in Dukarun is not affected.
-                </p>
-                <div class="mt-5 flex flex-wrap justify-center gap-2">
-                  <button type="button" class="btn btn-primary btn-sm" (click)="retry()">
-                    Retry
-                  </button>
+              } @else {
+                <h1 class="mt-1 text-base font-bold text-base-content sm:text-lg">
+                  Let the guide walk with you through the real task
+                </h1>
+              }
+              <p class="mt-1 max-w-3xl text-sm leading-5 text-base-content/70">
+                Follow each highlight and complete the requested action before choosing Next. You
+                can dismiss the guide at any time and continue working.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            class="btn btn-primary shrink-0 sm:self-center"
+            (click)="launchInteractiveGuide(contentKey() ?? 'first-business-cycle')"
+          >
+            {{ contentKey() ? 'Start interactive guide' : 'Start your first business cycle' }}
+          </button>
+        </div>
+      </header>
+
+      <div class="relative min-h-0 flex-1">
+        <iframe
+          #frame
+          class="absolute inset-0 h-full w-full border-0 bg-base-100"
+          title="Dukarun Guide"
+          src="about:blank"
+          allow="clipboard-write"
+          [style.color-scheme]="theme.theme()"
+          (load)="frameLoaded()"
+          (error)="frameFailed()"
+        ></iframe>
+
+        @if (state() !== 'ready') {
+          <div
+            class="absolute inset-0 grid place-items-center bg-base-200/40 p-5"
+            role="status"
+            aria-live="polite"
+          >
+            <div
+              class="w-full max-w-md rounded-2xl border border-base-300 bg-base-100 px-6 py-8 text-center shadow-sm sm:px-10"
+            >
+              @switch (state()) {
+                @case ('loading') {
+                  <span class="loading loading-spinner loading-md text-primary"></span>
+                  <h1 class="mt-4 text-lg font-semibold">Opening Dukarun Guide</h1>
+                  <p class="mt-2 text-sm text-base-content/60">
+                    Loading the official, searchable documentation…
+                  </p>
+                }
+                @case ('offline') {
+                  <span class="mx-auto grid size-12 place-items-center rounded-2xl bg-warning/10">
+                    <app-icon name="heroSignalSlash" size="lg" class="text-warning" />
+                  </span>
+                  <h1 class="mt-4 text-lg font-semibold">
+                    Dukarun Guide needs an internet connection
+                  </h1>
+                  <p class="mt-2 text-sm text-base-content/60">
+                    Reconnect, then retry. Your work in Dukarun is not affected.
+                  </p>
+                  <div class="mt-5 flex flex-wrap justify-center gap-2">
+                    <button type="button" class="btn btn-primary btn-sm" (click)="retry()">
+                      Retry
+                    </button>
+                    @if (externalUrl()) {
+                      <a
+                        class="btn btn-ghost btn-sm"
+                        [href]="externalUrl()"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        >Open in new tab</a
+                      >
+                    }
+                  </div>
+                }
+                @case ('unconfigured') {
+                  <span class="mx-auto grid size-12 place-items-center rounded-2xl bg-primary/10">
+                    <app-icon name="heroBookOpen" size="lg" class="text-primary" />
+                  </span>
+                  <h1 class="mt-4 text-lg font-semibold">Dukarun Guide is being connected</h1>
+                  <p class="mt-2 text-sm text-base-content/60">
+                    Set the GitBook site URL to make the searchable guide available here.
+                  </p>
+                }
+                @case ('insecure') {
+                  <span class="mx-auto grid size-12 place-items-center rounded-2xl bg-warning/10">
+                    <app-icon name="heroExclamationTriangle" size="lg" class="text-warning" />
+                  </span>
+                  <h1 class="mt-4 text-lg font-semibold">
+                    Dukarun Guide needs HTTPS in local development
+                  </h1>
+                  <p class="mt-2 text-sm text-base-content/60">
+                    Start Dukarun with <code>npm run dev:web:https</code> to test the real embedded
+                    guide, or open this page directly in GitBook.
+                  </p>
                   @if (externalUrl()) {
                     <a
-                      class="btn btn-ghost btn-sm"
+                      class="btn btn-primary btn-sm mt-5"
                       [href]="externalUrl()"
                       target="_blank"
                       rel="noopener noreferrer"
-                      >Open in new tab</a
+                      >Open GitBook</a
                     >
                   }
-                </div>
-              }
-              @case ('unconfigured') {
-                <span class="mx-auto grid size-12 place-items-center rounded-2xl bg-primary/10">
-                  <app-icon name="heroBookOpen" size="lg" class="text-primary" />
-                </span>
-                <h1 class="mt-4 text-lg font-semibold">Dukarun Guide is being connected</h1>
-                <p class="mt-2 text-sm text-base-content/60">
-                  Set the GitBook site URL to make the searchable guide available here.
-                </p>
-              }
-              @case ('insecure') {
-                <span class="mx-auto grid size-12 place-items-center rounded-2xl bg-warning/10">
-                  <app-icon name="heroExclamationTriangle" size="lg" class="text-warning" />
-                </span>
-                <h1 class="mt-4 text-lg font-semibold">
-                  Dukarun Guide needs HTTPS in local development
-                </h1>
-                <p class="mt-2 text-sm text-base-content/60">
-                  Start Dukarun with <code>npm run dev:web:https</code> to test the real embedded
-                  guide, or open this page directly in GitBook.
-                </p>
-                @if (externalUrl()) {
-                  <a
-                    class="btn btn-primary btn-sm mt-5"
-                    [href]="externalUrl()"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    >Open GitBook</a
-                  >
+                }
+                @default {
+                  <span class="mx-auto grid size-12 place-items-center rounded-2xl bg-warning/10">
+                    <app-icon name="heroExclamationTriangle" size="lg" class="text-warning" />
+                  </span>
+                  <h1 class="mt-4 text-lg font-semibold">Dukarun Guide could not be loaded</h1>
+                  <p class="mt-2 text-sm text-base-content/60">
+                    Retry here or open the guide in a new tab.
+                  </p>
+                  <div class="mt-5 flex justify-center gap-2">
+                    <button type="button" class="btn btn-primary btn-sm" (click)="retry()">
+                      Retry
+                    </button>
+                    @if (externalUrl()) {
+                      <a
+                        class="btn btn-ghost btn-sm"
+                        [href]="externalUrl()"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        >Open in new tab</a
+                      >
+                    }
+                  </div>
                 }
               }
-              @default {
-                <span class="mx-auto grid size-12 place-items-center rounded-2xl bg-warning/10">
-                  <app-icon name="heroExclamationTriangle" size="lg" class="text-warning" />
-                </span>
-                <h1 class="mt-4 text-lg font-semibold">Dukarun Guide could not be loaded</h1>
-                <p class="mt-2 text-sm text-base-content/60">
-                  Retry here or open the guide in a new tab.
-                </p>
-                <div class="mt-5 flex justify-center gap-2">
-                  <button type="button" class="btn btn-primary btn-sm" (click)="retry()">
-                    Retry
-                  </button>
-                  @if (externalUrl()) {
-                    <a
-                      class="btn btn-ghost btn-sm"
-                      [href]="externalUrl()"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      >Open in new tab</a
-                    >
-                  }
-                </div>
-              }
-            }
+            </div>
           </div>
-        </div>
-      }
+        }
+      </div>
     </section>
   `,
 })
@@ -156,7 +198,7 @@ export class HelpEmbedComponent implements AfterViewInit {
   @ViewChild('frame', { static: true }) private frame!: ElementRef<HTMLIFrameElement>;
 
   private readonly route = inject(ActivatedRoute);
-  private readonly router = inject(Router);
+  private readonly learning = inject(LearningPlatformService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly connectivity = inject(ConnectivityService);
   protected readonly theme = inject(ThemeService);
@@ -178,7 +220,8 @@ export class HelpEmbedComponent implements AfterViewInit {
           : 'loading'
   );
   private readonly pagePath = signal('/');
-  private readonly contentKey = signal<LearningContentKey | null>(null);
+  protected readonly contentKey = signal<LearningContentKey | null>(null);
+  protected readonly LEARNING_CONTENT_REGISTRY = LEARNING_CONTENT_REGISTRY;
   protected readonly externalUrl = signal('');
 
   constructor() {
@@ -193,6 +236,7 @@ export class HelpEmbedComponent implements AfterViewInit {
       this.contentKey.set(isLearningContentKey(topic) ? topic : null);
       this.pagePath.set(path);
       this.externalUrl.set(this.siteUrl ? `${this.siteUrl}${path === '/' ? '' : path}` : '');
+      this.configureFrame();
       this.frameClient?.navigateToPage(path);
     });
 
@@ -233,6 +277,11 @@ export class HelpEmbedComponent implements AfterViewInit {
     this.loadFrame();
   }
 
+  protected launchInteractiveGuide(key: LearningContentKey): void {
+    const definition = LEARNING_CONTENT_REGISTRY[key];
+    void this.learning.launch(key, { continue: definition.type === 'journey' });
+  }
+
   protected frameLoaded(): void {
     if (!this.requestedFrameUrl || this.frame.nativeElement.src === 'about:blank') return;
     if (!this.frameHasLoaded) {
@@ -257,27 +306,33 @@ export class HelpEmbedComponent implements AfterViewInit {
       this.requestedFrameUrl = client.getFrameURL({});
       this.frame.nativeElement.src = this.requestedFrameUrl;
       this.frameClient = client.createFrame(this.frame.nativeElement);
-      const actionKey = this.contentKey();
-      this.frameClient.configure({
-        tabs: ['assistant', 'search', 'docs'],
-        greeting: {
-          title: 'How can we help?',
-          subtitle: 'Search Dukarun Guide for tasks and business terms.',
-        },
-        actions: actionKey
-          ? [
-              {
-                icon: 'play',
-                label: `Start ${LEARNING_CONTENT_REGISTRY[actionKey].title.toLocaleLowerCase()}`,
-                onClick: () => void this.router.navigate(['/learn', actionKey]),
-              },
-            ]
-          : [],
-        trademark: true,
-      });
+      this.configureFrame();
       this.frameClient.navigateToPage(this.pagePath());
     } catch {
       this.state.set('error');
     }
+  }
+
+  private configureFrame(): void {
+    if (!this.frameClient) return;
+    const actionKey = this.contentKey() ?? 'first-business-cycle';
+    this.frameClient.configure({
+      tabs: ['assistant', 'search', 'docs'],
+      greeting: {
+        title: 'How can we help?',
+        subtitle: 'Search Dukarun Guide for tasks and business terms.',
+      },
+      actions: [
+        {
+          icon: 'play',
+          label:
+            actionKey === 'first-business-cycle'
+              ? 'Start your first business cycle'
+              : `Start ${LEARNING_CONTENT_REGISTRY[actionKey].title.toLocaleLowerCase()}`,
+          onClick: () => this.launchInteractiveGuide(actionKey),
+        },
+      ],
+      trademark: true,
+    });
   }
 }

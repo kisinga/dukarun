@@ -1,5 +1,7 @@
 {
-  "inline-svg": {},
+  "inline-svg": {
+    "products/barcode-label-print.service.ts": 2
+  },
   "arbitrary-text-size": {},
   "oversize-dashboard-text": {},
   "heavy-shadow": {},

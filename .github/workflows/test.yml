@@ -68,6 +68,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run test:contract
+      - name: Locate Chrome for Remotion
+        run: echo "REMOTION_BROWSER_EXECUTABLE=$(command -v google-chrome)" >> "$GITHUB_ENV"
       - run: npm run test:video
 
   artifact:

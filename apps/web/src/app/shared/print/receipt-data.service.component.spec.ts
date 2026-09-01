@@ -108,4 +108,18 @@ describe('receipt templates', () => {
       expect(html).toContain('You were served by Amina.');
     }
   );
+
+  it.each([new Receipt52mmTemplate(), new Receipt80mmTemplate(), new A4Template()])(
+    'prints the compact Dukarun signature on $name',
+    template => {
+      const html = template.render(printedOrder, null, 'Duka', {
+        documentType: 'receipt',
+        paymentMethodName: 'Cash',
+      });
+
+      expect(html).toContain('Powered by Dukarun');
+      expect(html).toContain('dukarun.com');
+      expect(html).toContain('/assets/logo/dukarun-icon-dark.svg');
+    }
+  );
 });

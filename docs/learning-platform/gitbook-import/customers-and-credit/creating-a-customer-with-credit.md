@@ -5,7 +5,11 @@
 A customer account keeps sales, payments, contact details, and credit decisions together. A clear
 credit policy controls how much the customer may owe and when payment is expected.
 
-[Open the interactive guide in Dukarun](https://app.dukarun.com/learn/creating-a-customer-with-credit)
+> **Interactive guide**
+>
+> <a href="https://app.dukarun.com/learn/creating-a-customer-with-credit" target="_top">Start the
+> interactive guide in Dukarun</a>. It opens the real customer screen and points to the controls as
+> you work.
 
 ## Before you start
 

@@ -4,7 +4,11 @@
 
 A unique barcode lets a scanner or device camera add the correct product variant to a sale quickly.
 
-[Open the interactive guide in Dukarun](https://app.dukarun.com/learn/generating-product-barcodes)
+> **Interactive guide**
+>
+> <a href="https://app.dukarun.com/learn/generating-product-barcodes" target="_top">Start the
+> interactive guide in Dukarun</a>. It opens the real product screen and points to the controls as
+> you work.
 
 ## Before you start
 

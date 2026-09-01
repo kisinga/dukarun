@@ -4,7 +4,11 @@
 
 A credit purchase records the stock received and the amount your business still owes the supplier.
 
-[Open the interactive guide in Dukarun](https://app.dukarun.com/learn/recording-a-credit-purchase)
+> **Interactive guide**
+>
+> <a href="https://app.dukarun.com/learn/recording-a-credit-purchase" target="_top">Start the
+> interactive guide in Dukarun</a>. It opens the real purchase screen and points to the controls as
+> you work.
 
 ## Before you start
 

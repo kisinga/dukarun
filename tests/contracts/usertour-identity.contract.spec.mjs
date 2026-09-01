@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   companyIdFromAccessToken,
   createUsertourIdentityToken,
+  identityFromAccessToken,
 } from '../../supabase/functions/_shared/usertour-identity.ts';
 
 const userId = '123e4567-e89b-42d3-a456-426614174000';
@@ -11,13 +12,20 @@ const companyId = '123e4567-e89b-42d3-a456-426614174001';
 
 const base64Url = value => Buffer.from(JSON.stringify(value)).toString('base64url');
 
-test('Usertour identity accepts only a valid active-company UUID claim', () => {
+test('Usertour identity accepts only valid user and active-company UUID claims', () => {
+  const accessToken = `header.${base64Url({ sub: userId, company_id: companyId })}.sig`;
+  assert.deepEqual(identityFromAccessToken(accessToken), { userId, companyId });
+  assert.equal(companyIdFromAccessToken(accessToken), companyId);
   assert.equal(
-    companyIdFromAccessToken(`header.${base64Url({ company_id: companyId })}.sig`),
-    companyId
+    companyIdFromAccessToken(
+      `header.${base64Url({ sub: userId, company_id: 'private-name' })}.sig`
+    ),
+    null
   );
   assert.equal(
-    companyIdFromAccessToken(`header.${base64Url({ company_id: 'private-name' })}.sig`),
+    identityFromAccessToken(
+      `header.${base64Url({ sub: 'private-name', company_id: companyId })}.sig`
+    ),
     null
   );
   assert.equal(companyIdFromAccessToken('not-a-token'), null);
@@ -60,9 +68,13 @@ test('Usertour identity signing fails closed when the secret is missing', async 
   );
 });
 
-test('Usertour identity endpoint authenticates before signing and fails closed on configuration', async () => {
-  const source = await readFile('supabase/functions/usertour-identity/index.ts', 'utf8');
-  assert.match(source, /auth\.getUser\(\)/);
+test('Usertour identity endpoint relies on gateway verification and fails closed', async () => {
+  const [source, config] = await Promise.all([
+    readFile('supabase/functions/usertour-identity/index.ts', 'utf8'),
+    readFile('supabase/config.toml', 'utf8'),
+  ]);
+  assert.match(config, /\[functions\.usertour-identity\]\s*verify_jwt = true/);
+  assert.match(source, /identityFromAccessToken\(accessToken\)/);
   assert.match(source, /not_authenticated.*401/s);
   assert.match(source, /active_company_required.*403/s);
   assert.match(source, /usertour_configuration_missing.*503/s);

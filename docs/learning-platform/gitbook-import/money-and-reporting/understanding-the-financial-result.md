@@ -6,7 +6,10 @@ Stock, cash, customer debt, supplier debt, revenue, and margin describe differen
 business cycle. Reading them together prevents a busy sales day from being mistaken for cash or
 profit.
 
-[Open the interactive recap in Dukarun](https://app.dukarun.com/learn/understanding-the-financial-result)
+> **Interactive guide**
+>
+> <a href="https://app.dukarun.com/learn/understanding-the-financial-result" target="_top">Start the
+> interactive recap in Dukarun</a>. It points to the real financial views.
 
 ## Before you start
 

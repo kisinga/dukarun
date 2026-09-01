@@ -294,6 +294,38 @@ interface NavSection {
           <router-outlet />
         </main>
 
+        @if (learning.launchFailure(); as failure) {
+          <div
+            class="fixed bottom-20 right-4 z-[1000001] w-[min(24rem,calc(100vw-2rem))] rounded-box border border-warning/30 bg-base-100 p-4 shadow-overlay lg:bottom-5"
+            role="alert"
+          >
+            <div class="flex items-start gap-3">
+              <app-icon name="heroExclamationTriangle" class="mt-0.5 shrink-0 text-warning" />
+              <div class="min-w-0 flex-1">
+                <p class="text-sm font-semibold">The interactive guide could not open</p>
+                <p class="mt-1 text-xs text-base-content/65">
+                  Continue with the task, or try the guide again.
+                </p>
+                <div class="mt-3 flex flex-wrap gap-2">
+                  <a
+                    class="btn btn-primary btn-xs"
+                    [routerLink]="['/learn', failure.key]"
+                    (click)="learning.dismissLaunchFailure()"
+                    >Try again</a
+                  >
+                  <button
+                    type="button"
+                    class="btn btn-ghost btn-xs"
+                    (click)="learning.dismissLaunchFailure()"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        }
+
         <!-- Mobile bottom tab bar -->
         <nav
           class="fixed bottom-0 left-0 right-0 z-50 border-t border-base-300 bg-base-100 pb-[env(safe-area-inset-bottom,0px)] lg:hidden"
@@ -532,7 +564,7 @@ export class ShellComponent implements OnInit {
   protected readonly legal = inject(LegalService);
   protected readonly connectivity = inject(ConnectivityService);
   protected readonly workspaces = inject(WorkspaceNavigationService);
-  private readonly learning = inject(LearningPlatformService);
+  protected readonly learning = inject(LearningPlatformService);
 
   protected readonly myName = computed(() => this.profile.me()?.display_name ?? 'Account');
   protected readonly myAvatarUrl = computed(() =>
@@ -719,7 +751,6 @@ export class ShellComponent implements OnInit {
       this.entitlements.refresh().catch(() => undefined),
       this.perms.ensureLoaded(),
     ]);
-    void this.learning.initialize();
     if (this.perms.has('SettleOrder')) {
       await this.cashierSession.start();
       await this.orderQueueCounts.refresh();

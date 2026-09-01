@@ -5,7 +5,10 @@
 A product gives your team one reliable record for an item or service. Its variants hold the selling
 price, stock setting, SKU, and barcode used in purchases and sales.
 
-[Open the interactive guide in Dukarun](https://app.dukarun.com/learn/creating-a-product)
+> **Interactive guide**
+>
+> <a href="https://app.dukarun.com/learn/creating-a-product" target="_top">Start the interactive
+> guide in Dukarun</a>. It opens the real product screen and points to the controls as you work.
 
 ## Before you start
 

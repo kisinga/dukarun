@@ -78,6 +78,32 @@ test('interactive learning anchors remain stable', async () => {
   }
 });
 
+test('every task flow declares a stable Usertour launch anchor', async () => {
+  const registry = await readFile('apps/web/src/app/learning/learning-content.ts', 'utf8');
+  const launchAnchors = [
+    'product-add',
+    'product-print-labels',
+    'supplier-add',
+    'purchase-supplier',
+    'sell-product-search',
+    'sell-barcode-scan',
+    'customer-add',
+    'financial-dashboard',
+  ];
+  const knownAnchors = new Set(Object.values(contracts).flat());
+
+  for (const anchor of launchAnchors) {
+    assert.equal(
+      knownAnchors.has(anchor),
+      true,
+      `${anchor}: launch anchor exists in the DOM contract`
+    );
+    assert.match(registry, new RegExp(`launchAnchor: '${anchor}'`));
+  }
+  assert.equal((registry.match(/\n    launchAnchor: /g) ?? []).length, 10);
+  assert.match(registry, /'first-business-cycle': content\(\{[\s\S]*?launchAnchor: null/);
+});
+
 test('custom business-cycle progress storage and query-driven guide routing stay removed', async () => {
   const files = [
     'apps/web/src/app/app.routes.ts',
@@ -93,10 +119,12 @@ test('custom business-cycle progress storage and query-driven guide routing stay
   assert.doesNotMatch(source, /params\.get\(['"]guide['"]\)/);
 });
 
-test('Dukarun Guide exposes Assistant, search, docs, and same-tab guide actions', async () => {
+test('Dukarun Guide introduces learning by doing and keeps guide actions in the app tab', async () => {
   const source = await readFile('apps/web/src/app/learning/help-embed.component.ts', 'utf8');
   assert.match(source, /tabs: \['assistant', 'search', 'docs'\]/);
-  assert.match(source, /this\.router\.navigate\(\['\/learn', actionKey\]\)/);
+  assert.match(source, /Learn by doing/);
+  assert.match(source, /complete the requested action before choosing Next/);
+  assert.match(source, /this\.learning\.launch\(key,/);
   assert.doesNotMatch(source, /suggestions: \[\]|tools: \[\]/);
   assert.match(source, /Dukarun Guide needs an internet connection/);
   assert.match(source, /Open in new tab/);
@@ -149,7 +177,10 @@ test('GitBook import keeps task articles clear, repeatable, and honest about ava
     'selling/making-a-credit-sale.md',
   ];
   for (const article of guideBackedArticles) {
-    assert.match(await readFile(`${root}/${article}`, 'utf8'), /\/learn\/[a-z-]+\)/, article);
+    const source = await readFile(`${root}/${article}`, 'utf8');
+    assert.match(source, /^> \*\*Interactive guide\*\*$/m, article);
+    assert.match(source, /href="https:\/\/app\.dukarun\.com\/learn\/[a-z-]+"/, article);
+    assert.match(source, /target="_top"/, `${article}: interactive guide stays in the same tab`);
   }
 
   const recap = await readFile(
@@ -161,6 +192,11 @@ test('GitBook import keeps task articles clear, repeatable, and honest about ava
   assert.match(recap, /\{% embed url="https:\/\/youtu\.be\/dfykDyK6Fs8" %\}/);
   assert.match(recap, /Customer payment \| No change \| Increases/);
   assert.match(recap, /Supplier payment \| No change \| Decreases/);
+  assert.match(recap, /^> \*\*Interactive guide\*\*$/m);
+  assert.match(
+    recap,
+    /href="https:\/\/app\.dukarun\.com\/learn\/understanding-the-financial-result" target="_top"/
+  );
   assert.doesNotMatch(recap, /\/media\/video\/guides\//);
 });
 
@@ -212,10 +248,10 @@ test('GitBook import seeds the canonical business glossary and journey', async (
   const journey = await readFile(`${root}/journeys/first-business-cycle.md`, 'utf8');
   assert.match(journey, /^## Video$/m);
   assert.match(journey, /\{% embed url="https:\/\/youtu\.be\/dfykDyK6Fs8" %\}/);
-  assert.equal(
-    (journey.match(/\/learn\/first-business-cycle/g) ?? []).length,
-    1,
-    'the journey keeps one clear launch action instead of repeating the same CTA'
+  assert.match(journey, /^> \*\*Interactive journey\*\*$/m);
+  assert.match(
+    journey,
+    /href="https:\/\/app\.dukarun\.com\/learn\/first-business-cycle" target="_top"/
   );
   for (const task of [
     'Create a product',
@@ -261,9 +297,13 @@ test('the public site treats GitBook as an acquisition and trust surface', async
     readFile('apps/site/src/app/marketing/marketing-layout.component.ts', 'utf8'),
   ]);
   assert.match(learning, /https:\/\/dukarun\.gitbook\.io\/docs/);
-  assert.match(home, /Open Dukarun Guide/);
-  assert.match(home, /Your first business cycle/);
+  assert.match(home, /\[href\]="guidesUrl"/);
+  assert.match(home, />public guides<\/a>/);
   assert.match(layout, /label: 'Dukarun Guide', href: DUKARUN_GUIDES_URL/);
+  assert.match(
+    layout,
+    /label: 'First business cycle', href: dukarunGuideUrl\('journeys\/first-business-cycle'\)/
+  );
   const primaryLinks = layout.match(
     /protected readonly links: NavLink\[\] = \[([\s\S]*?)\n  \];/
   )?.[1];

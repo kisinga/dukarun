@@ -162,7 +162,7 @@ interface DocSection {
             [href]="appUrl('/register')"
             class="btn btn-lg min-h-11 border-white bg-white text-primary hover:bg-white/90"
           >
-            Get started
+            Start my shop
             <app-icon name="heroArrowRight" size="md" />
           </a>
           <a

@@ -41,40 +41,67 @@ describe('DailyShopCashUpComponent', () => {
     ) as HTMLButtonElement;
   }
 
+  function continueTo(fixture: Awaited<ReturnType<typeof render>>, step: 2 | 3): void {
+    while (fixture.nativeElement.textContent.includes(`Step ${step - 1} of 3`)) {
+      button(fixture, 'Continue').click();
+      fixture.detectChanges();
+    }
+  }
+
   it('uses clear public language and explains that entered values are not stored', async () => {
     const fixture = await render();
     const text = fixture.nativeElement.textContent;
 
-    expect(text).toContain('Close the day with the numbers clear.');
+    expect(text).toContain('Do today’s money and sales agree?');
     expect(text).toContain('Nothing is saved');
-    expect(text).toContain('A difference is a prompt to review the records.');
+    expect(text).toContain('A blank closing figure will stay “Not checked”');
     expect(text).not.toContain('—');
   });
 
-  it('uses specific product, WhatsApp, and related-guide calls to action', async () => {
+  it('offers self-start, assisted setup, and a related guide', async () => {
     const fixture = await render();
     const anchors = [...fixture.nativeElement.querySelectorAll('a')] as HTMLAnchorElement[];
     const findLink = (label: string) =>
       anchors.find(anchor => anchor.textContent.includes(label)) as HTMLAnchorElement;
 
-    expect(findLink('See how Dukarun closes the day').href).toContain('/docs#cashier-sessions');
-    expect(findLink('Talk through my shop closing').href).toContain('wa.me/254788922222');
-    expect(findLink('Talk through my shop closing').href).toContain('shop%20closing');
-    expect(findLink('how to tell whether the shop made money today').href).toContain(
-      '/blog/how-to-know-shop-profit-kenya'
-    );
+    expect(findLink('Start my shop').href).toContain('/register');
+    expect(findLink('I need setup and training').href).toContain('wa.me/254788922222');
+    expect(findLink('I need setup and training').href).toContain('staff%20training');
+    expect(findLink('Read the closing guide').href).toContain('/docs#cashier-sessions');
   });
 
   it('updates the closing summary and labels an overage without assigning a cause', async () => {
     const fixture = await render();
-    enter(fixture, 'cash-up-openingCash', '1000');
     enter(fixture, 'cash-up-cashSales', '2000');
+    continueTo(fixture, 2);
+    enter(fixture, 'cash-up-openingCash', '1000');
+    continueTo(fixture, 3);
     enter(fixture, 'cash-up-actualClosingCash', '3100');
+    button(fixture, 'See closing result').click();
+    fixture.detectChanges();
 
     const text = fixture.nativeElement.textContent;
     expect(text).toContain('KES 3,000');
     expect(text).toContain('+KES 100');
-    expect(text).toContain('higher than expected');
+    expect(text).toContain('A difference needs review');
+    expect(text).toContain('Over');
+  });
+
+  it('does not treat an unchecked channel as a zero balance', async () => {
+    const fixture = await render();
+    enter(fixture, 'cash-up-cashSales', '2000');
+    continueTo(fixture, 2);
+    enter(fixture, 'cash-up-openingCash', '1000');
+    continueTo(fixture, 3);
+    enter(fixture, 'cash-up-actualMpesaReceipts', '0');
+    button(fixture, 'See closing result').click();
+    fixture.detectChanges();
+
+    const cashSection = fixture.nativeElement.querySelector(
+      '[aria-labelledby="cash-result-heading"]'
+    ) as HTMLElement;
+    expect(cashSection.textContent).toContain('Not checked');
+    expect(cashSection.textContent).not.toContain('-KES 3,000');
   });
 
   it('shows an accessible validation error and recovers after reset', async () => {
@@ -85,7 +112,7 @@ describe('DailyShopCashUpComponent', () => {
     expect(input.getAttribute('aria-invalid')).toBe('true');
     expect(fixture.nativeElement.textContent).toContain('positive amount');
 
-    button(fixture, 'Reset figures').click();
+    button(fixture, 'Clear').click();
     fixture.detectChanges();
     expect(input.value).toBe('');
   });
@@ -93,9 +120,13 @@ describe('DailyShopCashUpComponent', () => {
   it('prints a valid entered summary', async () => {
     const fixture = await render();
     const print = vi.spyOn(window, 'print').mockImplementation(() => undefined);
-    enter(fixture, 'cash-up-openingCash', '1000');
+    continueTo(fixture, 2);
+    continueTo(fixture, 3);
+    enter(fixture, 'cash-up-actualClosingCash', '0');
+    button(fixture, 'See closing result').click();
+    fixture.detectChanges();
 
-    button(fixture, 'Print summary').click();
+    button(fixture, 'Print').click();
     expect(print).toHaveBeenCalledOnce();
   });
 

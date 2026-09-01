@@ -96,6 +96,8 @@ test('dynamic sitemap contains current blog revisions', () => {
   assert.match(sitemap, /<loc>https:\/\/dukarun\.com\/blog\/stock-control<\/loc>/);
   assert.match(sitemap, /<lastmod>2026-08-12T07:00:00\.000Z<\/lastmod>/);
   assert.match(sitemap, /<loc>https:\/\/dukarun\.com\/docs\/hardware<\/loc>/);
+  assert.match(sitemap, /<loc>https:\/\/dukarun\.com\/developers\/storefront<\/loc>/);
+  assert.match(sitemap, /<loc>https:\/\/dukarun\.com\/developers\/storefront\/reference<\/loc>/);
   assert.match(sitemap, /<loc>https:\/\/dukarun\.com\/tools\/daily-shop-cash-up<\/loc>/);
 });
 

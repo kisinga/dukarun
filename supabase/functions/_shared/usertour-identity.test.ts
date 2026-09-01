@@ -1,5 +1,9 @@
 import { assertEquals, assertRejects } from 'jsr:@std/assert@1';
-import { companyIdFromAccessToken, createUsertourIdentityToken } from './usertour-identity.ts';
+import {
+  companyIdFromAccessToken,
+  createUsertourIdentityToken,
+  identityFromAccessToken,
+} from './usertour-identity.ts';
 
 const userId = '123e4567-e89b-42d3-a456-426614174000';
 const companyId = '123e4567-e89b-42d3-a456-426614174001';
@@ -12,10 +16,16 @@ function unsignedAccessToken(claims: Record<string, unknown>): string {
   return `header.${payload}.signature`;
 }
 
-Deno.test('company scope is read only from a valid UUID claim', () => {
-  assertEquals(companyIdFromAccessToken(unsignedAccessToken({ company_id: companyId })), companyId);
+Deno.test('identity is read only from valid user and company UUID claims', () => {
+  const token = unsignedAccessToken({ sub: userId, company_id: companyId });
+  assertEquals(identityFromAccessToken(token), { userId, companyId });
+  assertEquals(companyIdFromAccessToken(token), companyId);
   assertEquals(
-    companyIdFromAccessToken(unsignedAccessToken({ company_id: 'not-a-company' })),
+    identityFromAccessToken(unsignedAccessToken({ sub: 'not-a-user', company_id: companyId })),
+    null
+  );
+  assertEquals(
+    identityFromAccessToken(unsignedAccessToken({ sub: userId, company_id: 'not-a-company' })),
     null
   );
 });

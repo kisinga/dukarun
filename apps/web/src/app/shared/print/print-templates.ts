@@ -380,6 +380,7 @@ export class Receipt52mmTemplate extends PrintTemplate {
                 }
                 <div class="receipt-footer">
                     <p>Thank you for your business!</p>
+                    <p class="dukarun-signature"><img src="/assets/logo/dukarun-icon-dark.svg" width="48" height="52" alt="" aria-hidden="true" />Powered by Dukarun <span aria-hidden="true">&middot;</span> dukarun.com</p>
                 </div>
             </div>
         `;
@@ -472,6 +473,22 @@ export class Receipt52mmTemplate extends PrintTemplate {
                     margin-top: 16px;
                     text-align: center;
                     font-size: 9px;
+                }
+                .receipt-52mm .dukarun-signature {
+                    margin-top: 3px;
+                    color: #555;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 3px;
+                    font-size: 7px;
+                    letter-spacing: 0.15px;
+                }
+                .receipt-52mm .dukarun-signature img {
+                    width: 6.46px;
+                    height: 7px;
+                    flex: 0 0 auto;
+                    object-fit: contain;
                 }
             }
         `;
@@ -571,6 +588,7 @@ export class Receipt80mmTemplate extends PrintTemplate {
                 }
                 <div class="receipt-footer">
                     <p>Thank you for your business!</p>
+                    <p class="dukarun-signature"><img src="/assets/logo/dukarun-icon-dark.svg" width="48" height="52" alt="" aria-hidden="true" />Powered by Dukarun <span aria-hidden="true">&middot;</span> dukarun.com</p>
                 </div>
             </div>
         `;
@@ -662,6 +680,22 @@ export class Receipt80mmTemplate extends PrintTemplate {
                     margin-top: 18px;
                     text-align: center;
                     font-size: 10px;
+                }
+                .receipt-80mm .dukarun-signature {
+                    margin-top: 3px;
+                    color: #555;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 3px;
+                    font-size: 8px;
+                    letter-spacing: 0.2px;
+                }
+                .receipt-80mm .dukarun-signature img {
+                    width: 7.38px;
+                    height: 8px;
+                    flex: 0 0 auto;
+                    object-fit: contain;
                 }
             }
         `;
@@ -831,6 +865,7 @@ export class A4Template extends PrintTemplate {
                 </div>
                 <div class="invoice-footer">
                     <p>Thank you for your business!</p>
+                    <p class="dukarun-signature"><img src="/assets/logo/dukarun-icon-dark.svg" width="48" height="52" alt="" aria-hidden="true" />Powered by Dukarun <span aria-hidden="true">&middot;</span> dukarun.com</p>
                 </div>
             </div>
         `;
@@ -931,6 +966,22 @@ export class A4Template extends PrintTemplate {
                     text-align: center;
                     padding-top: 20px;
                     border-top: 1px solid #ddd;
+                }
+                .a4-invoice .dukarun-signature {
+                    margin-top: 4px;
+                    color: #666;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 4px;
+                    font-size: 9px;
+                    letter-spacing: 0.25px;
+                }
+                .a4-invoice .dukarun-signature img {
+                    width: 9.23px;
+                    height: 10px;
+                    flex: 0 0 auto;
+                    object-fit: contain;
                 }
             }
         `;

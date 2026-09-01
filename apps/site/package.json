@@ -3,8 +3,9 @@
   "version": "2.0.0",
   "scripts": {
     "ng": "ng",
+    "prestart": "node ../../scripts/copy-scalar-reference.mjs",
     "start": "ng serve",
-    "prebuild": "node ../../scripts/generate-environment.mjs site && node ../../scripts/generate-site-seo-files.mjs",
+    "prebuild": "node ../../scripts/generate-environment.mjs site && node ../../scripts/copy-scalar-reference.mjs && node ../../scripts/generate-site-seo-files.mjs",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test:unit": "vitest run --root ../.. --config vitest.unit.config.ts apps/site/src",
@@ -21,6 +22,7 @@
     "@angular/ssr": "^21.0.5",
     "@ng-icons/core": "^33.3.0",
     "@ng-icons/heroicons": "^33.3.0",
+    "@scalar/api-reference": "1.67.0",
     "@supabase/supabase-js": "^2.76.1",
     "rxjs": "~7.8.2",
     "tslib": "^2.8.1"

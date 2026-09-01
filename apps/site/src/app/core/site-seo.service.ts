@@ -5,75 +5,15 @@ import { ActivatedRoute, NavigationEnd, Router } from '@angular/router';
 import { filter, startWith } from 'rxjs';
 import { environment } from '../../environments/environment';
 import type { PublishedBlogPost } from '../blog/blog.service';
+import { PUBLIC_FAQS } from './public-faq';
 
 const SOCIAL_IMAGE_PATH = '/media/video/product-overview/product-overview-full-wide.png';
 
-const FAQ_ENTITIES = [
-  {
-    '@type': 'Question',
-    name: 'What happens when my internet drops?',
-    acceptedAnswer: {
-      '@type': 'Answer',
-      text: 'Nothing changes at the counter. The POS keeps selling and queues every sale on the device, then syncs when the network returns. Safeguards make sure no sale is ever posted twice.',
-    },
-  },
-  {
-    '@type': 'Question',
-    name: 'Do I need special hardware?',
-    acceptedAnswer: {
-      '@type': 'Answer',
-      text: 'No. Dukarun runs on the Android phone you already have, and on any desktop browser for the back office. For paper receipts, use a Bluetooth or USB printer that is available through your device’s normal print service and supports 52 mm or 80 mm paper.',
-    },
-  },
-  {
-    '@type': 'Question',
-    name: 'How do my customers pay?',
-    acceptedAnswer: {
-      '@type': 'Answer',
-      text: 'Cash or M-Pesa, recorded at the till. You can also sell on credit to customers you trust, with balances and limits tracked per person.',
-    },
-  },
-  {
-    '@type': 'Question',
-    name: 'Can I manage pickup and delivery orders?',
-    acceptedAnswer: {
-      '@type': 'Answer',
-      text: 'Yes. Choose pickup or delivery at checkout, move the order through preparation and handoff, assign a delivery person, and share a private tracking link and PIN. Cash on delivery can be enabled per location.',
-    },
-  },
-  {
-    '@type': 'Question',
-    name: 'Can customers pay straight into dukarun by M-Pesa?',
-    acceptedAnswer: {
-      '@type': 'Answer',
-      text: 'Not yet. Customer-initiated M-Pesa (an STK push from the buyer) is still in the works. Today you record M-Pesa payments from your existing till, and they post to the books like any other sale.',
-    },
-  },
-  {
-    '@type': 'Question',
-    name: 'Can my staff use it without seeing everything?',
-    acceptedAnswer: {
-      '@type': 'Answer',
-      text: 'Yes. Cashiers sell; managers approve; owners see the books. Roles decide what each person can do, and sensitive actions like price overrides or stock adjustments can require approval.',
-    },
-  },
-  {
-    '@type': 'Question',
-    name: 'Does Dukarun calculate VAT?',
-    acceptedAnswer: {
-      '@type': 'Answer',
-      text: 'Yes. In a supported jurisdiction, a business can turn on VAT accounting when it needs it. Dukarun extracts VAT from VAT-inclusive sales and eligible supplier invoices, posts input and output VAT to the ledger, and provides VAT breakdowns and reports. The business remains responsible for registration, filing, and its tax obligations. eTIMS support is in development; Dukarun does not currently submit invoices.',
-    },
-  },
-  {
-    '@type': 'Question',
-    name: 'How is the subscription billed?',
-    acceptedAnswer: {
-      '@type': 'Answer',
-      text: 'Monthly or yearly, through M-Pesa. You get a prompt on your phone, approve it, and you are done.',
-    },
-  },
-] as const;
+const FAQ_ENTITIES = PUBLIC_FAQS.map(faq => ({
+  '@type': 'Question',
+  name: faq.question,
+  acceptedAnswer: { '@type': 'Answer', text: faq.answer },
+}));
 
 @Injectable({ providedIn: 'root' })
 export class SiteSeoService {
@@ -200,8 +140,7 @@ export class SiteSeoService {
         url: siteUrl,
         applicationCategory: 'BusinessApplication',
         operatingSystem: 'Web, Android',
-        description:
-          'Point of sale, stock management, VAT calculations and double-entry books for Kenyan businesses.',
+        description: 'Point of sale, stock, customer credit and connected books for Kenyan shops.',
         publisher: { '@id': organizationId },
       },
     ];
