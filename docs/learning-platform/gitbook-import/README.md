@@ -12,7 +12,8 @@ Follow one product from setup to purchase, sale, customer credit, and financial 
 best starting point if you are new to Dukarun.
 
 [Read the first business cycle](journeys/first-business-cycle.md) or
-[start the interactive journey](https://app.dukarun.com/learn/first-business-cycle).
+<a href="https://app.dukarun.com/learn/first-business-cycle" target="_top">start the interactive
+journey in Dukarun</a>.
 
 ## Browse by business area
 

@@ -7,19 +7,34 @@ function base64Url(value: Uint8Array | string): string {
   return btoa(binary).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
 }
 
-export function companyIdFromAccessToken(token: string): string | null {
+export interface UsertourAccessIdentity {
+  userId: string;
+  companyId: string;
+}
+
+export function identityFromAccessToken(token: string): UsertourAccessIdentity | null {
   try {
     const segment = token.split('.')[1];
     if (!segment) return null;
     const normalized = segment.replace(/-/g, '+').replace(/_/g, '/');
     const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
-    const claims = JSON.parse(atob(padded)) as { company_id?: unknown };
-    return typeof claims.company_id === 'string' && UUID.test(claims.company_id)
-      ? claims.company_id
-      : null;
+    const claims = JSON.parse(atob(padded)) as { sub?: unknown; company_id?: unknown };
+    if (
+      typeof claims.sub !== 'string' ||
+      !UUID.test(claims.sub) ||
+      typeof claims.company_id !== 'string' ||
+      !UUID.test(claims.company_id)
+    ) {
+      return null;
+    }
+    return { userId: claims.sub, companyId: claims.company_id };
   } catch {
     return null;
   }
+}
+
+export function companyIdFromAccessToken(token: string): string | null {
+  return identityFromAccessToken(token)?.companyId ?? null;
 }
 
 export async function createUsertourIdentityToken(input: {

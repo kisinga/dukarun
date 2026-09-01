@@ -140,6 +140,21 @@ import { PoweredByDukarunComponent } from './powered-by-dukarun.component';
                   <p class="mt-1 whitespace-pre-wrap text-base-content/70">{{ d.notes }}</p>
                 </div>
               }
+              @if (d.document_type === 'receipt' || d.document_type === 'invoice') {
+                <p
+                  class="mt-6 hidden items-center justify-center gap-1 text-center text-[9px] tracking-wide text-neutral-600 print:flex"
+                >
+                  <img
+                    src="/assets/logo/dukarun-icon-dark.svg"
+                    width="48"
+                    height="52"
+                    alt=""
+                    aria-hidden="true"
+                    class="h-2.5 w-[9.23px] shrink-0 object-contain"
+                  />
+                  Powered by Dukarun <span aria-hidden="true">&middot;</span> dukarun.com
+                </p>
+              }
               <p class="mt-6 text-xs text-base-content/50 print:hidden">
                 Read-only snapshot · secure link expires {{ date(d.expires_at) }}
               </p>

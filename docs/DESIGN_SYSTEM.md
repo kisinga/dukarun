@@ -185,7 +185,11 @@ meaning, daisyUI tokens only.
   `apps/web/src/app/app.config.ts` and rendered through `<app-icon>`. Registration is centralized
   so an icon cannot work in one component scope and silently disappear in another; the design
   guard rejects unregistered literal Heroicon names.
-- **No inline `<svg>`, no emoji, ever** — the guard rejects them.
+- **No hand-authored inline `<svg>` for interface icons, and no emoji** — the guard rejects them.
+  Machine-generated, non-interface vector artifacts whose geometry carries data (currently printed
+  Code 128 barcodes) may use inline SVG only when retaining vector output is necessary for fidelity.
+  Each exception must be documented at its renderer and count-ratcheted by
+  `design-guard.allowlist.json`; it must not be used to bypass `<app-icon>` for visual icons.
 - Always use `<app-icon name="hero…">` (`IconComponent`) — sizes: `sm` (14px, with
   `text-xs`), `md` (16px, with `text-sm`, the default), `lg` (20px, standalone),
   `xl` (40px, decorative only: empty states and large placeholders). No other values.
@@ -464,7 +468,7 @@ vocabulary — same meaning, same shape; different data, different cells:
 - [ ] No dashboard text > `text-2xl`; titles/hero numbers are `tracking-tight`; amounts are `tabular-nums`.
 - [ ] One card recipe; no nested bordered boxes; heavy shadows only on overlays.
 - [ ] Semantic colour only with money meaning; muted text via `base-content/xx`.
-- [ ] Icons via `<app-icon>`; zero inline `<svg>`; zero emoji.
+- [ ] Interface icons via `<app-icon>`; zero unapproved inline `<svg>`; zero emoji.
 - [ ] Pages composed via `<app-page>`; forms via `<app-form-field>`; actions via `appButton`; money via `<app-money>`.
 - [ ] Modals via the shared shell (`.modal-box`, full-screen on mobile).
 - [ ] Task modals use `.modal-box-task` + one `.modal-body`; short/read-only dialogs use `.modal-box-scroll`; no consumer-owned viewport sizing or overflow.

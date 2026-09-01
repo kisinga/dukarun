@@ -14,6 +14,8 @@ describe('learning content registry', () => {
       expect(definition.key).toBe(key);
       expect(definition.gitbookPath).toMatch(/^\//);
       expect(definition.destinationRoute).toMatch(/^\//);
+      if (definition.type === 'flow') expect(definition.launchAnchor).toMatch(/^[a-z-]+$/);
+      else expect(definition.launchAnchor).toBeNull();
       expect(definition.permissions.length).toBeGreaterThan(0);
     }
   });

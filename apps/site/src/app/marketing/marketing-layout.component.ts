@@ -61,7 +61,7 @@ interface NavLink {
               Log in
             </a>
             <a [href]="appUrl('/register')" class="btn btn-primary btn-sm min-h-11">
-              Get started
+              Start my shop
               <app-icon name="heroArrowRight" size="sm" />
             </a>
             <button
@@ -127,8 +127,8 @@ interface NavLink {
               dukarun
             </span>
             <p class="mb-0 max-w-xs text-sm text-base-content/70">
-              Point of sale, pickup, delivery and books for Kenyan businesses. Every order and
-              shilling stays connected.
+              Sales, stock, customer credit and books for Kenyan shops. Every shilling stays
+              connected from the counter to closing.
             </p>
           </div>
           <nav class="flex flex-col gap-1" aria-label="Pages">
@@ -173,7 +173,7 @@ interface NavLink {
               [href]="appUrl('/register')"
               class="flex min-h-8 items-center text-sm text-base-content/70 hover:text-base-content"
             >
-              Get started
+              Start my shop
             </a>
             <a
               [href]="appUrl('/login')"

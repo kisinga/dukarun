@@ -5,7 +5,10 @@
 One supplier account keeps purchases, payments, terms, and the amount you owe connected to the
 right person or business.
 
-[Open the interactive guide in Dukarun](https://app.dukarun.com/learn/creating-a-supplier)
+> **Interactive guide**
+>
+> <a href="https://app.dukarun.com/learn/creating-a-supplier" target="_top">Start the interactive
+> guide in Dukarun</a>. It opens the real supplier screen and points to the controls as you work.
 
 ## Before you start
 

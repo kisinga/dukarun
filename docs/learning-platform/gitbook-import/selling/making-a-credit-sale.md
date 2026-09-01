@@ -5,7 +5,10 @@
 A credit sale records that an approved customer received the goods now and will pay some or all of
 the amount later.
 
-[Open the interactive guide in Dukarun](https://app.dukarun.com/learn/making-a-credit-sale)
+> **Interactive guide**
+>
+> <a href="https://app.dukarun.com/learn/making-a-credit-sale" target="_top">Start the interactive
+> guide in Dukarun</a>. It opens the real sell screen and points to the controls as you work.
 
 ## Before you start
 

@@ -1,9 +1,18 @@
 import { Injectable, inject } from '@angular/core';
 import type { Variant } from '../pos/pos.service';
 import { PrintService } from '../shared/print/print.service';
-import { barcodeLabelPageStyles, type BarcodeLabelLayout } from './barcode-label-presets';
+import {
+  barcodeLabelPageStyles,
+  barcodeLabelPrintableWidth,
+  type BarcodeLabelLayout,
+} from './barcode-label-presets';
 
 export type { BarcodeLabelLayout } from './barcode-label-presets';
+
+/** Thermal printers are 203 dpi; bars must land on whole dots to stay scannable. */
+const THERMAL_DOT_MM = 25.4 / 203;
+const MIN_MODULE_DOTS = 2;
+const MAX_MODULE_DOTS = 4;
 
 export interface BarcodeLabelRenderFailure {
   variant: Variant;
@@ -46,7 +55,7 @@ export class BarcodeLabelPrintService {
           paddingheight: 1,
           backgroundcolor: 'FFFFFF',
         });
-        return [this.labelHtml(variant, barcode, svg)];
+        return [this.labelHtml(variant, barcode, this.sizeBarcodeSvg(svg, layout))];
       } catch (error) {
         failures.push({
           variant,
@@ -111,6 +120,28 @@ export class BarcodeLabelPrintService {
       </article>`;
   }
 
+  /**
+   * Pins the SVG to an explicit mm width so one module is a whole number of
+   * printer dots. Forcing width:100% (the old behaviour) shrank Code128 bars
+   * to fractional dot widths, which rasterised into mush on thermal printers.
+   *
+   * Design-guard exception: this is machine-generated Code128 geometry, not a
+   * UI icon. Keeping it as vector output is required for thermal print fidelity;
+   * the two markup tokens used below are ratcheted in the guard allowlist.
+   */
+  private sizeBarcodeSvg(svg: string, layout: BarcodeLabelLayout): string {
+    const viewBox = /viewBox="-?[\d.]+ -?[\d.]+ ([\d.]+) ([\d.]+)"/.exec(svg);
+    if (!viewBox) return svg;
+    const units = Number(viewBox[1]);
+    const usable = barcodeLabelPrintableWidth(layout);
+    const fitDots = Math.floor(usable / (units * THERMAL_DOT_MM));
+    const widthMm =
+      fitDots >= MIN_MODULE_DOTS
+        ? units * Math.min(fitDots, MAX_MODULE_DOTS) * THERMAL_DOT_MM
+        : usable; // too long even at the minimum module width — best effort fit
+    return svg.replace('<svg ', `<svg style="width:${widthMm.toFixed(2)}mm;height:auto" `);
+  }
+
   private styles(layout: BarcodeLabelLayout): string {
     const common = `
       .label-sheet { background: #fff; color: #000; }
@@ -121,7 +152,7 @@ export class BarcodeLabelPrintService {
       .variant, .sku { font-size: 7.5pt; line-height: 1.15; white-space: nowrap; overflow: hidden;
         text-overflow: ellipsis; }
       .barcode-graphic { min-width: 0; margin-top: 1mm; text-align: center; }
-      .barcode-graphic svg { display: block; width: 100%; max-width: 100%; height: 12mm; }
+      .barcode-graphic svg { display: inline-block; height: auto; }
       .barcode-value { margin-top: .5mm; text-align: center; font: 7.5pt/1.1 monospace;
         white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     `;

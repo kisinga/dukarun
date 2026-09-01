@@ -1,6 +1,6 @@
 import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
+import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { environment } from '../../environments/environment';
@@ -8,6 +8,7 @@ import { ThemeService } from '../core/theme.service';
 import { ConnectivityService } from '../pos/offline/connectivity.service';
 import { IconComponent } from '../shared/ui/icon.component';
 import { GITBOOK_PARENT_PROTOCOL, HelpEmbedComponent } from './help-embed.component';
+import { LearningPlatformService } from './learning-platform.service';
 
 const gitbook = vi.hoisted(() => ({
   configure: vi.fn(),
@@ -16,6 +17,7 @@ const gitbook = vi.hoisted(() => ({
   getFrameURL: vi.fn(),
   createGitBook: vi.fn(),
 }));
+const launchGuide = vi.fn().mockResolvedValue('started');
 
 vi.mock('@gitbook/embed', () => ({ createGitBook: gitbook.createGitBook }));
 
@@ -37,6 +39,7 @@ describe('HelpEmbedComponent', () => {
       createFrame: gitbook.createFrame,
       getFrameURL: gitbook.getFrameURL,
     });
+    launchGuide.mockClear();
   });
 
   afterEach(() => {
@@ -67,6 +70,7 @@ describe('HelpEmbedComponent', () => {
           useValue: { offline: signal(input.offline ?? false) },
         },
         { provide: GITBOOK_PARENT_PROTOCOL, useValue: input.protocol ?? 'https:' },
+        { provide: LearningPlatformService, useValue: { launch: launchGuide } },
       ],
     })
       .overrideComponent(IconComponent, { set: { template: '' } })
@@ -119,7 +123,15 @@ describe('HelpEmbedComponent', () => {
 
     expect(gitbook.createFrame).toHaveBeenCalledWith(iframe);
     expect(gitbook.configure).toHaveBeenCalledWith(
-      expect.objectContaining({ tabs: ['assistant', 'search', 'docs'] })
+      expect.objectContaining({
+        tabs: ['assistant', 'search', 'docs'],
+        actions: [
+          expect.objectContaining({
+            label: 'Start your first business cycle',
+            onClick: expect.any(Function),
+          }),
+        ],
+      })
     );
     expect(gitbook.configure.mock.calls.at(-1)?.[0]).not.toHaveProperty('suggestions');
     expect(gitbook.configure.mock.calls.at(-1)?.[0]).not.toHaveProperty('tools');
@@ -131,9 +143,25 @@ describe('HelpEmbedComponent', () => {
     expect(gitbook.createFrame).toHaveBeenCalledOnce();
   });
 
+  it('makes interactive learning prominent and launches it through the current app router', async () => {
+    environment.gitbookSiteUrl = 'https://docs.example.test';
+    const fixture = await render({ routePattern: 'help' });
+
+    expect(fixture.nativeElement.textContent).toContain('Learn by doing');
+    expect(fixture.nativeElement.textContent).toContain(
+      'complete the requested action before choosing Next'
+    );
+    const launch = fixture.nativeElement.querySelector('header button') as HTMLButtonElement;
+    expect(launch.textContent).toContain('Start your first business cycle');
+
+    launch.click();
+
+    expect(launchGuide).toHaveBeenCalledWith('first-business-cycle', { continue: true });
+  });
+
   it('adds a same-tab walkthrough action to an exact GitBook topic', async () => {
     environment.gitbookSiteUrl = 'https://docs.example.test';
-    await render({
+    const fixture = await render({
       routePattern: 'help/topics/:topic',
       params: { topic: 'creating-a-product' },
     });
@@ -149,6 +177,12 @@ describe('HelpEmbedComponent', () => {
         ],
       })
     );
+    const launch = fixture.nativeElement.querySelector('header button') as HTMLButtonElement;
+    expect(launch.textContent).toContain('Start interactive guide');
+
+    launch.click();
+
+    expect(launchGuide).toHaveBeenCalledWith('creating-a-product', { continue: false });
   });
 
   it('opens the written journey and launches its interactive action in the same tab', async () => {
@@ -157,7 +191,6 @@ describe('HelpEmbedComponent', () => {
       routePattern: 'help/journeys/:topic',
       params: { topic: 'first-business-cycle' },
     });
-    const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
 
     expect(gitbook.navigateToPage).toHaveBeenCalledWith('/journeys/first-business-cycle');
     const settings = gitbook.configure.mock.calls.at(-1)?.[0] as
@@ -165,7 +198,7 @@ describe('HelpEmbedComponent', () => {
     const action = settings?.actions?.[0];
     expect(action?.label).toBe('Start your first business cycle');
     await action?.onClick();
-    expect(navigate).toHaveBeenCalledWith(['/learn', 'first-business-cycle']);
+    expect(launchGuide).toHaveBeenCalledWith('first-business-cycle', { continue: true });
   });
 
   it('replaces GitBook frame refusal with a first-party fallback on HTTP previews', async () => {

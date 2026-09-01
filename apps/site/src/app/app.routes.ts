@@ -42,10 +42,10 @@ export const routes: Routes = [
       {
         path: '',
         pathMatch: 'full',
-        title: 'Dukarun | POS, pickup, delivery and books',
+        title: 'Dukarun | POS and books for Kenyan shops',
         data: {
           description:
-            'Run counter, pickup and delivery sales, manage stock, calculate VAT, and keep balanced double-entry books with Dukarun.',
+            'Know what was sold, what should be in cash and M-Pesa, what customers owe and what stock remains with Dukarun.',
         },
         loadComponent: () => import('./marketing/home/home.component').then(m => m.HomeComponent),
       },

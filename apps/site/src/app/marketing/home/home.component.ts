@@ -7,10 +7,9 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { DatePipe, isPlatformBrowser } from '@angular/common';
+import { isPlatformBrowser } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { environment } from '../../../environments/environment';
-import { BlogPostSummary, BlogService } from '../../blog/blog.service';
 import { IconComponent } from '../../shared/ui/icon.component';
 import { MarketingVideoComponent } from '../marketing-video.component';
 import {
@@ -20,7 +19,8 @@ import {
 } from '../public-pricing.service';
 import { appUrl } from '../../core/public-url';
 import { dukarunWhatsAppUrl } from '../../core/public-contact';
-import { DUKARUN_GUIDES_URL, dukarunGuideUrl } from '../../core/public-learning';
+import { DUKARUN_GUIDES_URL } from '../../core/public-learning';
+import { PUBLIC_FAQS } from '../../core/public-faq';
 
 interface DemoProduct {
   readonly id: string;
@@ -34,27 +34,10 @@ interface CartLine {
   readonly qty: number;
 }
 
-interface Feature {
-  readonly icon: string;
-  readonly title: string;
-  readonly copy: string;
-  readonly docId: string;
-}
-
-interface Faq {
-  readonly question: string;
-  readonly answer: string;
-}
-
 interface Testimonial {
   readonly quote: string;
   readonly author: string;
   readonly title: string;
-}
-
-interface LearningStep {
-  readonly title: string;
-  readonly href: string;
 }
 
 /**
@@ -64,7 +47,7 @@ interface LearningStep {
  */
 @Component({
   selector: 'app-marketing-home',
-  imports: [RouterLink, DatePipe, IconComponent, MarketingVideoComponent],
+  imports: [RouterLink, IconComponent, MarketingVideoComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <!-- Hero -->
@@ -80,15 +63,15 @@ interface LearningStep {
           Every shilling,<br />accounted for<span class="text-primary">.</span>
         </h1>
         <p class="mkt-lead mx-auto mt-5 max-w-xl">
-          Record every sale, stock movement, credit balance and expense, even when the internet
-          drops. Keep accurate books and make decisions from numbers you can trust.
+          Know what was sold, what should be in cash and M-Pesa, what customers owe and what stock
+          remains, even when the internet drops.
         </p>
         <div class="mt-8 flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
-          <a [href]="appUrl('/register')" class="btn btn-primary btn-lg min-h-11">
-            Get started
+          <a routerLink="/tools/daily-shop-cash-up" class="btn btn-primary btn-lg min-h-11">
+            Check today’s closing free
             <app-icon name="heroArrowRight" size="md" />
           </a>
-          <a [href]="appUrl('/login')" class="btn btn-outline btn-lg min-h-11">Log in</a>
+          <a href="#how-it-works" class="btn btn-outline btn-lg min-h-11">See how Dukarun works</a>
         </div>
         <ul class="mt-7 flex flex-wrap justify-center gap-x-5 gap-y-2 text-sm text-base-content/60">
           @for (point of trustPoints; track point) {
@@ -98,6 +81,59 @@ interface LearningStep {
             </li>
           }
         </ul>
+      </div>
+    </section>
+
+    <!-- Problem recognition -->
+    <section class="bg-base-100 py-14 sm:py-20" aria-labelledby="questions-heading">
+      <div class="mkt-container">
+        <div class="text-center">
+          <span class="mkt-eyebrow">At closing time</span>
+          <h2 id="questions-heading" class="mkt-h2 mt-2">
+            Three questions your records should answer
+          </h2>
+          <p class="mkt-lead mx-auto mt-3 max-w-xl">
+            If these answers take hours, depend on memory or only appear after a stock count, the
+            business is being run without a clear closing record.
+          </p>
+        </div>
+        <div class="mt-10 grid gap-4 md:grid-cols-3">
+          @for (q of closingQuestions; track q.question) {
+            <article class="mkt-card flex flex-col gap-3 p-6">
+              <span
+                class="flex h-11 w-11 items-center justify-center rounded-field bg-primary/10 text-primary"
+              >
+                <app-icon [name]="q.icon" size="lg" />
+              </span>
+              <h3 class="text-lg font-semibold">{{ q.question }}</h3>
+              <p class="mb-0 text-sm text-base-content/70">{{ q.answer }}</p>
+            </article>
+          }
+        </div>
+      </div>
+    </section>
+
+    <!-- Daily cash-up entry point -->
+    <section class="bg-neutral text-neutral-content" aria-labelledby="cash-up-heading">
+      <div
+        class="mkt-container grid items-center gap-7 py-12 sm:py-16 lg:grid-cols-[1fr_auto] lg:gap-12"
+      >
+        <div class="max-w-3xl">
+          <span class="text-xs font-semibold uppercase tracking-[0.14em] text-primary"
+            >Free closing tool · No account needed</span
+          >
+          <h2 id="cash-up-heading" class="mt-2 text-3xl font-bold tracking-tight">
+            Count the drawer. Check M-Pesa. See the difference.
+          </h2>
+          <p class="mt-3 mb-0 max-w-2xl leading-relaxed text-neutral-content/70">
+            Compare your sales record with the money received in about two minutes. Your figures are
+            not saved.
+          </p>
+        </div>
+        <a routerLink="/tools/daily-shop-cash-up" class="btn btn-primary min-h-12 px-6">
+          Check today’s closing free
+          <app-icon name="heroArrowRight" size="sm" />
+        </a>
       </div>
     </section>
 
@@ -132,7 +168,11 @@ interface LearningStep {
     }
 
     <!-- Interactive till demo -->
-    <section class="bg-base-100 py-14 sm:py-20" aria-labelledby="demo-heading">
+    <section
+      id="how-it-works"
+      class="scroll-mt-20 bg-base-100 py-14 sm:py-20"
+      aria-labelledby="demo-heading"
+    >
       <div class="mkt-container">
         <div class="text-center">
           <span class="mkt-eyebrow">Live demo</span>
@@ -270,7 +310,7 @@ interface LearningStep {
                   <div class="receipt-edge shrink-0" aria-hidden="true"></div>
                   <div class="mt-3 flex flex-col gap-1.5">
                     <a [href]="appUrl('/register')" class="btn btn-primary btn-sm w-full min-h-11">
-                      Make it yours. Get started
+                      Make it yours. Start my shop
                     </a>
                     <button
                       type="button"
@@ -287,231 +327,6 @@ interface LearningStep {
           <p class="mt-4 text-center text-xs text-base-content/50">
             Nothing to type. The sale is already in the books.
           </p>
-        </div>
-      </div>
-    </section>
-
-    <!-- Public guides -->
-    <section
-      id="guides"
-      class="scroll-mt-20 bg-base-200/60 py-14 sm:py-20"
-      aria-labelledby="guides-heading"
-    >
-      <div class="mkt-container grid items-start gap-8 lg:grid-cols-[0.8fr_1.2fr] lg:gap-12">
-        <div class="lg:sticky lg:top-24">
-          <span class="mkt-eyebrow">Public guides</span>
-          <h2 id="guides-heading" class="mkt-h2 mt-2">See how the work gets done</h2>
-          <p class="mkt-lead mt-3 max-w-xl">
-            Use Dukarun Guide before you sign up. Learn the workflow, understand the business terms,
-            and see how each action reaches the books.
-          </p>
-          <ul class="mt-6 flex flex-col gap-3 text-sm text-base-content/75">
-            <li class="flex items-start gap-2">
-              <app-icon name="heroCheckCircle" size="md" class="mt-0.5 text-primary" />
-              No account required to read or search
-            </li>
-            <li class="flex items-start gap-2">
-              <app-icon name="heroCheckCircle" size="md" class="mt-0.5 text-primary" />
-              Written around real shop workflows, not feature lists
-            </li>
-            <li class="flex items-start gap-2">
-              <app-icon name="heroCheckCircle" size="md" class="mt-0.5 text-primary" />
-              Interactive walkthroughs are available when you log in
-            </li>
-          </ul>
-          <div class="mt-7 flex flex-col gap-3 sm:flex-row lg:flex-col xl:flex-row">
-            <a [href]="guidesUrl" class="btn btn-primary min-h-11">
-              Open Dukarun Guide
-              <app-icon name="heroArrowRight" size="md" />
-            </a>
-            <a [href]="glossaryUrl" class="btn btn-outline min-h-11">Business glossary</a>
-          </div>
-        </div>
-
-        <article class="mkt-card overflow-hidden">
-          <div class="border-b border-base-300/70 bg-base-100 p-5 sm:p-6">
-            <div class="flex items-start gap-3">
-              <span
-                class="flex h-11 w-11 shrink-0 items-center justify-center rounded-field bg-primary/10 text-primary"
-              >
-                <app-icon name="heroClipboardDocumentList" size="lg" />
-              </span>
-              <div class="min-w-0">
-                <span class="mkt-eyebrow">Recommended starting point</span>
-                <h3 class="mt-1 text-xl font-semibold">Your first business cycle</h3>
-                <p class="mt-1 mb-0 text-sm text-base-content/70">
-                  Follow one normal sequence from creating stock to understanding the financial
-                  result.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <ol class="divide-y divide-base-300/60 bg-base-100">
-            @for (step of learningSteps; track step.href; let index = $index) {
-              <li>
-                <a
-                  [href]="step.href"
-                  class="group flex min-h-14 items-center gap-3 px-5 py-3 transition-colors hover:bg-base-200/60 sm:px-6"
-                >
-                  <span
-                    class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold tabular-nums text-primary"
-                  >
-                    {{ index + 1 }}
-                  </span>
-                  <span class="min-w-0 flex-1 text-sm font-medium">{{ step.title }}</span>
-                  <app-icon
-                    name="heroArrowRight"
-                    size="sm"
-                    class="text-base-content/35 transition-transform group-hover:translate-x-0.5 group-hover:text-primary"
-                  />
-                </a>
-              </li>
-            }
-          </ol>
-
-          <div class="border-t border-base-300/70 bg-base-200/40 p-5 sm:px-6">
-            <a
-              [href]="firstBusinessCycleUrl"
-              class="inline-flex min-h-11 items-center gap-2 font-semibold text-primary"
-            >
-              Read the complete learning journey
-              <app-icon name="heroArrowRight" size="sm" />
-            </a>
-          </div>
-        </article>
-      </div>
-    </section>
-
-    <!-- Customer voices -->
-    <section class="bg-base-200/60 py-14 sm:py-20" aria-labelledby="voices-heading">
-      <div class="mkt-container">
-        <div class="text-center">
-          <span class="mkt-eyebrow">Word of mouth</span>
-          <h2 id="voices-heading" class="mkt-h2 mt-2">From the shops that run on dukarun</h2>
-          <p class="mkt-lead mx-auto mt-3 max-w-xl">Three shopkeepers, in their own words.</p>
-        </div>
-
-        <div class="mx-auto mt-10 max-w-md">
-          <div class="receipt-edge receipt-edge-up" aria-hidden="true"></div>
-          <div class="receipt px-6 py-6 font-mono shadow-overlay sm:px-8 sm:py-8">
-            <p class="mb-0 text-center text-xs font-bold tracking-widest">DUKARUN</p>
-            <p class="mb-0 mt-1 text-center text-xs uppercase tracking-widest opacity-60">
-              Customer voices · Kenya
-            </p>
-            <div class="my-4 border-t border-dashed border-current opacity-40"></div>
-
-            @for (t of testimonials; track t.author; let last = $last) {
-              <blockquote class="mb-0 text-sm leading-relaxed">"{{ t.quote }}"</blockquote>
-              <p class="mb-0 mt-2 text-xs uppercase tracking-wider opacity-60">
-                {{ t.author }} · {{ t.title }}
-              </p>
-              @if (!last) {
-                <div class="my-4 border-t border-dashed border-current opacity-40"></div>
-              }
-            }
-
-            <div class="my-4 border-t border-dashed border-current opacity-40"></div>
-            <p class="mb-0 text-center text-xs uppercase tracking-widest opacity-60">Asante sana</p>
-          </div>
-          <div class="receipt-edge" aria-hidden="true"></div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Three questions -->
-    <section class="bg-base-100 py-14 sm:py-20" aria-labelledby="questions-heading">
-      <div class="mkt-container">
-        <div class="text-center">
-          <span class="mkt-eyebrow">At closing time</span>
-          <h2 id="questions-heading" class="mkt-h2 mt-2">
-            Three questions your books should answer
-          </h2>
-          <p class="mkt-lead mx-auto mt-3 max-w-xl">
-            When the doors close, these are the questions that matter. A notebook can't answer them;
-            your ledger can.
-          </p>
-        </div>
-        <div class="mt-10 grid gap-4 md:grid-cols-3">
-          @for (q of closingQuestions; track q.question) {
-            <article class="mkt-card flex flex-col gap-3 p-6">
-              <span
-                class="flex h-11 w-11 items-center justify-center rounded-field bg-primary/10 text-primary"
-              >
-                <app-icon [name]="q.icon" size="lg" />
-              </span>
-              <h3 class="text-lg font-semibold">{{ q.question }}</h3>
-              <p class="mb-0 text-sm text-base-content/70">{{ q.answer }}</p>
-            </article>
-          }
-        </div>
-        <p class="mt-8 text-center font-semibold text-primary">
-          Real numbers from your own books, so you can go home sure.
-        </p>
-      </div>
-    </section>
-
-    <!-- Daily cash-up tool -->
-    <section class="bg-neutral text-neutral-content" aria-labelledby="cash-up-heading">
-      <div
-        class="mkt-container grid items-center gap-7 py-10 sm:py-12 lg:grid-cols-[1fr_auto] lg:gap-12"
-      >
-        <div class="max-w-3xl">
-          <span class="text-xs font-semibold uppercase tracking-[0.14em] text-primary"
-            >Free closing tool</span
-          >
-          <h2 id="cash-up-heading" class="mt-2 text-3xl font-bold tracking-tight">
-            Count the drawer. Check M-Pesa. See the difference.
-          </h2>
-          <p class="mt-3 mb-0 max-w-2xl leading-relaxed text-neutral-content/70">
-            Enter the shop record and the money received. The daily cash-up tool shows what should
-            be there without saving your figures or asking you to create an account.
-          </p>
-        </div>
-        <a routerLink="/tools/daily-shop-cash-up" class="btn btn-primary min-h-12 px-6">
-          Check today’s closing
-          <app-icon name="heroArrowRight" size="sm" />
-        </a>
-      </div>
-    </section>
-
-    <!-- Features -->
-    <section class="bg-base-200/60 py-14 sm:py-20" aria-labelledby="features-heading">
-      <div class="mkt-container">
-        <div class="text-center">
-          <span class="mkt-eyebrow">What's inside</span>
-          <h2 id="features-heading" class="mkt-h2 mt-2">One app for the whole shop</h2>
-          <p class="mkt-lead mx-auto mt-3 max-w-xl">
-            Here are some featured capabilities of dukarun.
-          </p>
-        </div>
-        <div class="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          @for (feature of features; track feature.title) {
-            <a
-              routerLink="/docs"
-              [fragment]="feature.docId"
-              class="mkt-card flex flex-col gap-3 p-5"
-              [attr.aria-label]="'Read the documentation for ' + feature.title"
-            >
-              <span
-                class="flex h-10 w-10 items-center justify-center rounded-field bg-primary/10 text-primary"
-              >
-                <app-icon [name]="feature.icon" size="lg" />
-              </span>
-              <h3 class="font-semibold">{{ feature.title }}</h3>
-              <p class="mb-0 text-sm text-base-content/70">{{ feature.copy }}</p>
-              <span class="mt-auto flex items-center gap-1 text-xs font-semibold text-primary">
-                Read the docs
-                <app-icon name="heroArrowRight" size="sm" />
-              </span>
-            </a>
-          }
-        </div>
-        <div class="mt-10 flex justify-center">
-          <a routerLink="/docs" class="btn btn-outline min-h-11">
-            See every feature in the docs
-            <app-icon name="heroArrowRight" size="md" />
-          </a>
         </div>
       </div>
     </section>
@@ -546,6 +361,134 @@ interface LearningStep {
       </div>
     </section>
 
+    <!-- Customer voices -->
+    <section class="bg-base-200/60 py-14 sm:py-20" aria-labelledby="voices-heading">
+      <div class="mkt-container">
+        <div class="text-center">
+          <span class="mkt-eyebrow">Word of mouth</span>
+          <h2 id="voices-heading" class="mkt-h2 mt-2">From the shops that run on Dukarun</h2>
+          <p class="mkt-lead mx-auto mt-3 max-w-xl">Three shopkeepers, in their own words.</p>
+        </div>
+
+        <div class="mx-auto mt-10 max-w-md">
+          <div class="receipt-edge receipt-edge-up" aria-hidden="true"></div>
+          <div class="receipt px-6 py-6 font-mono shadow-overlay sm:px-8 sm:py-8">
+            <p class="mb-0 text-center text-xs font-bold tracking-widest">DUKARUN</p>
+            <p class="mb-0 mt-1 text-center text-xs uppercase tracking-widest opacity-60">
+              Customer voices · Kenya
+            </p>
+            <div class="my-4 border-t border-dashed border-current opacity-40"></div>
+
+            @for (testimonial of testimonials; track testimonial.author; let last = $last) {
+              <blockquote class="mb-0 text-sm leading-relaxed">
+                "{{ testimonial.quote }}"
+              </blockquote>
+              <p class="mb-0 mt-2 text-xs uppercase tracking-wider opacity-60">
+                {{ testimonial.author }} · {{ testimonial.title }}
+              </p>
+              @if (!last) {
+                <div class="my-4 border-t border-dashed border-current opacity-40"></div>
+              }
+            }
+
+            <div class="my-4 border-t border-dashed border-current opacity-40"></div>
+            <p class="mb-0 text-center text-xs uppercase tracking-widest opacity-60">Asante sana</p>
+          </div>
+          <div class="receipt-edge" aria-hidden="true"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Choose a starting route -->
+    <section
+      class="border-y border-base-300/60 bg-base-200/60 py-14 sm:py-20"
+      aria-labelledby="start-heading"
+    >
+      <div class="mkt-container">
+        <div class="mx-auto max-w-2xl text-center">
+          <span class="mkt-eyebrow">Ready to use it?</span>
+          <h2 id="start-heading" class="mkt-h2 mt-2">Choose the right way to start</h2>
+          <p class="mkt-lead mt-3">
+            The subscription gives you ongoing access to Dukarun. Setup and staff training are
+            separate services used only when your operation needs them.
+          </p>
+        </div>
+
+        <div class="mx-auto mt-10 grid max-w-5xl gap-5 md:grid-cols-2">
+          <article class="mkt-card flex flex-col p-6 sm:p-8">
+            <span class="mkt-eyebrow">Simple operation</span>
+            <h3 class="mt-2 text-2xl font-bold tracking-tight">Start it myself</h3>
+            <p class="mt-3 text-base-content/70">
+              Best for an owner-run shop or small team with one location and a straightforward sales
+              process.
+            </p>
+            <ul class="mt-5 grid gap-3 text-sm text-base-content/75">
+              <li class="flex items-start gap-2">
+                <app-icon name="heroCheckCircle" size="md" class="mt-0.5 shrink-0 text-primary" />
+                Start with five products or services
+              </li>
+              <li class="flex items-start gap-2">
+                <app-icon name="heroCheckCircle" size="md" class="mt-0.5 shrink-0 text-primary" />
+                Use a 30-minute orientation and simple guides
+              </li>
+              <li class="flex items-start gap-2">
+                <app-icon name="heroCheckCircle" size="md" class="mt-0.5 shrink-0 text-primary" />
+                Add more detail after the first sale
+              </li>
+            </ul>
+            <a [href]="appUrl('/register')" class="btn btn-primary mt-7 min-h-12 self-start">
+              Start my shop
+              <app-icon name="heroArrowRight" size="sm" />
+            </a>
+          </article>
+
+          <article class="mkt-card flex flex-col p-6 sm:p-8">
+            <span class="mkt-eyebrow">More involved operation</span>
+            <h3 class="mt-2 text-2xl font-bold tracking-tight">Get setup and staff training</h3>
+            <p class="mt-3 text-base-content/70">
+              Best when you have existing stock records, several employees, more than one location
+              or a process that needs to be mapped first.
+            </p>
+            <ul class="mt-5 grid gap-3 text-sm text-base-content/75">
+              <li class="flex items-start gap-2">
+                <app-icon name="heroCheckCircle" size="md" class="mt-0.5 shrink-0 text-primary" />
+                Business setup and data preparation
+              </li>
+              <li class="flex items-start gap-2">
+                <app-icon name="heroCheckCircle" size="md" class="mt-0.5 shrink-0 text-primary" />
+                Staff training around your normal work
+              </li>
+              <li class="flex items-start gap-2">
+                <app-icon name="heroCheckCircle" size="md" class="mt-0.5 shrink-0 text-primary" />
+                Quoted from your scope; typical engagements exceed KES 40,000
+              </li>
+            </ul>
+            <a
+              [href]="assistedSetupWhatsAppUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="btn whatsapp-action mt-7 self-start"
+            >
+              <app-icon name="whatsapp" size="md" />
+              Discuss my setup
+            </a>
+          </article>
+        </div>
+
+        <p class="mt-6 text-center text-sm text-base-content/65">
+          Not sure which route fits?
+          <a
+            [href]="routeHelpWhatsAppUrl"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="link whatsapp-link font-semibold"
+            >Tell us how your business works</a
+          >
+          and we will recommend one.
+        </p>
+      </div>
+    </section>
+
     <!-- Pricing -->
     <section
       id="pricing"
@@ -557,7 +500,8 @@ interface LearningStep {
           <span class="mkt-eyebrow">Simple pricing</span>
           <h2 id="pricing-heading" class="mkt-h2 mt-2">Choose the plan that fits your shop</h2>
           <p class="mkt-lead mx-auto mt-3 max-w-xl">
-            Compare the available plans, then pay monthly or save with yearly billing.
+            Subscription pays for continued system access. Implementation pays for setup, data
+            preparation and staff training only when your business needs them.
           </p>
         </div>
 
@@ -657,58 +601,6 @@ interface LearningStep {
       </div>
     </section>
 
-    @if (featuredPost(); as post) {
-      <!-- Featured guide -->
-      <section class="bg-base-100 py-14 sm:py-20" aria-labelledby="journal-heading">
-        <div class="mkt-container">
-          <article
-            class="grid overflow-hidden rounded-[1.25rem] border border-base-300/70 bg-base-200/45 shadow-sm lg:grid-cols-[0.9fr_1.1fr]"
-          >
-            <a
-              [routerLink]="['/blog', post.slug]"
-              class="relative block min-h-64 overflow-hidden bg-neutral sm:min-h-80"
-              aria-label="Read {{ post.title }}"
-            >
-              @if (blogCover(post); as image) {
-                <img
-                  [src]="image"
-                  [alt]="post.cover_image_alt || ''"
-                  loading="lazy"
-                  class="absolute inset-0 h-full w-full object-cover"
-                />
-              } @else {
-                <div class="absolute inset-0 flex items-end bg-neutral p-8 text-neutral-content">
-                  <span class="text-7xl font-bold tracking-[-0.07em] text-primary">D.</span>
-                </div>
-              }
-            </a>
-            <div class="flex flex-col justify-center p-7 sm:p-10 lg:p-12">
-              <span class="mkt-eyebrow">From the Dukarun guides</span>
-              <h2 id="journal-heading" class="mt-3 text-3xl font-bold leading-tight tracking-tight">
-                <a [routerLink]="['/blog', post.slug]" class="hover:text-primary">{{
-                  post.title
-                }}</a>
-              </h2>
-              <p class="mt-4 mb-0 text-base leading-relaxed text-base-content/65">
-                {{ post.excerpt }}
-              </p>
-              <div class="mt-5 flex gap-4 text-sm text-base-content/50">
-                <span>{{ post.published_at | date: 'd MMM y' }}</span>
-                <span>{{ post.reading_minutes }} min read</span>
-              </div>
-              <a
-                [routerLink]="['/blog', post.slug]"
-                class="mt-7 inline-flex min-h-11 items-center gap-2 self-start font-semibold text-primary"
-              >
-                Read the guide
-                <app-icon name="heroArrowRight" size="sm" />
-              </a>
-            </div>
-          </article>
-        </div>
-      </section>
-    }
-
     <!-- FAQ -->
     <section class="bg-base-100 py-14 sm:py-20" aria-labelledby="faq-heading">
       <div class="mkt-container max-w-3xl">
@@ -757,17 +649,17 @@ interface LearningStep {
             [href]="appUrl('/register')"
             class="btn btn-lg min-h-11 border-white bg-white text-primary hover:bg-white/90"
           >
-            Get started
+            Start my shop
             <app-icon name="heroArrowRight" size="md" />
           </a>
           <a
-            [href]="whatsappUrl"
+            [href]="assistedSetupWhatsAppUrl"
             target="_blank"
             rel="noopener noreferrer"
             class="btn whatsapp-action"
           >
             <app-icon name="whatsapp" size="md" />
-            Chat on WhatsApp
+            Ask about setup
           </a>
         </div>
         <p class="mt-6 text-xs text-primary-content/70">
@@ -780,16 +672,19 @@ interface LearningStep {
 export class HomeComponent implements OnInit {
   protected readonly appUrl = appUrl;
   protected readonly guidesUrl = DUKARUN_GUIDES_URL;
-  protected readonly glossaryUrl = dukarunGuideUrl('glossary');
-  protected readonly firstBusinessCycleUrl = dukarunGuideUrl('journeys/first-business-cycle');
   protected readonly whatsappUrl = dukarunWhatsAppUrl(
     'Hello Dukarun, I would like to know whether Dukarun is right for my business.'
+  );
+  protected readonly assistedSetupWhatsAppUrl = dukarunWhatsAppUrl(
+    'Hello Dukarun, I would like to discuss business setup and staff training. My business type is:'
+  );
+  protected readonly routeHelpWhatsAppUrl = dukarunWhatsAppUrl(
+    'Hello Dukarun, I am not sure whether to start myself or get assisted setup. My business has this many staff and locations:'
   );
   protected readonly pricingWhatsAppUrl = dukarunWhatsAppUrl(
     'Hello Dukarun, I would like to ask about current Dukarun pricing.'
   );
   private readonly publicPricing = inject(PublicPricingService);
-  private readonly blog = inject(BlogService);
   private readonly platformId = inject(PLATFORM_ID);
   private readonly initialPlans = this.publicPricing.transferredPlans();
   private readonly initialConfig = this.publicPricing.transferredBillingConfig();
@@ -797,7 +692,6 @@ export class HomeComponent implements OnInit {
   protected readonly pricingPlans = signal<PublicSubscriptionPlan[]>(this.initialPlans ?? []);
   protected readonly billingConfig = signal<PublicBillingConfig | null>(this.initialConfig ?? null);
   protected readonly pricingLoading = signal(this.initialPlans === null);
-  protected readonly featuredPost = signal<BlogPostSummary | null>(null);
   protected readonly marketingVideoBaseUrl = environment.marketingVideoBaseUrl.replace(/\/+$/, '');
   protected videoUrl(file: string): string {
     return `${this.marketingVideoBaseUrl}/${file}`;
@@ -805,49 +699,16 @@ export class HomeComponent implements OnInit {
 
   async ngOnInit(): Promise<void> {
     const refresh = isPlatformBrowser(this.platformId) && this.initialPlans !== null;
-    const [plans, config, featured] = await Promise.allSettled([
+    const [plans, config] = await Promise.allSettled([
       this.publicPricing.activePlans(refresh),
       this.publicPricing.billingConfig(refresh),
-      this.blog.featuredPost(isPlatformBrowser(this.platformId)),
     ]);
     if (plans.status === 'fulfilled') this.pricingPlans.set(plans.value);
     if (config.status === 'fulfilled') this.billingConfig.set(config.value);
-    if (featured.status === 'fulfilled') this.featuredPost.set(featured.value);
     this.pricingLoading.set(false);
   }
 
-  protected blogCover(post: BlogPostSummary): string | null {
-    return this.blog.coverUrl(post.cover_image_path);
-  }
-
   protected readonly trustPoints = ['No hardware needed', 'Works offline', 'Cancel anytime'];
-
-  protected readonly learningSteps: LearningStep[] = [
-    {
-      title: 'Create a product',
-      href: dukarunGuideUrl('products/creating-a-product'),
-    },
-    {
-      title: 'Create a supplier',
-      href: dukarunGuideUrl('suppliers/creating-a-supplier'),
-    },
-    {
-      title: 'Record a credit purchase',
-      href: dukarunGuideUrl('purchases/recording-a-credit-purchase'),
-    },
-    {
-      title: 'Complete a cash sale',
-      href: dukarunGuideUrl('selling/making-a-cash-sale'),
-    },
-    {
-      title: 'Create a customer and set credit',
-      href: dukarunGuideUrl('customers-and-credit/creating-a-customer-with-credit'),
-    },
-    {
-      title: 'Complete a credit sale',
-      href: dukarunGuideUrl('selling/making-a-credit-sale'),
-    },
-  ];
 
   protected readonly products: DemoProduct[] = [
     { id: 'unga', name: 'Unga wa Dola 2kg', price: 185, initials: 'UD' },
@@ -943,9 +804,9 @@ export class HomeComponent implements OnInit {
   protected readonly closingQuestions = [
     {
       icon: 'heroChartBar',
-      question: 'How much did make this month?',
+      question: 'Do sales agree with cash and M-Pesa?',
       answer:
-        'Every sale and expense posts to a double-entry ledger, so profit is accurate. You can even track profit per batch, per product or duration. This and much more',
+        'Compare what the shop recorded with the money actually received and see which payment channel needs review.',
     },
     {
       icon: 'heroUsers',
@@ -954,10 +815,10 @@ export class HomeComponent implements OnInit {
         'Customer credit is tracked per person, with balances and payment history. No more flipping through the notebook under the counter.',
     },
     {
-      icon: 'heroCube',
-      question: 'What should I restock tomorrow?',
+      icon: 'heroBanknotes',
+      question: 'What did the business actually make?',
       answer:
-        'Stock updates with every sale, and batch and expiry dates show you what to move first and what to reorder.',
+        'Sales and expenses reach the same ledger, so you can review profit without rebuilding the month from notebooks.',
     },
   ];
 
@@ -977,45 +838,6 @@ export class HomeComponent implements OnInit {
       quote: 'The whole salon picked it up in one morning. Tracking sales is simple now.',
       author: 'Grace W.',
       title: 'Salon · Mombasa',
-    },
-  ];
-
-  protected readonly features: Feature[] = [
-    {
-      icon: 'heroShoppingCart',
-      title: 'Point of sale',
-      copy: 'Tap a product, take cash or M-Pesa, hand over the receipt. The counter screen is built for a phone in one hand.',
-      docId: 'pos',
-    },
-    {
-      icon: 'heroCube',
-      title: 'Inventory & batches',
-      copy: 'Keep stock current with every sale and purchase, including costs, batches and expiry dates.',
-      docId: 'inventory',
-    },
-    {
-      icon: 'heroMapPin',
-      title: 'Pickup & delivery',
-      copy: 'Prepare orders, assign handoffs, collect COD and let customers follow progress from a private link.',
-      docId: 'pickup-delivery',
-    },
-    {
-      icon: 'heroSignalSlash',
-      title: 'Offline selling',
-      copy: 'Keep selling when the network drops. Sales wait safely and sync on their own when you are back online.',
-      docId: 'offline',
-    },
-    {
-      icon: 'heroUsers',
-      title: 'Customer credit',
-      copy: 'Sell on credit to the customers you trust, with every balance and payment on record per person.',
-      docId: 'credit',
-    },
-    {
-      icon: 'heroClipboardDocumentList',
-      title: 'VAT calculations and double-entry books',
-      copy: 'Turn on VAT accounting when your business needs it, then track VAT from inclusive sales and supplier invoices in balanced books.',
-      docId: 'vat',
     },
   ];
 
@@ -1040,46 +862,5 @@ export class HomeComponent implements OnInit {
     },
   ];
 
-  protected readonly faqs: Faq[] = [
-    {
-      question: 'What happens when my internet drops?',
-      answer:
-        'Nothing changes at the counter. The POS keeps selling and queues every sale on the device, then syncs when the network returns. Safeguards make sure no sale is ever posted twice.',
-    },
-    {
-      question: 'Do I need special hardware?',
-      answer:
-        'No. Dukarun runs on the Android phone you already have, and on any desktop browser for the back office. For paper receipts, use a Bluetooth or USB printer that is available through your device’s normal print service and supports 52 mm or 80 mm paper.',
-    },
-    {
-      question: 'How do my customers pay?',
-      answer:
-        'Cash or M-Pesa, recorded at the till. You can also sell on credit to customers you trust, with balances and limits tracked per person.',
-    },
-    {
-      question: 'Can I manage pickup and delivery orders?',
-      answer:
-        'Yes. Choose pickup or delivery at checkout, move the order through preparation and handoff, assign a delivery person, and share a private tracking link and PIN. Cash on delivery can be enabled per location.',
-    },
-    {
-      question: 'Can customers pay straight into dukarun by M-Pesa?',
-      answer:
-        'Not yet. Customer-initiated M-Pesa (an STK push from the buyer) is still in the works. Today you record M-Pesa payments from your existing till, and they post to the books like any other sale.',
-    },
-    {
-      question: 'Can my staff use it without seeing everything?',
-      answer:
-        'Yes. Cashiers sell; managers approve; owners see the books. Roles decide what each person can do, and sensitive actions like price overrides or stock adjustments can require approval.',
-    },
-    {
-      question: 'Does Dukarun calculate VAT?',
-      answer:
-        'Yes. In a supported jurisdiction, a business can turn on VAT accounting when it needs it. Dukarun extracts VAT from VAT-inclusive sales and eligible supplier invoices, posts input and output VAT to the ledger, and provides VAT breakdowns and reports. The business remains responsible for registration, filing, and its tax obligations. eTIMS support is in development; Dukarun does not currently submit invoices.',
-    },
-    {
-      question: 'How is the subscription billed?',
-      answer:
-        'Monthly or yearly, through M-Pesa. You get a prompt on your phone, approve it, and you are done.',
-    },
-  ];
+  protected readonly faqs = PUBLIC_FAQS;
 }

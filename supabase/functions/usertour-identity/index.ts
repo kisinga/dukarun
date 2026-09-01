@@ -1,7 +1,6 @@
-import { createClient } from 'npm:@supabase/supabase-js@2';
 import {
-  companyIdFromAccessToken,
   createUsertourIdentityToken,
+  identityFromAccessToken,
 } from '../_shared/usertour-identity.ts';
 
 const cors = {
@@ -25,30 +24,21 @@ Deno.serve(async request => {
   const accessToken = authorization?.replace(/^Bearer\s+/i, '') ?? '';
   if (!authorization || !accessToken) return json({ error: 'not_authenticated' }, 401);
 
-  const userClient = createClient(
-    Deno.env.get('SUPABASE_URL') ?? '',
-    Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-    {
-      auth: { persistSession: false },
-      global: { headers: { Authorization: authorization } },
-    }
-  );
-  const { data, error } = await userClient.auth.getUser();
-  if (error || !data.user) return json({ error: 'not_authenticated' }, 401);
-
-  const companyId = companyIdFromAccessToken(accessToken);
-  if (!companyId) return json({ error: 'active_company_required' }, 403);
+  // Supabase verifies this JWT before invoking the function (see config.toml). Reading the
+  // already-verified claims avoids a second Auth network request on every guide launch.
+  const identity = identityFromAccessToken(accessToken);
+  if (!identity) return json({ error: 'active_company_required' }, 403);
 
   const secret = Deno.env.get('USERTOUR_SIGNING_SECRET') ?? '';
   if (!secret) return json({ error: 'usertour_configuration_missing' }, 503);
 
   try {
     const token = await createUsertourIdentityToken({
-      userId: data.user.id,
-      companyId,
+      userId: identity.userId,
+      companyId: identity.companyId,
       secret,
     });
-    return json({ token, companyId, expiresIn: 15 * 60 });
+    return json({ token, companyId: identity.companyId, expiresIn: 15 * 60 });
   } catch (signingError) {
     console.error(signingError);
     return json({ error: 'identity_token_failed' }, 500);

@@ -23,11 +23,14 @@ An article must stand on its own. An interactive guide may point to the article 
 and the article may launch the guide when one exists. A journey references guides in business order.
 A video supports an article or guide but never replaces the written steps.
 
-Keep both launch paths visible. Every guide-backed GitBook article includes its canonical
-`https://app.dukarun.com/learn/<content-key>` link. When that article is opened through an exact
-`/help/topics/<content-key>` or `/help/journeys/<content-key>` application route, the official
-GitBook embed also shows a launch action. That action uses the Angular router, so it starts the same
-interactive content in the current Dukarun tab and works against localhost.
+Keep both parts of the relationship visible. Every guide-backed GitBook article contains an
+**Interactive guide** callout with its canonical `https://app.dukarun.com/learn/<content-key>` link.
+The link uses `target="_top"`, so it replaces the current top-level page instead of opening another
+tab or loading Dukarun inside the docs frame. When the article is opened through an exact
+`/help/topics/<content-key>` or `/help/journeys/<content-key>` application route, Dukarun also shows
+a prominent launch button above the article and the official GitBook embed shows the same action.
+Those first-party actions use the Angular router, start the canonical Usertour content ID, and
+preserve the current origin for localhost testing.
 
 ## Canonical keys and Usertour setup
 
@@ -46,8 +49,19 @@ sale. A checklist task completes when its flow completes **or** its correspondin
 received. Configure dismissal on every flow and the checklist. Configure the checklist to
 auto-dismiss on completion and start the financial recap flow.
 
-Use only selectors of the form `[data-learning-anchor="..."]`. JavaScript evaluation is disabled by
-the app. Do not configure Usertour's Resource Center.
+Use only selectors of the form `[data-learning-anchor="..."]`. Every flow has one explicit launch
+anchor in `LEARNING_CONTENT_REGISTRY`; its first visible step must target that same anchor. Use an
+element-present condition for later steps that depend on an asynchronous modal or form stage.
+Usertour allows two seconds for a target to appear. The app does not add another selector wait.
+JavaScript evaluation is disabled by the app. Do not configure Usertour's Resource Center.
+
+Treat form steps as actions, not slides. The prompt must name the field and tell the user what to
+enter. Do not offer a generic **Next** action while required input is empty. Configure **User fills
+in input** or **Text input value is** on the relevant `data-learning-anchor`, then advance when the
+condition is met or enable a clearly labelled **I have entered this** action. For buttons and
+selectors, advance when the user clicks the highlighted application control instead of adding a
+second Next button. Keep dismissal available on every visible step. Test each flow from a clean
+account and confirm that clicking through without completing the task is impossible.
 
 The financial recap should navigate through `financial-dashboard` (revenue and margin),
 `financial-stock`, `financial-cash`, `financial-credit` (payables and receivables), and
@@ -60,6 +74,39 @@ Configure `USERTOUR_SIGNING_SECRET` only in Supabase Edge Function secrets. The 
 15-minute identity token containing only the authenticated user UUID and active company UUID.
 Membership attributes are boolean permissions. Events contain only a stable event name. URLs sent
 to Usertour have query strings, fragments, and UUID path segments removed.
+
+The identity Edge Function relies on Supabase gateway JWT verification and reads the validated user
+and active-company claims directly. Keep `verify_jwt = true` for `usertour-identity`. This avoids an
+extra Auth request during guide startup. Dukarun starts loading the Usertour SDK as soon as the
+authenticated shell opens and identifies the user in the background once permissions are ready.
+The company membership update is queued outside the explicit launch path so it cannot delay the
+first visible guide step. A launch opens the relevant Dukarun screen, schedules the Usertour start,
+and returns immediately. There is no preparation overlay and no application-level target wait.
+Production-authored Dukarun URLs are mapped back through the current Angular router, so localhost
+does not load the deployed app between steps. Interactive learning must never block ordinary
+business work.
+
+### Launch latency
+
+The Usertour SDK (`@usertour/sdk`, served from `js.usertour.io`) awaits a server acknowledgement
+over its WebSocket for every operation: identify, content start, each step advance (`GO_TO_STEP`),
+and checklist task clicks all wait for `api.usertour.io` before the UI proceeds. On slow or
+high-latency connections this adds several seconds to the first visible step and to each step
+click, and it cannot be removed application-side without patching the vendor bundle. Dukarun's
+launch path therefore overlaps identification with routing and never holds the app for vendor
+responses.
+
+The breakdown is visible in the browser console by default: launches log
+`[learning] <phase>: <ms>` for navigation, the identity-token Edge Function call, SDK
+identification, and the Usertour start, plus a line whenever the SDK requests an in-app
+navigation. Silence the logging with `localStorage.setItem('dukarun:learning-timing', '0')`.
+
+For local testing, put `USERTOUR_SIGNING_SECRET` in the gitignored
+`supabase/functions/.env`, then restart the local stack with `npm run sb:stop` followed by
+`npm run sb:start`. Supabase loads this file into local Edge Functions. A 503 response from
+`/functions/v1/usertour-identity` with `usertour_configuration_missing` means the local runtime did
+not receive that secret. Do not add an unsigned localhost identity path; local testing should use
+the same signed-token flow as production.
 
 ## GitBook publishing
 
@@ -83,10 +130,10 @@ GitBook primary color to Dukarun orange `#e85d2f` so both the public and embedde
 Expose GitBook's Assistant, Search, and Docs tabs. Search includes question suggestions that hand
 off to the Assistant; hiding that tab leaves those suggestions visibly clickable but inert. Keep
 Assistant suggestions and tools site-owned instead of overriding them with empty application
-configuration. In the GitBook site settings, set external links to open in the same tab so article
-CTAs do not create a second Dukarun tab. The application cannot override this site-level behavior
-inside GitBook's cross-origin frame. On localhost, use the embed's first-party launch action to stay
-on the local origin; the article link remains the canonical production URL.
+configuration. Keep GitBook's site-wide External links setting on **same tab**. The application
+cannot override a target chosen by GitBook inside its cross-origin frame, so the article CTAs also
+declare `target="_top"`. Dukarun's first-party button and official embed action call the application
+router and preserve the current origin, including localhost.
 
 Before publishing, verify every external link and use a non-production app origin when importing
 into a non-production space. Keep the `## Video` section in every task article and journey. Until a

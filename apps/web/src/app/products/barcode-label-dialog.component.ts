@@ -398,7 +398,9 @@ export class BarcodeLabelDialogComponent {
   private loadLayout(): BarcodeLabelLayout {
     try {
       const saved = localStorage.getItem(LABEL_LAYOUT_KEY);
-      if (saved === 'a4-grid' || saved === 'compact-roll') return saved;
+      if (BARCODE_LABEL_PRESETS.some(preset => preset.id === saved)) {
+        return saved as BarcodeLabelLayout;
+      }
     } catch {
       // Fall through to the default.
     }

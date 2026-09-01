@@ -3,7 +3,10 @@
 Follow one real product through a normal business cycle. You will set it up, buy stock, sell for
 immediate and later payment, and then review what changed.
 
-[Start or continue this journey](https://app.dukarun.com/learn/first-business-cycle)
+> **Interactive journey**
+>
+> <a href="https://app.dukarun.com/learn/first-business-cycle" target="_top">Start or continue the
+> interactive journey in Dukarun</a>. It resumes from your last task.
 
 ## Before you start
 
@@ -46,5 +49,5 @@ and **Reports** views for stock, cash, payables, receivables, revenue, cost of g
 
 [Understand the financial result](../money-and-reporting/understanding-the-financial-result.md).
 
-You can dismiss the interactive journey at any time. Use the link at the top to continue later. You
-can also reopen any interactive guide from its article.
+You can dismiss the interactive journey at any time. Return to this article and use the interactive
+journey link to continue later. You can reopen each interactive guide from its task article.
