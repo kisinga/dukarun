@@ -128,10 +128,24 @@ import { RouterLink } from '@angular/router';
             <p class="mt-1 text-xs text-base-content/55">Base URL</p>
             <code class="mt-1 block break-all text-xs">https://store.dukarun.com/api/v1</code>
             <div class="mt-5 flex flex-col gap-3 border-t border-base-300/60 pt-5">
-              <a href="#quick-start" class="hover:text-primary">Quick start</a>
-              <a href="#endpoints" class="hover:text-primary">Endpoints</a>
-              <a href="#browser-example" class="hover:text-primary">Browser example</a>
-              <a href="#rules" class="hover:text-primary">Contract rules</a>
+              <a
+                routerLink="/developers/storefront"
+                fragment="quick-start"
+                class="hover:text-primary"
+                >Quick start</a
+              >
+              <a routerLink="/developers/storefront" fragment="endpoints" class="hover:text-primary"
+                >Endpoints</a
+              >
+              <a
+                routerLink="/developers/storefront"
+                fragment="browser-example"
+                class="hover:text-primary"
+                >Browser example</a
+              >
+              <a routerLink="/developers/storefront" fragment="rules" class="hover:text-primary"
+                >Contract rules</a
+              >
               <a href="/developers/storefront/reference/" class="font-semibold text-primary">
                 Full reference →
               </a>

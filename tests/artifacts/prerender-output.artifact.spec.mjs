@@ -90,10 +90,10 @@ for (const marker of ['phone camera', '50 × 30 mm', '52 mm and 80 mm', 'system 
 
 const cashUpTool = requireFile(resolve(site, 'tools/daily-shop-cash-up/index.html'));
 for (const marker of [
-  'Close the day with the numbers clear.',
-  'Opening cash float',
-  'Actual M-Pesa receipts',
-  'Want every sale and payment connected before closing time?',
+  'Do today’s money and sales agree?',
+  'Enter today’s recorded sales',
+  'Your result will appear here',
+  'Make this the normal way your shop closes.',
 ]) {
   if (!cashUpTool.includes(marker)) {
     throw new Error(`Prerendered cash-up tool is missing: ${marker}`);

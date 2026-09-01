@@ -24,5 +24,14 @@ describe('StorefrontApiComponent', () => {
     expect(
       links.some(link => link.getAttribute('href') === '/developers/storefront/reference/')
     ).toBe(true);
+    expect(
+      ['quick-start', 'endpoints', 'browser-example', 'rules'].every(fragment =>
+        links.some(
+          link =>
+            link.getAttribute('href') === `/developers/storefront#${fragment}` &&
+            link.textContent?.trim().length
+        )
+      )
+    ).toBe(true);
   });
 });
