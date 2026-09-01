@@ -297,9 +297,13 @@ test('the public site treats GitBook as an acquisition and trust surface', async
     readFile('apps/site/src/app/marketing/marketing-layout.component.ts', 'utf8'),
   ]);
   assert.match(learning, /https:\/\/dukarun\.gitbook\.io\/docs/);
-  assert.match(home, /Open Dukarun Guide/);
-  assert.match(home, /Your first business cycle/);
+  assert.match(home, /\[href\]="guidesUrl"/);
+  assert.match(home, />public guides<\/a>/);
   assert.match(layout, /label: 'Dukarun Guide', href: DUKARUN_GUIDES_URL/);
+  assert.match(
+    layout,
+    /label: 'First business cycle', href: dukarunGuideUrl\('journeys\/first-business-cycle'\)/
+  );
   const primaryLinks = layout.match(
     /protected readonly links: NavLink\[\] = \[([\s\S]*?)\n  \];/
   )?.[1];
