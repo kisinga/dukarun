@@ -1,11 +1,10 @@
 import { Injectable, inject } from '@angular/core';
 import type { Workbook, Worksheet } from 'exceljs';
-import { CatalogCacheService } from '../core/catalog-cache.service';
 import { PartyCacheService } from '../core/party-cache.service';
 import { RecentSalesCacheService } from '../core/recent-sales-cache.service';
 import { createExcelWorkbook } from '../shared/excel-workbook';
 
-export type CachedExportKind = 'inventory' | 'customers' | 'suppliers' | 'recent-sales';
+export type CachedExportKind = 'customers' | 'suppliers' | 'recent-sales';
 
 export interface CachedExportResult {
   filename: string;
@@ -16,54 +15,11 @@ type ExportValue = string | number | boolean | null | undefined;
 
 @Injectable({ providedIn: 'root' })
 export class CachedDataExportService {
-  private readonly catalog = inject(CatalogCacheService);
   private readonly parties = inject(PartyCacheService);
   private readonly recentSales = inject(RecentSalesCacheService);
 
   async export(kind: CachedExportKind): Promise<CachedExportResult> {
     switch (kind) {
-      case 'inventory':
-        await this.requireLoaded(this.catalog.ensureLoaded(), () => this.catalog.loaded());
-        return this.download(
-          'inventory',
-          [
-            'product_id',
-            'variant_id',
-            'product_name',
-            'variant_name',
-            'sku',
-            'barcode',
-            'kind',
-            'retail_price_kes',
-            'wholesale_price_kes',
-            'track_inventory',
-            'quantity',
-            'stock_value_kes',
-            'manufacturer',
-            'product_active',
-            'variant_active',
-          ],
-          this.catalog.catalog().map(row => {
-            const stock = row.variant_id ? this.catalog.stock().get(row.variant_id) : undefined;
-            return [
-              row.product_id,
-              row.variant_id,
-              row.product_name,
-              row.variant_name === 'Default' ? '' : row.variant_name,
-              row.sku,
-              row.barcode,
-              row.kind,
-              row.price,
-              row.wholesale_price,
-              row.track_inventory,
-              stock?.stock ?? row.stock,
-              stock?.stock_value,
-              row.manufacturer_name,
-              row.product_active,
-              row.variant_active,
-            ];
-          })
-        );
       case 'customers':
         await this.requireLoaded(this.parties.ensureLoaded(), () => this.parties.loaded());
         return this.download(

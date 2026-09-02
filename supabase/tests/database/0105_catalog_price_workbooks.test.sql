@@ -1,5 +1,5 @@
 begin;
-select plan(22);
+select plan(30);
 
 select testkit.create_user('91919191-9191-4191-8191-919191919191', 'price-admin@local.test');
 select testkit.create_user('91919191-9191-4191-8191-919191919192', 'price-cashier@local.test');
@@ -207,6 +207,107 @@ select is(
   2::bigint,
   'price updates create one audit record per changed variant'
 );
+
+create temp table unified_product as
+select public.create_catalog_product(
+  'Unified Workbook Product',
+  '[{"name":"Small","sku":"UNIFIED-S","price":50},
+    {"name":"Large","sku":"UNIFIED-L","price":90}]'
+) product_id;
+
+create temp table unified_product_version as
+select id, updated_at from public.products
+where id = (select product_id from unified_product);
+
+create temp table manufacturer_result as
+select public.apply_catalog_workbook_updates(
+  p_product_changes => jsonb_build_array(jsonb_build_object(
+    'product_id', (select id from unified_product_version),
+    'expected_updated_at', (select updated_at from unified_product_version),
+    'new_manufacturer_name', 'Unified Foods'
+  ))
+) result;
+
+select is((select (result ->> 'manufacturer_changes')::integer from manufacturer_result), 1,
+  'unified workbook reports one manufacturer change');
+select is(
+  (select manufacturer.name
+   from public.products product
+   join public.manufacturers manufacturer on manufacturer.id = product.manufacturer_id
+   where product.id = (select product_id from unified_product)),
+  'Unified Foods',
+  'unified workbook links the selected manufacturer'
+);
+
+create temp table unified_versions as
+select variant.id variant_id, variant.updated_at variant_updated_at,
+       product.id product_id, product.updated_at product_updated_at
+from public.product_variants variant
+join public.products product on product.id = variant.product_id
+where product.id = (select product_id from unified_product);
+
+create temp table first_disable_result as
+select public.apply_catalog_workbook_updates(
+  p_disable_changes => jsonb_build_array(jsonb_build_object(
+    'variant_id', (select variant_id from unified_versions
+      where variant_id = (select id from public.product_variants where sku = 'UNIFIED-S')),
+    'expected_updated_at', (select variant_updated_at from unified_versions
+      where variant_id = (select id from public.product_variants where sku = 'UNIFIED-S')),
+    'product_id', (select product_id from unified_versions limit 1),
+    'expected_product_updated_at', (select product_updated_at from unified_versions limit 1),
+    'disable_product', false
+  ))
+) result;
+
+select is((select (result ->> 'disabled_variants')::integer from first_disable_result), 1,
+  'removing one exported row disables one variant');
+select ok((select active from public.products where id = (select product_id from unified_product)),
+  'product remains active while another variant remains');
+
+create temp table second_disable_version as
+select variant.id variant_id, variant.updated_at variant_updated_at,
+       product.id product_id, product.updated_at product_updated_at
+from public.product_variants variant
+join public.products product on product.id = variant.product_id
+where variant.sku = 'UNIFIED-L';
+
+create temp table second_disable_result as
+select public.apply_catalog_workbook_updates(
+  p_disable_changes => jsonb_build_array(jsonb_build_object(
+    'variant_id', (select variant_id from second_disable_version),
+    'expected_updated_at', (select variant_updated_at from second_disable_version),
+    'product_id', (select product_id from second_disable_version),
+    'expected_product_updated_at', (select product_updated_at from second_disable_version),
+    'disable_product', true
+  ))
+) result;
+
+select is((select (result ->> 'disabled_products')::integer from second_disable_result), 1,
+  'removing the final active variant reports a disabled product');
+select isnt((select active from public.products where id = (select product_id from unified_product)),
+  true, 'removing the final active variant disables the product');
+
+create temp table unified_import as
+select (public.begin_catalog_import(
+  'merge', '91919191-9191-4191-8191-919191919199'
+) ->> 'import_id')::uuid import_id;
+
+select public.append_catalog_import_chunk(
+  (select import_id from unified_import), 0,
+  '[{"product_key":"NEW-UNIFIED","name":"Workbook Flour","manufacturer_name":"Millers",
+     "active":true,"variants":[{"sku":"UNIFIED-FLOUR","kind":"good","price":140,
+     "track_inventory":false,"allow_fractional":false,"active":true}]}]'
+);
+
+create temp table unified_create_result as
+select public.apply_catalog_workbook_updates(
+  p_import_id => (select import_id from unified_import)
+) result;
+
+select is((select (result ->> 'created')::integer from unified_create_result), 1,
+  'an appended blank-ID workbook row creates a product');
+select is((select count(*)::integer from public.product_variants where sku = 'UNIFIED-FLOUR'), 1,
+  'the unified workbook creates its new variant');
 
 select testkit.as_user(
   (select company_id from price_other_company),
