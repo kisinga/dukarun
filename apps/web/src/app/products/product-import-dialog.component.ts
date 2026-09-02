@@ -17,8 +17,10 @@ import { formatKes } from '../core/money';
         <div class="modal-box modal-box-task p-0 md:w-full md:max-w-3xl">
           <header class="flex items-start justify-between gap-3 border-b border-base-300 p-4">
             <div>
-              <h2 class="type-title">Import products</h2>
-              <p class="type-caption mt-1">Preview every change before applying it.</p>
+              <h2 class="type-title">Upload edited workbook</h2>
+              <p class="type-caption mt-1">
+                Review updates, new rows, and removed rows before anything is applied.
+              </p>
             </div>
             <button
               appButton
@@ -41,7 +43,7 @@ import { formatKes } from '../core/money';
 
             <div class="rounded-field border border-base-300 p-4">
               <label class="block text-sm font-semibold" for="product-import-file"
-                >Excel workbook</label
+                >Edited products and stock workbook</label
               >
               <input
                 id="product-import-file"
@@ -51,19 +53,11 @@ import { formatKes } from '../core/money';
                 [disabled]="busy()"
                 (change)="chooseFile($event)"
               />
-              <button
-                class="link mt-2 text-xs"
-                type="button"
-                [disabled]="busy()"
-                (click)="downloadTemplate()"
-              >
-                Download new-products template
-              </button>
             </div>
 
             @if (preview(); as data) {
               @if (data.kind === 'price_update') {
-                <div class="grid grid-cols-2 gap-2 sm:grid-cols-6">
+                <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
                   <div class="rounded-field bg-base-200 p-3">
                     <p class="type-caption">Rows</p>
                     <p class="font-semibold">{{ data.rows }}</p>
@@ -81,6 +75,25 @@ import { formatKes } from '../core/money';
                     <p class="font-semibold">{{ data.stockChanges }}</p>
                   </div>
                   <div class="rounded-field bg-base-200 p-3">
+                    <p class="type-caption">Manufacturers</p>
+                    <p class="font-semibold">{{ data.manufacturerChanges }}</p>
+                  </div>
+                  <div class="rounded-field bg-base-200 p-3">
+                    <p class="type-caption">New products</p>
+                    <p class="font-semibold">{{ data.creationPreview?.creates ?? 0 }}</p>
+                  </div>
+                  <div class="rounded-field bg-base-200 p-3">
+                    <p class="type-caption">Will disable</p>
+                    <p class="font-semibold">
+                      {{ data.disabledVariants }}
+                      {{ data.disabledVariants === 1 ? 'variant' : 'variants' }}
+                    </p>
+                    <p class="type-caption">
+                      {{ data.disabledProducts }}
+                      {{ data.disabledProducts === 1 ? 'product' : 'products' }}
+                    </p>
+                  </div>
+                  <div class="rounded-field bg-base-200 p-3">
                     <p class="type-caption">Unchanged</p>
                     <p class="font-semibold">{{ data.unchangedRows }}</p>
                   </div>
@@ -89,6 +102,96 @@ import { formatKes } from '../core/money';
                     <p class="font-semibold">{{ data.errors.length + data.conflicts.length }}</p>
                   </div>
                 </div>
+
+                @if (data.productChanges.length) {
+                  <div class="rounded-field border border-base-300 p-3">
+                    <h3 class="text-sm font-semibold">Product detail changes</h3>
+                    <div class="mt-2 max-h-40 space-y-2 overflow-y-auto text-xs">
+                      @for (change of data.productChanges; track change.productId) {
+                        <div class="border-b border-base-200 pb-2 last:border-0">
+                          <p class="font-medium">{{ change.productName }}</p>
+                          <p>
+                            Manufacturer: {{ change.currentManufacturer || 'Not set' }} →
+                            {{ change.newManufacturer || 'Not set' }}
+                          </p>
+                        </div>
+                      }
+                    </div>
+                  </div>
+                }
+
+                @if (data.disableChanges.length) {
+                  <div class="rounded-field border border-warning/50 bg-warning/5 p-3">
+                    <h3 class="text-sm font-semibold">Will be disabled</h3>
+                    <p class="type-caption mt-1">
+                      These entire table rows were present in the export and removed from the
+                      workbook. No history will be deleted.
+                    </p>
+                    <div class="mt-2 max-h-56 space-y-2 overflow-y-auto lg:hidden">
+                      @for (change of data.disableChanges; track change.variantId) {
+                        <div class="rounded-field border border-warning/30 bg-base-100 p-2 text-xs">
+                          <p class="font-medium">{{ change.productName }}</p>
+                          <p>
+                            {{ change.variantName || 'Default' }} · {{ change.sku || 'No SKU' }}
+                          </p>
+                          <p class="mt-1 text-base-content/70">
+                            {{
+                              change.disableProduct
+                                ? 'Disable variant and product'
+                                : 'Disable variant'
+                            }}
+                          </p>
+                        </div>
+                      }
+                    </div>
+                    <div class="mt-2 hidden max-h-56 overflow-auto lg:block">
+                      <table class="table table-xs">
+                        <thead>
+                          <tr>
+                            <th>Product</th>
+                            <th>Variant</th>
+                            <th>SKU</th>
+                            <th>Effect</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          @for (change of data.disableChanges; track change.variantId) {
+                            <tr>
+                              <td>{{ change.productName }}</td>
+                              <td>{{ change.variantName || 'Default' }}</td>
+                              <td>{{ change.sku || '—' }}</td>
+                              <td>
+                                {{
+                                  change.disableProduct
+                                    ? 'Disable variant and product'
+                                    : 'Disable variant'
+                                }}
+                              </td>
+                            </tr>
+                          }
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                }
+
+                @if (data.creationPreview; as creation) {
+                  <div class="rounded-field border border-base-300 p-3">
+                    <h3 class="text-sm font-semibold">New products</h3>
+                    <div class="mt-2 max-h-40 space-y-2 overflow-y-auto text-xs">
+                      @for (product of creation.products; track product.product_key) {
+                        <p>
+                          <span class="font-medium">{{ product.name }}</span>
+                          · {{ product.variants.length }}
+                          {{ product.variants.length === 1 ? 'variant' : 'variants' }}
+                          @if (product.manufacturer_name) {
+                            · {{ product.manufacturer_name }}
+                          }
+                        </p>
+                      }
+                    </div>
+                  </div>
+                }
 
                 @if (data.changes.length) {
                   <div class="rounded-field border border-base-300 p-3">
@@ -182,7 +285,7 @@ import { formatKes } from '../core/money';
               [disabled]="!canImport()"
               (click)="apply()"
             >
-              {{ preview()?.kind === 'price_update' ? 'Apply product changes' : 'Create products' }}
+              {{ preview()?.kind === 'price_update' ? 'Apply workbook' : 'Create products' }}
             </button>
           </footer>
         </div>
@@ -217,22 +320,15 @@ export class ProductImportDialogComponent {
     }
   }
 
-  protected async downloadTemplate(): Promise<void> {
-    this.busy.set(true);
-    try {
-      await this.transfer.downloadTemplate();
-    } catch (error) {
-      this.error.set(error instanceof Error ? error.message : 'Could not create template');
-    } finally {
-      this.busy.set(false);
-    }
-  }
-
   protected canImport(): boolean {
     const preview = this.preview();
     if (!preview || preview.errors.length || this.busy()) return false;
     return preview.kind === 'price_update'
-      ? preview.conflicts.length === 0 && preview.changes.length > 0
+      ? preview.conflicts.length === 0 &&
+          (preview.changes.length > 0 ||
+            preview.productChanges.length > 0 ||
+            preview.disableChanges.length > 0 ||
+            !!preview.creationPreview?.products.length)
       : preview.products.length > 0;
   }
 

@@ -6,6 +6,7 @@ const userId = '85000000-0000-4000-8000-000000000002';
 const locationId = '85000000-0000-4000-8000-000000000003';
 const productId = '85000000-0000-4000-8000-000000000004';
 const variantId = '85000000-0000-4000-8000-000000000005';
+const manufacturerId = '85000000-0000-4000-8000-000000000006';
 const updatedAt = '2026-08-19T08:00:00.000Z';
 
 function authSession() {
@@ -41,10 +42,12 @@ function authSession() {
 async function mockPriceWorkbookFlow(page: Page) {
   const session = authSession();
   let appliedChanges: unknown = null;
+  let appliedProductChanges: unknown = null;
   let catalogRefreshes = 0;
   let lastCatalogPriceServed = 100;
   let catalogStock = 10;
   let lastCatalogStockServed = 10;
+  let manufacturerName = 'Acme';
   await page.addInitScript(
     value => {
       localStorage.setItem('sb-127-auth-token', JSON.stringify(value.session));
@@ -153,24 +156,49 @@ async function mockPriceWorkbookFlow(page: Page) {
         { id: locationId, code: 'MAIN', name: 'Main shop', is_default: true, is_primary: true },
       ]);
     }
-    if (path.endsWith('/rest/v1/rpc/apply_catalog_price_updates')) {
-      const changes = request.postDataJSON().p_changes as Array<{
+    if (path.endsWith('/rest/v1/rpc/apply_catalog_workbook_updates')) {
+      const payload = request.postDataJSON();
+      const changes = payload.p_variant_changes as Array<{
         new_retail_price?: number;
         new_stock_quantity?: number;
       }>;
       appliedChanges = changes;
+      appliedProductChanges = payload.p_product_changes;
       if (changes[0]?.new_retail_price !== undefined) {
         variant.price = changes[0].new_retail_price;
       }
       if (changes[0]?.new_stock_quantity !== undefined) {
         catalogStock = changes[0].new_stock_quantity;
       }
+      if (payload.p_product_changes?.[0]?.new_manufacturer_name) {
+        manufacturerName = payload.p_product_changes[0].new_manufacturer_name;
+      }
       return json({
         updated_variants: 1,
         retail_changes: 1,
         wholesale_changes: 0,
         stock_changes: 1,
+        manufacturer_changes: 1,
+        created: 0,
+        disabled_variants: 0,
+        disabled_products: 0,
       });
+    }
+    if (path.endsWith('/rest/v1/rpc/catalog_cache_families')) {
+      return json([
+        {
+          id: productId,
+          company_id: companyId,
+          name: 'Tea',
+          barcode: null,
+          active: true,
+          manufacturer_id: manufacturerId,
+          tax_category_id: null,
+          image_path: null,
+          created_at: updatedAt,
+          updated_at: updatedAt,
+        },
+      ]);
     }
     if (path.endsWith('/rest/v1/rpc/catalog_cache_page')) {
       catalogRefreshes++;
@@ -195,8 +223,8 @@ async function mockPriceWorkbookFlow(page: Page) {
           product_active: true,
           image_path: null,
           stock: catalogStock,
-          manufacturer_id: null,
-          manufacturer_name: null,
+          manufacturer_id: manufacturerId,
+          manufacturer_name: manufacturerName,
         },
       ]);
     }
@@ -207,6 +235,24 @@ async function mockPriceWorkbookFlow(page: Page) {
       return request.headers()['accept']?.includes('application/vnd.pgrst.object')
         ? json(company)
         : json([company]);
+    }
+    if (path.endsWith('/rest/v1/products')) {
+      return json([
+        {
+          id: productId,
+          company_id: companyId,
+          name: 'Tea',
+          barcode: null,
+          active: true,
+          manufacturer_id: manufacturerId,
+          tax_category_id: null,
+          created_at: updatedAt,
+          updated_at: updatedAt,
+        },
+      ]);
+    }
+    if (path.endsWith('/rest/v1/manufacturers')) {
+      return json([{ id: manufacturerId, name: manufacturerName }]);
     }
     if (path.endsWith('/rest/v1/product_variants')) return json([variant]);
     if (path.endsWith('/rest/v1/stock_locations')) {
@@ -226,6 +272,7 @@ async function mockPriceWorkbookFlow(page: Page) {
 
   return {
     appliedChanges: () => appliedChanges,
+    appliedProductChanges: () => appliedProductChanges,
     catalogRefreshes: () => catalogRefreshes,
     lastCatalogPriceServed: () => lastCatalogPriceServed,
     lastCatalogStockServed: () => lastCatalogStockServed,
@@ -238,9 +285,9 @@ test('Settings exports, previews, and applies a price workbook', async ({ page }
   await expect(page.getByRole('heading', { name: 'Data import & export' })).toBeVisible();
 
   const downloadPromise = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Export updates' }).click();
+  await page.getByRole('button', { name: 'Download editable workbook' }).click();
   const download = await downloadPromise;
-  expect(download.suggestedFilename()).toMatch(/^dukarun-product-update-.*\.xlsx$/);
+  expect(download.suggestedFilename()).toMatch(/^dukarun-products-and-stock-MAIN-.*\.xlsx$/);
   const stream = await download.createReadStream();
   expect(stream).not.toBeNull();
   const chunks: Buffer[] = [];
@@ -249,22 +296,32 @@ test('Settings exports, previews, and applies a price workbook', async ({ page }
   const workbook = new Workbook();
   await workbook.xlsx.load(Buffer.concat(chunks));
   expect(workbook.getWorksheet('_DukaRun Metadata')!.getCell('B2').value).toBe('price_update');
-  workbook.getWorksheet('Product Updates')!.getCell('I2').value = 125;
-  workbook.getWorksheet('Product Updates')!.getCell('Q2').value = 7;
+  const sheet = workbook.getWorksheet('Products & Stock')!;
+  const headerColumn = (name: string) => {
+    let column = 0;
+    sheet.getRow(1).eachCell((cell, index) => {
+      if (cell.text === name) column = index;
+    });
+    return column;
+  };
+  sheet.getCell(2, headerColumn('new_manufacturer')).value = 'New Dairy';
+  sheet.getCell(2, headerColumn('new_retail_price_kes')).value = 125;
+  sheet.getCell(2, headerColumn('new_stock_quantity')).value = 7;
   const edited = Buffer.from(await workbook.xlsx.writeBuffer());
 
-  await page.getByRole('button', { name: 'Import workbook' }).click();
+  await page.getByRole('button', { name: 'Upload edited workbook' }).click();
   await page.locator('#product-import-file').setInputFiles({
     name: 'edited-prices.xlsx',
     mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     buffer: edited,
   });
   await expect(page.getByText('Retail: KES 100 → KES 125')).toBeVisible();
+  await expect(page.getByText('Manufacturer: Acme → New Dairy')).toBeVisible();
   const refreshesBeforeApply = state.catalogRefreshes();
-  await page.getByRole('button', { name: 'Apply product changes' }).click();
+  await page.getByRole('button', { name: 'Apply workbook' }).click();
 
   await expect(page.getByRole('status')).toContainText(
-    'Update complete: 1 variants · 1 retail · 0 wholesale · 1 stock.'
+    'Workbook applied: 0 products created · 0 variants disabled · 0 products disabled · 1 manufacturers · 1 retail · 0 wholesale · 1 stock.'
   );
   expect(state.appliedChanges()).toEqual([
     {
@@ -274,6 +331,13 @@ test('Settings exports, previews, and applies a price workbook', async ({ page }
       stock_location_id: locationId,
       expected_stock_quantity: 10,
       new_stock_quantity: 7,
+    },
+  ]);
+  expect(state.appliedProductChanges()).toEqual([
+    {
+      product_id: productId,
+      expected_updated_at: updatedAt,
+      new_manufacturer_name: 'New Dairy',
     },
   ]);
   await expect.poll(state.catalogRefreshes).toBeGreaterThan(refreshesBeforeApply);

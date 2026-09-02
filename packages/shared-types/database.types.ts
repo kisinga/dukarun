@@ -12892,6 +12892,15 @@ export type Database = {
         Returns: string
       }
       apply_catalog_price_updates: { Args: { p_changes: Json }; Returns: Json }
+      apply_catalog_workbook_updates: {
+        Args: {
+          p_disable_changes?: Json
+          p_import_id?: string
+          p_product_changes?: Json
+          p_variant_changes?: Json
+        }
+        Returns: Json
+      }
       apply_checkout_customer_address_core: {
         Args: { p_company_id: string; p_customer: Json; p_customer_id: string }
         Returns: undefined

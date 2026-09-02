@@ -55,7 +55,7 @@ import { CachedDataExportService, type CachedExportKind } from './cached-data-ex
                   <app-icon name="heroArchiveBox" />
                 </span>
                 <div class="min-w-0 flex-1">
-                  <h3 class="font-semibold">Product catalog</h3>
+                  <h3 class="font-semibold">Update products &amp; stock</h3>
                   <p class="type-caption mt-1">
                     {{ catalogCache.families().length }} products ·
                     {{ catalogCache.catalog().length }} variants
@@ -66,9 +66,15 @@ import { CachedDataExportService, type CachedExportKind } from './cached-data-ex
                     }
                   </p>
                   <p class="mt-2 text-xs text-base-content/60">
-                    Export prices and stock for the current location, edit the yellow columns in
-                    Excel, then preview and apply. New products use a separate template.
+                    Edit yellow cells, add rows for new products, or delete entire table rows to
+                    disable them. Upload the same workbook to preview every change before applying
+                    it.
                   </p>
+                  <ol class="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-xs font-medium">
+                    <li>1. Download</li>
+                    <li>2. Edit, add, or remove rows</li>
+                    <li>3. Upload &amp; preview</li>
+                  </ol>
                 </div>
               </div>
               <div class="mt-4 flex flex-wrap gap-2">
@@ -81,7 +87,7 @@ import { CachedDataExportService, type CachedExportKind } from './cached-data-ex
                   [disabled]="dataExportBusy() !== null"
                   (click)="exportCatalog()"
                 >
-                  <app-icon name="heroArrowDownTray" /> Export updates
+                  <app-icon name="heroArrowDownTray" /> Download editable workbook
                 </button>
                 <button
                   appButton
@@ -91,42 +97,9 @@ import { CachedDataExportService, type CachedExportKind } from './cached-data-ex
                   [disabled]="dataExportBusy() !== null"
                   (click)="importOpen.set(true)"
                 >
-                  <app-icon name="heroArrowUpTray" /> Import workbook
+                  <app-icon name="heroArrowUpTray" /> Upload edited workbook
                 </button>
               </div>
-            </section>
-
-            <section class="rounded-box border border-base-300 p-4">
-              <div class="flex items-start gap-3">
-                <span
-                  class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary"
-                >
-                  <app-icon name="heroCube" />
-                </span>
-                <div class="min-w-0 flex-1">
-                  <h3 class="font-semibold">Inventory snapshot</h3>
-                  <p class="type-caption mt-1">
-                    {{ catalogCache.catalog().length }} variants · current location
-                  </p>
-                  <p class="mt-2 text-xs text-base-content/60">
-                    Excel with cached quantities, values, prices, SKUs and barcodes. This file is
-                    view-only; use the product update workbook or stock adjustments to change
-                    quantities.
-                  </p>
-                </div>
-              </div>
-              <button
-                appButton
-                variant="outline"
-                size="sm"
-                class="mt-4"
-                type="button"
-                [loading]="dataExportBusy() === 'inventory'"
-                [disabled]="dataExportBusy() !== null"
-                (click)="exportCached('inventory')"
-              >
-                <app-icon name="heroArrowDownTray" /> Export Excel
-              </button>
             </section>
           }
 
@@ -253,7 +226,7 @@ export class SettingsDataTransferComponent {
     this.dataMessage.set(null);
     try {
       await this.productTransfer.exportCatalog();
-      this.dataMessage.set({ ok: true, text: 'Product update workbook downloaded.' });
+      this.dataMessage.set({ ok: true, text: 'Editable products and stock workbook downloaded.' });
     } catch (err) {
       this.dataMessage.set({
         ok: false,
@@ -288,7 +261,7 @@ export class SettingsDataTransferComponent {
       ok: true,
       text:
         result.kind === 'price_update'
-          ? `Update complete: ${result.updated_variants} variants · ${result.retail_changes} retail · ${result.wholesale_changes} wholesale · ${result.stock_changes} stock.`
+          ? `Workbook applied: ${result.created} products created · ${result.disabled_variants} variants disabled · ${result.disabled_products} products disabled · ${result.manufacturer_changes} manufacturers · ${result.retail_changes} retail · ${result.wholesale_changes} wholesale · ${result.stock_changes} stock.`
           : `Import complete: ${result.created ?? 0} products created.`,
     });
     await this.catalogCache.refresh();
