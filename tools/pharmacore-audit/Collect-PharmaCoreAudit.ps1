@@ -7,7 +7,7 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$SiteName,
 
-    [ValidateRange(1, 180)]
+    [ValidateRange(1, 1440)]
     [int]$DurationMinutes = 20,
 
     [ValidateRange(2, 60)]
@@ -360,6 +360,21 @@ $counterPaths = @(
     '\Network Interface(*)\Packets Outbound Errors'
 )
 
+$availableCounterPaths = @()
+foreach ($counterPath in $counterPaths) {
+    try {
+        Get-Counter -Counter $counterPath -MaxSamples 1 -ErrorAction Stop | Out-Null
+        $availableCounterPaths += $counterPath
+    }
+    catch {
+        "Counter unavailable: $counterPath" | Add-Content -Path $ErrorLog -Encoding UTF8
+    }
+}
+
+if ($availableCounterPaths.Count -eq 0) {
+    throw 'No requested Windows performance counters are available on this computer.'
+}
+
 $sampleCount = [Math]::Max(1, [Math]::Floor(($DurationMinutes * 60) / $SampleIntervalSeconds))
 $performanceSamples = New-Object System.Collections.Generic.List[object]
 $performanceStart = Get-Date
@@ -368,7 +383,7 @@ $processSnapshotBefore = @(Get-Process -ErrorAction SilentlyContinue |
 $processSnapshotBefore | Export-Csv -Path (Join-Path $RunPath 'processes-before.csv') -NoTypeInformation -Encoding UTF8
 
 try {
-    Get-Counter -Counter $counterPaths -SampleInterval $SampleIntervalSeconds -MaxSamples $sampleCount -ErrorAction Continue |
+    Get-Counter -Counter $availableCounterPaths -SampleInterval $SampleIntervalSeconds -MaxSamples $sampleCount -ErrorAction SilentlyContinue |
         ForEach-Object {
             foreach ($sample in $_.CounterSamples) {
                 $row = [PSCustomObject]@{
