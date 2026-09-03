@@ -70,6 +70,17 @@ import { CachedDataExportService, type CachedExportKind } from './cached-data-ex
                     disable them. Upload the same workbook to preview every change before applying
                     it.
                   </p>
+                  @if (perms.has('ManageStockAdjustments') && perms.has('ViewFinancials')) {
+                    <p class="mt-2 text-xs text-base-content/60">
+                      The linked Batches sheet contains only batches with stock remaining. Latest
+                      batch details are editable from the main sheet.
+                    </p>
+                  } @else {
+                    <p class="mt-2 text-xs text-base-content/60">
+                      Batch details are omitted unless your role includes stock-adjustment and
+                      financial access.
+                    </p>
+                  }
                   <ol class="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-xs font-medium">
                     <li>1. Download</li>
                     <li>2. Edit, add, or remove rows</li>
@@ -259,10 +270,7 @@ export class SettingsDataTransferComponent {
   protected async productImportCompleted(result: ProductWorkbookResult): Promise<void> {
     this.dataMessage.set({
       ok: true,
-      text:
-        result.kind === 'price_update'
-          ? `Workbook applied: ${result.created} products created · ${result.disabled_variants} variants disabled · ${result.disabled_products} products disabled · ${result.manufacturer_changes} manufacturers · ${result.retail_changes} retail · ${result.wholesale_changes} wholesale · ${result.stock_changes} stock.`
-          : `Import complete: ${result.created ?? 0} products created.`,
+      text: `Workbook applied: ${result.created} products created · ${result.disabled_variants} variants disabled · ${result.disabled_products} products disabled · ${result.manufacturer_changes} manufacturers · ${result.retail_changes} retail · ${result.wholesale_changes} wholesale · ${result.stock_changes} stock · ${result.batches_created} batches created · ${result.batches_updated} batches updated.`,
     });
     await this.catalogCache.refresh();
   }

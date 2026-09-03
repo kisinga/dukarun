@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import type { Cell, Workbook, Worksheet } from 'exceljs';
 import { CatalogCacheService } from '../core/catalog-cache.service';
 import { LocationContextService } from '../core/location-context.service';
+import { PermissionsService } from '../core/permissions.service';
 import { createExcelWorkbook } from '../shared/excel-workbook';
 import { SupabaseService } from '../core/supabase.service';
 
@@ -55,7 +56,6 @@ export interface CatalogPriceChange {
   expectedStockQuantity?: number;
   currentStockQuantity?: number;
   newStockQuantity?: number;
-  stockUnitCost?: number;
   stockLocationId?: string;
   stockLocationName?: string;
 }
@@ -79,8 +79,31 @@ export interface CatalogDisableChange {
   disableProduct: boolean;
 }
 
+export interface CatalogBatchChange {
+  action: 'update' | 'create';
+  batchId: string | null;
+  variantId: string;
+  stockLocationId: string;
+  productName: string;
+  variantName: string;
+  sku: string;
+  batchLabel: string;
+  latest: boolean;
+  expectedRemaining: number;
+  currentUnitCost: number;
+  expectedRemainingCost: number;
+  currentBatchNumber: string | null;
+  currentExpiryDate: string | null;
+  newUnitCost: number;
+  newBatchNumber: string | null;
+  newExpiryDate: string | null;
+  newRemainingCost: number;
+  valueDifference: number;
+  quantityAdded: number;
+}
+
 export interface CatalogPriceUpdatePreview {
-  kind: 'price_update';
+  kind: 'catalog_workbook';
   fileName: string;
   rows: number;
   unchangedRows: number;
@@ -94,11 +117,12 @@ export interface CatalogPriceUpdatePreview {
   disableChanges: CatalogDisableChange[];
   disabledVariants: number;
   disabledProducts: number;
+  batchChanges: CatalogBatchChange[];
   errors: string[];
   conflicts: string[];
 }
 
-export type ProductWorkbookPreview = CatalogImportPreview | CatalogPriceUpdatePreview;
+export type ProductWorkbookPreview = CatalogPriceUpdatePreview;
 
 export interface CatalogImportResult {
   kind: 'product_create';
@@ -110,7 +134,7 @@ export interface CatalogImportResult {
 }
 
 export interface CatalogPriceUpdateResult {
-  kind: 'price_update';
+  kind: 'catalog_workbook';
   updated_variants: number;
   retail_changes: number;
   wholesale_changes: number;
@@ -119,9 +143,12 @@ export interface CatalogPriceUpdateResult {
   created: number;
   disabled_variants: number;
   disabled_products: number;
+  batch_changes: number;
+  batches_created: number;
+  batches_updated: number;
 }
 
-export type ProductWorkbookResult = CatalogImportResult | CatalogPriceUpdateResult;
+export type ProductWorkbookResult = CatalogPriceUpdateResult;
 
 const HEADERS = [
   'product_key',
@@ -148,36 +175,20 @@ const HEADERS = [
   'tax_category_code',
 ] as const;
 
-const LEGACY_PRICE_UPDATE_HEADERS = [
-  'variant_id',
-  'variant_updated_at',
-  'product_name',
-  'variant_name',
-  'sku',
-  'product_active',
-  'variant_active',
-  'current_retail_price_kes',
-  'new_retail_price_kes',
-  'current_wholesale_price_kes',
-  'new_wholesale_price_kes',
-  'expected_stock_quantity',
-  'stock_location',
-  'track_inventory',
-  'allow_fractional_stock',
-  'current_stock_quantity',
-  'new_stock_quantity',
-  'stock_increase_unit_cost_kes',
-] as const;
-
 const PRICE_UPDATE_HEADERS = [
   'variant_id',
   'variant_updated_at',
   'product_id',
   'product_updated_at',
+  'latest_batch_id',
+  'expected_latest_batch_remaining_quantity',
+  'expected_latest_batch_unit_cost_kes',
+  'expected_latest_batch_remaining_value_kes',
+  'expected_latest_batch_number',
+  'expected_latest_expiry_date',
   'product_key',
   'product_name',
-  'current_manufacturer',
-  'new_manufacturer',
+  'manufacturer',
   'product_barcode',
   'variant_name',
   'sku',
@@ -196,14 +207,39 @@ const PRICE_UPDATE_HEADERS = [
   'current_stock_quantity',
   'new_stock_quantity',
   'stock_value_kes',
-  'stock_increase_unit_cost_kes',
-  'batch_number',
-  'expiry_date',
+  'latest_batch',
+  'latest_batch_number',
+  'latest_buying_price_kes',
+  'latest_expiry_date',
   'tax_category_code',
+] as const;
+
+const BATCH_HEADERS = [
+  'batch_id',
+  'variant_id',
+  'stock_location_id',
+  'latest',
+  'main_sheet_row',
+  'expected_remaining_quantity',
+  'expected_current_unit_cost_kes',
+  'expected_remaining_value_kes',
+  'expected_batch_number',
+  'expected_expiry_date',
+  'product_name',
+  'manufacturer',
+  'variant_name',
+  'sku',
+  'batch',
+  'received_date',
+  'remaining_quantity',
+  'batch_number',
+  'buying_price_kes',
+  'expiry_date',
 ] as const;
 
 type Header = (typeof HEADERS)[number];
 type PriceUpdateHeader = (typeof PRICE_UPDATE_HEADERS)[number];
+type BatchHeader = (typeof BATCH_HEADERS)[number];
 type RowValues = Record<Header, unknown>;
 type ProductRow = {
   id: string;
@@ -215,7 +251,21 @@ type ProductRow = {
   created_at: string;
   updated_at: string;
 };
-type ManufacturerRow = { id: string; name: string };
+type ManufacturerRow = { id: string; name: string; active: boolean };
+type InventoryBatchRow = {
+  id: string;
+  variant_id: string;
+  stock_location_id: string;
+  batch_number: string | null;
+  purchased_at: string;
+  created_at: string;
+  quantity: number;
+  remaining: number;
+  unit_cost: number;
+  original_cost: number;
+  remaining_cost: number;
+  expiry_date: string | null;
+};
 type VariantRow = {
   id: string;
   product_id: string;
@@ -259,6 +309,20 @@ type PriceExportRow = {
   track_inventory: boolean;
   allow_fractional: boolean;
   stock_location: string;
+  latest_batch_id: string | null;
+  latest_batch_label: string | null;
+  latest_batch_unit_cost: number | null;
+  latest_batch_number: string | null;
+  latest_batch_expiry_date: string | null;
+};
+
+type BatchExportRow = InventoryBatchRow & {
+  product_name: string;
+  manufacturer_name: string | null;
+  variant_name: string;
+  sku: string;
+  label: string;
+  latest: boolean;
 };
 
 @Injectable({ providedIn: 'root' })
@@ -266,6 +330,7 @@ export class ProductTransferService {
   private readonly supabase = inject(SupabaseService);
   private readonly catalogCache = inject(CatalogCacheService);
   private readonly locations = inject(LocationContextService);
+  private readonly permissions = inject(PermissionsService);
 
   async exportCatalog(): Promise<void> {
     await this.catalogCache.ensureLoaded();
@@ -293,6 +358,38 @@ export class ProductTransferService {
     const productBarcodes = new Map(
       this.catalogCache.families().map(product => [product.id, product.barcode])
     );
+    const exportedVariants = new Set(variants.map(variant => variant.variant_id!));
+    const variantDetails = new Map(
+      variants.map(variant => [
+        variant.variant_id!,
+        {
+          productName: variant.product_name ?? 'Product',
+          manufacturerName: variant.manufacturer_name ?? null,
+          variantName: variant.variant_name ?? '',
+          sku: variant.sku ?? '',
+        },
+      ])
+    );
+    const canCorrectBatchCosts =
+      this.permissions.has('ManageStockAdjustments') && this.permissions.has('ViewFinancials');
+    const openBatches = (canCorrectBatchCosts ? await this.allOpenBatches(location.id) : [])
+      .filter(batch => exportedVariants.has(batch.variant_id))
+      .sort((left, right) => this.compareBatchesNewestFirst(left, right));
+    const latestBatchByVariant = new Map<string, InventoryBatchRow>();
+    const batchRows: BatchExportRow[] = openBatches.map(batch => {
+      const latest = !latestBatchByVariant.has(batch.variant_id);
+      if (latest) latestBatchByVariant.set(batch.variant_id, batch);
+      const details = variantDetails.get(batch.variant_id)!;
+      return {
+        ...batch,
+        product_name: details.productName,
+        manufacturer_name: details.manufacturerName,
+        variant_name: details.variantName,
+        sku: details.sku,
+        label: this.batchLabel(batch),
+        latest,
+      };
+    });
     const rows: PriceExportRow[] = variants.map(variant => ({
       variant_id: variant.variant_id!,
       variant_updated_at: variant.variant_updated_at!,
@@ -321,13 +418,21 @@ export class ProductTransferService {
       track_inventory: variant.track_inventory ?? false,
       allow_fractional: variant.allow_fractional ?? false,
       stock_location: `${location.code} — ${location.name}`,
+      latest_batch_id: latestBatchByVariant.get(variant.variant_id!)?.id ?? null,
+      latest_batch_label: latestBatchByVariant.has(variant.variant_id!)
+        ? this.batchLabel(latestBatchByVariant.get(variant.variant_id!)!)
+        : null,
+      latest_batch_unit_cost: latestBatchByVariant.get(variant.variant_id!)?.unit_cost ?? null,
+      latest_batch_number: latestBatchByVariant.get(variant.variant_id!)?.batch_number ?? null,
+      latest_batch_expiry_date: latestBatchByVariant.get(variant.variant_id!)?.expiry_date ?? null,
     }));
     const exportedAt = this.catalogCache.fetchedAt() ?? new Date().toISOString();
     const workbook = await this.priceUpdateWorkbook(
       rows,
       exportedAt,
       location.id,
-      this.catalogCache.manufacturers().map(item => item.name)
+      this.catalogCache.manufacturers().map(item => item.name),
+      batchRows
     );
     await this.download(
       workbook,
@@ -335,62 +440,13 @@ export class ProductTransferService {
     );
   }
 
-  async downloadTemplate(): Promise<void> {
-    const [locations, manufacturers] = await Promise.all([
-      this.allLocations(),
-      this.allManufacturers(),
-    ]);
-    const workbook = await this.baseWorkbook(
-      locations.map(item => item.code),
-      manufacturers.map(item => item.name)
-    );
-    const sheet = workbook.getWorksheet('Products')!;
-    sheet.addRow([
-      'NEW-001',
-      '',
-      '',
-      'Sample product',
-      '',
-      '',
-      true,
-      '',
-      'SAMPLE-001',
-      '',
-      'good',
-      100,
-      '',
-      true,
-      false,
-      true,
-      10,
-      60,
-      locations[0]?.code ?? 'MAIN',
-      '',
-      '',
-      '',
-    ]);
-    this.addMetadata(workbook, {
-      formatVersion: '2',
-      workbookKind: 'product_create',
-      exportedAt: new Date().toISOString(),
-    });
-    this.finishProductsSheet(sheet);
-    await this.download(workbook, 'dukarun-new-products-template.xlsx');
-  }
-
   async preview(file: File): Promise<ProductWorkbookPreview> {
     if (file.size > MAX_FILE_BYTES) throw new Error('Workbook must be 10 MB or smaller.');
     const workbook = await createExcelWorkbook();
     await workbook.xlsx.load(await file.arrayBuffer());
     const metadata = this.readMetadata(workbook);
-    if (
-      metadata['workbook_kind'] === 'price_update' &&
-      ['2', '3'].includes(metadata['format_version'] ?? '')
-    ) {
+    if (metadata['workbook_kind'] === 'catalog_workbook' && metadata['format_version'] === '5') {
       return this.previewPriceUpdate(workbook, file.name, metadata);
-    }
-    if (metadata['workbook_kind'] === 'product_create' && metadata['format_version'] === '2') {
-      return this.previewProductCreate(workbook, file.name);
     }
     if (metadata['workbook_kind'] === 'inventory_report') {
       throw new Error(
@@ -504,8 +560,8 @@ export class ProductTransferService {
         if (openingQuantity > 0 && !allowFractional && !Number.isInteger(openingQuantity)) {
           throw new Error('fractional opening quantity not allowed');
         }
-        if (openingQuantity > 0 && openingUnitCost === null) {
-          throw new Error('opening unit cost required');
+        if (openingQuantity > 0 && (!openingUnitCost || openingUnitCost <= 0)) {
+          throw new Error('opening unit cost must be greater than zero');
         }
 
         group.product.variants.push({
@@ -578,27 +634,44 @@ export class ProductTransferService {
     if (!activeLocation || metadata['stock_location_id'] !== activeLocation.id) {
       throw new Error('Switch to the stock location used by this workbook before importing it.');
     }
-    const sheet =
-      workbook.getWorksheet('Products & Stock') ?? workbook.getWorksheet('Product Updates');
+    const sheet = workbook.getWorksheet('Products & Stock');
     if (!sheet) throw new Error('Workbook needs a Products & Stock sheet.');
     if (sheet.actualRowCount - 1 > MAX_ROWS + STARTER_CREATION_ROWS) {
       throw new Error(`Maximum ${MAX_ROWS} rows per import.`);
     }
 
     const headers = this.priceHeaderMap(sheet);
-    const [currentProducts, currentVariants, manufacturers] = await Promise.all([
-      this.allProducts(),
-      this.allVariants(),
-      this.allManufacturers(),
-    ]);
+    const canEditBatches =
+      this.permissions.has('ManageStockAdjustments') && this.permissions.has('ViewFinancials');
+    const [currentProducts, currentVariants, manufacturers, currentOpenBatches] = await Promise.all(
+      [
+        this.allProducts(),
+        this.allVariants(),
+        this.allManufacturers(),
+        canEditBatches ? this.allOpenBatches(activeLocation.id) : Promise.resolve([]),
+      ]
+    );
     const currentProductsById = new Map(currentProducts.map(product => [product.id, product]));
     const currentById = new Map(currentVariants.map(variant => [variant.id, variant]));
     const manufacturerNamesById = new Map(manufacturers.map(item => [item.id, item.name]));
+    const allowedManufacturerNames = new Set(
+      manufacturers.filter(item => item.active).map(item => this.normalizedManufacturer(item.name))
+    );
     const cachedById = new Map(
       this.cachedPriceVariants().map(variant => [variant.variant_id!, variant])
     );
+    const currentBatchesById = new Map(currentOpenBatches.map(batch => [batch.id, batch]));
+    const latestBatchByVariant = new Map<string, InventoryBatchRow>();
+    [...currentOpenBatches]
+      .sort((left, right) => this.compareBatchesNewestFirst(left, right))
+      .forEach(batch => {
+        if (!latestBatchByVariant.has(batch.variant_id)) {
+          latestBatchByVariant.set(batch.variant_id, batch);
+        }
+      });
     const seen = new Set<string>();
     const changes: CatalogPriceChange[] = [];
+    const mainBatchChanges: CatalogBatchChange[] = [];
     const requestedManufacturerChanges: Array<CatalogManufacturerChange & { rowNumber: number }> =
       [];
     const productChanges: CatalogManufacturerChange[] = [];
@@ -637,13 +710,28 @@ export class ProductTransferService {
             const column = headers.get(header);
             return column ? this.rawCell(row.getCell(column)) : null;
           };
-          const newManufacturer = this.text(value('new_manufacturer'));
+          const manufacturerValue = value('manufacturer');
+          const newManufacturer = this.blank(manufacturerValue)
+            ? null
+            : this.manufacturerUpdateValue(manufacturerValue);
+          this.assertListedManufacturer(newManufacturer, allowedManufacturerNames);
+          const openingQuantityValue = value('new_stock_quantity');
+          const openingQuantity = this.blank(openingQuantityValue)
+            ? 0
+            : this.optionalNumber(openingQuantityValue, 'new_stock_quantity');
+          const hasPendingBatchDetails =
+            !this.blank(value('latest_batch_number')) ||
+            !this.blank(value('latest_buying_price_kes')) ||
+            !this.blank(value('latest_expiry_date'));
+          if (hasPendingBatchDetails && openingQuantity <= 0) {
+            throw new Error('latest batch details require a positive new_stock_quantity');
+          }
           creationSheet.addRow([
             value('product_key'),
             value('product_id'),
             value('variant_id'),
             value('product_name'),
-            newManufacturer.toUpperCase() === 'CLEAR' ? '' : newManufacturer,
+            newManufacturer ?? '',
             value('product_barcode'),
             value('product_active'),
             value('variant_name'),
@@ -655,11 +743,11 @@ export class ProductTransferService {
             value('track_inventory'),
             value('allow_fractional_stock'),
             value('variant_active'),
-            value('new_stock_quantity'),
-            value('stock_increase_unit_cost_kes'),
+            openingQuantityValue,
+            value('latest_buying_price_kes'),
             activeLocation.code,
-            value('batch_number'),
-            value('expiry_date'),
+            value('latest_batch_number'),
+            value('latest_expiry_date'),
             value('tax_category_code'),
           ]);
           creationSourceRows.push(rowNumber);
@@ -679,26 +767,16 @@ export class ProductTransferService {
         const retailCell = this.rawCell(cell('new_retail_price_kes'));
         const wholesaleCell = this.rawCell(cell('new_wholesale_price_kes'));
         const stockCell = this.rawCell(cell('new_stock_quantity'));
-        const stockUnitCostCell = this.rawCell(cell('stock_increase_unit_cost_kes'));
-        const manufacturerColumn = headers.get('new_manufacturer');
-        const manufacturerCell = manufacturerColumn
-          ? this.rawCell(row.getCell(manufacturerColumn))
-          : null;
+        const manufacturerCell = this.rawCell(cell('manufacturer'));
         const retailSupplied = !this.blank(retailCell);
         const wholesaleSupplied = !this.blank(wholesaleCell);
         const stockSupplied = !this.blank(stockCell);
-        const stockUnitCostSupplied = !this.blank(stockUnitCostCell);
-        const manufacturerSupplied = !this.blank(manufacturerCell);
-        if (stockUnitCostSupplied && !stockSupplied) {
-          throw new Error('stock unit cost requires a new stock quantity');
-        }
-        if (!retailSupplied && !wholesaleSupplied && !stockSupplied && !manufacturerSupplied) {
-          unchangedRows++;
-          return;
-        }
 
         let manufacturerChanged = false;
-        if (manufacturerSupplied) {
+        {
+          if (this.blank(manufacturerCell)) {
+            throw new Error('manufacturer must use the dropdown; choose CLEAR to remove it');
+          }
           const productIdColumn = headers.get('product_id');
           const productUpdatedAtColumn = headers.get('product_updated_at');
           if (!productIdColumn || !productUpdatedAtColumn) {
@@ -728,6 +806,7 @@ export class ProductTransferService {
             this.normalizedManufacturer(newManufacturer) !==
             this.normalizedManufacturer(currentManufacturer);
           if (manufacturerChanged) {
+            this.assertListedManufacturer(newManufacturer, allowedManufacturerNames);
             requestedManufacturerChanges.push({
               productId,
               expectedUpdatedAt: productUpdatedAt,
@@ -765,7 +844,6 @@ export class ProductTransferService {
         let expectedStockQuantity: number | undefined;
         let currentStockQuantity: number | undefined;
         let newStockQuantity: number | undefined;
-        let stockUnitCost: number | undefined;
         let stockChanged = false;
         if (stockSupplied) {
           if (!current.track_inventory || current.kind === 'service') {
@@ -784,15 +862,176 @@ export class ProductTransferService {
             current.allow_fractional
           );
           stockChanged = newStockQuantity !== currentStockQuantity;
-          if (stockUnitCostSupplied) {
-            stockUnitCost = this.wholeMoney(stockUnitCostCell, 'stock_increase_unit_cost_kes');
-            if (stockUnitCost === 0) throw new Error('stock unit cost must be greater than zero');
-            if (!stockChanged || newStockQuantity <= currentStockQuantity) {
-              throw new Error('stock unit cost is only used when increasing stock');
+        }
+
+        const latestBatchId = this.optionalUuid(
+          this.rawCell(cell('latest_batch_id')),
+          'latest_batch_id'
+        );
+        const latestBatchNumber = this.batchNumber(
+          this.rawCell(cell('latest_batch_number')),
+          'latest_batch_number'
+        );
+        const latestBuyingPriceValue = this.rawCell(cell('latest_buying_price_kes'));
+        const latestExpiryDate = this.date(this.rawCell(cell('latest_expiry_date')));
+        const quantityAdded =
+          stockChanged && newStockQuantity! > currentStockQuantity!
+            ? newStockQuantity! - currentStockQuantity!
+            : 0;
+        const hasVisibleBatchValue =
+          latestBatchNumber !== null ||
+          !this.blank(latestBuyingPriceValue) ||
+          latestExpiryDate !== null;
+        let mainBatchChanged = false;
+
+        if (latestBatchId) {
+          const expectedRemaining = this.quantity(
+            this.rawCell(cell('expected_latest_batch_remaining_quantity')),
+            'expected_latest_batch_remaining_quantity',
+            true
+          );
+          const expectedUnitCost = this.wholeMoney(
+            this.rawCell(cell('expected_latest_batch_unit_cost_kes')),
+            'expected_latest_batch_unit_cost_kes'
+          );
+          const expectedRemainingCost = this.wholeMoney(
+            this.rawCell(cell('expected_latest_batch_remaining_value_kes')),
+            'expected_latest_batch_remaining_value_kes'
+          );
+          const expectedBatchNumber = this.batchNumber(
+            this.rawCell(cell('expected_latest_batch_number')),
+            'expected_latest_batch_number'
+          );
+          const expectedExpiryDate = this.date(this.rawCell(cell('expected_latest_expiry_date')));
+          if (this.blank(latestBuyingPriceValue)) {
+            throw new Error('latest_buying_price_kes cannot be blank for an existing batch');
+          }
+          const newUnitCost = this.wholeMoney(latestBuyingPriceValue, 'latest_buying_price_kes');
+          const edited =
+            newUnitCost !== expectedUnitCost ||
+            latestBatchNumber !== expectedBatchNumber ||
+            latestExpiryDate !== expectedExpiryDate;
+          if (edited || quantityAdded > 0) {
+            if (!canEditBatches) {
+              throw new Error('latest batch changes require stock-adjustment and financial access');
+            }
+            if (quantityAdded > 0 && newUnitCost <= 0) {
+              throw new Error(
+                'latest_buying_price_kes must be greater than zero when adding stock'
+              );
+            }
+            const currentBatch = currentBatchesById.get(latestBatchId);
+            if (!currentBatch || currentBatch.remaining <= 0) {
+              conflicts.push(
+                `Row ${rowNumber}: ${this.priceRowLabel(row, headers)} latest batch is exhausted or no longer exists`
+              );
+            } else if (
+              currentBatch.variant_id !== variantId ||
+              currentBatch.stock_location_id !== activeLocation.id ||
+              latestBatchByVariant.get(variantId)?.id !== latestBatchId
+            ) {
+              throw new Error('latest batch identity does not match this variant and location');
+            } else if (
+              currentBatch.remaining !== expectedRemaining ||
+              currentBatch.unit_cost !== expectedUnitCost ||
+              currentBatch.remaining_cost !== expectedRemainingCost ||
+              (currentBatch.batch_number?.trim() || null) !== expectedBatchNumber ||
+              currentBatch.expiry_date !== expectedExpiryDate
+            ) {
+              conflicts.push(
+                `Row ${rowNumber}: ${this.priceRowLabel(row, headers)} latest batch changed after export`
+              );
+            } else {
+              const correctedRemainingValue =
+                newUnitCost === expectedUnitCost
+                  ? expectedRemainingCost
+                  : Math.round(currentBatch.remaining * newUnitCost);
+              const newRemainingCost = Math.round(
+                (currentBatch.remaining + quantityAdded) * newUnitCost
+              );
+              if (
+                !Number.isSafeInteger(correctedRemainingValue) ||
+                !Number.isSafeInteger(newRemainingCost)
+              ) {
+                throw new Error('resulting batch value is too large');
+              }
+              mainBatchChanges.push({
+                action: 'update',
+                batchId: latestBatchId,
+                variantId,
+                stockLocationId: activeLocation.id,
+                productName: cell('product_name').text.trim() || 'Product',
+                variantName: cell('variant_name').text.trim(),
+                sku: cell('sku').text.trim(),
+                batchLabel: this.batchLabel(currentBatch),
+                latest: true,
+                expectedRemaining,
+                currentUnitCost: expectedUnitCost,
+                expectedRemainingCost,
+                currentBatchNumber: expectedBatchNumber,
+                currentExpiryDate: expectedExpiryDate,
+                newUnitCost,
+                newBatchNumber: latestBatchNumber,
+                newExpiryDate: latestExpiryDate,
+                newRemainingCost,
+                valueDifference: correctedRemainingValue - expectedRemainingCost,
+                quantityAdded,
+              });
+              mainBatchChanged = true;
             }
           }
+        } else if (hasVisibleBatchValue || quantityAdded > 0) {
+          if (!canEditBatches) {
+            throw new Error(
+              'creating a latest batch requires stock-adjustment and financial access'
+            );
+          }
+          if (quantityAdded <= 0) {
+            throw new Error('latest batch details require a stock increase');
+          }
+          if (this.blank(latestBuyingPriceValue)) {
+            throw new Error('latest_buying_price_kes is required when adding stock');
+          }
+          const newUnitCost = this.wholeMoney(latestBuyingPriceValue, 'latest_buying_price_kes');
+          if (newUnitCost <= 0) {
+            throw new Error('latest_buying_price_kes must be greater than zero when adding stock');
+          }
+          const newRemainingCost = Math.round(quantityAdded * newUnitCost);
+          if (!Number.isSafeInteger(newRemainingCost)) {
+            throw new Error('resulting batch value is too large');
+          }
+          mainBatchChanges.push({
+            action: 'create',
+            batchId: null,
+            variantId,
+            stockLocationId: activeLocation.id,
+            productName: cell('product_name').text.trim() || 'Product',
+            variantName: cell('variant_name').text.trim(),
+            sku: cell('sku').text.trim(),
+            batchLabel: latestBatchNumber || 'New latest batch',
+            latest: true,
+            expectedRemaining: 0,
+            currentUnitCost: 0,
+            expectedRemainingCost: 0,
+            currentBatchNumber: null,
+            currentExpiryDate: null,
+            newUnitCost,
+            newBatchNumber: latestBatchNumber,
+            newExpiryDate: latestExpiryDate,
+            newRemainingCost,
+            valueDifference: 0,
+            quantityAdded,
+          });
+          mainBatchChanged = true;
         }
-        if (!retailChanged && !wholesaleChanged && !stockChanged && !manufacturerChanged) {
+
+        if (
+          !retailChanged &&
+          !wholesaleChanged &&
+          !stockChanged &&
+          !manufacturerChanged &&
+          !mainBatchChanged
+        ) {
           unchangedRows++;
           return;
         }
@@ -836,7 +1075,6 @@ export class ProductTransferService {
                   expectedStockQuantity,
                   currentStockQuantity,
                   newStockQuantity,
-                  ...(stockUnitCost !== undefined ? { stockUnitCost } : {}),
                   stockLocationId: activeLocation.id,
                   stockLocationName: activeLocation.name,
                 }
@@ -914,9 +1152,19 @@ export class ProductTransferService {
       currentById,
       conflicts
     );
+    const otherBatchChanges = await this.previewBatchChanges(
+      workbook,
+      activeLocation.id,
+      currentProductsById,
+      currentById,
+      currentBatchesById,
+      errors,
+      conflicts
+    );
+    const batchChanges = [...mainBatchChanges, ...otherBatchChanges];
 
     return {
-      kind: 'price_update',
+      kind: 'catalog_workbook',
       fileName,
       rows,
       unchangedRows,
@@ -930,9 +1178,139 @@ export class ProductTransferService {
       disableChanges,
       disabledVariants: disableChanges.length,
       disabledProducts: disableChanges.filter(change => change.disableProduct).length,
+      batchChanges,
       errors,
       conflicts,
     };
+  }
+
+  private async previewBatchChanges(
+    workbook: Workbook,
+    stockLocationId: string,
+    currentProductsById: ReadonlyMap<string, ProductRow>,
+    currentVariantsById: ReadonlyMap<string, VariantRow>,
+    currentBatches: ReadonlyMap<string, InventoryBatchRow>,
+    errors: string[],
+    conflicts: string[]
+  ): Promise<CatalogBatchChange[]> {
+    const sheet = workbook.getWorksheet('Batches');
+    if (!sheet) throw new Error('Workbook needs a Batches sheet. Download a fresh workbook.');
+    const headers = this.batchHeaderMap(sheet);
+    if (
+      !this.permissions.has('ManageStockAdjustments') ||
+      !this.permissions.has('ViewFinancials')
+    ) {
+      return [];
+    }
+
+    const seen = new Set<string>();
+    const changes: CatalogBatchChange[] = [];
+    sheet.eachRow((row, rowNumber) => {
+      if (rowNumber === 1) return;
+      const cell = (header: BatchHeader) => row.getCell(headers.get(header)!);
+      try {
+        if (this.bool(this.rawCell(cell('latest')), false, 'latest')) return;
+        const batchId = this.optionalUuid(this.rawCell(cell('batch_id')), 'batch_id');
+        const variantId = this.optionalUuid(this.rawCell(cell('variant_id')), 'variant_id');
+        if (!batchId || !variantId) throw new Error('hidden batch identity is missing');
+        if (seen.has(batchId)) throw new Error('duplicate batch_id');
+        seen.add(batchId);
+
+        const expectedRemaining = this.quantity(
+          this.rawCell(cell('expected_remaining_quantity')),
+          'expected_remaining_quantity',
+          true
+        );
+        const expectedUnitCost = this.wholeMoney(
+          this.rawCell(cell('expected_current_unit_cost_kes')),
+          'expected_current_unit_cost_kes'
+        );
+        const expectedRemainingCost = this.wholeMoney(
+          this.rawCell(cell('expected_remaining_value_kes')),
+          'expected_remaining_value_kes'
+        );
+        const expectedBatchNumber = this.batchNumber(
+          this.rawCell(cell('expected_batch_number')),
+          'expected_batch_number'
+        );
+        const expectedExpiryDate = this.date(this.rawCell(cell('expected_expiry_date')));
+        const newBatchNumber = this.batchNumber(this.rawCell(cell('batch_number')), 'batch_number');
+        const newUnitCost = this.wholeMoney(
+          this.rawCell(cell('buying_price_kes')),
+          'buying_price_kes'
+        );
+        const newExpiryDate = this.date(this.rawCell(cell('expiry_date')));
+        const edited =
+          newUnitCost !== expectedUnitCost ||
+          newBatchNumber !== expectedBatchNumber ||
+          newExpiryDate !== expectedExpiryDate;
+        if (!edited) return;
+        if (newUnitCost === 0 && newUnitCost !== expectedUnitCost) {
+          throw new Error('buying_price_kes must be greater than zero when changed');
+        }
+
+        const current = currentBatches.get(batchId);
+        if (!current || current.remaining <= 0) {
+          conflicts.push(
+            `Batches row ${rowNumber}: ${this.batchRowLabel(row, headers)} is exhausted or no longer exists`
+          );
+          return;
+        }
+        if (current.variant_id !== variantId || current.stock_location_id !== stockLocationId) {
+          throw new Error('batch identity does not match this location and variant');
+        }
+        if (
+          current.remaining !== expectedRemaining ||
+          current.unit_cost !== expectedUnitCost ||
+          current.remaining_cost !== expectedRemainingCost ||
+          (current.batch_number?.trim() || null) !== expectedBatchNumber ||
+          current.expiry_date !== expectedExpiryDate
+        ) {
+          conflicts.push(
+            `Batches row ${rowNumber}: ${this.batchRowLabel(row, headers)} changed after export`
+          );
+          return;
+        }
+
+        const variant = currentVariantsById.get(variantId);
+        const product = variant ? currentProductsById.get(variant.product_id) : undefined;
+        if (!variant || !product) throw new Error('batch product no longer exists');
+        const newRemainingCost =
+          newUnitCost === expectedUnitCost
+            ? expectedRemainingCost
+            : Math.round(current.remaining * newUnitCost);
+        if (!Number.isSafeInteger(newRemainingCost)) {
+          throw new Error('resulting batch value is too large');
+        }
+        changes.push({
+          action: 'update',
+          batchId,
+          variantId,
+          stockLocationId,
+          productName: product.name,
+          variantName: variant.name === 'Default' ? '' : variant.name,
+          sku: variant.sku,
+          batchLabel: this.batchLabel(current),
+          latest: false,
+          expectedRemaining,
+          currentUnitCost: current.unit_cost,
+          expectedRemainingCost,
+          currentBatchNumber: expectedBatchNumber,
+          currentExpiryDate: expectedExpiryDate,
+          newUnitCost,
+          newBatchNumber,
+          newExpiryDate,
+          newRemainingCost,
+          valueDifference: newRemainingCost - current.remaining_cost,
+          quantityAdded: 0,
+        });
+      } catch (error) {
+        errors.push(
+          `Batches row ${rowNumber}: ${error instanceof Error ? error.message : 'invalid row'}`
+        );
+      }
+    });
+    return changes;
   }
 
   private addBarcodeErrors(
@@ -1049,8 +1427,7 @@ export class ProductTransferService {
   }
 
   async apply(preview: ProductWorkbookPreview): Promise<ProductWorkbookResult> {
-    if (preview.kind === 'price_update') return this.applyPriceUpdate(preview);
-    return this.applyProductCreate(preview);
+    return this.applyPriceUpdate(preview);
   }
 
   private async applyPriceUpdate(
@@ -1063,9 +1440,10 @@ export class ProductTransferService {
       preview.changes.length === 0 &&
       preview.productChanges.length === 0 &&
       preview.disableChanges.length === 0 &&
+      preview.batchChanges.length === 0 &&
       !preview.creationPreview?.products.length
     ) {
-      throw new Error('Workbook has no product changes.');
+      throw new Error('Workbook has no changes.');
     }
     const variantChanges = preview.changes.map(change => ({
       variant_id: change.variantId,
@@ -1079,9 +1457,6 @@ export class ProductTransferService {
             stock_location_id: change.stockLocationId,
             expected_stock_quantity: change.expectedStockQuantity,
             new_stock_quantity: change.newStockQuantity,
-            ...(change.stockUnitCost !== undefined
-              ? { stock_unit_cost: change.stockUnitCost }
-              : {}),
           }
         : {}),
     }));
@@ -1097,6 +1472,22 @@ export class ProductTransferService {
       expected_product_updated_at: change.expectedProductUpdatedAt,
       disable_product: change.disableProduct,
     }));
+    const batchChanges = preview.batchChanges.map(change => ({
+      action: change.action,
+      ...(change.batchId ? { batch_id: change.batchId } : {}),
+      variant_id: change.variantId,
+      stock_location_id: change.stockLocationId,
+      latest: change.latest,
+      expected_remaining: change.expectedRemaining,
+      expected_unit_cost: change.currentUnitCost,
+      expected_remaining_cost: change.expectedRemainingCost,
+      expected_batch_number: change.currentBatchNumber,
+      expected_expiry_date: change.currentExpiryDate,
+      new_unit_cost: change.newUnitCost,
+      new_batch_number: change.newBatchNumber,
+      new_expiry_date: change.newExpiryDate,
+      quantity_added: change.quantityAdded,
+    }));
     const importId = preview.creationPreview
       ? await this.stageProductCreate(preview.creationPreview)
       : null;
@@ -1104,6 +1495,7 @@ export class ProductTransferService {
       p_variant_changes: variantChanges as never,
       p_product_changes: productChanges as never,
       p_disable_changes: disableChanges as never,
+      p_batch_changes: batchChanges as never,
       p_import_id: importId ?? undefined,
     });
     if (error) {
@@ -1123,21 +1515,12 @@ export class ProductTransferService {
           'A product selected for disabling changed after preview. Export a fresh workbook and try again.'
         );
       }
+      if (error.message.includes('stale_catalog_batch_export')) {
+        throw new Error('A batch changed after preview. Export a fresh workbook and try again.');
+      }
       throw new Error(error.message);
     }
-    return { kind: 'price_update', ...(data as Omit<CatalogPriceUpdateResult, 'kind'>) };
-  }
-
-  private async applyProductCreate(preview: CatalogImportPreview): Promise<CatalogImportResult> {
-    if (preview.errors.length) throw new Error('Fix workbook errors before importing.');
-    const importId = await this.stageProductCreate(preview);
-    const finalized = await this.supabase.client.rpc('finalize_catalog_import', {
-      p_import_id: importId,
-    });
-    if (finalized.error) throw finalized.error;
-    const result = finalized.data as unknown as Omit<CatalogImportResult, 'kind'>;
-    if (result.status === 'failed') throw new Error(result.error ?? 'Import failed');
-    return { kind: 'product_create', ...result };
+    return { kind: 'catalog_workbook', ...(data as Omit<CatalogPriceUpdateResult, 'kind'>) };
   }
 
   private async stageProductCreate(preview: CatalogImportPreview): Promise<string> {
@@ -1216,14 +1599,61 @@ export class ProductTransferService {
     rows: PriceExportRow[],
     exportedAt: string,
     stockLocationId = this.locations.active()?.id ?? '',
-    manufacturerNames: string[] = []
+    manufacturerNames: string[] = [],
+    batchRows: BatchExportRow[] = []
   ): Promise<Workbook> {
     const workbook = await createExcelWorkbook();
     workbook.creator = 'DukaRun';
     workbook.created = new Date();
+    const canEditBatches =
+      this.permissions.has('ManageStockAdjustments') && this.permissions.has('ViewFinancials');
     const sheet = workbook.addWorksheet('Products & Stock', {
-      views: [{ state: 'frozen', ySplit: 1, xSplit: 8 }],
+      views: [{ state: 'frozen', ySplit: 1, xSplit: 13 }],
       properties: { tabColor: { argb: '1F4E78' } },
+    });
+    const column = (header: PriceUpdateHeader) => PRICE_UPDATE_HEADERS.indexOf(header) + 1;
+    const batchById = new Map(batchRows.map(batch => [batch.id, batch]));
+    const exportedRows = rows.map(row => {
+      const latestBatch = row.latest_batch_id ? batchById.get(row.latest_batch_id) : undefined;
+      const values: Record<PriceUpdateHeader, unknown> = {
+        variant_id: row.variant_id,
+        variant_updated_at: row.variant_updated_at,
+        product_id: row.product_id,
+        product_updated_at: row.product_updated_at,
+        latest_batch_id: row.latest_batch_id ?? '',
+        expected_latest_batch_remaining_quantity: latestBatch?.remaining ?? '',
+        expected_latest_batch_unit_cost_kes: row.latest_batch_unit_cost ?? '',
+        expected_latest_batch_remaining_value_kes: latestBatch?.remaining_cost ?? '',
+        expected_latest_batch_number: row.latest_batch_number ?? '',
+        expected_latest_expiry_date: row.latest_batch_expiry_date ?? '',
+        product_key: '',
+        product_name: row.product_name,
+        manufacturer: row.manufacturer_name ?? 'CLEAR',
+        product_barcode: row.product_barcode ?? '',
+        variant_name: row.variant_name === 'Default' ? '' : row.variant_name,
+        sku: row.sku,
+        barcode: row.barcode ?? '',
+        kind: row.kind,
+        product_active: row.product_active,
+        variant_active: row.variant_active,
+        current_retail_price_kes: row.retail_price,
+        new_retail_price_kes: '',
+        current_wholesale_price_kes: row.wholesale_price ?? '',
+        new_wholesale_price_kes: '',
+        expected_stock_quantity: row.stock,
+        stock_location: row.stock_location,
+        track_inventory: row.track_inventory,
+        allow_fractional_stock: row.allow_fractional,
+        current_stock_quantity: row.stock,
+        new_stock_quantity: '',
+        stock_value_kes: row.stock_value,
+        latest_batch: row.latest_batch_label ?? '',
+        latest_batch_number: row.latest_batch_number ?? '',
+        latest_buying_price_kes: row.latest_batch_unit_cost ?? '',
+        latest_expiry_date: row.latest_batch_expiry_date ?? '',
+        tax_category_code: '',
+      };
+      return PRICE_UPDATE_HEADERS.map(header => values[header]);
     });
     const blankCreationRows = Array.from({ length: STARTER_CREATION_ROWS }, () =>
       Array.from({ length: PRICE_UPDATE_HEADERS.length }, () => '')
@@ -1235,72 +1665,131 @@ export class ProductTransferService {
       totalsRow: false,
       style: { theme: 'TableStyleMedium2', showRowStripes: true },
       columns: PRICE_UPDATE_HEADERS.map(name => ({ name })),
-      rows: [
-        ...rows.map(row => [
-          row.variant_id,
-          row.variant_updated_at,
-          row.product_id,
-          row.product_updated_at,
-          '',
-          row.product_name,
-          row.manufacturer_name ?? '',
-          '',
-          row.product_barcode ?? '',
-          row.variant_name === 'Default' ? '' : row.variant_name,
-          row.sku,
-          row.barcode ?? '',
-          row.kind,
-          row.product_active,
-          row.variant_active,
-          row.retail_price,
-          '',
-          row.wholesale_price ?? '',
-          '',
-          row.stock,
-          row.stock_location,
-          row.track_inventory,
-          row.allow_fractional,
-          row.stock,
-          '',
-          row.stock_value,
-          '',
-          '',
-          '',
-          '',
-        ]),
-        ...blankCreationRows,
-      ],
+      rows: [...exportedRows, ...blankCreationRows],
     });
-    const widths = [
-      38, 30, 38, 30, 20, 28, 24, 24, 20, 22, 20, 20, 14, 15, 15, 24, 22, 27, 25, 24, 28, 18, 24,
-      24, 22, 22, 30, 20, 16, 22,
-    ];
-    widths.forEach((width, index) => (sheet.getColumn(index + 1).width = width));
-    for (const column of [1, 2, 3, 4, 20]) sheet.getColumn(column).hidden = true;
-    for (const column of [16, 17, 18, 19, 26, 27]) {
-      sheet.getColumn(column).numFmt = '#,##0';
+    PRICE_UPDATE_HEADERS.forEach((header, index) => {
+      const widths: Partial<Record<PriceUpdateHeader, number>> = {
+        product_key: 20,
+        product_name: 28,
+        manufacturer: 24,
+        product_barcode: 20,
+        variant_name: 22,
+        sku: 20,
+        barcode: 20,
+        kind: 14,
+        current_retail_price_kes: 24,
+        new_retail_price_kes: 22,
+        current_wholesale_price_kes: 27,
+        new_wholesale_price_kes: 25,
+        stock_location: 28,
+        current_stock_quantity: 24,
+        new_stock_quantity: 22,
+        stock_value_kes: 22,
+        latest_batch: 36,
+        latest_batch_number: 24,
+        latest_buying_price_kes: 25,
+        latest_expiry_date: 22,
+        tax_category_code: 24,
+      };
+      sheet.getColumn(index + 1).width = widths[header] ?? 18;
+    });
+    for (const header of [
+      'variant_id',
+      'variant_updated_at',
+      'product_id',
+      'product_updated_at',
+      'latest_batch_id',
+      'expected_latest_batch_remaining_quantity',
+      'expected_latest_batch_unit_cost_kes',
+      'expected_latest_batch_remaining_value_kes',
+      'expected_latest_batch_number',
+      'expected_latest_expiry_date',
+      'expected_stock_quantity',
+    ] satisfies PriceUpdateHeader[]) {
+      sheet.getColumn(column(header)).hidden = true;
     }
-    for (const column of [20, 24, 25]) sheet.getColumn(column).numFmt = '#,##0.###';
-    sheet.getColumn(29).numFmt = 'yyyy-mm-dd';
+    for (const header of [
+      'current_retail_price_kes',
+      'new_retail_price_kes',
+      'current_wholesale_price_kes',
+      'new_wholesale_price_kes',
+      'stock_value_kes',
+      'latest_buying_price_kes',
+    ] satisfies PriceUpdateHeader[]) {
+      sheet.getColumn(column(header)).numFmt = '#,##0';
+    }
+    for (const header of [
+      'expected_stock_quantity',
+      'current_stock_quantity',
+      'new_stock_quantity',
+    ] satisfies PriceUpdateHeader[]) {
+      sheet.getColumn(column(header)).numFmt = '#,##0.###';
+    }
+    sheet.getColumn(column('latest_expiry_date')).numFmt = 'yyyy-mm-dd';
+
+    const mainRowsByVariant = new Map(rows.map((row, index) => [row.variant_id, index + 2]));
+    const batchSheetRows = this.addBatchesSheet(workbook, batchRows, mainRowsByVariant);
+    rows.forEach((row, index) => {
+      const rowNumber = index + 2;
+      if (!row.latest_batch_id) {
+        if (row.track_inventory && row.kind !== 'service') {
+          sheet.getCell(rowNumber, column('latest_batch')).value =
+            'No open batch — created when stock increases';
+        }
+        return;
+      }
+      const targetRow = batchSheetRows.get(row.latest_batch_id);
+      if (!targetRow) return;
+      sheet.getCell(rowNumber, column('latest_batch')).value = {
+        text: row.latest_batch_label ?? 'Open batch',
+        hyperlink: `#'Batches'!K${targetRow}`,
+        tooltip: 'Open this canonical batch row',
+      };
+      sheet.getCell(rowNumber, column('latest_batch')).font = {
+        color: { argb: 'FF0563C1' },
+        underline: true,
+      };
+      if (row.latest_batch_unit_cost === 0) {
+        sheet.getCell(rowNumber, column('latest_buying_price_kes')).fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFF4CCCC' },
+        };
+        sheet.getCell(rowNumber, column('latest_buying_price_kes')).font = {
+          bold: true,
+          color: { argb: 'FF9C0006' },
+        };
+      }
+    });
+
+    const sortedManufacturerChoices = [
+      ...new Set(manufacturerNames.map(name => name.trim()).filter(Boolean)),
+    ].sort((a, b) => a.localeCompare(b));
+    const manufacturers = workbook.addWorksheet('Manufacturers', {
+      properties: { tabColor: { argb: 'A5A5A5' } },
+    });
+    manufacturers.getColumn(1).width = 38;
+    manufacturers.addTable({
+      name: 'DukaRunManufacturers',
+      ref: 'A1',
+      headerRow: true,
+      totalsRow: false,
+      style: { theme: 'TableStyleMedium4', showRowStripes: true },
+      columns: [{ name: 'manufacturer_name' }],
+      rows: ['CLEAR', ...sortedManufacturerChoices].map(name => [name]),
+    });
+    manufacturers.getCell('A1').note =
+      'Reference list for the manufacturer dropdown. Manage this list in DukaRun, not in Excel.';
+    workbook.definedNames.add(
+      `'Manufacturers'!$A$2:$A$${sortedManufacturerChoices.length + 2}`,
+      'DukaRunManufacturerChoices'
+    );
 
     const reference = workbook.addWorksheet('Reference Data', {
       properties: { tabColor: { argb: 'FFC000' } },
     });
-    reference.columns = [{ width: 36 }, { width: 20 }, { width: 20 }, { width: 24 }];
-    reference.addRow([
-      'Manufacturer choices',
-      'Boolean values',
-      'Product kinds',
-      'Tax category codes',
-    ]);
-    const manufacturerChoices = [
-      'CLEAR',
-      ...new Set(
-        [...manufacturerNames, ...rows.flatMap(row => row.manufacturer_name ?? [])]
-          .map(name => name.trim())
-          .filter(Boolean)
-      ),
-    ];
+    reference.columns = [{ width: 20 }, { width: 20 }, { width: 24 }];
+    reference.addRow(['Boolean values', 'Product kinds', 'Tax category codes']);
     const { data: taxSettings, error: taxSettingsError } =
       await this.supabase.client.rpc('company_tax_settings');
     if (taxSettingsError) throw taxSettingsError;
@@ -1308,71 +1797,132 @@ export class ProductTransferService {
       (taxSettings as { categories?: Array<{ code: string }> } | null)?.categories?.map(
         category => category.code
       ) ?? [];
-    const sortedManufacturerChoices = manufacturerChoices
-      .slice(1)
-      .sort((a, b) => a.localeCompare(b));
-    const referenceRows = Math.max(2, sortedManufacturerChoices.length + 1, taxCodes.length);
+    const referenceRows = Math.max(2, taxCodes.length);
     for (let index = 0; index < referenceRows; index++) {
       reference.addRow([
-        index === 0 ? 'CLEAR' : (sortedManufacturerChoices[index - 1] ?? ''),
         ['true', 'false'][index] ?? '',
         ['good', 'service'][index] ?? '',
         taxCodes[index] ?? '',
       ]);
     }
     this.styleReferenceHeader(reference);
+    workbook.definedNames.add("'Reference Data'!$A$2:$A$3", 'DukaRunBooleanChoices');
+    workbook.definedNames.add("'Reference Data'!$B$2:$B$3", 'DukaRunKindChoices');
     workbook.definedNames.add(
-      `'Reference Data'!$A$2:$A$${sortedManufacturerChoices.length + 2}`,
-      'DukaRunManufacturerChoices'
-    );
-    workbook.definedNames.add("'Reference Data'!$B$2:$B$3", 'DukaRunBooleanChoices');
-    workbook.definedNames.add("'Reference Data'!$C$2:$C$3", 'DukaRunKindChoices');
-    workbook.definedNames.add(
-      `'Reference Data'!$D$2:$D$${Math.max(2, taxCodes.length + 1)}`,
+      `'Reference Data'!$C$2:$C$${Math.max(2, taxCodes.length + 1)}`,
       'DukaRunTaxCategoryChoices'
     );
 
     const firstCreationRow = rows.length + 2;
-    for (let row = 2; row <= sheet.rowCount; row++) {
-      const yellowColumns =
-        row >= firstCreationRow
-          ? [5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 17, 19, 22, 23, 25, 27, 28, 29, 30]
-          : [8, 17, 19, 25, 27];
-      for (const column of yellowColumns) {
-        sheet.getCell(row, column).fill = {
+    for (let rowNumber = 2; rowNumber <= sheet.rowCount; rowNumber++) {
+      const existingEditable: PriceUpdateHeader[] = [
+        'manufacturer',
+        'new_retail_price_kes',
+        'new_wholesale_price_kes',
+        'new_stock_quantity',
+        ...(canEditBatches
+          ? ([
+              'latest_batch_number',
+              'latest_buying_price_kes',
+              'latest_expiry_date',
+            ] satisfies PriceUpdateHeader[])
+          : []),
+      ];
+      const creationEditable: PriceUpdateHeader[] = [
+        'product_key',
+        'product_name',
+        'manufacturer',
+        'product_barcode',
+        'variant_name',
+        'sku',
+        'barcode',
+        'kind',
+        'product_active',
+        'variant_active',
+        'new_retail_price_kes',
+        'new_wholesale_price_kes',
+        'track_inventory',
+        'allow_fractional_stock',
+        'new_stock_quantity',
+        ...(canEditBatches
+          ? ([
+              'latest_batch_number',
+              'latest_buying_price_kes',
+              'latest_expiry_date',
+            ] satisfies PriceUpdateHeader[])
+          : []),
+        'tax_category_code',
+      ];
+      for (const header of rowNumber >= firstCreationRow ? creationEditable : existingEditable) {
+        sheet.getCell(rowNumber, column(header)).fill = {
           type: 'pattern',
           pattern: 'solid',
           fgColor: { argb: 'FFFFF2CC' },
         };
       }
-      sheet.getCell(row, 8).dataValidation = {
+      sheet.getCell(rowNumber, column('manufacturer')).dataValidation = {
         type: 'list',
-        allowBlank: true,
+        allowBlank: rowNumber >= firstCreationRow,
         formulae: ['DukaRunManufacturerChoices'],
         showInputMessage: true,
-        promptTitle: 'New manufacturer',
-        prompt: 'Choose an existing manufacturer, type a new name, or choose CLEAR.',
-        showErrorMessage: false,
+        promptTitle: 'Manufacturer',
+        prompt: 'Choose an existing manufacturer, or CLEAR to remove it.',
+        showErrorMessage: true,
+        errorStyle: 'stop',
+        errorTitle: 'Choose a listed manufacturer',
+        error: 'Select a value from the manufacturer dropdown.',
       };
-      sheet.getCell(row, 13).dataValidation = {
+      sheet.getCell(rowNumber, column('kind')).dataValidation = {
         type: 'list',
         allowBlank: true,
         formulae: ['DukaRunKindChoices'],
       };
-      for (const column of [14, 15, 22, 23]) {
-        sheet.getCell(row, column).dataValidation = {
+      for (const header of [
+        'product_active',
+        'variant_active',
+        'track_inventory',
+        'allow_fractional_stock',
+      ] satisfies PriceUpdateHeader[]) {
+        sheet.getCell(rowNumber, column(header)).dataValidation = {
           type: 'list',
           allowBlank: true,
           formulae: ['DukaRunBooleanChoices'],
         };
       }
-      sheet.getCell(row, 30).dataValidation = {
+      sheet.getCell(rowNumber, column('tax_category_code')).dataValidation = {
         type: 'list',
         allowBlank: true,
         formulae: ['DukaRunTaxCategoryChoices'],
         showErrorMessage: false,
       };
+      if (canEditBatches) {
+        sheet.getCell(rowNumber, column('latest_buying_price_kes')).dataValidation = {
+          type: 'whole',
+          operator: rowNumber >= firstCreationRow ? 'greaterThan' : 'greaterThanOrEqual',
+          allowBlank: rowNumber >= firstCreationRow,
+          formulae: [0],
+          showInputMessage: true,
+          promptTitle: 'Latest buying price',
+          prompt: 'Enter the whole-KES buying price for the linked latest batch.',
+          showErrorMessage: true,
+          errorTitle: 'Invalid buying price',
+          error:
+            rowNumber >= firstCreationRow
+              ? 'Enter a positive whole amount when adding opening stock.'
+              : 'Enter a whole amount of zero or greater.',
+        };
+      }
     }
+    rows.forEach((row, index) => {
+      if (row.latest_batch_unit_cost !== 0) return;
+      const priceCell = sheet.getCell(index + 2, column('latest_buying_price_kes'));
+      priceCell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFF4CCCC' },
+      };
+      priceCell.font = { bold: true, color: { argb: 'FF9C0006' } };
+    });
 
     const manifest = workbook.addWorksheet('_DukaRun Exported Rows', { state: 'veryHidden' });
     manifest.addRow([
@@ -1416,23 +1966,42 @@ export class ProductTransferService {
       ],
       [
         'Manufacturer',
-        'Choose a new manufacturer on any one variant row for the product. Choose CLEAR to remove it. Conflicting choices for the same product are rejected.',
+        'Choose a value from the strict dropdown linked to the Manufacturers sheet. Choose CLEAR to remove it. New manufacturer names cannot be created from this workbook.',
       ],
       [
         'Yellow cells',
-        'For existing rows, only yellow new-value columns are imported. For new rows, complete the yellow identity and value columns.',
+        'Yellow cells are the only intended input cells. Manufacturer and latest-batch fields are prefilled because they edit the linked records directly.',
       ],
       ['New prices', 'Enter whole Kenyan shillings in the yellow new-price columns.'],
       ['New stock', 'Enter the counted quantity for the location shown in the stock columns.'],
       [
-        'Stock cost',
-        'For stock increases, enter a whole-KES unit cost only when the product has no previous cost at this location.',
+        'Latest batch',
+        'Latest batch number, buying price, and expiry edit the linked open batch. If none exists, increasing stock creates one from these fields.',
+      ],
+      [
+        'Batches sheet',
+        'Batches is the canonical list of open batches. Latest rows mirror Products & Stock; edit those on the main sheet. Older open rows can be edited here.',
+      ],
+      [
+        'Batch row deletion',
+        'Deleting a row from Batches does nothing. It never disables a product or batch. Exhausted batches are intentionally excluded.',
+      ],
+      [
+        'Batch valuation',
+        'A batch cost correction updates the value of its remaining stock. It does not rewrite past sales or cost of goods sold. Every correction and valuation difference is shown in the preview.',
       ],
       [
         'Stock permission',
-        'Stock changes require the Manage stock adjustments permission and are recorded as counted-stock adjustments.',
+        'Stock changes require stock-adjustment access. Increases also require financial access and a positive latest buying price.',
       ],
-      ['No change', 'Leave a yellow cell blank to keep the current value.'],
+      [
+        'Stock increases',
+        'A counted-stock increase extends the linked latest batch. If no open batch exists, DukaRun creates one. Record separate purchase lots through Purchasing.',
+      ],
+      [
+        'No change',
+        'Leave new price and stock cells blank. Prefilled manufacturer and batch cells stay unchanged unless edited.',
+      ],
       ['Clear wholesale', 'Enter CLEAR in new_wholesale_price_kes to remove the wholesale price.'],
       [
         'Formulas',
@@ -1444,7 +2013,7 @@ export class ProductTransferService {
       ],
       [
         'Conflicts',
-        'Re-export if DukaRun reports that a price or stock quantity changed after export.',
+        'Re-export if DukaRun reports that a product, stock quantity, or batch changed after export.',
       ],
     ].forEach(row => instructions.addRow(row));
     instructions.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
@@ -1455,147 +2024,162 @@ export class ProductTransferService {
     };
 
     this.addMetadata(workbook, {
-      formatVersion: '3',
-      workbookKind: 'price_update',
+      formatVersion: '5',
+      workbookKind: 'catalog_workbook',
       exportedAt,
       stockLocationId,
     });
     return workbook;
   }
 
-  private async baseWorkbook(
-    locationCodes: string[],
-    manufacturerNames: string[] = []
-  ): Promise<Workbook> {
-    const workbook = await createExcelWorkbook();
-    workbook.creator = 'DukaRun';
-    workbook.created = new Date();
-    const products = workbook.addWorksheet('Products', {
-      views: [{ state: 'frozen', ySplit: 1 }],
-      properties: { tabColor: { argb: '1F4E78' } },
+  private addBatchesSheet(
+    workbook: Workbook,
+    rows: BatchExportRow[],
+    mainRowsByVariant: ReadonlyMap<string, number>
+  ): ReadonlyMap<string, number> {
+    const sheet = workbook.addWorksheet('Batches', {
+      views: [{ state: 'frozen', ySplit: 1, xSplit: 13 }],
+      properties: { tabColor: { argb: 'ED7D31' } },
     });
-    products.addRow([...HEADERS]);
-    products.columns = HEADERS.map(header => ({
-      key: header,
-      width: header.includes('id') ? 38 : Math.max(14, Math.min(24, header.length + 3)),
-    }));
-    const instructions = workbook.addWorksheet('Instructions', {
-      properties: { tabColor: { argb: '70AD47' } },
+    const batchColumn = (header: BatchHeader) => BATCH_HEADERS.indexOf(header) + 1;
+    const mainColumn = (header: PriceUpdateHeader) => PRICE_UPDATE_HEADERS.indexOf(header) + 1;
+    const mainSheet = workbook.getWorksheet('Products & Stock')!;
+    const linkedValue = (header: PriceUpdateHeader, mainRow: number, result: unknown) => ({
+      formula: `'Products & Stock'!${mainSheet.getColumn(mainColumn(header)).letter}${mainRow}`,
+      result,
     });
-    instructions.columns = [{ width: 24 }, { width: 100 }];
-    [
-      ['Rule', 'Details'],
-      [
-        'Rows',
-        'Each Products row is one sellable variant. Repeat product fields for its variants.',
-      ],
-      ['Purpose', 'This template creates new products. It does not update existing products.'],
-      ['New products', 'Leave IDs blank and group variants with the same product_key.'],
-      ['Prices', 'Enter whole Kenyan shillings only. Formula cells are not imported.'],
-      [
-        'Stock',
-        'Opening stock is allowed only for new variants. Adjust existing stock separately.',
-      ],
-      ['Services', 'Services cannot track inventory or carry opening stock.'],
-      [
-        'VAT',
-        'tax_category_code is optional. Leave it blank to use the shop default; exceptions must match Reference Data.',
-      ],
-    ].forEach(row => instructions.addRow(row));
 
-    const refs = workbook.addWorksheet('Reference Data', {
-      properties: { tabColor: { argb: 'FFC000' } },
+    sheet.addTable({
+      name: 'DukaRunOpenBatches',
+      ref: 'A1',
+      headerRow: true,
+      totalsRow: false,
+      style: { theme: 'TableStyleMedium9', showRowStripes: true },
+      columns: BATCH_HEADERS.map(name => ({ name })),
+      rows: rows.map(row => {
+        const mainRow = mainRowsByVariant.get(row.variant_id) ?? 0;
+        return [
+          row.id,
+          row.variant_id,
+          row.stock_location_id,
+          row.latest,
+          mainRow,
+          row.remaining,
+          row.unit_cost,
+          row.remaining_cost,
+          row.batch_number ?? '',
+          row.expiry_date ?? '',
+          row.product_name,
+          row.manufacturer_name ?? '',
+          row.variant_name === 'Default' ? '' : row.variant_name,
+          row.sku,
+          row.latest ? `Latest — ${row.label}` : row.label,
+          row.purchased_at.slice(0, 10),
+          row.remaining,
+          row.latest && mainRow
+            ? linkedValue('latest_batch_number', mainRow, row.batch_number ?? '')
+            : (row.batch_number ?? ''),
+          row.latest && mainRow
+            ? linkedValue('latest_buying_price_kes', mainRow, row.unit_cost)
+            : row.unit_cost,
+          row.latest && mainRow
+            ? linkedValue('latest_expiry_date', mainRow, row.expiry_date ?? '')
+            : (row.expiry_date ?? ''),
+        ];
+      }),
     });
-    const { data: taxSettings, error: taxSettingsError } =
-      await this.supabase.client.rpc('company_tax_settings');
-    if (taxSettingsError) throw taxSettingsError;
-    const taxCodes =
-      (taxSettings as { categories?: Array<{ code: string }> } | null)?.categories?.map(
-        category => category.code
-      ) ?? [];
-    refs.addRow([
-      'Boolean values',
-      'Product kinds',
-      'Stock location codes',
-      'Tax category codes',
-      'Manufacturer choices',
-    ]);
-    const sortedManufacturers = [
-      ...new Set(manufacturerNames.map(name => name.trim()).filter(Boolean)),
-    ].sort((a, b) => a.localeCompare(b));
-    const count = Math.max(2, locationCodes.length, taxCodes.length, sortedManufacturers.length);
-    for (let index = 0; index < count; index++) {
-      refs.addRow([
-        ['true', 'false'][index] ?? '',
-        ['good', 'service'][index] ?? '',
-        locationCodes[index] ?? '',
-        taxCodes[index] ?? '',
-        sortedManufacturers[index] ?? '',
-      ]);
-    }
-    this.styleReferenceHeader(refs);
-    workbook.definedNames.add(
-      `'Reference Data'!$E$2:$E$${Math.max(2, sortedManufacturers.length + 1)}`,
-      'DukaRunNewProductManufacturers'
-    );
-    return workbook;
-  }
-
-  private finishProductsSheet(sheet: Worksheet): void {
-    sheet.autoFilter = { from: 'A1', to: `V${Math.max(2, sheet.rowCount)}` };
-    sheet.getRow(1).height = 32;
-    sheet.getRow(1).eachCell(cell => {
-      cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F4E78' } };
-      cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
-    });
-    for (let column = 1; column <= 3; column++) {
-      sheet.getCell(1, column).fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FF666666' },
+    BATCH_HEADERS.forEach((header, index) => {
+      const widths: Partial<Record<BatchHeader, number>> = {
+        product_name: 28,
+        manufacturer: 24,
+        variant_name: 22,
+        sku: 20,
+        batch: 36,
+        received_date: 18,
+        remaining_quantity: 24,
+        batch_number: 24,
+        buying_price_kes: 24,
+        expiry_date: 20,
       };
+      sheet.getColumn(index + 1).width = widths[header] ?? 18;
+    });
+    for (const header of BATCH_HEADERS.slice(0, 10)) {
+      sheet.getColumn(batchColumn(header)).hidden = true;
     }
-    for (let row = 2; row <= Math.max(sheet.rowCount, MAX_ROWS + 1); row++) {
-      for (const column of [7, 14, 15, 16]) {
-        sheet.getCell(row, column).dataValidation = {
-          type: 'list',
-          allowBlank: false,
-          formulae: ['"true,false"'],
+    for (const header of [
+      'expected_current_unit_cost_kes',
+      'expected_remaining_value_kes',
+      'buying_price_kes',
+    ] satisfies BatchHeader[]) {
+      sheet.getColumn(batchColumn(header)).numFmt = '#,##0';
+    }
+    for (const header of [
+      'expected_remaining_quantity',
+      'remaining_quantity',
+    ] satisfies BatchHeader[]) {
+      sheet.getColumn(batchColumn(header)).numFmt = '#,##0.###';
+    }
+    for (const header of [
+      'expected_expiry_date',
+      'received_date',
+      'expiry_date',
+    ] satisfies BatchHeader[]) {
+      sheet.getColumn(batchColumn(header)).numFmt = 'yyyy-mm-dd';
+    }
+
+    const rowNumbers = new Map<string, number>();
+    rows.forEach((row, index) => {
+      const rowNumber = index + 2;
+      rowNumbers.set(row.id, rowNumber);
+      const batchLink = sheet.getCell(rowNumber, batchColumn('batch'));
+      const mainRow = mainRowsByVariant.get(row.variant_id);
+      if (mainRow) {
+        batchLink.value = {
+          text: row.latest ? `Latest — ${row.label}` : row.label,
+          hyperlink: `#'Products & Stock'!${mainSheet.getColumn(mainColumn('product_name')).letter}${mainRow}`,
+          tooltip: row.latest ? 'Edit this latest batch on Products & Stock' : 'Open this product',
         };
+        batchLink.font = { color: { argb: 'FF0563C1' }, underline: true };
       }
-      sheet.getCell(row, 11).dataValidation = {
-        type: 'list',
-        allowBlank: false,
-        formulae: ['"good,service"'],
-      };
-      sheet.getCell(row, 19).dataValidation = {
-        type: 'list',
-        allowBlank: true,
-        formulae: ["'Reference Data'!$C$2:$C$1000"],
-      };
-      sheet.getCell(row, 22).dataValidation = {
-        type: 'list',
-        allowBlank: true,
-        formulae: ["'Reference Data'!$D$2:$D$1000"],
-      };
-      sheet.getCell(row, 5).dataValidation = {
-        type: 'list',
-        allowBlank: true,
-        formulae: ['DukaRunNewProductManufacturers'],
-        showInputMessage: true,
-        promptTitle: 'Manufacturer',
-        prompt: 'Choose an existing manufacturer or type a new name.',
-        showErrorMessage: false,
-      };
-    }
-    for (let row = 2; row <= sheet.rowCount; row++) {
-      sheet.getCell(row, 12).numFmt = '#,##0';
-      sheet.getCell(row, 13).numFmt = '#,##0';
-      sheet.getCell(row, 17).numFmt = '0.000';
-      sheet.getCell(row, 18).numFmt = '#,##0';
-      sheet.getCell(row, 21).numFmt = 'yyyy-mm-dd';
-    }
+      for (const header of [
+        'batch_number',
+        'buying_price_kes',
+        'expiry_date',
+      ] satisfies BatchHeader[]) {
+        const cell = sheet.getCell(rowNumber, batchColumn(header));
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: row.latest ? 'FFDDEBF7' : 'FFFFF2CC' },
+        };
+        if (row.latest) {
+          cell.note = 'Linked to Products & Stock. Edit the latest batch on the main sheet.';
+        }
+      }
+      if (!row.latest) {
+        sheet.getCell(rowNumber, batchColumn('buying_price_kes')).dataValidation = {
+          type: 'whole',
+          operator: 'greaterThanOrEqual',
+          allowBlank: false,
+          formulae: [0],
+          showErrorMessage: true,
+          errorTitle: 'Invalid buying price',
+          error: 'Enter a whole amount of zero or greater.',
+        };
+      } else {
+        sheet.getRow(rowNumber).font = { bold: true };
+      }
+      if (row.unit_cost === 0) {
+        const priceCell = sheet.getCell(rowNumber, batchColumn('buying_price_kes'));
+        priceCell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFF4CCCC' },
+        };
+        priceCell.font = { bold: true, color: { argb: 'FF9C0006' } };
+      }
+    });
+    return rowNumbers;
   }
 
   private styleReferenceHeader(sheet: Worksheet): void {
@@ -1615,7 +2199,7 @@ export class ProductTransferService {
     workbook: Workbook,
     values: {
       formatVersion: string;
-      workbookKind: 'price_update' | 'product_create';
+      workbookKind: 'catalog_workbook';
       exportedAt: string;
       stockLocationId?: string;
     }
@@ -1655,13 +2239,23 @@ export class ProductTransferService {
   private priceHeaderMap(sheet: Worksheet): Map<PriceUpdateHeader, number> {
     const actual = new Map<string, number>();
     sheet.getRow(1).eachCell((cell, column) => actual.set(cell.text.trim(), column));
-    const missing = LEGACY_PRICE_UPDATE_HEADERS.filter(header => !actual.has(header));
+    const missing = PRICE_UPDATE_HEADERS.filter(header => !actual.has(header));
     if (missing.length) throw new Error(`Missing columns: ${missing.join(', ')}`);
     return new Map(
       PRICE_UPDATE_HEADERS.flatMap(header => {
         const column = actual.get(header);
         return column ? ([[header, column]] as Array<[PriceUpdateHeader, number]>) : [];
       })
+    );
+  }
+
+  private batchHeaderMap(sheet: Worksheet): Map<BatchHeader, number> {
+    const actual = new Map<string, number>();
+    sheet.getRow(1).eachCell((cell, column) => actual.set(cell.text.trim(), column));
+    const missing = BATCH_HEADERS.filter(header => !actual.has(header));
+    if (missing.length) throw new Error(`Batches missing columns: ${missing.join(', ')}`);
+    return new Map(
+      BATCH_HEADERS.map(header => [header, actual.get(header)!] as [BatchHeader, number])
     );
   }
 
@@ -1745,13 +2339,26 @@ export class ProductTransferService {
     const name = this.text(value);
     if (name.toUpperCase() === 'CLEAR') return null;
     if (!name || name.length > 120) {
-      throw new Error('new_manufacturer must be between 1 and 120 characters or CLEAR');
+      throw new Error('manufacturer must be between 1 and 120 characters or CLEAR');
     }
     return name;
   }
 
   private normalizedManufacturer(value: string | null): string {
     return value?.trim().toLocaleLowerCase() ?? '';
+  }
+
+  private assertListedManufacturer(value: string | null, allowedNames: ReadonlySet<string>): void {
+    if (value !== null && !allowedNames.has(this.normalizedManufacturer(value))) {
+      throw new Error('manufacturer must be selected from the Manufacturers sheet');
+    }
+  }
+
+  private batchNumber(value: unknown, name: string): string | null {
+    const result = this.text(value);
+    if (!result) return null;
+    if (result.length > 120) throw new Error(`${name} must be 120 characters or fewer`);
+    return result;
   }
 
   private quantity(value: unknown, name: string, allowFractional: boolean): number {
@@ -1782,6 +2389,29 @@ export class ProductTransferService {
     return variant ? `${product} — ${variant}` : product;
   }
 
+  private batchRowLabel(row: import('exceljs').Row, headers: Map<BatchHeader, number>): string {
+    const product = this.text(row.getCell(headers.get('product_name')!).value) || 'Product';
+    const variant = this.text(row.getCell(headers.get('variant_name')!).value);
+    const sku = this.text(row.getCell(headers.get('sku')!).value);
+    const batch = this.text(row.getCell(headers.get('batch')!).value);
+    return [product, variant, sku, batch].filter(Boolean).join(' — ');
+  }
+
+  private batchLabel(batch: Pick<InventoryBatchRow, 'batch_number' | 'purchased_at'>): string {
+    const received = batch.purchased_at.slice(0, 10);
+    return batch.batch_number?.trim()
+      ? `${batch.batch_number.trim()} · received ${received}`
+      : `Received ${received}`;
+  }
+
+  private compareBatchesNewestFirst(left: InventoryBatchRow, right: InventoryBatchRow): number {
+    return (
+      right.purchased_at.localeCompare(left.purchased_at) ||
+      right.created_at.localeCompare(left.created_at) ||
+      right.id.localeCompare(left.id)
+    );
+  }
+
   private date(value: unknown): string | null {
     if (value === null || value === undefined || value === '') return null;
     if (value instanceof Date && !Number.isNaN(value.getTime()))
@@ -1807,7 +2437,7 @@ export class ProductTransferService {
     return this.allPages(offset =>
       this.supabase.client
         .from('manufacturers')
-        .select('id,name')
+        .select('id,name,active')
         .order('name')
         .range(offset, offset + 999)
     ) as Promise<ManufacturerRow[]>;
@@ -1827,6 +2457,22 @@ export class ProductTransferService {
         .order('id')
         .range(offset, offset + 999)
     ) as Promise<VariantRow[]>;
+  }
+
+  private async allOpenBatches(stockLocationId: string): Promise<InventoryBatchRow[]> {
+    return this.allPages(offset =>
+      this.supabase.client
+        .from('inventory_batches')
+        .select(
+          'id,variant_id,stock_location_id,batch_number,expiry_date,purchased_at,created_at,quantity,remaining,unit_cost,original_cost,remaining_cost'
+        )
+        .eq('stock_location_id', stockLocationId)
+        .gt('remaining', 0)
+        .order('purchased_at', { ascending: false })
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
+        .range(offset, offset + 999)
+    ) as Promise<InventoryBatchRow[]>;
   }
 
   private async allLocations(): Promise<Array<{ id: string; code: string }>> {

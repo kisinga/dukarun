@@ -7,6 +7,7 @@ const locationId = '85000000-0000-4000-8000-000000000003';
 const productId = '85000000-0000-4000-8000-000000000004';
 const variantId = '85000000-0000-4000-8000-000000000005';
 const manufacturerId = '85000000-0000-4000-8000-000000000006';
+const batchId = '85000000-0000-4000-8000-000000000007';
 const updatedAt = '2026-08-19T08:00:00.000Z';
 
 function authSession() {
@@ -43,6 +44,7 @@ async function mockPriceWorkbookFlow(page: Page) {
   const session = authSession();
   let appliedChanges: unknown = null;
   let appliedProductChanges: unknown = null;
+  let appliedBatchChanges: unknown = null;
   let catalogRefreshes = 0;
   let lastCatalogPriceServed = 100;
   let catalogStock = 10;
@@ -126,7 +128,12 @@ async function mockPriceWorkbookFlow(page: Page) {
       return json({
         company_id: companyId,
         user_id: userId,
-        permissions: ['ManageCatalog', 'ManageStockAdjustments', 'ManageCompanySettings'],
+        permissions: [
+          'ManageCatalog',
+          'ManageStockAdjustments',
+          'ViewFinancials',
+          'ManageCompanySettings',
+        ],
         workspaces: ['dashboard', 'inventory', 'purchasing'],
         actions: {},
       });
@@ -164,6 +171,7 @@ async function mockPriceWorkbookFlow(page: Page) {
       }>;
       appliedChanges = changes;
       appliedProductChanges = payload.p_product_changes;
+      appliedBatchChanges = payload.p_batch_changes;
       if (changes[0]?.new_retail_price !== undefined) {
         variant.price = changes[0].new_retail_price;
       }
@@ -182,6 +190,9 @@ async function mockPriceWorkbookFlow(page: Page) {
         created: 0,
         disabled_variants: 0,
         disabled_products: 0,
+        batch_changes: 1,
+        batches_created: 0,
+        batches_updated: 1,
       });
     }
     if (path.endsWith('/rest/v1/rpc/catalog_cache_families')) {
@@ -252,9 +263,34 @@ async function mockPriceWorkbookFlow(page: Page) {
       ]);
     }
     if (path.endsWith('/rest/v1/manufacturers')) {
-      return json([{ id: manufacturerId, name: manufacturerName }]);
+      return json([
+        { id: manufacturerId, name: manufacturerName, active: true },
+        {
+          id: '85000000-0000-4000-8000-000000000008',
+          name: 'New Dairy',
+          active: true,
+        },
+      ]);
     }
     if (path.endsWith('/rest/v1/product_variants')) return json([variant]);
+    if (path.endsWith('/rest/v1/inventory_batches')) {
+      return json([
+        {
+          id: batchId,
+          variant_id: variantId,
+          stock_location_id: locationId,
+          batch_number: 'PO-104',
+          purchased_at: '2026-08-18T08:00:00.000Z',
+          created_at: '2026-08-18T08:00:00.000Z',
+          quantity: 10,
+          remaining: 6,
+          unit_cost: 0,
+          original_cost: 0,
+          remaining_cost: 0,
+          expiry_date: null,
+        },
+      ]);
+    }
     if (path.endsWith('/rest/v1/stock_locations')) {
       return json([
         {
@@ -273,13 +309,14 @@ async function mockPriceWorkbookFlow(page: Page) {
   return {
     appliedChanges: () => appliedChanges,
     appliedProductChanges: () => appliedProductChanges,
+    appliedBatchChanges: () => appliedBatchChanges,
     catalogRefreshes: () => catalogRefreshes,
     lastCatalogPriceServed: () => lastCatalogPriceServed,
     lastCatalogStockServed: () => lastCatalogStockServed,
   };
 }
 
-test('Settings exports, previews, and applies a price workbook', async ({ page }) => {
+test('Settings exports, previews, and applies the unified catalog workbook', async ({ page }) => {
   const state = await mockPriceWorkbookFlow(page);
   await page.goto('http://127.0.0.1:4203/settings?tab=data');
   await expect(page.getByRole('heading', { name: 'Data import & export' })).toBeVisible();
@@ -295,7 +332,7 @@ test('Settings exports, previews, and applies a price workbook', async ({ page }
 
   const workbook = new Workbook();
   await workbook.xlsx.load(Buffer.concat(chunks));
-  expect(workbook.getWorksheet('_DukaRun Metadata')!.getCell('B2').value).toBe('price_update');
+  expect(workbook.getWorksheet('_DukaRun Metadata')!.getCell('B2').value).toBe('catalog_workbook');
   const sheet = workbook.getWorksheet('Products & Stock')!;
   const headerColumn = (name: string) => {
     let column = 0;
@@ -304,9 +341,14 @@ test('Settings exports, previews, and applies a price workbook', async ({ page }
     });
     return column;
   };
-  sheet.getCell(2, headerColumn('new_manufacturer')).value = 'New Dairy';
+  sheet.getCell(2, headerColumn('manufacturer')).value = 'New Dairy';
   sheet.getCell(2, headerColumn('new_retail_price_kes')).value = 125;
   sheet.getCell(2, headerColumn('new_stock_quantity')).value = 7;
+  expect(sheet.getCell(2, headerColumn('latest_batch')).value).toMatchObject({
+    text: 'PO-104 · received 2026-08-18',
+    hyperlink: "#'Batches'!K2",
+  });
+  sheet.getCell(2, headerColumn('latest_buying_price_kes')).value = 50;
   const edited = Buffer.from(await workbook.xlsx.writeBuffer());
 
   await page.getByRole('button', { name: 'Upload edited workbook' }).click();
@@ -317,11 +359,12 @@ test('Settings exports, previews, and applies a price workbook', async ({ page }
   });
   await expect(page.getByText('Retail: KES 100 → KES 125')).toBeVisible();
   await expect(page.getByText('Manufacturer: Acme → New Dairy')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Batch changes' })).toBeVisible();
   const refreshesBeforeApply = state.catalogRefreshes();
   await page.getByRole('button', { name: 'Apply workbook' }).click();
 
   await expect(page.getByRole('status')).toContainText(
-    'Workbook applied: 0 products created · 0 variants disabled · 0 products disabled · 1 manufacturers · 1 retail · 0 wholesale · 1 stock.'
+    'Workbook applied: 0 products created · 0 variants disabled · 0 products disabled · 1 manufacturers · 1 retail · 0 wholesale · 1 stock · 0 batches created · 1 batches updated.'
   );
   expect(state.appliedChanges()).toEqual([
     {
@@ -338,6 +381,24 @@ test('Settings exports, previews, and applies a price workbook', async ({ page }
       product_id: productId,
       expected_updated_at: updatedAt,
       new_manufacturer_name: 'New Dairy',
+    },
+  ]);
+  expect(state.appliedBatchChanges()).toEqual([
+    {
+      action: 'update',
+      batch_id: batchId,
+      variant_id: variantId,
+      stock_location_id: locationId,
+      latest: true,
+      expected_remaining: 6,
+      expected_unit_cost: 0,
+      expected_remaining_cost: 0,
+      expected_batch_number: 'PO-104',
+      expected_expiry_date: null,
+      new_unit_cost: 50,
+      new_batch_number: 'PO-104',
+      new_expiry_date: null,
+      quantity_added: 0,
     },
   ]);
   await expect.poll(state.catalogRefreshes).toBeGreaterThan(refreshesBeforeApply);
