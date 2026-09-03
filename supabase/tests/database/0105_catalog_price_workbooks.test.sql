@@ -219,6 +219,9 @@ create temp table unified_product_version as
 select id, updated_at from public.products
 where id = (select product_id from unified_product);
 
+select public.upsert_manufacturer('Unified Foods');
+select public.upsert_manufacturer('Millers');
+
 create temp table manufacturer_result as
 select public.apply_catalog_workbook_updates(
   p_product_changes => jsonb_build_array(jsonb_build_object(

@@ -12892,8 +12892,22 @@ export type Database = {
         Returns: string
       }
       apply_catalog_price_updates: { Args: { p_changes: Json }; Returns: Json }
+      apply_catalog_workbook_core: {
+        Args: {
+          p_disable_changes?: Json
+          p_import_id?: string
+          p_product_changes?: Json
+          p_variant_changes?: Json
+        }
+        Returns: Json
+      }
+      apply_catalog_workbook_inventory_changes: {
+        Args: { p_batch_changes?: Json; p_variant_changes?: Json }
+        Returns: Json
+      }
       apply_catalog_workbook_updates: {
         Args: {
+          p_batch_changes?: Json
           p_disable_changes?: Json
           p_import_id?: string
           p_product_changes?: Json
@@ -17037,4 +17051,3 @@ export const Constants = {
     Enums: {},
   },
 } as const
-
