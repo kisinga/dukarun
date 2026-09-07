@@ -361,6 +361,7 @@ $counterPaths = @(
 )
 
 $availableCounterPaths = @()
+$counterFailureDetails = New-Object 'System.Collections.Generic.List[string]'
 foreach ($counterPath in $counterPaths) {
     # Rate counters need two readings before Windows can calculate a valid value.
     # A one-reading probe incorrectly rejected healthy counters on some machines.
@@ -381,12 +382,20 @@ foreach ($counterPath in $counterPaths) {
         else {
             'Windows returned no valid samples'
         }
-        "Counter unavailable: $counterPath ($reason)" | Add-Content -Path $ErrorLog -Encoding UTF8
+        $detail = "$counterPath => $reason"
+        $counterFailureDetails.Add($detail)
+        "Counter unavailable: $detail" | Add-Content -Path $ErrorLog -Encoding UTF8
     }
 }
 
 if ($availableCounterPaths.Count -eq 0) {
-    throw 'No requested Windows performance counters are available on this computer.'
+    $failureContext = @(
+        "PowerShell=$($PSVersionTable.PSVersion)"
+        "WindowsUICulture=$([Globalization.CultureInfo]::InstalledUICulture.Name)"
+        "Administrator=$isAdmin"
+        $counterFailureDetails
+    ) -join [Environment]::NewLine
+    throw "Windows rejected every requested performance counter. The original errors were:$([Environment]::NewLine)$failureContext"
 }
 
 $sampleCount = [Math]::Max(1, [Math]::Floor(($DurationMinutes * 60) / $SampleIntervalSeconds))
