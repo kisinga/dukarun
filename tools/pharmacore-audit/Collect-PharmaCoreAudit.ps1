@@ -362,12 +362,26 @@ $counterPaths = @(
 
 $availableCounterPaths = @()
 foreach ($counterPath in $counterPaths) {
-    try {
-        Get-Counter -Counter $counterPath -MaxSamples 1 -ErrorAction Stop | Out-Null
+    # Rate counters need two readings before Windows can calculate a valid value.
+    # A one-reading probe incorrectly rejected healthy counters on some machines.
+    $probeErrors = @()
+    $probeResults = @(Get-Counter -Counter $counterPath -SampleInterval 1 -MaxSamples 2 `
+        -ErrorAction SilentlyContinue -ErrorVariable probeErrors)
+    $validProbeSamples = @($probeResults | ForEach-Object {
+        $_.CounterSamples | Where-Object { $_.Status -eq 0 -or $_.Status -eq 1 }
+    })
+
+    if ($validProbeSamples.Count -gt 0) {
         $availableCounterPaths += $counterPath
     }
-    catch {
-        "Counter unavailable: $counterPath" | Add-Content -Path $ErrorLog -Encoding UTF8
+    else {
+        $reason = if ($probeErrors.Count -gt 0) {
+            ($probeErrors | ForEach-Object { $_.Exception.Message } | Select-Object -Unique) -join '; '
+        }
+        else {
+            'Windows returned no valid samples'
+        }
+        "Counter unavailable: $counterPath ($reason)" | Add-Content -Path $ErrorLog -Encoding UTF8
     }
 }
 
