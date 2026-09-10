@@ -189,9 +189,9 @@ const PRICE_UPDATE_HEADERS = [
   'expected_latest_expiry_date',
   'product_key',
   'product_name',
+  'variant_name',
   'manufacturer',
   'product_barcode',
-  'variant_name',
   'sku',
   'barcode',
   'kind',
@@ -717,6 +717,7 @@ export class ProductTransferService {
             ? null
             : this.manufacturerUpdateValue(manufacturerValue);
           this.assertListedManufacturer(newManufacturer, allowedManufacturerNames);
+          const newProductName = this.requiredText(value('product_name'), 'product_name');
           const openingQuantityValue = value('new_stock_quantity');
           const openingQuantity = this.blank(openingQuantityValue)
             ? 0
@@ -729,10 +730,10 @@ export class ProductTransferService {
             throw new Error('latest batch details require a positive new_stock_quantity');
           }
           creationSheet.addRow([
-            value('product_key'),
+            newProductName,
             value('product_id'),
             value('variant_id'),
-            value('product_name'),
+            newProductName,
             newManufacturer ?? '',
             value('product_barcode'),
             value('product_active'),
@@ -1620,7 +1621,7 @@ export class ProductTransferService {
     const canEditBatches =
       this.permissions.has('ManageStockAdjustments') && this.permissions.has('ViewFinancials');
     const sheet = workbook.addWorksheet('Products & Stock', {
-      views: [{ state: 'frozen', ySplit: 1, xSplit: 13 }],
+      views: [{ state: 'frozen', ySplit: 1, xSplit: 14 }],
       properties: { tabColor: { argb: '1F4E78' } },
     });
     const column = (header: PriceUpdateHeader) => PRICE_UPDATE_HEADERS.indexOf(header) + 1;
@@ -1716,6 +1717,7 @@ export class ProductTransferService {
       'expected_latest_batch_remaining_value_kes',
       'expected_latest_batch_number',
       'expected_latest_expiry_date',
+      'product_key',
       'expected_stock_quantity',
     ] satisfies PriceUpdateHeader[]) {
       sheet.getColumn(column(header)).hidden = true;
@@ -1839,7 +1841,6 @@ export class ProductTransferService {
           : []),
       ];
       const creationEditable: PriceUpdateHeader[] = [
-        'product_key',
         'product_name',
         'manufacturer',
         'product_barcode',
@@ -1968,7 +1969,7 @@ export class ProductTransferService {
       ],
       [
         'Add products',
-        'Use the blank yellow rows at the bottom. Leave hidden IDs blank, provide a product_key, and repeat that key and product fields for each variant.',
+        'Use the blank yellow rows at the bottom. Repeat the exact same product name, manufacturer, and other product fields on every variant row that belongs to one new product. DukaRun groups those rows for you.',
       ],
       [
         'Disable',

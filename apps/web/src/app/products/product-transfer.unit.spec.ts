@@ -245,11 +245,14 @@ describe('catalog workbooks', () => {
     const workbookMetadata = workbook.getWorksheet('_DukaRun Metadata')!;
 
     expect(sheet.getTable('DukaRunProductsAndStock')).toBeDefined();
-    expect(sheet.views[0]).toMatchObject({ state: 'frozen', xSplit: 13, ySplit: 1 });
+    expect(sheet.views[0]).toMatchObject({ state: 'frozen', xSplit: 14, ySplit: 1 });
     expect(sheet.getColumn(1).hidden).toBe(true);
     expect(sheet.getColumn(2).hidden).toBe(true);
     expect(sheet.getColumn(3).hidden).toBe(true);
     expect(sheet.getColumn(4).hidden).toBe(true);
+    expect(sheet.getColumn(column(sheet, 'product_key')).hidden).toBe(true);
+    expect(column(sheet, 'variant_name')).toBeLessThan(column(sheet, 'manufacturer'));
+    expect(column(sheet, 'manufacturer')).toBe(14);
     expect(sheet.getCell(2, column(sheet, 'product_name')).value).toBe('Tea');
     expect(sheet.getCell(2, column(sheet, 'manufacturer')).value).toBe('Acme');
     expect(sheet.getCell(2, column(sheet, 'stock_value_kes')).value).toBe(500);
@@ -700,7 +703,7 @@ describe('catalog workbooks', () => {
     expect(preview.retailChanges).toBe(1);
   });
 
-  it('treats an appended blank-ID row as a new product', async () => {
+  it('groups appended blank-ID rows into a new product by repeated product name', async () => {
     const instance = service();
     instance.allManufacturers = async () => [
       { id: MANUFACTURER_ID, name: 'Acme', active: true },
@@ -711,31 +714,40 @@ describe('catalog workbooks', () => {
       'Roaster Co',
     ]);
     const sheet = workbook.getWorksheet('Products & Stock')!;
-    const newRow = 3;
-    setCell(sheet, newRow, 'product_key', 'NEW-COFFEE');
-    setCell(sheet, newRow, 'product_name', 'Coffee');
-    setCell(sheet, newRow, 'manufacturer', 'Roaster Co');
-    setCell(sheet, newRow, 'sku', 'COFFEE-1');
-    setCell(sheet, newRow, 'kind', 'good');
-    setCell(sheet, newRow, 'product_active', true);
-    setCell(sheet, newRow, 'variant_active', true);
-    setCell(sheet, newRow, 'track_inventory', true);
-    setCell(sheet, newRow, 'allow_fractional_stock', false);
-    setCell(sheet, newRow, 'new_retail_price_kes', 250);
-    setCell(sheet, newRow, 'new_stock_quantity', 5);
-    setCell(sheet, newRow, 'latest_buying_price_kes', 100);
+    const firstNewRow = 3;
+    const secondNewRow = 4;
+    for (const [rowNumber, variantName, sku, price] of [
+      [firstNewRow, '250g', 'COFFEE-250', 250],
+      [secondNewRow, '500g', 'COFFEE-500', 450],
+    ] as const) {
+      setCell(sheet, rowNumber, 'product_name', 'Coffee');
+      setCell(sheet, rowNumber, 'manufacturer', 'Roaster Co');
+      setCell(sheet, rowNumber, 'variant_name', variantName);
+      setCell(sheet, rowNumber, 'sku', sku);
+      setCell(sheet, rowNumber, 'kind', 'good');
+      setCell(sheet, rowNumber, 'product_active', true);
+      setCell(sheet, rowNumber, 'variant_active', true);
+      setCell(sheet, rowNumber, 'track_inventory', true);
+      setCell(sheet, rowNumber, 'allow_fractional_stock', false);
+      setCell(sheet, rowNumber, 'new_retail_price_kes', price);
+    }
+    setCell(sheet, firstNewRow, 'new_stock_quantity', 5);
+    setCell(sheet, firstNewRow, 'latest_buying_price_kes', 100);
 
     const preview = await instance.previewPriceUpdate(workbook, 'catalog.xlsx', metadata());
     expect(preview.errors).toEqual([]);
-    expect(preview.creationPreview).toMatchObject({ rows: 1, creates: 1 });
+    expect(preview.creationPreview).toMatchObject({ rows: 2, creates: 1 });
     expect(preview.creationPreview?.products[0]).toMatchObject({
-      product_key: 'NEW-COFFEE',
+      product_key: 'Coffee',
       name: 'Coffee',
       manufacturer_name: 'Roaster Co',
-      variants: [{ sku: 'COFFEE-1', price: 250, opening_quantity: 5 }],
+      variants: [
+        { name: '250g', sku: 'COFFEE-250', price: 250, opening_quantity: 5 },
+        { name: '500g', sku: 'COFFEE-500', price: 450 },
+      ],
     });
 
-    setCell(sheet, newRow, 'latest_buying_price_kes', 0);
+    setCell(sheet, firstNewRow, 'latest_buying_price_kes', 0);
     const zeroCost = await instance.previewPriceUpdate(workbook, 'catalog.xlsx', metadata());
     expect(zeroCost.errors.join('\n')).toContain('opening unit cost must be greater than zero');
   });
