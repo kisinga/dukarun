@@ -118,6 +118,7 @@ export interface CatalogPriceUpdatePreview {
   disabledVariants: number;
   disabledProducts: number;
   batchChanges: CatalogBatchChange[];
+  warnings: string[];
   errors: string[];
   conflicts: string[];
 }
@@ -675,6 +676,7 @@ export class ProductTransferService {
     const requestedManufacturerChanges: Array<CatalogManufacturerChange & { rowNumber: number }> =
       [];
     const productChanges: CatalogManufacturerChange[] = [];
+    const warnings: string[] = [];
     const errors: string[] = [];
     const conflicts: string[] = [];
     let rows = 0;
@@ -981,48 +983,57 @@ export class ProductTransferService {
             }
           }
         } else if (hasVisibleBatchValue || quantityAdded > 0) {
-          if (!canEditBatches) {
-            throw new Error(
-              'creating a latest batch requires stock-adjustment and financial access'
-            );
-          }
           if (quantityAdded <= 0) {
-            throw new Error('latest batch details require a stock increase');
+            if (cached && Number(cached.stock ?? 0) === 0) {
+              warnings.push(
+                `Row ${rowNumber}: ${this.priceRowLabel(row, headers)} has no stock or open batch; latest batch details were ignored. Increase stock to create a batch.`
+              );
+            } else {
+              throw new Error('latest batch details require a stock increase');
+            }
+          } else {
+            if (!canEditBatches) {
+              throw new Error(
+                'creating a latest batch requires stock-adjustment and financial access'
+              );
+            }
+            if (this.blank(latestBuyingPriceValue)) {
+              throw new Error('latest_buying_price_kes is required when adding stock');
+            }
+            const newUnitCost = this.wholeMoney(latestBuyingPriceValue, 'latest_buying_price_kes');
+            if (newUnitCost <= 0) {
+              throw new Error(
+                'latest_buying_price_kes must be greater than zero when adding stock'
+              );
+            }
+            const newRemainingCost = Math.round(quantityAdded * newUnitCost);
+            if (!Number.isSafeInteger(newRemainingCost)) {
+              throw new Error('resulting batch value is too large');
+            }
+            mainBatchChanges.push({
+              action: 'create',
+              batchId: null,
+              variantId,
+              stockLocationId: activeLocation.id,
+              productName: cell('product_name').text.trim() || 'Product',
+              variantName: cell('variant_name').text.trim(),
+              sku: cell('sku').text.trim(),
+              batchLabel: latestBatchNumber || 'New latest batch',
+              latest: true,
+              expectedRemaining: 0,
+              currentUnitCost: 0,
+              expectedRemainingCost: 0,
+              currentBatchNumber: null,
+              currentExpiryDate: null,
+              newUnitCost,
+              newBatchNumber: latestBatchNumber,
+              newExpiryDate: latestExpiryDate,
+              newRemainingCost,
+              valueDifference: 0,
+              quantityAdded,
+            });
+            mainBatchChanged = true;
           }
-          if (this.blank(latestBuyingPriceValue)) {
-            throw new Error('latest_buying_price_kes is required when adding stock');
-          }
-          const newUnitCost = this.wholeMoney(latestBuyingPriceValue, 'latest_buying_price_kes');
-          if (newUnitCost <= 0) {
-            throw new Error('latest_buying_price_kes must be greater than zero when adding stock');
-          }
-          const newRemainingCost = Math.round(quantityAdded * newUnitCost);
-          if (!Number.isSafeInteger(newRemainingCost)) {
-            throw new Error('resulting batch value is too large');
-          }
-          mainBatchChanges.push({
-            action: 'create',
-            batchId: null,
-            variantId,
-            stockLocationId: activeLocation.id,
-            productName: cell('product_name').text.trim() || 'Product',
-            variantName: cell('variant_name').text.trim(),
-            sku: cell('sku').text.trim(),
-            batchLabel: latestBatchNumber || 'New latest batch',
-            latest: true,
-            expectedRemaining: 0,
-            currentUnitCost: 0,
-            expectedRemainingCost: 0,
-            currentBatchNumber: null,
-            currentExpiryDate: null,
-            newUnitCost,
-            newBatchNumber: latestBatchNumber,
-            newExpiryDate: latestExpiryDate,
-            newRemainingCost,
-            valueDifference: 0,
-            quantityAdded,
-          });
-          mainBatchChanged = true;
         }
 
         if (
@@ -1179,6 +1190,7 @@ export class ProductTransferService {
       disabledVariants: disableChanges.length,
       disabledProducts: disableChanges.filter(change => change.disableProduct).length,
       batchChanges,
+      warnings,
       errors,
       conflicts,
     };
@@ -1778,8 +1790,6 @@ export class ProductTransferService {
       columns: [{ name: 'manufacturer_name' }],
       rows: ['CLEAR', ...sortedManufacturerChoices].map(name => [name]),
     });
-    manufacturers.getCell('A1').note =
-      'Reference list for the manufacturer dropdown. Manage this list in DukaRun, not in Excel.';
     workbook.definedNames.add(
       `'Manufacturers'!$A$2:$A$${sortedManufacturerChoices.length + 2}`,
       'DukaRunManufacturerChoices'
@@ -2152,9 +2162,6 @@ export class ProductTransferService {
           pattern: 'solid',
           fgColor: { argb: row.latest ? 'FFDDEBF7' : 'FFFFF2CC' },
         };
-        if (row.latest) {
-          cell.note = 'Linked to Products & Stock. Edit the latest batch on the main sheet.';
-        }
       }
       if (!row.latest) {
         sheet.getCell(rowNumber, batchColumn('buying_price_kes')).dataValidation = {
