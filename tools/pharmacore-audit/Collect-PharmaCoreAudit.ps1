@@ -344,6 +344,7 @@ ORDER BY wait_time_ms DESC;
 
 Write-Status "Recording performance for $DurationMinutes minute(s)"
 Write-Host 'Use phAMACore normally now, especially known slow operations.' -ForegroundColor Yellow
+Save-SafeText 'performance-counter-status' { lodctr.exe /q }
 
 $counterPaths = @(
     '\Processor(_Total)\% Processor Time',
@@ -395,7 +396,7 @@ if ($availableCounterPaths.Count -eq 0) {
         "Administrator=$isAdmin"
         $counterFailureDetails
     ) -join [Environment]::NewLine
-    throw "Windows rejected every requested performance counter. The original errors were:$([Environment]::NewLine)$failureContext"
+    throw "The Windows performance-counter library is unavailable: none of its core Processor, System, Memory, PhysicalDisk, or Network Interface objects can be opened. See performance-counter-status.txt. The original errors were:$([Environment]::NewLine)$failureContext"
 }
 
 $sampleCount = [Math]::Max(1, [Math]::Floor(($DurationMinutes * 60) / $SampleIntervalSeconds))
