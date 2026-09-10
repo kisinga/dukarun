@@ -1,4 +1,5 @@
 import type { Workbook, Worksheet } from 'exceljs';
+import JSZip from 'jszip';
 import { describe, expect, it } from 'vitest';
 import {
   ProductTransferService,
@@ -282,12 +283,37 @@ describe('catalog workbooks', () => {
       type: 'pattern',
       fgColor: { argb: 'FFF4CCCC' },
     });
-    expect(workbook.getWorksheet('Batches')!.getCell('S2').note).toContain(
-      'Linked to Products & Stock'
-    );
+    expect(workbook.getWorksheet('Batches')!.getCell('S2').note).toBeUndefined();
+    expect(workbook.getWorksheet('Manufacturers')!.getCell('A1').note).toBeUndefined();
     expect(workbookMetadata.getCell('B1').value).toBe('5');
     expect(workbookMetadata.getCell('B2').value).toBe('catalog_workbook');
     expect(workbookMetadata.getCell('B4').value).toBe(COMPANY_ID);
+  });
+
+  it('serializes batch and manufacturer guidance without comment parts', async () => {
+    const workbook = await service().priceUpdateWorkbook(
+      [
+        row({
+          latest_batch_id: BATCH_ID,
+          latest_batch_label: 'PO-104 · received 2026-08-18',
+          latest_batch_unit_cost: 50,
+          latest_batch_number: 'PO-104',
+        }),
+      ],
+      UPDATED_AT,
+      LOCATION_ID,
+      ['Acme'],
+      [batch({ unit_cost: 50, remaining_cost: 300 })]
+    );
+
+    const archive = await JSZip.loadAsync(await workbook.xlsx.writeBuffer());
+    const commentParts = Object.keys(archive.files).filter(path =>
+      /(?:comments|threadedComments|vmlDrawing)/.test(path)
+    );
+
+    expect(commentParts).toEqual([]);
+    expect(archive.file('xl/worksheets/sheet2.xml')).not.toBeNull();
+    expect(archive.file('xl/worksheets/sheet3.xml')).not.toBeNull();
   });
 
   it('does not count the five blank starter rows against the import limit', async () => {
@@ -477,8 +503,36 @@ describe('catalog workbooks', () => {
     setCell(sheet, 2, 'new_stock_quantity', '');
     const withoutStock = await instance.previewPriceUpdate(workbook, 'catalog.xlsx', metadata());
     expect(withoutStock.batchChanges).toEqual([]);
-    expect(withoutStock.errors.join('\n')).toContain(
-      'latest batch details require a stock increase'
+    expect(withoutStock.errors).toEqual([]);
+    expect(withoutStock.warnings).toEqual([
+      expect.stringContaining(
+        'has no stock or open batch; latest batch details were ignored. Increase stock to create a batch.'
+      ),
+    ]);
+
+    const withExistingBatch = await instance.priceUpdateWorkbook(
+      [
+        row({
+          latest_batch_id: BATCH_ID,
+          latest_batch_label: 'PO-104 · received 2026-08-18',
+          latest_batch_unit_cost: 50,
+          latest_batch_number: 'PO-104',
+        }),
+      ],
+      UPDATED_AT,
+      LOCATION_ID,
+      ['Acme'],
+      [batch({ unit_cost: 50, remaining_cost: 300 })]
+    );
+    instance.allOpenBatches = async () => [batch({ unit_cost: 50, remaining_cost: 300 })];
+    setCell(withExistingBatch.getWorksheet('Products & Stock')!, 2, 'latest_buying_price_kes', '');
+    const missingExistingPrice = await instance.previewPriceUpdate(
+      withExistingBatch,
+      'catalog.xlsx',
+      metadata()
+    );
+    expect(missingExistingPrice.errors.join('\n')).toContain(
+      'latest_buying_price_kes cannot be blank for an existing batch'
     );
   });
 

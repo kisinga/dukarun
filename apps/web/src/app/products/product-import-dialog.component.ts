@@ -104,6 +104,10 @@ import { formatKes } from '../core/money';
                   <p class="type-caption">Issues</p>
                   <p class="font-semibold">{{ data.errors.length + data.conflicts.length }}</p>
                 </div>
+                <div class="rounded-field bg-base-200 p-3">
+                  <p class="type-caption">Warnings</p>
+                  <p class="font-semibold">{{ data.warnings.length }}</p>
+                </div>
               </div>
 
               @if (data.productChanges.length) {
@@ -358,6 +362,21 @@ import { formatKes } from '../core/money';
                       </tbody>
                     </table>
                   </div>
+                </div>
+              }
+
+              @if (data.warnings.length) {
+                <div class="rounded-field border border-warning/40 bg-warning/5 p-3">
+                  <h3 class="text-sm font-semibold">Ignored batch details</h3>
+                  <p class="type-caption mt-1">
+                    These rows have zero stock and no open batch. Their batch details will not be
+                    imported and do not block other changes.
+                  </p>
+                  <ul class="mt-2 max-h-56 list-disc space-y-1 overflow-y-auto pl-5 text-xs">
+                    @for (message of data.warnings; track message) {
+                      <li>{{ message }}</li>
+                    }
+                  </ul>
                 </div>
               }
 
