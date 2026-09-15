@@ -117,7 +117,7 @@ Deno.serve(async request => {
         'The product ID is invalid.'
       );
     }
-    const { data, error } = await db.rpc('storefront_product', {
+    const { data, error } = await db.rpc('storefront_product_units', {
       p_slug: route.slug,
       p_product_id: route.productId,
     });

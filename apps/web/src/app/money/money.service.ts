@@ -231,6 +231,10 @@ export interface ReconcilableAccount {
 }
 
 export interface PurchaseLineInput {
+  new_pack_sale_price?: number;
+  pack_id?: string | null;
+  unit_name?: string;
+  units_per_unit?: number;
   variant_id: string;
   quantity: number;
   unit_cost: number;

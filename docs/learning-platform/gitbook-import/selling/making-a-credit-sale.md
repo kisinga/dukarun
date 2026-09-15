@@ -23,16 +23,18 @@ The task-specific walkthrough is being prepared. For now, watch this Dukarun ove
 
 ## Steps
 
-1. Open **Sell** and add the products the customer is taking.
+1. Open **Sell** and add the products the customer is taking. Choose the individual unit or pack
+   when **Sell as** opens.
 2. Search for and select the customer.
-3. Check the items, quantities, prices, and total.
+3. Check the items, selling units, quantities, prices, and total.
 4. Review the customer's available credit and any downpayment that Dukarun will apply.
 5. Choose **Sell on credit**.
 6. Review **Confirm credit sale**, then choose **Confirm sale**.
 
 ## What changes in Dukarun
 
-Stock falls by the quantity sold. Dukarun records revenue and cost of goods sold. The unpaid amount
+Stock falls by the number of stock units sold: a pack removes all its contents from the variant's
+shared balance. Dukarun records revenue and cost of goods sold. The unpaid amount
 becomes a receivable on the customer's account. Cash only changes for any payment or downpayment
 applied to the sale.
 
@@ -52,3 +54,5 @@ applied to the sale.
 - If **Sell on credit** is unavailable, make sure a customer is selected and approved for credit.
 - Check that the sale fits within the customer's available credit.
 - A credit sale is already revenue. Do not record a second sale when the customer pays later.
+- Pack selection and stock checks work the same as for a cash sale. See
+  [Setting up and using packs](../products/using-product-packs.md).

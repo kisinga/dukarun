@@ -72,7 +72,7 @@ import { IconComponent } from './icon.component';
           </div>
         }
 
-        <div class="modal-body px-4 py-1 md:px-6">
+        <div class="modal-body px-4 py-3 md:px-6">
           <ng-content />
         </div>
 
@@ -135,7 +135,7 @@ import { IconComponent } from './icon.component';
     .task-dialog-panel {
       position: relative;
       padding: 0;
-      background: var(--color-base-100);
+      background: var(--surface-panel);
       box-shadow:
         0 24px 72px -24px rgb(0 0 0 / 0.7),
         0 0 0 1px color-mix(in oklab, var(--color-base-300) 82%, transparent);

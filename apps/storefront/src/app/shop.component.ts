@@ -59,7 +59,7 @@ function formatKes(amount: number): string {
             />
             <div class="min-w-0 flex-1">
               <h1 class="truncate text-lg font-bold tracking-tight sm:text-xl">{{ s.name }}</h1>
-              <p class="truncate text-xs text-base-content/55 sm:text-sm">
+              <p class="truncate text-xs text-base-content/70 sm:text-sm">
                 Local catalogue · direct ordering
               </p>
             </div>
@@ -99,7 +99,7 @@ function formatKes(amount: number): string {
             <section class="overflow-hidden rounded-3xl border border-base-300 bg-base-100">
               <div class="grid gap-6 p-5 sm:p-8 md:grid-cols-[1fr_auto] md:items-end">
                 <div>
-                  <p class="text-xs font-semibold tracking-[0.16em] text-primary uppercase">
+                  <p class="text-xs font-semibold tracking-[0.16em] text-base-content/70 uppercase">
                     Welcome to {{ s.name }}
                   </p>
                   <h2
@@ -249,7 +249,7 @@ function formatKes(amount: number): string {
                 >
                   <span>
                     <span class="block text-lg font-semibold">All products</span>
-                    <span class="mt-1 block text-sm leading-5 text-base-content/55">
+                    <span class="mt-1 block text-sm leading-5 text-base-content/70">
                       Browse the full catalogue.
                     </span>
                   </span>
@@ -270,7 +270,7 @@ function formatKes(amount: number): string {
                   >
                     <span>
                       <span class="block text-lg font-semibold">{{ category.name }}</span>
-                      <span class="mt-1 block text-sm leading-5 text-base-content/55">
+                      <span class="mt-1 block text-sm leading-5 text-base-content/70">
                         {{ category.description || 'Browse this category.' }}
                       </span>
                     </span>
@@ -331,7 +331,7 @@ function formatKes(amount: number): string {
                   </p>
                   <h2 class="mt-1 text-2xl font-bold">{{ activeCategoryName() }}</h2>
                 </div>
-                <p class="text-sm text-base-content/55">
+                <p class="text-sm text-base-content/70">
                   {{ pagedProducts().length }}
                   {{ pagedProducts().length === 1 ? 'product' : 'products' }} on this page
                 </p>
@@ -387,7 +387,7 @@ function formatKes(amount: number): string {
                               {{ product.variantCount }} options
                             </p>
                           }
-                          <p class="mt-auto pt-3 text-base font-bold tabular-nums text-primary">
+                          <p class="mt-auto pt-3 text-base font-bold tabular-nums">
                             {{ productPrice(product) }}
                           </p>
                         </div>
@@ -444,9 +444,7 @@ function formatKes(amount: number): string {
                               </p>
                             }
                           </div>
-                          <p
-                            class="mt-2 shrink-0 text-base font-bold tabular-nums text-primary sm:mt-0"
-                          >
+                          <p class="mt-2 shrink-0 text-base font-bold tabular-nums sm:mt-0">
                             {{ productPrice(product) }}
                           </p>
                         </div>
@@ -460,7 +458,7 @@ function formatKes(amount: number): string {
                     class="mt-8 flex flex-col items-center justify-between gap-4 border-t border-base-300 pt-6 sm:flex-row"
                     aria-label="Product pages"
                   >
-                    <p class="text-sm text-base-content/55">
+                    <p class="text-sm text-base-content/70">
                       Showing products {{ firstResult() }}–{{ lastResult() }}
                     </p>
                     <div class="join">
@@ -494,7 +492,7 @@ function formatKes(amount: number): string {
                   class="mt-4 rounded-2xl border border-dashed border-base-300 bg-base-100 px-5 py-14 text-center"
                 >
                   <p class="text-lg font-semibold">No matching products</p>
-                  <p class="mt-1 text-sm text-base-content/55">
+                  <p class="mt-1 text-sm text-base-content/70">
                     Try another search or browse all products.
                   </p>
                   @if (query() || selectedCategory()) {

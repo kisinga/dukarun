@@ -1,14 +1,18 @@
-import { computed, effect, inject, Injectable, signal, untracked } from '@angular/core';
+import { sellingUnits, type SellingUnit } from '@dukarun/pack-types';
+import { cartLineId, type CartLine } from '../cart.service';
+import { computed, DestroyRef, effect, inject, Injectable, signal, untracked } from '@angular/core';
 import { FormControl } from '@angular/forms';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { debounceTime, distinctUntilChanged } from 'rxjs';
 import { CatalogCacheService } from '../../core/catalog-cache.service';
 import { SupabaseService } from '../../core/supabase.service';
+import { LocationContextService } from '../../core/location-context.service';
 import { ScanFeedbackService } from '../../shared/ui/scan-feedback.service';
 import { MAX_SALE_LINES, CartService } from '../cart.service';
 import { isRapidScannerBurst, isTextEntryTarget } from '../keyboard-wedge';
 import { PosService, Variant, variantLabel } from '../pos.service';
 import { SyncService } from '../offline/sync.service';
+import { ConnectivityService } from '../offline/connectivity.service';
 
 export type CatalogView = 'grid' | 'list' | 'categories';
 
@@ -23,12 +27,80 @@ export type CatalogView = 'grid' | 'list' | 'categories';
  */
 @Injectable()
 export class SellCatalogStore {
+  readonly unitSelection = signal<{ variant: Variant; line: CartLine | null } | null>(null);
+  private unitSelectionRequest = 0;
+
+  async openUnitEditor(line: CartLine): Promise<void> {
+    const request = ++this.unitSelectionRequest;
+    const locationId = this.locations.activeId();
+    this.unitSelection.set(null);
+    this.errorState.set(null);
+    const currentRequest = () =>
+      request === this.unitSelectionRequest &&
+      !this.destroyRef.destroyed &&
+      locationId === this.locations.activeId();
+    try {
+      const variant = this.connectivity.online()
+        ? await this.pos.variantById(line.variant.variant_id!)
+        : this.catalogCache.catalog().find(row => row.variant_id === line.variant.variant_id);
+      if (!currentRequest()) return;
+      if (!variant?.variant_active || !variant.product_active) {
+        throw new Error('This item is no longer available in the catalog.');
+      }
+      if (variant.packs === undefined) {
+        throw new Error('Reconnect and refresh the catalog before changing this selling unit.');
+      }
+      const currentLine = this.cart.findLine(cartLineId(line));
+      if (!currentLine) return;
+      // Refresh the choices without changing the sale's price or conversion until confirmed.
+      this.unitSelection.set({ variant, line: currentLine });
+    } catch (error) {
+      if (currentRequest())
+        this.errorState.set(
+          error instanceof Error ? error.message : 'Could not load current selling units.'
+        );
+    }
+  }
+  closeUnitSelection(): void {
+    ++this.unitSelectionRequest;
+    this.unitSelection.set(null);
+  }
+  availableForSelection(): number {
+    const selection = this.unitSelection();
+    return selection
+      ? (selection.variant.stock ?? 0) -
+          this.cart.stockDemand(
+            selection.variant.variant_id!,
+            selection.line ? cartLineId(selection.line) : undefined
+          )
+      : 0;
+  }
+  chooseUnit(result: { unit: SellingUnit; quantity?: number }): void {
+    const selection = this.unitSelection();
+    if (!selection) return;
+    const saved = selection.line
+      ? this.cart.changeUnit(
+          cartLineId(selection.line),
+          result.unit,
+          result.quantity!,
+          selection.variant
+        )
+      : this.cart.addUnit(selection.variant, result.unit);
+    if (saved) {
+      this.closeUnitSelection();
+      this.errorState.set(null);
+    } else this.errorState.set(this.cart.error() ?? 'Could not add this selling unit.');
+  }
+
   private readonly cart = inject(CartService);
   readonly catalogCache = inject(CatalogCacheService);
   private readonly pos = inject(PosService);
   private readonly scanFeedback = inject(ScanFeedbackService);
   private readonly supabase = inject(SupabaseService);
   private readonly sync = inject(SyncService);
+  private readonly connectivity = inject(ConnectivityService);
+  private readonly locations = inject(LocationContextService);
+  private readonly destroyRef = inject(DestroyRef);
 
   readonly search = new FormControl('', { nonNullable: true });
   private readonly searchQueryState = signal('');
@@ -248,7 +320,7 @@ export class SellCatalogStore {
 
   quantityInCart(variantId: string | null): number {
     if (!variantId) return 0;
-    return this.cart.lines().find(line => line.variant.variant_id === variantId)?.quantity ?? 0;
+    return this.cart.stockDemand(variantId);
   }
 
   unavailable(variant: Variant): boolean {
@@ -259,14 +331,20 @@ export class SellCatalogStore {
     if (variant.kind === 'service') return 'Service';
     if (!variant.track_inventory) return 'In stock';
     const stock = variant.stock ?? 0;
-    return stock > 0 ? `${stock} left` : 'Out of stock';
+    return stock > 0 ? `${stock} ${variant.stock_unit || 'item'} left` : 'Out of stock';
   }
 
   addVariant(variant: Variant): boolean {
     if (this.unavailable(variant)) return false;
+    if (sellingUnits(variant).length > 1) {
+      this.closeUnitSelection();
+      this.unitSelection.set({ variant, line: null });
+      return true;
+    }
     if (this.cart.addVariant(variant)) return true;
     this.errorState.set(
-      `An order can contain at most ${MAX_SALE_LINES} different items. Complete this order, then start another.`
+      this.cart.error() ??
+        `An order can contain at most ${MAX_SALE_LINES} different items. Complete this order, then start another.`
     );
     return false;
   }
@@ -413,7 +491,8 @@ export class SellCatalogStore {
         this.errorState.set(`${this.label(result.variant)} is out of stock at this location.`);
         return;
       }
-      if (this.addVariant(result.variant)) this.scanFeedback.playSuccess();
+      if (this.cart.addVariant(result.variant)) this.scanFeedback.playSuccess();
+      else this.errorState.set(this.cart.error() ?? 'Could not add this unit.');
     } catch (error) {
       this.errorState.set(error instanceof Error ? error.message : 'Barcode lookup failed.');
     } finally {

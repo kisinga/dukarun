@@ -8,9 +8,7 @@ import { Component, input } from '@angular/core';
   selector: 'app-data-table-shell',
   host: { class: 'block' },
   template: `
-    <section
-      class="data-table-shell overflow-hidden rounded-box border border-base-300/70 bg-base-100"
-    >
+    <section class="data-table-shell surface-card overflow-hidden">
       @if (heading() || description()) {
         <header
           class="flex flex-col gap-2 border-b border-base-300/70 px-4 py-3 sm:flex-row sm:items-center"

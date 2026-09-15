@@ -29,7 +29,6 @@ import { EmptyStateComponent } from '../shared/ui/empty-state.component';
 import { IconComponent } from '../shared/ui/icon.component';
 import { MoneyComponent } from '../shared/ui/money.component';
 import { PermissionsService } from '../core/permissions.service';
-import { StatCardComponent } from '../shared/ui/stat-card.component';
 import { StatusBadgeComponent } from '../shared/ui/status-badge.component';
 import { PublicProductLinkService } from './public-product-link.service';
 
@@ -54,7 +53,6 @@ type ShareFeedback = { kind: 'success' | 'error'; message: string };
     EmptyStateComponent,
     IconComponent,
     MoneyComponent,
-    StatCardComponent,
     StatusBadgeComponent,
   ],
   template: `
@@ -65,89 +63,101 @@ type ShareFeedback = { kind: 'success' | 'error'; message: string };
         [title]="group()?.family?.name ?? 'Product'"
         [subtitle]="subtitle()"
       >
+        <ng-container ngProjectAs="[drawerActions]">
+          @if (group(); as group) {
+            @if (canShareProduct(group)) {
+              <button
+                drawerActions
+                appButton
+                variant="ghost"
+                [iconOnly]="true"
+                [loading]="shareBusy()"
+                type="button"
+                title="Share product"
+                aria-label="Share product"
+                (click)="shareProduct(group)"
+              >
+                <app-icon name="heroShare" />
+              </button>
+            }
+            @if (perms.has('ManageStockAdjustments')) {
+              <button
+                drawerActions
+                appButton
+                variant="ghost"
+                [iconOnly]="true"
+                type="button"
+                title="Edit product"
+                aria-label="Edit product"
+                (click)="editProduct.emit(group.family)"
+              >
+                <app-icon name="heroPencilSquare" />
+              </button>
+            }
+          }
+        </ng-container>
         @if (group(); as group) {
-          @if (canShareProduct(group)) {
-            <button
-              drawerActions
-              appButton
-              variant="ghost"
-              [iconOnly]="true"
-              [loading]="shareBusy()"
-              type="button"
-              title="Share product"
-              aria-label="Share product"
-              (click)="shareProduct(group)"
-            >
-              <app-icon name="heroShare" />
-            </button>
-          }
-          @if (perms.has('ManageStockAdjustments')) {
-            <button
-              drawerActions
-              appButton
-              variant="ghost"
-              [iconOnly]="true"
-              type="button"
-              title="Edit product"
-              aria-label="Edit product"
-              (click)="editProduct.emit(group.family)"
-            >
-              <app-icon name="heroPencilSquare" />
-            </button>
-          }
-
-          <div class="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <p class="type-caption">Manufacturer</p>
-              <p class="mt-0.5 text-sm font-semibold">
-                {{ manufacturerName(group.family.manufacturer_id) || 'Manufacturer not set' }}
-              </p>
-            </div>
-            <div class="text-right">
-              <p class="type-caption">Product status</p>
-              <app-status-badge
-                size="xs"
-                [type]="group.family.active ? 'neutral' : 'warning'"
-                [label]="group.family.active ? 'active' : 'inactive'"
-              />
-            </div>
-          </div>
-
-          <div class="mt-3 grid grid-cols-2 gap-2">
-            <app-stat-card label="Variants" [value]="group.variants.length + ''" />
-            <app-stat-card
-              label="Stock"
-              [value]="
-                group.variants.length === 0
-                  ? 'No variants'
-                  : familyTracksInventory(group.variants)
-                    ? familyStock(group.variants) + ' units'
-                    : 'Not tracked'
-              "
-              [sub]="
-                familyTracksInventory(group.variants)
-                  ? fmt(familyRetailStockValue(group.variants)) + ' retail value'
-                  : undefined
-              "
+          <div class="mb-3 flex items-center justify-between gap-2">
+            <span class="type-caption">Product status</span>
+            <app-status-badge
+              size="sm"
+              [type]="group.family.active ? 'success' : 'neutral'"
+              [label]="group.family.active ? 'Active' : 'Inactive'"
             />
           </div>
 
-          <section class="mt-4 border-t border-base-300/60 pt-4">
-            <h3 class="section-title">Categories</h3>
-            @if (!categoryMembershipsComplete()) {
-              <p class="type-caption mt-2">{{ categoryDataStatusLabel() }}</p>
-            } @else if (productCategoryNames(group.family.id); as categoryNames) {
-              @if (categoryNames.length > 0) {
-                <div class="mt-2 flex flex-wrap gap-1.5">
-                  @for (name of categoryNames; track name) {
-                    <span class="badge badge-ghost">{{ name }}</span>
-                  }
-                </div>
-              } @else {
-                <p class="type-caption mt-2">Uncategorized</p>
+          <dl class="surface-card grid grid-cols-2 gap-4 p-4">
+            <div class="min-w-0">
+              <dt class="type-caption">Stock on hand</dt>
+              <dd class="type-hero mt-1 break-words">
+                @if (group.variants.length === 0) {
+                  <span class="text-sm">No variants</span>
+                } @else if (familyTracksInventory(group.variants)) {
+                  {{ familyStock(group.variants) }} <span class="text-sm font-normal">units</span>
+                } @else {
+                  <span class="text-sm">Not tracked</span>
+                }
+              </dd>
+            </div>
+            <div class="min-w-0 border-l border-base-300 pl-4">
+              <dt class="type-caption">Retail value</dt>
+              <dd class="mt-1 break-words text-lg font-semibold tabular-nums">
+                @if (familyTracksInventory(group.variants)) {
+                  <app-money
+                    [amount]="familyRetailStockValue(group.variants)"
+                    [showCurrency]="true"
+                  />
+                } @else {
+                  <span class="text-sm font-normal">Not tracked</span>
+                }
+              </dd>
+            </div>
+          </dl>
+
+          <dl
+            class="my-4 grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-x-4 gap-y-3 text-sm"
+          >
+            <dt class="type-caption">Manufacturer</dt>
+            <dd class="break-words">
+              {{ manufacturerName(group.family.manufacturer_id) || 'Not set' }}
+            </dd>
+            <dt class="type-caption">Categories</dt>
+            <dd>
+              @if (!categoryMembershipsComplete()) {
+                <span class="type-caption">{{ categoryDataStatusLabel() }}</span>
+              } @else if (productCategoryNames(group.family.id); as categoryNames) {
+                @if (categoryNames.length > 0) {
+                  <div class="flex flex-wrap gap-1.5">
+                    @for (name of categoryNames; track name) {
+                      <span class="badge badge-ghost">{{ name }}</span>
+                    }
+                  </div>
+                } @else {
+                  <span class="text-base-content/70">Uncategorized</span>
+                }
               }
-            }
-          </section>
+            </dd>
+          </dl>
 
           @if (familyBarcodeAmbiguous(group)) {
             <div class="alert alert-warning mt-4 text-sm">
@@ -176,9 +186,7 @@ type ShareFeedback = { kind: 'success' | 'error'; message: string };
                 description="Edit the product to add one before selling it."
               />
             } @else {
-              <ul
-                class="overflow-hidden rounded-box border border-base-300/60 bg-base-100 shadow-sm"
-              >
+              <ul class="surface-card overflow-hidden">
                 @for (v of group.variants; track v.variant_id) {
                   <li
                     class="p-3 [&:not(:last-child)]:border-b [&:not(:last-child)]:border-base-200"
@@ -193,7 +201,7 @@ type ShareFeedback = { kind: 'success' | 'error'; message: string };
                         <div class="flex min-w-0 flex-wrap items-center gap-1.5">
                           <p class="truncate text-sm font-semibold">{{ v.variant_name }}</p>
                           @if (!v.variant_active) {
-                            <app-status-badge size="xs" type="warning" label="inactive" />
+                            <app-status-badge size="xs" type="neutral" label="inactive" />
                           }
                         </div>
                         <p class="type-caption mt-0.5">
@@ -215,7 +223,7 @@ type ShareFeedback = { kind: 'success' | 'error'; message: string };
                           <span class="font-mono text-base-content/80">{{ v.barcode }}</span>
                         </p>
                       } @else {
-                        <p class="type-caption text-warning">
+                        <p class="type-caption">
                           No barcode · edit this variant or generate one from Print labels
                         </p>
                       }
@@ -237,21 +245,30 @@ type ShareFeedback = { kind: 'success' | 'error'; message: string };
                       }
                     </div>
 
-                    <div class="mt-3 flex flex-wrap gap-1.5 border-t border-base-200 pt-2">
-                      <button
-                        appButton
-                        variant="outline"
-                        size="sm"
-                        type="button"
-                        [disabled]="!v.variant_active || !v.product_active"
-                        (click)="printLabel.emit(v.variant_id!)"
-                      >
-                        <app-icon name="heroPrinter" /> Print label
-                      </button>
+                    <div class="my-3 flex flex-wrap gap-2 border-t border-base-300/60 pt-3">
+                      @if (
+                        v.kind !== 'service' &&
+                        v.track_inventory &&
+                        perms.has('ManageStockAdjustments')
+                      ) {
+                        <a
+                          appButton
+                          [variant]="
+                            group.variants.length === 1 || selectedVariantId() === v.variant_id
+                              ? 'primary'
+                              : 'secondary'
+                          "
+                          size="sm"
+                          routerLink="/inventory/adjustments"
+                          [queryParams]="{ variant: v.variant_id }"
+                        >
+                          <app-icon name="heroArrowsRightLeft" /> Adjust stock
+                        </a>
+                      }
                       @if (perms.has('ManageStockAdjustments')) {
                         <button
                           appButton
-                          variant="outline"
+                          variant="secondary"
                           size="sm"
                           type="button"
                           (click)="editVariant.emit(group.family.id)"
@@ -259,42 +276,36 @@ type ShareFeedback = { kind: 'success' | 'error'; message: string };
                           <app-icon name="heroPencilSquare" /> Edit
                         </button>
                       }
-                      @if (v.kind !== 'service' && v.track_inventory) {
-                        @if (perms.has('ManageStockAdjustments')) {
-                          <a
-                            appButton
-                            variant="soft"
-                            size="sm"
-                            routerLink="/inventory/adjustments"
-                            [queryParams]="{ variant: v.variant_id }"
-                          >
-                            <app-icon name="heroArrowsRightLeft" /> Adjust stock
-                          </a>
-                        }
-                        <button
-                          appButton
-                          variant="ghost"
-                          size="sm"
-                          type="button"
-                          (click)="toggleBatches(v.variant_id!)"
-                        >
-                          <app-icon name="heroQueueList" />
-                          {{ batchesFor() === v.variant_id ? 'Hide stock lots' : 'Stock lots' }}
-                        </button>
-                      }
                       <button
                         appButton
                         variant="ghost"
                         size="sm"
                         type="button"
-                        (click)="togglePurchaseHistory(v.variant_id!)"
+                        [disabled]="!v.variant_active || !v.product_active"
+                        (click)="printLabel.emit(v.variant_id!)"
                       >
-                        <app-icon name="heroDocumentText" />
-                        {{ purchaseHistoryFor() === v.variant_id ? 'Hide purchases' : 'Purchases' }}
+                        <app-icon name="heroPrinter" /> Print label
                       </button>
                     </div>
+                    @if (v.kind !== 'service' && v.track_inventory) {
+                      <button
+                        class="detail-disclosure"
+                        type="button"
+                        [attr.aria-expanded]="batchesFor() === v.variant_id"
+                        [attr.aria-controls]="'stock-lots-' + v.variant_id"
+                        (click)="toggleBatches(v.variant_id!)"
+                      >
+                        <app-icon name="heroQueueList" />
+                        <span class="flex-1">Stock lots</span>
+                        <app-icon
+                          [name]="
+                            batchesFor() === v.variant_id ? 'heroChevronDown' : 'heroChevronRight'
+                          "
+                        />
+                      </button>
+                    }
                     @if (batchesFor() === v.variant_id) {
-                      <div class="mt-3 rounded-field bg-base-200/70 p-3">
+                      <div class="surface-inset mb-3 p-3" [id]="'stock-lots-' + v.variant_id">
                         <div class="mb-2 flex items-center justify-between gap-2">
                           <h4 class="type-caption">Stock lots</h4>
                           <a routerLink="/suppliers" class="link text-xs">Restock</a>
@@ -326,8 +337,25 @@ type ShareFeedback = { kind: 'success' | 'error'; message: string };
                         </ul>
                       </div>
                     }
+                    <button
+                      class="detail-disclosure"
+                      type="button"
+                      [attr.aria-expanded]="purchaseHistoryFor() === v.variant_id"
+                      [attr.aria-controls]="'purchase-history-' + v.variant_id"
+                      (click)="togglePurchaseHistory(v.variant_id!)"
+                    >
+                      <app-icon name="heroDocumentText" />
+                      <span class="flex-1">Purchase history</span>
+                      <app-icon
+                        [name]="
+                          purchaseHistoryFor() === v.variant_id
+                            ? 'heroChevronDown'
+                            : 'heroChevronRight'
+                        "
+                      />
+                    </button>
                     @if (purchaseHistoryFor() === v.variant_id) {
-                      <div class="mt-3 rounded-field border border-base-300 p-3">
+                      <div class="surface-inset p-3" [id]="'purchase-history-' + v.variant_id">
                         <div class="mb-2 flex items-center justify-between gap-2">
                           <h4 class="type-caption">Purchase history</h4>
                           <span class="type-caption">{{ purchaseHistoryTotal() }} records</span>

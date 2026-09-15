@@ -9,11 +9,11 @@ import { Component, input } from '@angular/core';
   selector: 'app-stat-card',
   host: { class: 'block h-full' },
   template: `
-    <div class="card h-full bg-base-100">
-      <div class="card-body p-4">
+    <div class="surface-card h-full min-w-0">
+      <div class="flex min-w-0 flex-col gap-1 p-4">
         <p class="type-caption">{{ label() }}</p>
         <p
-          class="type-hero mt-1"
+          class="type-hero mt-1 break-words"
           [class.text-success]="tone() === 'success'"
           [class.text-error]="tone() === 'error'"
           [class.text-warning]="tone() === 'warning'"

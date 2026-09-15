@@ -1,3 +1,5 @@
+import { packWholesaleComparison } from '@dukarun/pack-types';
+import { parseKes } from '../core/money';
 import { Component, input, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import type { Variant } from '../pos/pos.service';
@@ -9,6 +11,10 @@ import { StatusBadgeComponent, type BadgeType } from '../shared/ui/status-badge.
 import type { PurchasePriceBasis } from '@dukarun/tax-types';
 
 export interface PurchaseLineForm {
+  packSalePrice?: string;
+  packId?: string | null;
+  unitName?: string;
+  unitsPerUnit?: number;
   key: number;
   variantId: string;
   quantity: number;
@@ -28,7 +34,7 @@ export interface PurchaseLineForm {
 }
 
 export type PurchaseLineDetailField =
-  'batchNumber' | 'expiryDate' | 'wholesalePrice' | 'retailPrice';
+  'batchNumber' | 'expiryDate' | 'wholesalePrice' | 'retailPrice' | 'packSalePrice';
 
 export interface PurchaseLinePriceContext {
   supplierCost: number | null;
@@ -59,9 +65,9 @@ export interface PurchaseLinePriceContext {
       [attr.data-line-key]="line().key"
     >
       <div
-        class="grid gap-x-3 gap-y-2 p-3 md:grid-cols-6 md:items-center xl:grid-cols-[minmax(14rem,1fr)_7rem_10rem_10rem_3rem]"
+        class="grid grid-cols-2 gap-x-3 gap-y-2 p-3 md:grid-cols-6 md:items-center xl:grid-cols-[minmax(11rem,1fr)_5rem_minmax(7rem,9rem)_minmax(7rem,9rem)_2.75rem]"
       >
-        <div class="min-w-0 md:col-span-6 xl:col-auto xl:pr-2">
+        <div class="col-span-2 min-w-0 md:col-span-6 xl:col-auto xl:pr-2">
           <p class="truncate text-sm font-semibold">{{ label() }}</p>
           <p class="type-caption truncate">
             {{ variant()?.sku }} · {{ variant()?.stock ?? 0 }} currently in stock
@@ -72,9 +78,33 @@ export interface PurchaseLinePriceContext {
               · Expires {{ line().expiryDate }}
             }
           </p>
+          @if ((variant()?.packs?.length ?? 0) > 0) {
+            <app-form-field label="Buying unit" class="mt-2 block">
+              <select
+                class="select select-bordered w-full"
+                [ngModelOptions]="{ standalone: true }"
+                [ngModel]="line().packId || ''"
+                (ngModelChange)="packChange.emit($event)"
+              >
+                <option value="">{{ variant()?.stock_unit || 'item' }}</option>
+                @for (pack of variant()?.packs ?? []; track pack.id) {
+                  @if (pack.active) {
+                    <option [value]="pack.id">
+                      {{ pack.name }} · {{ pack.units_per_pack }}
+                      {{ variant()?.stock_unit || 'item' }}
+                    </option>
+                  }
+                }
+              </select>
+              <p class="type-caption mt-1">
+                Adds {{ line().quantity * (line().unitsPerUnit ?? 1) }}
+                {{ variant()?.stock_unit || 'item' }}
+              </p>
+            </app-form-field>
+          }
         </div>
         <app-form-field
-          label="Quantity"
+          [label]="'Quantity in ' + (line().unitName || variant()?.stock_unit || 'item')"
           class="md:col-span-2 xl:col-auto"
           [desktopLabelHidden]="true"
         >
@@ -83,15 +113,19 @@ export interface PurchaseLinePriceContext {
             data-learning-anchor="purchase-item-quantity"
             type="number"
             class="input input-bordered h-11 w-full text-right tabular-nums md:h-10"
-            min="0.001"
-            step="1"
+            [min]="line().packId || !variant()?.allow_fractional ? 1 : 0.001"
+            [step]="line().packId || !variant()?.allow_fractional ? 1 : 0.001"
             [ngModel]="line().quantity"
             [ngModelOptions]="{ standalone: true }"
             (ngModelChange)="quantityChange.emit($event)"
           />
         </app-form-field>
         <app-form-field
-          [label]="priceBasis() === 'exclusive' ? 'Unit cost before VAT' : 'Unit cost (KES)'"
+          [label]="
+            'Cost per ' +
+            (line().unitName || variant()?.stock_unit || 'item') +
+            (priceBasis() === 'exclusive' ? ' before VAT' : ' (KES)')
+          "
           class="md:col-span-2 xl:col-auto"
           [desktopLabelHidden]="true"
         >
@@ -99,6 +133,7 @@ export interface PurchaseLinePriceContext {
             data-learning-anchor="purchase-item-unit-cost"
             class="input input-bordered h-11 w-full text-right tabular-nums md:h-10"
             inputmode="numeric"
+            [placeholder]="'Cost per ' + (line().unitName || variant()?.stock_unit || 'item')"
             [ngModel]="line().unitCost"
             [ngModelOptions]="{ standalone: true }"
             (ngModelChange)="unitCostChange.emit($event)"
@@ -106,6 +141,11 @@ export interface PurchaseLinePriceContext {
         </app-form-field>
         <app-form-field
           [label]="priceBasis() === 'exclusive' ? 'Line total before VAT' : 'Line total (KES)'"
+          [hint]="
+            line().valueSource === 'total'
+              ? 'Exact total; cost is calculated.'
+              : 'Quantity × unit cost.'
+          "
           class="md:col-span-2 xl:col-auto"
           [desktopLabelHidden]="true"
         >
@@ -117,7 +157,7 @@ export interface PurchaseLinePriceContext {
             (ngModelChange)="lineTotalChange.emit($event)"
           />
         </app-form-field>
-        <div class="flex items-center justify-end md:col-span-6 xl:col-auto">
+        <div class="col-span-2 flex items-center justify-end md:col-span-6 xl:col-auto">
           <button
             appButton
             variant="ghost"
@@ -269,7 +309,9 @@ export interface PurchaseLinePriceContext {
                 Changes apply to the product catalogue when the purchase is confirmed.
               </p>
               <div class="mt-3 grid gap-3 md:grid-cols-2">
-                <app-form-field label="Wholesale price (KES)">
+                <app-form-field
+                  [label]="'Wholesale per ' + (variant()?.stock_unit || 'item') + ' (KES)'"
+                >
                   <input
                     class="input input-bordered h-11 w-full text-right md:h-10"
                     inputmode="numeric"
@@ -279,7 +321,9 @@ export interface PurchaseLinePriceContext {
                     (ngModelChange)="changeDetail('wholesalePrice', $event)"
                   />
                 </app-form-field>
-                <app-form-field label="Retail price (KES)">
+                <app-form-field
+                  [label]="'Retail per ' + (variant()?.stock_unit || 'item') + ' (KES)'"
+                >
                   <input
                     class="input input-bordered h-11 w-full text-right md:h-10"
                     inputmode="numeric"
@@ -290,6 +334,22 @@ export interface PurchaseLinePriceContext {
                   />
                 </app-form-field>
               </div>
+              @if (line().packId) {
+                <app-form-field
+                  [label]="'Selling price per ' + (line().unitName || 'pack') + ' (KES)'"
+                  class="mt-3 block"
+                  [hint]="packComparison() || 'Leave blank to keep the current pack price.'"
+                >
+                  <input
+                    class="input input-bordered min-h-11 w-full"
+                    inputmode="numeric"
+                    [readonly]="!canEditPrices()"
+                    [ngModel]="line().packSalePrice || ''"
+                    [ngModelOptions]="{ standalone: true }"
+                    (ngModelChange)="changeDetail('packSalePrice', $event)"
+                  />
+                </app-form-field>
+              }
               @if (!canEditPrices()) {
                 <p class="mt-3 text-sm text-base-content/60">
                   Your role can view catalogue prices but cannot change them.
@@ -310,6 +370,17 @@ export interface PurchaseLinePriceContext {
   `,
 })
 export class PurchaseLineRowComponent {
+  protected packComparison(): string {
+    const price = parseKes(this.line().packSalePrice ?? '');
+    return price === null
+      ? ''
+      : packWholesaleComparison(
+          price,
+          this.line().unitsPerUnit ?? 1,
+          parseKes(this.line().wholesalePrice)
+        );
+  }
+  readonly packChange = output<string>();
   readonly line = input.required<PurchaseLineForm>();
   readonly variant = input<Variant>();
   readonly label = input.required<string>();

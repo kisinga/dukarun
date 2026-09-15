@@ -5,10 +5,7 @@ import { Component, input } from '@angular/core';
   selector: 'app-mobile-list',
   host: { class: 'mobile-list block' },
   template: `
-    <div
-      class="overflow-hidden rounded-box border border-base-300/70 bg-base-100 shadow-card"
-      [class.lg:hidden]="!desktopVisible()"
-    >
+    <div class="surface-card overflow-hidden" [class.lg:hidden]="!desktopVisible()">
       <ng-content />
     </div>
   `,

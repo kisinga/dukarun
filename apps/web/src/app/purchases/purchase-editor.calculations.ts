@@ -110,6 +110,16 @@ export function buildPurchaseLineInputs(input: {
     const exclusive = input.basis === 'exclusive';
     return {
       variant_id: line.variantId,
+      pack_id: line.packId ?? null,
+      unit_name: line.unitName,
+      units_per_unit: line.unitsPerUnit ?? 1,
+      ...(input.canAdjustPrices &&
+      line.packId &&
+      line.packSalePrice?.trim() &&
+      parseKes(line.packSalePrice) !==
+        variant.packs?.find(pack => pack.id === line.packId)?.sale_price
+        ? { new_pack_sale_price: parseKes(line.packSalePrice)! }
+        : {}),
       quantity: line.quantity,
       unit_cost: exclusive ? Math.round(breakdown.gross / line.quantity) : enteredUnitCost,
       line_total: exclusive ? breakdown.gross : enteredLineTotal,

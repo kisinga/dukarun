@@ -21,7 +21,7 @@ export interface PendingProductImage {
   selector: 'app-product-photo-control',
   imports: [ButtonComponent, IconComponent],
   template: `
-    <section class="mt-5 border-t border-base-300 pt-4">
+    <section class="surface-card mt-4 p-4">
       <div>
         <h3 class="section-title">Product photo</h3>
         <p id="product-photo-help" class="type-caption mt-0.5">
@@ -30,9 +30,7 @@ export interface PendingProductImage {
         </p>
       </div>
 
-      <div
-        class="mt-3 rounded-box border border-base-300 bg-base-200/40 p-3 sm:flex sm:items-center sm:gap-4"
-      >
+      <div class="surface-inset mt-3 p-3 sm:flex sm:items-center sm:gap-4">
         <div
           class="mx-auto flex h-36 w-36 shrink-0 items-center justify-center overflow-hidden rounded-box border border-base-300 bg-base-100 sm:mx-0 sm:h-28 sm:w-28"
         >

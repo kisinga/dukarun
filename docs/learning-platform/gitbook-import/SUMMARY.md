@@ -3,6 +3,8 @@
 - [Dukarun Guide](README.md)
 - [Products](products/README.md)
   - [Creating a product](products/creating-a-product.md)
+  - [Setting up and using packs](products/using-product-packs.md)
+  - [Editing product workbooks](products/editing-product-workbooks.md)
   - [Generating product barcodes](products/generating-product-barcodes.md)
 - [Selling](selling/README.md)
   - [Making a cash sale](selling/making-a-cash-sale.md)

@@ -70,6 +70,15 @@ export interface StorefrontPageRpc {
 }
 
 export interface ProductVariantRpc {
+  stock_unit?: string;
+  packs?: Array<{
+    id: string;
+    name: string;
+    units_per_pack: number;
+    sale_price: number;
+    active: boolean;
+    available?: boolean;
+  }>;
   product_id: string;
   product_name: string;
   image_path: string | null;
@@ -263,6 +272,17 @@ export function publicProduct(rows: ProductVariantRpc[], storageOrigin: string) 
           sku: row.sku,
           price: { currency: STOREFRONT_API_CURRENCY, amount: Number(row.price) },
           available: row.available === true,
+          stock_unit: row.stock_unit ?? 'item',
+          packs: (row.packs ?? [])
+            .filter(pack => pack.active && pack.sale_price !== null)
+            .map(pack => ({
+              id: pack.id,
+              name: pack.name,
+              units_per_pack: Number(pack.units_per_pack),
+              sale_price: Number(pack.sale_price),
+              active: true,
+              available: pack.available !== false,
+            })),
         })),
       },
     },

@@ -1,3 +1,4 @@
+import { cartLineId } from '../cart.service';
 import { Component, input, output } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import type { CartLine } from '../cart.service';
@@ -22,6 +23,7 @@ export interface SellCartViewModel {
 }
 
 export type SellCartIntent =
+  | { type: 'unit-edit'; line: CartLine }
   | { type: 'arm-clear' }
   | { type: 'cancel-clear' }
   | { type: 'clear' }
@@ -46,19 +48,17 @@ export type SellCartIntent =
     SellCartLineComponent,
   ],
   template: `
-    <section
-      id="current-sale"
-      class="card order-3 min-w-0 scroll-mt-4 overflow-hidden bg-base-100 xl:col-start-1 xl:row-start-2"
-    >
+    <section id="current-sale" class="order-3 min-w-0 scroll-mt-4 xl:col-start-1 xl:row-start-2">
       <div
-        class="flex items-center justify-between gap-3 border-b border-base-content/15 px-3 py-2.5 sm:px-4 sm:py-3"
+        class="mb-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-base-300 px-1 pb-3"
       >
         <div>
-          <h2 class="type-heading">Current sale</h2>
+          <h2 class="text-lg font-bold tracking-tight">Current sale</h2>
           @if (viewModel().lines.length > 0) {
             <p class="type-caption">
               {{ viewModel().lines.length }}
-              {{ viewModel().lines.length === 1 ? 'product' : 'products' }}
+              {{ viewModel().lines.length === 1 ? 'line' : 'lines' }}
+              · KES
             </p>
           }
         </div>
@@ -91,9 +91,9 @@ export type SellCartIntent =
           } @else {
             <button
               appButton
-              variant="ghost"
-              size="sm"
-              class="text-base-content/60 hover:text-error"
+              variant="outline"
+              size="md"
+              class="hover:text-error"
               [disabled]="viewModel().busy"
               (click)="intent.emit({ type: 'arm-clear' })"
             >
@@ -114,29 +114,27 @@ export type SellCartIntent =
           />
         </div>
       } @else {
-        <div>
-          @for (item of viewModel().lines; track item.line.variant.variant_id) {
-            <div
-              class="border-b border-base-content/15 bg-base-100 last:border-b-0 even:bg-base-200/20"
-            >
+        <div class="space-y-2">
+          @for (item of viewModel().lines; track lineId(item.line)) {
+            <div class="rounded-lg border border-base-300 bg-base-100">
               <app-sell-cart-line
                 [line]="item.line"
                 [label]="item.label"
+                (unitEdit)="intent.emit({ type: 'unit-edit', line: item.line })"
                 [canOverridePrice]="viewModel().canOverridePrices"
-                [floorRejected]="
-                  viewModel().floorRejectedVariantId === item.line.variant.variant_id
-                "
+                [priceEditorOpen]="viewModel().overrideFor === lineId(item.line)"
+                [floorRejected]="viewModel().floorRejectedVariantId === lineId(item.line)"
                 (quantityStep)="
                   intent.emit({
                     type: 'quantity-step',
-                    variantId: item.line.variant.variant_id!,
+                    variantId: lineId(item.line),
                     direction: $event,
                   })
                 "
                 (quantityChanged)="
                   intent.emit({
                     type: 'quantity-change',
-                    variantId: item.line.variant.variant_id!,
+                    variantId: lineId(item.line),
                     quantity: $event,
                   })
                 "
@@ -145,18 +143,17 @@ export type SellCartIntent =
                 "
                 (priceEdit)="intent.emit({ type: 'price-edit', line: item.line })"
                 (priceReset)="intent.emit({ type: 'price-reset', line: item.line })"
-                (removed)="
-                  intent.emit({ type: 'remove', variantId: item.line.variant.variant_id! })
-                "
+                (removed)="intent.emit({ type: 'remove', variantId: lineId(item.line) })"
               />
 
-              @if (viewModel().overrideFor === item.line.variant.variant_id) {
-                <div class="border-t border-base-content/15 bg-base-200/70 p-3 sm:p-4">
+              @if (viewModel().overrideFor === lineId(item.line)) {
+                <div class="surface-inset mx-3 mb-3 p-3 sm:mx-4">
                   <div class="flex items-start justify-between gap-3">
                     <div>
                       <p class="text-sm font-semibold">Set exact unit price</p>
                       <p class="mt-0.5 text-xs text-base-content/60">
-                        Whole KES only. Quick arrows remain the fastest option.
+                        Per {{ item.line.unitName || item.line.variant.stock_unit || 'item' }} ·
+                        whole KES.
                       </p>
                     </div>
                     <button
@@ -221,6 +218,7 @@ export type SellCartIntent =
   `,
 })
 export class SellCartPanelComponent {
+  protected readonly lineId = cartLineId;
   readonly viewModel = input.required<SellCartViewModel>();
   readonly overridePrice = input.required<FormControl<string>>();
   readonly overrideReason = input.required<FormControl<string>>();

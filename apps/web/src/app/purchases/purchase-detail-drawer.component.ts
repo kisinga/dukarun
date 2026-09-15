@@ -1,3 +1,4 @@
+import { transactionUnitLabel } from '@dukarun/pack-types';
 import { Component, effect, inject, input, output } from '@angular/core';
 import { ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -123,7 +124,7 @@ import type { PurchaseRow } from './purchase-history.store';
         </div>
 
         @if (detailPurchase.claim_input_vat && store.permissions.has('ViewFinancials')) {
-          <section class="mt-3 rounded-field border border-base-300 p-3 text-sm">
+          <section class="surface-card mt-3 p-3 text-sm">
             <div class="flex items-center justify-between gap-2">
               <h3 class="section-title">Input VAT</h3>
               <app-status-badge size="xs" type="success" label="Claimed" />
@@ -156,7 +157,7 @@ import type { PurchaseRow } from './purchase-history.store';
           </div>
         } @else {
           <div class="mt-4 flex flex-col gap-4">
-            <section>
+            <section class="surface-card p-4">
               <h3 class="section-title mb-2">Items</h3>
               <ul class="divide-y divide-base-200">
                 @for (line of store.lines(); track line.id) {
@@ -175,7 +176,7 @@ import type { PurchaseRow } from './purchase-history.store';
                         </p>
                       }
                       <p class="type-caption">
-                        {{ line.quantity }} × {{ fmt(line.unit_cost) }}
+                        {{ line.quantity }} {{ unitLabel(line) }} × {{ fmt(line.unit_cost) }}
                         @if (line.expiry_date) {
                           · exp {{ line.expiry_date }}
                         }
@@ -199,7 +200,7 @@ import type { PurchaseRow } from './purchase-history.store';
             </section>
 
             @if (store.expenses().length > 0) {
-              <section class="border-t border-base-300 pt-3">
+              <section class="surface-card p-4">
                 <h3 class="section-title mb-2">Additional expenses</h3>
                 <ul class="divide-y divide-base-200">
                   @for (expense of store.expenses(); track expense.id) {
@@ -212,7 +213,7 @@ import type { PurchaseRow } from './purchase-history.store';
               </section>
             }
 
-            <section class="border-t border-base-300 pt-3">
+            <section class="surface-card p-4">
               <h3 class="section-title mb-2">Payments</h3>
               <ul class="divide-y divide-base-200">
                 @for (payment of store.payments(); track payment.id) {
@@ -230,7 +231,7 @@ import type { PurchaseRow } from './purchase-history.store';
               detailPurchase.paid < detailPurchase.total_cost &&
               store.permissions.has('ManageSupplierCreditPurchases')
             ) {
-              <section class="border-t border-base-300 pt-3">
+              <section class="surface-card p-4">
                 @if (!store.cashierSession.canTakePayment()) {
                   <app-session-required-notice action="paying a supplier" />
                 }
@@ -304,8 +305,8 @@ import type { PurchaseRow } from './purchase-history.store';
               store.permissions.has('ManageSupplierCreditPurchases') &&
               store.permissions.has('ReverseOrder')
             ) {
-              <section class="border-t border-base-300 pt-3">
-                <details class="rounded-field border border-base-300 p-3">
+              <section class="surface-card p-4">
+                <details>
                   <summary class="min-h-11 cursor-pointer py-2 text-sm font-medium">
                     Purchase entered incorrectly?
                   </summary>
@@ -338,6 +339,7 @@ import type { PurchaseRow } from './purchase-history.store';
   `,
 })
 export class PurchaseDetailDrawerComponent {
+  protected readonly unitLabel = transactionUnitLabel;
   readonly purchase = input.required<PurchaseRow>();
   readonly supplierName = input.required<string>();
   readonly closed = output<void>();

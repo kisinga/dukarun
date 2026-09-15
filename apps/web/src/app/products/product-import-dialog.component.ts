@@ -252,6 +252,24 @@ import { formatKes } from '../core/money';
                 </div>
               }
 
+              @if (data.packChanges?.length) {
+                <section class="mt-4 rounded-box border border-base-300 p-4">
+                  <h3 class="section-title">Pack changes</h3>
+                  @for (change of data.packChanges; track change.variant_id) {
+                    <p class="mt-3 font-medium">{{ change.product_name }}</p>
+                    @for (pack of change.packs; track pack.id) {
+                      <p class="text-sm">
+                        {{ pack.name }} · {{ pack.units_per_pack }} {{ change.stock_unit }} ·
+                        {{ pack.sale_price === null ? 'Purchase only' : 'KES ' + pack.sale_price }}
+                        · {{ pack.active ? 'Active' : 'Retired' }}
+                        @if (pack.barcode) {
+                          · {{ pack.barcode }}
+                        }
+                      </p>
+                    }
+                  }
+                </section>
+              }
               @if (data.batchChanges.length) {
                 <div class="rounded-field border border-info/40 bg-info/5 p-3">
                   <h3 class="text-sm font-semibold">Batch changes</h3>
@@ -459,6 +477,7 @@ export class ProductImportDialogComponent {
         preview.productChanges.length > 0 ||
         preview.disableChanges.length > 0 ||
         preview.batchChanges.length > 0 ||
+        (preview.packChanges?.length ?? 0) > 0 ||
         !!preview.creationPreview?.products.length)
     );
   }

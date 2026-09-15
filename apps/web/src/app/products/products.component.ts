@@ -57,8 +57,8 @@ const PRODUCT_SORT_OPTIONS: readonly ListSortOption[] = [
   { value: 'manufacturer', label: 'Manufacturer' },
   { value: 'stock', label: 'Stock quantity' },
   { value: 'cost_value', label: 'Cost value' },
-  { value: 'wholesale_value', label: 'Wholesale value' },
-  { value: 'retail_value', label: 'Retail value' },
+  { value: 'wholesale_value', label: 'Wholesale' },
+  { value: 'retail_value', label: 'Retail' },
   { value: 'variants', label: 'Variant count' },
 ];
 
@@ -874,11 +874,11 @@ export class ProductsComponent implements OnInit {
     );
     return [
       {
-        label: 'Matching products',
+        label: 'Matches',
         value: this.serverMode() && this.serverLoaded() ? this.serverTotal() : groups.length,
         mobilePriority: 'primary' as const,
       },
-      { label: 'Variants shown', value: variants, mobilePriority: 'secondary' as const },
+      { label: 'Variants', value: variants, mobilePriority: 'secondary' as const },
       {
         label: 'Needs restock',
         value: needsRestock,
@@ -886,17 +886,17 @@ export class ProductsComponent implements OnInit {
         mobilePriority: 'primary' as const,
       },
       {
-        label: 'Cost value',
+        label: 'Cost',
         value: this.fmt(this.totalStockValue()),
         mobilePriority: 'secondary' as const,
       },
       {
-        label: 'Wholesale value',
+        label: 'Wholesale',
         value: this.fmt(this.totalWholesaleStockValue()),
         mobilePriority: 'secondary' as const,
       },
       {
-        label: 'Retail value',
+        label: 'Retail',
         value: this.fmt(this.totalRetailStockValue()),
         mobilePriority: 'secondary' as const,
       },

@@ -1,3 +1,4 @@
+import { sellingUnits, type SellingUnit } from '@dukarun/pack-types';
 import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
 import { SupabaseService } from '../core/supabase.service';
 import { offlineDb, offlineScopeKey, type PersistedCart } from './offline/offline-db';
@@ -5,11 +6,24 @@ import { variantLabel, type SaleLineInput, type Variant } from './pos.service';
 import { LocationContextService } from '../core/location-context.service';
 
 export interface CartLine {
+  id?: string;
+  packId?: string | null;
+  unitName?: string;
+  stockUnit?: string;
+  unitsPerUnit?: number;
+  priceSource?: 'retail' | 'wholesale' | 'pack';
   variant: Variant;
   quantity: number;
   unitPrice: number; // shillings
   customPrice: number | null; // shillings; null = no override
   overrideReason: string;
+}
+
+export function cartLineId(line: CartLine): string {
+  return line.id ?? line.variant.variant_id!;
+}
+export function cartStockQuantity(line: CartLine): number {
+  return line.quantity * (line.unitsPerUnit ?? 1);
 }
 
 /**
@@ -24,6 +38,7 @@ export class CartService {
   private readonly supabase = inject(SupabaseService);
   private readonly locations = inject(LocationContextService);
   readonly lines = signal<CartLine[]>([]);
+  readonly error = signal<string | null>(null);
   /** null = Walk-in customer (sent as null customer_id to the RPCs). */
   readonly customerId = signal<string | null>(null);
   readonly customerName = signal('Walk-in');
@@ -80,9 +95,15 @@ export class CartService {
       if (saved && this.activeScope() === key) {
         // Merge instead of overwriting: lines added between scope activation
         // and this restore completing would otherwise be clobbered.
-        const merged = saved.lines.map(line => ({ ...line }));
+        const merged: CartLine[] = saved.lines.map(line => ({
+          ...line,
+          id: cartLineId(line),
+          unitsPerUnit: line.unitsPerUnit ?? 1,
+          unitName: line.unitName ?? line.variant.stock_unit ?? 'item',
+          packId: line.packId ?? null,
+        }));
         for (const line of this.lines()) {
-          const existing = merged.find(l => l.variant.variant_id === line.variant.variant_id);
+          const existing = merged.find(l => cartLineId(l) === cartLineId(line));
           if (existing) {
             existing.quantity += line.quantity;
           } else {
@@ -110,18 +131,50 @@ export class CartService {
   }
 
   addVariant(variant: Variant): boolean {
-    const existing = this.lines().find(l => l.variant.variant_id === variant.variant_id);
-    if (existing) {
-      this.setQuantity(variant.variant_id!, existing.quantity + this.quantityStep(variant));
-      return true;
+    const unit = sellingUnits(variant).find(
+      unit => unit.packId === (variant.selected_pack_id ?? null)
+    );
+    return unit ? this.addUnit(variant, unit) : false;
+  }
+
+  addUnit(variant: Variant, unit: SellingUnit): boolean {
+    this.error.set(null);
+    this.refreshStock(variant);
+    const existing = this.lines().find(
+      line =>
+        line.variant.variant_id === variant.variant_id &&
+        (line.packId ?? null) === unit.packId &&
+        line.customPrice === null &&
+        line.unitPrice === unit.price &&
+        (line.priceSource ?? 'retail') === (unit.packId ? 'pack' : 'retail')
+    );
+    const amount = unit.packId ? 1 : this.quantityStep(variant);
+    if (
+      variant.track_inventory &&
+      this.stockDemand(variant.variant_id!) + amount * unit.factor > (variant.stock ?? 0)
+    ) {
+      this.error.set(`Not enough ${unit.stockUnit} available for ${unit.name}.`);
+      return false;
     }
-    if (this.lines().length >= MAX_SALE_LINES) return false;
+    if (existing) {
+      return this.setQuantity(cartLineId(existing), existing.quantity + amount);
+    }
+    if (this.lines().length >= MAX_SALE_LINES) {
+      this.error.set(`An order can contain at most ${MAX_SALE_LINES} lines.`);
+      return false;
+    }
     this.lines.update(lines => [
       ...lines,
       {
+        id: crypto.randomUUID(),
         variant,
-        quantity: this.quantityStep(variant),
-        unitPrice: variant.price ?? 0,
+        packId: unit.packId,
+        unitName: unit.name,
+        stockUnit: unit.stockUnit,
+        unitsPerUnit: unit.factor,
+        priceSource: unit.packId ? 'pack' : 'retail',
+        quantity: amount,
+        unitPrice: unit.price,
         customPrice: null,
         overrideReason: '',
       },
@@ -129,27 +182,125 @@ export class CartService {
     return true;
   }
 
+  stockDemand(variantId: string, exceptLineId?: string): number {
+    return this.lines()
+      .filter(line => line.variant.variant_id === variantId && cartLineId(line) !== exceptLineId)
+      .reduce((sum, line) => sum + cartStockQuantity(line), 0);
+  }
+
+  findLine(id: string): CartLine | undefined {
+    const exact = this.lines().find(line => cartLineId(line) === id);
+    if (exact) return exact;
+    const legacy = this.lines().filter(line => line.variant.variant_id === id);
+    return legacy.length === 1 ? legacy[0] : undefined;
+  }
+
+  changeUnit(id: string, unit: SellingUnit, quantity: number, variant?: Variant): boolean {
+    const line = this.findLine(id);
+    if (!line) return false;
+    const currentVariant = variant ?? line.variant;
+    if (currentVariant.variant_id !== line.variant.variant_id) return false;
+    const currentUnit = sellingUnits(currentVariant).find(choice => choice.packId === unit.packId);
+    if (!currentUnit) {
+      this.error.set('This selling unit is no longer available.');
+      return false;
+    }
+    if (
+      !Number.isFinite(quantity) ||
+      quantity <= 0 ||
+      ((currentUnit.packId || !currentVariant.allow_fractional) && !Number.isInteger(quantity))
+    )
+      return false;
+    this.refreshStock(currentVariant);
+    if (
+      currentVariant.track_inventory &&
+      this.stockDemand(currentVariant.variant_id!, cartLineId(line)) +
+        quantity * currentUnit.factor >
+        (currentVariant.stock ?? 0)
+    ) {
+      this.error.set(`Not enough ${currentUnit.stockUnit} for this quantity.`);
+      return false;
+    }
+    this.patch(id, {
+      variant: currentVariant,
+      packId: currentUnit.packId,
+      unitName: currentUnit.name,
+      stockUnit: currentUnit.stockUnit,
+      unitsPerUnit: currentUnit.factor,
+      quantity,
+      unitPrice: currentUnit.price,
+      customPrice: null,
+      overrideReason: '',
+      priceSource: currentUnit.packId ? 'pack' : 'retail',
+    });
+    this.error.set(null);
+    return true;
+  }
+
+  /** Refresh shared availability while preserving each line's agreed unit and price. */
+  private refreshStock(variant: Variant): void {
+    this.lines.update(lines =>
+      lines.map(line =>
+        line.variant.variant_id === variant.variant_id
+          ? {
+              ...line,
+              variant: {
+                ...line.variant,
+                stock: variant.stock,
+                track_inventory: variant.track_inventory,
+              },
+            }
+          : line
+      )
+    );
+  }
+
+  /** Restore document intent, including shortages, for explicit review before checkout. */
+  restoreLine(line: CartLine): void {
+    this.lines.update(lines => [...lines, { ...line, id: line.id ?? crypto.randomUUID() }]);
+  }
+
   quantityStep(variant: Variant): number {
     return variant.allow_fractional ? 0.5 : 1;
   }
 
-  setQuantity(variantId: string, quantity: number): void {
-    const line = this.lines().find(l => l.variant.variant_id === variantId);
-    if (!line) return;
-    const normalized = line.variant.allow_fractional ? quantity : Math.round(quantity);
+  setQuantity(variantId: string, quantity: number): boolean {
+    const line = this.findLine(variantId);
+    if (!line) return false;
+    if (
+      !Number.isFinite(quantity) ||
+      ((line.packId || !line.variant.allow_fractional) && !Number.isInteger(quantity))
+    ) {
+      this.error.set(`Enter a whole quantity of ${line.unitName ?? 'items'}.`);
+      return false;
+    }
+    const normalized = quantity;
     if (!(normalized > 0)) {
       this.removeLine(variantId);
-      return;
+      return true;
     }
+    if (
+      line.variant.track_inventory &&
+      this.stockDemand(line.variant.variant_id!, cartLineId(line)) +
+        normalized * (line.unitsPerUnit ?? 1) >
+        (line.variant.stock ?? 0)
+    ) {
+      this.error.set('This quantity exceeds available stock.');
+      return false;
+    }
+    this.error.set(null);
     this.patch(variantId, { quantity: normalized });
+    return true;
   }
 
   setCustomPrice(variantId: string, priceAmount: number | null, reason: string): boolean {
-    const line = this.lines().find(item => item.variant.variant_id === variantId);
+    const line = this.findLine(variantId);
     if (!line) return false;
     if (
       priceAmount !== null &&
-      (!(priceAmount > 0) || priceAmount < (line.variant.wholesale_price ?? 0))
+      (!Number.isSafeInteger(priceAmount) ||
+        !(priceAmount > 0) ||
+        priceAmount < (line.packId ? line.unitPrice : (line.variant.wholesale_price ?? 0)))
     ) {
       return false;
     }
@@ -158,7 +309,9 @@ export class CartService {
   }
 
   removeLine(variantId: string): void {
-    this.lines.update(lines => lines.filter(l => l.variant.variant_id !== variantId));
+    const line = this.findLine(variantId);
+    if (line) this.lines.update(lines => lines.filter(l => cartLineId(l) !== cartLineId(line)));
+    this.error.set(null);
   }
 
   setCustomer(id: string | null, name: string): void {
@@ -173,6 +326,10 @@ export class CartService {
   toSaleLines(): SaleLineInput[] {
     return this.lines().map(l => ({
       variant_id: l.variant.variant_id!,
+      pack_id: l.packId ?? null,
+      units_per_unit: l.unitsPerUnit ?? 1,
+      expected_unit_price: l.unitPrice,
+      price_source: l.priceSource ?? 'retail',
       quantity: l.quantity,
       unit_price: l.unitPrice,
       ...(l.customPrice !== null && l.customPrice !== l.unitPrice
@@ -187,14 +344,17 @@ export class CartService {
 
   private reset(): void {
     this.lines.set([]);
+    this.error.set(null);
     this.customerId.set(null);
     this.customerName.set('Walk-in');
     this.draftId.set(null);
   }
 
   private patch(variantId: string, changes: Partial<CartLine>): void {
+    const target = this.findLine(variantId);
+    if (!target) return;
     this.lines.update(lines =>
-      lines.map(l => (l.variant.variant_id === variantId ? { ...l, ...changes } : l))
+      lines.map(l => (cartLineId(l) === cartLineId(target) ? { ...l, ...changes } : l))
     );
   }
 }

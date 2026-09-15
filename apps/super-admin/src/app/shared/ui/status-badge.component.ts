@@ -30,7 +30,7 @@ export class StatusBadgeComponent {
     const typeClass = `badge-${this.type()}`;
     const sizeClass = `badge-${this.size()}`;
     const gapClass = this.showIcon() ? 'gap-1' : '';
-    return `badge ${typeClass} ${sizeClass} ${gapClass}`;
+    return `badge badge-soft ${typeClass} ${sizeClass} ${gapClass}`;
   });
 }
 

@@ -2,6 +2,7 @@ import { Injectable, PLATFORM_ID, computed, effect, inject, signal } from '@angu
 import { isPlatformBrowser } from '@angular/common';
 import { environment } from '../environments/environment';
 import {
+  storefrontLineId,
   buildStorefrontCartMessage,
   formatCartKes,
   sanitizeCartQuantity,
@@ -26,6 +27,7 @@ export class StorefrontCartService {
   private readonly activeShop = signal<StorefrontCartShop | null>(null);
   private readonly restoredSlug = signal<string | null>(null);
 
+  readonly lineId = storefrontLineId;
   readonly lines = signal<StorefrontCartLine[]>([]);
   readonly count = computed(() => storefrontCartCount(this.lines()));
   readonly total = computed(() => storefrontCartTotal(this.lines()));
@@ -60,9 +62,9 @@ export class StorefrontCartService {
     const shop = this.activeShop();
     if (!shop || line.shopSlug !== shop.slug) return false;
     const amount = sanitizeCartQuantity(quantity);
-    const existing = this.lines().find(item => item.variantId === line.variantId);
+    const existing = this.lines().find(item => storefrontLineId(item) === storefrontLineId(line));
     if (existing) {
-      this.setQuantity(line.variantId, existing.quantity + amount);
+      this.setQuantity(storefrontLineId(line), existing.quantity + amount);
       return true;
     }
     if (this.lines().length >= MAX_CART_LINES) return false;
@@ -73,19 +75,26 @@ export class StorefrontCartService {
   setQuantity(variantId: string, quantity: number): void {
     const normalized = sanitizeCartQuantity(quantity);
     this.lines.update(lines =>
-      lines.map(line => (line.variantId === variantId ? { ...line, quantity: normalized } : line))
+      lines.map(line =>
+        storefrontLineId(line) === variantId ? { ...line, quantity: normalized } : line
+      )
     );
   }
 
   remove(variantId: string): void {
-    this.lines.update(lines => lines.filter(line => line.variantId !== variantId));
+    this.lines.update(lines => lines.filter(line => storefrontLineId(line) !== variantId));
   }
 
   clear(): void {
     this.lines.set([]);
   }
 
-  lineLabel(line: Pick<StorefrontCartLine, 'productName' | 'variantName'>): string {
+  lineLabel(
+    line: Pick<
+      StorefrontCartLine,
+      'productName' | 'variantName' | 'unitName' | 'unitsPerUnit' | 'stockUnit'
+    >
+  ): string {
     return storefrontCartLineLabel(line);
   }
 

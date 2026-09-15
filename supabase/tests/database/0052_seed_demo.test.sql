@@ -103,6 +103,8 @@ select results_eq(
     group by v.sku
     order by v.sku$$,
   $$values
+    ('MM-EGG'::text, 97::numeric),
+    ('MM-MILK500'::text, 75::numeric),
     ('SUG1'::text, 40::numeric),
     ('SUGL'::text, 30::numeric),
     ('UNGA2'::text, 50::numeric)$$,
