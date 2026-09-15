@@ -8,14 +8,16 @@ device's normal print settings. No scanner driver or browser hardware permission
 1. Connect the scanner and set it to **USB HID keyboard** mode.
 2. Configure its suffix as **Enter**. A fast Tab suffix also works.
 3. Open **POS → Sell**, then scan a known product.
-4. A successful scan adds one unit and plays a short confirmation sound.
+4. A successful scan adds the matching selling unit and plays a short confirmation sound. A pack
+   barcode adds one whole pack; a base barcode uses the variant's normal quantity step.
 
 Scans work from the product search or any non-text control on the Sell screen. DukaRun leaves
 customer, quantity, price, and payment fields alone while they are being edited.
 
 If a scan fails:
 
-- Confirm the barcode appears on the product's active variant.
+- Confirm the barcode appears on the active variant or an active pack with a selling price.
+- For a pack, confirm that the current location has enough stock for the complete pack.
 - Confirm the scanner types the complete value, including leading zeroes.
 - Remove duplicate barcodes reported on the Products page.
 - When offline, refresh the catalogue after reconnecting if DukaRun says the cache is incomplete.
@@ -42,6 +44,16 @@ are scaled down to fit the label as a best effort.
 
 DukaRun opens the system print dialog for every print job. Silent/direct USB printing is not part
 of this integration.
+
+### Pack labels
+
+Set pack barcodes in the product editor. Automatic generation assigns base-variant barcodes only.
+For a single variant, use **Label for** to select the individual unit or a sellable pack. Catalogue
+printing includes both when their codes are ready. Pack labels include the unit name and contents;
+test that the label adds the expected pack and price on the Sell screen.
+
+See [Setting up and using packs](learning-platform/gitbook-import/products/using-product-packs.md)
+for barcode retirement, stock conversion, and offline behaviour.
 
 ### Troubleshooting
 

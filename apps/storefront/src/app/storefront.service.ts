@@ -8,12 +8,13 @@ import {
 } from '@angular/core';
 import { isPlatformServer } from '@angular/common';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import type { PackCatalogue, ProductPack } from '@dukarun/pack-types';
 import type { Database } from '@dukarun/shared-types';
 import { environment } from '../environments/environment';
 
 export type StorefrontInfo = Database['public']['Views']['public_storefronts']['Row'];
 export type CatalogRow =
-  Database['public']['Functions']['storefront_catalog_page']['Returns'][number];
+  Database['public']['Functions']['storefront_catalog_page']['Returns'][number] & PackCatalogue;
 export interface CatalogPageRow {
   product_id: string;
   product_name: string;
@@ -82,6 +83,8 @@ interface ApiProductResponse {
       manufacturer: ApiManufacturer | null;
       variants: Array<{
         id: string;
+        stock_unit?: string;
+        packs?: ProductPack[];
         name: string;
         kind: string;
         sku: string;
@@ -499,12 +502,12 @@ export class StorefrontService {
       );
       const request = await fetch(requestUrl, { headers: { Accept: 'application/json' } });
       if (!environment.production && request.status === 404) {
-        const { data, error } = await this.client.rpc('storefront_product', {
+        const { data, error } = await this.client.rpc('storefront_product_units', {
           p_slug: slug,
           p_product_id: productId,
         });
         if (error) throw error;
-        return data;
+        return data as unknown as CatalogRow[];
       }
       if (!request.ok) throw new Error(`storefront_product_failed:${request.status}`);
       const product = ((await request.json()) as ApiProductResponse).data.product;
@@ -519,6 +522,8 @@ export class StorefrontService {
         kind: variant.kind,
         sku: variant.sku,
         price: variant.price.amount,
+        stock_unit: variant.stock_unit,
+        packs: variant.packs,
         available: variant.available,
         total_count: 1,
       }));

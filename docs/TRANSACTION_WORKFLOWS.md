@@ -11,48 +11,149 @@ would otherwise point at the deleted document. Completed and parked orders are n
 they use the controlled reversal or settlement workflows instead. Deleting a proforma does not
 require an open cashier session because it has no stock, payment, or ledger effect.
 
-## Product opening stock
+## Product creation, packs, and opening stock
 
-`create_catalog_product` creates the family, variants and optional opening stock atomically.
-Each positive opening quantity creates an inventory batch and movement. Opening value posts
-`DR INVENTORY / CR OPENING_BALANCE_EQUITY`. Services and non-tracked goods reject opening
-stock, fractional quantities follow the variant setting, and stock locations are tenant scoped.
+The product editor calls `save_catalog_product_units(p_product, p_variants, p_client_ref)`. The
+aggregate saves the product, variants, pack definitions, photo reference, categories, VAT treatment,
+and optional opening stock in one database transaction. The existing catalogue creation/update
+helpers run inside it. Product and pack edits require `ManageStockAdjustments`; category and VAT
+treatment writes also enforce their existing `ManageCatalog` checks.
+
+`p_client_ref` is a UUID scoped to the company. `catalog_save_requests` retains the request and
+result, so retrying an identical save does not duplicate a product or opening stock. Reusing the
+reference with a different payload raises `idempotency_conflict`. Image uploads retain the same
+upload identity on retry; storage cleanup cannot delete an image currently attached to a product.
+
+Each variant has a named `stock_unit`. A `variant_packs` row belongs to that variant and contains a
+name, immutable whole `units_per_pack` greater than one, optional independent `sale_price`, optional
+barcode, and active flag. Packs require whole-quantity goods. A null selling price permits buying
+but excludes the pack from selling. Retirement preserves the identity used by completed documents
+and queued transactions. Only active packs reserve their barcode, so replacements can reuse a
+retired code. Active pack and effective base-variant barcodes cannot collide.
+
+Opening quantities are sent in stock units. The editor converts whole opening packs plus loose
+units before submitting. Each positive quantity creates a batch and movement. `opening_total_cost`
+preserves exact acquisition value; rounded `opening_unit_cost` is only a per-stock-unit estimate.
+Opening value posts `DR INVENTORY / CR OPENING_BALANCE_EQUITY`, with no supplier invoice or payment.
+Services and non-tracked goods reject opening stock, fractional quantities follow the variant
+setting, and stock locations are tenant scoped. Opening stock is only accepted for new variants.
+
+The operator instructions are in [Creating a product](learning-platform/gitbook-import/products/creating-a-product.md)
+and [Setting up and using packs](learning-platform/gitbook-import/products/using-product-packs.md).
+
+## Sales, held drafts, and offline replay
+
+Sale lines carry `pack_id`, `units_per_unit`, `expected_unit_price`, and `price_source` alongside
+quantity and price intent. `resolve_transaction_unit` validates the active variant, whole pack
+quantity, and pack ownership; `resolve_sale_units` checks current pricing and conversion. An
+ordinary unit uses retail or authorized wholesale pricing. A pack uses its own selling price and
+price floor, independently of the wholesale equivalent for its contents.
+
+Cart lines have distinct IDs so individual units and multiple packs of one variant can coexist.
+Their combined `quantity * units_per_unit` competes for the same location stock. Changing a cart
+line's unit resets its price to the configured value and removes its custom-price adjustment.
+Opening the unit editor loads the current variant, packs, and location stock online, or uses the
+latest catalog snapshot offline. The existing line keeps its price and conversion until the
+cashier confirms the edit. Confirmation uses the refreshed stock for the selected line and its
+sibling selling units.
+
+`order_lines`, `purchase_lines`, and `tax_document_lines` retain `pack_id`, `unit_name`,
+`stock_unit_name`, and `units_per_unit`. Their generated `stock_quantity` drives inventory and
+quantity analytics; document quantities and totals remain in the selected transaction unit.
+Completed unit snapshots cannot be rewritten by later catalogue changes. Fiscal integration
+envelopes express quantities in base stock units and preserve the exact document totals.
+
+`save_draft` rejects legacy payloads that omit conversion metadata when replacing a pack-bearing
+draft. Checkout also enforces this in `prepare_sale_order_core`, before creating a replacement
+order and deleting the source draft. The source is locked for the check. The idempotency lookup
+runs first, allowing a successful checkout to be retried after its source draft has been deleted.
+The shared core covers immediate, cashier, fulfillment, and offline checkout paths that replace a
+draft.
+
+Sales acquire the shared company `catalog-units` advisory lock before locking a source draft or
+resolving variant/pack rows. Catalog and purchase writers acquire the exclusive lock before their
+row locks. Sales can resolve concurrently, while a catalog edit waits without holding the cache
+journal needed by an in-flight sale. Legacy product, price, barcode, and workbook RPCs follow the
+same order; row triggers alone cannot establish it because an UPDATE has already locked its row.
+
+Offline carts and outbox entries retain pack identity, conversion, and expected price. A changed
+price or unavailable pack can reject replay instead of silently repricing money already collected.
+Queued sales remain distinct from completed server transactions; review their status in Pending
+sync. Reopening a held sale checks current pack availability, prices, and total stock demand.
+
+`complete_order_core` consumes FIFO using stock quantities and persists each line's COGS. A full
+refund with return-to-stock restores the original movement quantities and exact acquisition costs,
+including multiple lines that consumed the same batch.
 
 ## Purchases
 
-- `save_purchase_draft` stores editable intent and has no stock, AP, cash, or ledger effect.
-- `confirm_purchase_draft` calls the same receiving path as an immediate purchase and only
-  marks the draft confirmed if receiving and accounting succeed.
-- `record_purchase` retains purchase lines, receiving location, batch/expiry metadata, notes,
-  reference, and purchase date. It creates batches, movements and the balanced journal.
-- `record_purchase_with_prices` validates optional wholesale/retail changes first, posts the
-  purchase through `record_purchase`, and updates only the selected variant prices in the same
-  transaction. The selling price is one value per variant: duplicate lines for the same variant
-  must agree on the new price or the purchase is rejected with
-  `conflicting_new_prices_for_variant`. Drafts retain these choices and use the same path when
-  confirmed.
-- `record_purchase_with_payment` and `confirm_purchase_draft_with_payment` accept the initial
-  amount paid. Zero records credit, the full total records paid now, and an in-between amount
-  records a credit purchase plus its allocated supplier payment atomically.
-- `record_purchase_complete` is the purchase-workspace contract. Each line carries both unit cost
-  and line total plus the user's authoritative input. Total-authoritative lines retain the exact
-  invoice amount; batch `original_cost`/`remaining_cost` carry that value through FIFO so final
-  COGS cannot lose a rounding residual.
+- `save_purchase_workspace_draft` stores receiving, invoice, price-basis, expense, and settlement
+  intent. Saving has no stock, AP, cash, or ledger effect. `save_purchase_draft_complete` resolves
+  pack definitions and snapshots the selected buying units into the draft.
+- `finalize_purchase_draft` and `finalize_purchase_draft_core` revalidate intent, call
+  `record_purchase_complete_core`, apply account payments or supplier advances, and mark the draft
+  confirmed only if the whole transaction succeeds. Compatibility RPCs such as
+  `record_purchase_complete` and `record_purchase_with_prices` feed the same aggregate.
+- Each purchase line's quantity and unit cost refer to the selected buying unit. The last explicit
+  input (`value_source`: `unit` or `total`) determines its value. A total-authoritative line keeps
+  the exact invoice amount; batch `original_cost`/`remaining_cost` preserve the recognized value
+  through FIFO rather than reconstructing it from rounded per-piece costs.
+- `new_wholesale_price` and `new_retail_price` refer to a stock unit. `new_pack_sale_price` refers
+  to the whole selected pack. Updates require `ManageStockAdjustments` and apply on confirmation.
+  Conflicting prices for a shared variant or pack reject the purchase. Supplier cost is an
+  independent input, never derived from these selling prices.
 - Purchase-associated expenses post in the same transaction. Supplier-bill expenses increase the
   invoice/AP total; separately paid expenses credit their selected asset account immediately.
   Both debit `EXPENSES`, remain linked to the purchase, and never affect product-cost intelligence.
-- Purchase drafts retain receiving, payment, exact line totals, and expense intent. Draft save has
-  no stock, cash, AP, or journal effect; confirmation revalidates every account and permission.
+- Purchase reversal requires the received stock and its full original cost to remain available.
+  The check compares batch remaining quantity to the purchase line's `stock_quantity`, so a
+  two-box purchase is compared with its full contents, not the document quantity of two.
 - `pay_purchase` allocates payment to one purchase; `pay_supplier` remains the oldest-first
   supplier-level shortcut.
 
-`supplier_variant_performance` derives weighted average, latest and range costs from durable
-purchase lines. It powers supplier comparisons without maintaining a second mutable score.
+`supplier_variant_performance` derives weighted average, latest and range costs per stock unit
+from durable purchase lines. It powers supplier comparisons without maintaining a second mutable score.
 Suppliers are archived rather than deleted because purchases, inventory batches and journal
 history retain their identity. Archiving is blocked while AP or an open purchase draft exists.
 
 Paid purchases and supplier payments require an open cashier session at the journal boundary.
 Credit purchases do not move money and remain available with the till closed.
+
+### Purchase and catalogue lock order
+
+Every purchase path takes the company `catalog-units:` transaction advisory lock before locking
+draft, variant, or pack rows. This includes ordinary receipts with no selling-price changes, draft
+save/edit, and confirmation of an existing draft. Receiving still emits catalogue stock changes,
+so taking unit locks first can deadlock with a product editor holding catalogue cache-journal locks.
+The workspace and finalizer wrappers acquire the lock before selecting the draft `FOR UPDATE`;
+the internal receivers retain the same order for direct callers. Transactions for different
+companies use different lock keys.
+
+## Catalogue cache, workbooks, and storefront
+
+- `catalog_pack_definitions` hydrates pack metadata into variant rows used by the shared catalogue
+  cache, search, product editing, and purchasing. Pack writes notify the existing variant cache
+  journal. Legacy cached rows without pack metadata cannot establish unique offline barcode matches.
+- `resolve_catalog_selling_unit` returns the variant and an explicit `selected_pack_id`; scanning
+  a pack adds that unit directly. Automatic barcode assignment remains base-variant-only.
+- Version 6 product workbooks add a **Packs** sheet. `apply_catalog_workbook_units` validates
+  `expected_packs` against current definitions and atomically applies pack, catalogue, stock, and
+  batch changes. Pack-only updates are supported. Omitted pack rows preserve definitions;
+  `active=false` retires them. New products need a fresh export before pack rows can reference them.
+- `new_remaining_value_kes` becomes `new_remaining_cost` for an open-batch correction. The exact
+  value applies to remaining stock before counted additions; consumed COGS stays unchanged. Version
+  5 workbooks remain readable without the new optional sheets and fields.
+- `storefront_product_units` extends the existing public visibility boundary with stock-unit names
+  and active sellable packs. The API exposes price and availability, excluding cost, wholesale,
+  barcodes, and exact stock. Public baskets distinguish variant-plus-pack identities; WhatsApp
+  messages identify the unit and estimated total. They do not reserve stock or post a sale.
+- The published `storefront-v1.yaml` uses JSON syntax, a YAML-compatible representation. The
+  formatter is configured to preserve JSON because the contract test parses it with `JSON.parse`.
+
+Apply the pack migrations through `0171_sale_catalog_lock_order` before releasing the
+corresponding clients. Baseline historical lines default to a conversion factor of one. Regression
+coverage lives in `0120_product_packs.test.sql`, `packs.concurrency.spec.mjs`, the cart/product/purchase
+component tests, and the storefront API contract tests.
 
 ## Customer credit
 

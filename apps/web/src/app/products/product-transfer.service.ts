@@ -1,3 +1,4 @@
+import { addPackWorksheet, readPackChanges, type CatalogPackChange } from './product-pack-workbook';
 import { Injectable, inject } from '@angular/core';
 import type { Cell, Workbook, Worksheet } from 'exceljs';
 import { CatalogCacheService } from '../core/catalog-cache.service';
@@ -97,6 +98,7 @@ export interface CatalogBatchChange {
   newUnitCost: number;
   newBatchNumber: string | null;
   newExpiryDate: string | null;
+  exactRemainingCost?: number;
   newRemainingCost: number;
   valueDifference: number;
   quantityAdded: number;
@@ -117,6 +119,7 @@ export interface CatalogPriceUpdatePreview {
   disableChanges: CatalogDisableChange[];
   disabledVariants: number;
   disabledProducts: number;
+  packChanges?: CatalogPackChange[];
   batchChanges: CatalogBatchChange[];
   warnings: string[];
   errors: string[];
@@ -213,6 +216,7 @@ const PRICE_UPDATE_HEADERS = [
   'latest_buying_price_kes',
   'latest_expiry_date',
   'tax_category_code',
+  'new_remaining_value_kes',
 ] as const;
 
 const BATCH_HEADERS = [
@@ -236,6 +240,7 @@ const BATCH_HEADERS = [
   'batch_number',
   'buying_price_kes',
   'expiry_date',
+  'new_remaining_value_kes',
 ] as const;
 
 type Header = (typeof HEADERS)[number];
@@ -446,7 +451,10 @@ export class ProductTransferService {
     const workbook = await createExcelWorkbook();
     await workbook.xlsx.load(await file.arrayBuffer());
     const metadata = this.readMetadata(workbook);
-    if (metadata['workbook_kind'] === 'catalog_workbook' && metadata['format_version'] === '5') {
+    if (
+      metadata['workbook_kind'] === 'catalog_workbook' &&
+      ['5', '6'].includes(metadata['format_version'])
+    ) {
       return this.previewPriceUpdate(workbook, file.name, metadata);
     }
     if (metadata['workbook_kind'] === 'inventory_report') {
@@ -910,7 +918,14 @@ export class ProductTransferService {
             throw new Error('latest_buying_price_kes cannot be blank for an existing batch');
           }
           const newUnitCost = this.wholeMoney(latestBuyingPriceValue, 'latest_buying_price_kes');
+          const exactValue = headers.has('new_remaining_value_kes')
+            ? this.rawCell(cell('new_remaining_value_kes'))
+            : '';
+          const exactRemainingCost = this.blank(exactValue)
+            ? undefined
+            : this.wholeMoney(exactValue, 'new_remaining_value_kes');
           const edited =
+            (exactRemainingCost !== undefined && exactRemainingCost !== expectedRemainingCost) ||
             newUnitCost !== expectedUnitCost ||
             latestBatchNumber !== expectedBatchNumber ||
             latestExpiryDate !== expectedExpiryDate;
@@ -946,12 +961,12 @@ export class ProductTransferService {
               );
             } else {
               const correctedRemainingValue =
-                newUnitCost === expectedUnitCost
+                exactRemainingCost ??
+                (newUnitCost === expectedUnitCost
                   ? expectedRemainingCost
-                  : Math.round(currentBatch.remaining * newUnitCost);
-              const newRemainingCost = Math.round(
-                (currentBatch.remaining + quantityAdded) * newUnitCost
-              );
+                  : Math.round(currentBatch.remaining * newUnitCost));
+              const newRemainingCost =
+                correctedRemainingValue + Math.round(quantityAdded * newUnitCost);
               if (
                 !Number.isSafeInteger(correctedRemainingValue) ||
                 !Number.isSafeInteger(newRemainingCost)
@@ -977,6 +992,7 @@ export class ProductTransferService {
                 newBatchNumber: latestBatchNumber,
                 newExpiryDate: latestExpiryDate,
                 newRemainingCost,
+                exactRemainingCost,
                 valueDifference: correctedRemainingValue - expectedRemainingCost,
                 quantityAdded,
               });
@@ -1174,6 +1190,7 @@ export class ProductTransferService {
       conflicts
     );
     const batchChanges = [...mainBatchChanges, ...otherBatchChanges];
+    const packChanges = readPackChanges(workbook, errors);
 
     return {
       kind: 'catalog_workbook',
@@ -1191,6 +1208,7 @@ export class ProductTransferService {
       disabledVariants: disableChanges.length,
       disabledProducts: disableChanges.filter(change => change.disableProduct).length,
       batchChanges,
+      packChanges,
       warnings,
       errors,
       conflicts,
@@ -1253,7 +1271,14 @@ export class ProductTransferService {
           'buying_price_kes'
         );
         const newExpiryDate = this.date(this.rawCell(cell('expiry_date')));
+        const exactValue = headers.has('new_remaining_value_kes')
+          ? this.rawCell(cell('new_remaining_value_kes'))
+          : '';
+        const exactRemainingCost = this.blank(exactValue)
+          ? undefined
+          : this.wholeMoney(exactValue, 'new_remaining_value_kes');
         const edited =
+          (exactRemainingCost !== undefined && exactRemainingCost !== expectedRemainingCost) ||
           newUnitCost !== expectedUnitCost ||
           newBatchNumber !== expectedBatchNumber ||
           newExpiryDate !== expectedExpiryDate;
@@ -1289,9 +1314,10 @@ export class ProductTransferService {
         const product = variant ? currentProductsById.get(variant.product_id) : undefined;
         if (!variant || !product) throw new Error('batch product no longer exists');
         const newRemainingCost =
-          newUnitCost === expectedUnitCost
+          exactRemainingCost ??
+          (newUnitCost === expectedUnitCost
             ? expectedRemainingCost
-            : Math.round(current.remaining * newUnitCost);
+            : Math.round(current.remaining * newUnitCost));
         if (!Number.isSafeInteger(newRemainingCost)) {
           throw new Error('resulting batch value is too large');
         }
@@ -1314,6 +1340,7 @@ export class ProductTransferService {
           newBatchNumber,
           newExpiryDate,
           newRemainingCost,
+          exactRemainingCost,
           valueDifference: newRemainingCost - current.remaining_cost,
           quantityAdded: 0,
         });
@@ -1454,6 +1481,7 @@ export class ProductTransferService {
       preview.productChanges.length === 0 &&
       preview.disableChanges.length === 0 &&
       preview.batchChanges.length === 0 &&
+      !preview.packChanges?.length &&
       !preview.creationPreview?.products.length
     ) {
       throw new Error('Workbook has no changes.');
@@ -1497,6 +1525,9 @@ export class ProductTransferService {
       expected_batch_number: change.currentBatchNumber,
       expected_expiry_date: change.currentExpiryDate,
       new_unit_cost: change.newUnitCost,
+      ...(change.exactRemainingCost !== undefined
+        ? { new_remaining_cost: change.exactRemainingCost }
+        : {}),
       new_batch_number: change.newBatchNumber,
       new_expiry_date: change.newExpiryDate,
       quantity_added: change.quantityAdded,
@@ -1504,7 +1535,8 @@ export class ProductTransferService {
     const importId = preview.creationPreview
       ? await this.stageProductCreate(preview.creationPreview)
       : null;
-    const { data, error } = await this.supabase.client.rpc('apply_catalog_workbook_updates', {
+    const { data, error } = await this.supabase.client.rpc('apply_catalog_workbook_units', {
+      p_pack_changes: (preview.packChanges ?? []) as never,
       p_variant_changes: variantChanges as never,
       p_product_changes: productChanges as never,
       p_disable_changes: disableChanges as never,
@@ -1665,6 +1697,7 @@ export class ProductTransferService {
         latest_buying_price_kes: row.latest_batch_unit_cost ?? '',
         latest_expiry_date: row.latest_batch_expiry_date ?? '',
         tax_category_code: '',
+        new_remaining_value_kes: '',
       };
       return PRICE_UPDATE_HEADERS.map(header => values[header]);
     });
@@ -1935,6 +1968,20 @@ export class ProductTransferService {
       priceCell.font = { bold: true, color: { argb: 'FF9C0006' } };
     });
 
+    addPackWorksheet(
+      workbook,
+      this.catalogCache
+        .catalog()
+        .filter(variant => rows.some(row => row.variant_id === variant.variant_id))
+    );
+    sheet.getColumn(column('new_remaining_value_kes')).width = 26;
+    for (let row = 2; row <= rows.length + 1; row++) {
+      sheet.getCell(row, column('new_remaining_value_kes')).fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFFFF2CC' },
+      };
+    }
     const manifest = workbook.addWorksheet('_DukaRun Exported Rows', { state: 'veryHidden' });
     manifest.addRow([
       'variant_id',
@@ -1984,7 +2031,14 @@ export class ProductTransferService {
         'Yellow cells are the only intended input cells. Manufacturer and latest-batch fields are prefilled because they edit the linked records directly.',
       ],
       ['New prices', 'Enter whole Kenyan shillings in the yellow new-price columns.'],
-      ['New stock', 'Enter the counted quantity for the location shown in the stock columns.'],
+      [
+        'New stock',
+        'Enter the counted BASE STOCK quantity for the location shown. Prices on Products & Stock are per base stock unit.',
+      ],
+      [
+        'Packs',
+        'Packs share base stock. Edit pack name, selling price, barcode or active. Blank selling price means purchase only. Contents of existing packs are fixed. To add a pack, copy a row for that variant and clear its pack_id. Set active to FALSE to retire; deleting rows does nothing. Create new products before adding their packs in an exported workbook.',
+      ],
       [
         'Latest batch',
         'Latest batch number, buying price, and expiry edit the linked open batch. If none exists, increasing stock creates one from these fields.',
@@ -1999,7 +2053,7 @@ export class ProductTransferService {
       ],
       [
         'Batch valuation',
-        'A batch cost correction updates the value of its remaining stock. It does not rewrite past sales or cost of goods sold. Every correction and valuation difference is shown in the preview.',
+        'Enter an exact total in new_remaining_value_kes when the cost does not divide evenly per stock unit. This overrides the unit-cost calculation for the current remaining quantity, before any counted additions. A batch cost correction updates the value of its remaining stock. It does not rewrite past sales or cost of goods sold. Every correction and valuation difference is shown in the preview.',
       ],
       [
         'Stock permission',
@@ -2035,7 +2089,7 @@ export class ProductTransferService {
     };
 
     this.addMetadata(workbook, {
-      formatVersion: '5',
+      formatVersion: '6',
       workbookKind: 'catalog_workbook',
       exportedAt,
       stockLocationId,
@@ -2096,6 +2150,7 @@ export class ProductTransferService {
           row.latest && mainRow
             ? linkedValue('latest_expiry_date', mainRow, row.expiry_date ?? '')
             : (row.expiry_date ?? ''),
+          '',
         ];
       }),
     });
@@ -2155,6 +2210,7 @@ export class ProductTransferService {
       for (const header of [
         'batch_number',
         'buying_price_kes',
+        'new_remaining_value_kes',
         'expiry_date',
       ] satisfies BatchHeader[]) {
         const cell = sheet.getCell(rowNumber, batchColumn(header));
@@ -2247,7 +2303,9 @@ export class ProductTransferService {
   private priceHeaderMap(sheet: Worksheet): Map<PriceUpdateHeader, number> {
     const actual = new Map<string, number>();
     sheet.getRow(1).eachCell((cell, column) => actual.set(cell.text.trim(), column));
-    const missing = PRICE_UPDATE_HEADERS.filter(header => !actual.has(header));
+    const missing = PRICE_UPDATE_HEADERS.filter(
+      header => header !== 'new_remaining_value_kes' && !actual.has(header)
+    );
     if (missing.length) throw new Error(`Missing columns: ${missing.join(', ')}`);
     return new Map(
       PRICE_UPDATE_HEADERS.flatMap(header => {
@@ -2260,10 +2318,14 @@ export class ProductTransferService {
   private batchHeaderMap(sheet: Worksheet): Map<BatchHeader, number> {
     const actual = new Map<string, number>();
     sheet.getRow(1).eachCell((cell, column) => actual.set(cell.text.trim(), column));
-    const missing = BATCH_HEADERS.filter(header => !actual.has(header));
+    const missing = BATCH_HEADERS.filter(
+      header => header !== 'new_remaining_value_kes' && !actual.has(header)
+    );
     if (missing.length) throw new Error(`Batches missing columns: ${missing.join(', ')}`);
     return new Map(
-      BATCH_HEADERS.map(header => [header, actual.get(header)!] as [BatchHeader, number])
+      BATCH_HEADERS.flatMap(header =>
+        actual.has(header) ? [[header, actual.get(header)!] as [BatchHeader, number]] : []
+      )
     );
   }
 

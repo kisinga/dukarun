@@ -3,6 +3,7 @@ import {
   buildStorefrontCartMessage,
   storefrontCartCount,
   storefrontCartTotal,
+  storefrontLineId,
   type StorefrontCartLine,
 } from './storefront-cart.models';
 
@@ -50,4 +51,23 @@ describe('storefront cart helpers', () => {
     expect(message).toContain('Estimated total: KES 650');
     expect(message).toContain('Catalogue: https://store.dukarun.com/fixture-shop');
   });
+});
+
+it('keeps pack and piece basket identities separate and quotes the selected unit', () => {
+  const piece = lines[0];
+  const pack = {
+    ...piece,
+    packId: 'bundle',
+    unitName: 'Bundle',
+    stockUnit: 'packet',
+    unitsPerUnit: 10,
+    price: 1500,
+    quantity: 2,
+  };
+  expect(storefrontLineId(pack)).not.toBe(storefrontLineId(piece));
+  expect(storefrontCartTotal([piece, pack])).toBe(3330);
+  const message = buildStorefrontCartMessage('Shop', [pack], '/shop');
+  expect(message).toContain('Bundle (10 packet)');
+  expect(message).toContain('Qty: 2');
+  expect(message).toContain('Line: KES 3,000');
 });

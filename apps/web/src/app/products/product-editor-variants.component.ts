@@ -1,3 +1,4 @@
+import { ProductPacksEditorComponent } from './product-packs-editor.component';
 import { Component, input, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import type { BusinessLocation } from '../core/location-context.service';
@@ -21,7 +22,14 @@ import type {
  */
 @Component({
   selector: 'app-product-editor-variants',
-  imports: [FormsModule, ButtonComponent, FormFieldComponent, IconComponent, MoneyComponent],
+  imports: [
+    ProductPacksEditorComponent,
+    FormsModule,
+    ButtonComponent,
+    FormFieldComponent,
+    IconComponent,
+    MoneyComponent,
+  ],
   template: `
     <section>
       <div class="mb-4">
@@ -39,7 +47,7 @@ import type {
       } @else {
         <div class="space-y-2">
           @for (row of rows(); track row.key; let index = $index) {
-            <section class="rounded-box bg-base-200/60 p-3">
+            <section class="surface-card p-4">
               <div class="mb-3 flex min-h-11 items-center justify-between gap-3">
                 <h4 class="type-heading">
                   {{
@@ -86,7 +94,10 @@ import type {
                     [ngModelOptions]="{ standalone: true }"
                   />
                 </app-form-field>
-                <app-form-field label="Retail price (KES)" [required]="true">
+                <app-form-field
+                  [label]="'Retail price per ' + (row.stockUnit || 'item') + ' (KES)'"
+                  [required]="true"
+                >
                   <input
                     type="text"
                     inputmode="numeric"
@@ -171,7 +182,10 @@ import type {
                       </button>
                     </div>
                   </app-form-field>
-                  <app-form-field label="Wholesale price (KES)" hint="Optional">
+                  <app-form-field
+                    [label]="'Wholesale price per ' + (row.stockUnit || 'item') + ' (KES)'"
+                    hint="Optional"
+                  >
                     <input
                       type="text"
                       inputmode="numeric"
@@ -216,6 +230,31 @@ import type {
               </details>
 
               @if (row.kind !== 'service') {
+                <app-form-field
+                  label="Stock unit"
+                  hint="What one existing stock quantity represents. Naming it does not convert stock."
+                >
+                  <input
+                    class="input input-bordered w-full"
+                    placeholder="item, tablet, capsule"
+                    maxlength="40"
+                    [ngModel]="row.stockUnit || 'item'"
+                    [ngModelOptions]="{ standalone: true }"
+                    (ngModelChange)="patch(index, { stockUnit: $event })"
+                  />
+                </app-form-field>
+                @if (!row.allowFractional) {
+                  <app-product-packs-editor
+                    [packs]="row.packs ?? []"
+                    [savedIds]="row.savedPackIds ?? []"
+                    [stockUnit]="row.stockUnit || 'item'"
+                    [wholesale]="parseAmount(row.wholesale)"
+                    (changed)="patch(index, { packs: $event })"
+                  />
+                }
+              }
+
+              @if (row.kind !== 'service') {
                 <div class="flex flex-wrap gap-x-6 gap-y-1 border-t border-base-300/70 pt-2">
                   <label class="flex min-h-11 cursor-pointer items-center gap-2">
                     <input
@@ -253,6 +292,47 @@ import type {
                     <span class="font-normal text-base-content/60">(optional)</span>
                   </summary>
                   <div class="grid gap-4 pt-2 sm:grid-cols-2 lg:grid-cols-3">
+                    <app-form-field label="Opening stock unit">
+                      <select
+                        class="select select-bordered w-full"
+                        [ngModel]="row.openingPackId || ''"
+                        [ngModelOptions]="{ standalone: true }"
+                        (ngModelChange)="patch(index, { openingPackId: $event })"
+                      >
+                        <option value="">{{ row.stockUnit || 'item' }}</option>
+                        @for (pack of row.packs ?? []; track pack.id) {
+                          @if (pack.active) {
+                            <option [value]="pack.id">
+                              {{ pack.name }} · {{ pack.units_per_pack }}
+                              {{ row.stockUnit || 'item' }}
+                            </option>
+                          }
+                        }
+                      </select>
+                    </app-form-field>
+                    @if (row.openingPackId) {
+                      <app-form-field [label]="'Loose ' + (row.stockUnit || 'item')">
+                        <input
+                          class="input input-bordered w-full"
+                          inputmode="numeric"
+                          [ngModel]="row.openingLooseQuantity || ''"
+                          [ngModelOptions]="{ standalone: true }"
+                          (ngModelChange)="patch(index, { openingLooseQuantity: $event })"
+                        />
+                      </app-form-field>
+                    }
+                    <app-form-field
+                      label="Total opening value (KES)"
+                      hint="Optional exact acquisition value; overrides the unit-cost calculation."
+                    >
+                      <input
+                        class="input input-bordered w-full"
+                        inputmode="numeric"
+                        [ngModel]="row.openingTotalCost || ''"
+                        [ngModelOptions]="{ standalone: true }"
+                        (ngModelChange)="patch(index, { openingTotalCost: $event })"
+                      />
+                    </app-form-field>
                     <app-form-field label="Quantity">
                       <input
                         type="text"
@@ -311,11 +391,7 @@ import type {
                       <div class="self-end pb-3 text-sm text-base-content/60">
                         Opening value
                         <strong class="ml-1 text-base-content">
-                          <app-money
-                            [amount]="
-                              +row.openingQuantity * (parseAmount(row.openingUnitCost) ?? 0)
-                            "
-                          />
+                          <app-money [amount]="openingValue(row)" />
                         </strong>
                       </div>
                     }
@@ -378,6 +454,17 @@ export class ProductEditorVariantsComponent {
 
   protected stockOf(variantId: string): ProductEditorStockInfo | undefined {
     return this.stockLookup()(variantId);
+  }
+
+  protected openingValue(row: ProductEditorRow): number {
+    if (row.openingTotalCost?.trim()) return parseKes(row.openingTotalCost) ?? 0;
+    const pack = row.packs?.find(pack => pack.id === row.openingPackId && pack.active);
+    const factor = pack?.units_per_pack ?? 1;
+    const loose = pack ? Number(row.openingLooseQuantity || 0) : 0;
+    return Math.round(
+      ((Number(row.openingQuantity || 0) * factor + loose) * (parseKes(row.openingUnitCost) ?? 0)) /
+        factor
+    );
   }
 
   protected parseAmount(value: string): number | null {

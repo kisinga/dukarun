@@ -7,6 +7,13 @@ stores guide progress or article copy.
 Use the [learning platform next steps](NEXT_STEPS.md) for the GitBook publication and real-app video
 pilot sequence.
 
+The local GitBook source now covers the product editor's **Selling & stock** step, pack definitions,
+exact opening value, pack purchasing and selling, barcode labels, and version 6 workbook edits.
+Import the updated `gitbook-import/SUMMARY.md` with its articles when publishing. The two new
+written guides are **Setting up and using packs** and **Editing product workbooks**; they do not
+introduce new Usertour flow IDs. Existing hosted interactive guides and videos need a separate
+content update to match these controls; editing these Markdown files does not publish them.
+
 ## Use these names consistently
 
 | Name              | Owner    | Meaning                                                     |

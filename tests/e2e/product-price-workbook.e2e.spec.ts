@@ -163,7 +163,7 @@ async function mockPriceWorkbookFlow(page: Page) {
         { id: locationId, code: 'MAIN', name: 'Main shop', is_default: true, is_primary: true },
       ]);
     }
-    if (path.endsWith('/rest/v1/rpc/apply_catalog_workbook_updates')) {
+    if (path.endsWith('/rest/v1/rpc/apply_catalog_workbook_units')) {
       const payload = request.postDataJSON();
       const changes = payload.p_variant_changes as Array<{
         new_retail_price?: number;

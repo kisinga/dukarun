@@ -14,8 +14,8 @@ credit sale and rises after the customer pays.
 
 ## Barcode
 
-A code that a scanner or camera can read to identify a product variant. Each sellable variant should
-have one unique barcode.
+A code that a scanner or camera can read to identify a variant and selling unit. Individual units
+and sellable packs use different active barcodes.
 
 ## Cash received
 
@@ -81,6 +81,13 @@ supplier bill still needs to be paid.
 Money the business owes a supplier. An unpaid credit purchase creates a payable. Recording the
 supplier payment reduces it.
 
+## Pack
+
+A named group of whole stock units of one variant, such as a tray of 30 eggs. Packs share the
+variant's stock balance and have an independent optional selling price and barcode. Blank selling
+price means purchase-only. Saved contents are fixed; retire the pack and create a replacement to
+change them.
+
 ## Payment terms
 
 The agreed number of days allowed before payment is due.
@@ -102,7 +109,8 @@ even when a credit customer will pay later.
 
 ## Selling price
 
-The amount charged to the customer for one unit of a product variant before any sale-level change.
+The amount charged for the selected selling unit before a sale-level adjustment. Retail and
+wholesale prices refer to one stock unit. A pack has its own price for all its contents.
 
 ## Stock location
 
@@ -111,6 +119,11 @@ A shop, stockroom, or warehouse where tracked stock is kept.
 ## Stock on hand
 
 The quantity of a tracked product variant currently recorded at a stock location.
+
+## Stock unit
+
+What one inventory quantity represents, such as an egg, bottle, or tablet. Purchases and sales in
+packs convert to this unit when changing stock. Naming the unit does not convert existing stock.
 
 ## Supplier
 
@@ -123,11 +136,12 @@ may require a till to be opened before taking or making a payment.
 
 ## Unit cost
 
-What the business paid or expects to pay a supplier for one unit. Dukarun uses recorded costs when
-calculating stock value and cost of goods sold.
+What the business paid or expects to pay for one selected buying unit, such as a box. Inventory
+costs refer to stock units. Exact invoice and batch values are retained when division would round
+the per-stock-unit cost.
 
 ## Variant
 
-A specific sellable version of a product, such as a size, colour, or pack size. For example, "2 kg"
-can be a variant of Dola Maize Flour. Stock quantities, prices, SKUs, and barcodes belong to the
-variant.
+A version of a product with its own stock identity, such as a size or colour. For example, a sealed
+"2 kg" bag can be a variant of Dola Maize Flour. Use a pack for several units of the same variant
+that share stock, such as a carton containing twelve of those bags.

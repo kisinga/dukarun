@@ -33,13 +33,15 @@ import { StorefrontService } from './storefront.service';
           (click)="close()"
         ></button>
         <aside
-          class="absolute right-0 bottom-0 left-0 max-h-[88vh] overflow-hidden rounded-t-3xl border border-base-300 bg-base-100 shadow-lg sm:top-0 sm:left-auto sm:h-full sm:max-h-none sm:w-[26rem] sm:rounded-none"
+          class="absolute right-0 bottom-0 left-0 flex max-h-[88dvh] flex-col overflow-hidden rounded-t-3xl border border-base-300 bg-base-100 shadow-lg sm:top-0 sm:left-auto sm:h-full sm:max-h-none sm:w-[26rem] sm:rounded-none"
         >
-          <div class="flex h-full flex-col">
-            <header class="flex items-start gap-3 border-b border-base-300 px-5 py-4">
+          <div class="flex min-h-0 flex-1 flex-col">
+            <header
+              class="storefront-chrome flex shrink-0 items-start gap-3 border-b border-base-300 px-5 py-4"
+            >
               <div class="min-w-0 flex-1">
                 <p id="basket-title" class="text-lg font-bold">Basket</p>
-                <p class="mt-0.5 text-sm text-base-content/55">
+                <p class="mt-0.5 text-sm text-base-content/70">
                   {{ shop().name }} will confirm availability on WhatsApp.
                 </p>
               </div>
@@ -53,12 +55,12 @@ import { StorefrontService } from './storefront.service';
               </button>
             </header>
 
-            <div class="flex-1 overflow-y-auto px-5 py-4">
+            <div class="storefront-basket-body min-h-0 flex-1 overflow-y-auto px-5 py-4">
               @if (cart.lines().length) {
                 <div class="flex flex-col gap-3">
-                  @for (line of cart.lines(); track line.variantId) {
+                  @for (line of cart.lines(); track cart.lineId(line)) {
                     <article
-                      class="grid grid-cols-[4.5rem_minmax(0,1fr)] gap-3 rounded-2xl border border-base-300 p-3"
+                      class="storefront-surface grid grid-cols-[4.5rem_minmax(0,1fr)] gap-3 p-3"
                     >
                       <div class="aspect-square overflow-hidden rounded-xl bg-[#eee8df]">
                         @if (imageUrl(line.imagePath); as image) {
@@ -81,39 +83,39 @@ import { StorefrontService } from './storefront.service';
                             <h3 class="line-clamp-2 text-sm leading-snug font-semibold">
                               {{ cart.lineLabel(line) }}
                             </h3>
-                            <p class="mt-1 text-sm font-bold tabular-nums text-primary">
+                            <p class="mt-1 text-sm font-bold tabular-nums">
                               {{ cart.formatKes(line.price) }}
                             </p>
                           </div>
                           <button
                             type="button"
-                            class="btn btn-ghost btn-square btn-sm text-base-content/45"
+                            class="btn btn-ghost btn-square btn-sm min-h-11 min-w-11 text-base-content/65"
                             aria-label="Remove item"
-                            (click)="cart.remove(line.variantId)"
+                            (click)="cart.remove(cart.lineId(line))"
                           >
                             <ng-icon name="heroTrash" size="1rem" aria-hidden="true" />
                           </button>
                         </div>
 
-                        <div class="mt-3 flex items-center justify-between gap-3">
+                        <div class="mt-3 flex flex-wrap items-center justify-between gap-3">
                           <div class="join">
                             <button
                               type="button"
-                              class="btn join-item btn-sm min-h-10"
+                              class="btn join-item btn-sm min-h-11 min-w-11"
                               aria-label="Decrease quantity"
-                              (click)="decrement(line.variantId, line.quantity)"
+                              (click)="decrement(cart.lineId(line), line.quantity)"
                             >
                               <ng-icon name="heroMinus" size="1rem" aria-hidden="true" />
                             </button>
                             <span
-                              class="join-item grid min-h-10 min-w-12 place-items-center border-y border-base-300 px-3 text-sm font-semibold tabular-nums"
+                              class="join-item grid min-h-11 min-w-12 place-items-center border-y border-base-300 px-3 text-sm font-semibold tabular-nums"
                               >{{ line.quantity }}</span
                             >
                             <button
                               type="button"
-                              class="btn join-item btn-sm min-h-10"
+                              class="btn join-item btn-sm min-h-11 min-w-11"
                               aria-label="Increase quantity"
-                              (click)="cart.setQuantity(line.variantId, line.quantity + 1)"
+                              (click)="cart.setQuantity(cart.lineId(line), line.quantity + 1)"
                             >
                               <ng-icon name="heroPlus" size="1rem" aria-hidden="true" />
                             </button>
@@ -129,22 +131,20 @@ import { StorefrontService } from './storefront.service';
               } @else {
                 <div class="grid min-h-52 place-content-center text-center">
                   <p class="text-lg font-bold">Basket cleared</p>
-                  <p class="mt-1 text-sm text-base-content/55">
+                  <p class="mt-1 text-sm text-base-content/70">
                     Add another item when you're ready.
                   </p>
                 </div>
               }
             </div>
 
-            <footer class="border-t border-base-300 p-5">
+            <footer class="storefront-chrome shrink-0 border-t border-base-300 p-5">
               @if (cart.lines().length) {
                 <div class="flex items-center justify-between gap-4">
-                  <span class="text-sm text-base-content/55">Estimated total</span>
-                  <strong class="text-xl tabular-nums text-primary">{{
-                    cart.formatKes(cart.total())
-                  }}</strong>
+                  <span class="text-sm text-base-content/70">Estimated total</span>
+                  <strong class="text-xl tabular-nums">{{ cart.formatKes(cart.total()) }}</strong>
                 </div>
-                <p class="mt-2 text-xs leading-5 text-base-content/50">
+                <p class="mt-2 text-xs leading-5 text-base-content/70">
                   The shop will confirm availability and final total on WhatsApp.
                 </p>
                 @if (cart.whatsappLink(); as href) {

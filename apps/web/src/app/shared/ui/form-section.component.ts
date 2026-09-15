@@ -1,10 +1,11 @@
 import { Component, input } from '@angular/core';
 
-/** Unframed grouping for fields that belong to one part of a task. */
+/** One task section; the shared recipe flattens automatically when embedded in another card. */
 @Component({
   selector: 'app-form-section',
+  host: { class: 'block min-w-0' },
   template: `
-    <section class="border-t border-base-300/60 py-5">
+    <section class="form-section">
       <div class="mb-3 flex items-start justify-between gap-3">
         <div>
           <h3 class="section-title">{{ title() }}</h3>

@@ -680,7 +680,8 @@ export class PurchaseEditorStore implements OnDestroy {
   }
   linePriceContext(line: PurchaseLineForm): PurchaseLinePriceContext {
     const variant = this.lineVariant(line);
-    const currentCost = parseKes(line.unitCost);
+    const enteredCost = parseKes(line.unitCost);
+    const currentCost = enteredCost === null ? null : enteredCost / (line.unitsPerUnit ?? 1);
     const supplierInsight = this.performance().find(
       item => item.variant_id === line.variantId && item.supplier_id === this.supplier.value
     );
@@ -764,6 +765,9 @@ export class PurchaseEditorStore implements OnDestroy {
       {
         key,
         variantId: variant.variant_id!,
+        packId: null,
+        unitName: variant.stock_unit || 'item',
+        unitsPerUnit: 1,
         quantity: 1,
         unitCost: initialCost,
         lineTotal: initialCost,
@@ -810,6 +814,7 @@ export class PurchaseEditorStore implements OnDestroy {
         if (
           line.key !== lineKey ||
           line.valueSource !== 'unit' ||
+          line.packId ||
           line.unitCost !== initialCost ||
           line.lineTotal !== initialCost
         ) {
@@ -840,6 +845,28 @@ export class PurchaseEditorStore implements OnDestroy {
     this.linesState.update(items => [...items]);
     this.markDirty();
   }
+  packChanged(line: PurchaseLineForm, packId: string): void {
+    const variant = this.lineVariant(line);
+    const pack = variant?.packs?.find(pack => pack.id === packId && pack.active);
+    if (packId && !pack) return;
+    line.packId = pack?.id ?? null;
+    line.packSalePrice = pack?.sale_price ? formatKesInput(pack.sale_price) : '';
+    line.unitName = pack?.name ?? variant?.stock_unit ?? 'item';
+    line.unitsPerUnit = pack?.units_per_pack ?? 1;
+    // A supplier pack cost is an explicit input, not a retail/wholesale-derived amount.
+    line.unitCost = '';
+    line.lineTotal = '';
+    line.valueSource = 'unit';
+    line.defaultCostNeedsConversion = false;
+    line.grossAmountOverride = undefined;
+    line.error = null;
+    this.linesState.update(items => [...items]);
+    this.markDirty();
+  }
+  /**
+   * Quantity and cost refer to the selected buying unit. Hold the last explicitly
+   * entered cost or total fixed; a rounded derived cost must not replace an exact total.
+   */
   quantityChanged(line: PurchaseLineForm, value: number | string): void {
     line.quantity = Math.max(0, Number(value) || 0);
     if (line.valueSource === 'unit') this.syncTotal(line);
@@ -850,6 +877,7 @@ export class PurchaseEditorStore implements OnDestroy {
   }
   unitCostChanged(line: PurchaseLineForm, value: string): void {
     line.unitCost = value;
+    line.error = null;
     line.valueSource = 'unit';
     line.defaultCostNeedsConversion = false;
     line.grossAmountOverride = undefined;
@@ -859,6 +887,7 @@ export class PurchaseEditorStore implements OnDestroy {
   }
   lineTotalChanged(line: PurchaseLineForm, value: string): void {
     line.lineTotal = value;
+    line.error = null;
     line.valueSource = 'total';
     line.defaultCostNeedsConversion = false;
     line.grossAmountOverride = undefined;
@@ -868,12 +897,15 @@ export class PurchaseEditorStore implements OnDestroy {
   }
   private syncTotal(line: PurchaseLineForm): void {
     const unit = parseKes(line.unitCost);
-    line.lineTotal = unit === null ? '' : formatKesInput(line.quantity * unit);
+    line.lineTotal =
+      !line.unitCost.trim() || unit === null ? '' : formatKesInput(line.quantity * unit);
   }
   private syncUnit(line: PurchaseLineForm): void {
     const total = parseKes(line.lineTotal);
     line.unitCost =
-      total === null || line.quantity <= 0 ? '' : formatKesInput(total / line.quantity);
+      !line.lineTotal.trim() || total === null || line.quantity <= 0
+        ? ''
+        : formatKesInput(total / line.quantity);
   }
   addExpense(): void {
     this.expensesState.update(items => [
@@ -1273,10 +1305,28 @@ export class PurchaseEditorStore implements OnDestroy {
     }
     for (const line of this.lines()) {
       line.error = null;
+      if (
+        line.packId &&
+        (!Number.isInteger(line.quantity) ||
+          !this.lineVariant(line)?.packs?.some(pack => pack.id === line.packId && pack.active))
+      ) {
+        line.error = 'Choose an active pack and enter a whole pack quantity.';
+        valid = false;
+      }
       const unit = parseKes(line.unitCost);
       const total = parseKes(line.lineTotal);
-      if (line.quantity <= 0 || unit === null || unit <= 0 || total === null || total <= 0) {
+      if (
+        !Number.isFinite(line.quantity) ||
+        line.quantity <= 0 ||
+        (line.valueSource === 'unit' && (unit === null || unit <= 0)) ||
+        total === null ||
+        total <= 0
+      ) {
         line.error = 'Enter a valid quantity, unit cost, and line total';
+        valid = false;
+      }
+      if (line.packSalePrice?.trim() && (parseKes(line.packSalePrice) ?? 0) <= 0) {
+        line.error = 'Enter a positive pack selling price';
         valid = false;
       }
       const wholesale = parseKes(line.wholesalePrice);
@@ -1414,6 +1464,12 @@ export class PurchaseEditorStore implements OnDestroy {
         return {
           key: this.nextKey++,
           variantId: String(item['variant_id'] ?? ''),
+          packSalePrice: item['new_pack_sale_price']
+            ? formatKesInput(Number(item['new_pack_sale_price']))
+            : '',
+          packId: item['pack_id'] ? String(item['pack_id']) : null,
+          unitName: String(item['unit_name'] ?? 'item'),
+          unitsPerUnit: Number(item['units_per_unit'] ?? 1),
           quantity: Number(item['quantity'] ?? 1),
           unitCost: formatKesInput(Number(unitCost ?? item['unit_cost'] ?? 0)),
           lineTotal: formatKesInput(

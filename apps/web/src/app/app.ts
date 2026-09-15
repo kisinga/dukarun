@@ -19,6 +19,19 @@ import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
       <div class="navigation-progress" role="progressbar" aria-label="Loading page"></div>
     }
     <router-outlet />
+    @if (updateNotice()) {
+      <div
+        class="fixed inset-x-3 bottom-3 z-50 mx-auto flex max-w-lg items-center gap-3 rounded-box border border-base-300 bg-base-100 p-3 shadow-overlay"
+        role="status"
+      >
+        <p class="flex-1 text-sm">
+          {{ updateNotice() }} Finish your transaction, then close and reopen the app.
+        </p>
+        <button type="button" class="btn btn-ghost min-h-11" (click)="updateNotice.set(null)">
+          Dismiss
+        </button>
+      </div>
+    }
   `,
   styles: [
     `
@@ -56,6 +69,7 @@ export class App {
   private readonly updates = inject(SwUpdate);
   private readonly router = inject(Router);
   protected readonly showNavigationProgress = signal(false);
+  protected readonly updateNotice = signal<string | null>(null);
   private progressTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
@@ -79,10 +93,10 @@ export class App {
     const unrecoverable = toSignal(this.updates.unrecoverable, { initialValue: null });
     effect(() => {
       const event = versionEvent();
-      if (event?.type === 'VERSION_READY') window.location.reload();
+      if (event?.type === 'VERSION_READY') this.updateNotice.set('An update is ready.');
     });
     effect(() => {
-      if (unrecoverable()) window.location.reload();
+      if (unrecoverable()) this.updateNotice.set('The app needs to restart.');
     });
   }
 

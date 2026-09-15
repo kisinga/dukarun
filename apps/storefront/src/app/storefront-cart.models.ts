@@ -2,6 +2,10 @@ export interface StorefrontCartLine {
   shopSlug: string;
   productId: string;
   variantId: string;
+  packId?: string | null;
+  unitName?: string;
+  stockUnit?: string;
+  unitsPerUnit?: number;
   productName: string;
   variantName: string;
   price: number;
@@ -21,11 +25,18 @@ export function formatCartKes(amount: number): string {
 }
 
 export function storefrontCartLineLabel(
-  line: Pick<StorefrontCartLine, 'productName' | 'variantName'>
+  line: Pick<
+    StorefrontCartLine,
+    'productName' | 'variantName' | 'unitName' | 'unitsPerUnit' | 'stockUnit'
+  >
 ): string {
-  return !line.variantName || line.variantName === 'Default'
-    ? line.productName
-    : `${line.productName} · ${line.variantName}`;
+  const label =
+    !line.variantName || line.variantName === 'Default'
+      ? line.productName
+      : `${line.productName} · ${line.variantName}`;
+  return (line.unitsPerUnit ?? 1) > 1
+    ? `${label} · ${line.unitName} (${line.unitsPerUnit} ${line.stockUnit || 'item'})`
+    : label;
 }
 
 export function sanitizeCartQuantity(quantity: number): number {
@@ -60,4 +71,8 @@ export function buildStorefrontCartMessage(
     '',
     `Catalogue: ${shopUrl}`,
   ].join('\n');
+}
+
+export function storefrontLineId(line: Pick<StorefrontCartLine, 'variantId' | 'packId'>): string {
+  return line.packId ? `${line.variantId}:${line.packId}` : line.variantId;
 }

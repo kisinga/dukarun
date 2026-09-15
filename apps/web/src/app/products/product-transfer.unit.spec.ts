@@ -288,7 +288,7 @@ describe('catalog workbooks', () => {
     });
     expect(workbook.getWorksheet('Batches')!.getCell('S2').note).toBeUndefined();
     expect(workbook.getWorksheet('Manufacturers')!.getCell('A1').note).toBeUndefined();
-    expect(workbookMetadata.getCell('B1').value).toBe('5');
+    expect(workbookMetadata.getCell('B1').value).toBe('6');
     expect(workbookMetadata.getCell('B2').value).toBe('catalog_workbook');
     expect(workbookMetadata.getCell('B4').value).toBe(COMPANY_ID);
   });

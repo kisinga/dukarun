@@ -321,19 +321,19 @@ import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
         <div class="modal-body p-4">
           @if (preview(); as p) {
             <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <div class="stat rounded-box bg-base-200 p-3">
+              <div class="stat surface-card p-3">
                 <span class="type-caption">Eligible</span
                 ><strong class="text-xl">{{ p.eligible }}</strong>
               </div>
-              <div class="stat rounded-box bg-base-200 p-3">
+              <div class="stat surface-card p-3">
                 <span class="type-caption">Skipped</span
                 ><strong class="text-xl">{{ p.skipped }}</strong>
               </div>
-              <div class="stat rounded-box bg-base-200 p-3">
+              <div class="stat surface-card p-3">
                 <span class="type-caption">No primary contact</span
                 ><strong class="text-xl">{{ p.missing_primary }}</strong>
               </div>
-              <div class="stat rounded-box bg-base-200 p-3">
+              <div class="stat surface-card p-3">
                 <span class="type-caption">No phone</span
                 ><strong class="text-xl">{{ p.missing_phone }}</strong>
               </div>
@@ -341,7 +341,7 @@ import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
             <p class="type-caption mt-3">
               One selected primary contact per company. Scheduled audience resolves at dispatch.
             </p>
-            <div class="mt-4 rounded-box border border-base-300 p-4">
+            <div class="surface-card mt-4 p-4">
               <p class="type-caption">
                 Rendered sample · {{ p.sample?.merchant_name || 'No eligible merchant' }}
               </p>
@@ -353,7 +353,7 @@ import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
             </div>
           }
           @if (channel.value !== 'in_app') {
-            <div class="mt-4 rounded-box border border-base-300 p-3">
+            <div class="surface-card mt-4 p-4">
               <p class="font-medium">Optional real test</p>
               <div class="mt-2 flex gap-2">
                 <input

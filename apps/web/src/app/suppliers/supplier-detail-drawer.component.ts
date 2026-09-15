@@ -106,7 +106,7 @@ export interface SupplierDetailMetrics {
           }
         </div>
 
-        <div class="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+        <div class="mt-3 grid grid-cols-2 gap-2">
           <app-stat-card
             label="We owe"
             [value]="store.permissions.has('ViewFinancials') ? fmt(supplier.ap_balance) : 'Hidden'"
@@ -118,24 +118,30 @@ export interface SupplierDetailMetrics {
             [tone]="store.advance() > 0 ? 'success' : 'neutral'"
             [sub]="store.netPosition()"
           />
-          <app-stat-card
-            label="Credit available"
-            [value]="
-              !store.permissions.has('ViewFinancials')
-                ? 'Hidden'
-                : supplier.supplier_credit_limit > 0
-                  ? fmt(Math.max(0, supplier.supplier_credit_limit - supplier.ap_balance))
-                  : 'No cap'
-            "
-            [sub]="
-              supplier.supplier_credit_limit > 0
-                ? 'Limit ' + fmt(supplier.supplier_credit_limit)
-                : (supplier.supplier_credit_terms_days || 0) + 'd terms'
-            "
-          />
+          <div
+            class="col-span-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-b border-base-300/60 py-3 text-sm"
+          >
+            <span class="type-caption">Credit available</span>
+            <span class="font-medium tabular-nums">
+              {{
+                !store.permissions.has('ViewFinancials')
+                  ? 'Hidden'
+                  : supplier.supplier_credit_limit > 0
+                    ? fmt(Math.max(0, supplier.supplier_credit_limit - supplier.ap_balance))
+                    : 'No cap'
+              }}
+            </span>
+            <span class="type-caption w-full">
+              {{
+                supplier.supplier_credit_limit > 0
+                  ? 'Limit ' + fmt(supplier.supplier_credit_limit)
+                  : (supplier.supplier_credit_terms_days || 0) + 'd terms'
+              }}
+            </span>
+          </div>
         </div>
 
-        <div class="mt-3 rounded-field border border-base-300 p-3 text-sm">
+        <div class="mt-4 text-sm">
           <div class="grid gap-2 sm:grid-cols-2">
             <div>
               <p class="type-caption">Contact</p>
@@ -148,7 +154,7 @@ export interface SupplierDetailMetrics {
           </div>
         </div>
 
-        <div class="mt-3 grid grid-cols-2 gap-2 rounded-field bg-base-200/50 p-3 text-sm">
+        <div class="surface-card mt-4 grid grid-cols-2 gap-3 p-4 text-sm">
           <div>
             <p class="type-caption">Purchases</p>
             <p class="font-semibold">{{ metrics().purchases }}</p>
@@ -189,7 +195,7 @@ export interface SupplierDetailMetrics {
         } @else {
           <div class="mt-4 flex flex-col gap-4">
             @if (store.permissions.has('ManageSupplierCreditPurchases')) {
-              <section>
+              <section class="surface-card p-4">
                 <h3 class="section-title">Supplier advance</h3>
                 <p class="type-caption mt-1">Held separately until it is applied to a purchase.</p>
                 <form
@@ -223,6 +229,7 @@ export interface SupplierDetailMetrics {
                   </app-form-field>
                   <button
                     appButton
+                    variant="secondary"
                     type="submit"
                     class="self-end justify-self-start"
                     [loading]="store.busy()"
@@ -233,7 +240,7 @@ export interface SupplierDetailMetrics {
                 </form>
 
                 @if (store.advance() > 0) {
-                  <details class="mt-3 rounded-field border border-base-300 p-3">
+                  <details class="surface-inset mt-3 p-3">
                     <summary class="min-h-11 cursor-pointer py-2 text-sm font-medium">
                       Supplier returned unused advance
                     </summary>
@@ -284,7 +291,7 @@ export interface SupplierDetailMetrics {
                 }
               </section>
 
-              <section class="border-t border-base-300 pt-3">
+              <section class="surface-card p-4">
                 <h3 class="section-title">Pay this supplier</h3>
                 @if (supplier.ap_balance <= 0) {
                   <p class="type-caption mt-1">We do not owe this supplier.</p>
@@ -339,7 +346,7 @@ export interface SupplierDetailMetrics {
             }
 
             @if (store.permissions.has('ViewFinancials')) {
-              <section class="border-t border-base-300 pt-3">
+              <section class="surface-card p-4">
                 <h3 class="section-title">Account activity</h3>
                 @if (store.accountStatus()?.is_consistent === false) {
                   <div role="alert" class="alert alert-error mt-3 text-sm">
@@ -368,7 +375,7 @@ export interface SupplierDetailMetrics {
                   </a>
                 </div>
 
-                <details class="mt-3 rounded-field border border-base-300 p-3">
+                <details class="surface-inset mt-3 p-3">
                   <summary class="min-h-11 cursor-pointer py-2 text-sm font-medium">
                     Recent payments and reversals
                   </summary>
@@ -433,7 +440,7 @@ export interface SupplierDetailMetrics {
             }
 
             @if (store.permissions.has('ManageSupplierCreditPurchases')) {
-              <section class="border-t border-base-300 pt-3">
+              <section class="surface-card p-4">
                 <h3 class="section-title">Credit terms</h3>
                 <form
                   class="mt-3 grid gap-2 sm:grid-cols-2"
@@ -470,7 +477,7 @@ export interface SupplierDetailMetrics {
               </section>
             }
 
-            <section class="border-t border-base-300 pt-3">
+            <section class="surface-card p-4">
               <div class="flex items-center justify-between gap-2">
                 <h3 class="section-title">Recent purchases</h3>
                 <a
@@ -521,7 +528,7 @@ export interface SupplierDetailMetrics {
             </section>
 
             @if (store.advanceActivity().length > 0 && store.permissions.has('ViewFinancials')) {
-              <section class="border-t border-base-300 pt-3">
+              <section class="surface-card p-4">
                 <h3 class="section-title">Advance activity</h3>
                 <ul class="mt-2 divide-y divide-base-200">
                   @for (activity of store.advanceActivity(); track activity.id) {

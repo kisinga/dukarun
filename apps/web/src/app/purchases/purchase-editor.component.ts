@@ -168,7 +168,7 @@ import { PurchaseVatPanelComponent } from './purchase-vat-panel.component';
                   @if (store.lines().length > 0) {
                     <div class="divide-y divide-base-300 border-y border-base-300">
                       <div
-                        class="hidden grid-cols-[minmax(14rem,1fr)_7rem_10rem_10rem_3rem] items-center gap-3 border-b border-base-300 bg-base-200/30 px-3 py-2 xl:grid"
+                        class="hidden grid-cols-[minmax(11rem,1fr)_5rem_minmax(7rem,9rem)_minmax(7rem,9rem)_2.75rem] items-center gap-3 border-b border-base-300 bg-base-200/30 px-3 py-2 xl:grid"
                         aria-hidden="true"
                       >
                         <span class="type-caption">Item</span>
@@ -195,6 +195,7 @@ import { PurchaseVatPanelComponent } from './purchase-vat-panel.component';
                           [canEditPrices]="store.perms.has('ManageStockAdjustments')"
                           [trackExpiry]="store.preferences.batchExpiryEnabled()"
                           (quantityChange)="store.quantityChanged(line, $event)"
+                          (packChange)="store.packChanged(line, $event)"
                           (unitCostChange)="store.unitCostChanged(line, $event)"
                           (lineTotalChange)="store.lineTotalChanged(line, $event)"
                           (detailChange)="store.updateLineDetail(line, $event.field, $event.value)"
