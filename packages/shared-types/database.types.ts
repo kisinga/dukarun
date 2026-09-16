@@ -13141,6 +13141,10 @@ export type Database = {
         Args: { p_amount: number; p_client_ref?: string; p_order_id: string }
         Returns: string
       }
+      apply_product_workbook: {
+        Args: { p_changes: Json; p_request_id: string }
+        Returns: Json
+      }
       apply_purchase_pack_prices: {
         Args: { p_lines: Json }
         Returns: undefined
@@ -15550,6 +15554,10 @@ export type Database = {
         Returns: Json
       }
       primary_contact_notification_settings: { Args: never; Returns: Json }
+      product_workbook_snapshot: {
+        Args: { p_location_id: string }
+        Returns: Json
+      }
       provision_company: {
         Args: {
           p_address?: string
@@ -17312,3 +17320,4 @@ export const Constants = {
     Enums: {},
   },
 } as const
+

@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { Workbook } from 'exceljs';
+import type { WorkbookChanges } from '../../apps/web/src/app/products/product-workbook';
 
 const companyId = '85000000-0000-4000-8000-000000000001';
 const userId = '85000000-0000-4000-8000-000000000002';
@@ -42,9 +43,7 @@ function authSession() {
 
 async function mockPriceWorkbookFlow(page: Page) {
   const session = authSession();
-  let appliedChanges: unknown = null;
-  let appliedProductChanges: unknown = null;
-  let appliedBatchChanges: unknown = null;
+  let applied: WorkbookChanges | null = null;
   let catalogRefreshes = 0;
   let lastCatalogPriceServed = 100;
   let catalogStock = 10;
@@ -96,6 +95,7 @@ async function mockPriceWorkbookFlow(page: Page) {
     product_id: productId,
     name: '250g',
     sku: 'TEA-250',
+    stock_unit: 'bag',
     barcode: null,
     kind: 'good',
     price: 100,
@@ -163,36 +163,97 @@ async function mockPriceWorkbookFlow(page: Page) {
         { id: locationId, code: 'MAIN', name: 'Main shop', is_default: true, is_primary: true },
       ]);
     }
-    if (path.endsWith('/rest/v1/rpc/apply_catalog_workbook_units')) {
-      const payload = request.postDataJSON();
-      const changes = payload.p_variant_changes as Array<{
-        new_retail_price?: number;
-        new_stock_quantity?: number;
-      }>;
-      appliedChanges = changes;
-      appliedProductChanges = payload.p_product_changes;
-      appliedBatchChanges = payload.p_batch_changes;
-      if (changes[0]?.new_retail_price !== undefined) {
-        variant.price = changes[0].new_retail_price;
-      }
-      if (changes[0]?.new_stock_quantity !== undefined) {
-        catalogStock = changes[0].new_stock_quantity;
-      }
-      if (payload.p_product_changes?.[0]?.new_manufacturer_name) {
-        manufacturerName = payload.p_product_changes[0].new_manufacturer_name;
-      }
+    if (path.endsWith('/rest/v1/rpc/catalog_pack_definitions')) {
+      return json([
+        {
+          variant_id: variantId,
+          stock_unit: 'bag',
+          packs: [
+            {
+              id: '85000000-0000-4000-8000-000000000008',
+              name: 'Carton',
+              units_per_pack: 6,
+              sale_price: 550,
+              barcode: 'CARTON-TEA',
+              active: true,
+            },
+          ],
+        },
+      ]);
+    }
+    if (path.endsWith('/rest/v1/rpc/product_workbook_snapshot')) {
       return json({
-        updated_variants: 1,
-        retail_changes: 1,
-        wholesale_changes: 0,
-        stock_changes: 1,
-        manufacturer_changes: 1,
-        created: 0,
-        disabled_variants: 0,
-        disabled_products: 0,
-        batch_changes: 1,
-        batches_created: 0,
-        batches_updated: 1,
+        company_id: companyId,
+        company_name: company.name,
+        exported_at: updatedAt,
+        location: { id: locationId, code: 'MAIN', name: 'Main shop' },
+        capabilities: { stock: true, financial: true },
+        products: [
+          {
+            id: productId,
+            name: 'Tea',
+            barcode: null,
+            active: true,
+            manufacturer_id: manufacturerId,
+            tax_category_id: null,
+            updated_at: updatedAt,
+          },
+        ],
+        variants: [variant],
+        manufacturers: [
+          { id: manufacturerId, name: manufacturerName, active: true, updated_at: updatedAt },
+          {
+            id: '85000000-0000-4000-8000-000000000008',
+            name: 'New Dairy',
+            active: true,
+            updated_at: updatedAt,
+          },
+        ],
+        taxes: [],
+        packs: [
+          {
+            id: '85000000-0000-4000-8000-000000000008',
+            variant_id: variantId,
+            name: 'Carton',
+            units_per_pack: 6,
+            sale_price: 550,
+            barcode: 'CARTON-TEA',
+            active: true,
+          },
+        ],
+        stock: [
+          {
+            variant_id: variantId,
+            quantity: catalogStock,
+            value: 500,
+            batch: {
+              id: batchId,
+              remaining: 6,
+              unit_cost: 0,
+              remaining_cost: 0,
+              batch_number: 'PO-104',
+              expiry_date: null,
+            },
+          },
+        ],
+      });
+    }
+    if (path.endsWith('/rest/v1/rpc/apply_product_workbook')) {
+      applied = request.postDataJSON().p_changes as WorkbookChanges;
+      const existing = applied.products.flatMap(p => p.variants).find(v => v.id === variantId);
+      if (existing) variant.price = existing.values.price;
+      if (applied.stock[0]) catalogStock = applied.stock[0].new_stock_quantity;
+      return json({
+        products_created: applied.products.filter(p => !p.id).length,
+        products_updated: applied.products.filter(p => p.id).length,
+        variants_created: applied.products.flatMap(p => p.variants).filter(v => !v.id).length,
+        variants_updated: existing ? 1 : 0,
+        manufacturers_changed: applied.manufacturers.length,
+        packs_changed: applied.products
+          .flatMap(p => p.variants)
+          .reduce((n, v) => n + v.packs.length, 0),
+        stock_changes: applied.stock.length,
+        batch_changes: applied.batches.length,
       });
     }
     if (path.endsWith('/rest/v1/rpc/catalog_cache_families')) {
@@ -307,101 +368,130 @@ async function mockPriceWorkbookFlow(page: Page) {
   });
 
   return {
-    appliedChanges: () => appliedChanges,
-    appliedProductChanges: () => appliedProductChanges,
-    appliedBatchChanges: () => appliedBatchChanges,
+    applied: () => applied,
     catalogRefreshes: () => catalogRefreshes,
     lastCatalogPriceServed: () => lastCatalogPriceServed,
     lastCatalogStockServed: () => lastCatalogStockServed,
   };
 }
 
-test('Settings exports, previews, and applies the unified catalog workbook', async ({ page }) => {
+async function downloadWorkbook(page: Page): Promise<Workbook> {
+  const downloading = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download editable workbook' }).click();
+  const download = await downloading;
+  expect(download.suggestedFilename()).toMatch(/^Products-MAIN-.*\.xlsx$/);
+  const chunks: Buffer[] = [];
+  for await (const chunk of (await download.createReadStream())!) chunks.push(Buffer.from(chunk));
+  const workbook = new Workbook();
+  await workbook.xlsx.load(Buffer.concat(chunks));
+  return workbook;
+}
+async function uploadWorkbook(page: Page, workbook: Workbook): Promise<void> {
+  await page.locator('#product-import-file').setInputFiles({
+    name: 'Products-edited.xlsx',
+    mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    buffer: Buffer.from(await workbook.xlsx.writeBuffer()),
+  });
+}
+
+test('Settings exports, previews, and applies the three-sheet Products workbook', async ({
+  page,
+}) => {
   const state = await mockPriceWorkbookFlow(page);
   await page.goto('http://127.0.0.1:4203/settings?tab=data');
   await expect(page.getByRole('heading', { name: 'Data import & export' })).toBeVisible();
-
-  const downloadPromise = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Download editable workbook' }).click();
-  const download = await downloadPromise;
-  expect(download.suggestedFilename()).toMatch(/^dukarun-products-and-stock-MAIN-.*\.xlsx$/);
-  const stream = await download.createReadStream();
-  expect(stream).not.toBeNull();
-  const chunks: Buffer[] = [];
-  for await (const chunk of stream!) chunks.push(Buffer.from(chunk));
-
-  const workbook = new Workbook();
-  await workbook.xlsx.load(Buffer.concat(chunks));
-  expect(workbook.getWorksheet('_DukaRun Metadata')!.getCell('B2').value).toBe('catalog_workbook');
-  const sheet = workbook.getWorksheet('Products & Stock')!;
-  const headerColumn = (name: string) => {
-    let column = 0;
-    sheet.getRow(1).eachCell((cell, index) => {
-      if (cell.text === name) column = index;
-    });
-    return column;
-  };
-  sheet.getCell(2, headerColumn('manufacturer')).value = 'New Dairy';
-  sheet.getCell(2, headerColumn('new_retail_price_kes')).value = 125;
-  sheet.getCell(2, headerColumn('new_stock_quantity')).value = 7;
-  expect(sheet.getCell(2, headerColumn('latest_batch')).value).toMatchObject({
-    text: 'PO-104 · received 2026-08-18',
-    hyperlink: "#'Batches'!K2",
-  });
-  sheet.getCell(2, headerColumn('latest_buying_price_kes')).value = 50;
-  const edited = Buffer.from(await workbook.xlsx.writeBuffer());
-
+  const workbook = await downloadWorkbook(page);
+  expect(workbook.worksheets.filter(s => s.state === 'visible').map(s => s.name)).toEqual([
+    'Products',
+    'Manufacturers',
+    'Pack sizes',
+  ]);
+  const sheet = workbook.getWorksheet('Products')!;
+  sheet.getCell('B6').value = 'New Dairy';
+  sheet.getCell('F6').value = 125;
+  sheet.getCell('L6').value = 7;
+  sheet.getCell('J6').value = 50;
   await page.getByRole('button', { name: 'Upload edited workbook' }).click();
-  await page.locator('#product-import-file').setInputFiles({
-    name: 'edited-prices.xlsx',
-    mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    buffer: edited,
-  });
-  await expect(page.getByText('Retail: KES 100 → KES 125')).toBeVisible();
-  await expect(page.getByText('Manufacturer: Acme → New Dairy')).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Batch changes' })).toBeVisible();
-  const refreshesBeforeApply = state.catalogRefreshes();
+  await uploadWorkbook(page, workbook);
+  await expect(
+    page
+      .locator('[data-workbook-change]:visible')
+      .filter({ hasText: 'Retail' })
+      .getByText('125', { exact: true })
+  ).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Apply workbook' })).toBeEnabled();
+  const before = state.catalogRefreshes();
   await page.getByRole('button', { name: 'Apply workbook' }).click();
-
-  await expect(page.getByRole('status')).toContainText(
-    'Workbook applied: 0 products created · 0 variants disabled · 0 products disabled · 1 manufacturers · 1 retail · 0 wholesale · 1 stock · 0 batches created · 1 batches updated.'
+  await expect(page.getByRole('status')).toContainText('Workbook applied: 0 products created');
+  expect(state.applied()?.products[0].values.manufacturer_key).toBe(
+    '85000000-0000-4000-8000-000000000008'
   );
-  expect(state.appliedChanges()).toEqual([
-    {
-      variant_id: variantId,
-      expected_updated_at: updatedAt,
-      new_retail_price: 125,
-      stock_location_id: locationId,
-      expected_stock_quantity: 10,
-      new_stock_quantity: 7,
-    },
-  ]);
-  expect(state.appliedProductChanges()).toEqual([
-    {
-      product_id: productId,
-      expected_updated_at: updatedAt,
-      new_manufacturer_name: 'New Dairy',
-    },
-  ]);
-  expect(state.appliedBatchChanges()).toEqual([
-    {
-      action: 'update',
-      batch_id: batchId,
-      variant_id: variantId,
-      stock_location_id: locationId,
-      latest: true,
-      expected_remaining: 6,
-      expected_unit_cost: 0,
-      expected_remaining_cost: 0,
-      expected_batch_number: 'PO-104',
-      expected_expiry_date: null,
-      new_unit_cost: 50,
-      new_batch_number: 'PO-104',
-      new_expiry_date: null,
-      quantity_added: 0,
-    },
-  ]);
-  await expect.poll(state.catalogRefreshes).toBeGreaterThan(refreshesBeforeApply);
+  expect(state.applied()?.products[0].variants[0].values.price).toBe(125);
+  expect(state.applied()?.stock[0]).toMatchObject({
+    expected_stock_quantity: 10,
+    new_stock_quantity: 7,
+  });
+  expect(state.applied()?.batches[0]).toMatchObject({
+    batch_id: batchId,
+    new_unit_cost: 50,
+    expected_remaining_cost: 0,
+  });
+  await expect.poll(state.catalogRefreshes).toBeGreaterThan(before);
   expect(state.lastCatalogPriceServed()).toBe(125);
   expect(state.lastCatalogStockServed()).toBe(7);
+});
+
+test('Workbook creates products, sizes/types and packs, and blocks pack stock entry', async ({
+  page,
+}) => {
+  const state = await mockPriceWorkbookFlow(page);
+  await page.goto('http://127.0.0.1:4203/settings?tab=data');
+  const workbook = await downloadWorkbook(page);
+  const sheet = workbook.getWorksheet('Products')!;
+  workbook.getWorksheet('Pack sizes')!.getCell('A7').value = 'Tray';
+  workbook.getWorksheet('Pack sizes')!.getCell('B7').value = 30;
+  for (const [i, name, count] of [
+    [8, 'Large', 120],
+    [10, 'Small', 60],
+  ] as const) {
+    sheet.getCell(i, 1).value = 'Workbook Eggs';
+    sheet.getCell(i, 3).value = name;
+    sheet.getCell(i, 4).value = 'Single egg';
+    sheet.getCell(i, 6).value = 20;
+    sheet.getCell(i, 10).value = 14;
+    sheet.getCell(i, 12).value = count;
+    sheet.getCell(i, 13).value = `NEW-EGGS-${name}`;
+    sheet.getCell(i + 1, 1).value = 'Workbook Eggs';
+    sheet.getCell(i + 1, 3).value = name;
+    sheet.getCell(i + 1, 4).value = 'Tray of 30 eggs';
+    sheet.getCell(i + 1, 6).value = 480;
+    sheet.getCell(i + 1, 14).value = `NEW-TRAY-${name}`;
+  }
+  sheet.getCell('L7').value = 5;
+  await page.getByRole('button', { name: 'Upload edited workbook' }).click();
+  await uploadWorkbook(page, workbook);
+  await expect(page.getByText(/Counted stock belongs on the Single/)).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Apply workbook' })).toBeDisabled();
+  sheet.getCell('L7').value = 'XXXX';
+  await uploadWorkbook(page, workbook);
+  await expect(page.getByRole('button', { name: 'Apply workbook' })).toBeEnabled();
+  await page.getByRole('button', { name: 'Apply workbook' }).click();
+  await expect(page.getByRole('status')).toContainText('1 products created');
+  expect(state.applied()?.products).toMatchObject([
+    {
+      values: { name: 'Workbook Eggs' },
+      variants: [
+        {
+          values: { name: 'Large', stock_unit: 'egg' },
+          opening_quantity: 120,
+          packs: [{ name: 'Tray', units_per_pack: 30 }],
+        },
+        {
+          values: { name: 'Small', stock_unit: 'egg' },
+          opening_quantity: 60,
+          packs: [{ name: 'Tray', units_per_pack: 30 }],
+        },
+      ],
+    },
+  ]);
 });

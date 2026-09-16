@@ -1,6 +1,6 @@
 -- The local demo must stay fully walkable as features and permissions grow.
 begin;
-select plan(15);
+select plan(16);
 
 select is(
   (select count(*)::int from public.companies where name = 'Mama Mboga Stores'),
@@ -120,6 +120,15 @@ select is(
      and m.user_id = '5877ac73-ff8d-457c-afcd-791e66229d17'),
   3,
   'seeded administrator is assigned to every location'
+);
+
+select results_eq(
+  $$select v.name::text, v.stock_unit::text, v.allow_fractional
+    from public.product_variants v
+    join public.companies c on c.id = v.company_id
+    where c.name = 'Mama Mboga Stores' and v.sku = 'SUGL'$$,
+  $$values ('Loose'::text, 'kg'::text, true)$$,
+  'loose sugar has a distinct option name and is measured in kilograms'
 );
 
 select is(

@@ -1,61 +1,94 @@
-# Editing products, packs, and stock in a workbook
+# Edit and import Products workbooks
 
-Use an exported product workbook to review several catalogue changes together. Start with a fresh
-export from the shop and stock location you intend to update. Keep the original workbook as a
-reference and edit a copy.
+Download an editable workbook from **Settings → Data import & export**. Choose the stock
+location you want to count before downloading. The same workbook supports existing edits and
+new products, sizes/types, manufacturers and packs.
 
-## Products and stock
+## Three sheets
 
-In **Products & Stock**, retail and wholesale prices refer to one stock unit. Stock quantities are
-also in stock units, even when the product can be sold in packs. For example, two trays of 30 eggs
-must be entered as 60 eggs in a stock-count column.
+- **Products:** product details, every price and all stock.
+- **Manufacturers:** names available in the Manufacturer dropdown. Add a name or rename an
+  existing one here. Renaming a manufacturer affects its linked products throughout your shop.
+- **Pack sizes:** pack names and contents, such as Box / 12. Definitions supply Sold as choices;
+  they receive no price or stock of their own.
 
-Edit the intended yellow input cells. The linked latest-batch fields control buying cost, batch
-number, and expiry. For a stock increase, supply the required latest-batch cost so Dukarun can
-value the added units. Review the upload preview for any product or variant disable actions before
-applying it.
+On Products, **Size / type** distinguishes versions with separate stock, such as Soap / 250g
+and Soap / 500g. **Sold as** describes what the retail price buys: Single bar or Box of 12 bars.
+Rice sold by weight can have no size/type and use Per kg.
 
-## Packs
+## Change a price or count
 
-The **Packs** sheet lists whole-quantity goods and their existing packs. You can edit a pack name,
-selling price, barcode, or active status. Prices are whole KES for the entire pack. Leave the
-selling price blank to make it purchase-only.
+Current prices and stock appear beside yellow **New** and **Counted stock** cells. Enter a
+change in the yellow cell. Blank New / Counted cells preserve the saved value. Enter **0** to
+count zero stock. Use **CLEAR** to remove wholesale pricing or make a pack purchase-only.
 
-- To add the first pack, fill the blank pack row for the variant.
-- To add another pack, copy a row for that variant and clear the copied `pack_id`. This identity
-  column is hidden in the export; temporarily unhide it when making a new row. Preserve
-  `variant_id` and `expected_packs`.
-- To retire a pack, set `active` to `FALSE`. Deleting pack rows preserves the existing packs.
-- Existing `units_per_pack` values cannot change. Retire the old pack and add a replacement.
-- Create a new product first, then download a fresh workbook before adding its packs. Pack rows
-  need an existing variant identity.
+Count stock once on the **Single / Per** row. A Soap / 250g box uses the Soap / 250g stock
+balance. Packs show grey **XXXX** for wholesale, buying and stock because those values belong
+to their Single / Per row. Enter numeric quantities; the cell displays the measure for you.
 
-Keep the original identity and baseline columns intact. They let Dukarun reject stale pack edits
-instead of overwriting a later change made by another member of staff. Use the product editor to
-change a stock-unit name on its own.
+Expand the columns after Counted stock for SKU, barcodes, tracking, tax category, availability
+and latest-batch information. Optional details are edited in place; clearing an optional
+barcode or batch detail removes it. Existing SKU and stock-unit identities cannot be cleared.
+Tax categories come from your shop's tax configuration.
 
-## Exact remaining stock value
+## Add a product or size/type
 
-If acquisition cost does not divide evenly per stock unit, enter the exact remaining batch value
-in `new_remaining_value_kes`. Use the main sheet for the latest batch or **Batches** for another
-open batch. The value replaces the calculation for stock already remaining; any additional counted
-units are valued separately using the entered buying price.
+1. Fill a prepared blank Products row with Product, Manufacturer, optional Size / type and a
+   **Single / Per** choice in Sold as.
+2. Enter **New retail**. To start with stock, also enter **Counted stock** and **New buying**.
+   Opening buying cost may be explicitly zero. Buying cost is stored with the opening stock.
+3. To add another size/type to a product, use the same Product and Manufacturer and a different
+   Size / type. Product details on a new child inherit the existing parent's values when left
+   at their blank/default values.
 
-For example, 100 tablets bought for KES 755 must retain a total value of KES 755, even if the
-displayed per-tablet cost rounds to KES 8. A value correction changes remaining inventory value
-and posts the difference. It does not rewrite the cost of goods already sold.
+The downloaded workbook prepares up to **10,000 selling-option rows**, including existing
+rows and packs. Use its blank rows for bulk entry. Each reference sheet provides its existing
+entries plus at least 50 new slots. The file limit is 10 MB.
 
-## Review and apply
+## Add a pack
 
-1. Save the workbook, then open **Upload edited workbook** in Dukarun.
-2. Check the preview for prices, stock, packs, batches, new products, and disable actions.
-3. Resolve all errors and conflicts. If the catalogue or stock changed after export, download a
-   fresh workbook and reapply the intended edits.
-4. Choose **Apply workbook** and check the updated product and location stock.
+1. **Fill the Single / Per row first.** This makes that item's contextual pack choices available.
+2. On **Pack sizes**, add the pack name and number of individual units if the definition is new.
+3. Add a Products row with the same Product, Manufacturer and Size / type. Select the pack in
+   **Sold as**, then enter its retail price and optional barcode.
 
-Pack-only edits can be applied without an unrelated price or stock change. The submitted changes
-apply together; a rejected pack, stock, or price change does not leave the other edits half-applied.
-Your role needs catalogue management access, plus stock-adjustment access for packs or stock
-changes. Batch-value corrections also require financial access.
+A Box / 12 definition can supply choices for different products. Each assigned pack has its
+own price and barcode. Leaving a new pack's retail price blank makes it purchase-only.
+Existing pack contents are fixed; add a different definition and pack for a new count.
 
-See [Setting up and using packs](using-product-packs.md) for buying, selling, and counting examples.
+### Entry sequence and sorting
+
+Keep a Single / Per row followed by its packs for readability. **Row position does not establish
+ownership.** Import checks the entire table, including when a parent appears below its pack.
+Repeat identifying fields; blank does not mean “same as above”. Sort complete rows through the
+table headers so hidden references move with them.
+
+Existing manufacturer and pack labels follow linked reference formulas. Choosing a different
+entry replaces the formula with a value. If you subsequently rename that reference, reselect
+any old literal selections. Use distinct parent names when identical names make a new pack's
+parent ambiguous.
+
+## Availability and inventory value
+
+Set **Product active?** or **Selling option active?** to **No** to disable it. Removing a row
+from the workbook leaves the saved record unchanged; it never deletes or disables a product.
+
+Buying and exact-value corrections require financial and stock-adjustment permissions. They
+apply to the latest open batch at the chosen location and may revalue remaining inventory.
+Use **New buying** or **Revised batch value KES** for a correction, not both. Exact values are
+kept separately: 97 eggs at a rounded buying price of 14 KES may have an actual remaining value
+of 1,400 KES. Existing inventory history stays in the application.
+
+## Upload and review
+
+Upload the workbook and review current → proposed values, creations, pack assignments and
+inventory effects. Fix errors using the displayed sheet, row and column. If saved catalogue or
+stock values changed since export, download a fresh workbook and review your edits against it.
+
+**Apply workbook** saves the reviewed changes together. A failed apply leaves no partial
+product, manufacturer, pack or stock changes. Retrying after a connection failure uses the same
+request and cannot repeat the adjustments. After success, download a fresh workbook for your
+next changes.
+
+Only the current three-sheet format is accepted. Download a fresh workbook to replace files
+from earlier formats.

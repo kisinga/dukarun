@@ -136,13 +136,24 @@ companies use different lock keys.
   journal. Legacy cached rows without pack metadata cannot establish unique offline barcode matches.
 - `resolve_catalog_selling_unit` returns the variant and an explicit `selected_pack_id`; scanning
   a pack adds that unit directly. Automatic barcode assignment remains base-variant-only.
-- Version 6 product workbooks add a **Packs** sheet. `apply_catalog_workbook_units` validates
-  `expected_packs` against current definitions and atomically applies pack, catalogue, stock, and
-  batch changes. Pack-only updates are supported. Omitted pack rows preserve definitions;
-  `active=false` retires them. New products need a fresh export before pack rows can reference them.
-- `new_remaining_value_kes` becomes `new_remaining_cost` for an open-batch correction. The exact
-  value applies to remaining stock before counted additions; consumed COGS stays unchanged. Version
-  5 workbooks remain readable without the new optional sheets and fields.
+- Products workbooks use one `dukarun-products-1` contract with three visible sheets:
+  **Products**, **Manufacturers**, and **Pack sizes**. All prices, stock and latest-batch values
+  remain on Products. Existing records retain hidden identities; new rows resolve across the
+  complete table by product/manufacturer/size-type. Entry starts with a Single / Per row, but
+  physical row order never selects a parent. Omitted rows leave records unchanged.
+- `product_workbook_snapshot` exports a consistent company/location snapshot, shared reference
+  records and exact inventory values. Costs and values are absent from restricted exports,
+  including hidden metadata. `apply_product_workbook` validates ownership, permissions and
+  versions, resolves new references, and applies catalogue, pack and inventory changes together.
+  Both creation and update-only requests retain a payload hash and result in `catalog_imports`
+  so retries cannot repeat writes or expose financial inputs through import history.
+- Pack sizes are workbook templates; assigned packs remain variant-owned database records.
+  Existing contents cannot change. Pack stock/wholesale/buying cells are grey `XXXX`; counted
+  stock belongs to the Single / Per row. Blank proposed prices preserve values; `CLEAR` makes a
+  pack purchase-only. The application has no readers or converters for previous workbook formats.
+- Revised batch value maps to `new_remaining_cost` in the established inventory writer. Exact
+  corrections apply to remaining stock before counted additions; consumed COGS stays unchanged.
+  Historical batch editing and multiple stock locations are separate application workflows.
 - `storefront_product_units` extends the existing public visibility boundary with stock-unit names
   and active sellable packs. The API exposes price and availability, excluding cost, wholesale,
   barcodes, and exact stock. Public baskets distinguish variant-plus-pack identities; WhatsApp
@@ -150,7 +161,7 @@ companies use different lock keys.
 - The published `storefront-v1.yaml` uses JSON syntax, a YAML-compatible representation. The
   formatter is configured to preserve JSON because the contract test parses it with `JSON.parse`.
 
-Apply the pack migrations through `0171_sale_catalog_lock_order` before releasing the
+Apply the migrations through `0173_product_workbook` before releasing the
 corresponding clients. Baseline historical lines default to a conversion factor of one. Regression
 coverage lives in `0120_product_packs.test.sql`, `packs.concurrency.spec.mjs`, the cart/product/purchase
 component tests, and the storefront API contract tests.

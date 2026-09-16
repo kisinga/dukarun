@@ -6,7 +6,6 @@ import {
   type ProductWorkbookPreview,
   type ProductWorkbookResult,
 } from './product-transfer.service';
-import { formatKes } from '../core/money';
 
 @Component({
   selector: 'app-product-import-dialog',
@@ -17,9 +16,9 @@ import { formatKes } from '../core/money';
         <div class="modal-box modal-box-task p-0 md:w-full md:max-w-3xl">
           <header class="flex items-start justify-between gap-3 border-b border-base-300 p-4">
             <div>
-              <h2 class="type-title">Upload edited workbook</h2>
+              <h2 class="type-title">Upload Products workbook</h2>
               <p class="type-caption mt-1">
-                Review product, stock, batch cost, new-row, and disable changes before applying.
+                Review new products, selling options, prices and stock before applying.
               </p>
             </div>
             <button
@@ -28,22 +27,19 @@ import { formatKes } from '../core/money';
               [iconOnly]="true"
               type="button"
               aria-label="Close"
+              [disabled]="busy()"
               (click)="close()"
             >
               <app-icon name="heroXMark" />
             </button>
           </header>
-
           <div class="modal-body space-y-4 p-4">
             @if (error()) {
-              <div role="alert" class="alert alert-error text-sm">
-                <app-icon name="heroExclamationTriangle" /><span>{{ error() }}</span>
-              </div>
+              <div role="alert" class="alert alert-error text-sm">{{ error() }}</div>
             }
-
-            <div class="rounded-field border border-base-300 p-4">
+            <div>
               <label class="block text-sm font-semibold" for="product-import-file"
-                >Edited products and stock workbook</label
+                >Products workbook (.xlsx)</label
               >
               <input
                 id="product-import-file"
@@ -53,366 +49,82 @@ import { formatKes } from '../core/money';
                 [disabled]="busy()"
                 (change)="chooseFile($event)"
               />
+              <p class="type-caption mt-2">
+                Use the same workbook for new entries and edits. Missing rows leave saved products
+                unchanged.
+              </p>
             </div>
-
             @if (preview(); as data) {
-              <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                <div class="rounded-field bg-base-200 p-3">
-                  <p class="type-caption">Rows</p>
-                  <p class="font-semibold">{{ data.rows }}</p>
-                </div>
-                <div class="rounded-field bg-base-200 p-3">
-                  <p class="type-caption">Retail</p>
-                  <p class="font-semibold">{{ data.retailChanges }}</p>
-                </div>
-                <div class="rounded-field bg-base-200 p-3">
-                  <p class="type-caption">Wholesale</p>
-                  <p class="font-semibold">{{ data.wholesaleChanges }}</p>
-                </div>
-                <div class="rounded-field bg-base-200 p-3">
-                  <p class="type-caption">Stock</p>
-                  <p class="font-semibold">{{ data.stockChanges }}</p>
-                </div>
-                <div class="rounded-field bg-base-200 p-3">
-                  <p class="type-caption">Batches</p>
-                  <p class="font-semibold">{{ batchChangeCount(data) }}</p>
-                </div>
-                <div class="rounded-field bg-base-200 p-3">
-                  <p class="type-caption">Manufacturers</p>
-                  <p class="font-semibold">{{ data.manufacturerChanges }}</p>
-                </div>
-                <div class="rounded-field bg-base-200 p-3">
-                  <p class="type-caption">New products</p>
-                  <p class="font-semibold">{{ data.creationPreview?.creates ?? 0 }}</p>
-                </div>
-                <div class="rounded-field bg-base-200 p-3">
-                  <p class="type-caption">Will disable</p>
-                  <p class="font-semibold">
-                    {{ data.disabledVariants }}
-                    {{ data.disabledVariants === 1 ? 'variant' : 'variants' }}
-                  </p>
-                  <p class="type-caption">
-                    {{ data.disabledProducts }}
-                    {{ data.disabledProducts === 1 ? 'product' : 'products' }}
-                  </p>
-                </div>
-                <div class="rounded-field bg-base-200 p-3">
-                  <p class="type-caption">Unchanged</p>
-                  <p class="font-semibold">{{ data.unchangedRows }}</p>
-                </div>
-                <div class="rounded-field bg-base-200 p-3">
-                  <p class="type-caption">Issues</p>
-                  <p class="font-semibold">{{ data.errors.length + data.conflicts.length }}</p>
-                </div>
-                <div class="rounded-field bg-base-200 p-3">
-                  <p class="type-caption">Warnings</p>
-                  <p class="font-semibold">{{ data.warnings.length }}</p>
-                </div>
-              </div>
-
-              @if (data.productChanges.length) {
-                <div class="rounded-field border border-base-300 p-3">
-                  <h3 class="text-sm font-semibold">Product detail changes</h3>
-                  <div class="mt-2 max-h-40 space-y-2 overflow-y-auto text-xs">
-                    @for (change of data.productChanges; track change.productId) {
-                      <div class="border-b border-base-200 pb-2 last:border-0">
-                        <p class="font-medium">{{ change.productName }}</p>
-                        <p>
-                          Manufacturer: {{ change.currentManufacturer || 'Not set' }} →
-                          {{ change.newManufacturer || 'Not set' }}
-                        </p>
-                      </div>
-                    }
-                  </div>
-                </div>
+              <p class="text-sm">
+                {{ data.rows }} selling-option rows · {{ data.lines.length }} changes to review
+              </p>
+              @if (!data.lines.length && !data.errors.length && !data.conflicts.length) {
+                <div role="status" class="rounded-field bg-base-200 p-3">No changes to apply.</div>
               }
-
-              @if (data.disableChanges.length) {
-                <div class="rounded-field border border-warning/50 bg-warning/5 p-3">
-                  <h3 class="text-sm font-semibold">Will be disabled</h3>
-                  <p class="type-caption mt-1">
-                    These entire table rows were present in the export and removed from the
-                    workbook. No history will be deleted.
-                  </p>
-                  <div class="mt-2 max-h-56 space-y-2 overflow-y-auto lg:hidden">
-                    @for (change of data.disableChanges; track change.variantId) {
-                      <div class="rounded-field border border-warning/30 bg-base-100 p-2 text-xs">
-                        <p class="font-medium">{{ change.productName }}</p>
-                        <p>{{ change.variantName || 'Default' }} · {{ change.sku || 'No SKU' }}</p>
-                        <p class="mt-1 text-base-content/70">
-                          {{
-                            change.disableProduct
-                              ? 'Disable variant and product'
-                              : 'Disable variant'
-                          }}
-                        </p>
-                      </div>
-                    }
-                  </div>
-                  <div class="mt-2 hidden max-h-56 overflow-auto lg:block">
-                    <table class="table table-xs">
-                      <thead>
-                        <tr>
-                          <th>Product</th>
-                          <th>Variant</th>
-                          <th>SKU</th>
-                          <th>Effect</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        @for (change of data.disableChanges; track change.variantId) {
-                          <tr>
-                            <td>{{ change.productName }}</td>
-                            <td>{{ change.variantName || 'Default' }}</td>
-                            <td>{{ change.sku || '—' }}</td>
-                            <td>
-                              {{
-                                change.disableProduct
-                                  ? 'Disable variant and product'
-                                  : 'Disable variant'
-                              }}
-                            </td>
-                          </tr>
-                        }
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              }
-
-              @if (data.creationPreview; as creation) {
-                <div class="rounded-field border border-base-300 p-3">
-                  <h3 class="text-sm font-semibold">New products</h3>
-                  <div class="mt-2 max-h-40 space-y-2 overflow-y-auto text-xs">
-                    @for (product of creation.products; track product.product_key) {
-                      <div class="border-b border-base-200 pb-2 last:border-0">
-                        <p>
-                          <span class="font-medium">{{ product.name }}</span>
-                          · {{ product.variants.length }}
-                          {{ product.variants.length === 1 ? 'variant' : 'variants' }}
-                          @if (product.manufacturer_name) {
-                            · {{ product.manufacturer_name }}
-                          }
-                        </p>
-                        @for (variant of product.variants; track $index) {
-                          @if (variant.opening_quantity) {
-                            <p class="mt-1 text-base-content/70">
-                              {{ variant.name || variant.sku || 'Default variant' }}: opening stock
-                              {{ qty(variant.opening_quantity) }} at
-                              {{ fmt(variant.opening_unit_cost ?? 0) }}
-                              @if (variant.batch_number) {
-                                · batch {{ variant.batch_number }}
-                              }
-                              @if (variant.expiry_date) {
-                                · expires {{ variant.expiry_date }}
-                              }
-                            </p>
-                          }
-                        }
-                      </div>
-                    }
-                  </div>
-                </div>
-              }
-
-              @if (data.changes.length) {
-                <div class="rounded-field border border-base-300 p-3">
-                  <h3 class="text-sm font-semibold">Product changes</h3>
-                  <div class="mt-2 max-h-56 space-y-2 overflow-y-auto text-xs">
-                    @for (change of data.changes; track change.variantId) {
-                      <div class="border-b border-base-200 pb-2 last:border-0">
-                        <p class="font-medium">
-                          {{ change.productName }}
-                          @if (change.variantName) {
-                            <span class="text-base-content/60">— {{ change.variantName }}</span>
-                          }
-                        </p>
-                        @if (change.newRetailPrice !== undefined) {
-                          <p>
-                            Retail: {{ fmt(change.currentRetailPrice) }} →
-                            {{ fmt(change.newRetailPrice) }}
-                          </p>
-                        }
-                        @if (change.newWholesalePrice !== undefined) {
-                          <p>
-                            Wholesale: {{ nullableMoney(change.currentWholesalePrice) }} →
-                            {{ nullableMoney(change.newWholesalePrice) }}
-                          </p>
-                        }
-                        @if (change.newStockQuantity !== undefined) {
-                          <p>
-                            Stock at {{ change.stockLocationName }}:
-                            {{ qty(change.currentStockQuantity ?? 0) }} →
-                            {{ qty(change.newStockQuantity) }}
-                          </p>
-                        }
-                      </div>
-                    }
-                  </div>
-                </div>
-              }
-
-              @if (data.packChanges?.length) {
-                <section class="mt-4 rounded-box border border-base-300 p-4">
-                  <h3 class="section-title">Pack changes</h3>
-                  @for (change of data.packChanges; track change.variant_id) {
-                    <p class="mt-3 font-medium">{{ change.product_name }}</p>
-                    @for (pack of change.packs; track pack.id) {
-                      <p class="text-sm">
-                        {{ pack.name }} · {{ pack.units_per_pack }} {{ change.stock_unit }} ·
-                        {{ pack.sale_price === null ? 'Purchase only' : 'KES ' + pack.sale_price }}
-                        · {{ pack.active ? 'Active' : 'Retired' }}
-                        @if (pack.barcode) {
-                          · {{ pack.barcode }}
-                        }
+              @if (data.lines.length) {
+                <div class="space-y-3 lg:hidden">
+                  @for (line of data.lines; track $index) {
+                    <article data-workbook-change class="rounded-field border border-base-300 p-3">
+                      <h3 class="font-semibold">{{ line.product }}</h3>
+                      <p class="type-caption">
+                        {{ line.option }} · {{ line.sheet }} row {{ line.row }}
                       </p>
-                    }
+                      <p class="mt-2 text-sm font-medium">{{ line.field }}</p>
+                      <dl class="mt-1 grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                          <dt class="type-caption">Current</dt>
+                          <dd>{{ line.before }}</dd>
+                        </div>
+                        <div>
+                          <dt class="type-caption">Proposed</dt>
+                          <dd>{{ line.after }}</dd>
+                        </div>
+                      </dl>
+                    </article>
                   }
-                </section>
-              }
-              @if (data.batchChanges.length) {
-                <div class="rounded-field border border-info/40 bg-info/5 p-3">
-                  <h3 class="text-sm font-semibold">Batch changes</h3>
-                  <p class="type-caption mt-1">
-                    Latest-batch changes come from Products &amp; Stock. Older open batches come
-                    from Batches. Past sales and cost of goods sold stay unchanged.
-                  </p>
-                  <div class="mt-2 max-h-56 space-y-2 overflow-y-auto lg:hidden">
-                    @for (change of data.batchChanges; track change.batchId || change.variantId) {
-                      <div class="rounded-field border border-info/30 bg-base-100 p-2 text-xs">
-                        <p class="font-medium">
-                          {{ change.productName }}
-                          @if (change.variantName) {
-                            · {{ change.variantName }}
-                          }
-                        </p>
-                        <p class="text-base-content/60">
-                          {{ change.sku || 'No SKU' }} ·
-                          {{
-                            change.action === 'create' ? 'Create latest batch' : change.batchLabel
-                          }}
-                        </p>
-                        <p class="mt-1">
-                          @if (change.quantityAdded > 0) {
-                            Add {{ qty(change.quantityAdded) }} at {{ fmt(change.newUnitCost) }}
-                          } @else {
-                            {{ qty(change.expectedRemaining) }} remaining ·
-                            {{ fmt(change.currentUnitCost) }} → {{ fmt(change.newUnitCost) }}
-                          }
-                        </p>
-                        @if (change.currentBatchNumber !== change.newBatchNumber) {
-                          <p>
-                            Batch number: {{ change.currentBatchNumber || 'Not set' }} →
-                            {{ change.newBatchNumber || 'Not set' }}
-                          </p>
-                        }
-                        @if (change.currentExpiryDate !== change.newExpiryDate) {
-                          <p>
-                            Expiry: {{ change.currentExpiryDate || 'Not set' }} →
-                            {{ change.newExpiryDate || 'Not set' }}
-                          </p>
-                        }
-                      </div>
-                    }
-                  </div>
-                  <div class="mt-2 hidden max-h-56 overflow-auto lg:block">
-                    <table class="table table-xs">
-                      <thead>
-                        <tr>
-                          <th>Product / batch</th>
-                          <th>Remaining</th>
-                          <th>Unit cost</th>
-                          <th>Batch number</th>
-                          <th>Expiry</th>
-                          <th>Cost correction</th>
+                </div>
+                <div class="hidden overflow-x-auto rounded-field border border-base-300 lg:block">
+                  <table class="table table-sm">
+                    <thead>
+                      <tr>
+                        <th>Product / selling option</th>
+                        <th>Change</th>
+                        <th>Current</th>
+                        <th>Proposed</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (line of data.lines; track $index) {
+                        <tr data-workbook-change>
+                          <td>
+                            <div class="font-semibold">{{ line.product }}</div>
+                            <div class="type-caption">{{ line.option }}</div>
+                            <div class="type-caption">{{ line.sheet }} · row {{ line.row }}</div>
+                          </td>
+                          <td>{{ line.field }}</td>
+                          <td>{{ line.before }}</td>
+                          <td>{{ line.after }}</td>
                         </tr>
-                      </thead>
-                      <tbody>
-                        @for (
-                          change of data.batchChanges;
-                          track change.batchId || change.variantId
-                        ) {
-                          <tr>
-                            <td>
-                              <span class="font-medium">{{ change.productName }}</span>
-                              @if (change.variantName) {
-                                · {{ change.variantName }}
-                              }
-                              @if (change.sku) {
-                                · {{ change.sku }}
-                              }
-                              <br />
-                              <span class="text-base-content/60">
-                                {{
-                                  change.action === 'create'
-                                    ? 'Create latest batch'
-                                    : change.batchLabel
-                                }}
-                              </span>
-                            </td>
-                            <td>
-                              {{
-                                change.quantityAdded > 0
-                                  ? '+' + qty(change.quantityAdded)
-                                  : qty(change.expectedRemaining)
-                              }}
-                            </td>
-                            <td>
-                              {{ fmt(change.currentUnitCost) }} → {{ fmt(change.newUnitCost) }}
-                            </td>
-                            <td>
-                              {{ change.currentBatchNumber || '—' }} →
-                              {{ change.newBatchNumber || '—' }}
-                            </td>
-                            <td>
-                              {{ change.currentExpiryDate || '—' }} →
-                              {{ change.newExpiryDate || '—' }}
-                            </td>
-                            <td>
-                              {{
-                                change.action === 'create'
-                                  ? '—'
-                                  : signedMoney(change.valueDifference)
-                              }}
-                            </td>
-                          </tr>
-                        }
-                      </tbody>
-                    </table>
-                  </div>
+                      }
+                    </tbody>
+                  </table>
                 </div>
               }
-
-              @if (data.warnings.length) {
-                <div class="rounded-field border border-warning/40 bg-warning/5 p-3">
-                  <h3 class="text-sm font-semibold">Ignored batch details</h3>
-                  <p class="type-caption mt-1">
-                    These rows have zero stock and no open batch. Their batch details will not be
-                    imported and do not block other changes.
-                  </p>
-                  <ul class="mt-2 max-h-56 list-disc space-y-1 overflow-y-auto pl-5 text-xs">
-                    @for (message of data.warnings; track message) {
-                      <li>{{ message }}</li>
-                    }
-                  </ul>
-                </div>
-              }
-
               @if (data.conflicts.length) {
-                <div class="rounded-field border border-warning/40 bg-warning/5 p-3">
-                  <h3 class="text-sm font-semibold">Re-export before applying</h3>
-                  <ul class="mt-2 list-disc space-y-1 pl-5 text-xs">
-                    @for (message of data.conflicts; track message) {
+                <div role="alert" class="rounded-field border border-warning/40 bg-warning/5 p-3">
+                  <h3 class="text-sm font-semibold">Download a fresh workbook</h3>
+                  <ul class="mt-2 list-disc space-y-1 pl-5 text-sm">
+                    @for (message of data.conflicts; track $index) {
                       <li>{{ message }}</li>
                     }
                   </ul>
                 </div>
               }
               @if (data.errors.length) {
-                <div class="rounded-field border border-error/40 bg-error/5 p-3">
-                  <h3 class="text-sm font-semibold text-error">Fix workbook errors</h3>
-                  <ul class="mt-2 list-disc space-y-1 pl-5 text-xs">
-                    @for (message of data.errors; track message) {
+                <div role="alert" class="rounded-field border border-error/40 bg-error/5 p-3">
+                  <h3 class="text-sm font-semibold">Fix workbook errors</h3>
+                  <ul class="mt-2 list-disc space-y-1 pl-5 text-sm">
+                    @for (message of data.errors; track $index) {
                       <li>{{ message }}</li>
                     }
                   </ul>
@@ -420,7 +132,6 @@ import { formatKes } from '../core/money';
               }
             }
           </div>
-
           <footer class="flex justify-end gap-2 border-t border-base-300 p-4">
             <button appButton variant="ghost" type="button" [disabled]="busy()" (click)="close()">
               Cancel
@@ -446,13 +157,11 @@ import { formatKes } from '../core/money';
 })
 export class ProductImportDialogComponent {
   private readonly transfer = inject(ProductTransferService);
-
   readonly open = model(false);
   readonly imported = output<ProductWorkbookResult>();
   protected readonly preview = signal<ProductWorkbookPreview | null>(null);
   protected readonly busy = signal(false);
   protected readonly error = signal<string | null>(null);
-
   protected async chooseFile(event: Event): Promise<void> {
     const file = (event.target as HTMLInputElement).files?.[0];
     if (!file) return;
@@ -462,73 +171,35 @@ export class ProductImportDialogComponent {
     try {
       this.preview.set(await this.transfer.preview(file));
     } catch (error) {
-      this.error.set(error instanceof Error ? error.message : 'Could not read workbook');
+      this.error.set(error instanceof Error ? error.message : 'Could not read workbook.');
     } finally {
       this.busy.set(false);
     }
   }
-
   protected canImport(): boolean {
-    const preview = this.preview();
-    if (!preview || preview.errors.length || this.busy()) return false;
-    return (
-      preview.conflicts.length === 0 &&
-      (preview.changes.length > 0 ||
-        preview.productChanges.length > 0 ||
-        preview.disableChanges.length > 0 ||
-        preview.batchChanges.length > 0 ||
-        (preview.packChanges?.length ?? 0) > 0 ||
-        !!preview.creationPreview?.products.length)
-    );
+    const p = this.preview();
+    return !!p && !this.busy() && !p.errors.length && !p.conflicts.length && !!p.lines.length;
   }
-
   protected async apply(): Promise<void> {
     const preview = this.preview();
     if (!preview || !this.canImport()) return;
     this.busy.set(true);
     this.error.set(null);
     try {
-      const result = await this.transfer.apply(preview);
-      this.imported.emit(result);
-      this.close();
+      this.imported.emit(await this.transfer.apply(preview));
+      this.open.set(false);
+      this.preview.set(null);
     } catch (error) {
-      this.error.set(error instanceof Error ? error.message : 'Import failed');
+      this.error.set(error instanceof Error ? error.message : 'Import failed.');
     } finally {
       this.busy.set(false);
     }
   }
-
-  protected fmt(amount: number): string {
-    return formatKes(amount);
-  }
-
-  protected nullableMoney(amount: number | null): string {
-    return amount === null ? 'Not set' : formatKes(amount);
-  }
-
-  protected qty(amount: number): string {
-    return new Intl.NumberFormat('en-KE', { maximumFractionDigits: 3 }).format(amount);
-  }
-
-  protected batchChangeCount(preview: ProductWorkbookPreview): number {
-    const openingBatches =
-      preview.creationPreview?.products.reduce(
-        (count, product) =>
-          count + product.variants.filter(variant => (variant.opening_quantity ?? 0) > 0).length,
-        0
-      ) ?? 0;
-    return preview.batchChanges.length + openingBatches;
-  }
-
-  protected signedMoney(amount: number): string {
-    if (amount === 0) return formatKes(0);
-    return `${amount > 0 ? '+' : '−'}${formatKes(Math.abs(amount))}`;
-  }
-
   protected close(): void {
-    if (this.busy()) return;
-    this.open.set(false);
-    this.preview.set(null);
-    this.error.set(null);
+    if (!this.busy()) {
+      this.open.set(false);
+      this.preview.set(null);
+      this.error.set(null);
+    }
   }
 }

@@ -301,10 +301,16 @@ join public.manufacturers m on m.company_id=c.id and m.normalized_name='mumias s
 where c.name = 'Mama Mboga Stores'
 on conflict do nothing;
 
-insert into public.product_variants (id, product_id, company_id, name, sku, price, allow_fractional)
-select 'dd000000-0000-0000-0000-000000000002', 'd0000000-0000-0000-0000-000000000002', c.id, 'Loose (per kg)', 'SUGL', 180, true
+-- Loose sugar quantities and prices are per kilogram. Keep the selling measure
+-- in stock_unit and the distinguishing product option in name.
+insert into public.product_variants (id, product_id, company_id, name, sku, price, allow_fractional, stock_unit)
+select 'dd000000-0000-0000-0000-000000000002', 'd0000000-0000-0000-0000-000000000002', c.id, 'Loose', 'SUGL', 180, true, 'kg'
 from public.companies c where c.name = 'Mama Mboga Stores'
-on conflict do nothing;
+on conflict (id) do update
+set name = excluded.name,
+    stock_unit = excluded.stock_unit
+where product_variants.company_id = excluded.company_id
+  and product_variants.sku = 'SUGL';
 
 insert into public.product_variants (id, product_id, company_id, name, sku, price)
 select 'dd000000-0000-0000-0000-000000000003', 'd0000000-0000-0000-0000-000000000002', c.id, '1kg Packed', 'SUG1', 200
