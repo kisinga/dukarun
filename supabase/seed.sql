@@ -301,10 +301,16 @@ join public.manufacturers m on m.company_id=c.id and m.normalized_name='mumias s
 where c.name = 'Mama Mboga Stores'
 on conflict do nothing;
 
-insert into public.product_variants (id, product_id, company_id, name, sku, price, allow_fractional)
-select 'dd000000-0000-0000-0000-000000000002', 'd0000000-0000-0000-0000-000000000002', c.id, 'Loose (per kg)', 'SUGL', 180, true
+-- Loose sugar quantities and prices are per kilogram. Keep the selling measure
+-- in stock_unit and the distinguishing product option in name.
+insert into public.product_variants (id, product_id, company_id, name, sku, price, allow_fractional, stock_unit)
+select 'dd000000-0000-0000-0000-000000000002', 'd0000000-0000-0000-0000-000000000002', c.id, 'Loose', 'SUGL', 180, true, 'kg'
 from public.companies c where c.name = 'Mama Mboga Stores'
-on conflict do nothing;
+on conflict (id) do update
+set name = excluded.name,
+    stock_unit = excluded.stock_unit
+where product_variants.company_id = excluded.company_id
+  and product_variants.sku = 'SUGL';
 
 insert into public.product_variants (id, product_id, company_id, name, sku, price)
 select 'dd000000-0000-0000-0000-000000000003', 'd0000000-0000-0000-0000-000000000002', c.id, '1kg Packed', 'SUG1', 200
@@ -360,6 +366,52 @@ insert into public.customers (id, company_id, first_name, phone, is_supplier, su
 select 'dc000000-0000-0000-0000-000000000002', id, 'Brookside Distributors', '0700111222', true, 200000, 30
 from public.companies where name = 'Mama Mboga Stores'
 on conflict do nothing;
+
+-- Packs share base inventory. Fractional sugar and the delivery service stay as-is.
+-- Existing stocked examples: a bale of flour and a bundle of packed sugar.
+update public.product_variants set stock_unit='packet'
+where id in ('dd000000-0000-0000-0000-000000000001','dd000000-0000-0000-0000-000000000003');
+insert into public.variant_packs(id,company_id,variant_id,name,units_per_pack,sale_price,barcode)
+select p.id::uuid,c.id,p.variant_id::uuid,p.name,p.contents,p.price,p.barcode
+from public.companies c cross join (values
+ ('de000000-0000-4000-8000-000000000001','dd000000-0000-0000-0000-000000000001','Bale',12,2280,'MM-UNGA-BALE-12'),
+ ('de000000-0000-4000-8000-000000000002','dd000000-0000-0000-0000-000000000003','Bundle',10,1850,'MM-SUGAR-BUNDLE-10')
+) p(id,variant_id,name,contents,price,barcode)
+where c.name='Mama Mboga Stores' on conflict(id) do nothing;
+
+-- Use real product creation for new pack items so opening stock has matching ledger value.
+do $$
+declare v_claims text:=current_setting('request.jwt.claims',true);v_company uuid;
+begin
+ select id into strict v_company from public.companies where name='Mama Mboga Stores';
+ perform set_config('request.jwt.claims',jsonb_build_object(
+   'sub','5877ac73-ff8d-457c-afcd-791e66229d17','role','authenticated',
+   'company_id',v_company,'user_role','Admin')::text,true);
+ if not exists(select 1 from public.product_variants where company_id=public.current_company_id() and sku='MM-EGG') then
+  perform public.create_catalog_product('Fresh eggs','[{
+   "name":"Default","sku":"MM-EGG","barcode":"MM-EGG-1","price":20,"wholesale_price":17,
+   "stock_unit":"egg","kind":"good","track_inventory":true,"allow_fractional":false,
+   "opening_quantity":97,"opening_unit_cost":14,"opening_total_cost":1400,
+   "packs":[
+    {"id":"de000000-0000-4000-8000-000000000003","name":"Tray","units_per_pack":30,"sale_price":480,"barcode":"MM-EGG-TRAY-30","active":true},
+    {"id":"de000000-0000-4000-8000-000000000004","name":"Half tray","units_per_pack":15,"sale_price":260,"barcode":"MM-EGG-HALF-15","active":true}
+   ]
+  }]'::jsonb);
+ end if;
+ if not exists(select 1 from public.product_variants where company_id=public.current_company_id() and sku='MM-MILK500') then
+  perform public.create_catalog_product('Fresh milk 500ml','[{
+   "name":"Default","sku":"MM-MILK500","barcode":"MM-MILK-500","price":60,"wholesale_price":55,
+   "stock_unit":"packet","kind":"good","track_inventory":true,"allow_fractional":false,
+   "opening_quantity":75,"opening_unit_cost":48,"opening_total_cost":3600,
+   "packs":[
+    {"id":"de000000-0000-4000-8000-000000000005","name":"Six-pack","units_per_pack":6,"sale_price":320,"barcode":"MM-MILK-SIX-6","active":true},
+    {"id":"de000000-0000-4000-8000-000000000006","name":"Supplier crate","units_per_pack":24,"sale_price":null,"barcode":null,"active":true}
+   ]
+  }]'::jsonb);
+ end if;
+ perform set_config('request.jwt.claims',v_claims,true);
+end;
+$$;
 
 -- ---------------------------------------------------------------------------
 -- Second company for the demo user (multi-company switching, 0018).

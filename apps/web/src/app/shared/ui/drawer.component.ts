@@ -50,13 +50,13 @@ const CLOSE_MS = 150;
           class="task-sheet-panel"
           [class.task-sheet-panel-shown]="shown()"
         >
-          <div
-            class="flex min-h-14 items-center justify-between gap-3 border-b border-base-300/60 px-4 py-2.5"
+          <header
+            class="surface-chrome flex min-h-14 items-center justify-between gap-3 border-b border-base-300/60 px-4 py-3"
           >
             <div class="flex min-w-0 items-center gap-3">
               <ng-content select="[leading]" />
               <div class="min-w-0">
-                <h2 class="section-title truncate">{{ title() }}</h2>
+                <h2 class="type-title truncate">{{ title() }}</h2>
                 @if (subtitle()) {
                   <p class="type-caption mt-0.5 truncate">{{ subtitle() }}</p>
                 }
@@ -77,7 +77,7 @@ const CLOSE_MS = 150;
                 <app-icon name="heroXMark" />
               </button>
             </div>
-          </div>
+          </header>
 
           <div class="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">
             <ng-content />
@@ -92,6 +92,7 @@ const CLOSE_MS = 150;
             @if (!hasActionFooter() && !hasFooter()) {
               <button
                 appButton
+                variant="secondary"
                 type="button"
                 class="w-full"
                 [disabled]="closeDisabled()"
@@ -145,7 +146,7 @@ const CLOSE_MS = 150;
       border: 1px solid color-mix(in oklab, var(--color-base-300) 60%, transparent);
       border-bottom: 0;
       border-radius: var(--radius-box) var(--radius-box) 0 0;
-      background: var(--color-base-100);
+      background: var(--surface-panel);
       box-shadow: var(--shadow-overlay);
       outline: none;
       transform: translateY(100%);

@@ -1,3 +1,5 @@
+import { cartLineId } from '../cart.service';
+import { sellingUnits } from '@dukarun/pack-types';
 import { Injectable, OnDestroy, computed, effect, inject, signal, untracked } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { FormControl } from '@angular/forms';
@@ -144,7 +146,7 @@ export class SellWorkflowStore implements OnDestroy {
   readonly busy = this.busyState.asReadonly();
   private readonly errorState = signal<string | null>(null);
   readonly error = this.errorState.asReadonly();
-  readonly displayError = computed(() => this.error() ?? this.catalog.error());
+  readonly displayError = computed(() => this.error() ?? this.cart.error() ?? this.catalog.error());
   private readonly noticeState = signal<string | null>(null);
   readonly notice = this.noticeState.asReadonly();
   /**
@@ -285,11 +287,11 @@ export class SellWorkflowStore implements OnDestroy {
   }
 
   stepQty(variantId: string, direction: 1 | -1): void {
-    const line = this.cart.lines().find(l => l.variant.variant_id === variantId);
+    const line = this.cart.findLine(variantId);
     if (!line) return;
     this.cart.setQuantity(
       variantId,
-      line.quantity + direction * this.cart.quantityStep(line.variant)
+      line.quantity + direction * (line.packId ? 1 : this.cart.quantityStep(line.variant))
     );
   }
 
@@ -319,21 +321,21 @@ export class SellWorkflowStore implements OnDestroy {
     const customPrice = next === line.unitPrice ? null : next;
     const verb = direction > 0 ? 'increased' : 'reduced';
     this.cart.setCustomPrice(
-      line.variant.variant_id!,
+      cartLineId(line),
       customPrice,
       customPrice === null ? '' : `Quick price ${verb} by KES ${step}`
     );
 
     // When a whole-KES base is reached, remove the override entirely.
     if (next === baseWhole && baseWhole === line.unitPrice) {
-      this.cart.setCustomPrice(line.variant.variant_id!, null, '');
+      this.cart.setCustomPrice(cartLineId(line), null, '');
     }
   }
 
   startOverride(line: CartLine): void {
     if (!this.canOverridePrices()) return;
     const effectivePrice = line.customPrice ?? line.unitPrice;
-    this.overrideForState.set(line.variant.variant_id!);
+    this.overrideForState.set(cartLineId(line));
     this.overridePrice.setValue(String(effectivePrice));
     this.overrideReason.setValue(line.overrideReason);
   }
@@ -348,7 +350,7 @@ export class SellWorkflowStore implements OnDestroy {
       return;
     }
 
-    const line = this.cart.lines().find(item => item.variant.variant_id === variantId);
+    const line = this.cart.findLine(variantId);
     if (!line) return;
     const wholesaleFloor = this.wholesaleFloor(line);
     if (enteredAmount < wholesaleFloor) {
@@ -369,21 +371,21 @@ export class SellWorkflowStore implements OnDestroy {
 
   resetPrice(line: CartLine): void {
     this.clearPriceFloorFeedback();
-    this.cart.setCustomPrice(line.variant.variant_id!, null, '');
-    if (this.overrideFor() === line.variant.variant_id) this.overrideForState.set(null);
+    this.cart.setCustomPrice(cartLineId(line), null, '');
+    if (this.overrideFor() === cartLineId(line)) this.overrideForState.set(null);
   }
 
   private wholesaleFloor(line: CartLine): number {
-    return Math.max(1, line.variant.wholesale_price ?? 0);
+    return Math.max(1, line.packId ? line.unitPrice : (line.variant.wholesale_price ?? 0));
   }
 
   private rejectBelowWholesale(line: CartLine, floor: number): void {
     this.clearPriceFloorFeedback();
     this.priceFloorFeedbackState.set({
-      variantId: line.variant.variant_id!,
+      variantId: cartLineId(line),
       label: this.cart.lineLabel(line),
       floor,
-      wholesale: (line.variant.wholesale_price ?? 0) > 0,
+      wholesale: !line.packId && (line.variant.wholesale_price ?? 0) > 0,
     });
     this.priceFloorTimer = setTimeout(() => this.priceFloorFeedbackState.set(null), 3000);
   }
@@ -455,6 +457,10 @@ export class SellWorkflowStore implements OnDestroy {
   }
 
   handleCartIntent(intent: SellCartIntent): void {
+    if (intent.type === 'unit-edit') {
+      void this.catalog.openUnitEditor(intent.line);
+      return;
+    }
     if (intent.type === 'arm-clear') this.armClearCart();
     else if (intent.type === 'cancel-clear') this.cancelClearCart();
     else if (intent.type === 'clear') this.clearCart();
@@ -1209,7 +1215,17 @@ export class SellWorkflowStore implements OnDestroy {
         }
         const label = variantLabel(variant);
         const was = Number(savedLine.unit_price);
-        const now = variant.price ?? 0;
+        const unit = sellingUnits(variant).find(
+          unit => unit.packId === (savedLine.pack_id ?? null)
+        );
+        if (!unit) {
+          unavailable++;
+          continue;
+        }
+        const now =
+          savedLine.price_source === 'wholesale' && !unit.packId
+            ? (variant.wholesale_price ?? unit.price)
+            : unit.price;
         const override = savedLine.custom_price;
         // The server rejects a custom_price that differs from the CURRENT list
         // price when the user lacks OverridePrice — flag it now, not at checkout.
@@ -1249,11 +1265,35 @@ export class SellWorkflowStore implements OnDestroy {
           });
         }
         const needed = Number(savedLine.quantity);
+        this.cart.restoreLine({
+          id: savedLine.id,
+          variant,
+          quantity: needed,
+          packId: unit.packId,
+          unitName: unit.name,
+          stockUnit: unit.stockUnit,
+          unitsPerUnit: unit.factor,
+          priceSource: unit.packId
+            ? 'pack'
+            : savedLine.price_source === 'wholesale'
+              ? 'wholesale'
+              : 'retail',
+          unitPrice: now,
+          customPrice: override,
+          overrideReason: savedLine.price_override_reason ?? '',
+        });
+      }
+      // A held sale may contain pieces and several packs of the same variant.
+      // Compare their combined demand and report both numbers in stock units.
+      for (const variant of new Map(
+        this.cart.lines().map(line => [line.variant.variant_id, line.variant])
+      ).values()) {
+        const needed = this.cart.stockDemand(variant.variant_id!);
         const available = Number(variant.stock ?? 0);
         if (variant.track_inventory && available < needed) {
           flags.push({
             kind: 'stock',
-            label,
+            label: `${variantLabel(variant)} (${variant.stock_unit || 'item'})`,
             was: 0,
             now: 0,
             overridePrice: 0,
@@ -1261,15 +1301,6 @@ export class SellWorkflowStore implements OnDestroy {
             needed,
             count: 0,
           });
-        }
-        this.cart.addVariant(variant);
-        this.cart.setQuantity(variant.variant_id!, needed);
-        if (override !== null) {
-          this.cart.setCustomPrice(
-            variant.variant_id!,
-            override,
-            savedLine.price_override_reason ?? ''
-          );
         }
       }
       if (unavailable > 0) {

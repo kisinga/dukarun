@@ -49,7 +49,7 @@ export type SupplierProfileFormResult = {
         </p>
       }
 
-      <div class="grid gap-3 sm:grid-cols-2">
+      <div class="surface-card grid gap-3 p-4 sm:grid-cols-2">
         <app-form-field label="Supplier name" [required]="true" class="sm:col-span-2">
           <input
             type="text"

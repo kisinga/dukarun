@@ -10,6 +10,7 @@ import { environment } from '../environments/environment';
 import { PoweredByDukarunComponent } from './powered-by-dukarun.component';
 import { StorefrontCartComponent } from './storefront-cart.component';
 import { StorefrontCartService } from './storefront-cart.service';
+import { sellingUnits, unitDescription, type SellingUnit } from '@dukarun/pack-types';
 
 function formatKes(amount: number): string {
   return `KES ${Math.round(amount).toLocaleString('en-KE')}`;
@@ -37,7 +38,7 @@ function formatKes(amount: number): string {
               />
               <div class="min-w-0">
                 <p class="truncate text-lg font-bold">{{ s.name }}</p>
-                <p class="text-xs text-base-content/50">Back to the catalogue</p>
+                <p class="text-xs text-base-content/70">Back to the catalogue</p>
               </div>
             </a>
             @if (s.public_whatsapp_number) {
@@ -54,7 +55,7 @@ function formatKes(amount: number): string {
 
         <div class="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-9">
           <nav
-            class="mb-5 flex min-w-0 items-center gap-2 text-sm text-base-content/50"
+            class="mb-5 flex min-w-0 items-center gap-2 text-sm text-base-content/70"
             aria-label="Breadcrumb"
           >
             <a [routerLink]="['/', shopSlug]" class="hover:text-primary">Catalogue</a
@@ -77,7 +78,7 @@ function formatKes(amount: number): string {
               class="mx-auto max-w-lg rounded-3xl border border-error/25 bg-base-100 px-6 py-16 text-center"
             >
               <h1 class="text-2xl font-bold">The product couldn't load</h1>
-              <p class="mt-2 text-base-content/55">
+              <p class="mt-2 text-base-content/70">
                 Check your connection, then return to the catalogue and try again.
               </p>
               <a [routerLink]="['/', shopSlug]" class="btn btn-primary mt-6 min-h-11"
@@ -105,9 +106,9 @@ function formatKes(amount: number): string {
                 </div>
               </section>
 
-              <section class="flex flex-col md:py-3">
+              <section class="storefront-surface flex flex-col p-5 sm:p-6">
                 @if (p.manufacturer) {
-                  <p class="text-xs font-semibold tracking-[0.16em] text-primary uppercase">
+                  <p class="text-xs font-semibold tracking-[0.16em] text-base-content/70 uppercase">
                     {{ p.manufacturer }}
                   </p>
                 }
@@ -116,11 +117,14 @@ function formatKes(amount: number): string {
                 </h1>
                 @if (selectedVariant(); as variant) {
                   <div class="mt-5 flex flex-wrap items-center gap-3">
-                    <p class="text-2xl font-bold tabular-nums text-primary">
-                      {{ fmt(variant.price) }}
+                    <p class="text-2xl font-bold tabular-nums">
+                      {{ fmt(selectedUnit()?.price ?? variant.price) }}
+                      <span class="text-sm font-normal"
+                        >/ {{ selectedUnit()?.name || 'item' }}</span
+                      >
                     </p>
                     <span
-                      class="badge px-3 py-3"
+                      class="badge badge-soft px-3 py-3"
                       [class.badge-success]="available(variant)"
                       [class.badge-ghost]="!available(variant)"
                       >{{ available(variant) ? 'Available' : 'Currently unavailable' }}</span
@@ -135,9 +139,8 @@ function formatKes(amount: number): string {
                       @for (variant of p.variants; track variant.variant_id) {
                         <button
                           type="button"
-                          class="btn min-h-11 rounded-xl"
-                          [class.btn-primary]="variant.variant_id === selectedVariantId()"
-                          [class.btn-outline]="variant.variant_id !== selectedVariantId()"
+                          class="catalog-choice btn min-h-11 rounded-xl"
+                          [attr.aria-pressed]="variant.variant_id === selectedVariantId()"
                           (click)="selectVariant(variant)"
                           [disabled]="!available(variant)"
                         >
@@ -149,32 +152,53 @@ function formatKes(amount: number): string {
                 }
 
                 @if (selectedVariant(); as variant) {
-                  <div class="mt-8 rounded-2xl border border-base-300 bg-base-100 p-4 text-sm">
+                  <div class="storefront-inset mt-6 p-4 text-sm">
                     <div class="flex justify-between gap-4">
-                      <span class="text-base-content/55">Product</span
+                      <span class="text-base-content/70">Product</span
                       ><span class="text-right font-medium">{{ catalogLabel(variant) }}</span>
                     </div>
                     @if (variant.sku) {
                       <div class="mt-3 flex justify-between gap-4 border-t border-base-300 pt-3">
-                        <span class="text-base-content/55">Reference</span
+                        <span class="text-base-content/70">Reference</span
                         ><span class="font-mono text-xs">{{ variant.sku }}</span>
                       </div>
                     }
                     <div class="mt-3 flex justify-between gap-4 border-t border-base-300 pt-3">
-                      <span class="text-base-content/55">Ordering</span
+                      <span class="text-base-content/70">Ordering</span
                       ><span class="text-right">Confirm directly with {{ s.name }}</span>
                     </div>
                   </div>
                 }
 
                 @if (selectedVariant(); as variant) {
-                  <div class="mt-5 rounded-2xl border border-base-300 bg-base-100 p-4">
-                    <div class="flex items-center justify-between gap-4">
-                      <span class="text-sm font-semibold">Quantity</span>
+                  @if (units().length > 1) {
+                    <fieldset class="mt-5">
+                      <legend class="text-sm font-semibold">Buy as</legend>
+                      <div class="mt-2 grid gap-2">
+                        @for (unit of units(); track unit.packId) {
+                          <button
+                            type="button"
+                            class="catalog-choice btn min-h-14 justify-between"
+                            [attr.aria-pressed]="unit.packId === selectedPackId()"
+                            [disabled]="!unitAvailable(unit)"
+                            (click)="selectUnit(unit)"
+                          >
+                            <span>{{ unitLabel(unit) }}</span
+                            ><span>{{ fmt(unit.price) }}</span>
+                          </button>
+                        }
+                      </div>
+                    </fieldset>
+                  }
+                  <div class="mt-5 border-t border-base-300 pt-5">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                      <span class="text-sm font-semibold"
+                        >Quantity · {{ selectedUnit()?.name || 'item' }}</span
+                      >
                       <div class="join">
                         <button
                           type="button"
-                          class="btn join-item min-h-11"
+                          class="btn join-item min-h-11 min-w-11"
                           aria-label="Decrease quantity"
                           [disabled]="quantity() <= 1"
                           (click)="setQuantity(quantity() - 1)"
@@ -187,7 +211,7 @@ function formatKes(amount: number): string {
                         >
                         <button
                           type="button"
-                          class="btn join-item min-h-11"
+                          class="btn join-item min-h-11 min-w-11"
                           aria-label="Increase quantity"
                           (click)="setQuantity(quantity() + 1)"
                         >
@@ -198,7 +222,7 @@ function formatKes(amount: number): string {
                     <button
                       type="button"
                       class="btn btn-primary mt-4 min-h-14 w-full rounded-2xl text-base"
-                      [disabled]="!available(variant)"
+                      [disabled]="!available(variant) || !selectedUnitAvailable()"
                       (click)="addToBasket(variant)"
                     >
                       <ng-icon name="heroShoppingBag" size="1.15rem" aria-hidden="true" />
@@ -240,7 +264,7 @@ function formatKes(amount: number): string {
               class="mx-auto max-w-lg rounded-3xl border border-base-300 bg-base-100 px-6 py-16 text-center"
             >
               <h1 class="text-2xl font-bold">Product not found</h1>
-              <p class="mt-2 text-base-content/55">It may no longer be listed in this shop.</p>
+              <p class="mt-2 text-base-content/70">It may no longer be listed in this shop.</p>
               <a [routerLink]="['/', shopSlug]" class="btn btn-primary mt-6 min-h-11"
                 >Return to catalogue</a
               >
@@ -284,6 +308,30 @@ export class ProductDetailComponent implements OnInit {
   protected readonly shareNotice = signal<string | null>(null);
   protected readonly addNotice = signal<string | null>(null);
   protected readonly quantity = signal(1);
+  protected readonly selectedPackId = signal<string | null>(null);
+  protected readonly units = computed(() => {
+    const variant = this.selectedVariant();
+    return variant ? sellingUnits(variant) : [];
+  });
+  protected readonly selectedUnit = computed<SellingUnit | undefined>(
+    () => this.units().find(unit => unit.packId === this.selectedPackId()) ?? this.units()[0]
+  );
+  protected readonly unitLabel = unitDescription;
+  protected unitAvailable(unit: SellingUnit): boolean {
+    return (
+      !unit.packId ||
+      this.selectedVariant()?.packs?.find(pack => pack.id === unit.packId)?.available !== false
+    );
+  }
+  protected selectedUnitAvailable(): boolean {
+    const unit = this.selectedUnit();
+    return !!unit && this.unitAvailable(unit);
+  }
+  protected selectUnit(unit: SellingUnit): void {
+    this.selectedPackId.set(unit.packId);
+    this.quantity.set(1);
+    this.addNotice.set(null);
+  }
   protected readonly selectedVariant = computed(
     () =>
       this.product()?.variants.find(variant => variant.variant_id === this.selectedVariantId()) ??
@@ -302,7 +350,7 @@ export class ProductDetailComponent implements OnInit {
         ).toString();
     return this.waLink(
       shop.public_whatsapp_number,
-      `Hello ${shop.name}! I'd like to order ${catalogLabel(variant)} for ${formatKes(Number(variant.price))}. ${pageUrl}`
+      `Hello ${shop.name}! I'd like to order ${this.quantity()} × ${catalogLabel(variant)} · ${this.selectedUnit() ? unitDescription(this.selectedUnit()!) : 'item'} at ${formatKes(this.selectedUnit()?.price ?? Number(variant.price))} each. Estimated total: ${formatKes(this.quantity() * (this.selectedUnit()?.price ?? Number(variant.price)))}. ${pageUrl}`
     );
   });
 
@@ -354,6 +402,7 @@ export class ProductDetailComponent implements OnInit {
 
   protected selectVariant(variant: CatalogRow): void {
     this.selectedVariantId.set(variant.variant_id);
+    this.selectedPackId.set(null);
     this.quantity.set(1);
   }
   protected setQuantity(quantity: number): void {
@@ -361,7 +410,7 @@ export class ProductDetailComponent implements OnInit {
   }
   protected addToBasket(variant: CatalogRow): void {
     const shop = this.shop();
-    if (!shop || !isVariantAvailable(variant)) return;
+    if (!shop || !isVariantAvailable(variant) || !this.selectedUnitAvailable()) return;
     const productUrl = new URL(
       `/${this.shopSlug}/products/${this.productId}`,
       `${environment.storefrontPublicUrl.replace(/\/+$/, '')}/`
@@ -373,7 +422,11 @@ export class ProductDetailComponent implements OnInit {
         variantId: variant.variant_id,
         productName: variant.product_name ?? '',
         variantName: variant.variant_name ?? '',
-        price: Number(variant.price),
+        price: this.selectedUnit()?.price ?? Number(variant.price),
+        packId: this.selectedUnit()?.packId,
+        unitName: this.selectedUnit()?.name,
+        unitsPerUnit: this.selectedUnit()?.factor,
+        stockUnit: this.selectedUnit()?.stockUnit,
         quantity: this.quantity(),
         imagePath: variant.image_path,
         productUrl,

@@ -1,3 +1,5 @@
+import { transactionUnitLabel } from '@dukarun/pack-types';
+import type { PackCatalogue, ProductPack } from '@dukarun/pack-types';
 import { Injectable, inject } from '@angular/core';
 import type { Database, Json } from '@dukarun/shared-types';
 import { SupabaseService } from '../core/supabase.service';
@@ -14,8 +16,10 @@ export type ProductCategoryLink = Pick<
   Database['public']['Tables']['product_categories']['Row'],
   'product_id' | 'category_id'
 >;
-export type Variant = Database['public']['Views']['variant_catalog']['Row'];
-export type ProductVariant = Database['public']['Tables']['product_variants']['Row'];
+export type Variant = Database['public']['Views']['variant_catalog']['Row'] &
+  PackCatalogue & { selected_pack_id?: string | null };
+export type ProductVariant = Database['public']['Tables']['product_variants']['Row'] &
+  PackCatalogue;
 export type Customer = Database['public']['Tables']['customers']['Row'];
 export type CustomerWithCredit = Customer & { ar_balance: number };
 export type Order = Database['public']['Tables']['orders']['Row'];
@@ -27,6 +31,9 @@ export type BarcodeAssignmentResult =
   Database['public']['Functions']['assign_missing_variant_barcodes']['Returns'][number];
 
 export interface CatalogVariantInput {
+  stock_unit?: string;
+  packs?: ProductPack[];
+  opening_total_cost?: number;
   variant_id?: string;
   name?: string;
   price: number;
@@ -53,6 +60,10 @@ export function variantLabel(v: Pick<Variant, 'product_name' | 'variant_name'>):
 
 /** p_lines item for post_sale / save_draft (amounts in shillings). */
 export interface SaleLineInput {
+  pack_id?: string | null;
+  units_per_unit?: number;
+  expected_unit_price?: number;
+  price_source?: 'retail' | 'wholesale' | 'pack';
   variant_id: string;
   quantity: number;
   unit_price: number;
@@ -171,6 +182,40 @@ export class PosService {
     return this.supabase.client;
   }
 
+  async withPackDefinitions<T extends { variant_id?: string | null; id?: string }>(
+    rows: T[]
+  ): Promise<Array<T & PackCatalogue>> {
+    if (!rows.length) return [];
+    const definitions = new Map<string, PackCatalogue>();
+    const ids = rows.map(row => row.variant_id ?? row.id!).filter(Boolean);
+    for (let start = 0; start < ids.length; start += 500) {
+      const { data, error } = await this.client.rpc('catalog_pack_definitions', {
+        p_variant_ids: ids.slice(start, start + 500),
+      });
+      if (error) throw rpcError(error);
+      for (const row of data ?? [])
+        definitions.set(row.variant_id, {
+          stock_unit: row.stock_unit,
+          packs: row.packs as unknown as ProductPack[],
+        });
+    }
+    return rows.map(row => ({ ...row, ...definitions.get(row.variant_id ?? row.id!) }));
+  }
+
+  async saveProductUnits(
+    product: Record<string, unknown>,
+    variants: CatalogVariantInput[],
+    clientRef: string
+  ): Promise<string> {
+    const { data, error } = await this.client.rpc('save_catalog_product_units', {
+      p_product: product as Json,
+      p_variants: variants as unknown as Json,
+      p_client_ref: clientRef,
+    });
+    if (error) throw rpcError(error);
+    return data;
+  }
+
   /** POS search: active variants of active products from variant_catalog. */
   async searchVariants(query: string, limit = 20): Promise<Variant[]> {
     const { data, error } = await this.client.rpc('search_catalog_variants', {
@@ -179,19 +224,19 @@ export class PosService {
       ...(this.locations.activeId() ? { p_location_id: this.locations.activeId()! } : {}),
     });
     if (error) throw error;
-    return data;
+    return this.withPackDefinitions(data);
   }
 
   /** Exact, tenant-scoped barcode lookup with current price and location stock. */
   async resolveBarcode(barcode: string): Promise<Variant | null> {
     const value = barcode.trim();
     if (!value) return null;
-    const { data, error } = await this.client.rpc('resolve_catalog_barcode', {
+    const { data, error } = await this.client.rpc('resolve_catalog_selling_unit', {
       p_barcode: value,
       ...(this.locations.activeId() ? { p_location_id: this.locations.activeId()! } : {}),
     });
     if (error) throw rpcError(error);
-    return data[0] ?? null;
+    return data as unknown as Variant | null;
   }
 
   /** Atomically assign labels only to variants that still lack their own barcode. */
@@ -261,7 +306,7 @@ export class PosService {
       .eq('product_id', productId)
       .order('created_at');
     if (error) throw error;
-    return data;
+    return this.withPackDefinitions(data);
   }
 
   /** Stock per variant from the product_stock view (client-side join). */
@@ -406,13 +451,20 @@ export class PosService {
    * Upload under the mandatory <company_id>/ prefix (RLS allows writes only
    * under the caller's company). Returns the storage PATH (not a URL).
    */
-  async uploadProductImage(companyId: string, blob: Blob, ext: string): Promise<string> {
-    const path = `${companyId}/${crypto.randomUUID()}.${ext}`;
+  async uploadProductImage(
+    companyId: string,
+    blob: Blob,
+    ext: string,
+    uploadId = crypto.randomUUID()
+  ): Promise<string> {
+    const path = `${companyId}/${uploadId}.${ext}`;
     const { error } = await this.client.storage.from('product-images').upload(path, blob, {
       contentType: ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg',
       upsert: false,
     });
-    if (error) throw new Error(error.message);
+    // A retry of the same selected file keeps the aggregate request identical.
+    if (error && !('statusCode' in error && String(error.statusCode) === '409'))
+      throw new Error(error.message);
     return path;
   }
 
@@ -700,7 +752,11 @@ export class PosService {
       const v = byId.get(l.variant_id);
       return {
         ...l,
-        label: v ? variantLabel(v) : l.variant_id.slice(0, 8),
+        label:
+          (v ? variantLabel(v) : l.variant_id.slice(0, 8)) +
+          ((l.units_per_unit ?? 1) > 1 || (l.unit_name && l.unit_name !== 'item')
+            ? ' · ' + transactionUnitLabel(l)
+            : ''),
         manufacturer_name: v?.manufacturer_name ?? null,
         sku: v?.sku ?? null,
         wholesale_price: v?.wholesale_price ?? null,
@@ -746,7 +802,7 @@ export class PosService {
       .select('*')
       .in('variant_id', ids);
     if (error) throw error;
-    return data;
+    return this.withPackDefinitions(data);
   }
 
   /** Variants with stock resolved for the active location (proforma load checks). */
@@ -784,7 +840,7 @@ export class PosService {
     }
     return {
       family: familyResult.data,
-      variants: await this.withLocationStock(variants),
+      variants: await this.withLocationStock(await this.withPackDefinitions(variants)),
     };
   }
 

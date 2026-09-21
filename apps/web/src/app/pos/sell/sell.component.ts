@@ -1,3 +1,4 @@
+import { SellingUnitDialogComponent } from './selling-unit-dialog.component';
 import { Component, OnInit, computed, effect, inject, untracked, viewChild } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
@@ -55,6 +56,7 @@ import { SellWorkflowStore } from './sell-workflow.store';
   selector: 'app-sell',
   providers: [SellCatalogStore, SellWorkflowStore],
   imports: [
+    SellingUnitDialogComponent,
     ReactiveFormsModule,
     CheckoutPanelComponent,
     ButtonComponent,
@@ -71,6 +73,15 @@ import { SellWorkflowStore } from './sell-workflow.store';
     SellCheckoutWorkspaceComponent,
   ],
   template: `
+    @if (catalog.unitSelection(); as selection) {
+      <app-selling-unit-dialog
+        [variant]="selection.variant"
+        [line]="selection.line"
+        [availableStock]="catalog.availableForSelection()"
+        (chosen)="catalog.chooseUnit($event)"
+        (closed)="catalog.closeUnitSelection()"
+      />
+    }
     <app-page
       title="Sell"
       subtitle="Find an item, adjust it, and take payment without leaving the counter."
@@ -143,7 +154,12 @@ import { SellWorkflowStore } from './sell-workflow.store';
         >
           <app-sell-catalog-panel
             [itemCount]="cartItemCount()"
-            [wedgeBlocked]="checkoutOpen() || creditConfirmOpen() || mpesaSplitReady() !== null"
+            [wedgeBlocked]="
+              catalog.unitSelection() !== null ||
+              checkoutOpen() ||
+              creditConfirmOpen() ||
+              mpesaSplitReady() !== null
+            "
           />
 
           <app-sell-cart-panel

@@ -37,9 +37,12 @@ export type CachedBarcodeResolution =
   | { status: 'incomplete' };
 
 /**
- * Shared journal-backed catalog cache — the single writer of the
- * `products` IndexedDB snapshot. Reads emit the complete cached snapshot
- * immediately; durable journal reconciliation patches it in place.
+ * Single writer of IndexedDB's catalogVariants/catalogMetadata records;
+ * the legacy products snapshot is migrated on read. Cached rows emit immediately,
+ * and durable journal reconciliation patches them in place.
+ * Packs live inside each variant. Pack writers notify the existing variant journal;
+ * full downloads and incremental patches hydrate definitions through PosService.
+ * Missing pack metadata marks legacy barcode lookups incomplete until refreshed.
  * Scope is company + user + location; any change resets and reloads.
  */
 @Injectable({ providedIn: 'root' })
@@ -68,11 +71,19 @@ export class CatalogCacheService {
     const index = new Map<string, Variant[]>();
     for (const variant of this.catalog()) {
       if (!variant.variant_active || !variant.product_active) continue;
-      const barcode = variant.barcode?.trim();
-      if (!barcode) continue;
-      const matches = index.get(barcode) ?? [];
-      matches.push(variant);
-      index.set(barcode, matches);
+      const assignments = [
+        { barcode: variant.barcode, packId: null as string | null },
+        ...(variant.packs ?? [])
+          .filter(pack => pack.active && pack.sale_price !== null)
+          .map(pack => ({ barcode: pack.barcode, packId: pack.id })),
+      ];
+      for (const assignment of assignments) {
+        const barcode = assignment.barcode?.trim();
+        if (!barcode) continue;
+        const matches = index.get(barcode) ?? [];
+        matches.push({ ...variant, selected_pack_id: assignment.packId });
+        index.set(barcode, matches);
+      }
     }
     return index;
   });
@@ -124,7 +135,9 @@ export class CatalogCacheService {
     // the durable journal without paying for an unconditional full download.
     if (
       this.connectivity.online() &&
-      (!snapshot || snapshot.category_memberships_complete !== true)
+      (!snapshot ||
+        snapshot.category_memberships_complete !== true ||
+        snapshot.products.some(row => row.packs === undefined))
     ) {
       void this.refresh();
     }
@@ -142,7 +155,8 @@ export class CatalogCacheService {
     if (!barcode) return { status: 'unknown' };
     // A match inside a capped snapshot is not proof of uniqueness: an omitted
     // variant may carry the same effective barcode.
-    if (this.catalogTruncated()) return { status: 'incomplete' };
+    if (this.catalogTruncated() || this.catalog().some(row => row.packs === undefined))
+      return { status: 'incomplete' };
     const matches = this.barcodeIndex().get(barcode) ?? [];
     if (matches.length === 0) return { status: 'unknown' };
     if (matches.length > 1) return { status: 'ambiguous' };
@@ -192,7 +206,7 @@ export class CatalogCacheService {
         this.pos.listProductCategoryLinks(),
       ]);
       const categories = await this.pos.listCategories(productCategories);
-      const catalogRows = catalogResult.rows;
+      const catalogRows = await this.pos.withPackDefinitions(catalogResult.rows);
       const locationStock = await this.fetchLocationStock(
         locationId,
         catalogRows.flatMap(row => (row.variant_id ? [row.variant_id] : []))
@@ -348,7 +362,7 @@ export class CatalogCacheService {
       p_product_ids: [...productIds],
     });
     if (error) throw error;
-    const patched = (data ?? []) as unknown as Variant[];
+    const patched = await this.pos.withPackDefinitions((data ?? []) as unknown as Variant[]);
     for (const row of patched) if (row.product_id) familyIds.add(row.product_id);
 
     const stockPatch = new Map<string, { stock: number; stock_value: number }>();

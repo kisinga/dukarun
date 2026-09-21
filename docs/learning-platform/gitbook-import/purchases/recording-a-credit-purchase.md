@@ -26,7 +26,9 @@ The task-specific walkthrough is being prepared. For now, watch this Dukarun ove
 1. Open **Purchases**, then choose **Record purchase**.
 2. Select the supplier and the location that received the goods.
 3. Add each product that arrived.
-4. Enter the quantity received and the supplier's unit cost for each line.
+4. Choose each line's **Buying unit**, then enter the quantity received and supplier's cost per
+   selected unit. For boxes, enter whole boxes and cost per box. You can enter an exact **Line
+   total** instead; Dukarun calculates the displayed unit cost without changing that total.
 5. Add the supplier reference and any useful notes.
 6. Choose **Review purchase** and check the supplier, location, items, quantities, costs, and total.
 7. Under payment, choose **Pay later**.
@@ -36,6 +38,28 @@ The task-specific walkthrough is being prepared. For now, watch this Dukarun ove
 
 Tracked stock increases at the selected location. The unpaid total becomes a payable on the
 supplier account. Choosing **Pay later** does not record money leaving the business.
+
+## Receiving packs and setting prices
+
+Receiving two boxes of 100 tablets at KES 755 per box adds 200 tablets and records an invoice total
+of KES 1,510. The purchase document keeps the two-box quantity and cost. Inventory retains the exact
+KES 1,510 value even though cost per tablet does not divide into whole shillings.
+
+Configure packs in the product editor before receiving them. Packs with a blank selling price
+can still be purchased. Changing **Buying unit** clears the previous cost and total; enter the
+supplier's cost for the newly selected unit.
+
+With permission to adjust prices, you can set a new selling price per pack and update retail or
+wholesale prices per stock unit while recording the purchase. These are separate prices. Changes
+apply when the purchase is confirmed, not when a draft is saved. Duplicate lines for the same
+variant or pack must agree on the new price.
+
+If entering prices before VAT, keep the selected price basis consistent and review the invoice
+total. Any optional exact line total refers to the selected buying unit's line, not a reconstructed
+total from rounded stock-unit costs.
+
+A saved purchase draft has no stock, supplier-balance, or payment effect. Reopen it to review the
+buying units and costs before confirmation. See [Using packs](../products/using-product-packs.md).
 
 ## Related terms
 

@@ -405,48 +405,49 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
                 [lastName]="c.last_name ?? ''"
               />
             }
-            @if (detailCustomer(); as c) {
-              @if (c.deleted_at) {
-                @if (perms.has('ManageCustomers')) {
-                  <button
-                    drawerActions
-                    appButton
-                    variant="outline"
-                    type="button"
-                    (click)="restoreCustomer(c)"
-                  >
-                    <app-icon name="heroArrowPath" /> Restore
-                  </button>
-                }
-              } @else {
-                @if (perms.has('ManageCustomers')) {
-                  <button
-                    drawerActions
-                    appButton
-                    variant="ghost"
-                    [iconOnly]="true"
-                    type="button"
-                    title="Edit customer"
-                    aria-label="Edit customer"
-                    (click)="editFromDrawer(c)"
-                  >
-                    <app-icon name="heroPencilSquare" />
-                  </button>
-                }
-                @if (perms.has('ManageCustomers')) {
-                  <button
-                    drawerActions
-                    appButton
-                    variant="ghost"
-                    type="button"
-                    (click)="startDelete(c)"
-                  >
-                    <app-icon name="heroArchiveBox" /> Delete
-                  </button>
+            <ng-container ngProjectAs="[drawerActions]">
+              @if (detailCustomer(); as c) {
+                @if (c.deleted_at) {
+                  @if (perms.has('ManageCustomers')) {
+                    <button
+                      drawerActions
+                      appButton
+                      variant="outline"
+                      type="button"
+                      (click)="restoreCustomer(c)"
+                    >
+                      <app-icon name="heroArrowPath" /> Restore
+                    </button>
+                  }
+                } @else {
+                  @if (perms.has('ManageCustomers')) {
+                    <button
+                      drawerActions
+                      appButton
+                      variant="ghost"
+                      [iconOnly]="true"
+                      type="button"
+                      title="Edit customer"
+                      aria-label="Edit customer"
+                      (click)="editFromDrawer(c)"
+                    >
+                      <app-icon name="heroPencilSquare" />
+                    </button>
+                  }
+                  @if (perms.has('ManageCustomers')) {
+                    <button
+                      drawerActions
+                      appButton
+                      variant="ghost"
+                      type="button"
+                      (click)="startDelete(c)"
+                    >
+                      <app-icon name="heroArchiveBox" /> Delete
+                    </button>
+                  }
                 }
               }
-            }
-
+            </ng-container>
             @if (selectedCustomer(); as c) {
               @if (c.deleted_at) {
                 <div role="status" class="alert alert-warning mb-3 text-sm">
@@ -485,7 +486,7 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
                 />
               </div>
               @if (c.tax_registration_number) {
-                <div class="mt-3 rounded-field border border-base-300 px-3 py-2">
+                <div class="mt-3 py-2">
                   <p class="type-caption">Customer tax PIN</p>
                   <p class="text-sm font-medium">{{ c.tax_registration_number }}</p>
                 </div>
@@ -509,7 +510,7 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
                 </div>
               } @else {
                 <div class="mt-4 flex flex-col gap-4">
-                  <section>
+                  <section class="surface-card p-4">
                     <h3 class="section-title mb-2">Credit</h3>
                     <div class="flex flex-wrap items-center gap-2">
                       <app-status-badge
@@ -620,12 +621,12 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
                   </section>
 
                   @if (customerApprovals().length > 0) {
-                    <section class="border-t border-base-300/60 pt-3">
+                    <section class="surface-card p-4">
                       <h3 class="section-title mb-2">Credit-policy activity</h3>
                       <ol class="flex flex-col gap-2">
                         @for (approval of customerApprovals(); track approval.id) {
                           <li
-                            class="rounded-field border border-base-300 p-3"
+                            class="surface-inset p-3"
                             [class.ring-2]="highlightedApprovalId() === approval.id"
                             [class.ring-primary]="highlightedApprovalId() === approval.id"
                           >
@@ -657,7 +658,7 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
                     </section>
                   }
 
-                  <section class="border-t border-base-300/60 pt-3">
+                  <section class="surface-card p-4">
                     <div class="flex flex-wrap items-start justify-between gap-3">
                       <div>
                         <h3 class="section-title">Customer account</h3>
@@ -679,7 +680,7 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
                     @if (perms.has('SettleOrder')) {
                       <form
                         (submit)="$event.preventDefault(); receivePayment(c.id)"
-                        class="mt-3 grid gap-2 rounded-field border border-base-300 bg-base-200/50 p-3 sm:grid-cols-3"
+                        class="surface-inset mt-3 grid gap-2 p-3 sm:grid-cols-3"
                       >
                         <app-form-field label="Payment received (KES)">
                           <input
@@ -828,7 +829,7 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
                       customerDepositBalance() > 0 &&
                       (perms.has('SettleOrder') || perms.has('ReverseOrder'))
                     ) {
-                      <details class="mt-2 rounded-field border border-base-300 p-2">
+                      <details class="surface-inset mt-2 p-3">
                         <summary class="cursor-pointer text-sm font-medium">
                           Refund unused deposit
                         </summary>
@@ -888,7 +889,7 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
                     }
                   </section>
 
-                  <section class="border-t border-base-300/60 pt-3">
+                  <section class="surface-card p-4">
                     <h3 class="section-title mb-2">Open invoices</h3>
                     @if (creditOrders().length === 0) {
                       <app-empty-state
@@ -932,7 +933,7 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
                     }
                   </section>
 
-                  <section class="border-t border-base-300/60 pt-3">
+                  <section class="surface-card p-4">
                     <div class="mb-2 flex items-center justify-between gap-2">
                       <h3 class="section-title">Recent sales</h3>
                       <button
@@ -989,7 +990,7 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
                   </section>
 
                   @if (perms.has('ViewFinancials')) {
-                    <section class="border-t border-base-300/60 pt-3">
+                    <section class="surface-card p-4">
                       <div class="mb-2 flex items-center justify-between gap-2">
                         <div>
                           <h3 class="section-title">Customer statement</h3>
@@ -1049,9 +1050,7 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
                                 </div>
                               </div>
                               @if (row.receipt_id && row.details; as receipt) {
-                                <details
-                                  class="mt-2 rounded-field border border-base-300/70 bg-base-200/40 p-2"
-                                >
+                                <details class="surface-inset mt-2 p-3">
                                   <summary class="cursor-pointer text-xs font-medium">
                                     Receipt allocation
                                   </summary>

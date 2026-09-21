@@ -124,11 +124,14 @@ export class ProductEditorStore implements OnDestroy {
   });
 
   private rowSequence = 0;
+  private saveRef = crypto.randomUUID();
+  private imageUploadRef = crypto.randomUUID();
   private loadRequest = 0;
 
   async initialize(request: ProductEditorRequest): Promise<void> {
     const loadRequest = ++this.loadRequest;
     this.reset();
+    this.saveRef = crypto.randomUUID();
     this.requestState.set(request);
     this.stepState.set(request.initialStep ?? 1);
     void this.loadTaxCategories(loadRequest);
@@ -202,6 +205,24 @@ export class ProductEditorStore implements OnDestroy {
 
   setCategoryQuery(value: string): void {
     this.categoryQueryState.set(value);
+  }
+
+  readonly creatingCategory = signal(false);
+  async createCategory(): Promise<void> {
+    const name = this.categoryQuery().trim();
+    if (!name || !this.canEditCategories() || this.creatingCategory()) return;
+    this.creatingCategory.set(true);
+    try {
+      const id = await this.pos.upsertCategory({ name });
+      await this.catalog.refresh();
+      this.familyCategoriesState.update(current => new Set([...current, id]));
+      this.categoriesDirtyState.set(true);
+      this.categoryQueryState.set('');
+    } catch (error) {
+      this.errorState.set(error instanceof Error ? error.message : 'Could not create category.');
+    } finally {
+      this.creatingCategory.set(false);
+    }
   }
 
   toggleCategory(categoryId: string): void {
@@ -300,6 +321,7 @@ export class ProductEditorStore implements OnDestroy {
     this.errorState.set(null);
     this.noticeState.set(null);
     this.clearPendingImage();
+    this.imageUploadRef = crypto.randomUUID();
     this.pendingImageState.set(pending);
     this.imageRemovalPendingState.set(false);
   }
@@ -376,7 +398,8 @@ export class ProductEditorStore implements OnDestroy {
         unattachedImagePath = await this.pos.uploadProductImage(
           companyId,
           pendingImage.blob,
-          pendingImage.extension
+          pendingImage.extension,
+          this.imageUploadRef
         );
       }
 
@@ -390,35 +413,46 @@ export class ProductEditorStore implements OnDestroy {
 
       let productId: string;
       if (request.mode === 'create') {
-        productId = await this.pos.createProductWithVariants({
-          name,
-          barcode: this.barcode.value.trim() || undefined,
-          manufacturer_id: manufacturerId,
-          ...(unattachedImagePath ? { image_path: unattachedImagePath } : {}),
+        productId = await this.pos.saveProductUnits(
+          {
+            name,
+            barcode: this.barcode.value.trim() || undefined,
+            manufacturer_id: manufacturerId,
+            ...(unattachedImagePath ? { image_path: unattachedImagePath } : {}),
+            ...(this.canEditCategories() ? { category_ids: [...this.familyCategories()] } : {}),
+            ...(this.permissions.has('ManageCatalog') && this.taxCategory.value
+              ? { tax_category_id: this.taxCategory.value }
+              : {}),
+          },
           variants,
-        });
+          this.saveRef
+        );
         if (unattachedImagePath) {
           this.imagePathState.set(unattachedImagePath);
           this.brokenImageState.set(false);
           this.clearPendingImage();
           unattachedImagePath = null;
         }
-        if (this.permissions.has('ManageCatalog') && this.taxCategory.value) {
-          await this.tax.setProductCategory(productId, this.taxCategory.value);
-        }
       } else {
         productId = request.product.id;
-        await this.pos.updateProductWithVariants({
-          product_id: productId,
-          name,
-          barcode: this.barcode.value.trim(),
-          active: this.active.value,
-          manufacturer_id: manufacturerId,
-          image_changed: imageChanged,
-          image_path: unattachedImagePath,
-          expected_image_path: previousImagePath,
+        await this.pos.saveProductUnits(
+          {
+            product_id: productId,
+            name,
+            barcode: this.barcode.value.trim(),
+            active: this.active.value,
+            manufacturer_id: manufacturerId,
+            image_changed: imageChanged,
+            image_path: unattachedImagePath,
+            expected_image_path: previousImagePath,
+            ...(this.canEditCategories() ? { category_ids: [...this.familyCategories()] } : {}),
+            ...(this.permissions.has('ManageCatalog')
+              ? { tax_category_id: this.taxCategory.value || null }
+              : {}),
+          },
           variants,
-        });
+          this.saveRef
+        );
         if (imageChanged) {
           this.imagePathState.set(unattachedImagePath);
           this.brokenImageState.set(false);
@@ -426,12 +460,6 @@ export class ProductEditorStore implements OnDestroy {
           this.imageRemovalPendingState.set(false);
           unattachedImagePath = null;
           if (previousImagePath) void this.pos.cleanupProductImage(previousImagePath);
-        }
-        if (this.permissions.has('ManageCatalog') && this.connectivity.online()) {
-          await this.pos.setProductCategories(productId, [...this.familyCategories()]);
-          if ((request.product.tax_category_id ?? '') !== this.taxCategory.value) {
-            await this.tax.setProductCategory(productId, this.taxCategory.value || null);
-          }
         }
       }
 
@@ -487,12 +515,42 @@ export class ProductEditorStore implements OnDestroy {
       if (row.wholesale.trim() && wholesalePrice === null) {
         return this.invalid(`${label}: enter a valid wholesale price.`, 'variants');
       }
+      const packs = row.packs ?? [];
+      for (const pack of packs.filter(p => p.active)) {
+        if (
+          !pack.name.trim() ||
+          !Number.isInteger(pack.units_per_pack) ||
+          pack.units_per_pack <= 1 ||
+          (pack.sale_price !== null &&
+            (!Number.isSafeInteger(pack.sale_price) || pack.sale_price <= 0))
+        ) {
+          return this.invalid(
+            `${label}: enter a pack name, whole contents greater than one, and a valid pack price.`,
+            'variants'
+          );
+        }
+      }
+      if (packs.some(p => p.active) && row.kind === 'service') {
+        return this.invalid(`${label}: remove packs before changing to a service.`, 'variants');
+      }
       const isService = row.kind === 'service';
-      const openingQuantity =
+      const enteredOpeningQuantity =
         !row.variantId && !isService && row.openingQuantity.trim()
           ? Number(row.openingQuantity)
           : 0;
-      if (!Number.isFinite(openingQuantity) || openingQuantity < 0) {
+      const openingPack = packs.find(pack => pack.id === row.openingPackId && pack.active);
+      const loose = openingPack ? Number(row.openingLooseQuantity || 0) : 0;
+      const openingQuantity = enteredOpeningQuantity * (openingPack?.units_per_pack ?? 1) + loose;
+      if (openingPack && !Number.isInteger(enteredOpeningQuantity))
+        return this.invalid(`${label}: enter whole opening packs.`, 'variants');
+      if (!Number.isFinite(loose) || loose < 0)
+        return this.invalid(`${label}: enter a valid loose quantity.`, 'variants');
+      if (
+        !Number.isFinite(enteredOpeningQuantity) ||
+        enteredOpeningQuantity < 0 ||
+        !Number.isFinite(openingQuantity) ||
+        openingQuantity < 0
+      ) {
         return this.invalid(`${label}: opening quantity must be zero or greater.`, 'variants');
       }
       if (openingQuantity > 0 && !row.trackInventory) {
@@ -505,10 +563,19 @@ export class ProductEditorStore implements OnDestroy {
         );
       }
       const openingUnitCost = row.openingUnitCost.trim() ? parseKes(row.openingUnitCost) : null;
-      if (openingQuantity > 0 && openingUnitCost === null) {
+      if (openingQuantity > 0 && openingUnitCost === null && !row.openingTotalCost?.trim()) {
         return this.invalid(`${label}: enter a valid opening unit cost.`, 'variants');
       }
+      const totalCost = row.openingTotalCost?.trim()
+        ? parseKes(row.openingTotalCost)
+        : Math.round(
+            (openingQuantity * (openingUnitCost ?? 0)) / (openingPack?.units_per_pack ?? 1)
+          );
+      if (openingQuantity > 0 && totalCost === null)
+        return this.invalid(`${label}: enter a valid opening stock value.`, 'variants');
       variants.push({
+        stock_unit: row.stockUnit?.trim() || 'item',
+        packs,
         ...(row.variantId ? { variant_id: row.variantId } : {}),
         ...(row.name.trim() ? { name: row.name.trim() } : {}),
         price,
@@ -522,7 +589,8 @@ export class ProductEditorStore implements OnDestroy {
         ...(openingQuantity > 0
           ? {
               opening_quantity: openingQuantity,
-              opening_unit_cost: openingUnitCost!,
+              opening_unit_cost: Math.round(totalCost! / openingQuantity),
+              opening_total_cost: totalCost!,
               ...(row.openingLocationId ? { opening_location_id: row.openingLocationId } : {}),
               ...(row.batchNumber.trim() ? { batch_number: row.batchNumber.trim() } : {}),
               ...(this.preferences.batchExpiryEnabled() && row.expiryDate
@@ -601,6 +669,12 @@ export class ProductEditorStore implements OnDestroy {
       barcode: '',
       pendingBarcode: null,
       wholesale: '',
+      stockUnit: 'item',
+      packs: [],
+      savedPackIds: [],
+      openingPackId: '',
+      openingLooseQuantity: '',
+      openingTotalCost: '',
       kind: 'good',
       trackInventory: true,
       allowFractional: false,
@@ -623,6 +697,9 @@ export class ProductEditorStore implements OnDestroy {
       sku: variant.sku,
       barcode: variant.barcode ?? '',
       wholesale: variant.wholesale_price === null ? '' : formatKesInput(variant.wholesale_price),
+      stockUnit: variant.stock_unit,
+      packs: variant.packs ?? [],
+      savedPackIds: (variant.packs ?? []).map(pack => pack.id),
       kind: variant.kind,
       trackInventory: variant.track_inventory,
       allowFractional: variant.allow_fractional,

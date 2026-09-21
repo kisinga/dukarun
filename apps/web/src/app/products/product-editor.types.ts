@@ -1,6 +1,13 @@
+import type { ProductPack } from '@dukarun/pack-types';
 import type { Product } from '../pos/pos.service';
 
 export interface ProductEditorRow {
+  stockUnit?: string;
+  packs?: ProductPack[];
+  savedPackIds?: string[];
+  openingPackId?: string;
+  openingLooseQuantity?: string;
+  openingTotalCost?: string;
   key: string;
   variantId: string | null;
   name: string;

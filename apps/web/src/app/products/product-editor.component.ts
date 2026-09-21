@@ -91,7 +91,7 @@ import type { ProductEditorRequest, ProductEditorResult } from './product-editor
               [class.bg-base-200]="store.step() !== 2"
               >2</span
             >
-            Variants
+            Selling & stock
             <span class="type-caption">{{ store.rows().length }}</span>
           </button>
         </nav>
@@ -111,7 +111,7 @@ import type { ProductEditorRequest, ProductEditorResult } from './product-editor
           }
 
           @if (store.step() === 1) {
-            <section class="grid gap-5 sm:grid-cols-2">
+            <section class="surface-card grid gap-5 p-4 sm:grid-cols-2">
               <app-form-field label="Product name" [required]="true">
                 <input
                   data-editor-field="name"
@@ -234,10 +234,69 @@ import type { ProductEditorRequest, ProductEditorResult } from './product-editor
               (imageBroken)="store.markImageBroken()"
             />
 
+            <section class="surface-card mt-4 p-4">
+              <h3 class="section-title">Categories</h3>
+              @if (store.canEditCategories()) {
+                <label class="input input-bordered input-sm mt-3 flex items-center gap-2">
+                  <app-icon name="heroMagnifyingGlass" class="text-base-content/50" />
+                  <input
+                    type="search"
+                    class="min-w-0 grow"
+                    placeholder="Search categories..."
+                    [value]="store.categoryQuery()"
+                    (input)="store.setCategoryQuery($any($event.target).value)"
+                  />
+                </label>
+                <div class="mt-2 max-h-56 overflow-y-auto rounded-box border border-base-300">
+                  @for (category of store.visibleCategories(); track category.id) {
+                    <label
+                      class="flex min-h-11 cursor-pointer items-center gap-3 border-b border-base-200 px-3 last:border-0 hover:bg-base-200"
+                    >
+                      <input
+                        type="checkbox"
+                        class="checkbox checkbox-sm"
+                        [checked]="store.familyCategories().has(category.id)"
+                        (change)="store.toggleCategory(category.id)"
+                      />
+                      <span class="min-w-0 flex-1 truncate text-sm">{{ category.name }}</span>
+                    </label>
+                  } @empty {
+                    <p class="p-4 text-center text-sm text-base-content/60">No categories match.</p>
+                  }
+                </div>
+                @if (store.categoryQuery().trim() && store.matchingCategories().length === 0) {
+                  <button
+                    appButton
+                    type="button"
+                    variant="outline"
+                    class="mt-2 min-h-11"
+                    [disabled]="store.creatingCategory()"
+                    (click)="store.createCategory()"
+                  >
+                    Create “{{ store.categoryQuery().trim() }}” and select
+                  </button>
+                }
+                @if (store.matchingCategories().length > store.visibleCategories().length) {
+                  <p class="type-caption mt-2">Keep typing to narrow the category list.</p>
+                }
+              } @else if (store.categoryMembershipsComplete()) {
+                <div class="mt-2 flex flex-wrap gap-1.5">
+                  @for (name of store.productCategoryNames(); track name) {
+                    <span class="badge badge-ghost">{{ name }}</span>
+                  } @empty {
+                    <p class="type-caption">Uncategorized</p>
+                  }
+                </div>
+                @if (store.permissions.has('ManageCatalog') && !store.connectivity.online()) {
+                  <p class="type-caption mt-2">Reconnect to change categories.</p>
+                }
+              } @else {
+                <p class="type-caption mt-2">{{ store.categoryDataStatusLabel() }}</p>
+              }
+            </section>
+
             @if (store.mode() === 'create') {
-              <div
-                class="mt-5 flex items-start gap-3 rounded-field border border-base-300/70 bg-base-200/60 p-3"
-              >
+              <div class="surface-inset mt-4 flex items-start gap-3 p-3">
                 <span
                   class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-base-100 text-primary"
                   aria-hidden="true"
@@ -250,7 +309,7 @@ import type { ProductEditorRequest, ProductEditorResult } from './product-editor
                 </div>
               </div>
             } @else {
-              <section class="mt-5 border-t border-base-300 pt-4">
+              <section class="surface-card mt-4 p-4">
                 <label class="flex min-h-11 cursor-pointer items-center justify-between gap-4">
                   <span>
                     <span class="type-heading block">Product available for sale</span>
@@ -264,57 +323,6 @@ import type { ProductEditorRequest, ProductEditorResult } from './product-editor
                     [formControl]="store.active"
                   />
                 </label>
-              </section>
-
-              <section class="mt-5 border-t border-base-300 pt-4">
-                <h3 class="section-title">Categories</h3>
-                @if (store.canEditCategories()) {
-                  <label class="input input-bordered input-sm mt-3 flex items-center gap-2">
-                    <app-icon name="heroMagnifyingGlass" class="text-base-content/50" />
-                    <input
-                      type="search"
-                      class="min-w-0 grow"
-                      placeholder="Search categories..."
-                      [value]="store.categoryQuery()"
-                      (input)="store.setCategoryQuery($any($event.target).value)"
-                    />
-                  </label>
-                  <div class="mt-2 max-h-56 overflow-y-auto rounded-box border border-base-300">
-                    @for (category of store.visibleCategories(); track category.id) {
-                      <label
-                        class="flex min-h-11 cursor-pointer items-center gap-3 border-b border-base-200 px-3 last:border-0 hover:bg-base-200"
-                      >
-                        <input
-                          type="checkbox"
-                          class="checkbox checkbox-sm"
-                          [checked]="store.familyCategories().has(category.id)"
-                          (change)="store.toggleCategory(category.id)"
-                        />
-                        <span class="min-w-0 flex-1 truncate text-sm">{{ category.name }}</span>
-                      </label>
-                    } @empty {
-                      <p class="p-4 text-center text-sm text-base-content/60">
-                        No categories match.
-                      </p>
-                    }
-                  </div>
-                  @if (store.matchingCategories().length > store.visibleCategories().length) {
-                    <p class="type-caption mt-2">Keep typing to narrow the category list.</p>
-                  }
-                } @else if (store.categoryMembershipsComplete()) {
-                  <div class="mt-2 flex flex-wrap gap-1.5">
-                    @for (name of store.productCategoryNames(); track name) {
-                      <span class="badge badge-ghost">{{ name }}</span>
-                    } @empty {
-                      <p class="type-caption">Uncategorized</p>
-                    }
-                  </div>
-                  @if (store.permissions.has('ManageCatalog') && !store.connectivity.online()) {
-                    <p class="type-caption mt-2">Reconnect to change categories.</p>
-                  }
-                } @else {
-                  <p class="type-caption mt-2">{{ store.categoryDataStatusLabel() }}</p>
-                }
               </section>
             }
           } @else {
@@ -361,8 +369,8 @@ import type { ProductEditorRequest, ProductEditorResult } from './product-editor
               [disabled]="store.name.value.trim().length === 0"
               (click)="store.setStep(2)"
             >
-              <span class="sm:hidden">Next: variants</span>
-              <span class="hidden sm:inline">Continue to variants</span>
+              <span class="sm:hidden">Next: selling & stock</span>
+              <span class="hidden sm:inline">Continue to selling & stock</span>
             </button>
           } @else {
             <button

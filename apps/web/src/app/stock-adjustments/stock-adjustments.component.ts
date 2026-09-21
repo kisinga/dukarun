@@ -1,3 +1,4 @@
+import { StockQuantityInputComponent } from '../shared/ui/stock-quantity-input.component';
 import { Component, OnInit, computed, effect, inject, signal, untracked } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute } from '@angular/router';
@@ -38,6 +39,7 @@ type StockAdjustmentHistoryDisplay = StockAdjustmentHistoryRow & {
 @Component({
   selector: 'app-stock-adjustments',
   imports: [
+    StockQuantityInputComponent,
     ReactiveFormsModule,
     FormFieldComponent,
     ButtonComponent,
@@ -177,12 +179,10 @@ type StockAdjustmentHistoryDisplay = StockAdjustmentHistoryRow & {
                   </div>
                   <span class="hidden pb-3 text-base-content/35 sm:block">→</span>
                   <app-form-field label="New quantity" [required]="true">
-                    <input
-                      type="number"
-                      min="0"
-                      [step]="selected()?.allow_fractional ? 'any' : '1'"
-                      class="input input-bordered min-h-11 w-full text-lg font-semibold tabular-nums"
-                      [formControl]="newQuantity"
+                    <app-stock-quantity-input
+                      [variant]="selected()!"
+                      [value]="newQuantity.value"
+                      (valueChange)="newQuantity.setValue($event)"
                     />
                   </app-form-field>
                 </div>

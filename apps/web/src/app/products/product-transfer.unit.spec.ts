@@ -1,862 +1,466 @@
-import type { Workbook, Worksheet } from 'exceljs';
-import JSZip from 'jszip';
 import { describe, expect, it } from 'vitest';
-import {
-  ProductTransferService,
-  type CatalogImportPreview,
-  type CatalogPriceUpdatePreview,
-} from './product-transfer.service';
+import type { Workbook, Row } from 'exceljs';
+import { createExcelWorkbook } from '../shared/excel-workbook';
+import { exportProductWorkbook } from './product-workbook-export';
+import { readProductWorkbook } from './product-workbook-read';
+import { workbookFixture } from './product-workbook.fixture';
+import { EXTRA_ROWS, packSizes, unitChoices } from './product-workbook';
 
-const COMPANY_ID = '11111111-1111-4111-8111-111111111111';
-const VARIANT_ID = '22222222-2222-4222-8222-222222222222';
-const VARIANT_ID_2 = '22222222-2222-4222-8222-222222222223';
-const PRODUCT_ID = '33333333-3333-4333-8333-333333333333';
-const MANUFACTURER_ID = '44444444-4444-4444-8444-444444444444';
-const UPDATED_AT = '2026-08-19T08:00:00.000Z';
-const LOCATION_ID = '55555555-5555-4555-8555-555555555555';
-const BATCH_ID = '66666666-6666-4666-8666-666666666666';
-const OLDER_BATCH_ID = '66666666-6666-4666-8666-666666666667';
-
-type ExportRow = {
-  variant_id: string;
-  variant_updated_at: string;
-  product_id: string;
-  product_updated_at: string;
-  product_barcode: string | null;
-  product_name: string;
-  manufacturer_name: string | null;
-  variant_name: string;
-  sku: string;
-  barcode: string | null;
-  kind: string;
-  product_active: boolean;
-  variant_active: boolean;
-  retail_price: number;
-  wholesale_price: number | null;
-  stock: number;
-  stock_value: number;
-  track_inventory: boolean;
-  allow_fractional: boolean;
-  stock_location: string;
-  latest_batch_id: string | null;
-  latest_batch_label: string | null;
-  latest_batch_unit_cost: number | null;
-  latest_batch_number: string | null;
-  latest_batch_expiry_date: string | null;
+const bySku = (book: Workbook, sku: string): Row => {
+  let found: Row | undefined;
+  book.getWorksheet('Products')!.eachRow(row => {
+    if (row.getCell(13).value === sku) found = row;
+  });
+  if (!found) throw new Error(`Missing ${sku}`);
+  return found;
 };
-
-type BatchRow = {
-  id: string;
-  variant_id: string;
-  stock_location_id: string;
-  batch_number: string | null;
-  purchased_at: string;
-  created_at: string;
-  quantity: number;
-  remaining: number;
-  unit_cost: number;
-  original_cost: number;
-  remaining_cost: number;
-  expiry_date: string | null;
-  product_name: string;
-  manufacturer_name: string | null;
-  variant_name: string;
-  sku: string;
-  label: string;
-  latest: boolean;
+const packRow = (book: Workbook): Row => {
+  let found: Row | undefined;
+  book.getWorksheet('Products')!.eachRow(row => {
+    if (String(row.getCell(28).value).startsWith('p:')) found = row;
+  });
+  return found!;
 };
-
-type TestService = {
-  supabase: {
-    claims: () => { company_id: string };
-    client: { rpc: () => Promise<{ data: { categories: never[] }; error: null }> };
-  };
-  allProducts: () => Promise<Array<Record<string, unknown>>>;
-  allVariants: () => Promise<Array<Record<string, unknown>>>;
-  allManufacturers: () => Promise<Array<Record<string, unknown>>>;
-  allOpenBatches: () => Promise<BatchRow[]>;
-  locations: { active: () => { id: string; code: string; name: string } };
-  permissions: { has: () => boolean };
-  catalogCache: { catalog: () => Array<Record<string, unknown>> };
-  previewProductCreate: (workbook: Workbook, fileName: string) => Promise<CatalogImportPreview>;
-  priceUpdateWorkbook: (
-    rows: ExportRow[],
-    exportedAt: string,
-    stockLocationId?: string,
-    manufacturerNames?: string[],
-    batchRows?: BatchRow[]
-  ) => Promise<Workbook>;
-  previewPriceUpdate: (
-    workbook: Workbook,
-    fileName: string,
-    metadata: Record<string, string>
-  ) => Promise<CatalogPriceUpdatePreview>;
-  preview: ProductTransferService['preview'];
+const add = (
+  book: Workbook,
+  offset: number,
+  product: string,
+  maker: string,
+  size: string,
+  sold: string,
+  price?: number
+): Row => {
+  const row = book.getWorksheet('Products')!.getRow(10 + offset);
+  [product, maker, size, sold].forEach((v, i) => {
+    row.getCell(i + 1).value = v;
+  });
+  if (price !== undefined) row.getCell(6).value = price;
+  return row;
 };
+async function setup() {
+  const snapshot = workbookFixture();
+  return { snapshot, book: await exportProductWorkbook(snapshot) };
+}
 
-function service(): TestService {
-  const instance = Object.create(ProductTransferService.prototype) as TestService;
-  instance.supabase = {
-    claims: () => ({ company_id: COMPANY_ID }),
-    client: { rpc: async () => ({ data: { categories: [] }, error: null }) },
-  };
-  instance.locations = { active: () => ({ id: LOCATION_ID, code: 'MAIN', name: 'Main shop' }) };
-  instance.permissions = { has: () => true };
-  instance.catalogCache = {
-    catalog: () => [{ variant_id: VARIANT_ID, stock: 10 }],
-  };
-  instance.allProducts = async () => [
-    {
-      id: PRODUCT_ID,
-      name: 'Tea',
-      active: true,
-      manufacturer_id: MANUFACTURER_ID,
-      updated_at: UPDATED_AT,
-    },
-  ];
-  instance.allManufacturers = async () => [{ id: MANUFACTURER_ID, name: 'Acme', active: true }];
-  instance.allOpenBatches = async () => [];
-  instance.allVariants = async () => [
-    {
-      id: VARIANT_ID,
-      product_id: PRODUCT_ID,
-      name: '250g',
-      sku: 'TEA-250',
-      active: true,
-      updated_at: UPDATED_AT,
-      price: 100,
-      wholesale_price: 80,
-      track_inventory: true,
-      allow_fractional: false,
+describe('Products workbook', () => {
+  it('does not inherit a variant barcode on a pack with no barcode', async () => {
+    const snapshot = workbookFixture();
+    snapshot.packs[0].barcode = null;
+    const book = await exportProductWorkbook(snapshot);
+    expect(packRow(book).getCell(14).value).toBeNull();
+    expect(readProductWorkbook(book, 'Products.xlsx', snapshot).lines).toEqual([]);
+  });
+  it('round trips packs whose names differ only in case without renaming them', async () => {
+    const snapshot = workbookFixture();
+    snapshot.packs.push({
+      ...snapshot.packs[0],
+      id: '85000000-0000-4000-8000-000000000099',
+      variant_id: snapshot.variants[1].id,
+      name: 'box',
+      barcode: null,
+    });
+    const book = await exportProductWorkbook(snapshot);
+    const loaded = await createExcelWorkbook();
+    await loaded.xlsx.load(await book.xlsx.writeBuffer());
+    const p = readProductWorkbook(loaded, 'Products.xlsx', snapshot);
+    expect(p.errors).toEqual([]);
+    expect(p.conflicts).toEqual([]);
+    expect(p.lines).toEqual([]);
+    expect(p.changes.products).toEqual([]);
+  });
+  it('rejects identical pack definitions added to a workbook with no packs', async () => {
+    const snapshot = workbookFixture();
+    snapshot.packs = [];
+    const book = await exportProductWorkbook(snapshot);
+    for (const n of [6, 7]) {
+      const row = book.getWorksheet('Pack sizes')!.getRow(n);
+      row.getCell(1).value = 'Box';
+      row.getCell(2).value = 12;
+    }
+    expect(readProductWorkbook(book, 'Products.xlsx', snapshot).errors).toContain(
+      'Pack sizes: duplicate Box / 12. Use one definition.'
+    );
+  });
+  it.each([
+    { sold: 'Single item', itemType: 'Service', kind: 'service', tracked: false },
+    { sold: 'Per service', itemType: 'Good', kind: 'good', tracked: true },
+  ])('uses the edited $itemType item type for new-row tracking defaults', async testCase => {
+    const { snapshot, book } = await setup();
+    const row = add(book, 0, 'New entry', '', '', testCase.sold, 20);
+    row.getCell(16).value = testCase.itemType;
+    const p = readProductWorkbook(book, 'Products.xlsx', snapshot);
+    expect(p.errors).toEqual([]);
+    expect(p.changes.products[0].variants[0].values).toMatchObject({
+      kind: testCase.kind,
+      track_inventory: testCase.tracked,
+    });
+  });
+  it.each([false, true])(
+    'enables tracking without interpreting blocked batch cells as edits (retained batch: %s)',
+    async retainedBatch => {
+      const snapshot = workbookFixture();
+      snapshot.packs = [];
+      snapshot.variants[1].track_inventory = false;
+      if (retainedBatch) {
+        snapshot.stock[1].batch!.batch_number = 'RETAINED';
+        snapshot.stock[1].batch!.expiry_date = '2027-03-01';
+      } else {
+        snapshot.stock[1] = {
+          variant_id: snapshot.variants[1].id,
+          quantity: 0,
+          value: 0,
+          batch: null,
+        };
+      }
+      const book = await exportProductWorkbook(snapshot);
+      const row = bySku(book, 'SOAP500');
+      expect(row.getCell(22).value).toBe('XXXX');
+      expect(row.getCell(23).value).toBe('XXXX');
+      row.getCell(17).value = 'Yes';
+      const p = readProductWorkbook(book, 'Products.xlsx', snapshot);
+      expect(p.errors).toEqual([]);
+      expect(p.conflicts).toEqual([]);
+      expect(p.changes.products[0].variants[0].values.track_inventory).toBe(true);
+      expect(p.changes.batches).toEqual([]);
+      expect(p.changes.stock).toEqual([]);
+      expect(p.lines.map(line => line.field)).toEqual(['Track stock?']);
+    }
+  );
+  it('creates zero-priced services and fractional opening stock from an empty-shop workbook', async () => {
+    const snapshot = workbookFixture();
+    snapshot.products = [];
+    snapshot.variants = [];
+    snapshot.packs = [];
+    snapshot.stock = [];
+    const book = await exportProductWorkbook(snapshot);
+    add(book, 0, 'Delivery', '', '', 'Per service', 0);
+    const rice = add(book, 1, 'Rice', '', '', 'Per kg', 160);
+    rice.getCell(12).value = 12.5;
+    rice.getCell(10).value = 0;
+    const p = readProductWorkbook(book, 'Products.xlsx', snapshot);
+    expect(p.errors).toEqual([]);
+    expect(
+      p.changes.products.find(p => p.values.name === 'Delivery')!.variants[0].values
+    ).toMatchObject({ price: 0, kind: 'service', track_inventory: false });
+    expect(p.lines.some(l => l.field === 'Retail' && l.after === '0')).toBe(true);
+    expect(p.changes.products.find(p => p.values.name === 'Rice')!.variants[0]).toMatchObject({
+      opening_quantity: 12.5,
+      opening_unit_cost: 0,
+    });
+  });
+  it('keeps existing duplicate display names distinct and rejects ambiguous new pack parents', async () => {
+    const snapshot = workbookFixture();
+    const product = { ...snapshot.products[0], id: '85000000-0000-4000-8000-000000000099' };
+    snapshot.products.push(product);
+    snapshot.variants.push({
+      ...snapshot.variants[0],
+      id: '85000000-0000-4000-8000-000000000098',
+      product_id: product.id,
+      sku: 'DUP-SOAP',
+      barcode: null,
+    });
+    const book = await exportProductWorkbook(snapshot);
+    expect(readProductWorkbook(book, 'Products.xlsx', snapshot).errors).toEqual([]);
+    add(book, 1, 'Soap', 'Soap Works', '250g', 'Box of 12 bars', 540);
+    expect(readProductWorkbook(book, 'Products.xlsx', snapshot).errors.join()).toContain(
+      'exactly one matching'
+    );
+  });
+  it('blocks pack-only metadata and allows unchanged retired packs on fractional variants', async () => {
+    const { snapshot, book } = await setup();
+    packRow(book).getCell(13).value = 'PACK-SKU';
+    expect(readProductWorkbook(book, 'Products.xlsx', snapshot).errors.join()).toContain(
+      'SKU belongs on'
+    );
+    snapshot.variants[0].allow_fractional = true;
+    snapshot.packs[0].active = false;
+    const measured = await exportProductWorkbook(snapshot);
+    expect(readProductWorkbook(measured, 'Products.xlsx', snapshot).errors).toEqual([]);
+  });
+
+  it('exports, edits and creates active packs on fractional base-unit variants', async () => {
+    const snapshot = workbookFixture();
+    const rice = snapshot.variants[2];
+    snapshot.packs = [
+      {
+        ...snapshot.packs[0],
+        variant_id: rice.id,
+        name: 'Bag',
+        units_per_pack: 25,
+        sale_price: 3500,
+      },
+    ];
+    const book = await exportProductWorkbook(snapshot);
+    const loaded = await createExcelWorkbook();
+    await loaded.xlsx.load(await book.xlsx.writeBuffer());
+    expect(readProductWorkbook(loaded, 'Products.xlsx', snapshot).errors).toEqual([]);
+    expect(readProductWorkbook(loaded, 'Products.xlsx', snapshot).lines).toEqual([]);
+    const labels: unknown[] = [];
+    loaded.getWorksheet('_Choices')!.eachRow(row => {
+      const cell = row.getCell(1);
+      labels.push(cell.formula ? cell.result : cell.value);
+    });
+    expect(labels).toContain('Bag of 25 kg');
+    packRow(loaded).getCell(6).value = 3600;
+    const preview = readProductWorkbook(loaded, 'Products.xlsx', snapshot);
+    expect(preview.errors).toEqual([]);
+    expect(preview.changes.products[0].variants[0]).toMatchObject({
+      values: { allow_fractional: true, stock_unit: 'kg' },
+      packs: [expect.objectContaining({ sale_price: 3600, active: true })],
+    });
+
+    snapshot.packs = [];
+    const fresh = await exportProductWorkbook(snapshot);
+    fresh.getWorksheet('Pack sizes')!.getRow(6).getCell(1).value = 'Bag';
+    fresh.getWorksheet('Pack sizes')!.getRow(6).getCell(2).value = 25;
+    add(fresh, 0, 'Rice', '', '', 'Bag of 25 kg', 3500);
+    const created = readProductWorkbook(fresh, 'Products.xlsx', snapshot);
+    expect(created.errors).toEqual([]);
+    expect(created.changes.products[0].variants[0]).toMatchObject({
+      values: { allow_fractional: true },
+      packs: [expect.objectContaining({ name: 'Bag', units_per_pack: 25, active: true })],
+    });
+  });
+
+  it('can enable fractional base quantities without retiring an existing pack', async () => {
+    const { snapshot, book } = await setup();
+    bySku(book, 'SOAP250').getCell(18).value = 'Yes';
+    const preview = readProductWorkbook(book, 'Products.xlsx', snapshot);
+    expect(preview.errors).toEqual([]);
+    expect(preview.changes.products[0].variants[0]).toMatchObject({
+      values: { allow_fractional: true },
+      packs: [expect.objectContaining({ active: true })],
+    });
+  });
+
+  it('still accepts prepared new-row formulas from exports made before fractional packs', async () => {
+    const { snapshot, book } = await setup();
+    const references =
+      Math.max(packSizes(snapshot).length, snapshot.manufacturers.length) + EXTRA_ROWS;
+    const legacyEnd =
+      1 +
+      unitChoices(snapshot).reduce(
+        (sum, choice) => sum + 1 + (choice.kind === 'good' && !choice.fractional ? references : 0),
+        0
+      );
+    const row = add(book, 0, 'New rice', '', '', 'Per kg', 160);
+    for (const column of [16, 18]) {
+      const cell = row.getCell(column);
+      cell.value = { formula: cell.formula!.replace(/\$F\$\d+/, `$F$${legacyEnd}`) };
+    }
+    const preview = readProductWorkbook(book, 'Products.xlsx', snapshot);
+    expect(preview.errors).toEqual([]);
+    expect(preview.changes.products[0].variants[0].values).toMatchObject({
       kind: 'good',
-    },
-    {
-      id: VARIANT_ID_2,
-      product_id: PRODUCT_ID,
-      name: '500g',
-      sku: 'TEA-500',
-      active: true,
-      updated_at: UPDATED_AT,
-      price: 180,
-      wholesale_price: 150,
-      track_inventory: true,
-      allow_fractional: false,
-      kind: 'good',
-    },
-  ];
-  return instance;
-}
-
-function row(overrides: Partial<ExportRow> = {}): ExportRow {
-  return {
-    variant_id: VARIANT_ID,
-    variant_updated_at: UPDATED_AT,
-    product_id: PRODUCT_ID,
-    product_updated_at: UPDATED_AT,
-    product_barcode: null,
-    product_name: 'Tea',
-    manufacturer_name: 'Acme',
-    variant_name: '250g',
-    sku: 'TEA-250',
-    barcode: '616000000001',
-    kind: 'good',
-    product_active: true,
-    variant_active: true,
-    retail_price: 100,
-    wholesale_price: 80,
-    stock: 10,
-    stock_value: 500,
-    track_inventory: true,
-    allow_fractional: false,
-    stock_location: 'MAIN — Main shop',
-    latest_batch_id: null,
-    latest_batch_label: null,
-    latest_batch_unit_cost: null,
-    latest_batch_number: null,
-    latest_batch_expiry_date: null,
-    ...overrides,
-  };
-}
-
-function batch(overrides: Partial<BatchRow> = {}): BatchRow {
-  return {
-    id: BATCH_ID,
-    variant_id: VARIANT_ID,
-    stock_location_id: LOCATION_ID,
-    batch_number: 'PO-104',
-    purchased_at: '2026-08-18T08:00:00.000Z',
-    created_at: '2026-08-18T08:00:00.000Z',
-    quantity: 10,
-    remaining: 6,
-    unit_cost: 0,
-    original_cost: 0,
-    remaining_cost: 0,
-    expiry_date: null,
-    product_name: 'Tea',
-    manufacturer_name: 'Acme',
-    variant_name: '250g',
-    sku: 'TEA-250',
-    label: 'PO-104 · received 2026-08-18',
-    latest: true,
-    ...overrides,
-  };
-}
-
-const metadata = (companyId = COMPANY_ID) => ({
-  format_version: '5',
-  workbook_kind: 'catalog_workbook',
-  company_id: companyId,
-  exported_at: UPDATED_AT,
-  stock_location_id: LOCATION_ID,
-});
-
-function column(sheet: Worksheet, header: string): number {
-  let result = 0;
-  sheet.getRow(1).eachCell((cell, index) => {
-    if (cell.text === header) result = index;
+      allow_fractional: true,
+    });
   });
-  if (!result) throw new Error(`Missing test column: ${header}`);
-  return result;
-}
-
-function setCell(sheet: Worksheet, rowNumber: number, header: string, value: unknown): void {
-  sheet.getCell(rowNumber, column(sheet, header)).value = value as never;
-}
-
-describe('catalog workbooks', () => {
-  it('builds a versioned, filterable workbook with hidden identity columns', async () => {
-    const workbook = await service().priceUpdateWorkbook(
-      [
-        row({
-          product_active: false,
-          variant_active: false,
-          latest_batch_id: BATCH_ID,
-          latest_batch_label: 'PO-104 · received 2026-08-18',
-          latest_batch_unit_cost: 0,
-          latest_batch_number: 'PO-104',
-        }),
-      ],
-      UPDATED_AT,
-      LOCATION_ID,
-      ['Acme'],
-      [batch()]
+  it('does not accept buying cost without creating opening inventory', async () => {
+    const { snapshot, book } = await setup();
+    const row = add(book, 0, 'New rice', '', '', 'Per kg', 160);
+    row.getCell(12).value = 0;
+    row.getCell(10).value = 120;
+    expect(readProductWorkbook(book, 'Products.xlsx', snapshot).errors.join()).toContain(
+      'opening Counted stock'
     );
-    const sheet = workbook.getWorksheet('Products & Stock')!;
-    const workbookMetadata = workbook.getWorksheet('_DukaRun Metadata')!;
-
-    expect(sheet.getTable('DukaRunProductsAndStock')).toBeDefined();
-    expect(sheet.views[0]).toMatchObject({ state: 'frozen', xSplit: 13, ySplit: 1 });
-    expect(sheet.getColumn(1).hidden).toBe(true);
-    expect(sheet.getColumn(2).hidden).toBe(true);
-    expect(sheet.getColumn(3).hidden).toBe(true);
-    expect(sheet.getColumn(4).hidden).toBe(true);
-    expect(sheet.getCell(2, column(sheet, 'product_name')).value).toBe('Tea');
-    expect(sheet.getCell(2, column(sheet, 'manufacturer')).value).toBe('Acme');
-    expect(sheet.getCell(2, column(sheet, 'stock_value_kes')).value).toBe(500);
-    expect(sheet.getCell(2, column(sheet, 'latest_batch')).value).toMatchObject({
-      text: 'PO-104 · received 2026-08-18',
-      hyperlink: "#'Batches'!K2",
-    });
-    expect(sheet.getCell(2, column(sheet, 'latest_buying_price_kes')).value).toBe(0);
-    expect(sheet.getCell(2, column(sheet, 'latest_buying_price_kes')).fill).toMatchObject({
-      type: 'pattern',
-      fgColor: { argb: 'FFF4CCCC' },
-    });
-    expect(sheet.getCell(2, column(sheet, 'manufacturer')).fill).toMatchObject({
-      type: 'pattern',
-      fgColor: { argb: 'FFFFF2CC' },
-    });
-    expect(sheet.getCell(2, column(sheet, 'manufacturer')).dataValidation).toMatchObject({
-      type: 'list',
-      formulae: ['DukaRunManufacturerChoices'],
-    });
-    expect(sheet.getColumn(column(sheet, 'current_stock_quantity')).numFmt).toBe('#,##0.###');
-    expect(workbook.getWorksheet('Manufacturers')!.getCell('A3').value).toBe('Acme');
-    expect(workbookMetadata.state).toBe('veryHidden');
-    expect(workbook.getWorksheet('Batches')!.getCell('K2').value).toBe('Tea');
-    expect(workbook.getWorksheet('Batches')!.getCell('L2').value).toBe('Acme');
-    expect(workbook.getWorksheet('Batches')!.getCell('M2').value).toBe('250g');
-    expect(workbook.getWorksheet('Batches')!.getCell('S2').value).toMatchObject({
-      formula: expect.stringContaining('Products & Stock'),
-    });
-    expect(workbook.getWorksheet('Batches')!.getCell('S2').fill).toMatchObject({
-      type: 'pattern',
-      fgColor: { argb: 'FFF4CCCC' },
-    });
-    expect(workbook.getWorksheet('Batches')!.getCell('S2').note).toBeUndefined();
-    expect(workbook.getWorksheet('Manufacturers')!.getCell('A1').note).toBeUndefined();
-    expect(workbookMetadata.getCell('B1').value).toBe('5');
-    expect(workbookMetadata.getCell('B2').value).toBe('catalog_workbook');
-    expect(workbookMetadata.getCell('B4').value).toBe(COMPANY_ID);
   });
-
-  it('serializes batch and manufacturer guidance without comment parts', async () => {
-    const workbook = await service().priceUpdateWorkbook(
-      [
-        row({
-          latest_batch_id: BATCH_ID,
-          latest_batch_label: 'PO-104 · received 2026-08-18',
-          latest_batch_unit_cost: 50,
-          latest_batch_number: 'PO-104',
-        }),
-      ],
-      UPDATED_AT,
-      LOCATION_ID,
-      ['Acme'],
-      [batch({ unit_cost: 50, remaining_cost: 300 })]
-    );
-
-    const archive = await JSZip.loadAsync(await workbook.xlsx.writeBuffer());
-    const commentParts = Object.keys(archive.files).filter(path =>
-      /(?:comments|threadedComments|vmlDrawing)/.test(path)
-    );
-
-    expect(commentParts).toEqual([]);
-    expect(archive.file('xl/worksheets/sheet2.xml')).not.toBeNull();
-    expect(archive.file('xl/worksheets/sheet3.xml')).not.toBeNull();
-  });
-
-  it('does not count the five blank starter rows against the import limit', async () => {
-    const instance = service();
-    const workbook = await instance.priceUpdateWorkbook(
-      Array.from({ length: 9_996 }, () => row()),
-      UPDATED_AT
-    );
-
-    const preview = await instance.previewPriceUpdate(workbook, 'catalog.xlsx', metadata());
-
-    expect(preview.rows).toBe(9_996);
-    expect(preview.errors.some(error => error.includes('Maximum 10000'))).toBe(false);
-  });
-
-  it('previews retail changes, wholesale clearing, and unchanged rows exactly', async () => {
-    const instance = service();
-    const workbook = await instance.priceUpdateWorkbook([row()], UPDATED_AT);
-    const sheet = workbook.getWorksheet('Products & Stock')!;
-    setCell(sheet, 2, 'new_retail_price_kes', 120);
-    setCell(sheet, 2, 'new_wholesale_price_kes', 'CLEAR');
-
-    const preview = await instance.previewPriceUpdate(workbook, 'prices.xlsx', metadata());
-
-    expect(preview).toMatchObject({
-      rows: 1,
-      unchangedRows: 0,
-      retailChanges: 1,
-      wholesaleChanges: 1,
-      errors: [],
-      conflicts: [],
-    });
-    expect(preview.changes[0]).toMatchObject({
-      variantId: VARIANT_ID,
-      currentRetailPrice: 100,
-      newRetailPrice: 120,
-      currentWholesalePrice: 80,
-      newWholesalePrice: null,
-    });
-
-    setCell(sheet, 2, 'new_retail_price_kes', 100);
-    setCell(sheet, 2, 'new_wholesale_price_kes', 80);
-    const unchanged = await instance.previewPriceUpdate(workbook, 'prices.xlsx', metadata());
-    expect(unchanged).toMatchObject({ unchangedRows: 1, retailChanges: 0, wholesaleChanges: 0 });
-    expect(unchanged.changes).toEqual([]);
-  });
-
-  it('previews location stock changes and validates counted quantities', async () => {
-    const instance = service();
-    const workbook = await instance.priceUpdateWorkbook([row()], UPDATED_AT);
-    const sheet = workbook.getWorksheet('Products & Stock')!;
-    setCell(sheet, 2, 'new_stock_quantity', 7);
-
-    const preview = await instance.previewPriceUpdate(workbook, 'updates.xlsx', metadata());
-    expect(preview).toMatchObject({ stockChanges: 1, errors: [], conflicts: [] });
-    expect(preview.changes[0]).toMatchObject({
-      currentStockQuantity: 10,
-      newStockQuantity: 7,
-      stockLocationId: LOCATION_ID,
-    });
-
-    setCell(sheet, 2, 'new_stock_quantity', 7.5);
-    const fractional = await instance.previewPriceUpdate(workbook, 'updates.xlsx', metadata());
-    expect(fractional.errors.join('\n')).toContain('does not allow fractional stock');
-  });
-
-  it('previews intentional corrections for open batches and ignores deleted batch rows', async () => {
-    const instance = service();
-    const currentBatch = batch();
-    const olderBatch = batch({
-      id: OLDER_BATCH_ID,
-      batch_number: null,
-      purchased_at: '2026-08-01T08:00:00.000Z',
-      created_at: '2026-08-01T08:00:00.000Z',
-      remaining: 2,
-      unit_cost: 40,
-      original_cost: 400,
-      remaining_cost: 80,
-      label: 'Received 2026-08-01',
-      latest: false,
-    });
-    instance.allOpenBatches = async () => [currentBatch, olderBatch];
-    const workbook = await instance.priceUpdateWorkbook(
-      [
-        row({
-          latest_batch_id: BATCH_ID,
-          latest_batch_label: currentBatch.label,
-          latest_batch_unit_cost: 0,
-          latest_batch_number: 'PO-104',
-        }),
-      ],
-      UPDATED_AT,
-      LOCATION_ID,
-      ['Acme'],
-      [currentBatch, olderBatch]
-    );
-    const mainSheet = workbook.getWorksheet('Products & Stock')!;
-    setCell(mainSheet, 2, 'latest_buying_price_kes', 55);
-    setCell(mainSheet, 2, 'latest_batch_number', 'COUNT-104');
-    workbook.getWorksheet('Batches')!.spliceRows(3, 1);
-
-    const preview = await instance.previewPriceUpdate(workbook, 'catalog.xlsx', metadata());
-
+  it('round trips a real XLSX without changes, keeping three sheets and all primary columns visible', async () => {
+    const { snapshot, book } = await setup();
+    const loaded = await createExcelWorkbook();
+    await loaded.xlsx.load(await book.xlsx.writeBuffer());
+    expect(loaded.worksheets.filter(s => s.state === 'visible').map(s => s.name)).toEqual([
+      'Products',
+      'Manufacturers',
+      'Pack sizes',
+    ]);
+    for (let c = 1; c <= 12; c++)
+      expect(loaded.getWorksheet('Products')!.getColumn(c).hidden).toBeFalsy();
+    const preview = readProductWorkbook(loaded, 'Products.xlsx', snapshot);
     expect(preview.errors).toEqual([]);
     expect(preview.conflicts).toEqual([]);
-    expect(preview.batchChanges).toEqual([
-      expect.objectContaining({
-        action: 'update',
-        batchId: BATCH_ID,
-        productName: 'Tea',
-        variantName: '250g',
-        expectedRemaining: 6,
-        currentUnitCost: 0,
-        newUnitCost: 55,
-        newBatchNumber: 'COUNT-104',
-        newRemainingCost: 330,
-        valueDifference: 330,
-      }),
-    ]);
+    expect(preview.lines).toEqual([]);
+    expect(preview.changes.products).toEqual([]);
   });
-
-  it('links a stock increase to the existing latest batch', async () => {
-    const instance = service();
-    const currentBatch = batch();
-    instance.allOpenBatches = async () => [currentBatch];
-    const workbook = await instance.priceUpdateWorkbook(
-      [
-        row({
-          latest_batch_id: BATCH_ID,
-          latest_batch_label: currentBatch.label,
-          latest_batch_unit_cost: 0,
-          latest_batch_number: 'PO-104',
-        }),
-      ],
-      UPDATED_AT,
-      LOCATION_ID,
-      ['Acme'],
-      [currentBatch]
-    );
-    const sheet = workbook.getWorksheet('Products & Stock')!;
-    setCell(sheet, 2, 'new_stock_quantity', 12);
-    setCell(sheet, 2, 'latest_buying_price_kes', 50);
-
-    const preview = await instance.previewPriceUpdate(workbook, 'catalog.xlsx', metadata());
-
-    expect(preview.errors).toEqual([]);
-    expect(preview.batchChanges).toEqual([
-      expect.objectContaining({
-        action: 'update',
-        batchId: BATCH_ID,
-        latest: true,
-        quantityAdded: 2,
-        newUnitCost: 50,
-        newRemainingCost: 400,
-      }),
-    ]);
-  });
-
-  it('creates a latest batch only when a stock increase has no open batch', async () => {
-    const instance = service();
-    instance.catalogCache = { catalog: () => [{ variant_id: VARIANT_ID, stock: 0 }] };
-    const workbook = await instance.priceUpdateWorkbook(
-      [row({ stock: 0, stock_value: 0 })],
-      UPDATED_AT,
-      LOCATION_ID,
-      ['Acme']
-    );
-    const sheet = workbook.getWorksheet('Products & Stock')!;
-    setCell(sheet, 2, 'new_stock_quantity', 3);
-    setCell(sheet, 2, 'latest_batch_number', 'COUNT-1');
-    setCell(sheet, 2, 'latest_buying_price_kes', 75);
-
-    const preview = await instance.previewPriceUpdate(workbook, 'catalog.xlsx', metadata());
-
-    expect(preview.errors).toEqual([]);
-    expect(preview.batchChanges).toEqual([
-      expect.objectContaining({
-        action: 'create',
-        batchId: null,
-        latest: true,
-        quantityAdded: 3,
-        newBatchNumber: 'COUNT-1',
-        newUnitCost: 75,
-      }),
-    ]);
-
-    setCell(sheet, 2, 'new_stock_quantity', '');
-    const withoutStock = await instance.previewPriceUpdate(workbook, 'catalog.xlsx', metadata());
-    expect(withoutStock.batchChanges).toEqual([]);
-    expect(withoutStock.errors).toEqual([]);
-    expect(withoutStock.warnings).toEqual([
-      expect.stringContaining(
-        'has no stock or open batch; latest batch details were ignored. Increase stock to create a batch.'
-      ),
-    ]);
-
-    const withExistingBatch = await instance.priceUpdateWorkbook(
-      [
-        row({
-          latest_batch_id: BATCH_ID,
-          latest_batch_label: 'PO-104 · received 2026-08-18',
-          latest_batch_unit_cost: 50,
-          latest_batch_number: 'PO-104',
-        }),
-      ],
-      UPDATED_AT,
-      LOCATION_ID,
-      ['Acme'],
-      [batch({ unit_cost: 50, remaining_cost: 300 })]
-    );
-    instance.allOpenBatches = async () => [batch({ unit_cost: 50, remaining_cost: 300 })];
-    setCell(withExistingBatch.getWorksheet('Products & Stock')!, 2, 'latest_buying_price_kes', '');
-    const missingExistingPrice = await instance.previewPriceUpdate(
-      withExistingBatch,
-      'catalog.xlsx',
-      metadata()
-    );
-    expect(missingExistingPrice.errors.join('\n')).toContain(
-      'latest_buying_price_kes cannot be blank for an existing batch'
+  it('rejects old formats', async () => {
+    const book = await createExcelWorkbook();
+    book.addWorksheet('Products & Stock');
+    expect(() => readProductWorkbook(book, 'old.xlsx', workbookFixture())).toThrow(
+      'Download a fresh'
     );
   });
-
-  it('edits an older open batch only from the Batches sheet', async () => {
-    const instance = service();
-    const currentBatch = batch({ unit_cost: 50, original_cost: 500, remaining_cost: 300 });
-    const olderBatch = batch({
-      id: OLDER_BATCH_ID,
-      batch_number: 'OLD-1',
-      purchased_at: '2026-08-01T08:00:00.000Z',
-      created_at: '2026-08-01T08:00:00.000Z',
-      remaining: 2,
-      unit_cost: 40,
-      original_cost: 400,
-      remaining_cost: 80,
-      label: 'OLD-1 · received 2026-08-01',
-      latest: false,
+  it('edits retail, clears wholesale and counts zero without touching sibling stock', async () => {
+    const { snapshot, book } = await setup();
+    const row = bySku(book, 'SOAP250');
+    row.getCell(6).value = 55;
+    row.getCell(8).value = 'CLEAR';
+    row.getCell(12).value = 0;
+    const p = readProductWorkbook(book, 'Products.xlsx', snapshot);
+    expect(p.errors).toEqual([]);
+    expect(p.changes.stock).toHaveLength(1);
+    expect(p.changes.stock[0].new_stock_quantity).toBe(0);
+    expect(p.changes.products[0].variants[0].values).toMatchObject({
+      price: 55,
+      wholesale_price: null,
     });
-    instance.allOpenBatches = async () => [currentBatch, olderBatch];
-    const workbook = await instance.priceUpdateWorkbook(
-      [
-        row({
-          latest_batch_id: BATCH_ID,
-          latest_batch_label: currentBatch.label,
-          latest_batch_unit_cost: 50,
-          latest_batch_number: 'PO-104',
-        }),
-      ],
-      UPDATED_AT,
-      LOCATION_ID,
-      ['Acme'],
-      [currentBatch, olderBatch]
-    );
-    const batchSheet = workbook.getWorksheet('Batches')!;
-    setCell(batchSheet, 3, 'batch_number', 'OLD-CORRECTED');
-    setCell(batchSheet, 3, 'buying_price_kes', 45);
-
-    const preview = await instance.previewPriceUpdate(workbook, 'catalog.xlsx', metadata());
-
-    expect(preview.errors).toEqual([]);
-    expect(preview.batchChanges).toEqual([
-      expect.objectContaining({
-        batchId: OLDER_BATCH_ID,
-        latest: false,
-        newBatchNumber: 'OLD-CORRECTED',
-        newUnitCost: 45,
-      }),
-    ]);
   });
-
-  it('rejects a batch correction when that batch is exhausted after export', async () => {
-    const instance = service();
-    const workbook = await instance.priceUpdateWorkbook(
-      [
-        row({
-          latest_batch_id: BATCH_ID,
-          latest_batch_label: 'PO-104 · received 2026-08-18',
-          latest_batch_unit_cost: 0,
-          latest_batch_number: 'PO-104',
-        }),
-      ],
-      UPDATED_AT,
-      LOCATION_ID,
-      [],
-      [batch()]
-    );
-    setCell(workbook.getWorksheet('Products & Stock')!, 2, 'latest_buying_price_kes', 55);
-
-    const preview = await instance.previewPriceUpdate(workbook, 'catalog.xlsx', metadata());
-
-    expect(preview.batchChanges).toEqual([]);
-    expect(preview.conflicts.join('\n')).toContain('exhausted or no longer exists');
-  });
-
-  it('does not preview batch costs without stock-adjustment and financial access', async () => {
-    const instance = service();
-    instance.permissions = { has: () => false };
-    const workbook = await instance.priceUpdateWorkbook(
-      [
-        row({
-          latest_batch_id: BATCH_ID,
-          latest_batch_label: 'PO-104 · received 2026-08-18',
-          latest_batch_unit_cost: 0,
-          latest_batch_number: 'PO-104',
-        }),
-      ],
-      UPDATED_AT,
-      LOCATION_ID,
-      [],
-      [batch()]
-    );
-    setCell(workbook.getWorksheet('Products & Stock')!, 2, 'latest_buying_price_kes', 55);
-
-    const preview = await instance.previewPriceUpdate(workbook, 'catalog.xlsx', metadata());
-
-    expect(preview.batchChanges).toEqual([]);
-    expect(preview.errors.join('\n')).toContain('require stock-adjustment and financial access');
-  });
-
-  it('applies one product-level manufacturer choice across repeated variant rows', async () => {
-    const instance = service();
-    instance.allManufacturers = async () => [
-      { id: MANUFACTURER_ID, name: 'Acme', active: true },
-      { id: '44444444-4444-4444-8444-444444444445', name: 'New Dairy', active: true },
-      { id: '44444444-4444-4444-8444-444444444446', name: 'Another Dairy', active: true },
-    ];
-    const workbook = await instance.priceUpdateWorkbook(
-      [
-        row(),
-        row({
-          variant_id: VARIANT_ID_2,
-          variant_name: '500g',
-          sku: 'TEA-500',
-          retail_price: 180,
-          wholesale_price: 150,
-        }),
-      ],
-      UPDATED_AT,
-      LOCATION_ID,
-      ['Acme', 'New Dairy']
-    );
-    const sheet = workbook.getWorksheet('Products & Stock')!;
-    setCell(sheet, 3, 'manufacturer', 'New Dairy');
-
-    const preview = await instance.previewPriceUpdate(workbook, 'updates.xlsx', metadata());
-    expect(preview).toMatchObject({
-      manufacturerChanges: 1,
-      unchangedRows: 1,
-      errors: [],
-      conflicts: [],
+  it('creates a manufacturer, product, variant, opening stock and pack in the same workbook', async () => {
+    const { snapshot, book } = await setup();
+    const m = book.getWorksheet('Manufacturers')!.getRow(7);
+    m.getCell(1).value = 'Example Care';
+    const base = add(book, 0, 'Handwash', 'Example Care', '500ml', 'Single bottle', 180);
+    base.getCell(10).value = 120;
+    base.getCell(12).value = 24;
+    const ref = book.getWorksheet('Pack sizes')!.getRow(7);
+    ref.getCell(1).value = 'Carton';
+    ref.getCell(2).value = 6;
+    add(book, 1, 'Handwash', 'Example Care', '500ml', 'Carton of 6 bottles', 1020);
+    const p = readProductWorkbook(book, 'Products.xlsx', snapshot);
+    expect(p.errors).toEqual([]);
+    expect(p.changes.manufacturers).toHaveLength(1);
+    const product = p.changes.products.find(p => p.values.name === 'Handwash')!;
+    expect(product.id).toBeNull();
+    expect(product.variants).toHaveLength(1);
+    expect(product.variants[0]).toMatchObject({
+      opening_quantity: 24,
+      opening_unit_cost: 120,
+      packs: [{ name: 'Carton', units_per_pack: 6, sale_price: 1020 }],
     });
-    expect(preview.productChanges).toEqual([
-      {
-        productId: PRODUCT_ID,
-        expectedUpdatedAt: UPDATED_AT,
-        productName: 'Tea',
-        currentManufacturer: 'Acme',
-        newManufacturer: 'New Dairy',
-      },
-    ]);
-
-    setCell(sheet, 2, 'manufacturer', 'Another Dairy');
-    const conflicting = await instance.previewPriceUpdate(workbook, 'updates.xlsx', metadata());
-    expect(conflicting.productChanges).toEqual([]);
-    expect(conflicting.errors.join('\n')).toContain('conflicting new manufacturers on rows 2, 3');
-
-    const pastedWorkbook = await instance.priceUpdateWorkbook([row()], UPDATED_AT);
-    setCell(pastedWorkbook.getWorksheet('Products & Stock')!, 2, 'manufacturer', 'Made Up Co');
-    const pasted = await instance.previewPriceUpdate(pastedWorkbook, 'updates.xlsx', metadata());
-    expect(pasted.errors.join('\n')).toContain(
-      'manufacturer must be selected from the Manufacturers sheet'
-    );
   });
-
-  it('allows an assigned inactive manufacturer to remain unchanged', async () => {
-    const instance = service();
-    instance.allManufacturers = async () => [{ id: MANUFACTURER_ID, name: 'Acme', active: false }];
-    const workbook = await instance.priceUpdateWorkbook([row()], UPDATED_AT, LOCATION_ID, ['Acme']);
-    setCell(workbook.getWorksheet('Products & Stock')!, 2, 'new_retail_price_kes', 125);
-
-    const preview = await instance.previewPriceUpdate(workbook, 'updates.xlsx', metadata());
-
-    expect(preview.errors).toEqual([]);
-    expect(preview.productChanges).toEqual([]);
-    expect(preview.retailChanges).toBe(1);
+  it('finds a new Single row below its pack with unrelated rows between', async () => {
+    const { snapshot, book } = await setup();
+    add(book, 0, 'Water', '', '500ml', 'Box of 12 bottles', 420);
+    add(book, 1, 'Unrelated', '', '', 'Single item', 20);
+    add(book, 2, 'Water', '', '500ml', 'Single bottle', 40);
+    const p = readProductWorkbook(book, 'Products.xlsx', snapshot);
+    expect(p.errors).toEqual([]);
+    expect(
+      p.changes.products.find(p => p.values.name === 'Water')!.variants[0].packs[0].sale_price
+    ).toBe(420);
   });
-
-  it('treats an appended blank-ID row as a new product', async () => {
-    const instance = service();
-    instance.allManufacturers = async () => [
-      { id: MANUFACTURER_ID, name: 'Acme', active: true },
-      { id: '44444444-4444-4444-8444-444444444447', name: 'Roaster Co', active: true },
-    ];
-    const workbook = await instance.priceUpdateWorkbook([row()], UPDATED_AT, LOCATION_ID, [
-      'Acme',
-      'Roaster Co',
-    ]);
-    const sheet = workbook.getWorksheet('Products & Stock')!;
-    const newRow = 3;
-    setCell(sheet, newRow, 'product_key', 'NEW-COFFEE');
-    setCell(sheet, newRow, 'product_name', 'Coffee');
-    setCell(sheet, newRow, 'manufacturer', 'Roaster Co');
-    setCell(sheet, newRow, 'sku', 'COFFEE-1');
-    setCell(sheet, newRow, 'kind', 'good');
-    setCell(sheet, newRow, 'product_active', true);
-    setCell(sheet, newRow, 'variant_active', true);
-    setCell(sheet, newRow, 'track_inventory', true);
-    setCell(sheet, newRow, 'allow_fractional_stock', false);
-    setCell(sheet, newRow, 'new_retail_price_kes', 250);
-    setCell(sheet, newRow, 'new_stock_quantity', 5);
-    setCell(sheet, newRow, 'latest_buying_price_kes', 100);
-
-    const preview = await instance.previewPriceUpdate(workbook, 'catalog.xlsx', metadata());
-    expect(preview.errors).toEqual([]);
-    expect(preview.creationPreview).toMatchObject({ rows: 1, creates: 1 });
-    expect(preview.creationPreview?.products[0]).toMatchObject({
-      product_key: 'NEW-COFFEE',
-      name: 'Coffee',
-      manufacturer_name: 'Roaster Co',
-      variants: [{ sku: 'COFFEE-1', price: 250, opening_quantity: 5 }],
+  it('adds a size/type to an existing product while inheriting product metadata', async () => {
+    const snapshot = workbookFixture();
+    snapshot.products[0].barcode = 'PARENT';
+    snapshot.products[0].tax_category_id = snapshot.taxes[0].id;
+    const book = await exportProductWorkbook(snapshot);
+    add(book, 0, 'Soap', 'Soap Works', '1kg', 'Single bar', 150);
+    const p = readProductWorkbook(book, 'Products.xlsx', snapshot);
+    expect(p.errors).toEqual([]);
+    expect(p.changes.products).toHaveLength(1);
+    expect(p.changes.products[0].values).toMatchObject({
+      barcode: 'PARENT',
+      tax_category_id: snapshot.taxes[0].id,
     });
-
-    setCell(sheet, newRow, 'latest_buying_price_kes', 0);
-    const zeroCost = await instance.previewPriceUpdate(workbook, 'catalog.xlsx', metadata());
-    expect(zeroCost.errors.join('\n')).toContain('opening unit cost must be greater than zero');
+    expect(p.changes.products[0].variants[0].id).toBeNull();
   });
-
-  it('previews removed exported rows as disables without deleting history', async () => {
-    const instance = service();
-    const workbook = await instance.priceUpdateWorkbook(
-      [
-        row(),
-        row({
-          variant_id: VARIANT_ID_2,
-          variant_name: '500g',
-          sku: 'TEA-500',
-          retail_price: 180,
-          wholesale_price: 150,
-        }),
-      ],
-      UPDATED_AT
+  it('keeps omitted rows unchanged and rejects a pack whose parent row is missing', async () => {
+    const { snapshot, book } = await setup();
+    bySku(book, 'SOAP500').values = [];
+    expect(readProductWorkbook(book, 'Products.xlsx', snapshot).changes.products).toEqual([]);
+    bySku(book, 'SOAP250').values = [];
+    expect(readProductWorkbook(book, 'Products.xlsx', snapshot).errors.join()).toContain(
+      'exactly one matching'
     );
-    const sheet = workbook.getWorksheet('Products & Stock')!;
-    setCell(sheet, 2, 'product_name', '');
-    const cleared = await instance.previewPriceUpdate(workbook, 'catalog.xlsx', metadata());
-    expect(cleared.errors.join('\n')).toContain('delete the entire Excel table row');
-    expect(cleared.disableChanges).toEqual([]);
-
-    setCell(sheet, 2, 'product_name', 'Tea');
-    sheet.spliceRows(2, 1);
-
-    const oneRemoved = await instance.previewPriceUpdate(workbook, 'catalog.xlsx', metadata());
-    expect(oneRemoved.disableChanges).toEqual([
-      expect.objectContaining({
-        variantId: VARIANT_ID,
-        productName: 'Tea',
-        variantName: '250g',
-        disableProduct: false,
-      }),
-    ]);
-
-    sheet.spliceRows(2, 1);
-    const allRemoved = await instance.previewPriceUpdate(workbook, 'catalog.xlsx', metadata());
-    expect(allRemoved.disabledVariants).toBe(2);
-    expect(allRemoved.disabledProducts).toBe(1);
-    expect(allRemoved.disableChanges.some(change => change.disableProduct)).toBe(true);
   });
-
-  it('rejects decimals, formulas, Excel errors, duplicates, and stale rows', async () => {
-    const instance = service();
-    const invalidValues: Array<[unknown, string]> = [
-      [100.5, 'whole amount'],
-      [Number.MAX_SAFE_INTEGER + 1, 'whole amount'],
-      [{ formula: '1+1', result: 2 }, 'Formulas are not allowed'],
-      [{ error: '#VALUE!' }, 'Excel error'],
-    ];
-    for (const [value, message] of invalidValues) {
-      const invalidWorkbook = await instance.priceUpdateWorkbook([row()], UPDATED_AT);
-      setCell(invalidWorkbook.getWorksheet('Products & Stock')!, 2, 'new_retail_price_kes', value);
-      const invalid = await instance.previewPriceUpdate(invalidWorkbook, 'prices.xlsx', metadata());
-      expect(invalid.errors.join('\n')).toContain(message);
+  it('follows reference renames through stable IDs without relying on formula caches', async () => {
+    const { snapshot, book } = await setup();
+    book.getWorksheet('Manufacturers')!.getCell('A6').value = 'New Soap Works';
+    book.getWorksheet('Pack sizes')!.getCell('A6').value = 'Carton';
+    const p = readProductWorkbook(book, 'Products.xlsx', snapshot);
+    expect(p.errors).toEqual([]);
+    expect(p.changes.manufacturers[0].name).toBe('New Soap Works');
+    expect(p.changes.products[0].variants[0].packs[0].name).toBe('Carton');
+  });
+  it('applies one deliberate product rename without unchanged repeated cells undoing it', async () => {
+    const { snapshot, book } = await setup();
+    bySku(book, 'SOAP250').getCell(1).value = 'Laundry Soap';
+    const p = readProductWorkbook(book, 'Products.xlsx', snapshot);
+    expect(p.errors).toEqual([]);
+    expect(p.changes.products[0].values.name).toBe('Laundry Soap');
+    bySku(book, 'SOAP500').getCell(1).value = 'Different Soap';
+    expect(readProductWorkbook(book, 'Products.xlsx', snapshot).errors.join()).toContain(
+      'conflicting edits'
+    );
+  });
+  it('blocks pack stock, pack wholesale, zero pack retail, and changed contents', async () => {
+    for (const [c, value] of [
+      [12, 1],
+      [8, 100],
+      [6, 0],
+    ] as const) {
+      const { snapshot, book } = await setup();
+      packRow(book).getCell(c).value = value;
+      expect(readProductWorkbook(book, 'Products.xlsx', snapshot).errors.length).toBeGreaterThan(0);
     }
-
-    const duplicateWorkbook = await instance.priceUpdateWorkbook(
-      [row(), row({ product_name: 'Duplicate' })],
-      UPDATED_AT
+    const { snapshot, book } = await setup();
+    book.getWorksheet('Pack sizes')!.getCell('B6').value = 24;
+    expect(readProductWorkbook(book, 'Products.xlsx', snapshot).errors.join()).toContain(
+      'contents are fixed'
     );
-    setCell(duplicateWorkbook.getWorksheet('Products & Stock')!, 2, 'new_retail_price_kes', 120);
-    setCell(duplicateWorkbook.getWorksheet('Products & Stock')!, 3, 'new_retail_price_kes', 130);
-    const duplicate = await instance.previewPriceUpdate(
-      duplicateWorkbook,
-      'prices.xlsx',
-      metadata()
-    );
-    expect(duplicate.errors.join('\n')).toContain('duplicate variant_id');
-
-    const staleWorkbook = await instance.priceUpdateWorkbook(
-      [row({ variant_updated_at: '2026-08-18T08:00:00.000Z' })],
-      UPDATED_AT
-    );
-    setCell(staleWorkbook.getWorksheet('Products & Stock')!, 2, 'new_retail_price_kes', 120);
-    const stale = await instance.previewPriceUpdate(staleWorkbook, 'prices.xlsx', metadata());
-    expect(stale.conflicts).toHaveLength(1);
-    expect(stale.changes).toEqual([]);
-
-    const preciseStaleWorkbook = await instance.priceUpdateWorkbook(
-      [row({ variant_updated_at: '2026-08-19T08:00:00.000500Z' })],
-      UPDATED_AT
-    );
-    setCell(preciseStaleWorkbook.getWorksheet('Products & Stock')!, 2, 'new_retail_price_kes', 120);
-    const preciseStale = await instance.previewPriceUpdate(
-      preciseStaleWorkbook,
-      'prices.xlsx',
-      metadata()
-    );
-    expect(preciseStale.conflicts).toHaveLength(1);
-
-    const untouchedStaleWorkbook = await instance.priceUpdateWorkbook(
-      [row({ variant_updated_at: '2026-08-18T08:00:00.000Z' })],
-      UPDATED_AT
-    );
-    const untouchedStale = await instance.previewPriceUpdate(
-      untouchedStaleWorkbook,
-      'prices.xlsx',
-      metadata()
-    );
-    expect(untouchedStale).toMatchObject({ unchangedRows: 1, conflicts: [], errors: [] });
   });
-
-  it('rejects another company and old workbook formats', async () => {
-    const instance = service();
-    const workbook = await instance.priceUpdateWorkbook([row()], UPDATED_AT);
-
-    await expect(
-      instance.previewPriceUpdate(workbook, 'prices.xlsx', metadata('another-company'))
-    ).rejects.toThrow('different company');
-
-    workbook.getWorksheet('_DukaRun Metadata')!.getCell('B1').value = '1';
-    const bytes = await workbook.xlsx.writeBuffer();
-    const file = {
-      name: 'outdated.xlsx',
-      size: bytes.byteLength,
-      arrayBuffer: async () => bytes,
-    } as unknown as File;
-    await expect(instance.preview(file)).rejects.toThrow('outdated');
+  it('accepts measured counts, rejects fractional bars and excess precision', async () => {
+    const { snapshot, book } = await setup();
+    bySku(book, 'RICE').getCell(12).value = 35.751;
+    expect(readProductWorkbook(book, 'Products.xlsx', snapshot).errors).toEqual([]);
+    bySku(book, 'RICE').getCell(12).value = 35.7511;
+    expect(readProductWorkbook(book, 'Products.xlsx', snapshot).errors.join()).toContain(
+      '3 decimal'
+    );
+    bySku(book, 'SOAP250').getCell(12).value = 1.5;
+    expect(readProductWorkbook(book, 'Products.xlsx', snapshot).errors.join()).toContain(
+      'whole number'
+    );
+  });
+  it('preserves exact batch value rather than multiplying rounded unit cost', async () => {
+    const snapshot = workbookFixture();
+    snapshot.stock[0].value = 1400;
+    snapshot.stock[0].quantity = 97;
+    snapshot.stock[0].batch = {
+      ...snapshot.stock[0].batch!,
+      remaining: 97,
+      remaining_cost: 1400,
+      unit_cost: 14,
+    };
+    const book = await exportProductWorkbook(snapshot);
+    expect(bySku(book, 'SOAP250').getCell(24).value).toBe(1400);
+    expect(readProductWorkbook(book, 'Products.xlsx', snapshot).changes.batches).toEqual([]);
+    bySku(book, 'SOAP250').getCell(27).value = 1450;
+    const p = readProductWorkbook(book, 'Products.xlsx', snapshot);
+    expect(p.errors).toEqual([]);
+    expect(p.changes.batches[0].new_remaining_cost).toBe(1450);
+  });
+  it('rejects unsupported input formulas and edits to current values', async () => {
+    const { snapshot, book } = await setup();
+    bySku(book, 'SOAP250').getCell(6).value = { formula: '1+1', result: 2 };
+    expect(readProductWorkbook(book, 'Products.xlsx', snapshot).errors.join()).toContain(
+      'unsupported formula'
+    );
+    bySku(book, 'SOAP250').getCell(6).value = null;
+    bySku(book, 'SOAP250').getCell(5).value = 55;
+    expect(readProductWorkbook(book, 'Products.xlsx', snapshot).errors.join()).toContain(
+      'Retail now is a reference'
+    );
+  });
+  it('detects changed prices, manufacturer records and stock before apply', async () => {
+    const { snapshot, book } = await setup();
+    bySku(book, 'SOAP250').getCell(12).value = 40;
+    const live = structuredClone(snapshot);
+    live.stock[0].quantity = 47;
+    live.variants[0].updated_at = '2026-09-16T10:00:00Z';
+    const p = readProductWorkbook(book, 'Products.xlsx', live);
+    expect(p.conflicts.length).toBeGreaterThanOrEqual(2);
+  });
+  it('supports purchase-only packs and protects financial inputs', async () => {
+    const { snapshot, book } = await setup();
+    packRow(book).getCell(6).value = 'CLEAR';
+    expect(
+      readProductWorkbook(book, 'Products.xlsx', snapshot).changes.products[0].variants[0].packs[0]
+        .sale_price
+    ).toBeNull();
+    const live = structuredClone(snapshot);
+    live.capabilities.financial = false;
+    bySku(book, 'SOAP250').getCell(10).value = 35;
+    expect(readProductWorkbook(book, 'Products.xlsx', live).errors.join()).toContain(
+      'financial permissions'
+    );
   });
 });

@@ -1107,6 +1107,56 @@ export type Database = {
           },
         ]
       }
+      catalog_save_requests: {
+        Row: {
+          client_ref: string
+          company_id: string
+          payload: Json
+          product_id: string
+        }
+        Insert: {
+          client_ref: string
+          company_id: string
+          payload: Json
+          product_id: string
+        }
+        Update: {
+          client_ref?: string
+          company_id?: string
+          payload?: Json
+          product_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "catalog_save_requests_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "catalog_save_requests_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "catalog_save_requests_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "catalog_save_requests_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "variant_catalog"
+            referencedColumns: ["product_id"]
+          },
+        ]
+      }
       catalog_search_documents: {
         Row: {
           barcode_normalized: string | null
@@ -6250,15 +6300,22 @@ export type Database = {
           line_total: number
           net_total: number
           order_id: string
+          pack_id: string | null
+          price_floor: number | null
           price_override_reason: string | null
+          price_source: string
           quantity: number
+          stock_quantity: number | null
+          stock_unit_name: string
           tax_category_code: string | null
           tax_category_id: string | null
           tax_classification: string | null
           tax_rate_bps: number
           tax_rate_version_id: string | null
           tax_total: number
+          unit_name: string
           unit_price: number
+          units_per_unit: number
           variant_id: string
         }
         Insert: {
@@ -6271,15 +6328,22 @@ export type Database = {
           line_total: number
           net_total?: number
           order_id: string
+          pack_id?: string | null
+          price_floor?: number | null
           price_override_reason?: string | null
+          price_source?: string
           quantity: number
+          stock_quantity?: number | null
+          stock_unit_name?: string
           tax_category_code?: string | null
           tax_category_id?: string | null
           tax_classification?: string | null
           tax_rate_bps?: number
           tax_rate_version_id?: string | null
           tax_total?: number
+          unit_name?: string
           unit_price: number
+          units_per_unit?: number
           variant_id: string
         }
         Update: {
@@ -6292,15 +6356,22 @@ export type Database = {
           line_total?: number
           net_total?: number
           order_id?: string
+          pack_id?: string | null
+          price_floor?: number | null
           price_override_reason?: string | null
+          price_source?: string
           quantity?: number
+          stock_quantity?: number | null
+          stock_unit_name?: string
           tax_category_code?: string | null
           tax_category_id?: string | null
           tax_classification?: string | null
           tax_rate_bps?: number
           tax_rate_version_id?: string | null
           tax_total?: number
+          unit_name?: string
           unit_price?: number
+          units_per_unit?: number
           variant_id?: string
         }
         Relationships: [
@@ -6317,6 +6388,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "public_storefronts"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_lines_company_id_variant_id_pack_id_fkey"
+            columns: ["company_id", "variant_id", "pack_id"]
+            isOneToOne: false
+            referencedRelation: "variant_packs"
+            referencedColumns: ["company_id", "variant_id", "id"]
           },
           {
             foreignKeyName: "order_lines_order_id_fkey"
@@ -7995,6 +8073,7 @@ export type Database = {
           price: number
           product_id: string
           sku: string
+          stock_unit: string
           track_inventory: boolean
           updated_at: string
           wholesale_price: number | null
@@ -8011,6 +8090,7 @@ export type Database = {
           price: number
           product_id: string
           sku: string
+          stock_unit?: string
           track_inventory?: boolean
           updated_at?: string
           wholesale_price?: number | null
@@ -8027,6 +8107,7 @@ export type Database = {
           price?: number
           product_id?: string
           sku?: string
+          stock_unit?: string
           track_inventory?: boolean
           updated_at?: string
           wholesale_price?: number | null
@@ -8594,8 +8675,11 @@ export type Database = {
           inventory_batch_id: string | null
           line_total: number
           net_total: number
+          pack_id: string | null
           purchase_id: string
           quantity: number
+          stock_quantity: number | null
+          stock_unit_name: string
           tax_category_code: string | null
           tax_category_id: string | null
           tax_classification: string | null
@@ -8603,6 +8687,8 @@ export type Database = {
           tax_rate_version_id: string | null
           tax_total: number
           unit_cost: number
+          unit_name: string
+          units_per_unit: number
           value_source: string
           variant_id: string
         }
@@ -8616,8 +8702,11 @@ export type Database = {
           inventory_batch_id?: string | null
           line_total: number
           net_total?: number
+          pack_id?: string | null
           purchase_id: string
           quantity: number
+          stock_quantity?: number | null
+          stock_unit_name?: string
           tax_category_code?: string | null
           tax_category_id?: string | null
           tax_classification?: string | null
@@ -8625,6 +8714,8 @@ export type Database = {
           tax_rate_version_id?: string | null
           tax_total?: number
           unit_cost: number
+          unit_name?: string
+          units_per_unit?: number
           value_source?: string
           variant_id: string
         }
@@ -8638,8 +8729,11 @@ export type Database = {
           inventory_batch_id?: string | null
           line_total?: number
           net_total?: number
+          pack_id?: string | null
           purchase_id?: string
           quantity?: number
+          stock_quantity?: number | null
+          stock_unit_name?: string
           tax_category_code?: string | null
           tax_category_id?: string | null
           tax_classification?: string | null
@@ -8647,6 +8741,8 @@ export type Database = {
           tax_rate_version_id?: string | null
           tax_total?: number
           unit_cost?: number
+          unit_name?: string
+          units_per_unit?: number
           value_source?: string
           variant_id?: string
         }
@@ -8664,6 +8760,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "public_storefronts"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_lines_company_id_variant_id_pack_id_fkey"
+            columns: ["company_id", "variant_id", "pack_id"]
+            isOneToOne: false
+            referencedRelation: "variant_packs"
+            referencedColumns: ["company_id", "variant_id", "id"]
           },
           {
             foreignKeyName: "purchase_lines_inventory_batch_id_fkey"
@@ -10338,8 +10441,11 @@ export type Database = {
           gross_total: number
           id: string
           net_total: number
+          pack_id: string | null
           quantity: number
           source_order_line_id: string | null
+          stock_quantity: number | null
+          stock_unit_name: string
           tax_category_code: string
           tax_category_id: string | null
           tax_classification: string
@@ -10347,7 +10453,9 @@ export type Database = {
           tax_rate_bps: number
           tax_rate_version_id: string | null
           tax_total: number
+          unit_name: string
           unit_price: number | null
+          units_per_unit: number
           variant_id: string | null
         }
         Insert: {
@@ -10358,8 +10466,11 @@ export type Database = {
           gross_total: number
           id?: string
           net_total: number
+          pack_id?: string | null
           quantity: number
           source_order_line_id?: string | null
+          stock_quantity?: number | null
+          stock_unit_name?: string
           tax_category_code: string
           tax_category_id?: string | null
           tax_classification: string
@@ -10367,7 +10478,9 @@ export type Database = {
           tax_rate_bps: number
           tax_rate_version_id?: string | null
           tax_total: number
+          unit_name?: string
           unit_price?: number | null
+          units_per_unit?: number
           variant_id?: string | null
         }
         Update: {
@@ -10378,8 +10491,11 @@ export type Database = {
           gross_total?: number
           id?: string
           net_total?: number
+          pack_id?: string | null
           quantity?: number
           source_order_line_id?: string | null
+          stock_quantity?: number | null
+          stock_unit_name?: string
           tax_category_code?: string
           tax_category_id?: string | null
           tax_classification?: string
@@ -10387,7 +10503,9 @@ export type Database = {
           tax_rate_bps?: number
           tax_rate_version_id?: string | null
           tax_total?: number
+          unit_name?: string
           unit_price?: number | null
+          units_per_unit?: number
           variant_id?: string | null
         }
         Relationships: [
@@ -11489,6 +11607,95 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "public_storefronts"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      variant_packs: {
+        Row: {
+          active: boolean
+          barcode: string | null
+          company_id: string
+          created_at: string
+          id: string
+          name: string
+          sale_price: number | null
+          units_per_pack: number
+          updated_at: string
+          variant_id: string
+        }
+        Insert: {
+          active?: boolean
+          barcode?: string | null
+          company_id: string
+          created_at?: string
+          id?: string
+          name: string
+          sale_price?: number | null
+          units_per_pack: number
+          updated_at?: string
+          variant_id: string
+        }
+        Update: {
+          active?: boolean
+          barcode?: string | null
+          company_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+          sale_price?: number | null
+          units_per_pack?: number
+          updated_at?: string
+          variant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "variant_packs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "variant_packs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "variant_packs_company_id_variant_id_fkey"
+            columns: ["company_id", "variant_id"]
+            isOneToOne: false
+            referencedRelation: "low_stock_variants"
+            referencedColumns: ["company_id", "variant_id"]
+          },
+          {
+            foreignKeyName: "variant_packs_company_id_variant_id_fkey"
+            columns: ["company_id", "variant_id"]
+            isOneToOne: false
+            referencedRelation: "low_stock_variants_by_location"
+            referencedColumns: ["company_id", "variant_id"]
+          },
+          {
+            foreignKeyName: "variant_packs_company_id_variant_id_fkey"
+            columns: ["company_id", "variant_id"]
+            isOneToOne: false
+            referencedRelation: "product_stock"
+            referencedColumns: ["company_id", "variant_id"]
+          },
+          {
+            foreignKeyName: "variant_packs_company_id_variant_id_fkey"
+            columns: ["company_id", "variant_id"]
+            isOneToOne: false
+            referencedRelation: "product_variants"
+            referencedColumns: ["company_id", "id"]
+          },
+          {
+            foreignKeyName: "variant_packs_company_id_variant_id_fkey"
+            columns: ["company_id", "variant_id"]
+            isOneToOne: false
+            referencedRelation: "variant_catalog"
+            referencedColumns: ["company_id", "variant_id"]
           },
         ]
       }
@@ -12905,6 +13112,17 @@ export type Database = {
         Args: { p_batch_changes?: Json; p_variant_changes?: Json }
         Returns: Json
       }
+      apply_catalog_workbook_units: {
+        Args: {
+          p_batch_changes?: Json
+          p_disable_changes?: Json
+          p_import_id?: string
+          p_pack_changes?: Json
+          p_product_changes?: Json
+          p_variant_changes?: Json
+        }
+        Returns: Json
+      }
       apply_catalog_workbook_updates: {
         Args: {
           p_batch_changes?: Json
@@ -12922,6 +13140,14 @@ export type Database = {
       apply_customer_deposit: {
         Args: { p_amount: number; p_client_ref?: string; p_order_id: string }
         Returns: string
+      }
+      apply_product_workbook: {
+        Args: { p_changes: Json; p_request_id: string }
+        Returns: Json
+      }
+      apply_purchase_pack_prices: {
+        Args: { p_lines: Json }
+        Returns: undefined
       }
       apply_role_template: { Args: { p_template_id: string }; Returns: string }
       apply_supplier_advance: {
@@ -13330,6 +13556,15 @@ export type Database = {
         }
         Returns: Json
       }
+      catalog_pack_definitions: {
+        Args: { p_variant_ids: string[] }
+        Returns: {
+          packs: Json
+          stock_unit: string
+          variant_id: string
+        }[]
+      }
+      catalog_packs_json: { Args: { p_variant_id: string }; Returns: Json }
       change_customer_credit: {
         Args: {
           p_credit_limit: number
@@ -15319,6 +15554,10 @@ export type Database = {
         Returns: Json
       }
       primary_contact_notification_settings: { Args: never; Returns: Json }
+      product_workbook_snapshot: {
+        Args: { p_location_id: string }
+        Returns: Json
+      }
       provision_company: {
         Args: {
           p_address?: string
@@ -15867,6 +16106,10 @@ export type Database = {
           wholesale_price: number
         }[]
       }
+      resolve_catalog_selling_unit: {
+        Args: { p_barcode: string; p_location_id?: string }
+        Returns: Json
+      }
       resolve_category_inclusive_tax: {
         Args: {
           p_company_id: string
@@ -16016,6 +16259,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      resolve_sale_units: { Args: { p_lines: Json }; Returns: Json }
       resolve_tender_account: {
         Args: {
           p_company_id: string
@@ -16024,6 +16268,15 @@ export type Database = {
           p_requested_account_code?: string
         }
         Returns: string
+      }
+      resolve_transaction_unit: {
+        Args: {
+          p_pack_id: string
+          p_quantity: number
+          p_selling: boolean
+          p_variant_id: string
+        }
+        Returns: Json
       }
       restock_product_intelligence: {
         Args: {
@@ -16094,6 +16347,10 @@ export type Database = {
           order_id: string
           staff_user_id: string
         }[]
+      }
+      save_catalog_product_units: {
+        Args: { p_client_ref: string; p_product: Json; p_variants: Json }
+        Returns: string
       }
       save_customer_profile: {
         Args: { p_customer_id?: string; p_profile: Json }
@@ -16212,6 +16469,10 @@ export type Database = {
           p_tax_invoice_date?: string
         }
         Returns: string
+      }
+      save_variant_packs: {
+        Args: { p_packs: Json; p_stock_unit: string; p_variant_id: string }
+        Returns: undefined
       }
       scan_registration_volume_alerts: { Args: never; Returns: number }
       schedule_company_tax_profile: {
@@ -16501,6 +16762,10 @@ export type Database = {
           variant_name: string
         }[]
       }
+      storefront_product_units: {
+        Args: { p_product_id: string; p_slug: string }
+        Returns: Json
+      }
       submit_cash_custody_remittance: {
         Args: { p_location_id: string; p_payment_ids: string[] }
         Returns: Json
@@ -16563,6 +16828,10 @@ export type Database = {
         Returns: Json
       }
       team_management_snapshot: { Args: never; Returns: Json }
+      transaction_unit_suffix: {
+        Args: { p_factor: number; p_name: string; p_stock_unit: string }
+        Returns: string
+      }
       transfer_stock: {
         Args: {
           p_from_location_id: string
@@ -17051,3 +17320,4 @@ export const Constants = {
     Enums: {},
   },
 } as const
+

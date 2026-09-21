@@ -14,8 +14,9 @@ obvious without behaving like a full ecommerce checkout.
    disclosure. Operational data and exact inventory counts never appear publicly.
 3. **Warm and useful.** Warm paper surfaces and terracotta accents make the experience distinctive;
    charcoal type keeps it legible. Decoration never competes with products.
-4. **One clear action.** Product discovery leads to a detail page, and the detail page leads to a
-   pre-filled WhatsApp enquiry. Avoid competing primary buttons.
+4. **One clear action.** Product discovery leads to a detail page and Add to basket. The basket
+   leads to a pre-filled WhatsApp order, where the merchant confirms availability and total.
+   Direct enquiry and sharing stay secondary. Avoid competing primary buttons.
 5. **Small-screen native.** Two-column product grids, 44px minimum targets, horizontal category
    rails, and sticky mobile actions are the default. Larger layouts expand rather than redesign.
 
@@ -29,6 +30,34 @@ obvious without behaving like a full ecommerce checkout.
 - **Depth:** borders establish structure. Shadows are soft and reserved for interactive cards and
   the mobile order action.
 - **Spacing:** 4px base rhythm. Page sections use 24–48px; card internals use 12–20px.
+
+## Surface and interaction hierarchy
+
+Use the same role vocabulary as the dashboard and super-admin, expressed in this shop's warm,
+light-only palette. Do not import the operational apps' dark theme or dense accounting layout.
+
+| Role                   | Recipe                            | Use                                                                          |
+| ---------------------- | --------------------------------- | ---------------------------------------------------------------------------- |
+| Canvas                 | `--surface-canvas`                | Warm paper behind browsing and basket content.                               |
+| Content                | `storefront-surface`              | Product purchasing panel and individual basket items.                        |
+| Supporting information | `storefront-inset`                | Reference/ordering metadata; quieter than identity, price and actions.       |
+| Chrome                 | `storefront-chrome`               | Basket header and total/action footer, separated from its scrolling body.    |
+| Editable controls      | `.input`, `.select`, `.textarea`  | Inset fill, visible neutral boundary, persistent label and solid focus ring. |
+| Choices                | `catalog-choice` + `aria-pressed` | Neutral border; selected option uses soft terracotta and a strong border.    |
+| Primary action         | `btn-primary`                     | Terracotta fill with contrasting ink text.                                   |
+
+Prices and totals lead through size, weight and tabular numbers; they are not orange actions.
+Manufacturer and reference information use quieter text. Availability uses a small labelled,
+tinted status badge. Selected variants and pack sizes must not look like competing Add buttons.
+Do not use colour alone for selection, availability or validation.
+
+The basket separates item information from quantity controls and the estimated total. Its body
+scrolls within the viewport while the header and footer remain reachable. Quantity and remove
+controls have 44px targets, and narrow layouts wrap without horizontal overflow.
+
+These rules also govern catalogue search and controls on tracking, document and statement routes.
+Their document/print layouts retain their existing structure. Colours live in the global theme and
+surface tokens; new screens should compose these roles instead of inventing another palette.
 
 ## Components and behaviour
 
@@ -45,8 +74,9 @@ obvious without behaving like a full ecommerce checkout.
   counts; choosing one returns to the shopper's last product view and loads the filtered first page.
 - **Product card:** square image, manufacturer eyebrow, two-line product name, price/range, and
   availability. The whole card opens the detail page.
-- **Product detail:** breadcrumb, large image, manufacturer/name, selectable variants, availability,
-  price, and one WhatsApp action whose message includes the chosen option and page URL.
+- **Product detail:** breadcrumb, large image, manufacturer/name, selectable variants and selling
+  units, availability, price, quantity and Add to basket. Direct WhatsApp enquiry remains secondary
+  and includes the chosen option and page URL.
 - **Pagination:** numbered pages with previous/next actions, a visible result range, and an automatic
   reset after search or category changes.
 - **Empty/error states:** short, specific, and actionable. Missing imagery uses a calm branded

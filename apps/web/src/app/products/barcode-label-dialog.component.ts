@@ -68,6 +68,22 @@ const LABEL_LAYOUT_KEY = 'dukarun-barcode-label-layout';
             </div>
           </div>
 
+          @if (mode() === 'single' && unitOptions().length > 1) {
+            <label class="mt-4 block">
+              <span class="form-field-label">Label for</span>
+              <select
+                class="select select-bordered min-h-11 w-full"
+                [ngModel]="selectedPackId()"
+                (ngModelChange)="selectedPackId.set($event)"
+              >
+                @for (option of unitOptions(); track option.variant.selected_pack_id) {
+                  <option [value]="option.variant.selected_pack_id || ''">
+                    {{ option.variant.variant_name || 'item' }}
+                  </option>
+                }
+              </select>
+            </label>
+          }
           @if (mode() === 'single' && selected(); as selected) {
             <div class="mt-4 rounded-field border border-base-300 p-3">
               <p class="font-semibold">{{ label(selected.variant) }}</p>
@@ -91,6 +107,10 @@ const LABEL_LAYOUT_KEY = 'dukarun-barcode-label-layout';
               @if (!perms.has('ManageStockAdjustments')) {
                 <p class="mt-2 text-sm text-warning">
                   You can print ready labels, but barcode generation requires catalog edit access.
+                </p>
+              } @else if (needsCodes().length === 0) {
+                <p class="type-caption mt-2">
+                  Set pack barcodes in the product editor before printing these labels.
                 </p>
               } @else if (!confirmGenerate()) {
                 <button
@@ -242,7 +262,39 @@ export class BarcodeLabelDialogComponent {
   protected readonly renderFailures = signal<string[]>([]);
   protected readonly batchIndex = signal(0);
 
-  protected readonly classified = computed(() => classifyBarcodeLabels(this.variants()));
+  protected readonly selectedPackId = signal('');
+  protected readonly classified = computed(() =>
+    classifyBarcodeLabels(
+      this.variants().flatMap(variant => [
+        {
+          ...variant,
+          selected_pack_id: null,
+          variant_name: [
+            variant.variant_name === 'Default' ? '' : variant.variant_name,
+            variant.stock_unit || 'item',
+          ]
+            .filter(Boolean)
+            .join(' · '),
+        },
+        ...(variant.packs ?? [])
+          .filter(pack => pack.active && pack.sale_price !== null)
+          .map(pack => ({
+            ...variant,
+            selected_pack_id: pack.id,
+            barcode: pack.barcode,
+            variant_name: [
+              variant.variant_name === 'Default' ? '' : variant.variant_name,
+              `${pack.name} (${pack.units_per_pack} ${variant.stock_unit || 'item'})`,
+            ]
+              .filter(Boolean)
+              .join(' · '),
+          })),
+      ])
+    )
+  );
+  protected readonly unitOptions = computed(() =>
+    this.classified().filter(item => item.variant.variant_id === this.variantId())
+  );
   protected readonly visibleClassified = computed(() => {
     if (this.mode() === 'catalogue') return this.classified();
     return this.classified().filter(item => item.variant.variant_id === this.variantId());
@@ -257,10 +309,16 @@ export class BarcodeLabelDialogComponent {
     this.visibleClassified().filter(item => item.state === 'ambiguous')
   );
   protected readonly selected = computed(() =>
-    this.classified().find(item => item.variant.variant_id === this.variantId())
+    this.classified().find(
+      item =>
+        item.variant.variant_id === this.variantId() &&
+        (item.variant.selected_pack_id || '') === this.selectedPackId()
+    )
   );
   protected readonly needsCodes = computed(() => {
-    const candidates = [...this.missing(), ...this.ambiguous()];
+    const candidates = [...this.missing(), ...this.ambiguous()].filter(
+      item => !item.variant.selected_pack_id
+    );
     if (this.mode() === 'catalogue') return candidates;
     return candidates.filter(item => item.variant.variant_id === this.variantId());
   });

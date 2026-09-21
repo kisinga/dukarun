@@ -66,14 +66,14 @@ import { CachedDataExportService, type CachedExportKind } from './cached-data-ex
                     }
                   </p>
                   <p class="mt-2 text-xs text-base-content/60">
-                    Edit yellow cells, add rows for new products, or delete entire table rows to
-                    disable them. Upload the same workbook to preview every change before applying
-                    it.
+                    Edit prices and stock on Products, or add products and selling options in the
+                    prepared blank rows. Manufacturers and Pack sizes provide dropdown choices.
+                    Upload the same workbook to review every change before applying it.
                   </p>
                   @if (perms.has('ManageStockAdjustments') && perms.has('ViewFinancials')) {
                     <p class="mt-2 text-xs text-base-content/60">
-                      The linked Batches sheet contains only batches with stock remaining. Latest
-                      batch details are editable from the main sheet.
+                      Expand the extra columns on Products for barcodes, settings and latest-batch
+                      details. All prices and stock stay on that sheet.
                     </p>
                   } @else {
                     <p class="mt-2 text-xs text-base-content/60">
@@ -83,7 +83,7 @@ import { CachedDataExportService, type CachedExportKind } from './cached-data-ex
                   }
                   <ol class="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-xs font-medium">
                     <li>1. Download</li>
-                    <li>2. Edit, add, or remove rows</li>
+                    <li>2. Edit or add entries</li>
                     <li>3. Upload &amp; preview</li>
                   </ol>
                 </div>
@@ -267,11 +267,10 @@ export class SettingsDataTransferComponent {
     }
   }
 
-  protected async productImportCompleted(result: ProductWorkbookResult): Promise<void> {
+  protected productImportCompleted(result: ProductWorkbookResult): void {
     this.dataMessage.set({
       ok: true,
-      text: `Workbook applied: ${result.created} products created · ${result.disabled_variants} variants disabled · ${result.disabled_products} products disabled · ${result.manufacturer_changes} manufacturers · ${result.retail_changes} retail · ${result.wholesale_changes} wholesale · ${result.stock_changes} stock · ${result.batches_created} batches created · ${result.batches_updated} batches updated.`,
+      text: `Workbook applied: ${result.products_created} products created · ${result.products_updated} products updated · ${result.variants_created} sizes/types created · ${result.packs_changed} packs changed · ${result.manufacturers_changed} manufacturers changed · ${result.stock_changes} stock counts · ${result.batch_changes} batch changes.`,
     });
-    await this.catalogCache.refresh();
   }
 }

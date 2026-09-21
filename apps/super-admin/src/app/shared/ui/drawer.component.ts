@@ -35,7 +35,7 @@ const CLOSE_MS = 150;
           aria-modal="true"
           [attr.aria-label]="title()"
           tabindex="-1"
-          class="absolute inset-y-0 right-0 flex w-full flex-col overflow-hidden border-l border-base-300/60 bg-base-100 shadow-overlay outline-none transition-transform sm:max-w-[520px] motion-reduce:transition-none"
+          class="console-drawer absolute inset-y-0 right-0 flex w-full flex-col overflow-hidden border-l border-base-300/60 bg-base-100 shadow-overlay outline-none transition-transform sm:max-w-[520px] motion-reduce:transition-none"
           [class.duration-200]="shown()"
           [class.ease-out]="shown()"
           [class.duration-150]="!shown()"
@@ -43,10 +43,10 @@ const CLOSE_MS = 150;
           [class.translate-x-full]="!shown()"
         >
           <header
-            class="flex min-h-[4.5rem] shrink-0 items-center gap-3 border-b border-base-300/60 px-5 py-3"
+            class="surface-chrome flex min-h-[4.5rem] shrink-0 items-center gap-3 border-b border-base-300/60 px-5 py-3"
           >
             <div class="min-w-0 flex-1">
-              <h2 class="truncate text-base font-semibold tracking-tight">{{ title() }}</h2>
+              <h2 class="truncate text-xl font-semibold tracking-tight">{{ title() }}</h2>
               @if (subtitle()) {
                 <p class="type-caption mt-0.5 truncate">{{ subtitle() }}</p>
               }

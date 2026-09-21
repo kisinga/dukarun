@@ -218,6 +218,8 @@ test('product mapper exposes variants without private inventory fields', () => {
       sku: 'TEA-100',
       price: { currency: 'KES', amount: 120 },
       available: true,
+      stock_unit: 'item',
+      packs: [],
     },
   ]);
   assert.doesNotMatch(JSON.stringify(response), /exact_stock|total_count/);
@@ -273,4 +275,47 @@ test('proxy and deployment configuration publish v1 without removing the legacy 
     storefrontClient.match(/!environment\.production && request\.status === 404/g)?.length,
     2
   );
+});
+
+test('public packs expose only selling information', () => {
+  const response = publicProduct(
+    [
+      {
+        product_id: productId,
+        product_name: 'Tea',
+        variant_id: variantId,
+        variant_name: 'Default',
+        kind: 'good',
+        price: 120,
+        available: true,
+        stock_unit: 'packet',
+        packs: [
+          {
+            id: 'pack-id',
+            name: 'Bundle',
+            units_per_pack: 10,
+            sale_price: 1100,
+            active: true,
+            available: true,
+            barcode: 'PRIVATE',
+            wholesale_price: 99,
+            unit_cost: 80,
+            remaining: 123,
+            company_id: 'PRIVATE',
+          },
+        ],
+      },
+    ],
+    storageOrigin
+  );
+  assert.deepEqual(response.data.product.variants[0].packs, [
+    {
+      id: 'pack-id',
+      name: 'Bundle',
+      units_per_pack: 10,
+      sale_price: 1100,
+      active: true,
+      available: true,
+    },
+  ]);
 });

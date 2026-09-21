@@ -1,3 +1,4 @@
+import { transactionUnitLabel } from '@dukarun/pack-types';
 import { Injectable, inject } from '@angular/core';
 import { SupabaseService } from '../../core/supabase.service';
 import { PosService, variantLabel } from '../../pos/pos.service';
@@ -226,7 +227,11 @@ export class ReceiptDataService {
           taxRateBps: estimateLine?.tax_rate_bps ?? l.tax_rate_bps,
           productVariant: {
             id: l.variant_id,
-            name: v?.variant_name ?? l.label,
+            name:
+              (v?.variant_name ?? l.label) +
+              ((l.units_per_unit ?? 1) > 1 || (l.unit_name && l.unit_name !== 'item')
+                ? ' · ' + transactionUnitLabel(l)
+                : ''),
             product:
               v?.product_id && v.product_name
                 ? {
@@ -332,7 +337,7 @@ export class ReceiptDataService {
     return { order, meta: { documentType: 'cashier-slip' } };
   }
 
-  /** Purchase + supplier + stock-in movements (the purchase's lines) → PurchaseData. */
+  /** Supplier document quantities and costs, with legacy movement fallback. */
   async buildPurchaseData(purchaseId: string): Promise<PurchaseData> {
     const { data: purchase, error: e1 } = await this.db
       .from('purchases')
@@ -341,15 +346,35 @@ export class ReceiptDataService {
       .single();
     if (e1) throw e1;
 
-    // record_purchase logs one movement per line (source_type 'InventoryPurchase').
-    const { data: movements, error: e2 } = await this.db
-      .from('inventory_movements')
-      .select('*')
-      .eq('source_type', 'InventoryPurchase')
-      .eq('source_id', purchaseId);
+    const { data: purchaseLines, error: e2 } = await this.db
+      .from('purchase_lines')
+      .select(
+        'id,variant_id,quantity,unit_cost,line_total,units_per_unit,unit_name,stock_unit_name'
+      )
+      .eq('purchase_id', purchaseId);
     if (e2) throw e2;
+    let lines = purchaseLines ?? [];
+    // Purchases recorded before invoice lines existed have only base-unit movements.
+    if (!lines.length) {
+      const { data: movements, error } = await this.db
+        .from('inventory_movements')
+        .select('id,variant_id,quantity,unit_cost,total_cost')
+        .eq('source_type', 'InventoryPurchase')
+        .eq('source_id', purchaseId);
+      if (error) throw error;
+      lines = (movements ?? []).map(m => ({
+        id: m.id,
+        variant_id: m.variant_id,
+        quantity: Number(m.quantity),
+        unit_cost: m.unit_cost ?? 0,
+        line_total: m.total_cost ?? 0,
+        units_per_unit: 1,
+        unit_name: 'item',
+        stock_unit_name: 'item',
+      }));
+    }
 
-    const variants = await this.pos.variantsByIds((movements ?? []).map(m => m.variant_id));
+    const variants = await this.pos.variantsByIds(lines.map(m => m.variant_id));
     const byId = new Map(variants.map(v => [v.variant_id, v]));
 
     const { data: payments } = await this.db
@@ -389,18 +414,22 @@ export class ReceiptDataService {
             emailAddress: purchase.customers.email ?? undefined,
           }
         : null,
-      lines: (movements ?? []).map(m => {
+      lines: lines.map(m => {
         const v = byId.get(m.variant_id);
         return {
           id: m.id,
           variantId: m.variant_id,
           quantity: Number(m.quantity),
           unitCost: m.unit_cost ?? 0,
-          totalCost: m.total_cost ?? Math.round(Number(m.quantity) * (m.unit_cost ?? 0)),
+          totalCost: m.line_total,
           variant: v
             ? {
                 id: v.variant_id!,
-                name: v.variant_name ?? variantLabel(v),
+                name:
+                  (v.variant_name ?? variantLabel(v)) +
+                  ((m.units_per_unit ?? 1) > 1 || (m.unit_name && m.unit_name !== 'item')
+                    ? ' · ' + transactionUnitLabel(m)
+                    : ''),
                 product:
                   v.product_id && v.product_name
                     ? {

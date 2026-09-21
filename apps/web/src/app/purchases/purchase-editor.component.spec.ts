@@ -228,6 +228,45 @@ describe('PurchaseEditorComponent input VAT', () => {
     component.setClaimInputVat(true);
   }
 
+  it('recomputes pack totals from quantity and cost while preserving explicitly entered totals', async () => {
+    const { component } = await render();
+    addValidInvoice(component);
+    component.variantsState.set([
+      {
+        ...variant,
+        stock_unit: 'packet',
+        packs: [
+          {
+            id: 'crate',
+            name: 'Supplier crate',
+            units_per_pack: 24,
+            sale_price: null,
+            active: true,
+            barcode: null,
+          },
+        ],
+      },
+    ]);
+    const line = component.lines()[0];
+    component.packChanged(line, 'crate');
+    component.quantityChanged(line, 2);
+    expect(line.lineTotal).toBe('');
+    component.unitCostChanged(line, '1000');
+    expect(line.lineTotal).toBe('2000');
+    component.quantityChanged(line, 3);
+    expect(line.lineTotal).toBe('3000');
+    component.lineTotalChanged(line, '1000');
+    expect(line.unitCost).toBe('333');
+    component.quantityChanged(line, 4);
+    expect(line.lineTotal).toBe('1000');
+    expect(line.unitCost).toBe('250');
+    expect(line.unitsPerUnit).toBe(24);
+    component.packChanged(line, '');
+    component.unitCostChanged(line, '50');
+    expect(line.lineTotal).toBe('200');
+    expect(line.unitsPerUnit).toBe(1);
+  });
+
   it('shows the claim control, prefills supplier evidence, and renders a server estimate', async () => {
     const { fixture, component, money } = await render();
     const priceBasis = fixture.nativeElement.querySelector('[data-purchase-price-basis]');

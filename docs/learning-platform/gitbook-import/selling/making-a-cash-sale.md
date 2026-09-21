@@ -23,8 +23,10 @@ The task-specific walkthrough is being prepared. For now, watch this Dukarun ove
 ## Steps
 
 1. Open **Sell**.
-2. Search, scan, or browse for each product and add it to the sale.
-3. Check the item, quantity, price, and total.
+2. Search, scan, or browse for each product. If **Sell as** opens, choose the individual stock unit
+   or a pack. Scanning a pack barcode selects that pack directly.
+3. Check the item, selling unit, quantity, price per selected unit, and total. Packs and individual
+   units of the same variant appear as separate lines.
 4. Choose **Take payment**.
 5. Select **Cash** or the immediate payment method the customer used.
 6. For cash, choose **Exact** or enter the amount received.
@@ -32,8 +34,9 @@ The task-specific walkthrough is being prepared. For now, watch this Dukarun ove
 
 ## What changes in Dukarun
 
-Stock falls by the quantity sold. Dukarun records the completed sale, payment received, revenue,
-cost of goods sold, and margin.
+Stock falls by the number of stock units sold. One 30-egg tray and three individual eggs remove
+33 eggs from the same balance. Dukarun records the completed sale, payment received, revenue,
+cost of goods sold, and margin. Receipts show the selected selling units.
 
 ## Related terms
 
@@ -50,3 +53,9 @@ cost of goods sold, and margin.
 - If Dukarun asks for a till, open it before taking payment.
 - Check the quantity and price before completing the sale. Correcting a completed sale is different
   from editing the current cart.
+- If a pack exceeds available stock, reduce the pack quantity or sell individual units. Stock is
+  checked across every line for the same variant.
+- To change a line's selling unit, review its new quantity and price. Previous custom pricing is
+  cleared when the unit changes. See [Using packs](../products/using-product-packs.md).
+- Reopened held sales may flag changed prices, unavailable packs, or stock shortages. Resolve these
+  before checkout. If prompted to reopen an older app, do so before continuing the held sale.

@@ -33,7 +33,11 @@ export default defineConfig({
       url: 'http://127.0.0.1:4205/login',
       reuseExistingServer: !process.env.CI,
     },
-  ],
+  ].map(server => ({
+    ...server,
+    // Cold Angular builds can exceed one minute on a busy local or CI runner.
+    timeout: 180_000,
+  })),
   projects: [
     {
       name: 'mocked-desktop',

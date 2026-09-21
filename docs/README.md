@@ -4,18 +4,21 @@
 
 Current system documentation:
 
-| Topic                          | Document                                                              |
-| ------------------------------ | --------------------------------------------------------------------- |
-| Architecture and boundaries    | [`../ARCHITECTURE.md`](../ARCHITECTURE.md)                            |
-| Local setup and infrastructure | [`INFRASTRUCTURE.md`](INFRASTRUCTURE.md)                              |
-| Production deployment          | [`DEPLOYMENT.md`](DEPLOYMENT.md)                                      |
-| Dashboard design language      | [`DESIGN_SYSTEM.md`](DESIGN_SYSTEM.md)                                |
-| Transaction workflows          | [`TRANSACTION_WORKFLOWS.md`](TRANSACTION_WORKFLOWS.md)                |
-| Direct M-PESA integration      | [`MPESA_INTEGRATION.md`](MPESA_INTEGRATION.md)                        |
-| Metrics decisions              | [`METRICS_DECISIONS.md`](METRICS_DECISIONS.md)                        |
-| Kitui market intelligence      | [`KITUI_MARKET_INTELLIGENCE.md`](KITUI_MARKET_INTELLIGENCE.md)        |
-| Vendure → Supabase cutover     | `V1_V2_MIGRATION.md` — internal, gitignored (references real tenants) |
-| Troubleshooting                | [`GENERAL_TROUBLESHOOTING.md`](GENERAL_TROUBLESHOOTING.md)            |
+| Topic                              | Document                                                                                            |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Architecture and boundaries        | [`../ARCHITECTURE.md`](../ARCHITECTURE.md)                                                          |
+| Local setup and infrastructure     | [`INFRASTRUCTURE.md`](INFRASTRUCTURE.md)                                                            |
+| Production deployment              | [`DEPLOYMENT.md`](DEPLOYMENT.md)                                                                    |
+| Dashboard design language          | [`DESIGN_SYSTEM.md`](DESIGN_SYSTEM.md)                                                              |
+| Transaction workflows              | [`TRANSACTION_WORKFLOWS.md`](TRANSACTION_WORKFLOWS.md)                                              |
+| Product creation and opening stock | [Creating a product](learning-platform/gitbook-import/products/creating-a-product.md)               |
+| Packs, selling units, and counts   | [Setting up and using packs](learning-platform/gitbook-import/products/using-product-packs.md)      |
+| Product and stock workbook edits   | [Editing product workbooks](learning-platform/gitbook-import/products/editing-product-workbooks.md) |
+| Direct M-PESA integration          | [`MPESA_INTEGRATION.md`](MPESA_INTEGRATION.md)                                                      |
+| Metrics decisions                  | [`METRICS_DECISIONS.md`](METRICS_DECISIONS.md)                                                      |
+| Kitui market intelligence          | [`KITUI_MARKET_INTELLIGENCE.md`](KITUI_MARKET_INTELLIGENCE.md)                                      |
+| Vendure → Supabase cutover         | `V1_V2_MIGRATION.md` — internal, gitignored (references real tenants)                               |
+| Troubleshooting                    | [`GENERAL_TROUBLESHOOTING.md`](GENERAL_TROUBLESHOOTING.md)                                          |
 
 ## Source-of-truth map
 

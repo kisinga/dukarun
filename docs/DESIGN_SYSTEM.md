@@ -32,8 +32,10 @@ Numbers are the heroes of every screen.
   Establish currency once in the surrounding context when ambiguity is possible; compact
   amounts are the default. Receipts, exports, free-standing text, and cross-currency views
   must retain an explicit currency code.
-- Semantic colour is **money meaning only**: `success` = received/positive, `error` =
-  owed/overdue/failed, `warning` = needs attention, `info`/primary = neutral emphasis.
+- Semantic colour carries **state, never section identity**: `success` = received/confirmed/active,
+  `error` = owed/overdue/failed, `warning` = needs attention, `info` = contextual guidance.
+  Pair colour with a label or icon. Ordinary stock quantities stay neutral unless an actual
+  threshold establishes a stock warning; missing optional metadata is neutral too.
   Never decorative — no gradient-tinted stat cards, no red asterisks-as-decoration.
 - Muted text uses the `base-content/80|70|60` opacity ramp, never ad-hoc greys.
 
@@ -41,15 +43,18 @@ Numbers are the heroes of every screen.
 
 Must read on a dim, glare-struck phone screen.
 
-- Surfaces are separated by **hairline border + whisper shadow**, never shadow alone:
-  the one card recipe is `rounded-box border border-base-300/60 bg-base-100 shadow-sm`.
+- Surfaces are separated by **neutral surface contrast + hairline border**, never shadow alone:
+  use `surface-card` (or `card` when DaisyUI card layout is needed). Both own the same border,
+  background, radius, and whisper shadow. Do not rebuild the recipe with local colour mixtures.
 - No bordered card inside a bordered card — use dividers or spacing for inner grouping.
 - Dark mode: depth comes from a **lighter surface**, not shadows (`--depth: 0` in the dark
   theme); heavy shadows are reserved for overlays (menus, modals) in both modes.
 
 ### 3. Counter speed
 
-One primary action per screen, in the standard page-header action group.
+One dominant primary action per active task, in the page-header group or task action area.
+An open drawer/dialog becomes the active task. Repeated records use secondary actions; only
+the selected record (or the sole record) may promote its next action to primary.
 
 - Touch targets ≥ 44px; keep create actions in the same header position at every breakpoint.
 - Complex line-item and multi-step modals are full-screen on phones — encoded globally on `.modal-box` in `styles.scss`
@@ -138,13 +143,13 @@ interactive content is a design-language violation.
 Dashboard text never exceeds 24px. The roles are encoded as Tailwind utilities in
 `apps/web/src/styles.scss` — use them, not raw size classes:
 
-| Role      | Utility                                                   | Use                                          |
-| --------- | --------------------------------------------------------- | -------------------------------------------- |
-| `hero`    | `type-hero` (24px bold, `tracking-tight`, `tabular-nums`) | Stat numbers, totals                         |
-| `title`   | `type-title` (20px bold tight)                            | Page titles only (via `PageHeaderComponent`) |
-| `heading` | `type-heading` / `.section-title` (14px semibold)         | Section headings                             |
-| `body`    | `type-body` (14px)                                        | Values, rows                                 |
-| `caption` | `type-caption` (12px, `/60` muted)                        | Labels, timestamps                           |
+| Role      | Utility                                                   | Use                            |
+| --------- | --------------------------------------------------------- | ------------------------------ |
+| `hero`    | `type-hero` (24px bold, `tracking-tight`, `tabular-nums`) | Stat numbers, totals           |
+| `title`   | `type-title` (20px bold tight)                            | Page, drawer and dialog titles |
+| `heading` | `type-heading` / `.section-title` (14px semibold)         | Section headings               |
+| `body`    | `type-body` (14px)                                        | Values, rows                   |
+| `caption` | `type-caption` (12px, `/70` muted)                        | Labels, timestamps             |
 
 - No arbitrary sizes (`text-[10px]`, `text-[11px]`) — the guard rejects them.
 - Public marketing/storefront surfaces may define a separate documented scale; this five-role
@@ -203,6 +208,62 @@ meaning, daisyUI tokens only.
 - Dark mode: card surfaces (`base-100`) sit lighter than the page (`base-200`) so depth
   reads without shadows; keep `--depth: 0`.
 
+## Information, fields, and actions
+
+Hierarchy must still read in grayscale. Arrange a task as identity → key outcome/amount →
+working content → supporting detail. Use the existing Outfit type roles and space between
+groups before adding another border. A small count is not automatically a hero metric.
+
+| Role               | Shared token / recipe                      | Contract                                                                                                   |
+| ------------------ | ------------------------------------------ | ---------------------------------------------------------------------------------------------------------- |
+| Page canvas        | `--surface-canvas` / `base-200`            | Quiet background between content areas.                                                                    |
+| Drawer/dialog body | `--surface-panel`                          | Intermediate neutral surface behind content; shell owns scrolling.                                         |
+| Content group      | `--surface-content` / `surface-card`       | Raised in dark mode, white on the light canvas. One frame per group.                                       |
+| Supporting detail  | `--surface-inset` / `surface-inset`        | Recessed history, context, or empty state within a group; no second card border.                           |
+| Editable control   | `.input`, `.select`, `.textarea`           | Inset fill and `--control-border`; permanent label above. Includes searchable choices and compound inputs. |
+| Secondary action   | `--surface-action` / `appButton` secondary | Neutral filled button, distinct from an inset field.                                                       |
+| Primary action     | `appButton` primary                        | Orange fill with contrasting dark text; one dominant next action per task.                                 |
+| Disclosure         | `.detail-disclosure`                       | Full-width neutral row, chevron, 44px target, `aria-expanded`; never looks like a save button.             |
+
+- Read-only data uses plain label/value text or a `dl`, not disabled inputs. Manufacturer,
+  barcode, tax PIN and category are supporting information; absent optional values are quiet.
+- Forms use `app-form-section` to group related fields. Its surface is flattened automatically
+  inside an existing content card, avoiding bordered cards within cards. Field boundaries remain.
+- Input focus has a visible orange ring. Validation retains its error border and message;
+  focus, selection, disabled, loading and expanded states must remain distinguishable.
+- Status badges use a restrained tinted fill (`badge-soft`) with a readable label. Do not
+  colour whole cards by department or give every metric a different colour.
+- Primary, secondary and ghost actions express priority. Printing and sharing are utilities;
+  history is a disclosure. Repeated variant actions stay neutral until a variant is selected.
+- Empty supporting sections use a short sentence in an inset region. Large illustrations and
+  extra bordered containers are unnecessary for an empty history inside a record.
+- Surface tokens resolve in both themes, including nested theme scopes. Put new colours only
+  in theme tokens; do not introduce per-screen palettes or arbitrary input backgrounds.
+- Keep body/metadata readable, control borders distinguishable, touch targets at least 44px,
+  and keyboard focus visible. Validate both themes, 320px phones, short desktops and 200% text.
+
+### Dashboard application map
+
+These rules cover the merchant dashboard and the super-admin console. The console retains its
+warmer neutral palette and existing desktop density, with the same surface and interaction roles.
+Its tokens and control recipes live in `apps/super-admin/src/styles.scss`; shared console drawers,
+status badges, company details and campaign reviews follow this contract too. Storefront adapts
+the roles in `STOREFRONT_DESIGN_LANGUAGE.md`; marketing retains its separate presentation.
+
+| Area                           | Application                                                                                                                    |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| Product details                | Stock/value summary leads; variant count and optional metadata recede; variant actions precede stock/purchase disclosures.     |
+| Purchase details               | Invoice/payment metrics above distinct items, payments and task sections; tax information remains read-only.                   |
+| Customer and supplier accounts | Balances lead; contact/tax metadata is plain; financial tasks and history have separate groups.                                |
+| Product and supplier editing   | Related fields share a content surface; editable controls are inset; task chrome remains visible.                              |
+| Settings and other task forms  | Existing cards and shared form sections inherit surface roles; preference descriptions remain subordinate to controls.         |
+| Lists and reports              | Shared toolbar, stat cards, data-table shell and mobile list use the same content surface; headers and dividers organize rows. |
+| Sell and checkout              | Catalog/cart/checkout cards separate from the canvas; controls are inset; total and payment action retain priority.            |
+
+Future screens must compose these recipes rather than copy a finished screen's utility-class
+stack. Shared changes propagate to all consumers; screen-specific changes should correct
+information order, not invent new colours.
+
 ## Shared primitives (`apps/web/src/app/shared/ui/`)
 
 Compose pages from these — never hand-roll what a primitive owns:
@@ -210,7 +271,9 @@ Compose pages from these — never hand-roll what a primitive owns:
 - **`<app-page>`** — the page shell. Owns `dashboard-main` + `.page`; pass `title` (+
   optional `subtitle`, `badge`, `backLink`) for the standard header and project header
   actions into the `[actions]` slot. `wide` bumps the wrapper to max-w-7xl.
-- **`<app-form-field label="…">`** — one field recipe (label above the control, optional
+- **`<app-form-section title="…">`** — one related field group, raised on a task canvas and
+  unframed inside another content card. Optional description and `[sectionAction]` slot.
+- **`<app-form-field label="…">`** — one field recipe (label above the inset control, optional
   `hint` / `error`, `required` marker). Wrap every input/select in forms; add `w-full` to
   the projected control. No bare `form-control`/`label-text` blocks.
 - **Searchable entity choices** — native `<select>` is only for small, intrinsically bounded
@@ -222,7 +285,8 @@ Compose pages from these — never hand-roll what a primitive owns:
 - **`<button appButton>` / `<a appButton>`** — one action idiom: `variant="primary|secondary|soft|outline|ghost|error"`,
   `size="sm|md"`, `[iconOnly]` for square icon actions, and `[loading]` to swap in a spinner
   and disable. `primary` is the one page/sheet CTA; `secondary` is a quiet filled action;
-  `soft` is a low-emphasis primary-tinted action; `outline` and `ghost` step down from there.
+  `soft` is a low-emphasis primary-tinted action; `outline` is an alternative secondary treatment
+  and `ghost` is a utility action.
   Use `soft`, not `primary`, for a selected method/filter so the CTA remains singular.
   Variants never change button geometry. No raw `btn btn-*` strings for standard actions
   (tight table-row clusters may stay raw by exception).
@@ -240,7 +304,7 @@ Compose pages from these — never hand-roll what a primitive owns:
   border, radius, and dividers.
 - **`<app-drawer>`** — bottom task sheet below 768px and 480px right-side drawer above it:
   `[(open)]`, `title`, optional `subtitle`, `dirty`, `mobileDismissLabel`, a `[leading]` header
-  slot, an `[actions]` header slot, `[drawerFooter]`, and a scrollable projected body. Backdrop,
+  slot, a `[drawerActions]` header slot, `[drawerFooter]`, and a scrollable projected body. Backdrop,
   Escape, close, and footer dismissal all use the same close request. Drawers do not add synthetic
   browser-history entries; route-level overlays must model their open state in the route itself.
   The phone sheet is auto-height up to 92dvh with sticky header/footer and safe-area padding.
@@ -249,11 +313,13 @@ Compose pages from these — never hand-roll what a primitive owns:
   Close is two-phase: the panel plays its exit transition, then `(closed)` emits — parents
   clear their selection there, not on `openChange`. Keep the selected row highlighted while
   the drawer is open.
+  Group conditional header actions in a direct `<ng-container ngProjectAs="[drawerActions]">`;
+  placing them inside the same multi-root `@if` as body content sends them into the body slot.
   - Motion: panel slides in from the right (ease-out, 200ms) and out (ease-in, 150ms),
     backdrop fades; both are disabled under `prefers-reduced-motion` (`motion-reduce:`).
     This is the sanctioned overlay motion — don't invent others.
-  - Drawer body sections stack in one column: `.section-title` headings separated by
-    hairline `border-t border-base-300/60`, stat summary via `app-stat-card` pairs, forms
+  - Drawer body sections stack in one column: `surface-card` content groups with
+    `.section-title` headings, stat summary via `app-stat-card` pairs, forms
     via `app-form-field`. History lists are two-line rows (`divide-y divide-base-200`,
     primary `text-sm font-medium` + `type-caption` secondary, amount right-aligned
     `tabular-nums`), not wide tables; long lists cap at `max-h-80 overflow-y-auto`; empty
@@ -268,7 +334,7 @@ Compose pages from these — never hand-roll what a primitive owns:
   safe-area padding, dirty-change confirmation, and a fixed task-level error region.
   Bind command failures to its `[error]` input so feedback remains visible inside the active
   modal; keep field validation beside the affected field and never send modal errors to a
-  page banner behind the backdrop. Compose forms with unframed `app-form-section` groups and
+  page banner behind the backdrop. Compose forms with `app-form-section` content groups and
   `app-preference-row` switches. Use it for multi-section, conditional, or transactional
   work; do not reproduce hand-rolled modal chrome.
 - Plus the existing shells: `app-page-header` (inside `app-page`), `app-stat-bar`,
@@ -392,6 +458,21 @@ Live dashboards must show the last successful refresh time, preserve existing da
 background refresh, and provide explicit initial loading, error, and empty states.
 
 ## The Counter Workspace (Sell)
+
+Sale lines keep price decrease, exact price editing, price increase, and quantity controls
+visible without opening details. These are primary counter actions, including on mobile.
+Use distinct, labelled compound controls with at least 44px touch targets. On phones, keep price and quantity side by side with compact compound controls. Stack only
+when the available width cannot fit six 44px targets, including at enlarged text sizes.
+Product identity and line total lead each row; SKU, manufacturer, and other reference details
+can expand below it. Keep the original price and reset immediately beneath the price control.
+Use a standalone sale heading, stronger item names and totals, a restrained primary tint for
+price controls, and neutral quantity controls to distinguish summary, actions, and reference data. Give each sale line a complete border and its own content surface, separated by a narrow
+canvas-colored gap. Do not enclose the list in another card or shaded tray. Prioritize manufacturer and pack contents beneath the item name; keep SKU in expanded
+details. Product names have no carets. Underlined selling-unit text opens unit selection;
+up/down arrows are reserved for price adjustment. Give Current sale a strong section heading
+and Clear cart an outlined button, with confirmation retained. The boundary encloses its controls, price note, and expanded editor so
+the whole item reads as one unit. Keep the controls themselves flat within that boundary. Validate populated carts
+with packs and services in both themes and at 320px width.
 
 Sell is an explicit workspace variant, not an exception from the design system. It uses
 `<app-page [workspace]="true">`, which keeps the standard page header, gutters, wide canvas,

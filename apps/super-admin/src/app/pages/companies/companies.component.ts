@@ -321,7 +321,7 @@ const LEGAL_TYPE: Record<string, BadgeType> = {
             </div>
 
             <div class="mt-4 grid grid-cols-2 gap-3">
-              <div class="rounded-box bg-base-200 p-3">
+              <div class="surface-card p-3">
                 <p class="type-caption">Members</p>
                 @if (counts(); as totals) {
                   <p class="type-hero mt-1">{{ totals.members }}</p>
@@ -329,7 +329,7 @@ const LEGAL_TYPE: Record<string, BadgeType> = {
                   <div class="skeleton mt-2 h-7 w-12"></div>
                 }
               </div>
-              <div class="rounded-box bg-base-200 p-3">
+              <div class="surface-card p-3">
                 <p class="type-caption">Sales</p>
                 @if (counts(); as totals) {
                   <p class="type-hero mt-1">{{ totals.orders }}</p>
@@ -340,7 +340,7 @@ const LEGAL_TYPE: Record<string, BadgeType> = {
             </div>
           </section>
 
-          <section class="border-t border-base-300/60 pt-5">
+          <section class="surface-card p-4">
             <h3 class="section-title">Subscription details</h3>
             <dl class="mt-3 divide-y divide-base-200">
               <div class="flex items-center justify-between gap-4 py-2.5">
@@ -367,7 +367,7 @@ const LEGAL_TYPE: Record<string, BadgeType> = {
             </dl>
           </section>
 
-          <section class="border-t border-base-300/60 pt-5">
+          <section class="surface-card p-4">
             <h3 class="section-title">Subscription override</h3>
             <p class="type-caption mt-1">Changes apply immediately to this tenant.</p>
             <form
@@ -443,7 +443,7 @@ const LEGAL_TYPE: Record<string, BadgeType> = {
             </form>
           </section>
 
-          <section class="border-t border-base-300/60 pt-5">
+          <section class="surface-card p-4">
             <h3 class="section-title">Customer automation</h3>
             <p class="type-caption mt-1">
               Override this company’s own automated-notification preference. Manual document sends
@@ -475,7 +475,7 @@ const LEGAL_TYPE: Record<string, BadgeType> = {
           </section>
 
           @if (company.status !== 'banned') {
-            <section class="border-t border-base-300/60 pt-5">
+            <section class="surface-card p-4">
               <h3 class="section-title">Access controls</h3>
               <p class="type-caption mt-1">Restrict access without changing subscription data.</p>
               <div class="mt-3 flex flex-wrap gap-2">

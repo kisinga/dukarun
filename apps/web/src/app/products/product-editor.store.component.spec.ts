@@ -18,8 +18,7 @@ describe('ProductEditorStore', () => {
       variantsForProduct: vi.fn().mockResolvedValue([]),
       productCategoryIds: vi.fn().mockResolvedValue([]),
       upsertManufacturer: vi.fn().mockResolvedValue('manufacturer-1'),
-      createProductWithVariants: vi.fn().mockResolvedValue('product-1'),
-      updateProductWithVariants: vi.fn().mockResolvedValue('product-1'),
+      saveProductUnits: vi.fn().mockResolvedValue('product-1'),
       setProductCategories: vi.fn().mockResolvedValue(undefined),
       uploadProductImage: vi
         .fn()
@@ -81,6 +80,54 @@ describe('ProductEditorStore', () => {
     updated_at: '2026-08-01T00:00:00Z',
   };
 
+  it('saves whole packs with fractional base units and fractional loose opening stock', async () => {
+    const { store, pos } = createStore();
+    await store.initialize({ mode: 'create' });
+    store.name.setValue('Cable');
+    store.mutateRow({
+      index: 0,
+      changes: {
+        price: '20',
+        stockUnit: 'metre',
+        allowFractional: true,
+        packs: [
+          {
+            id: 'roll',
+            name: 'Roll',
+            units_per_pack: 90,
+            sale_price: 1500,
+            barcode: null,
+            active: true,
+          },
+        ],
+        openingPackId: 'roll',
+        openingQuantity: '1',
+        openingLooseQuantity: '0.5',
+        openingUnitCost: '900',
+        openingLocationId: 'location-1',
+      },
+    });
+
+    expect(await store.save()).not.toBeNull();
+    expect(pos.saveProductUnits).toHaveBeenCalledWith(
+      expect.anything(),
+      [
+        expect.objectContaining({
+          allow_fractional: true,
+          stock_unit: 'metre',
+          opening_quantity: 90.5,
+          packs: [expect.objectContaining({ units_per_pack: 90 })],
+        }),
+      ],
+      expect.any(String)
+    );
+
+    pos.saveProductUnits.mockClear();
+    store.mutateRow({ index: 0, changes: { openingQuantity: '0.5' } });
+    expect(await store.save()).toBeNull();
+    expect(pos.saveProductUnits).not.toHaveBeenCalled();
+  });
+
   it('applies variant intents immutably and builds the coupled create payload', async () => {
     const { store, pos, learning } = createStore();
     await store.initialize({ mode: 'create' });
@@ -97,11 +144,14 @@ describe('ProductEditorStore', () => {
     expect(original.price).toBe('');
     expect(store.rows()[0]).not.toBe(original);
     expect(pos.upsertManufacturer).toHaveBeenCalledWith('Dairy Co');
-    expect(pos.createProductWithVariants).toHaveBeenCalledWith({
-      name: 'Fresh milk',
-      barcode: undefined,
-      manufacturer_id: 'manufacturer-1',
-      variants: [
+    expect(pos.saveProductUnits).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'Fresh milk',
+        barcode: undefined,
+        manufacturer_id: 'manufacturer-1',
+        category_ids: [],
+      }),
+      [
         expect.objectContaining({
           name: '500 ml',
           price: 120,
@@ -109,7 +159,8 @@ describe('ProductEditorStore', () => {
           track_inventory: true,
         }),
       ],
-    });
+      expect.any(String)
+    );
     expect(result).toMatchObject({
       productId: 'product-1',
       mode: 'created',
@@ -120,7 +171,7 @@ describe('ProductEditorStore', () => {
 
   it('retains the selected photo and durably cleans the upload when aggregate persistence fails', async () => {
     const { store, pos } = createStore();
-    pos.createProductWithVariants.mockRejectedValueOnce(new Error('metadata failed'));
+    pos.saveProductUnits.mockRejectedValueOnce(new Error('metadata failed'));
     await store.initialize({ mode: 'create' });
     store.name.setValue('Bread');
     store.mutateRow({ index: 0, changes: { price: '80' } });
@@ -134,10 +185,13 @@ describe('ProductEditorStore', () => {
 
     expect(result).toBeNull();
     expect(store.pendingImage()?.previewUrl).toBe('blob:preview');
-    expect(pos.createProductWithVariants).toHaveBeenCalledOnce();
+    expect(pos.saveProductUnits).toHaveBeenCalledOnce();
     expect(pos.scheduleProductImageCleanup).toHaveBeenCalledWith(
       'company-1/10000000-0000-4000-8000-000000000001.webp'
     );
+    await store.save();
+    expect(pos.uploadProductImage.mock.calls[1]).toEqual(pos.uploadProductImage.mock.calls[0]);
+    expect(pos.saveProductUnits.mock.calls[1]).toEqual(pos.saveProductUnits.mock.calls[0]);
   });
 
   it('stages an edit replacement until save and keeps the previous path as the expected value', async () => {
@@ -152,18 +206,20 @@ describe('ProductEditorStore', () => {
     });
 
     expect(pos.uploadProductImage).not.toHaveBeenCalled();
-    expect(pos.updateProductWithVariants).not.toHaveBeenCalled();
+    expect(pos.saveProductUnits).not.toHaveBeenCalled();
     expect(store.imagePreview()).toBe('blob:new-preview');
 
     await store.save();
 
-    expect(pos.updateProductWithVariants).toHaveBeenCalledWith(
+    expect(pos.saveProductUnits).toHaveBeenCalledWith(
       expect.objectContaining({
         product_id: 'product-1',
         image_changed: true,
         image_path: 'company-1/10000000-0000-4000-8000-000000000001.webp',
         expected_image_path: 'company-1/old-photo.webp',
-      })
+      }),
+      expect.any(Array),
+      expect.any(String)
     );
     expect(pos.cleanupProductImage).toHaveBeenCalledWith('company-1/old-photo.webp');
   });
@@ -176,7 +232,7 @@ describe('ProductEditorStore', () => {
     store.removeImage();
     expect(store.imageRemovalPending()).toBe(true);
     expect(store.imagePreview()).toBeNull();
-    expect(pos.updateProductWithVariants).not.toHaveBeenCalled();
+    expect(pos.saveProductUnits).not.toHaveBeenCalled();
 
     store.removeImage();
     expect(store.imageRemovalPending()).toBe(false);
@@ -184,15 +240,82 @@ describe('ProductEditorStore', () => {
 
     store.removeImage();
     await store.save();
-    expect(pos.updateProductWithVariants).toHaveBeenCalledWith(
+    expect(pos.saveProductUnits).toHaveBeenCalledWith(
       expect.objectContaining({
         product_id: 'product-1',
         image_changed: true,
         image_path: null,
         expected_image_path: 'company-1/old-photo.webp',
-      })
+      }),
+      expect.any(Array),
+      expect.any(String)
     );
     expect(pos.cleanupProductImage).toHaveBeenCalledWith('company-1/old-photo.webp');
+  });
+
+  it('ignores hidden loose stock after switching from packs to items', async () => {
+    const { store, pos } = createStore();
+    await store.initialize({ mode: 'create' });
+    store.name.setValue('Tablets');
+    store.mutateRow({
+      index: 0,
+      changes: {
+        price: '20',
+        openingPackId: 'box',
+        openingQuantity: '2',
+        openingLooseQuantity: '5',
+        openingUnitCost: '10',
+        packs: [
+          {
+            id: 'box',
+            name: 'Box',
+            units_per_pack: 10,
+            sale_price: 100,
+            barcode: null,
+            active: true,
+          },
+        ],
+      },
+    });
+    store.mutateRow({ index: 0, changes: { openingPackId: '', openingQuantity: '25' } });
+    expect(await store.save()).not.toBeNull();
+    expect(pos.saveProductUnits).toHaveBeenCalledWith(
+      expect.any(Object),
+      [expect.objectContaining({ opening_quantity: 25, opening_total_cost: 250 })],
+      expect.any(String)
+    );
+  });
+
+  it('includes loose stock when opening stock uses an active pack', async () => {
+    const { store, pos } = createStore();
+    await store.initialize({ mode: 'create' });
+    store.name.setValue('Tablets');
+    store.mutateRow({
+      index: 0,
+      changes: {
+        price: '20',
+        openingPackId: 'box',
+        openingQuantity: '2',
+        openingLooseQuantity: '5',
+        openingUnitCost: '100',
+        packs: [
+          {
+            id: 'box',
+            name: 'Box',
+            units_per_pack: 10,
+            sale_price: 100,
+            barcode: null,
+            active: true,
+          },
+        ],
+      },
+    });
+    expect(await store.save()).not.toBeNull();
+    expect(pos.saveProductUnits).toHaveBeenCalledWith(
+      expect.any(Object),
+      [expect.objectContaining({ opening_quantity: 25, opening_total_cost: 250 })],
+      expect.any(String)
+    );
   });
 
   it('retains dirty state after immutable edits until a successful save', async () => {

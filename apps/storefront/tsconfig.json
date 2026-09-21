@@ -16,6 +16,7 @@
     "baseUrl": "./",
     "paths": {
       "@dukarun/shared-types": ["../../packages/shared-types/database.types.ts"],
+      "@dukarun/pack-types": ["../../packages/shared-types/pack.types.ts"],
       "@dukarun/tax-types": ["../../packages/shared-types/tax.types.ts"]
     }
   },

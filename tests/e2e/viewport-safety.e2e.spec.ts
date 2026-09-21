@@ -1,4 +1,4 @@
-import { expect, test, type Locator, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '../fixtures/mocked-browser';
 
 const companyId = '96000000-0000-4000-8000-000000000001';
 const userId = '96000000-0000-4000-8000-000000000002';
@@ -272,6 +272,12 @@ async function mockOperationsApp(page: Page): Promise<{
     if (path.endsWith('/rest/v1/rpc/location_stock_for_variants')) {
       return json([{ variant_id: variantId, stock: 12, stock_value: 1_200 }]);
     }
+    if (path.endsWith('/rest/v1/rpc/save_catalog_product_units')) {
+      const body = request.postDataJSON();
+      if (body.p_product.product_id) updatedProduct = body;
+      else createdProduct = body;
+      return json(productId);
+    }
     if (path.endsWith('/rest/v1/rpc/create_catalog_product_with_manufacturer')) {
       createdProduct = request.postDataJSON();
       return json(productId);
@@ -390,9 +396,95 @@ test('product editor keeps task chrome reachable across the viewport contract', 
     const editor = page.locator('dialog.modal-open .modal-box-task');
     await assertTaskModalGeometry(page, editor);
     await editor.getByLabel('Product name').fill(`Viewport item ${viewport.name}`);
-    await editor.getByRole('button', { name: /Variants/ }).click();
+    await editor.getByRole('button', { name: /Selling & stock/ }).click();
     await expect(editor.getByRole('heading', { name: 'Sellable variants' })).toBeVisible();
     await assertTaskModalGeometry(page, editor);
+    await editor.getByRole('button', { name: 'Close product editor' }).click();
+  }
+});
+
+test('record and edit hierarchy stays distinct in both themes', async ({ page, isMobile }) => {
+  await mockOperationsApp(page);
+
+  for (const theme of ['light', 'dark']) {
+    await page.goto(`http://127.0.0.1:4203/inventory/products?product=${productId}`);
+    await page.evaluate(value => {
+      localStorage.setItem('dukarun-theme', value);
+      document.documentElement.setAttribute('data-theme', value);
+    }, theme);
+    const drawer = page.getByRole('dialog', { name: 'Breakfast tea' });
+    await expect(drawer).toBeVisible();
+    await expect(
+      drawer.locator('header').getByRole('button', { name: 'Edit product' })
+    ).toBeVisible();
+    const summary = drawer.locator('dl.surface-card');
+    await expect(summary).toContainText('Stock on hand');
+    expect(await summary.evaluate(element => getComputedStyle(element).backgroundColor)).not.toBe(
+      await drawer.evaluate(element => getComputedStyle(element).backgroundColor)
+    );
+
+    const history = drawer.getByRole('button', { name: 'Purchase history', exact: true });
+    await history.focus();
+    await page.keyboard.press('Enter');
+    await expect(history).toHaveAttribute('aria-expanded', 'true');
+    await expect(drawer.getByText('No purchases recorded for this variant.')).toBeVisible();
+    await page.keyboard.press('Enter');
+    await expect(history).toHaveAttribute('aria-expanded', 'false');
+    await expect(drawer.getByText('No purchases recorded for this variant.')).toHaveCount(0);
+
+    // Verify the actual rendered colour contrast, including oklab theme mixtures.
+    const primary = drawer.getByRole('link', { name: 'Adjust stock' });
+    const contrast = await primary.evaluate(element => {
+      const context = document.createElement('canvas').getContext('2d')!;
+      const luminance = (color: string) => {
+        context.fillStyle = color;
+        context.fillRect(0, 0, 1, 1);
+        const rgb = [...context.getImageData(0, 0, 1, 1).data].slice(0, 3).map(channel => {
+          const value = channel / 255;
+          return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+        });
+        return rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722;
+      };
+      const style = getComputedStyle(element);
+      const a = luminance(style.color);
+      const b = luminance(style.backgroundColor);
+      return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+    });
+    expect(contrast).toBeGreaterThanOrEqual(4.5);
+
+    if (process.env.DESIGN_REVIEW_DIR) {
+      await summary.scrollIntoViewIfNeeded();
+      await drawer.screenshot({
+        path: `${process.env.DESIGN_REVIEW_DIR}/product-${theme}-${isMobile ? 'phone' : 'desktop'}.png`,
+      });
+    }
+
+    await drawer.getByRole('button', { name: 'Edit product' }).click();
+    const editor = page.locator('dialog.modal-open .modal-box-task');
+    const name = editor.getByLabel('Product name');
+    await name.focus();
+    const field = await name.evaluate(element => {
+      const style = getComputedStyle(element);
+      const surface = getComputedStyle(element.closest('.surface-card')!);
+      return {
+        background: style.backgroundColor,
+        surface: surface.backgroundColor,
+        border: style.borderTopWidth,
+        outline: style.outlineStyle,
+        outlineWidth: style.outlineWidth,
+      };
+    });
+    expect(field.background).not.toBe(field.surface);
+    expect(field.border).not.toBe('0px');
+    expect(field.outline).toBe('solid');
+    expect(parseFloat(field.outlineWidth)).toBeGreaterThanOrEqual(2);
+    await assertTaskModalGeometry(page, editor);
+    if (process.env.DESIGN_REVIEW_DIR) {
+      await name.scrollIntoViewIfNeeded();
+      await editor.screenshot({
+        path: `${process.env.DESIGN_REVIEW_DIR}/editor-${theme}-${isMobile ? 'phone' : 'desktop'}.png`,
+      });
+    }
     await editor.getByRole('button', { name: 'Close product editor' }).click();
   }
 });
@@ -404,13 +496,13 @@ test('product editor creates the coupled product and variant payload', async ({ 
 
   const editor = page.locator('dialog.modal-open .modal-box-task');
   await editor.getByLabel('Product name').fill('Breakfast tea');
-  await editor.getByRole('button', { name: /Continue to variants|Next: variants/ }).click();
-  await editor.getByLabel('Retail price (KES)').fill('125');
+  await editor.getByRole('button', { name: /Continue to|Next:/ }).click();
+  await editor.getByLabel('Retail price per item (KES)').fill('125');
   await editor.getByRole('button', { name: 'Create product' }).click();
 
   await expect(page.getByText('Created Breakfast tea')).toBeVisible();
   expect(capture.createdProduct()).toMatchObject({
-    p_name: 'Breakfast tea',
+    p_product: { name: 'Breakfast tea' },
     p_variants: [expect.objectContaining({ price: 125, kind: 'good' })],
   });
 });
@@ -424,14 +516,13 @@ test('product editor updates the coupled product and variant payload', async ({ 
   await drawer.getByRole('button', { name: 'Edit product' }).click();
   const editor = page.locator('dialog.modal-open .modal-box-task');
   await editor.getByLabel('Product name').fill('Breakfast tea premium');
-  await editor.getByRole('button', { name: /Variants/ }).click();
-  await editor.getByLabel('Retail price (KES)').fill('140');
+  await editor.getByRole('button', { name: /Selling & stock/ }).click();
+  await editor.getByLabel('Retail price per item (KES)').fill('140');
   await editor.getByRole('button', { name: 'Save product' }).click();
 
   await expect(page.getByText('Updated Breakfast tea premium and 1 variant')).toBeVisible();
   expect(capture.updatedProduct()).toMatchObject({
-    p_product_id: productId,
-    p_name: 'Breakfast tea premium',
+    p_product: { product_id: productId, name: 'Breakfast tea premium' },
     p_variants: [expect.objectContaining({ variant_id: variantId, price: 140 })],
   });
 });

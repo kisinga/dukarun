@@ -1,3 +1,4 @@
+import { StockQuantityInputComponent } from '../shared/ui/stock-quantity-input.component';
 import { Component, OnInit, computed, effect, inject, signal, untracked } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
@@ -26,6 +27,7 @@ interface TransferLine {
 @Component({
   selector: 'app-stock-transfers',
   imports: [
+    StockQuantityInputComponent,
     ReactiveFormsModule,
     RouterLink,
     DatePipe,
@@ -156,7 +158,7 @@ interface TransferLine {
                 <div class="mt-4 divide-y divide-base-200 rounded-box border border-base-300">
                   @for (line of lines(); track line.variant.variant_id) {
                     <div
-                      class="grid gap-3 p-3 sm:grid-cols-[minmax(0,1fr)_8rem_auto] sm:items-center"
+                      class="grid gap-3 p-3 sm:grid-cols-[minmax(0,1fr)_minmax(12rem,1fr)_auto] sm:items-center"
                     >
                       <div class="min-w-0">
                         <p class="font-medium">{{ label(line.variant) }}</p>
@@ -167,14 +169,10 @@ interface TransferLine {
                       </div>
                       <div>
                         <label class="type-caption mb-1 block sm:hidden">Quantity</label>
-                        <input
-                          type="number"
-                          min="0.001"
-                          [max]="line.variant.stock ?? 0"
-                          [step]="line.variant.allow_fractional ? '0.001' : '1'"
-                          class="input input-bordered input-sm w-full"
+                        <app-stock-quantity-input
+                          [variant]="line.variant"
                           [value]="line.quantity"
-                          (input)="setQuantity(line.variant.variant_id!, $event)"
+                          (valueChange)="setQuantity(line.variant.variant_id!, $event)"
                         />
                       </div>
                       <div class="text-right">
@@ -364,7 +362,11 @@ export class StockTransfersComponent implements OnInit {
       !!this.destination.value &&
       this.lines().length > 0 &&
       this.lines().every(
-        line => line.quantity > 0 && line.quantity <= Number(line.variant.stock ?? 0)
+        line =>
+          Number.isFinite(line.quantity) &&
+          (line.variant.allow_fractional || Number.isInteger(line.quantity)) &&
+          line.quantity > 0 &&
+          line.quantity <= Number(line.variant.stock ?? 0)
       ) &&
       !this.saving()
   );
@@ -402,8 +404,7 @@ export class StockTransfersComponent implements OnInit {
     this.lines.update(lines => lines.filter(line => line.variant.variant_id !== variantId));
   }
 
-  protected setQuantity(variantId: string, event: Event): void {
-    const value = Number((event.target as HTMLInputElement).value);
+  protected setQuantity(variantId: string, value: number): void {
     this.lines.update(lines =>
       lines.map(line =>
         line.variant.variant_id === variantId ? { ...line, quantity: value } : line
