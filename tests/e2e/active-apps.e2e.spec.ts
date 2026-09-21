@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../fixtures/mocked-browser';
 
 async function mockSupabase(page: import('@playwright/test').Page): Promise<void> {
   await page.route('http://127.0.0.1:54321/**', async route => {

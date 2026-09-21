@@ -4,6 +4,7 @@ import { createExcelWorkbook } from '../shared/excel-workbook';
 import { exportProductWorkbook } from './product-workbook-export';
 import { readProductWorkbook } from './product-workbook-read';
 import { workbookFixture } from './product-workbook.fixture';
+import { EXTRA_ROWS, packSizes, unitChoices } from './product-workbook';
 
 const bySku = (book: Workbook, sku: string): Row => {
   let found: Row | undefined;
@@ -175,6 +176,84 @@ describe('Products workbook', () => {
     snapshot.packs[0].active = false;
     const measured = await exportProductWorkbook(snapshot);
     expect(readProductWorkbook(measured, 'Products.xlsx', snapshot).errors).toEqual([]);
+  });
+
+  it('exports, edits and creates active packs on fractional base-unit variants', async () => {
+    const snapshot = workbookFixture();
+    const rice = snapshot.variants[2];
+    snapshot.packs = [
+      {
+        ...snapshot.packs[0],
+        variant_id: rice.id,
+        name: 'Bag',
+        units_per_pack: 25,
+        sale_price: 3500,
+      },
+    ];
+    const book = await exportProductWorkbook(snapshot);
+    const loaded = await createExcelWorkbook();
+    await loaded.xlsx.load(await book.xlsx.writeBuffer());
+    expect(readProductWorkbook(loaded, 'Products.xlsx', snapshot).errors).toEqual([]);
+    expect(readProductWorkbook(loaded, 'Products.xlsx', snapshot).lines).toEqual([]);
+    const labels: unknown[] = [];
+    loaded.getWorksheet('_Choices')!.eachRow(row => {
+      const cell = row.getCell(1);
+      labels.push(cell.formula ? cell.result : cell.value);
+    });
+    expect(labels).toContain('Bag of 25 kg');
+    packRow(loaded).getCell(6).value = 3600;
+    const preview = readProductWorkbook(loaded, 'Products.xlsx', snapshot);
+    expect(preview.errors).toEqual([]);
+    expect(preview.changes.products[0].variants[0]).toMatchObject({
+      values: { allow_fractional: true, stock_unit: 'kg' },
+      packs: [expect.objectContaining({ sale_price: 3600, active: true })],
+    });
+
+    snapshot.packs = [];
+    const fresh = await exportProductWorkbook(snapshot);
+    fresh.getWorksheet('Pack sizes')!.getRow(6).getCell(1).value = 'Bag';
+    fresh.getWorksheet('Pack sizes')!.getRow(6).getCell(2).value = 25;
+    add(fresh, 0, 'Rice', '', '', 'Bag of 25 kg', 3500);
+    const created = readProductWorkbook(fresh, 'Products.xlsx', snapshot);
+    expect(created.errors).toEqual([]);
+    expect(created.changes.products[0].variants[0]).toMatchObject({
+      values: { allow_fractional: true },
+      packs: [expect.objectContaining({ name: 'Bag', units_per_pack: 25, active: true })],
+    });
+  });
+
+  it('can enable fractional base quantities without retiring an existing pack', async () => {
+    const { snapshot, book } = await setup();
+    bySku(book, 'SOAP250').getCell(18).value = 'Yes';
+    const preview = readProductWorkbook(book, 'Products.xlsx', snapshot);
+    expect(preview.errors).toEqual([]);
+    expect(preview.changes.products[0].variants[0]).toMatchObject({
+      values: { allow_fractional: true },
+      packs: [expect.objectContaining({ active: true })],
+    });
+  });
+
+  it('still accepts prepared new-row formulas from exports made before fractional packs', async () => {
+    const { snapshot, book } = await setup();
+    const references =
+      Math.max(packSizes(snapshot).length, snapshot.manufacturers.length) + EXTRA_ROWS;
+    const legacyEnd =
+      1 +
+      unitChoices(snapshot).reduce(
+        (sum, choice) => sum + 1 + (choice.kind === 'good' && !choice.fractional ? references : 0),
+        0
+      );
+    const row = add(book, 0, 'New rice', '', '', 'Per kg', 160);
+    for (const column of [16, 18]) {
+      const cell = row.getCell(column);
+      cell.value = { formula: cell.formula!.replace(/\$F\$\d+/, `$F$${legacyEnd}`) };
+    }
+    const preview = readProductWorkbook(book, 'Products.xlsx', snapshot);
+    expect(preview.errors).toEqual([]);
+    expect(preview.changes.products[0].variants[0].values).toMatchObject({
+      kind: 'good',
+      allow_fractional: true,
+    });
   });
   it('does not accept buying cost without creating opening inventory', async () => {
     const { snapshot, book } = await setup();

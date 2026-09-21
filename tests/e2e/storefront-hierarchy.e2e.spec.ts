@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../fixtures/mocked-browser';
 
 test('storefront separates purchasing controls and keeps the basket usable', async ({
   page,

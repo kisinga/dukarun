@@ -244,7 +244,7 @@ export async function exportProductWorkbook(
       choice.fractional,
     ];
     // Unit, factor and mode stay in a single bounded block per unit, not a copy per product.
-    if (choice.kind === 'good' && !choice.fractional) {
+    if (choice.kind === 'good') {
       for (let i = 0; i < references; i++) {
         const n = START_ROW + i,
           r = choiceRow++,

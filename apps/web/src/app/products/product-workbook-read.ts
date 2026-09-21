@@ -394,19 +394,27 @@ export function readProductWorkbook(
     deliberate.set(id, after);
     target[field] = after;
   };
-  const choiceRange = `'_Choices'!$A$2:$F$${1 + choices.reduce((sum, choice) => sum + 1 + (choice.kind === 'good' && !choice.fractional ? references : 0), 0)}`;
+  // Keep prepared formulas from older exports valid when their lookup list
+  // omitted packs for fractional base units. Evaluate defaults from the base row.
+  const choiceRanges = [true, false].map(
+    fractionalPacks =>
+      `'_Choices'!$A$2:$F$${1 + choices.reduce((sum, choice) => sum + 1 + (choice.kind === 'good' && (fractionalPacks || !choice.fractional) ? references : 0), 0)}`
+  );
   const raw = (entry: Entry, c: number): string | number | boolean | null => {
     const cell = entry.row.getCell(c),
       n = entry.row.number;
     if (!cell.formula) return literal(cell);
     if ([8, 10, 12, 27].includes(c) && cell.formula === inputFormula(n, c, original)) return '';
     if (!entry.variant) {
-      const defaults: Record<number, string> = {
-        16: `IF(A${n}="","",IFERROR(IF(VLOOKUP(D${n},${choiceRange},5,FALSE())="service","Service","Good"),"Good"))`,
-        17: `IF(A${n}="","",IF(P${n}="Service","No","Yes"))`,
-        18: `IF(A${n}="","",IFERROR(IF(VLOOKUP(D${n},${choiceRange},6,FALSE()),"Yes","No"),"No"))`,
-      };
-      if (defaults[c] && sameFormula(cell.formula, defaults[c]))
+      const preparedDefault = choiceRanges.some(choiceRange => {
+        const defaults: Record<number, string> = {
+          16: `IF(A${n}="","",IFERROR(IF(VLOOKUP(D${n},${choiceRange},5,FALSE())="service","Service","Good"),"Good"))`,
+          17: `IF(A${n}="","",IF(P${n}="Service","No","Yes"))`,
+          18: `IF(A${n}="","",IFERROR(IF(VLOOKUP(D${n},${choiceRange},6,FALSE()),"Yes","No"),"No"))`,
+        };
+        return !!defaults[c] && sameFormula(cell.formula!, defaults[c]);
+      });
+      if (preparedDefault)
         return c === 16
           ? entry.choice?.kind === 'service'
             ? 'Service'
@@ -926,9 +934,9 @@ export function readProductWorkbook(
         barcode: optional(raw(entry, 14), 64, 'Barcode'),
         active: bool(raw(entry, 21), entry.pack?.active ?? true, 'Selling option active?'),
       };
-      if (updated.active && (owner.values.allow_fractional || owner.values.kind !== 'good'))
+      if (updated.active && owner.values.kind !== 'good')
         throw new Error(
-          'Active packs require whole-quantity goods. Retire the packs before changing quantity settings.'
+          'Active packs require physical goods. Retire the packs before changing to a service.'
         );
       if (entry.pack) {
         if (literal(entry.row.getCell(5)) !== (entry.pack.sale_price ?? 'Purchase only'))

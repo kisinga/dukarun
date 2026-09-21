@@ -75,7 +75,7 @@ select is((select count(*)::int from public.product_variants where sku='ROLLBACK
 reset role;
 select throws_ok($$update public.variant_packs set units_per_pack=50 where id='aa200000-0000-4000-8000-000000000004'$$,'P0001','pack_contents_immutable: retire this pack and create a replacement','contents cannot rewrite historical or offline conversion');
 select throws_ok($$update public.product_variants set barcode='PACK-BOX' where id='aa200000-0000-4000-8000-000000000003'$$,'P0001',null,'pack and piece barcode namespace cannot collide');
-select throws_ok($$update public.product_variants set allow_fractional=true where id='aa200000-0000-4000-8000-000000000003'$$,'P0001','retire_packs_before_changing_quantity_type','fractional products cannot carry active packs');
+select lives_ok($$update public.product_variants set allow_fractional=true where id='aa200000-0000-4000-8000-000000000003'$$,'base quantities can become fractional while keeping active packs');
 -- Pack-only changes must reach existing catalogue consumers, including missed-event replay.
 create temp table pack_cache_head as select head_sequence from public.cache_stream_heads
 where company_id=(select company_id from pack_fixture) and stream='catalog';
@@ -126,9 +126,13 @@ select lives_ok($q$select public.save_variant_packs(
  'aa200000-0000-4000-8000-000000000003','tablet',
  public.catalog_packs_json('aa200000-0000-4000-8000-000000000003'))$q$,
  'retired packs can be saved again on fractional goods');
-select throws_ok($q$update public.variant_packs set active=true
+select lives_ok($q$update public.variant_packs set active=true
  where id='aa200000-0000-4000-8000-000000000004'$q$,
- 'P0001','packs_require_whole_quantity_goods','fractional goods still cannot reactivate packs');
+ 'fractional goods can reactivate packs');
+select throws_ok($q$update public.product_variants set kind='service'
+ where id='aa200000-0000-4000-8000-000000000003'$q$,
+ 'P0001','retire_packs_before_changing_quantity_type','services still require pack retirement');
+update public.variant_packs set active=false where id='aa200000-0000-4000-8000-000000000004';
 select lives_ok($q$select public.update_catalog_product(
  'aa200000-0000-4000-8000-000000000002','Tablets',
  jsonb_build_array(jsonb_build_object(
@@ -138,7 +142,7 @@ select lives_ok($q$select public.update_catalog_product(
  'retired packs can be retained when changing to a service');
 select throws_ok($q$update public.variant_packs set active=true
  where id='aa200000-0000-4000-8000-000000000004'$q$,
- 'P0001','packs_require_whole_quantity_goods','services still cannot reactivate packs');
+ 'P0001','packs_require_goods','services still cannot reactivate packs');
 select throws_ok($q$update public.variant_packs set units_per_pack=50
  where id='aa200000-0000-4000-8000-000000000004'$q$,
  'P0001','pack_contents_immutable: retire this pack and create a replacement',

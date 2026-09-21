@@ -530,11 +530,8 @@ export class ProductEditorStore implements OnDestroy {
           );
         }
       }
-      if (packs.some(p => p.active) && (row.allowFractional || row.kind === 'service')) {
-        return this.invalid(
-          `${label}: remove packs before changing the quantity type.`,
-          'variants'
-        );
+      if (packs.some(p => p.active) && row.kind === 'service') {
+        return this.invalid(`${label}: remove packs before changing to a service.`, 'variants');
       }
       const isService = row.kind === 'service';
       const enteredOpeningQuantity =

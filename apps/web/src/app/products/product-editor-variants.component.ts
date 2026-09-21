@@ -243,15 +243,13 @@ import type {
                     (ngModelChange)="patch(index, { stockUnit: $event })"
                   />
                 </app-form-field>
-                @if (!row.allowFractional) {
-                  <app-product-packs-editor
-                    [packs]="row.packs ?? []"
-                    [savedIds]="row.savedPackIds ?? []"
-                    [stockUnit]="row.stockUnit || 'item'"
-                    [wholesale]="parseAmount(row.wholesale)"
-                    (changed)="patch(index, { packs: $event })"
-                  />
-                }
+                <app-product-packs-editor
+                  [packs]="row.packs ?? []"
+                  [savedIds]="row.savedPackIds ?? []"
+                  [stockUnit]="row.stockUnit || 'item'"
+                  [wholesale]="parseAmount(row.wholesale)"
+                  (changed)="patch(index, { packs: $event })"
+                />
               }
 
               @if (row.kind !== 'service') {

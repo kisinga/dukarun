@@ -122,6 +122,16 @@ select throws_ok($$select public.apply_product_workbook('aa220000-0000-4000-8000
 select throws_ok($$select public.apply_product_workbook('aa220000-0000-4000-8000-000000000015',jsonb_set(pg_temp.workbook_change((select id from workbook_variant),24),'{products,0,variants,0,values,stock_unit}','"kg"'))$$,
   'P0001','existing_stock_unit_immutable_in_workbook','workbooks do not reinterpret existing stock');
 
+-- Fractional base units do not require retiring the existing selling pack.
+select lives_ok($$select public.apply_product_workbook('aa220000-0000-4000-8000-000000000040',
+  jsonb_set(pg_temp.workbook_change((select id from workbook_variant),23),
+    '{products,0,variants,0,values,allow_fractional}','true'))$$,
+  'workbook enables fractional base quantities without retiring an active pack');
+select ok((select allow_fractional from public.product_variants where id=(select id from workbook_variant)),
+  'workbook persists fractional base quantity setting');
+select ok((select active from public.variant_packs where id='aa220000-0000-4000-8000-000000000002'),
+  'workbook retains the active pack');
+
 -- Catalogue managers retain price edits; financial values never enter their export.
 reset role;
 select testkit.create_user('aa220000-0000-4000-8000-000000000020','products-workbook-catalog@test.local');

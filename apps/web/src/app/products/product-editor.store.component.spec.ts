@@ -80,6 +80,54 @@ describe('ProductEditorStore', () => {
     updated_at: '2026-08-01T00:00:00Z',
   };
 
+  it('saves whole packs with fractional base units and fractional loose opening stock', async () => {
+    const { store, pos } = createStore();
+    await store.initialize({ mode: 'create' });
+    store.name.setValue('Cable');
+    store.mutateRow({
+      index: 0,
+      changes: {
+        price: '20',
+        stockUnit: 'metre',
+        allowFractional: true,
+        packs: [
+          {
+            id: 'roll',
+            name: 'Roll',
+            units_per_pack: 90,
+            sale_price: 1500,
+            barcode: null,
+            active: true,
+          },
+        ],
+        openingPackId: 'roll',
+        openingQuantity: '1',
+        openingLooseQuantity: '0.5',
+        openingUnitCost: '900',
+        openingLocationId: 'location-1',
+      },
+    });
+
+    expect(await store.save()).not.toBeNull();
+    expect(pos.saveProductUnits).toHaveBeenCalledWith(
+      expect.anything(),
+      [
+        expect.objectContaining({
+          allow_fractional: true,
+          stock_unit: 'metre',
+          opening_quantity: 90.5,
+          packs: [expect.objectContaining({ units_per_pack: 90 })],
+        }),
+      ],
+      expect.any(String)
+    );
+
+    pos.saveProductUnits.mockClear();
+    store.mutateRow({ index: 0, changes: { openingQuantity: '0.5' } });
+    expect(await store.save()).toBeNull();
+    expect(pos.saveProductUnits).not.toHaveBeenCalled();
+  });
+
   it('applies variant intents immutably and builds the coupled create payload', async () => {
     const { store, pos, learning } = createStore();
     await store.initialize({ mode: 'create' });

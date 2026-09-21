@@ -8,7 +8,7 @@ package sizes that you do not break into individual units.
 ## Configure a pack
 
 1. Create or edit the product and open **Selling & stock**.
-2. Select a physical-good variant with fractional quantities turned off. Give its stock unit a
+2. Select a physical-good variant. Give its stock unit a
    clear name, such as `egg`.
 3. Choose **Add pack**, enter a name such as `Tray`, and set **egg per pack** to `30`.
 4. Enter the **Selling price per pack (KES)**, or leave it blank if the pack is only used for buying.
@@ -19,6 +19,10 @@ package sizes that you do not break into individual units.
 The pack price is independent of retail and wholesale prices for a single unit. With retail at
 KES 20 per egg and wholesale at KES 17, a tray may have its own fixed price of KES 480. The displayed
 per-unit price and comparison with wholesale are information only; they do not set the pack price.
+
+The variant's **Allow fractional quantities** setting applies to its base unit, not its packs.
+For example, cable can be sold as 0.5 metres or as a complete 90-metre roll. Pack quantities must
+still be whole numbers; to sell part of a roll, select metres and enter the loose quantity.
 
 You can change a pack's name, price, or barcode later. Its contents are fixed after saving. Use
 **Remove** to retire a saved pack, then add a replacement with the new contents. Old documents keep

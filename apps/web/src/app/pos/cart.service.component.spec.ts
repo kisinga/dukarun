@@ -67,6 +67,38 @@ describe('Pack cart', () => {
     expect(service.addUnit(packVariant, tray)).toBe(false);
     expect(service.stockDemand('variant-eggs')).toBe(32);
   });
+
+  it('combines whole rolls and fractional base units without permitting fractional packs', () => {
+    const service = cart();
+    const cable = {
+      ...packVariant,
+      variant_id: 'variant-cable',
+      stock_unit: 'metre',
+      allow_fractional: true,
+      stock: 90.5,
+      packs: [
+        {
+          ...packVariant.packs![0],
+          id: 'roll',
+          name: 'Roll',
+          units_per_pack: 90,
+          sale_price: 1500,
+        },
+      ],
+    };
+    const [metre, roll] = sellingUnits(cable);
+    expect(service.addUnit(cable, metre)).toBe(true);
+    const looseId = cartLineId(service.lines()[0]);
+    expect(service.setQuantity(looseId, 0.5)).toBe(true);
+    expect(service.addUnit(cable, roll)).toBe(true);
+    const rollId = cartLineId(service.lines()[1]);
+    expect(service.stockDemand(cable.variant_id)).toBe(90.5);
+    expect(service.total()).toBe(1510);
+    expect(service.setQuantity(rollId, 0.5)).toBe(false);
+    expect(service.setQuantity(looseId, 1)).toBe(false);
+    expect(service.changeUnit(rollId, metre, 90)).toBe(true);
+    expect(service.stockDemand(cable.variant_id)).toBe(90.5);
+  });
   it('uses configured pack price as its floor, independent of wholesale equivalent', () => {
     const service = cart();
     service.addVariant({ ...packVariant, selected_pack_id: 'tray' });

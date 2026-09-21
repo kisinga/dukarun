@@ -1,4 +1,4 @@
-import { expect, test, type Locator, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '../fixtures/mocked-browser';
 
 const companyId = '96000000-0000-4000-8000-000000000001';
 const userId = '96000000-0000-4000-8000-000000000002';

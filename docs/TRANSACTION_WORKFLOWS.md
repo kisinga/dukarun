@@ -26,7 +26,8 @@ upload identity on retry; storage cleanup cannot delete an image currently attac
 
 Each variant has a named `stock_unit`. A `variant_packs` row belongs to that variant and contains a
 name, immutable whole `units_per_pack` greater than one, optional independent `sale_price`, optional
-barcode, and active flag. Packs require whole-quantity goods. A null selling price permits buying
+barcode, and active flag. Packs require physical goods, but those goods may allow fractional base
+quantities. Pack quantities remain whole independently of that setting. A null selling price permits buying
 but excludes the pack from selling. Retirement preserves the identity used by completed documents
 and queued transactions. Only active packs reserve their barcode, so replacements can reuse a
 retired code. Active pack and effective base-variant barcodes cannot collide.

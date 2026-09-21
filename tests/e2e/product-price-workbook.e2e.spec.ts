@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from '../fixtures/mocked-browser';
 import { Workbook } from 'exceljs';
 import type { WorkbookChanges } from '../../apps/web/src/app/products/product-workbook';
 

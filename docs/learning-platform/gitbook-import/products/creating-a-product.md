@@ -96,5 +96,5 @@ belong to the individual variant. Changes to the catalogue do not rewrite comple
 - Naming the stock unit does not convert existing quantities. Stock-unit renaming is restricted
   once a named unit has transaction history.
 - A saved pack's contents cannot change. Remove it and add a replacement; existing receipts keep
-  the original contents. Remove active packs before switching a variant to fractional quantities
-  or a service.
+  the original contents. Packs can coexist with fractional base quantities. Remove active packs
+  before switching a variant to a service.
