@@ -65,6 +65,7 @@ export type PurchaseVatPanelIntent =
                   class="btn btn-sm join-item"
                   [attr.aria-pressed]="viewModel().priceEntryBasis === 'inclusive'"
                   [class.btn-primary]="viewModel().priceEntryBasis === 'inclusive'"
+                  [class.btn-soft]="viewModel().priceEntryBasis === 'inclusive'"
                   [class.btn-outline]="viewModel().priceEntryBasis !== 'inclusive'"
                   (click)="intent.emit({ type: 'set-price-basis', basis: 'inclusive' })"
                 >
@@ -75,6 +76,7 @@ export type PurchaseVatPanelIntent =
                   class="btn btn-sm join-item"
                   [attr.aria-pressed]="viewModel().priceEntryBasis === 'exclusive'"
                   [class.btn-primary]="viewModel().priceEntryBasis === 'exclusive'"
+                  [class.btn-soft]="viewModel().priceEntryBasis === 'exclusive'"
                   [class.btn-outline]="viewModel().priceEntryBasis !== 'exclusive'"
                   [disabled]="
                     viewModel().priceEntryBasis !== 'exclusive' &&

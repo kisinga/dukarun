@@ -8,6 +8,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { CashierSessionService } from '../core/cashier-session.service';
 import { SyncService } from '../pos/offline/sync.service';
 import { IconComponent } from '../shared/ui/icon.component';
+import { ButtonComponent } from '../shared/ui/button.component';
 import { CashierSessionDialogService } from '../core/cashier-session-dialog.service';
 import { CashierSessionModalComponent } from '../money/cashier/cashier-session-modal.component';
 import { PersonaSwitcherComponent } from '../shared/ui/persona-switcher.component';
@@ -53,6 +54,7 @@ interface NavSection {
     RouterLink,
     RouterLinkActive,
     IconComponent,
+    ButtonComponent,
     EntityAvatarComponent,
     CashierSessionModalComponent,
     PersonaSwitcherComponent,
@@ -77,7 +79,7 @@ interface NavSection {
 
           @if (locations.isMultiLocation()) {
             <label class="mr-2 hidden items-center gap-2 lg:flex">
-              <span class="text-xs font-medium text-base-content/55">Working location</span>
+              <span class="type-caption font-medium">Working location</span>
               <select
                 class="select select-bordered select-sm max-w-52"
                 [value]="locations.activeId()"
@@ -164,11 +166,15 @@ interface NavSection {
             @if (perms.has('SettleOrder') && cashierSession.cashControlEnabled()) {
               <button
                 type="button"
-                class="btn btn-sm min-h-11 gap-2 px-3"
-                [class.btn-primary]="!cashierSession.loading() && !cashierSession.isOpen()"
-                [class.btn-success]="!cashierSession.loading() && cashierSession.isOpen()"
-                [class.btn-outline]="cashierSession.isOpen()"
-                [class.btn-ghost]="cashierSession.loading()"
+                appButton
+                size="md"
+                [variant]="
+                  cashierSession.loading()
+                    ? 'ghost'
+                    : cashierSession.isOpen()
+                      ? 'secondary'
+                      : 'primary'
+                "
                 [title]="
                   cashierSession.isOpen() ? 'Count and close the till' : 'Count and open the till'
                 "
@@ -186,6 +192,7 @@ interface NavSection {
                         : 'heroLockOpen'
                   "
                   [class.animate-spin]="cashierSession.loading()"
+                  [class.text-success]="!cashierSession.loading() && cashierSession.isOpen()"
                 />
                 <span class="hidden sm:inline">
                   @if (cashierSession.loading()) {
@@ -448,7 +455,7 @@ interface NavSection {
               @for (section of visibleSections(); track section.label ?? 'top') {
                 @if (section.label) {
                   <div
-                    class="px-3 pb-1 pt-4 text-xs font-semibold uppercase tracking-wider text-base-content/40"
+                    class="px-3 pb-1 pt-4 text-xs font-semibold uppercase tracking-wider text-muted"
                   >
                     {{ section.label }}
                   </div>

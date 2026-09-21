@@ -44,7 +44,7 @@ type PaymentActionsMode = 'sidebar' | 'dock';
             appButton
             size="md"
             data-learning-anchor="sell-checkout"
-            class="min-w-40 flex-1"
+            class="min-w-40 flex-1 basis-full sm:basis-auto"
             [disabled]="primaryDisabled()"
             (click)="checkout.emit()"
           >

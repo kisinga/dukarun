@@ -31,7 +31,7 @@ export type ListSortDirection = 'asc' | 'desc';
           <ng-icon
             name="heroMagnifyingGlass"
             size="1rem"
-            class="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-base-content/40"
+            class="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted"
           />
           <input
             type="search"
@@ -145,7 +145,7 @@ export type ListSortDirection = 'asc' | 'desc';
               <ng-icon
                 name="heroChevronDown"
                 size="0.875rem"
-                class="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-base-content/55"
+                class="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-muted"
               />
             </div>
             <button

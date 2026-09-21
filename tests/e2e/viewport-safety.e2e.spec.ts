@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '../fixtures/mocked-browser';
+import { renderedTextContrast } from '../fixtures/contrast';
 
 const companyId = '96000000-0000-4000-8000-000000000001';
 const userId = '96000000-0000-4000-8000-000000000002';
@@ -128,7 +129,10 @@ async function assertTaskModalGeometry(page: Page, shell: Locator): Promise<void
   expect(horizontalOverflow).toBeLessThanOrEqual(1);
 }
 
-async function mockOperationsApp(page: Page): Promise<{
+async function mockOperationsApp(
+  page: Page,
+  options: { cashControl?: boolean; openTill?: () => boolean } = {}
+): Promise<{
   createdProduct: () => unknown;
   updatedProduct: () => unknown;
 }> {
@@ -187,7 +191,11 @@ async function mockOperationsApp(page: Page): Promise<{
       return json({
         company_id: companyId,
         user_id: userId,
-        permissions: ['ManageCatalog', 'ManageStockAdjustments'],
+        permissions: [
+          'ManageCatalog',
+          'ManageStockAdjustments',
+          ...(options.cashControl ? ['SettleOrder'] : []),
+        ],
         workspaces: ['dashboard', 'inventory', 'purchasing'],
         actions: {},
       });
@@ -229,15 +237,28 @@ async function mockOperationsApp(page: Page): Promise<{
       }
       return json(
         select.includes('cashier_flow_enabled')
-          ? [
-              {
-                cashier_flow_enabled: false,
-                cash_control_enabled: false,
-                require_opening_count: false,
-                batch_expiry_enabled: false,
-              },
-            ]
+          ? {
+              cashier_flow_enabled: false,
+              cash_control_enabled: options.cashControl ?? false,
+              require_opening_count: false,
+              batch_expiry_enabled: false,
+              variance_notification_threshold: 100,
+              low_stock_threshold: 10,
+            }
           : [{ id: companyId, name: 'Viewport shop', code: 'VIEWPORT' }]
+      );
+    }
+    if (path.endsWith('/rest/v1/cashier_sessions')) {
+      return json(
+        options.openTill?.()
+          ? {
+              id: '96000000-0000-4000-8000-000000000007',
+              company_id: companyId,
+              location_id: locationId,
+              status: 'open',
+              opened_at: new Date().toISOString(),
+            }
+          : null
       );
     }
     if (path.endsWith('/rest/v1/products')) {
@@ -432,25 +453,15 @@ test('record and edit hierarchy stays distinct in both themes', async ({ page, i
     await expect(history).toHaveAttribute('aria-expanded', 'false');
     await expect(drawer.getByText('No purchases recorded for this variant.')).toHaveCount(0);
 
-    // Verify the actual rendered colour contrast, including oklab theme mixtures.
+    // Preserve the historical pairing; 3.48:1 at rest is below small-text AA.
     const primary = drawer.getByRole('link', { name: 'Adjust stock' });
-    const contrast = await primary.evaluate(element => {
-      const context = document.createElement('canvas').getContext('2d')!;
-      const luminance = (color: string) => {
-        context.fillStyle = color;
-        context.fillRect(0, 0, 1, 1);
-        const rgb = [...context.getImageData(0, 0, 1, 1).data].slice(0, 3).map(channel => {
-          const value = channel / 255;
-          return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
-        });
-        return rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722;
-      };
-      const style = getComputedStyle(element);
-      const a = luminance(style.color);
-      const b = luminance(style.backgroundColor);
-      return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
-    });
-    expect(contrast).toBeGreaterThanOrEqual(4.5);
+    for (const hovered of [false, true]) {
+      if (hovered) await primary.hover();
+      const measured = await renderedTextContrast(primary);
+      expect(measured.foreground).toEqual([255, 255, 255]);
+      expect(measured.ratio).toBeGreaterThanOrEqual(hovered ? 4.5 : 3.47);
+    }
+    await page.mouse.move(0, 0);
 
     if (process.env.DESIGN_REVIEW_DIR) {
       await summary.scrollIntoViewIfNeeded();
@@ -486,6 +497,189 @@ test('record and edit hierarchy stays distinct in both themes', async ({ page, i
       });
     }
     await editor.getByRole('button', { name: 'Close product editor' }).click();
+  }
+});
+
+test('shared actions, navigation and metadata retain their contrast and hierarchy', async ({
+  page,
+}) => {
+  await mockOperationsApp(page);
+  await page.goto('http://127.0.0.1:4203/inventory/products');
+  await expect(page.getByRole('button', { name: 'Add product' })).toBeVisible();
+  // Exercise both production CSS recipes, including legacy controls not yet using appButton.
+  await page.evaluate(() => {
+    const fixture = document.createElement('section');
+    fixture.id = 'shared-style-contract';
+    fixture.className = 'dashboard-main';
+    fixture.style.cssText =
+      'position:fixed;inset:0;z-index:2000000;padding:16px;overflow:auto;background:var(--color-base-100)';
+    for (const [name, classes] of Object.entries({
+      shared: 'counter-btn counter-btn-primary counter-btn-md',
+      legacy: 'btn btn-primary min-h-11',
+      outline: 'btn btn-primary btn-outline min-h-11',
+      soft: 'btn btn-primary btn-soft min-h-11',
+      badge: 'badge badge-primary',
+      'neutral-badge': 'badge badge-neutral badge-soft badge-xs',
+      marker: 'brand-marker',
+      'nav-active': 'nav-item nav-item-active',
+      'tab-active': 'section-tab section-tab-active',
+      'tab-inactive': 'section-tab',
+      'bottom-active': 'bottom-nav-item bottom-nav-active',
+      'bottom-inactive': 'bottom-nav-item',
+      metadata: 'table-secondary',
+      caption: 'type-caption',
+    })) {
+      const control = document.createElement('button');
+      control.className = classes;
+      control.textContent = name;
+      fixture.append(control);
+    }
+    const table = document.createElement('table');
+    table.className = 'table';
+    table.innerHTML = '<thead><tr><th>Product</th></tr></thead>';
+    fixture.append(table);
+    document.body.append(fixture);
+  });
+  const fixture = page.locator('#shared-style-contract');
+  for (const theme of ['light', 'dark']) {
+    await page.evaluate(value => document.documentElement.setAttribute('data-theme', value), theme);
+    for (const state of ['default', 'hover', 'pressed', 'focus']) {
+      const primaryColours = [];
+      for (const name of [
+        'shared',
+        'legacy',
+        'outline',
+        'soft',
+        'badge',
+        'neutral-badge',
+        'marker',
+        'nav-active',
+        'tab-active',
+        'tab-inactive',
+        'bottom-active',
+        'bottom-inactive',
+        'metadata',
+        'caption',
+      ]) {
+        // Check supporting styles once per theme; exercise each action state below.
+        if (state !== 'default' && !['shared', 'legacy', 'outline', 'soft'].includes(name)) {
+          continue;
+        }
+        const control = fixture.getByRole('button', { name, exact: true });
+        await page.mouse.move(0, 0);
+        if (state === 'hover' || state === 'pressed') await control.hover();
+        if (state === 'pressed') await page.mouse.down();
+        if (state === 'focus') {
+          await control.focus();
+          await page.keyboard.press('Tab');
+          await page.keyboard.press('Shift+Tab');
+          await expect(control).toBeFocused();
+          expect(await control.evaluate(element => getComputedStyle(element).outlineStyle)).toBe(
+            'solid'
+          );
+        }
+        const measured = await renderedTextContrast(control);
+        if (name === 'shared' || name === 'legacy') {
+          expect(measured.fontSize).toBe(14);
+          expect(measured.fontWeight).toBe(600);
+          expect(measured.foreground).toEqual([255, 255, 255]);
+          // Normal white-on-brand labels are 3.48:1, not AA-compliant small text.
+          expect(measured.ratio).toBeGreaterThanOrEqual(
+            state === 'hover' || state === 'pressed' ? 4.5 : 3.47
+          );
+          if (state === 'default' || state === 'focus') {
+            expect(measured.background).toEqual([232, 93, 47]);
+          }
+          primaryColours.push([measured.background, measured.foreground]);
+          if (state === 'pressed') {
+            expect(await control.evaluate(element => getComputedStyle(element).translate)).toBe(
+              'none'
+            );
+          }
+        } else {
+          expect(measured.ratio, `${theme} ${name} ${state}`).toBeGreaterThanOrEqual(4.5);
+        }
+        if (state === 'pressed') await page.mouse.up();
+      }
+      expect(primaryColours[0]).toEqual(primaryColours[1]);
+    }
+    expect((await renderedTextContrast(fixture.locator('th'))).ratio).toBeGreaterThanOrEqual(4.5);
+    const disabledColours = [];
+    for (const name of ['shared', 'legacy']) {
+      const control = fixture.getByRole('button', { name, exact: true });
+      const height = (await control.boundingBox())!.height;
+      await control.evaluate(element => ((element as HTMLButtonElement).disabled = true));
+      await expect(control).toBeDisabled();
+      const measured = await renderedTextContrast(control);
+      expect(measured.background).not.toEqual([232, 93, 47]);
+      expect(measured.ratio).toBeGreaterThanOrEqual(4.5);
+      expect((await control.boundingBox())!.height).toBe(height);
+      disabledColours.push([measured.background, measured.foreground]);
+      await control.evaluate(element => ((element as HTMLButtonElement).disabled = false));
+    }
+    expect(disabledColours[0]).toEqual(disabledColours[1]);
+  }
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  for (const name of ['shared', 'legacy']) {
+    expect(
+      await fixture
+        .getByRole('button', { name, exact: true })
+        .evaluate(element => getComputedStyle(element).transitionDuration)
+    ).toBe('0s');
+  }
+});
+
+test('header actions and avatars retain the compact historical brand treatment', async ({
+  page,
+  isMobile,
+}) => {
+  let openTill = false;
+  await mockOperationsApp(page, { cashControl: true, openTill: () => openTill });
+  if (isMobile) await page.setViewportSize({ width: 320, height: 700 });
+  for (const theme of ['light', 'dark']) {
+    openTill = false;
+    await page.goto('http://127.0.0.1:4203/inventory/products');
+    await page.evaluate(value => document.documentElement.setAttribute('data-theme', value), theme);
+    const till = page.getByRole('button', { name: 'Open till opening dialog' });
+    await expect(till).toBeVisible();
+    await expect(till).toHaveClass(/counter-btn-primary/);
+    const label = await renderedTextContrast(till);
+    expect(label.fontSize).toBe(14);
+    expect(label.fontWeight).toBe(600);
+    expect(label.foreground).toEqual([255, 255, 255]);
+    expect(label.background).toEqual([232, 93, 47]);
+    const account = page.getByRole('button', { name: 'Account menu' });
+    await expect(account.locator('app-entity-avatar')).toHaveAttribute('aria-hidden', 'true');
+    const initial = await renderedTextContrast(account.locator('app-entity-avatar span'));
+    expect(initial.fontSize).toBe(12);
+    expect(initial.fontWeight).toBe(600);
+    expect(initial.ratio).toBeGreaterThanOrEqual(3.47);
+    expect(initial.background).toEqual([232, 93, 47]);
+    expect(initial.foreground).toEqual([255, 255, 255]);
+    const activeStatus = page
+      .locator('app-status-badge .badge:visible')
+      .filter({ hasText: /^\s*active\s*$/ })
+      .first();
+    await expect(activeStatus).toBeVisible();
+    expect((await renderedTextContrast(activeStatus)).ratio).toBeGreaterThanOrEqual(4.5);
+    const geometry = await till.evaluate(element => {
+      const box = element.getBoundingClientRect();
+      const bar = element.closest('.navbar')!.getBoundingClientRect();
+      return { top: box.top - bar.top, bottom: bar.bottom - box.bottom, height: box.height };
+    });
+    expect(geometry.top).toBeGreaterThanOrEqual(0);
+    expect(geometry.bottom).toBeGreaterThanOrEqual(0);
+    expect(geometry.height).toBeGreaterThanOrEqual(44);
+    expect(geometry.height).toBeLessThanOrEqual(48);
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)
+    ).toBeLessThanOrEqual(1);
+    openTill = true;
+    await page.reload();
+    const closeTill = page.getByRole('button', { name: 'Open till closing dialog' });
+    await expect(closeTill).toBeVisible();
+    await expect(closeTill).toHaveClass(/counter-btn-secondary/);
+    await expect(closeTill.locator('app-icon')).toHaveClass(/text-success/);
   }
 });
 
