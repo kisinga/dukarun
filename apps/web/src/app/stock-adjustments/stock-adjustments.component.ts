@@ -75,7 +75,7 @@ type StockAdjustmentHistoryDisplay = StockAdjustmentHistoryRow & {
           <div class="border-b border-base-300/70 p-4 sm:p-6">
             <div class="mb-3 flex items-start gap-3">
               <span
-                class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-content"
+                class="brand-marker flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold"
                 >1</span
               >
               <div>
@@ -157,7 +157,7 @@ type StockAdjustmentHistoryDisplay = StockAdjustmentHistoryRow & {
               <div class="border-b border-base-300/70 p-4 sm:p-6 lg:border-r lg:border-base-300/70">
                 <div class="mb-4 flex items-start gap-3">
                   <span
-                    class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-content"
+                    class="brand-marker flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold"
                     >2</span
                   >
                   <div>
@@ -226,7 +226,7 @@ type StockAdjustmentHistoryDisplay = StockAdjustmentHistoryRow & {
               <div class="p-4 sm:p-6">
                 <div class="mb-4 flex items-start gap-3">
                   <span
-                    class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-content"
+                    class="brand-marker flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold"
                     >3</span
                   >
                   <div>

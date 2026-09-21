@@ -60,15 +60,13 @@ import type { ProductEditorRequest, ProductEditorResult } from './product-editor
             type="button"
             class="flex min-h-11 items-center justify-center gap-2 border-b-2 px-2 text-sm font-semibold transition-colors"
             [class.border-primary]="store.step() === 1"
-            [class.text-primary]="store.step() === 1"
             [class.border-transparent]="store.step() !== 1"
             [attr.aria-current]="store.step() === 1 ? 'step' : null"
             (click)="store.setStep(1)"
           >
             <span
               class="flex h-6 w-6 items-center justify-center rounded-full text-xs"
-              [class.bg-primary]="store.step() === 1"
-              [class.text-primary-content]="store.step() === 1"
+              [class.brand-marker]="store.step() === 1"
               [class.bg-base-200]="store.step() !== 1"
               >1</span
             >
@@ -78,7 +76,6 @@ import type { ProductEditorRequest, ProductEditorResult } from './product-editor
             type="button"
             class="flex min-h-11 items-center justify-center gap-2 border-b-2 px-2 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40"
             [class.border-primary]="store.step() === 2"
-            [class.text-primary]="store.step() === 2"
             [class.border-transparent]="store.step() !== 2"
             [disabled]="store.name.value.trim().length === 0"
             [attr.aria-current]="store.step() === 2 ? 'step' : null"
@@ -86,8 +83,7 @@ import type { ProductEditorRequest, ProductEditorResult } from './product-editor
           >
             <span
               class="flex h-6 w-6 items-center justify-center rounded-full text-xs"
-              [class.bg-primary]="store.step() === 2"
-              [class.text-primary-content]="store.step() === 2"
+              [class.brand-marker]="store.step() === 2"
               [class.bg-base-200]="store.step() !== 2"
               >2</span
             >

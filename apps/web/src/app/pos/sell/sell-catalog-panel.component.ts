@@ -43,7 +43,7 @@ import { SellCatalogStore } from './sell-catalog.store';
             </p>
           </div>
           @if (itemCount() > 0) {
-            <span class="badge badge-primary shrink-0"> {{ itemCount() }} in cart </span>
+            <span class="badge badge-ghost shrink-0"> {{ itemCount() }} in cart </span>
           }
         </div>
 
@@ -250,7 +250,7 @@ import { SellCatalogStore } from './sell-catalog.store';
                     /></span>
                   }
                   <span class="min-w-0 flex-1">
-                    <span class="block truncate text-xs text-base-content/55">{{
+                    <span class="type-caption block truncate">{{
                       v.manufacturer_name || 'Manufacturer not set'
                     }}</span>
                     <span class="line-clamp-2 text-sm font-semibold">{{ catalog.label(v) }}</span>
@@ -266,9 +266,7 @@ import { SellCatalogStore } from './sell-catalog.store';
                     <span class="block text-sm font-bold"
                       ><app-money [amount]="v.price ?? 0"
                     /></span>
-                    <span class="block text-xs text-base-content/50">{{
-                      catalog.stockLabel(v)
-                    }}</span>
+                    <span class="type-caption block">{{ catalog.stockLabel(v) }}</span>
                   </span>
                 </button>
               }
@@ -310,7 +308,7 @@ import { SellCatalogStore } from './sell-catalog.store';
                         ><app-icon name="heroCube" size="lg"
                       /></span>
                     }
-                    <span class="min-w-0 flex-1 truncate pt-0.5 text-xs text-base-content/55">{{
+                    <span class="type-caption min-w-0 flex-1 truncate pt-0.5">{{
                       v.manufacturer_name || 'Manufacturer not set'
                     }}</span>
                     @if (catalog.quantityInCart(v.variant_id) > 0) {
@@ -331,7 +329,7 @@ import { SellCatalogStore } from './sell-catalog.store';
                     <span
                       class="text-right text-xs whitespace-nowrap"
                       [class.text-error]="catalog.unavailable(v)"
-                      [class.text-base-content/50]="!catalog.unavailable(v)"
+                      [class.text-muted]="!catalog.unavailable(v)"
                       >{{ catalog.stockLabel(v) }}</span
                     >
                   </span>

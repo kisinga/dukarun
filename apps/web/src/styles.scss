@@ -57,7 +57,11 @@ input.search-with-custom-clear::-ms-clear {
 @utility type-caption {
   font-size: 0.75rem; // 12px — labels, timestamps
   line-height: 1rem;
-  color: color-mix(in oklab, var(--color-base-content) 70%, transparent);
+  color: var(--text-muted);
+}
+
+@utility text-muted {
+  color: var(--text-muted);
 }
 
 @layer components {
@@ -72,6 +76,15 @@ input.search-with-custom-clear::-ms-clear {
     --surface-border: color-mix(in oklab, var(--color-base-300) 85%, var(--color-base-100));
     --control-border: color-mix(in oklab, var(--color-base-content) 55%, var(--color-base-100));
     --surface-action: color-mix(in oklab, var(--color-base-content) 10%, var(--color-base-100));
+    --text-muted: color-mix(in oklab, var(--color-base-content) 70%, transparent);
+    // Small accent text needs a stronger tone than the unchanged orange used for filled actions.
+    --text-accent: color-mix(in oklab, var(--color-primary) 65%, var(--color-base-content));
+    --action-disabled-bg: var(--surface-inset);
+    --action-disabled-fg: var(--text-muted);
+    --action-primary-border: color-mix(in oklab, var(--color-primary) 90%, black);
+    // Historical white-on-orange treatment; interaction fills deepen the same brand colour.
+    --action-primary-hover: color-mix(in oklab, var(--color-primary) 88%, black);
+    --action-primary-pressed: color-mix(in oklab, var(--color-primary) 82%, black);
   }
 
   /* Content stands above the canvas. Nested supporting information uses an inset, not a card. */
@@ -236,7 +249,7 @@ input.search-with-custom-clear::-ms-clear {
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.05em;
-      color: color-mix(in oklab, var(--color-base-content) 50%, transparent);
+      color: var(--text-muted);
       background: color-mix(in oklab, var(--color-base-200) 72%, var(--color-base-100));
       border-bottom: 1px solid var(--color-base-300);
       white-space: nowrap;
@@ -316,7 +329,7 @@ input.search-with-custom-clear::-ms-clear {
     margin-top: 0.125rem;
     font-size: 0.75rem;
     line-height: 1rem;
-    color: color-mix(in oklab, var(--color-base-content) 55%, transparent);
+    color: var(--text-muted);
   }
 
   .table-number {
@@ -425,13 +438,26 @@ input.search-with-custom-clear::-ms-clear {
   }
 
   .counter-btn-primary {
-    border-color: var(--color-primary);
+    border-color: var(--action-primary-border);
     background: var(--color-primary);
     color: var(--color-primary-content);
 
     &:hover:not(:disabled) {
-      background: color-mix(in oklab, var(--color-primary) 88%, black);
-      border-color: color-mix(in oklab, var(--color-primary) 88%, black);
+      background: var(--action-primary-hover);
+      border-color: var(--action-primary-hover);
+    }
+
+    &:active:not(:disabled) {
+      background: var(--action-primary-pressed);
+      border-color: var(--action-primary-pressed);
+    }
+
+    &:disabled,
+    &[disabled] {
+      background: var(--action-disabled-bg);
+      border-color: var(--surface-border);
+      color: var(--action-disabled-fg);
+      opacity: 1;
     }
   }
 
@@ -441,13 +467,13 @@ input.search-with-custom-clear::-ms-clear {
     color: var(--color-base-content);
 
     &:hover:not(:disabled) {
-      background: color-mix(in oklab, var(--color-base-content) 9%, var(--color-base-100));
+      background: color-mix(in oklab, var(--color-base-content) 14%, var(--color-base-100));
     }
   }
 
   .counter-btn-soft {
     background: color-mix(in oklab, var(--color-primary) 12%, transparent);
-    color: var(--color-primary);
+    color: var(--color-base-content);
 
     &:hover:not(:disabled) {
       background: color-mix(in oklab, var(--color-primary) 18%, transparent);
@@ -682,11 +708,11 @@ input.search-with-custom-clear::-ms-clear {
   .nav-item-active,
   .nav-item-active:hover {
     background-color: color-mix(in oklab, var(--color-primary) 10%, transparent);
-    color: var(--color-primary);
+    color: var(--text-accent);
     font-weight: 600;
 
     ng-icon {
-      color: var(--color-primary);
+      color: currentColor;
     }
   }
 
@@ -718,7 +744,7 @@ input.search-with-custom-clear::-ms-clear {
     border-radius: var(--radius-field);
     background: transparent;
     padding: 0.5rem 0.875rem;
-    color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+    color: var(--text-muted);
     font-size: 0.875rem;
     font-weight: 500;
     line-height: 1.25rem;
@@ -749,7 +775,7 @@ input.search-with-custom-clear::-ms-clear {
   .section-tab-active,
   .section-tab-active:hover {
     background: color-mix(in oklab, var(--color-primary) 10%, transparent);
-    color: var(--color-primary);
+    color: var(--text-accent);
     font-weight: 600;
 
     ng-icon {
@@ -775,7 +801,7 @@ input.search-with-custom-clear::-ms-clear {
     min-width: 4rem;
     min-height: 2.75rem;
     border-radius: var(--radius-field);
-    color: color-mix(in oklab, var(--color-base-content) 50%, transparent);
+    color: var(--text-muted);
     transition: color 150ms ease;
     -webkit-tap-highlight-color: transparent;
   }
@@ -795,7 +821,7 @@ input.search-with-custom-clear::-ms-clear {
   }
 
   .bottom-nav-active {
-    color: var(--color-primary);
+    color: var(--text-accent);
 
     .bottom-nav-ico {
       background-color: color-mix(in oklab, var(--color-primary) 12%, transparent);
@@ -824,7 +850,7 @@ input.search-with-custom-clear::-ms-clear {
   --color-base-300: #d5d5db;
   --color-base-content: #2b2b2f;
   --color-primary: #e85d2f;
-  --color-primary-content: #19191d;
+  --color-primary-content: #ffffff;
   --color-secondary: #5a5a5a;
   --color-secondary-content: #fafafa;
   --color-accent: #f17a54;
@@ -862,7 +888,7 @@ input.search-with-custom-clear::-ms-clear {
   --color-base-300: #45454e;
   --color-base-content: #e8e8e6;
   --color-primary: #e85d2f;
-  --color-primary-content: #19191d;
+  --color-primary-content: #ffffff;
   --color-secondary: #71717a;
   --color-secondary-content: #f4f4f2;
   --color-accent: #f17a54;
@@ -891,6 +917,105 @@ input.search-with-custom-clear::-ms-clear {
 /* DaisyUI controls are emitted in utilities. Keep the shared control contract in that same
    layer so it overrides component defaults without !important or per-screen fixes. */
 @layer utilities {
+  /* Legacy DaisyUI actions and appButton share emphasis, type and interaction colours. */
+  .btn-primary {
+    --btn-color: var(--color-primary);
+    --fontsize: 0.875rem;
+    font-weight: 600;
+    line-height: 1.25rem;
+    text-shadow: none;
+    box-shadow: none;
+  }
+
+  .btn-primary:not(:disabled, [disabled], .btn-disabled) {
+    --btn-fg: var(--color-primary-content);
+    --btn-bg: var(--color-primary);
+    --btn-border: var(--action-primary-border);
+
+    &:hover {
+      --btn-bg: var(--action-primary-hover);
+      --btn-border: var(--action-primary-hover);
+    }
+
+    &:active,
+    &.btn-active {
+      --btn-bg: var(--action-primary-pressed);
+      --btn-border: var(--action-primary-pressed);
+      translate: none;
+    }
+  }
+
+  .btn-primary:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+
+  .btn-primary:is(:disabled, [disabled], .btn-disabled) {
+    --btn-fg: var(--action-disabled-fg);
+    --btn-border: var(--surface-border);
+    background-color: var(--action-disabled-bg);
+    opacity: 1;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .counter-btn,
+    .btn-primary {
+      transition: none;
+    }
+  }
+
+  .btn-primary:is(.btn-outline, .btn-soft, .btn-ghost, .btn-link):not(
+      :disabled,
+      [disabled],
+      .btn-disabled
+    ) {
+    --btn-fg: var(--color-base-content);
+    --btn-bg: transparent;
+    --btn-border: transparent;
+
+    &:hover,
+    &:active {
+      --btn-bg: var(--surface-action);
+    }
+  }
+
+  .btn-primary.btn-outline:not(:disabled, [disabled], .btn-disabled) {
+    --btn-border: var(--control-border);
+  }
+
+  .btn-primary.btn-soft:not(:disabled, [disabled], .btn-disabled) {
+    --btn-bg: color-mix(in oklab, var(--color-primary) 12%, var(--color-base-100));
+    --btn-border: var(--surface-border);
+
+    &:hover,
+    &:active {
+      --btn-bg: color-mix(in oklab, var(--color-primary) 18%, var(--color-base-100));
+    }
+  }
+
+  /* Counts and step markers are supporting information, not primary actions. */
+  .brand-marker,
+  .badge-primary {
+    color: var(--color-base-content);
+    background-color: color-mix(in oklab, var(--color-primary) 12%, var(--color-base-100));
+  }
+
+  .badge-primary {
+    --badge-fg: var(--color-base-content);
+    --badge-color: color-mix(in oklab, var(--color-primary) 28%, var(--color-base-100));
+    border-color: var(--badge-color);
+  }
+
+  .badge-primary.badge-outline {
+    background-color: transparent;
+  }
+
+  .badge-neutral.badge-soft {
+    color: var(--color-base-content);
+    background-color: var(--surface-inset);
+    border-color: var(--surface-border);
+  }
+
   /* The class also covers compound controls (label.input); never box their inner input twice. */
   .input,
   .select,

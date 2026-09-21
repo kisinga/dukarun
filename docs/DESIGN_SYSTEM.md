@@ -71,6 +71,17 @@ The orange is a spice, not a sauce.
 
 - Primary orange (`#e85d2f`) is reserved for actions and brand moments. Celebration is
   allowed on success screens — expressed with colour and iconography, **not** oversized type.
+- Filled primary actions use `--color-primary` orange with white `--color-primary-content`
+  text/icons and 14px/600 labels in both themes, for both `appButton` and legacy DaisyUI actions.
+  A fine brand-derived border defines the edge; hover/pressed fills deepen the same orange without
+  moving the label. Reduced motion removes transitions. Disabled actions use a neutral inset fill
+  and readable muted labels.
+- Known accessibility limitation: the historical white-on-`#e85d2f` pairing is 3.48:1, below WCAG
+  AA's 4.5:1 threshold for small text. This is not an AA contrast fix. Do not enlarge labels or
+  substitute an unrelated action colour to work around it.
+- Open till uses the shared primary treatment at 44px. Avatar initials use brand orange and white.
+  Counts and step markers stay subordinate: `badge-primary` and `brand-marker` supply a quiet tint,
+  while plain quantities use neutral badges.
 - One font family: **Outfit**. Headings are tightened (`tracking-tight`). Corners are
   rounded but not bubbly (`--radius-box: 0.75rem`).
 - Empty states and errors speak like a person, not a system log.
@@ -222,7 +233,7 @@ groups before adding another border. A small count is not automatically a hero m
 | Supporting detail  | `--surface-inset` / `surface-inset`        | Recessed history, context, or empty state within a group; no second card border.                           |
 | Editable control   | `.input`, `.select`, `.textarea`           | Inset fill and `--control-border`; permanent label above. Includes searchable choices and compound inputs. |
 | Secondary action   | `--surface-action` / `appButton` secondary | Neutral filled button, distinct from an inset field.                                                       |
-| Primary action     | `appButton` primary                        | Orange fill with contrasting dark text; one dominant next action per task.                                 |
+| Primary action     | `appButton` primary                        | Brand orange with white text; one dominant next action per task. See the contrast limitation above.        |
 | Disclosure         | `.detail-disclosure`                       | Full-width neutral row, chevron, 44px target, `aria-expanded`; never looks like a save button.             |
 
 - Read-only data uses plain label/value text or a `dl`, not disabled inputs. Manufacturer,
@@ -499,7 +510,9 @@ history remain on their operational pages; do not duplicate those workflows insi
 
 One recipe, encoded in `styles.scss`: `.nav-item` (sidebar links, drawer links, footer
 links) and `.bottom-nav-item` (mobile tab bar). Ghost by default, 4pt rhythm, 44px
-targets, icons inherit state color. Exactly **one active signifier**: the tinted
+targets, icons inherit state color. Small selected labels use the shared brand-derived
+`--text-accent` tone, which deepens in light mode and lightens in dark mode without changing
+the main orange action fill. Exactly **one active signifier**: the tinted
 container (`.nav-item-active` / the icon pill in `.bottom-nav-active`) — no indicator
 bars, dots, gradients, or weight games on top of it. Apply the active class via
 `routerLinkActive`. Never hand-roll nav rows in shell files.
@@ -508,9 +521,10 @@ bars, dots, gradients, or weight games on top of it. Apply the active class via
 
 Peer views inside a workspace use the global `.section-tabs` surface and `.section-tab` items.
 The group is content-width, horizontally scrollable when necessary, and uses the standard box and
-field radii. `.section-tab-active` is the only active signifier: a quiet primary tint with primary
-text. Do not use underline-only tabs, square outlines, full-width empty tab bars, or page-specific
-tab geometry. On phones, multi-view workspaces may replace the strip with a labeled select.
+field radii. `.section-tab-active` is the only active signifier: a quiet primary tint with readable
+`--text-accent` text. Inactive labels use `--text-muted`. Do not use underline-only tabs, square
+outlines, full-width empty tab bars, or page-specific tab geometry. On phones, multi-view workspaces
+may replace the strip with a labeled select.
 
 Wizard steps and in-flow choices such as payment methods are not section navigation and keep their
 own purpose-specific patterns.
@@ -518,8 +532,9 @@ own purpose-specific patterns.
 ## Tables (the row language)
 
 Header chrome is encoded globally (`.dashboard-main .table thead th`): uppercase 12px
-semibold, `/50` muted, hairline divider. Never style `<th>` per page. Rows follow one
-vocabulary — same meaning, same shape; different data, different cells:
+semibold, shared `--text-muted`, hairline divider. `type-caption`, table supporting text and catalog
+metadata use this same readable 70% tone instead of ad-hoc 50–55% text. Never style `<th>` per page.
+Rows follow one vocabulary — same meaning, same shape; different data, different cells:
 
 - **Density**: cells are `vertical-align: middle` (encoded); one line per cell where
   possible. A cell may stack exactly two lines: primary `text-sm font-medium`, secondary

@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '../fixtures/mocked-browser';
+import { renderedTextContrast } from '../fixtures/contrast';
 
 const companyId = '97000000-0000-4000-8000-000000000001';
 const userId = '97000000-0000-4000-8000-000000000002';
@@ -570,6 +571,7 @@ test('populated cart stays compact and keeps editing reachable in both themes', 
   await page.goto('http://127.0.0.1:4203/pos/sell');
   await expect.poll(() => cachedPack(page)).not.toBeNull();
   await expect(page.locator('#current-sale')).toContainText('Cart is empty');
+  await expect(page.locator('[data-learning-anchor="sell-checkout"]:visible')).toBeDisabled();
   const sampleLines = [
     {
       name: 'Sugar — 1kg Packed',
@@ -680,6 +682,35 @@ test('populated cart stays compact and keeps editing reachable in both themes', 
   await expect(rows).toHaveCount(3);
   for (const theme of ['light', 'dark']) {
     await page.evaluate(value => document.documentElement.setAttribute('data-theme', value), theme);
+    const payment = page.locator('[data-learning-anchor="sell-checkout"]:visible');
+    const count = page.locator('app-sell-catalog-panel .badge').filter({ hasText: 'in cart' });
+    await expect(payment).toBeEnabled();
+    const paymentGeometry = await payment.evaluate(element => {
+      const range = document.createRange();
+      range.selectNodeContents(element);
+      const label = range.getBoundingClientRect();
+      const button = element.getBoundingClientRect();
+      return {
+        height: button.height,
+        labelLeft: label.left - button.left,
+        labelRight: button.right - label.right,
+        overflow: element.scrollWidth - element.clientWidth,
+      };
+    });
+    expect(paymentGeometry.height).toBeGreaterThanOrEqual(44);
+    expect(paymentGeometry.height).toBeLessThanOrEqual(48);
+    expect(paymentGeometry.labelLeft).toBeGreaterThanOrEqual(0);
+    expect(paymentGeometry.labelRight).toBeGreaterThanOrEqual(0);
+    expect(paymentGeometry.overflow).toBeLessThanOrEqual(1);
+    const badge = await renderedTextContrast(count);
+    expect(badge.ratio).toBeGreaterThanOrEqual(4.5);
+    expect(badge.background).not.toEqual([232, 93, 47]);
+    // Interaction states are covered by the shared style contract; verify this integration.
+    const label = await renderedTextContrast(payment);
+    expect(label.fontSize).toBe(14);
+    expect(label.fontWeight).toBe(600);
+    expect(label.foreground).toEqual([255, 255, 255]);
+    expect(label.background).toEqual([232, 93, 47]);
     await cart.scrollIntoViewIfNeeded();
     const geometry = await rows.evaluateAll(elements =>
       elements.map(element => ({

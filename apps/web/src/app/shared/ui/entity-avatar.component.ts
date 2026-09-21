@@ -3,9 +3,10 @@ import { Component, computed, input } from '@angular/core';
 type AvatarSize = 'sm' | 'md' | 'lg';
 
 /** Initials avatar for customers/team rows (ported from the old app).
- *  Renders the photo when `imageUrl` is set, initials otherwise. */
+ *  Decorative photo/initials; the surrounding entity name or account control owns the label. */
 @Component({
   selector: 'app-entity-avatar',
+  host: { 'aria-hidden': 'true' },
   template: `
     <div class="avatar" [class.placeholder]="!imageUrl()">
       @if (imageUrl(); as url) {
@@ -40,6 +41,6 @@ export class EntityAvatarComponent {
 
   protected readonly textClasses = computed(() => {
     const size = this.size();
-    return size === 'sm' ? 'text-xs' : size === 'lg' ? 'text-base' : 'text-sm';
+    return `font-semibold ${size === 'sm' ? 'text-xs' : size === 'lg' ? 'text-base' : 'text-sm'}`;
   });
 }
