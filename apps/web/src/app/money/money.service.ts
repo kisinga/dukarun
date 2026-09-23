@@ -1661,7 +1661,7 @@ export class MoneyService {
     newQuantity: number,
     reason: string,
     unitCost?: number
-  ): Promise<string> {
+  ): Promise<string | null> {
     const { data, error } = await this.db.rpc('post_stock_adjustment_at_location', {
       p_location_id: this.locations.requireActiveId(),
       p_variant_id: variantId,

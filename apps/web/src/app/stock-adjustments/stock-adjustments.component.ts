@@ -4,7 +4,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute } from '@angular/router';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { debounceTime, distinctUntilChanged } from 'rxjs';
-import { formatKes, formatKesInput, parseKes } from '../core/money';
+import { formatKes, formatUnitCostInput, parseUnitCost } from '../core/money';
 import { MoneyService } from '../money/money.service';
 import { PosService, Variant, variantLabel } from '../pos/pos.service';
 import { ButtonComponent } from '../shared/ui/button.component';
@@ -213,7 +213,7 @@ type StockAdjustmentHistoryDisplay = StockAdjustmentHistoryRow & {
                     >
                       <input
                         type="text"
-                        inputmode="numeric"
+                        inputmode="decimal"
                         class="input input-bordered min-h-11 w-full sm:max-w-xs"
                         placeholder="0"
                         [formControl]="unitCost"
@@ -600,7 +600,7 @@ export class StockAdjustmentsComponent implements OnInit {
       const batches = await this.pos.variantBatches(variant.variant_id);
       const latestCost = batches.find(batch => batch.unit_cost > 0)?.unit_cost;
       if (latestCost !== undefined && this.unitCost.value === '') {
-        this.unitCost.setValue(formatKesInput(latestCost));
+        this.unitCost.setValue(formatUnitCostInput(latestCost));
       }
     } catch {
       // A cost can still be entered manually if stock is increased.
@@ -644,7 +644,7 @@ export class StockAdjustmentsComponent implements OnInit {
     if (!variant.allow_fractional && !Number.isInteger(next)) return false;
     if (this.reason.value.length === 0) return false;
     if (this.quantityDifference() > 0) {
-      const cost = parseKes(this.unitCost.value);
+      const cost = parseUnitCost(this.unitCost.value);
       if (cost === null || cost <= 0) return false;
     }
     return true;
@@ -681,7 +681,7 @@ export class StockAdjustmentsComponent implements OnInit {
 
     const previous = this.currentQuantity();
     const difference = next - previous;
-    const unitCost = difference > 0 ? parseKes(this.unitCost.value) : undefined;
+    const unitCost = difference > 0 ? parseUnitCost(this.unitCost.value) : undefined;
     const details = this.notes.value.trim();
     const adjustmentReason = details ? `${this.reason.value}: ${details}` : this.reason.value;
 

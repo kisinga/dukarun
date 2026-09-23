@@ -1,7 +1,7 @@
 import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import type { Json } from '@dukarun/shared-types';
-import { formatKes } from '../core/money';
+import { formatKes, formatUnitCost } from '../core/money';
 import { PermissionsService } from '../core/permissions.service';
 import { SupabaseService } from '../core/supabase.service';
 import { AuditActor, AuditEvent, AuditService } from './audit.service';
@@ -768,6 +768,7 @@ export class AuditComponent implements OnInit, OnDestroy {
     if (value === undefined || value === null || value === '') return '—';
     if (/password|secret|token|key/i.test(field)) return 'Hidden';
     if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+    if (typeof value === 'number' && /(?:^|_)unit_cost$/.test(field)) return formatUnitCost(value);
     if (typeof value === 'number' && /amount|balance|cost|credit_limit|price|total/.test(field)) {
       return formatKes(value);
     }

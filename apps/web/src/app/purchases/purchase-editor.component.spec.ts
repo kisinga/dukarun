@@ -256,7 +256,7 @@ describe('PurchaseEditorComponent input VAT', () => {
     component.quantityChanged(line, 3);
     expect(line.lineTotal).toBe('3000');
     component.lineTotalChanged(line, '1000');
-    expect(line.unitCost).toBe('333');
+    expect(line.unitCost).toBe('333.33');
     component.quantityChanged(line, 4);
     expect(line.lineTotal).toBe('1000');
     expect(line.unitCost).toBe('250');
@@ -266,6 +266,31 @@ describe('PurchaseEditorComponent input VAT', () => {
     expect(line.lineTotal).toBe('200');
     expect(line.unitsPerUnit).toBe(1);
   });
+
+  it.each([
+    ['2.50', '250'],
+    ['0.25', '25'],
+  ])(
+    'preserves the %s buying rate through editor calculations and payloads',
+    async (rate, total) => {
+      const { component } = await render();
+      addValidInvoice(component);
+      component.variantsState.set([variant]);
+      const line = component.lines()[0];
+      component.quantityChanged(line, 100);
+      component.unitCostChanged(line, rate);
+      expect(line.lineTotal).toBe(total);
+      expect(component.parsedLines()[0]).toMatchObject({
+        unit_cost: Number(rate),
+        line_total: Number(total),
+        quantity: 100,
+      });
+      component.lineTotalChanged(line, total);
+      expect(line.unitCost).toBe(String(Number(rate)));
+      component.unitCostChanged(line, '2.123');
+      expect(line.lineTotal).toBe('');
+    }
+  );
 
   it('shows the claim control, prefills supplier evidence, and renders a server estimate', async () => {
     const { fixture, component, money } = await render();
@@ -356,37 +381,41 @@ describe('PurchaseEditorComponent input VAT', () => {
     );
   });
 
-  it('adds a line immediately and applies supplier cost only while it is untouched', async () => {
-    const { component, money } = await render();
-    const price = deferred<ReturnType<typeof supplierPerformance>[]>();
-    money.supplierVariantPerformance.mockReturnValueOnce(price.promise);
-    component.supplier.setValue('supplier-1');
+  it.each([104, 2.5])(
+    'applies supplier cost %s without rounding the rate or overwriting edits',
+    async supplierCost => {
+      const { component, money } = await render();
+      const price = deferred<ReturnType<typeof supplierPerformance>[]>();
+      money.supplierVariantPerformance.mockReturnValueOnce(price.promise);
+      component.supplier.setValue('supplier-1');
 
-    const add = component.addVariant(variant);
-    expect(component.lines()).toHaveLength(1);
-    expect(component.lines()[0].unitCost).toBe('116');
+      const add = component.addVariant(variant);
+      expect(component.lines()).toHaveLength(1);
+      expect(component.lines()[0].unitCost).toBe('116');
 
-    price.resolve([supplierPerformance('variant-1', 104)]);
-    await add;
-    await vi.waitFor(() => expect(component.lines()[0].unitCost).toBe('104'));
+      price.resolve([supplierPerformance('variant-1', supplierCost)]);
+      await add;
+      await vi.waitFor(() => expect(component.lines()[0].unitCost).toBe(String(supplierCost)));
+      expect(component.lines()[0].lineTotal).toBe(String(Math.round(supplierCost)));
 
-    const secondPrice = deferred<ReturnType<typeof supplierPerformance>[]>();
-    money.supplierVariantPerformance.mockReturnValueOnce(secondPrice.promise);
-    component.performanceState.set([]);
-    component.performanceLoadedKeys.clear();
-    const secondAdd = component.addVariant(variant);
-    const secondLine = component.lines()[1];
-    secondLine.unitCost = '109';
-    secondLine.lineTotal = '109';
-    component.linesState.update((items: unknown[]) => [...items]);
-    secondPrice.resolve([supplierPerformance('variant-1', 101)]);
-    await secondAdd;
-    await secondPrice.promise;
-    await Promise.resolve();
+      const secondPrice = deferred<ReturnType<typeof supplierPerformance>[]>();
+      money.supplierVariantPerformance.mockReturnValueOnce(secondPrice.promise);
+      component.performanceState.set([]);
+      component.performanceLoadedKeys.clear();
+      const secondAdd = component.addVariant(variant);
+      const secondLine = component.lines()[1];
+      secondLine.unitCost = '109';
+      secondLine.lineTotal = '109';
+      component.linesState.update((items: unknown[]) => [...items]);
+      secondPrice.resolve([supplierPerformance('variant-1', 101)]);
+      await secondAdd;
+      await secondPrice.promise;
+      await Promise.resolve();
 
-    expect(component.lines()[1].unitCost).toBe('109');
-    expect(component.lines()[1].lineTotal).toBe('109');
-  });
+      expect(component.lines()[1].unitCost).toBe('109');
+      expect(component.lines()[1].lineTotal).toBe('109');
+    }
+  );
 
   it('persists VAT evidence before invoking the canonical finalizer', async () => {
     const { component, money, learning } = await render();
@@ -528,48 +557,58 @@ describe('PurchaseEditorComponent input VAT', () => {
     expect(component.expenses()[0].amount).toBe('100');
   });
 
-  it('restores VAT evidence from a draft and preserves it when saving again', async () => {
-    const { component, money } = await render();
-    component.restoreDraft({
-      id: 'draft-1',
-      supplier_id: 'supplier-1',
-      reference: 'SUP-DRAFT-1',
-      notes: null,
-      purchase_date: '2026-08-18',
-      claim_input_vat: true,
-      tax_invoice_date: '2026-08-17',
-      stock_location_id: 'location-1',
-      payment_mode: 'paid',
-      payment_amount: 116,
-      price_entry_basis: 'inclusive',
-      account_code: 'CASH_ON_HAND',
-      client_ref: null,
-      lines: [
-        {
-          variant_id: 'variant-1',
-          quantity: 1,
-          unit_cost: 116,
-          line_total: 116,
-          value_source: 'unit',
-        },
-      ],
-      expenses: [],
-    });
-    component.syncSupplierPin();
-
-    expect(component.claimInputVat.value).toBe(true);
-    expect(component.taxInvoiceDate.value).toBe('2026-08-17');
-    expect(component.supplierPinSaved()).toBe(true);
-
-    await component.saveDraft();
-
-    expect(money.savePurchaseWorkspaceDraft).toHaveBeenCalledWith(
-      expect.objectContaining({
-        draftId: 'draft-1',
+  it.each([116, 2.5])(
+    'restores VAT evidence and a %s unit cost from a draft without rounding',
+    async unitCost => {
+      const { component, money } = await render();
+      component.restoreDraft({
+        id: 'draft-1',
+        supplier_id: 'supplier-1',
         reference: 'SUP-DRAFT-1',
-        claimInputVat: true,
-        taxInvoiceDate: '2026-08-17',
-      })
-    );
-  });
+        notes: null,
+        purchase_date: '2026-08-18',
+        claim_input_vat: true,
+        tax_invoice_date: '2026-08-17',
+        stock_location_id: 'location-1',
+        payment_mode: 'paid',
+        payment_amount: Math.round(unitCost * 100),
+        price_entry_basis: 'inclusive',
+        account_code: 'CASH_ON_HAND',
+        client_ref: null,
+        lines: [
+          {
+            variant_id: 'variant-1',
+            quantity: 100,
+            unit_cost: unitCost,
+            line_total: Math.round(unitCost * 100),
+            value_source: 'unit',
+          },
+        ],
+        expenses: [],
+      });
+      component.syncSupplierPin();
+
+      expect(component.claimInputVat.value).toBe(true);
+      expect(component.taxInvoiceDate.value).toBe('2026-08-17');
+      expect(component.supplierPinSaved()).toBe(true);
+      expect(component.lines()[0].unitCost).toBe(String(unitCost));
+
+      await component.saveDraft();
+
+      expect(money.savePurchaseWorkspaceDraft).toHaveBeenCalledWith(
+        expect.objectContaining({
+          draftId: 'draft-1',
+          reference: 'SUP-DRAFT-1',
+          claimInputVat: true,
+          taxInvoiceDate: '2026-08-17',
+          lines: [
+            expect.objectContaining({
+              unit_cost: unitCost,
+              line_total: Math.round(unitCost * 100),
+            }),
+          ],
+        })
+      );
+    }
+  );
 });

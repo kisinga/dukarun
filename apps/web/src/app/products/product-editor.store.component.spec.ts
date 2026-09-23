@@ -128,6 +128,96 @@ describe('ProductEditorStore', () => {
     expect(pos.saveProductUnits).not.toHaveBeenCalled();
   });
 
+  it.each([
+    { quantity: 100, cost: '2.50', total: 250 },
+    { quantity: 100, cost: '0.25', total: 25 },
+    { quantity: 1, cost: '0.25', total: 0 },
+    { quantity: 3, cost: '2.50', total: 8 },
+  ])(
+    'keeps $quantity items at $cost while rounding only stock value',
+    async ({ quantity, cost, total }) => {
+      const { store, pos } = createStore();
+      await store.initialize({ mode: 'create' });
+      store.name.setValue('Screws');
+      store.mutateRow({
+        index: 0,
+        changes: { price: '5', openingQuantity: String(quantity), openingUnitCost: cost },
+      });
+      expect(await store.save()).not.toBeNull();
+      expect(pos.saveProductUnits).toHaveBeenCalledWith(
+        expect.anything(),
+        [
+          expect.objectContaining({
+            opening_quantity: quantity,
+            opening_unit_cost: Number(cost),
+            opening_total_cost: total,
+          }),
+        ],
+        expect.any(String)
+      );
+    }
+  );
+
+  it('derives the opening rate when the exact stock value is explicitly entered', async () => {
+    const { store, pos } = createStore();
+    await store.initialize({ mode: 'create' });
+    store.name.setValue('Screws');
+    store.mutateRow({
+      index: 0,
+      changes: { price: '5', openingQuantity: '3', openingUnitCost: '2.50', openingTotalCost: '8' },
+    });
+    expect(await store.save()).not.toBeNull();
+    expect(pos.saveProductUnits).toHaveBeenCalledWith(
+      expect.anything(),
+      [
+        expect.objectContaining({
+          opening_quantity: 3,
+          opening_unit_cost: 2.67,
+          opening_total_cost: 8,
+        }),
+      ],
+      expect.any(String)
+    );
+  });
+
+  it('converts the cost of a 100-piece opening box into a fractional base-unit rate', async () => {
+    const { store, pos } = createStore();
+    await store.initialize({ mode: 'create' });
+    store.name.setValue('Screws');
+    store.mutateRow({
+      index: 0,
+      changes: {
+        price: '5',
+        stockUnit: 'piece',
+        openingQuantity: '1',
+        openingUnitCost: '250',
+        openingPackId: 'box',
+        packs: [
+          {
+            id: 'box',
+            name: 'Box',
+            units_per_pack: 100,
+            sale_price: null,
+            barcode: null,
+            active: true,
+          },
+        ],
+      },
+    });
+    expect(await store.save()).not.toBeNull();
+    expect(pos.saveProductUnits).toHaveBeenCalledWith(
+      expect.anything(),
+      [
+        expect.objectContaining({
+          opening_quantity: 100,
+          opening_unit_cost: 2.5,
+          opening_total_cost: 250,
+        }),
+      ],
+      expect.any(String)
+    );
+  });
+
   it('applies variant intents immutably and builds the coupled create payload', async () => {
     const { store, pos, learning } = createStore();
     await store.initialize({ mode: 'create' });

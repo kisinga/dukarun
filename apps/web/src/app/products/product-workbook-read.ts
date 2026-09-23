@@ -1,4 +1,5 @@
 import type { Cell, Row, Workbook } from 'exceljs';
+import { parseUnitCost } from '../core/money';
 import {
   BLOCKED,
   HEADERS,
@@ -743,7 +744,9 @@ export function readProductWorkbook(
       const count = blank(counted)
         ? undefined
         : number(counted, 'Counted stock', owner.values.allow_fractional);
-      const cost = blank(buying) ? undefined : number(buying, 'New buying');
+      const cost = blank(buying) ? undefined : parseUnitCost(text(buying));
+      if (cost === null)
+        throw new Error('New buying: enter a nonnegative cost with at most 2 decimal places.');
       const exactValue = blank(exact) ? undefined : number(exact, 'Revised batch value KES');
       const oldStock = entry.variant ? stockByVariant.get(entry.variant.id) : undefined;
       const batch = oldStock?.batch;

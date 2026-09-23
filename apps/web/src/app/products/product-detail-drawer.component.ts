@@ -324,6 +324,7 @@ type ShareFeedback = { kind: 'success' | 'error'; message: string };
                                 Cost
                                 <app-money
                                   [amount]="b.unit_cost"
+                                  [unitCost]="true"
                                   [masked]="!perms.has('ViewFinancials')"
                                 />
                                 @if (preferences.batchExpiryEnabled()) {
@@ -388,6 +389,7 @@ type ShareFeedback = { kind: 'success' | 'error'; message: string };
                                       {{ row.quantity }} ×
                                       <app-money
                                         [amount]="row.unit_cost"
+                                        [unitCost]="true"
                                         [masked]="!perms.has('ViewFinancials')"
                                       />
                                     </p>

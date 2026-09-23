@@ -420,6 +420,7 @@ export async function exportProductWorkbook(
       cell.fill = fill([6, 8, 10, 12, 27].includes(c) || !variant ? YELLOW : 'FFFFFF');
       if ([5, 7, 9, 11, 24, 25, 26].includes(c) || cell.value === BLOCKED) readonly(cell);
       if ((c >= 5 && c <= 12) || c >= 24) cell.numFmt = '#,##0.###;[Red](#,##0.###);0;@';
+      if (c === 9 || c === 10) cell.numFmt = '#,##0.##;[Red](#,##0.##);0;@';
       if (variant && ![5, 7, 9, 11, 24, 25, 26].includes(c))
         cell.note = `At export: ${cell.text || '(blank)'}. Optional details are edited here; blank clears an optional detail.`;
     }
@@ -496,7 +497,7 @@ export async function exportProductWorkbook(
             : ''
       );
       const address = `${column(c)}${n}`;
-      const numeric = `AND(ISNUMBER(${address}),${address}>=0,${c === 12 ? `IF(R${n}="Yes",ROUND(${address},3)=${address},MOD(${address},1)=0)` : `MOD(${address},1)=0`})`;
+      const numeric = `AND(ISNUMBER(${address}),${address}>=0,${c === 12 ? `IF(R${n}="Yes",ROUND(${address},3)=${address},MOD(${address},1)=0)` : c === 10 ? `ROUND(${address},2)=${address}` : `MOD(${address},1)=0`})`;
       if (n === START_ROW)
         validateRange(main, `${column(c)}${n}:${column(c)}${last}`, {
           type: 'custom',
@@ -527,9 +528,12 @@ export async function exportProductWorkbook(
       dropdown(main.getCell(n, 19), 'TaxChoices');
     }
     if (choice) {
-      for (const c of [7, 8, 9, 10])
+      for (const c of [7, 8])
         main.getCell(n, c).numFmt =
           `#,##0" / ${choice.unit.replaceAll('"', '')}";[Red](#,##0);0" / ${choice.unit.replaceAll('"', '')}";@`;
+      for (const c of [9, 10])
+        main.getCell(n, c).numFmt =
+          `#,##0.##" / ${choice.unit.replaceAll('"', '')}";[Red](#,##0.##);0" / ${choice.unit.replaceAll('"', '')}";@`;
       for (const c of [11, 12])
         main.getCell(n, c).numFmt =
           `#,##0.###" ${choice.plural.replaceAll('"', '')}";[Red](#,##0.###);0" ${choice.plural.replaceAll('"', '')}";@`;
@@ -551,7 +555,8 @@ export async function exportProductWorkbook(
   for (const choice of choices) {
     for (const [ref, format] of [
       [`K6:L${last}`, `#,##0.###" ${choice.plural.replaceAll('"', '')}"`],
-      [`G6:J${last}`, `#,##0" / ${choice.unit.replaceAll('"', '')}"`],
+      [`G6:H${last}`, `#,##0" / ${choice.unit.replaceAll('"', '')}"`],
+      [`I6:J${last}`, `#,##0.##" / ${choice.unit.replaceAll('"', '')}"`],
     ] as const)
       main.addConditionalFormatting({
         ref,

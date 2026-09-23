@@ -3,7 +3,7 @@ import { Component, effect, inject, input, output } from '@angular/core';
 import { ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { DocumentSendComponent } from '../communications/document-send.component';
-import { formatKes } from '../core/money';
+import { formatKes, formatUnitCost } from '../core/money';
 import { ButtonComponent } from '../shared/ui/button.component';
 import { DrawerComponent } from '../shared/ui/drawer.component';
 import { EmptyStateComponent } from '../shared/ui/empty-state.component';
@@ -176,7 +176,7 @@ import type { PurchaseRow } from './purchase-history.store';
                         </p>
                       }
                       <p class="type-caption">
-                        {{ line.quantity }} {{ unitLabel(line) }} × {{ fmt(line.unit_cost) }}
+                        {{ line.quantity }} {{ unitLabel(line) }} × {{ fmtCost(line.unit_cost) }}
                         @if (line.expiry_date) {
                           · exp {{ line.expiry_date }}
                         }
@@ -347,6 +347,7 @@ export class PurchaseDetailDrawerComponent {
 
   protected readonly store = inject(PurchaseDetailStore);
   protected readonly fmt = formatKes;
+  protected readonly fmtCost = formatUnitCost;
 
   constructor() {
     effect(() => void this.store.open(this.purchase()));

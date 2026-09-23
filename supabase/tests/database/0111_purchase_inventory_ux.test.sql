@@ -260,7 +260,7 @@ select results_eq(
     from public.supplier_variant_performance
     where supplier_id = '11110000-0000-4000-8000-000000000020'
       and variant_id = '11110000-0000-4000-8000-000000000011'$$,
-  $$values (1, 100::bigint)$$,
+  $$values (1, 100::numeric)$$,
   'supplier price history excludes reversed purchases'
 );
 

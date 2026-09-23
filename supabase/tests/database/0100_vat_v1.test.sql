@@ -321,7 +321,7 @@ select results_eq(
   $$values (1160::bigint,1000::bigint,160::bigint,true)$$,
   'claimable purchase separates input VAT from net inventory cost');
 select is((select b.unit_cost from public.inventory_batches b join public.purchase_lines l
-  on l.inventory_batch_id=b.id where l.purchase_id=(select purchase_id from vat_purchase)),100::bigint,
+  on l.inventory_batch_id=b.id where l.purchase_id=(select purchase_id from vat_purchase)),100::numeric,
   'inventory batch uses net unit cost after recoverable VAT');
 select results_eq(
   $$select a.code::text,sum(l.debit)::bigint,sum(l.credit)::bigint

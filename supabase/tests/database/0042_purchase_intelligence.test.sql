@@ -47,7 +47,7 @@ select is((select price from public.product_variants
 select is((select count(*)::int from public.purchase_lines
   where purchase_id=(select purchase_id from pi_purchase)),1,'purchase line is retained');
 select is((select average_unit_cost from public.supplier_variant_performance
-  where supplier_id='42000000-0000-0000-0000-000000000003'),9000::bigint,
+  where supplier_id='42000000-0000-0000-0000-000000000003'),9000::numeric,
   'supplier product cost aggregate is accurate');
 
 select public.record_purchase_with_prices('42000000-0000-0000-0000-000000000004',

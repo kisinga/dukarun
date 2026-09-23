@@ -106,7 +106,7 @@ returns jsonb language sql as $$
 $$;
 select lives_ok($$select public.apply_product_workbook('aa220000-0000-4000-8000-000000000033',pg_temp.workbook_batch_change((select id from workbook_variant),23,null,null,1499))$$,'exact batch value can be corrected without changing rounded buying price');
 select is((select sum(remaining_cost) from public.inventory_batches where variant_id=(select id from workbook_variant)),1499::numeric,'exact batch correction keeps the entered value');
-select is((select unit_cost from public.inventory_batches where variant_id=(select id from workbook_variant) and remaining>0),14::bigint,'exact correction preserves the buying price');
+select is((select unit_cost from public.inventory_batches where variant_id=(select id from workbook_variant) and remaining>0),14::numeric,'exact correction preserves the buying price');
 select lives_ok($$select public.apply_product_workbook('aa220000-0000-4000-8000-000000000034',pg_temp.workbook_batch_change((select id from workbook_variant),23,97,16))$$,'increased count and buying correction apply together');
 select is((select sum(remaining) from public.inventory_batches where variant_id=(select id from workbook_variant)),97::numeric,'increased count receives only the difference');
 select is((select sum(remaining_cost) from public.inventory_batches where variant_id=(select id from workbook_variant)),1552::numeric,'buying correction and additional stock preserve accounting value');

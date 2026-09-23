@@ -132,7 +132,7 @@ export interface PurchaseLinePriceContext {
           <input
             data-learning-anchor="purchase-item-unit-cost"
             class="input input-bordered h-11 w-full text-right tabular-nums md:h-10"
-            inputmode="numeric"
+            inputmode="decimal"
             [placeholder]="'Cost per ' + (line().unitName || variant()?.stock_unit || 'item')"
             [ngModel]="line().unitCost"
             [ngModelOptions]="{ standalone: true }"
@@ -190,7 +190,7 @@ export interface PurchaseLinePriceContext {
             <span class="type-caption shrink-0">This supplier</span>
             @if (priceContext().supplierCost !== null) {
               <span class="text-xs font-semibold">
-                <app-money [amount]="priceContext().supplierCost!" />
+                <app-money [amount]="priceContext().supplierCost!" [unitCost]="true" />
               </span>
               <span class="type-caption truncate">
                 {{ priceContext().supplierComparison }} ·

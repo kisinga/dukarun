@@ -31,7 +31,7 @@ create temp table fractional_pack_purchase as select public.record_purchase_comp
   '[]',0,'FRACTIONAL-PACK-BUY') id;
 select results_eq($$select quantity,stock_quantity,unit_cost,line_total from public.purchase_lines
   where purchase_id=(select id from fractional_pack_purchase) order by stock_quantity desc$$,
-  $$values (2::numeric,180::numeric,901::bigint,1802::bigint),(0.5::numeric,0.5::numeric,10::bigint,5::bigint)$$,
+  $$values (2::numeric,180::numeric,901::numeric,1802::bigint),(0.5::numeric,0.5::numeric,10::numeric,5::bigint)$$,
   'purchase mixes complete rolls and fractional metres without rounding invoice costs');
 select is((select sum(remaining) from public.inventory_batches where variant_id=(select id from fractional_pack_variant)),
   180.5::numeric,'both purchase units feed one stock balance');

@@ -153,7 +153,7 @@ select is(
 );
 select is(
   (select unit_cost from public.inventory_batches where id = (select id from editable_batch)),
-  60::bigint,
+  60::numeric,
   'the open batch unit cost is corrected'
 );
 select is(
@@ -265,7 +265,7 @@ select throws_ok(
 );
 select is(
   (select unit_cost from public.inventory_batches where id = (select id from editable_batch)),
-  60::bigint,
+  60::numeric,
   'a failed unified workbook leaves the batch unchanged'
 );
 select is(
@@ -410,7 +410,7 @@ select is(
 select results_eq(
   $$select quantity,remaining,unit_cost,original_cost,remaining_cost,batch_number
     from public.inventory_batches where id = '92929292-9292-4292-8292-9292929292b1'$$,
-  $$values (12::numeric,8::numeric,70::bigint,560::bigint,560::bigint,'COUNT-LATEST'::text)$$,
+  $$values (12::numeric,8::numeric,70::numeric,560::bigint,560::bigint,'COUNT-LATEST'::text)$$,
   'the added quantity, corrected cost, and metadata share one canonical batch row'
 );
 select is(
@@ -467,7 +467,7 @@ select results_eq(
   $$select quantity,remaining,unit_cost,original_cost,remaining_cost,batch_number
     from public.inventory_batches
     where variant_id = (select variant_id from no_batch_variant)$$,
-  $$values (3::numeric,3::numeric,75::bigint,225::bigint,225::bigint,'COUNT-NEW'::text)$$,
+  $$values (3::numeric,3::numeric,75::numeric,225::bigint,225::bigint,'COUNT-NEW'::text)$$,
   'the dynamically created batch carries the entered quantity, price, and number'
 );
 select is(

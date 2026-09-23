@@ -5,7 +5,7 @@ select plan(15);
 select has_function(
   'public',
   'post_stock_adjustment',
-  array['uuid', 'numeric', 'numeric', 'text', 'bigint'],
+  array['uuid', 'numeric', 'numeric', 'text', 'numeric'],
   'counted stock adjustment RPC exists'
 );
 
@@ -161,7 +161,7 @@ select is(
   (select unit_cost from public.inventory_batches
    where variant_id = 'aa000000-0000-0000-0000-000000000046'
    order by created_at desc, id desc limit 1),
-  400::bigint,
+  400::numeric,
   'the fallback increase uses the most recent cost layer'
 );
 
