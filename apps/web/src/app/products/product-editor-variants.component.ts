@@ -2,7 +2,7 @@ import { ProductPacksEditorComponent } from './product-packs-editor.component';
 import { Component, input, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import type { BusinessLocation } from '../core/location-context.service';
-import { parseKes } from '../core/money';
+import { parseKes, parseUnitCost } from '../core/money';
 import { ButtonComponent } from '../shared/ui/button.component';
 import { FormFieldComponent } from '../shared/ui/form-field.component';
 import { IconComponent } from '../shared/ui/icon.component';
@@ -345,7 +345,7 @@ import type {
                     <app-form-field label="Unit cost (KES)">
                       <input
                         type="text"
-                        inputmode="numeric"
+                        inputmode="decimal"
                         class="input input-bordered w-full"
                         placeholder="0"
                         [ngModel]="row.openingUnitCost"
@@ -460,7 +460,8 @@ export class ProductEditorVariantsComponent {
     const factor = pack?.units_per_pack ?? 1;
     const loose = pack ? Number(row.openingLooseQuantity || 0) : 0;
     return Math.round(
-      ((Number(row.openingQuantity || 0) * factor + loose) * (parseKes(row.openingUnitCost) ?? 0)) /
+      ((Number(row.openingQuantity || 0) * factor + loose) *
+        (parseUnitCost(row.openingUnitCost) ?? 0)) /
         factor
     );
   }

@@ -1,4 +1,4 @@
-import { Component, ElementRef, effect, inject, input, output } from '@angular/core';
+import { Component, ElementRef, effect, inject, input, output, untracked } from '@angular/core';
 import { ReactiveFormsModule } from '@angular/forms';
 import { BarcodeScannerComponent } from '../shared/ui/barcode-scanner.component';
 import { ButtonComponent } from '../shared/ui/button.component';
@@ -424,7 +424,10 @@ export class ProductEditorComponent {
   protected readonly stockLookup = (variantId: string) => this.store.stockOf(variantId);
 
   constructor() {
-    effect(() => void this.store.initialize(this.request()));
+    effect(() => {
+      const request = this.request();
+      untracked(() => void this.store.initialize(request));
+    });
   }
 
   protected requestClose(): void {

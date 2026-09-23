@@ -25,10 +25,12 @@ describe('ProductPhotoControlComponent', () => {
   });
 
   async function render(mode: 'create' | 'edit' = 'create') {
-    vi.stubGlobal(
-      'createImageBitmap',
-      vi.fn(async () => ({ width: 100, height: 60, close: vi.fn() }))
-    );
+    const createImageBitmap = vi.fn(async (_source: Blob) => ({
+      width: 100,
+      height: 60,
+      close: vi.fn(),
+    }));
+    vi.stubGlobal('createImageBitmap', createImageBitmap);
     Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
       configurable: true,
       value: vi.fn(() => ({ drawImage: vi.fn() })),
@@ -39,7 +41,7 @@ describe('ProductPhotoControlComponent', () => {
         callback(new Blob(['resized'], { type: type ?? 'image/jpeg' }));
       }),
     });
-    const createObjectUrl = vi.fn(() => 'blob:preview');
+    const createObjectUrl = vi.fn().mockReturnValue('blob:preview');
     Object.defineProperty(URL, 'createObjectURL', {
       configurable: true,
       value: createObjectUrl,
@@ -61,7 +63,14 @@ describe('ProductPhotoControlComponent', () => {
     fixture.componentRef.setInput('mode', mode);
     fixture.componentRef.setInput('alt', 'Widget photo');
     fixture.detectChanges();
-    return { fixture, selected, failed, remove, createObjectUrl };
+    return {
+      fixture,
+      selected,
+      failed,
+      remove,
+      createImageBitmap,
+      createObjectUrl,
+    };
   }
 
   it('resizes and emits a pending product image from a selected file', async () => {
@@ -81,6 +90,26 @@ describe('ProductPhotoControlComponent', () => {
     });
   });
 
+  it.each(['', 'application/octet-stream'])(
+    'accepts a decodable camera photo when the provider MIME type is %j',
+    async providerType => {
+      const { fixture, selected, failed, createImageBitmap } = await render();
+      const file = new File(['photo'], 'camera-photo.jpg', { type: providerType });
+
+      await (fixture.componentInstance as any).selectPhoto({
+        target: { files: [file], value: 'camera-photo.jpg' },
+      });
+
+      expect(failed).not.toHaveBeenCalled();
+      expect((createImageBitmap.mock.calls[0][0] as Blob).type).toBe('image/jpeg');
+      expect(selected).toHaveBeenCalledWith({
+        blob: expect.any(Blob),
+        extension: 'jpg',
+        previewUrl: 'blob:preview',
+      });
+    }
+  );
+
   it('emits a friendly error for non-image files', async () => {
     const { fixture, selected, failed } = await render();
     const file = new File(['csv'], 'products.csv', { type: 'text/csv' });
@@ -91,6 +120,27 @@ describe('ProductPhotoControlComponent', () => {
 
     expect(selected).not.toHaveBeenCalled();
     expect(failed).toHaveBeenCalledWith('Choose a valid image file.');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Choose a valid image file.');
+  });
+
+  it('reports a stable error when image bytes cannot be decoded', async () => {
+    const { fixture, selected, failed } = await render();
+    vi.stubGlobal(
+      'createImageBitmap',
+      vi.fn().mockRejectedValue(new DOMException('Decode failed'))
+    );
+    const file = new File(['not really an image'], 'broken.jpg', { type: 'image/jpeg' });
+
+    await (fixture.componentInstance as any).selectPhoto({
+      target: { files: [file], value: 'broken.jpg' },
+    });
+
+    const message = 'Could not read this photo. Choose a JPEG, PNG, or WebP image.';
+    expect(selected).not.toHaveBeenCalled();
+    expect(failed).toHaveBeenCalledWith(message);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain(message);
   });
 
   it('makes a staged replacement explicit and allows it to be cancelled', async () => {

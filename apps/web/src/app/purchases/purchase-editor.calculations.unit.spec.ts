@@ -3,6 +3,7 @@ import {
   buildPurchaseExpenseInputs,
   buildPurchaseLineInputs,
   purchaseLineTaxBreakdown,
+  purchaseLineEnteredAmount,
   purchasePaymentProjection,
   purchaseTaxBreakdown,
 } from './purchase-editor.calculations';
@@ -39,8 +40,66 @@ describe('purchase editor calculations', () => {
       canAdjustPrices: true,
     });
     expect(payload.line_total).toBe(116);
-    expect(payload.unit_cost).toBe(39);
+    expect(payload.unit_cost).toBe(38.67);
+    expect(payload.entered_unit_cost).toBe(33.33);
     expect(payload.entered_line_total).toBe(100);
+  });
+
+  it.each([
+    ['2.50', 250],
+    ['0.25', 25],
+  ] as const)('multiplies a %s buying rate before rounding the posted total', (unitCost, total) => {
+    const purchaseLine = {
+      ...line,
+      quantity: 100,
+      unitCost,
+      lineTotal: String(total),
+      valueSource: 'unit' as const,
+    };
+    expect(purchaseLineEnteredAmount(purchaseLine)).toBe(total);
+    const breakdown = purchaseLineTaxBreakdown(purchaseLine, 0, 'inclusive');
+    const [payload] = buildPurchaseLineInputs({
+      lines: [purchaseLine],
+      breakdowns: new Map([[1, breakdown]]),
+      basis: 'inclusive',
+      variants: new Map([['variant-1', { variant_id: 'variant-1' } as never]]),
+      includeExpiry: false,
+      canAdjustPrices: false,
+    });
+    expect(payload.unit_cost).toBe(Number(unitCost));
+    expect(payload.line_total).toBe(total);
+  });
+
+  it('keeps pack buying rates and exact line totals separate from base-stock rates', () => {
+    const purchaseLine = {
+      ...line,
+      quantity: 1,
+      unitCost: '250',
+      lineTotal: '250',
+      valueSource: 'unit' as const,
+      packId: 'box',
+      unitsPerUnit: 100,
+      unitName: 'box',
+    };
+    const breakdown = purchaseLineTaxBreakdown(purchaseLine, 0, 'inclusive');
+    const [payload] = buildPurchaseLineInputs({
+      lines: [purchaseLine],
+      breakdowns: new Map([[1, breakdown]]),
+      basis: 'inclusive',
+      variants: new Map([['variant-1', { variant_id: 'variant-1' } as never]]),
+      includeExpiry: false,
+      canAdjustPrices: false,
+    });
+    expect(payload).toMatchObject({
+      unit_cost: 250,
+      line_total: 250,
+      quantity: 1,
+      units_per_unit: 100,
+    });
+    expect(payload.unit_cost / payload.units_per_unit!).toBe(2.5);
+    expect(
+      purchaseLineEnteredAmount({ ...line, quantity: 3, unitCost: '2.5', valueSource: 'unit' })
+    ).toBe(8);
   });
 
   it('preserves entered expense values while persisting the computed gross supplier cost', () => {

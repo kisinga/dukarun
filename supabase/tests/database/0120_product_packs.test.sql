@@ -17,7 +17,7 @@ create temp table pack_purchase as select public.record_purchase_complete(
  '[{"variant_id":"aa200000-0000-4000-8000-000000000003","pack_id":"aa200000-0000-4000-8000-000000000004","quantity":2,"unit_cost":755}]',
  '[]',0,'PACK-BUY') id;
 select results_eq($$select quantity,stock_quantity,unit_cost,line_total,unit_name from public.purchase_lines where purchase_id=(select id from pack_purchase)$$,
- $$values (2::numeric,200::numeric,755::bigint,1510::bigint,'Box'::text)$$,'supplier invoice retains boxes and exact box cost');
+ $$values (2::numeric,200::numeric,755::numeric,1510::bigint,'Box'::text)$$,'supplier invoice retains boxes and exact box cost');
 select results_eq($$select quantity,remaining,original_cost,remaining_cost from public.inventory_batches where variant_id='aa200000-0000-4000-8000-000000000003'$$,
  $$values (200::numeric,200::numeric,1510::bigint,1510::bigint)$$,'one stock balance preserves indivisible acquisition value');
 select is(public.resolve_catalog_selling_unit('PACK-BOX')->>'selected_pack_id','aa200000-0000-4000-8000-000000000004','barcode resolves exact pack');

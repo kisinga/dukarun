@@ -182,15 +182,15 @@ export async function exportProductWorkbook(
   const main = sheet(
     book,
     'Products',
-    [24, 24, 19, 30, 12, 12, 13, 13, 12, 12, 17, 17],
+    [24, 24, 19, 30, 12, 12, 13, 13, 22, 22, 17, 17],
     `${snapshot.company_name} · ${snapshot.location.code} — ${snapshot.location.name} · KES · ${snapshot.exported_at.slice(0, 10)}`,
-    `FILL FIRST: Single / Per row → pack definition on Pack sizes → pack row with the same Product, Manufacturer and Size / type.\nRecommended layout: Single / Per followed by its packs. Matching searches the whole table; row position does not select a parent.\nYellow = changes · Grey / XXXX = reference · Blank New / Counted cells keep values · ${capacity - populated} prepared new rows · Sort using table headers.`
+    `FILL FIRST: Single / Per row → pack definition on Pack sizes → pack row with the same Product, Manufacturer and Size / type.\nRecommended layout: Single / Per followed by its packs. Matching searches the whole table; row position does not select a parent.\nBUYING PRICE = cost of ONE stock unit (piece, metre, pair, etc.). Divide the pack cost by its contents: KES 250 / 100 pieces = KES 2.50 per piece.\nYellow = changes · Grey / XXXX = reference · Blank New / Counted cells keep values · ${capacity - populated} prepared new rows · Sort using table headers.`
   );
   for (const [a, b, label] of [
     [1, 4, 'WHICH PRODUCT · HOW IT IS SOLD'],
     [5, 6, 'RETAIL · PER SOLD AS'],
     [7, 8, 'WHOLESALE'],
-    [9, 10, 'BUYING · LATEST BATCH'],
+    [9, 10, 'BUYING · PER ONE STOCK UNIT'],
     [11, 12, 'STOCK · COUNT ONCE'],
   ] as const) {
     main.mergeCells(4, a, 4, b);
@@ -420,6 +420,7 @@ export async function exportProductWorkbook(
       cell.fill = fill([6, 8, 10, 12, 27].includes(c) || !variant ? YELLOW : 'FFFFFF');
       if ([5, 7, 9, 11, 24, 25, 26].includes(c) || cell.value === BLOCKED) readonly(cell);
       if ((c >= 5 && c <= 12) || c >= 24) cell.numFmt = '#,##0.###;[Red](#,##0.###);0;@';
+      if (c === 9 || c === 10) cell.numFmt = '#,##0.##;[Red](#,##0.##);0;@';
       if (variant && ![5, 7, 9, 11, 24, 25, 26].includes(c))
         cell.note = `At export: ${cell.text || '(blank)'}. Optional details are edited here; blank clears an optional detail.`;
     }
@@ -496,7 +497,7 @@ export async function exportProductWorkbook(
             : ''
       );
       const address = `${column(c)}${n}`;
-      const numeric = `AND(ISNUMBER(${address}),${address}>=0,${c === 12 ? `IF(R${n}="Yes",ROUND(${address},3)=${address},MOD(${address},1)=0)` : `MOD(${address},1)=0`})`;
+      const numeric = `AND(ISNUMBER(${address}),${address}>=0,${c === 12 ? `IF(R${n}="Yes",ROUND(${address},3)=${address},MOD(${address},1)=0)` : c === 10 ? `ROUND(${address},2)=${address}` : `MOD(${address},1)=0`})`;
       if (n === START_ROW)
         validateRange(main, `${column(c)}${n}:${column(c)}${last}`, {
           type: 'custom',
@@ -506,8 +507,18 @@ export async function exportProductWorkbook(
           ],
           showErrorMessage: true,
           errorStyle: 'stop',
+          ...(c === 10
+            ? {
+                showInputMessage: true,
+                promptTitle: 'Buying price per stock unit',
+                prompt:
+                  'Enter the cost of ONE piece, metre, pair, etc., with up to 2 decimal places. Divide pack cost by its contents: KES 250 / 100 pieces = KES 2.50 per piece. Do not enter the whole pack cost.',
+              }
+            : {}),
           error:
-            'Enter a valid amount on the Single / Per row. Pack stock is counted on its parent.',
+            c === 10
+              ? 'Enter KES per ONE stock unit, with up to 2 decimal places, on the Single / Per row. Divide pack cost by its contents first.'
+              : 'Enter a valid amount on the Single / Per row. Pack stock is counted on its parent.',
         });
     }
     if (n === START_ROW)
@@ -527,9 +538,12 @@ export async function exportProductWorkbook(
       dropdown(main.getCell(n, 19), 'TaxChoices');
     }
     if (choice) {
-      for (const c of [7, 8, 9, 10])
+      for (const c of [7, 8])
         main.getCell(n, c).numFmt =
           `#,##0" / ${choice.unit.replaceAll('"', '')}";[Red](#,##0);0" / ${choice.unit.replaceAll('"', '')}";@`;
+      for (const c of [9, 10])
+        main.getCell(n, c).numFmt =
+          `#,##0.##" / ${choice.unit.replaceAll('"', '')}";[Red](#,##0.##);0" / ${choice.unit.replaceAll('"', '')}";@`;
       for (const c of [11, 12])
         main.getCell(n, c).numFmt =
           `#,##0.###" ${choice.plural.replaceAll('"', '')}";[Red](#,##0.###);0" ${choice.plural.replaceAll('"', '')}";@`;
@@ -551,7 +565,8 @@ export async function exportProductWorkbook(
   for (const choice of choices) {
     for (const [ref, format] of [
       [`K6:L${last}`, `#,##0.###" ${choice.plural.replaceAll('"', '')}"`],
-      [`G6:J${last}`, `#,##0" / ${choice.unit.replaceAll('"', '')}"`],
+      [`G6:H${last}`, `#,##0" / ${choice.unit.replaceAll('"', '')}"`],
+      [`I6:J${last}`, `#,##0.##" / ${choice.unit.replaceAll('"', '')}"`],
     ] as const)
       main.addConditionalFormatting({
         ref,

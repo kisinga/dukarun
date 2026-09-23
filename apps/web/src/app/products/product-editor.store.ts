@@ -5,7 +5,7 @@ import type { TaxCategory } from '@dukarun/tax-types';
 import { CatalogCacheService } from '../core/catalog-cache.service';
 import { CompanyPreferencesService } from '../core/company-preferences.service';
 import { LocationContextService } from '../core/location-context.service';
-import { formatKesInput, parseKes } from '../core/money';
+import { formatKesInput, parseKes, parseUnitCost, roundUnitCost } from '../core/money';
 import { PermissionsService } from '../core/permissions.service';
 import { SupabaseService } from '../core/supabase.service';
 import { TaxService } from '../core/tax.service';
@@ -562,7 +562,9 @@ export class ProductEditorStore implements OnDestroy {
           'variants'
         );
       }
-      const openingUnitCost = row.openingUnitCost.trim() ? parseKes(row.openingUnitCost) : null;
+      const openingUnitCost = row.openingUnitCost.trim()
+        ? parseUnitCost(row.openingUnitCost)
+        : null;
       if (openingQuantity > 0 && openingUnitCost === null && !row.openingTotalCost?.trim()) {
         return this.invalid(`${label}: enter a valid opening unit cost.`, 'variants');
       }
@@ -589,7 +591,11 @@ export class ProductEditorStore implements OnDestroy {
         ...(openingQuantity > 0
           ? {
               opening_quantity: openingQuantity,
-              opening_unit_cost: Math.round(totalCost! / openingQuantity),
+              opening_unit_cost: roundUnitCost(
+                row.openingTotalCost?.trim()
+                  ? totalCost! / openingQuantity
+                  : openingUnitCost! / (openingPack?.units_per_pack ?? 1)
+              ),
               opening_total_cost: totalCost!,
               ...(row.openingLocationId ? { opening_location_id: row.openingLocationId } : {}),
               ...(row.batchNumber.trim() ? { batch_number: row.batchNumber.trim() } : {}),

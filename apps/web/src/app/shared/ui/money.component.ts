@@ -1,5 +1,10 @@
 import { Component, computed, input } from '@angular/core';
-import { formatKes, formatMoneyAmount } from '../../core/money';
+import {
+  formatKes,
+  formatMoneyAmount,
+  formatUnitCost,
+  formatUnitCostAmount,
+} from '../../core/money';
 
 /**
  * Canonical money renderer (The Counter — money talks first).
@@ -24,8 +29,10 @@ import { formatKes, formatMoneyAmount } from '../../core/money';
   `,
 })
 export class MoneyComponent {
-  /** Amount in integer shillings. */
+  /** Amount in shillings; fractional values require unitCost. */
   readonly amount = input.required<number>();
+  /** Buying-cost rate, not a posted total or selling price. */
+  readonly unitCost = input(false);
   readonly direction = input<'in' | 'out' | 'none'>('none');
   /** Show the currency code when the surrounding label does not establish it. */
   readonly showCurrency = input(false);
@@ -33,7 +40,15 @@ export class MoneyComponent {
   readonly masked = input(false);
 
   protected readonly formatted = computed(() =>
-    this.showCurrency() ? formatKes(this.amount()) : formatMoneyAmount(this.amount())
+    this.unitCost()
+      ? this.showCurrency()
+        ? formatUnitCost(this.amount())
+        : formatUnitCostAmount(this.amount())
+      : this.showCurrency()
+        ? formatKes(this.amount())
+        : formatMoneyAmount(this.amount())
   );
-  protected readonly accessibleAmount = computed(() => formatKes(this.amount()));
+  protected readonly accessibleAmount = computed(() =>
+    this.unitCost() ? formatUnitCost(this.amount()) : formatKes(this.amount())
+  );
 }

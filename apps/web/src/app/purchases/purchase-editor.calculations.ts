@@ -1,5 +1,5 @@
 import type { PurchasePriceBasis, PurchaseTaxContext } from '@dukarun/tax-types';
-import { parseKes } from '../core/money';
+import { parseKes, parseUnitCost, roundUnitCost } from '../core/money';
 import type { PurchaseExpenseInput, PurchaseLineInput } from '../money/money.service';
 import type { Variant } from '../pos/pos.service';
 import type { PurchaseLineForm } from './purchase-line-row.component';
@@ -31,7 +31,7 @@ export function purchaseTaxBreakdown(
 export function purchaseLineEnteredAmount(line: PurchaseLineForm): number {
   return line.valueSource === 'total'
     ? (parseKes(line.lineTotal) ?? 0)
-    : Math.round(line.quantity * (parseKes(line.unitCost) ?? 0));
+    : Math.round(line.quantity * (parseUnitCost(line.unitCost) ?? 0));
 }
 
 export function purchaseLineTaxBreakdown(
@@ -104,7 +104,7 @@ export function buildPurchaseLineInputs(input: {
     const variant = input.variants.get(line.variantId)!;
     const wholesale = parseKes(line.wholesalePrice) ?? 0;
     const retail = parseKes(line.retailPrice) ?? 0;
-    const enteredUnitCost = parseKes(line.unitCost)!;
+    const enteredUnitCost = parseUnitCost(line.unitCost)!;
     const enteredLineTotal = parseKes(line.lineTotal)!;
     const breakdown = input.breakdowns.get(line.key)!;
     const exclusive = input.basis === 'exclusive';
@@ -121,7 +121,7 @@ export function buildPurchaseLineInputs(input: {
         ? { new_pack_sale_price: parseKes(line.packSalePrice)! }
         : {}),
       quantity: line.quantity,
-      unit_cost: exclusive ? Math.round(breakdown.gross / line.quantity) : enteredUnitCost,
+      unit_cost: exclusive ? roundUnitCost(breakdown.gross / line.quantity) : enteredUnitCost,
       line_total: exclusive ? breakdown.gross : enteredLineTotal,
       value_source: exclusive ? 'total' : line.valueSource,
       price_entry_basis: input.basis,

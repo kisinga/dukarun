@@ -1,3 +1,5 @@
+import { formatUnitCost } from '../../core/money';
+
 /**
  * Print Template System
  *
@@ -1086,7 +1088,7 @@ export class A4PurchaseTemplate {
                                 <tr>
                                     <td>${itemName}</td>
                                     <td class="text-right">${quantity}</td>
-                                    <td class="text-right">${this.formatCurrency(unitCost, 'KES')}</td>
+                                    <td class="text-right">${formatUnitCost(unitCost)}</td>
                                     <td class="text-right">${this.formatCurrency(lineTotal, 'KES')}</td>
                                 </tr>
             `;

@@ -43,6 +43,97 @@ async function setup() {
 }
 
 describe('Products workbook', () => {
+  it.each(['piece', 'metre', 'pair'])(
+    'makes buying prices explicitly per %s without changing numeric values',
+    async unit => {
+      const snapshot = workbookFixture();
+      snapshot.variants[0].stock_unit = unit;
+      snapshot.stock[0].batch!.unit_cost = 2.5;
+      const exported = await exportProductWorkbook(snapshot);
+      const book = await createExcelWorkbook();
+      await book.xlsx.load(await exported.xlsx.writeBuffer());
+      const main = book.getWorksheet('Products')!;
+      const row = bySku(book, 'SOAP250');
+      expect(main.getCell('I5').value).toBe('Buying now (KES / stock unit)');
+      expect(main.getCell('J5').value).toBe('New buying (KES / stock unit)');
+      expect(main.getCell('A3').text).toContain('KES 250 / 100 pieces = KES 2.50 per piece');
+      for (const c of [9, 10]) expect(row.getCell(c).numFmt).toContain(` / ${unit}`);
+      expect(row.getCell(9).value).toBe(2.5);
+      expect(row.getCell(10).dataValidation).toMatchObject({
+        showInputMessage: true,
+        promptTitle: 'Buying price per stock unit',
+      });
+      expect(row.getCell(10).dataValidation.prompt).toContain('Do not enter the whole pack cost');
+      expect(readProductWorkbook(book, 'Products.xlsx', snapshot).lines).toEqual([]);
+      row.getCell(10).value = 2.75;
+      const preview = readProductWorkbook(book, 'Products.xlsx', snapshot);
+      expect(preview.errors).toEqual([]);
+      expect(preview.changes.batches[0].new_unit_cost).toBe(2.75);
+      expect(packRow(book).getCell(9).value).toBe('XXXX');
+    }
+  );
+
+  it('still imports workbooks downloaded with the previous buying-price headings', async () => {
+    const { snapshot, book } = await setup();
+    const main = book.getWorksheet('Products')!;
+    main.getCell('I5').value = 'Buying now';
+    main.getCell('J5').value = 'New buying';
+    bySku(book, 'SOAP250').getCell(10).value = 2.5;
+    const preview = readProductWorkbook(book, 'Previous export.xlsx', snapshot);
+    expect(preview.errors).toEqual([]);
+    expect(preview.changes.batches[0].new_unit_cost).toBe(2.5);
+    main.getCell('J5').value = 'Pack buying price';
+    expect(() => readProductWorkbook(book, 'Wrong heading.xlsx', snapshot)).toThrow(
+      'missing or renamed column'
+    );
+  });
+
+  it('round trips fractional buying rates and keeps selling-price validation whole-shilling', async () => {
+    const snapshot = workbookFixture();
+    snapshot.stock[0].batch!.unit_cost = 2.5;
+    const exported = await exportProductWorkbook(snapshot);
+    const book = await createExcelWorkbook();
+    await book.xlsx.load(await exported.xlsx.writeBuffer());
+    const row = bySku(book, 'SOAP250');
+    expect(row.getCell(9).value).toBe(2.5);
+    expect(row.getCell(9).numFmt).toContain('0.##');
+    expect(row.getCell(10).dataValidation.formulae?.join()).toContain(',2)');
+    expect(readProductWorkbook(book, 'Products.xlsx', snapshot).lines).toEqual([]);
+    row.getCell(10).value = 0.25;
+    let preview = readProductWorkbook(book, 'Products.xlsx', snapshot);
+    expect(preview.errors).toEqual([]);
+    expect(preview.changes.batches[0]).toMatchObject({
+      expected_unit_cost: 2.5,
+      new_unit_cost: 0.25,
+    });
+    row.getCell(6).value = 2.5;
+    preview = readProductWorkbook(book, 'Products.xlsx', snapshot);
+    expect(preview.errors.join()).toContain('whole number');
+  });
+
+  it.each([-2.5, 'Infinity', 'NaN', 2.123])(
+    'rejects invalid workbook buying cost %s',
+    async cost => {
+      const { snapshot, book } = await setup();
+      bySku(book, 'SOAP250').getCell(10).value = cost;
+      expect(readProductWorkbook(book, 'Products.xlsx', snapshot).errors.join()).toContain(
+        '2 decimal places'
+      );
+    }
+  );
+
+  it('accepts fractional buying rates for new opening stock', async () => {
+    const { snapshot, book } = await setup();
+    const row = add(book, 0, 'Screws', '', '', 'Single item', 5);
+    row.getCell(10).value = 2.5;
+    row.getCell(12).value = 100;
+    const preview = readProductWorkbook(book, 'Products.xlsx', snapshot);
+    expect(preview.errors).toEqual([]);
+    expect(
+      preview.changes.products.find(product => product.values.name === 'Screws')!.variants[0]
+    ).toMatchObject({ opening_quantity: 100, opening_unit_cost: 2.5 });
+  });
+
   it('does not inherit a variant barcode on a pack with no barcode', async () => {
     const snapshot = workbookFixture();
     snapshot.packs[0].barcode = null;
