@@ -212,9 +212,14 @@ export function readProductWorkbook(
     throw new Error(
       'Keep the Products, Manufacturers and Pack sizes sheets. Download a fresh workbook.'
     );
-  for (const [i, header] of HEADERS.entries())
-    if (main.getCell(5, i + 1).value !== header)
+  for (const [i, header] of HEADERS.entries()) {
+    const actual = main.getCell(5, i + 1).value;
+    // The labels became explicit without changing the workbook's columns or values.
+    const previousBuyingHeader =
+      (i === 8 && actual === 'Buying now') || (i === 9 && actual === 'New buying');
+    if (actual !== header && !previousBuyingHeader)
       throw new Error(`Products: missing or renamed column ${header}. Download a fresh workbook.`);
+  }
   if (original.variants.length + original.packs.length > MAX_ROWS)
     throw new Error(`Maximum ${MAX_ROWS} selling-option rows.`);
   const attempt = (sheet: string, row: number, action: () => void) => {

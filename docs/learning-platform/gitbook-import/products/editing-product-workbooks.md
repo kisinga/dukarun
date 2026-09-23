@@ -26,6 +26,12 @@ Count stock once on the **Single / Per** row. A Soap / 250g box uses the Soap / 
 balance. Packs show grey **XXXX** for wholesale, buying and stock because those values belong
 to their Single / Per row. Enter numeric quantities; the cell displays the measure for you.
 
+**Buying prices are KES per one stock unit**, such as a piece, metre or pair, not the cost of
+the whole pack. Divide the pack's buying cost by its contents before entering **New buying**:
+a box costing KES 250 with 100 pieces means **KES 2.50 per piece**. Buying cells display the
+unit and accept up to two decimal places. Retail prices still apply to the row's **Sold as**
+option, so a pack row's retail price is for the whole pack.
+
 Expand the columns after Counted stock for SKU, barcodes, tracking, tax category, availability
 and latest-batch information. Optional details are edited in place; clearing an optional
 barcode or batch detail removes it. Existing SKU and stock-unit identities cannot be cleared.

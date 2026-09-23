@@ -182,15 +182,15 @@ export async function exportProductWorkbook(
   const main = sheet(
     book,
     'Products',
-    [24, 24, 19, 30, 12, 12, 13, 13, 12, 12, 17, 17],
+    [24, 24, 19, 30, 12, 12, 13, 13, 22, 22, 17, 17],
     `${snapshot.company_name} · ${snapshot.location.code} — ${snapshot.location.name} · KES · ${snapshot.exported_at.slice(0, 10)}`,
-    `FILL FIRST: Single / Per row → pack definition on Pack sizes → pack row with the same Product, Manufacturer and Size / type.\nRecommended layout: Single / Per followed by its packs. Matching searches the whole table; row position does not select a parent.\nYellow = changes · Grey / XXXX = reference · Blank New / Counted cells keep values · ${capacity - populated} prepared new rows · Sort using table headers.`
+    `FILL FIRST: Single / Per row → pack definition on Pack sizes → pack row with the same Product, Manufacturer and Size / type.\nRecommended layout: Single / Per followed by its packs. Matching searches the whole table; row position does not select a parent.\nBUYING PRICE = cost of ONE stock unit (piece, metre, pair, etc.). Divide the pack cost by its contents: KES 250 / 100 pieces = KES 2.50 per piece.\nYellow = changes · Grey / XXXX = reference · Blank New / Counted cells keep values · ${capacity - populated} prepared new rows · Sort using table headers.`
   );
   for (const [a, b, label] of [
     [1, 4, 'WHICH PRODUCT · HOW IT IS SOLD'],
     [5, 6, 'RETAIL · PER SOLD AS'],
     [7, 8, 'WHOLESALE'],
-    [9, 10, 'BUYING · LATEST BATCH'],
+    [9, 10, 'BUYING · PER ONE STOCK UNIT'],
     [11, 12, 'STOCK · COUNT ONCE'],
   ] as const) {
     main.mergeCells(4, a, 4, b);
@@ -507,8 +507,18 @@ export async function exportProductWorkbook(
           ],
           showErrorMessage: true,
           errorStyle: 'stop',
+          ...(c === 10
+            ? {
+                showInputMessage: true,
+                promptTitle: 'Buying price per stock unit',
+                prompt:
+                  'Enter the cost of ONE piece, metre, pair, etc., with up to 2 decimal places. Divide pack cost by its contents: KES 250 / 100 pieces = KES 2.50 per piece. Do not enter the whole pack cost.',
+              }
+            : {}),
           error:
-            'Enter a valid amount on the Single / Per row. Pack stock is counted on its parent.',
+            c === 10
+              ? 'Enter KES per ONE stock unit, with up to 2 decimal places, on the Single / Per row. Divide pack cost by its contents first.'
+              : 'Enter a valid amount on the Single / Per row. Pack stock is counted on its parent.',
         });
     }
     if (n === START_ROW)
