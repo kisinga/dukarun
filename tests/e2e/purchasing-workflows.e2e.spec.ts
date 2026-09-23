@@ -460,16 +460,20 @@ test('pack purchase keeps quantity, cost, total and Remove aligned and computes 
   const cost = row.getByLabel('Cost per Supplier crate (KES)');
   const total = row.getByLabel('Line total (KES)');
   await quantity.fill('2');
-  await cost.fill('1000');
-  await expect(total).toHaveValue('2000');
+  await cost.fill('1000.25');
+  await expect(total).toHaveValue('2001');
   await quantity.fill('3');
-  await expect(total).toHaveValue('3000');
+  await expect(total).toHaveValue('3001');
   await expect(row.getByText('Adds 72 packet')).toBeVisible();
   await total.fill('1000');
-  await expect(cost).toHaveValue('333');
+  await expect(cost).toHaveValue('333.33');
   await quantity.fill('4');
   await expect(total).toHaveValue('1000');
   await expect(cost).toHaveValue('250');
+  // Persist the rounded decimal rate without replacing the exact supplier total.
+  await quantity.fill('3');
+  await expect(total).toHaveValue('1000');
+  await expect(cost).toHaveValue('333.33');
   await expect(row.getByRole('button', { name: 'Remove item' })).toBeVisible();
   if ((page.viewportSize()?.width ?? 0) >= 1280) {
     const qtyBox = await quantity.boundingBox();
@@ -486,9 +490,10 @@ test('pack purchase keeps quantity, cost, total and Remove aligned and computes 
   expect(capture.savedDraft()).toMatchObject({
     p_lines: [
       expect.objectContaining({
-        quantity: 4,
+        quantity: 3,
         pack_id: '97000000-0000-4000-8000-000000000009',
         units_per_unit: 24,
+        unit_cost: 333.33,
         line_total: 1000,
         value_source: 'total',
       }),

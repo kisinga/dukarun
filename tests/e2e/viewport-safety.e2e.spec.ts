@@ -643,11 +643,16 @@ test('header actions and avatars retain the compact historical brand treatment',
     const till = page.getByRole('button', { name: 'Open till opening dialog' });
     await expect(till).toBeVisible();
     await expect(till).toHaveClass(/counter-btn-primary/);
-    const label = await renderedTextContrast(till);
-    expect(label.fontSize).toBe(14);
-    expect(label.fontWeight).toBe(600);
-    expect(label.foreground).toEqual([255, 255, 255]);
-    expect(label.background).toEqual([232, 93, 47]);
+    // The loading-to-primary change can restart the theme's colour transition.
+    // Wait for the final treatment, not a single intermediate animation frame.
+    await expect
+      .poll(() => renderedTextContrast(till))
+      .toMatchObject({
+        fontSize: 14,
+        fontWeight: 600,
+        foreground: [255, 255, 255],
+        background: [232, 93, 47],
+      });
     const account = page.getByRole('button', { name: 'Account menu' });
     await expect(account.locator('app-entity-avatar')).toHaveAttribute('aria-hidden', 'true');
     const initial = await renderedTextContrast(account.locator('app-entity-avatar span'));
