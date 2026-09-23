@@ -135,10 +135,12 @@ async function mockOperationsApp(
 ): Promise<{
   createdProduct: () => unknown;
   updatedProduct: () => unknown;
+  uploadedImage: () => { path: string; contentType: string; size: number } | null;
 }> {
   const storedSession = await installSession(page);
   let createdProduct: unknown = null;
   let updatedProduct: unknown = null;
+  let uploadedImage: { path: string; contentType: string; size: number } | null = null;
   const product = {
     id: productId,
     company_id: companyId,
@@ -299,6 +301,18 @@ async function mockOperationsApp(
       else createdProduct = body;
       return json(productId);
     }
+    if (path.startsWith('/storage/v1/object/product-images/')) {
+      const objectPath = decodeURIComponent(
+        path.slice('/storage/v1/object/product-images/'.length)
+      );
+      const body = request.postDataBuffer();
+      uploadedImage = {
+        path: objectPath,
+        contentType: body?.toString('latin1').match(/Content-Type: (image\/[^\r\n]+)/)?.[1] ?? '',
+        size: body?.byteLength ?? 0,
+      };
+      return json({ Key: objectPath });
+    }
     if (path.endsWith('/rest/v1/rpc/create_catalog_product_with_manufacturer')) {
       createdProduct = request.postDataJSON();
       return json(productId);
@@ -313,6 +327,7 @@ async function mockOperationsApp(
   return {
     createdProduct: () => createdProduct,
     updatedProduct: () => updatedProduct,
+    uploadedImage: () => uploadedImage,
   };
 }
 
@@ -422,6 +437,44 @@ test('product editor keeps task chrome reachable across the viewport contract', 
     await assertTaskModalGeometry(page, editor);
     await editor.getByRole('button', { name: 'Close product editor' }).click();
   }
+});
+
+test('product camera and gallery stage and upload a real image', async ({ page }) => {
+  const capture = await mockOperationsApp(page);
+  await page.goto('http://127.0.0.1:4203/inventory/products');
+  await page.getByRole('button', { name: 'Add product' }).click();
+
+  const editor = page.locator('dialog.modal-open .modal-box-task');
+  const photo = editor.locator('app-product-photo-control');
+  const galleryInput = photo.locator('input[type="file"]:not([capture])');
+  const cameraInput = photo.locator('input[type="file"][capture]');
+  const image = 'assets/logo/v2.png';
+
+  await galleryInput.setInputFiles(image);
+  await expect(
+    photo.getByText('Ready - the photo will upload when you create the product.')
+  ).toBeVisible();
+  await expect(photo.locator('img')).toHaveAttribute('src', /^blob:/);
+
+  await cameraInput.setInputFiles(image);
+  await expect(
+    photo.getByText('Ready - the photo will upload when you create the product.')
+  ).toBeVisible();
+  await expect(photo.locator('img')).toHaveAttribute('src', /^blob:/);
+
+  await editor.getByLabel('Product name').fill('Photo test product');
+  await editor.getByRole('button', { name: /Continue to|Next:/ }).click();
+  await editor.getByLabel('Retail price per item (KES)').fill('125');
+  await editor.getByRole('button', { name: 'Create product' }).click();
+
+  await expect(page.getByText('Created Photo test product')).toBeVisible();
+  const upload = capture.uploadedImage();
+  expect(upload).toMatchObject({ contentType: 'image/png' });
+  expect(upload?.path).toMatch(new RegExp(`^${companyId}/[0-9a-f-]+\\.png$`));
+  expect(upload?.size).toBeGreaterThan(0);
+  expect(capture.createdProduct()).toMatchObject({
+    p_product: { name: 'Photo test product', image_path: upload?.path },
+  });
 });
 
 test('record and edit hierarchy stays distinct in both themes', async ({ page, isMobile }) => {

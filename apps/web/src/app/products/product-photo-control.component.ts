@@ -133,6 +133,9 @@ export interface PendingProductImage {
               Photos are resized for faster uploads.
             }
           </p>
+          @if (selectionError()) {
+            <p class="mt-2 text-sm text-error" role="alert">{{ selectionError() }}</p>
+          }
         </div>
       </div>
     </section>
@@ -154,6 +157,7 @@ export class ProductPhotoControlComponent {
   readonly imageBroken = output<void>();
 
   protected readonly processing = signal(false);
+  protected readonly selectionError = signal<string | null>(null);
   protected readonly controlBusy = computed(() => this.processing() || this.busy());
   protected readonly actionDisabled = computed(() => this.disabled() || this.controlBusy());
 
@@ -167,8 +171,8 @@ export class ProductPhotoControlComponent {
     const file = input.files?.[0];
     if (!file) return;
     this.processing.set(true);
+    this.selectionError.set(null);
     try {
-      if (!file.type.startsWith('image/')) throw new Error('Choose a valid image file.');
       const resized = await resizeImage(file, 800);
       this.imageSelected.emit({
         blob: resized,
@@ -176,7 +180,9 @@ export class ProductPhotoControlComponent {
         previewUrl: URL.createObjectURL(resized),
       });
     } catch (err) {
-      this.selectionFailed.emit(err instanceof Error ? err.message : 'Could not use that photo');
+      const message = err instanceof Error ? err.message : 'Could not use that photo';
+      this.selectionError.set(message);
+      this.selectionFailed.emit(message);
     } finally {
       this.processing.set(false);
       input.value = '';
