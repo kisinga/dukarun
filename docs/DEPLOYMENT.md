@@ -89,6 +89,21 @@ CI uses typed fixtures.
 The normal `all` deployment starts web first, checks every new container is healthy, and
 deploys site last.
 
+### Frontend build resource controls
+
+Coolify keeps the four Compose application builds concurrent. Each Angular build uses at most
+`NG_BUILD_MAX_WORKERS` workers (default `2`) so the four-core production host does not give every
+compiler the full CPU count. Set `NG_BUILD_MAX_WORKERS=1` in the Coolify application environment
+and redeploy if a build causes an OOM, SSH latency, or sustained swap usage above 75%.
+
+The Dockerfile shares one dependency-install stage across all four images and persists separate
+npm and per-app/per-architecture Angular BuildKit caches. Angular's persistent cache is enabled in
+CI/container builds; local builds stay uncached because the LMDB cache backend aborts on the current
+macOS 27 development host. Use a normal deploy to reuse those caches; **Force deploy without cache**
+intentionally discards the layer-cache benefit. The storefront is browser-only, while its crawler
+HTML and sitemap continue to come from `public-content-renderer`. The marketing site keeps its
+static prerendering pipeline.
+
 Database-backed public content does not require a frontend rebuild. Browsers load current blog,
 shop, and product rows through the existing public RPCs. Nginx sends only social/search crawler
 requests for those routes to `public-content-renderer`, which returns current semantic HTML and

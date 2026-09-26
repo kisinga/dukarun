@@ -95,7 +95,8 @@
   "cli": {
     "analytics": false,
     "cache": {
-      "enabled": false
+      "enabled": true,
+      "environment": "ci"
     }
   }
 }

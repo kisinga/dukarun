@@ -21,8 +21,6 @@
             "outputPath": "dist/storefront",
             "index": "src/index.html",
             "browser": "src/main.ts",
-            "server": "src/main.server.ts",
-            "outputMode": "static",
             "tsConfig": "tsconfig.app.json",
             "inlineStyleLanguage": "scss",
             "assets": [
@@ -96,7 +94,8 @@
   "cli": {
     "analytics": false,
     "cache": {
-      "enabled": false
+      "enabled": true,
+      "environment": "ci"
     }
   }
 }

@@ -94,7 +94,7 @@ import { PurchaseVatPanelComponent } from './purchase-vat-panel.component';
                 (notesInput)="store.markDirty()"
               />
 
-              @if (store.recommendationsLoading()) {
+              @if (store.recommendationsLoading() && store.recommendations().length === 0) {
                 <section class="surface-card p-4">
                   <p class="type-caption">Loading supplier recommendations…</p>
                 </section>
@@ -109,6 +109,12 @@ import { PurchaseVatPanelComponent } from './purchase-vat-panel.component';
                     </div>
                     <a class="link type-caption" routerLink="/insights/inventory">View inventory</a>
                   </div>
+                  @if (store.recommendationsLoading()) {
+                    <p class="type-caption mt-2 flex items-center gap-2">
+                      <span class="loading loading-spinner loading-xs"></span> Refreshing
+                      suggestions
+                    </p>
+                  }
                   <ul class="mt-3 divide-y divide-base-200">
                     @for (item of store.recommendations(); track item.variant_id) {
                       <li class="flex min-h-12 items-center justify-between gap-3 py-2">
@@ -116,6 +122,13 @@ import { PurchaseVatPanelComponent } from './purchase-vat-panel.component';
                           <p class="truncate text-sm font-medium">
                             {{ item.product_name
                             }}{{ item.variant_name === 'Default' ? '' : ' · ' + item.variant_name }}
+                          </p>
+                          <p class="type-caption truncate">
+                            {{
+                              item.identity_resolution === 'unresolved'
+                                ? 'Details unavailable'
+                                : item.manufacturer_name || 'Manufacturer not set'
+                            }}
                           </p>
                           <p class="type-caption">
                             {{ item.current_stock }} in stock ·

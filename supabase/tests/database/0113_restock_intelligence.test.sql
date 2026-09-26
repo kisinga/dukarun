@@ -1,5 +1,5 @@
 begin;
-select plan(14);
+select plan(15);
 
 select ok(
   to_regclass('public.mv_daily_location_product_sales') is not null,
@@ -271,6 +271,9 @@ select results_eq(
   $$values (600::bigint, current_date - 14)$$,
   'latest supplier cost and receipt date are returned'
 );
+select ok(not ((select value from supplier_restock_report)->'products'->0 ?| array[
+  'productId','productName','variantName','manufacturerId','manufacturerName'
+]),'restock collections omit locally hydrated product identity');
 select is(
   jsonb_array_length(public.restock_product_intelligence(
     (now() at time zone 'Africa/Nairobi')::date - 6,

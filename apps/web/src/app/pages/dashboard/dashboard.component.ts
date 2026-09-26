@@ -13,19 +13,20 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 import { formatKes } from '../../core/money';
 import { Company, SupabaseService } from '../../core/supabase.service';
 import { PermissionsService } from '../../core/permissions.service';
+import { CatalogIdentityLookupService } from '../../core/identity-lookup.services';
+import { manufacturerLabel, productIdentity } from '../../core/product-identity';
 import { SyncService } from '../../pos/offline/sync.service';
-import { PosService } from '../../pos/pos.service';
 import {
   DashboardDailySummary,
   DashboardLocationSummary,
   DashboardPeriodComparison,
   DashboardTopVariant,
   ExpiringBatch,
-  LowStockVariant,
   ReportsService,
 } from '../../reports/reports.service';
 import { LocationContextService } from '../../core/location-context.service';
 import { ButtonComponent } from '../../shared/ui/button.component';
+import { DemandConfidenceIndicatorComponent } from '../../shared/ui/demand-confidence-indicator.component';
 import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
 import { IconComponent } from '../../shared/ui/icon.component';
 import { MoneyComponent } from '../../shared/ui/money.component';
@@ -57,6 +58,7 @@ type ProductSignal = {
   variantId: string;
   productId: string;
   label: string;
+  manufacturer: string;
   kind: ProductPerformanceCategory;
   currentQuantity: number;
   robustQuantity: number;
@@ -70,11 +72,10 @@ type ProductSignal = {
   stock: number;
   daysCover: number | null;
 };
-type LowStockDisplay = LowStockVariant & {
+type ExpiringDisplay = ExpiringBatch & {
   manufacturer_name: string | null;
-  product_id: string | null;
+  identity_resolution: 'resolved' | 'unresolved';
 };
-type ExpiringDisplay = ExpiringBatch & { manufacturer_name: string | null };
 type SalesChartPoint = DashboardDailySummary & {
   day: string;
   revenue: number;
@@ -86,6 +87,7 @@ type DashboardSection = 'sales' | 'attention';
   selector: 'app-dashboard',
   imports: [
     ButtonComponent,
+    DemandConfidenceIndicatorComponent,
     EmptyStateComponent,
     IconComponent,
     MoneyComponent,
@@ -326,8 +328,8 @@ type DashboardSection = 'sales' | 'attention';
           </section>
         }
 
-        @if (canViewFinancials()) {
-          <section aria-label="Sales performance" class="grid items-start gap-4 xl:grid-cols-12">
+        <section aria-label="Sales performance" class="grid items-start gap-4 xl:grid-cols-12">
+          @if (canViewFinancials()) {
             <article class="card overflow-hidden bg-base-100 xl:col-span-7">
               <div
                 class="flex flex-wrap items-end justify-between gap-2 border-b border-base-300 px-4 py-3"
@@ -436,92 +438,102 @@ type DashboardSection = 'sales' | 'attention';
                 </div>
               }
             </article>
+          }
 
-            <article class="card overflow-hidden bg-base-100 xl:col-span-5">
-              <div
-                class="flex flex-wrap items-end justify-between gap-2 border-b border-base-300 px-4 py-3"
-              >
-                <div>
-                  <h2 class="section-title">Product performance</h2>
-                  <p class="type-caption mt-1">
-                    Distinct leaders over 7 days, adjusted for unusual spikes.
-                  </p>
-                </div>
-                <a class="link text-xs" routerLink="/insights/inventory">View performance</a>
+          <article
+            class="card overflow-hidden bg-base-100"
+            [class.xl:col-span-5]="canViewFinancials()"
+            [class.xl:col-span-12]="!canViewFinancials()"
+          >
+            <div
+              class="flex flex-wrap items-end justify-between gap-2 border-b border-base-300 px-4 py-3"
+            >
+              <div>
+                <h2 class="section-title">Product performance</h2>
+                <p class="type-caption mt-1">
+                  Distinct leaders over 7 days, adjusted for unusual spikes.
+                </p>
               </div>
+              <a
+                class="link text-xs"
+                routerLink="/insights/inventory"
+                [queryParams]="{ view: 'performance', leader: 'trending' }"
+                >View performance</a
+              >
+            </div>
 
-              @if (initialLoading()) {
-                <div
-                  role="status"
-                  class="flex min-h-52 items-center justify-center gap-2 text-sm text-base-content/60"
-                >
-                  <span class="loading loading-spinner loading-sm"></span>
-                  Loading products
-                </div>
-              } @else if (productSignals().length === 0) {
-                <app-empty-state
-                  [embedded]="true"
-                  [compact]="true"
-                  icon="heroCube"
-                  title="No performance leaders yet"
-                  description="Leaders appear after enough repeat selling activity is available."
-                />
-              } @else {
-                <div class="divide-y divide-base-200">
-                  @for (signal of productSignals(); track signal.kind + signal.variantId) {
-                    <a
-                      class="flex min-h-20 items-center gap-3 px-4 py-3 hover:bg-base-200/40"
-                      [routerLink]="signal.productId ? '/inventory/products' : null"
-                      [queryParams]="{ product: signal.productId, variant: signal.variantId }"
-                    >
-                      <div class="min-w-0 flex-1">
-                        <p class="truncate font-medium">{{ signal.label }}</p>
-                        @if (signal.locationName) {
-                          <p class="type-caption truncate">{{ signal.locationName }}</p>
-                        }
-                        <p class="type-caption truncate">
-                          Adjusted {{ quantity(signal.robustQuantity) }} vs
-                          {{ quantity(signal.previousRobustQuantity) }} ·
-                          {{ signal.orderCount }} orders · {{ signal.activeDays }} active days
-                        </p>
-                        <div class="mt-1 flex flex-wrap gap-1">
-                          <span class="badge badge-ghost badge-xs"
-                            >{{ signal.confidence }} confidence</span
+            @if (initialLoading()) {
+              <div
+                role="status"
+                class="flex min-h-52 items-center justify-center gap-2 text-sm text-base-content/60"
+              >
+                <span class="loading loading-spinner loading-sm"></span>
+                Loading products
+              </div>
+            } @else if (productSignals().length === 0) {
+              <app-empty-state
+                [embedded]="true"
+                [compact]="true"
+                icon="heroCube"
+                title="No performance leaders yet"
+                description="Leaders appear after enough repeat selling activity is available."
+              />
+            } @else {
+              <div class="divide-y divide-base-200">
+                @for (signal of productSignals(); track signal.kind + signal.variantId) {
+                  <a
+                    class="flex min-h-20 items-center gap-3 px-4 py-3 hover:bg-base-200/40"
+                    [routerLink]="['/insights/inventory', signal.variantId]"
+                  >
+                    <div class="min-w-0 flex-1">
+                      <p class="truncate font-medium">{{ signal.label }}</p>
+                      <p class="type-caption truncate">{{ signal.manufacturer }}</p>
+                      @if (signal.locationName) {
+                        <p class="type-caption truncate">{{ signal.locationName }}</p>
+                      }
+                      <p class="type-caption truncate">
+                        Adjusted {{ quantity(signal.robustQuantity) }} vs
+                        {{ quantity(signal.previousRobustQuantity) }} ·
+                        {{ signal.orderCount }} orders · {{ signal.activeDays }} active days
+                      </p>
+                      <div class="mt-1 flex flex-wrap gap-1">
+                        <app-demand-confidence [value]="signal.confidence" />
+                        @if (signal.outlierDetected) {
+                          <span class="badge badge-warning badge-soft badge-xs"
+                            >Unusual spike adjusted</span
                           >
-                          @if (signal.outlierDetected) {
-                            <span class="badge badge-warning badge-xs">Unusual spike adjusted</span>
-                          }
-                        </div>
-                      </div>
-                      <div class="shrink-0 text-right">
-                        <p class="text-xs font-semibold uppercase text-base-content/70">
-                          {{ signalLabel(signal.kind) }}
-                        </p>
-                        @if (canViewFinancials()) {
-                          <p
-                            class="type-caption"
-                            [class.text-success]="signal.margin > 0"
-                            [class.text-error]="signal.margin < 0"
-                          >
-                            <app-money [amount]="signal.margin" /> margin
-                          </p>
                         }
-                        <p class="type-caption">
-                          {{ quantity(signal.currentQuantity) }} factual units ·
-                          {{
-                            signal.daysCover === null
-                              ? 'no cover'
-                              : quantity(signal.daysCover) + 'd cover'
-                          }}
-                        </p>
                       </div>
-                    </a>
-                  }
-                </div>
-              }
-            </article>
-          </section>
-        }
+                    </div>
+                    <div class="shrink-0 text-right">
+                      <p class="text-xs font-semibold uppercase text-base-content/70">
+                        {{ signalLabel(signal.kind) }}
+                      </p>
+                      @if (canViewFinancials()) {
+                        <p
+                          class="type-caption"
+                          [class.text-success]="signal.margin > 0"
+                          [class.text-error]="signal.margin < 0"
+                        >
+                          <app-money [amount]="signal.margin" /> margin
+                        </p>
+                      }
+                      <p class="type-caption">
+                        {{ quantity(signal.currentQuantity) }} factual units ·
+                        {{ quantity(signal.stock) }} on hand ·
+                        {{
+                          signal.daysCover === null
+                            ? 'no cover'
+                            : quantity(signal.daysCover) + 'd cover'
+                        }}
+                      </p>
+                    </div>
+                  </a>
+                }
+              </div>
+            }
+          </article>
+        </section>
 
         <section
           aria-labelledby="attention-heading"
@@ -530,13 +542,13 @@ type DashboardSection = 'sales' | 'attention';
         >
           <div class="flex flex-wrap items-end justify-between gap-2">
             <div>
-              <h2 id="attention-heading" class="section-title">Needs attention</h2>
-              <p class="type-caption mt-1">Inventory exceptions that may affect the next sale.</p>
+              <h2 id="attention-heading" class="section-title">Operational priorities</h2>
+              <p class="type-caption mt-1">The exceptions most likely to affect the next sale.</p>
             </div>
             <span class="type-caption">Updates with stock activity</span>
           </div>
 
-          <div class="grid gap-4 lg:grid-cols-2">
+          <div class="grid gap-4 lg:grid-cols-3">
             @if (canViewFinancials()) {
               <article class="card bg-base-100">
                 <div class="card-body p-4">
@@ -582,8 +594,8 @@ type DashboardSection = 'sales' | 'attention';
               <div class="card-body p-4">
                 <div class="flex items-center justify-between gap-2">
                   <div>
-                    <h3 class="section-title">Stock attention</h3>
-                    <p class="type-caption">Demand and cover signals</p>
+                    <h3 class="section-title">Inventory priorities</h3>
+                    <p class="type-caption">Robust demand and planning cover</p>
                   </div>
                   <a routerLink="/insights/inventory" class="link text-xs">View inventory</a>
                 </div>
@@ -606,82 +618,13 @@ type DashboardSection = 'sales' | 'attention';
                     ></span>
                     <div class="min-w-0 flex-1">
                       <p class="truncate text-sm font-semibold">{{ item.title }}</p>
+                      <p class="type-caption truncate">{{ manufacturerName(item) }}</p>
                       <p class="type-caption truncate">{{ insightReason(item.reason_code) }}</p>
                     </div>
                     @if (item.stock !== null) {
                       <span class="text-sm font-semibold tabular-nums">{{ item.stock }} left</span>
                     }
                   </a>
-                }
-              </div>
-            </article>
-          </div>
-
-          <div class="grid gap-4" [class.lg:grid-cols-2]="preferences.batchExpiryEnabled()">
-            <article class="card h-full bg-base-100">
-              <div class="card-body p-4">
-                <div class="flex items-center justify-between gap-2">
-                  <div class="flex items-center gap-2">
-                    <app-icon name="heroCube" />
-                    <div>
-                      <h3 class="section-title">Needs restock</h3>
-                      <p class="type-caption">{{ attentionLocationName() }}</p>
-                    </div>
-                  </div>
-                  <div class="flex items-center gap-2">
-                    @if (lowStock().length > 0) {
-                      <span class="badge badge-warning badge-sm">{{ lowStockTotal() }}</span>
-                    }
-                    <a
-                      routerLink="/inventory/products"
-                      [queryParams]="{ stock: 'needs_restock' }"
-                      class="link text-xs"
-                      >View all</a
-                    >
-                  </div>
-                </div>
-
-                @if (initialLoading()) {
-                  <div
-                    role="status"
-                    class="flex min-h-32 items-center justify-center gap-2 text-sm text-base-content/60"
-                  >
-                    <span class="loading loading-spinner loading-sm"></span>
-                    Loading stock
-                  </div>
-                } @else if (lowStock().length === 0) {
-                  <app-empty-state
-                    [embedded]="true"
-                    [compact]="true"
-                    icon="heroCheckCircle"
-                    title="All stocked up"
-                    description="Nothing is below its low-stock threshold."
-                  />
-                } @else {
-                  <div class="mt-2 flex flex-col divide-y divide-base-200">
-                    @for (item of lowStock(); track item.variant_id) {
-                      <a
-                        class="flex items-center gap-3 py-3 hover:text-primary"
-                        routerLink="/inventory/products"
-                        [queryParams]="{
-                          product: item.product_id,
-                          variant: item.variant_id,
-                        }"
-                      >
-                        <div class="min-w-0 flex-1">
-                          <p class="truncate text-sm font-medium">{{ item.product_name }}</p>
-                          <p class="type-caption truncate">
-                            {{ item.manufacturer_name || 'Manufacturer not set' }} ·
-                            {{ item.variant_name }}
-                          </p>
-                        </div>
-                        <div class="text-right">
-                          <p class="font-medium tabular-nums text-warning">{{ item.stock }}</p>
-                          <p class="type-caption">threshold {{ item.low_stock_threshold }}</p>
-                        </div>
-                      </a>
-                    }
-                  </div>
                 }
               </div>
             </article>
@@ -722,7 +665,7 @@ type DashboardSection = 'sales' | 'attention';
                           <div class="min-w-0 flex-1">
                             <p class="truncate text-sm font-medium">{{ batch.product_name }}</p>
                             <p class="type-caption truncate">
-                              {{ batch.manufacturer_name || 'Manufacturer not set' }} ·
+                              {{ manufacturerName(batch) }} ·
                               {{ batch.variant_name }}
                             </p>
                           </div>
@@ -750,7 +693,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   private readonly router = inject(Router);
   private readonly reports = inject(ReportsService);
   private readonly insights = inject(InsightsService);
-  private readonly pos = inject(PosService);
+  private readonly catalogIdentities = inject(CatalogIdentityLookupService);
   protected readonly sync = inject(SyncService);
   protected readonly locations = inject(LocationContextService);
   protected readonly preferences = inject(CompanyPreferencesService);
@@ -771,8 +714,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
   protected readonly summary = signal<DashboardDailySummary[]>([]);
   protected readonly topVariants = signal<TopVariant[]>([]);
   protected readonly productSignals = signal<ProductSignal[]>([]);
-  protected readonly lowStock = signal<LowStockDisplay[]>([]);
-  protected readonly lowStockTotal = signal(0);
   protected readonly expiring = signal<ExpiringDisplay[]>([]);
   protected readonly insightAttention = signal<InsightSignal[]>([]);
   protected readonly creditAttention = computed(() =>
@@ -796,11 +737,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
     previous_orders: 0,
   });
   protected readonly dashboardLocationId = signal<string | null>(null);
-  protected readonly attentionLocationName = computed(
-    () =>
-      this.locations.locations().find(location => location.id === this.locations.activeId())
-        ?.name ?? 'Active location'
-  );
 
   protected readonly dashboardSubtitle = computed(() => {
     const company = this.company();
@@ -897,9 +833,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
       attentionLocationId = nextLocationId;
       if (!this.reportsReady || !nextLocationId) return;
       untracked(() => {
-        // Do not show the previous location's stock under the new location label.
-        this.lowStock.set([]);
-        this.lowStockTotal.set(0);
+        // Do not show the previous location's priorities under the new location label.
+        this.insightAttention.set([]);
         void this.loadReports(['attention']);
       });
     });
@@ -1002,16 +937,14 @@ export class DashboardComponent implements OnInit, OnDestroy {
         const canView = this.canViewFinancials();
         if (!canView) this.clearFinancials();
 
-        const salesPromise =
-          requestedSections.has('sales') && canView
-            ? this.reports.dashboardSales(this.daysAgoIso(6), requestedLocationId)
-            : Promise.resolve(null);
+        const salesPromise = requestedSections.has('sales')
+          ? this.reports.dashboardSales(this.daysAgoIso(6), requestedLocationId)
+          : Promise.resolve(null);
         const attentionLocationId = requestedSections.has('attention')
           ? this.locations.requireActiveId()
           : null;
         const attentionPromise = attentionLocationId
           ? Promise.all([
-              this.reports.lowStock(attentionLocationId),
               this.preferences.batchExpiryEnabled()
                 ? this.reports.expiringBatches()
                 : Promise.resolve([]),
@@ -1031,12 +964,11 @@ export class DashboardComponent implements OnInit, OnDestroy {
         }
 
         await Promise.all([
-          sales && this.canViewFinancials() ? this.applySalesReport(sales) : Promise.resolve(),
+          sales ? this.applySalesReport(sales) : Promise.resolve(),
           attention && attentionLocationId
-            ? this.applyAttentionReport(attention[0], attention[1], attentionLocationId)
+            ? this.applyAttentionReport(attention[0], attention[1].items, attentionLocationId)
             : Promise.resolve(),
         ]);
-        if (attention) this.insightAttention.set(attention[2].items);
         if (
           requestedSections.has('attention') &&
           attentionLocationId !== this.locations.activeId()
@@ -1064,18 +996,30 @@ export class DashboardComponent implements OnInit, OnDestroy {
   private async applySalesReport(
     sales: Awaited<ReturnType<ReportsService['dashboardSales']>>
   ): Promise<void> {
-    this.summary.set(sales.summary);
-    this.locationRows.set(sales.locations);
-    this.comparison.set(sales.comparison);
+    if (this.canViewFinancials()) {
+      this.summary.set(sales.summary);
+      this.locationRows.set(sales.locations);
+      this.comparison.set(sales.comparison);
+    }
+    const identities = await this.catalogIdentities.resolve(
+      sales.topVariants.map(row => row.variant_id),
+      { coverage: 'may-include-historical' }
+    );
     this.topVariants.set(
-      sales.topVariants.map(row => ({
-        variantId: row.variant_id,
-        label: row.variant_id.slice(0, 8),
-        manufacturer: 'Manufacturer not set',
-        quantity: Number(row.quantity),
-        revenue: Number(row.revenue),
-        margin: Number(row.margin),
-      }))
+      sales.topVariants.map(row => {
+        const identity = productIdentity(identities.items.get(row.variant_id));
+        return {
+          variantId: row.variant_id,
+          label:
+            identity.variant_name && identity.variant_name !== 'Default'
+              ? `${identity.product_name} — ${identity.variant_name}`
+              : identity.product_name,
+          manufacturer: manufacturerLabel(identity),
+          quantity: Number(row.quantity),
+          revenue: Number(row.revenue),
+          margin: Number(row.margin),
+        };
+      })
     );
     this.computeProductPerformance(sales.productPerformance);
     if (sales.refreshAfter) this.scheduleSnapshotRefresh(sales.refreshAfter);
@@ -1083,37 +1027,25 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   private async applyAttentionReport(
-    lowStockResult: Awaited<ReturnType<ReportsService['lowStock']>>,
     expiring: ExpiringBatch[],
+    attention: InsightSignal[],
     locationId: string
   ): Promise<void> {
-    const lowStock = lowStockResult.rows;
-    const attentionIds = [
-      ...new Set(
-        [...lowStock, ...expiring].map(item => item.variant_id).filter((id): id is string => !!id)
-      ),
-    ];
-    const attentionVariants = await this.pos.variantsByIds(attentionIds);
+    const identities = await this.catalogIdentities.resolve(
+      expiring.map(item => item.variant_id).filter((id): id is string => !!id),
+      { coverage: 'may-include-historical' }
+    );
     if (this.locations.activeId() !== locationId) return;
-    const manufacturerByVariant = new Map(
-      attentionVariants.map(variant => [variant.variant_id, variant.manufacturer_name])
-    );
-    const productByVariant = new Map(
-      attentionVariants.map(variant => [variant.variant_id, variant.product_id])
-    );
-    this.lowStock.set(
-      lowStock.map(item => ({
-        ...item,
-        manufacturer_name: manufacturerByVariant.get(item.variant_id) ?? null,
-        product_id: productByVariant.get(item.variant_id) ?? null,
-      }))
-    );
-    this.lowStockTotal.set(lowStockResult.total);
+    this.insightAttention.set(attention);
     this.expiring.set(
-      expiring.map(item => ({
-        ...item,
-        manufacturer_name: manufacturerByVariant.get(item.variant_id) ?? null,
-      }))
+      expiring.map(item => {
+        const identity = productIdentity(identities.items.get(item.variant_id ?? ''));
+        return {
+          ...item,
+          manufacturer_name: identity.manufacturer_name,
+          identity_resolution: identity.identity_resolution,
+        };
+      })
     );
   }
 
@@ -1171,7 +1103,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     if (!identity || !this.canViewFinancials()) return;
     const serverLoadVersion = this.serverLoadVersion;
     const scope = offlineScopeKey(identity, this.dashboardLocationId() ?? 'all');
-    const cached = await (await offlineDb()).get('snapshots', `${scope}:dashboard`);
+    const cached = await (await offlineDb()).get('snapshots', `${scope}:dashboard:v2`);
     const currentIdentity = this.supabase.offlineIdentity();
     const currentScope = currentIdentity
       ? offlineScopeKey(currentIdentity, this.dashboardLocationId() ?? 'all')
@@ -1188,9 +1120,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
       summary: DashboardDailySummary[];
       topVariants: TopVariant[];
       productSignals?: ProductSignal[];
-      lowStock: LowStockDisplay[];
-      lowStockTotal?: number;
       attentionLocationId?: string;
+      insightAttention?: InsightSignal[];
       expiring: ExpiringDisplay[];
       locationRows: DashboardLocationSummary[];
       comparison: DashboardPeriodComparison;
@@ -1201,8 +1132,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
       (value.productSignals ?? []).filter(signal => Number.isFinite(signal.robustQuantity))
     );
     if (value.attentionLocationId === this.locations.activeId()) {
-      this.lowStock.set(value.lowStock);
-      this.lowStockTotal.set(value.lowStockTotal ?? value.lowStock.length);
+      this.insightAttention.set(value.insightAttention ?? []);
     }
     this.expiring.set(value.expiring);
     this.locationRows.set(value.locationRows);
@@ -1216,7 +1146,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     if (locationId !== this.dashboardLocationId()) return;
     const scope = offlineScopeKey(identity, locationId ?? 'all');
     const snapshot: NamedSnapshot = {
-      key: `${scope}:dashboard`,
+      key: `${scope}:dashboard:v2`,
       name: 'dashboard',
       company_id: identity.companyId,
       user_id: identity.userId,
@@ -1225,9 +1155,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
         summary: this.summary(),
         topVariants: this.topVariants(),
         productSignals: this.productSignals(),
-        lowStock: this.lowStock(),
-        lowStockTotal: this.lowStockTotal(),
         attentionLocationId: this.locations.activeId(),
+        insightAttention: this.insightAttention(),
         expiring: this.expiring(),
         locationRows: this.locationRows(),
         comparison: this.comparison(),
@@ -1255,7 +1184,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
   private clearFinancials(): void {
     this.summary.set([]);
     this.topVariants.set([]);
-    this.productSignals.set([]);
     this.locationRows.set([]);
     this.comparison.set({
       current_revenue: 0,
@@ -1278,6 +1206,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
             !row.variant_name || row.variant_name === 'Default'
               ? row.product_name
               : `${row.product_name} — ${row.variant_name}`,
+          manufacturer: manufacturerLabel(row),
           kind,
           currentQuantity: Number(row.current_quantity),
           robustQuantity: Number(row.robust_quantity),
@@ -1300,6 +1229,13 @@ export class DashboardComponent implements OnInit, OnDestroy {
     if (kind === 'volume') return 'Volume leader';
     if (kind === 'margin') return 'Margin leader';
     return 'Consistent seller';
+  }
+
+  protected manufacturerName(item: {
+    manufacturer_name?: string | null;
+    identity_resolution?: 'resolved' | 'unresolved';
+  }): string {
+    return manufacturerLabel(item);
   }
 
   /** Coalesce a burst of sale invalidations before asking for the shared snapshot. */

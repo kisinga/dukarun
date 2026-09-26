@@ -1,5 +1,6 @@
 import { transactionUnitLabel } from '@dukarun/pack-types';
 import { Injectable, inject } from '@angular/core';
+import { CatalogIdentityLookupService } from '../../core/identity-lookup.services';
 import { SupabaseService } from '../../core/supabase.service';
 import { PosService, variantLabel } from '../../pos/pos.service';
 import { ProfileService } from '../../profile/profile.service';
@@ -46,6 +47,7 @@ function toLegacyState(status: string): string {
 export class ReceiptDataService {
   private readonly supabase = inject(SupabaseService);
   private readonly pos = inject(PosService);
+  private readonly catalogIdentities = inject(CatalogIdentityLookupService);
   private readonly profile = inject(ProfileService);
 
   private get db() {
@@ -163,8 +165,11 @@ export class ReceiptDataService {
         }
       | undefined;
     const estimatedByLine = new Map((estimatedTax?.lines ?? []).map(line => [line.line_id, line]));
-    const variants = await this.pos.variantsByIds(lines.map(l => l.variant_id));
-    const byId = new Map(variants.map(v => [v.variant_id, v]));
+    const variants = await this.catalogIdentities.resolve(
+      lines.map(l => l.variant_id),
+      { coverage: 'may-include-historical' }
+    );
+    const byId = variants.items;
 
     const taxGroups = new Map<string, NonNullable<OrderData['taxBreakdown']>[number]>();
     for (const line of lines) {
@@ -374,8 +379,11 @@ export class ReceiptDataService {
       }));
     }
 
-    const variants = await this.pos.variantsByIds(lines.map(m => m.variant_id));
-    const byId = new Map(variants.map(v => [v.variant_id, v]));
+    const variants = await this.catalogIdentities.resolve(
+      lines.map(m => m.variant_id),
+      { coverage: 'may-include-historical' }
+    );
+    const byId = variants.items;
 
     const { data: payments } = await this.db
       .from('purchase_payments')

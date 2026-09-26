@@ -20,8 +20,8 @@ select has_function('public','record_credit_advisory_snapshot',array['uuid','tex
 select has_function('public','product_profile',array['uuid','uuid','date','date'],
   'bounded product profile exists');
 select has_function('public','product_intelligence',
-  array['integer','uuid','uuid','uuid','text','integer','integer','date','date'],
-  'inventory intelligence accepts bounded custom periods');
+  array['integer','uuid','uuid','uuid','text','integer','integer','date','date','text'],
+  'inventory intelligence accepts bounded custom periods and decision filters');
 select has_function('public','update_inventory_settings',array['integer','boolean','integer','integer'],
   'inventory preferences have one atomic update boundary');
 select has_function('public','current_business_date',array[]::text[],
@@ -176,12 +176,14 @@ reset role;
 select public.process_analytics_dirty_buckets(1000);
 select is((select net_quantity from public.product_daily_facts
   where variant_id='12600000-0000-4000-8000-000000000021'
-    and day=current_date),2::numeric,'dirty worker builds the affected daily fact');
+    and day=public.current_business_date()),2::numeric,
+  'dirty worker builds the affected daily fact');
 select is((select current_quantity from public.product_window_metrics
   where variant_id='12600000-0000-4000-8000-000000000021' and window_days=7),2::numeric,
   'preset window metrics are precomputed');
 select is((select count(*)::int from public.inventory_position_days
-  where variant_id='12600000-0000-4000-8000-000000000021' and day=current_date),1,
+  where variant_id='12600000-0000-4000-8000-000000000021'
+    and day=public.current_business_date()),1,
   'multiple same-day stock changes coalesce into one sparse position');
 select is((select count(*)::int from public.product_attention
   where variant_id='12600000-0000-4000-8000-000000000023'),0,
@@ -330,6 +332,10 @@ select ok(not exists(select 1 from jsonb_array_elements(
   public.insight_attention_feed('products',null,100,0)->'items') item
   where item->>'entity_id'='12600000-0000-4000-8000-000000000023'),
   'all-location attention excludes locations the caller cannot access');
+select ok(not exists(select 1 from jsonb_array_elements(
+  public.insight_attention_feed('products',null,100,0)->'items') item
+  where item ?| array['title','href']),
+  'product attention rows return ids without repeated display identity');
 select throws_ok(
   $$select public.list_party_credit_profiles('customer')$$,
   'P0001','permission_denied: ViewFinancials required',

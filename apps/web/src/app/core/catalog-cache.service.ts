@@ -25,8 +25,9 @@ import {
 } from './cache-journal.service';
 import { postgrestIdBatches } from './postgrest-batches';
 
-// Current offline catalogue contract. Enterprise catalogues beyond 10k need a
-// server-search tier before this bound can safely grow.
+// Hard active-catalog retention limit for the offline snapshot. Collections can
+// still return IDs beyond this ceiling, but cache-only identity hydration cannot
+// resolve them until a bounded server-search tier is introduced.
 const CATALOG_LIMIT = 10_000;
 const CATALOG_PAGE_SIZE = 1_000;
 
@@ -61,7 +62,7 @@ export class CatalogCacheService {
   readonly categoryMembershipsComplete = signal(false);
   readonly stock = signal<Map<string, { stock: number; stock_value: number }>>(new Map());
   readonly fetchedAt = signal<string | null>(null);
-  /** Defensive compatibility flag for snapshots created before the 10k ceiling. */
+  /** True when the active catalog exceeded the hard 10k offline retention limit. */
   readonly catalogTruncated = signal(false);
   private readonly catalogCompletenessKnown = signal(false);
   /** True once a snapshot (cached or fresh) is available for the current scope. */

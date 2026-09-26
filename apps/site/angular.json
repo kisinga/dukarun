@@ -73,5 +73,5 @@
       }
     }
   },
-  "cli": { "analytics": false, "cache": { "enabled": false } }
+  "cli": { "analytics": false, "cache": { "enabled": true, "environment": "ci" } }
 }

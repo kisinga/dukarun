@@ -1,5 +1,5 @@
 begin;
-select plan(23);
+select plan(34);
 
 select has_column('public','product_window_metrics','current_robust_quantity',
   'window cache stores robust quantity');
@@ -7,14 +7,21 @@ select has_column('public','product_attention','demand_confidence',
   'attention stores demand confidence');
 select has_function('public','product_performance',array['integer','uuid','integer'],
   'separate product performance RPC exists');
+select has_function('public','catalog_identity_lookup',array['uuid[]'],
+  'bounded historical catalog identity lookup exists');
 
 select testkit.create_user(
   '18400000-0000-4000-8000-000000000001','robust-admin@test.local');
 select testkit.create_user(
   '18400000-0000-4000-8000-000000000002','robust-staff@test.local');
+select testkit.create_user(
+  '18400000-0000-4000-8000-000000000003','robust-other@test.local');
 create temp table robust_company as
 select testkit.provision(
   '18400000-0000-4000-8000-000000000001','Robust Product Store') company_id;
+create temp table robust_other_company as
+select testkit.provision(
+  '18400000-0000-4000-8000-000000000003','Other Product Store') company_id;
 grant select on pg_temp.robust_company to authenticated;
 select testkit.add_member(
   (select company_id from robust_company),
@@ -58,6 +65,13 @@ insert into public.product_variants(
     (select company_id from robust_company),'Default','BULK',100,true,now()-interval '2 days'),
   ('18400000-0000-4000-8000-000000000022','18400000-0000-4000-8000-000000000012',
     (select company_id from robust_company),'Default','GROWTH',100,true,now()-interval '100 days');
+insert into public.products(id,company_id,name)
+select '18400000-0000-4000-8000-000000000090',company_id,'Other Company Product'
+from robust_other_company;
+insert into public.product_variants(id,product_id,company_id,name,sku,price)
+select '18400000-0000-4000-8000-000000000091',
+  '18400000-0000-4000-8000-000000000090',company_id,'Default','OTHER',100
+from robust_other_company;
 
 insert into public.product_daily_facts(
   company_id,location_id,day,variant_id,net_quantity,gross_quantity,
@@ -185,6 +199,24 @@ select is((select count(distinct item->>'location_id') from all_location_perform
 select ok((select bool_and(item->'margin' is not null) from admin_performance,
   jsonb_array_elements(value->'leaders'->'margin') item),
   'financial users receive margin evidence');
+select ok(not exists(select 1 from admin_performance,
+  jsonb_array_elements(value->'leaders'->'volume') item
+  where item ?| array['product_id','product_name','variant_name','stock_unit']),
+  'performance collections return metric ids without repeated product identity');
+select ok(not (public.product_intelligence(30,(select location_id from robust_location),
+  null,null,null,10,0)->'items'->0 ?| array[
+    'product_id','product_name','variant_name','stock_unit','manufacturer_id','manufacturer_name'
+  ]),
+  'inventory collections omit product identity hydrated by clients');
+select ok((select count(*)>0 and bool_and(item->>'signal'='stockout')
+  from jsonb_array_elements(public.product_intelligence(
+    p_window_days=>30,p_location_id=>(select location_id from robust_location),
+    p_limit=>10,p_decision=>'stockout')->'items') item),
+  'inventory decisions are filtered before pagination');
+select throws_ok($$select public.product_intelligence(
+    p_window_days=>30,p_location_id=>(select location_id from robust_location),
+    p_limit=>10,p_decision=>'unsupported')$$,
+  'P0001','invalid_product_decision','unknown inventory decisions are rejected');
 
 select is((select count(distinct value->'items'->0->>'planning_daily_demand')
   from (values
@@ -195,6 +227,31 @@ select is((select count(distinct value->'items'->0->>'planning_daily_demand')
   ) periods(value)),1::bigint,
   'changing reporting period does not change the fixed planning forecast');
 
+reset role;
+update public.product_variants set active=false
+where id='18400000-0000-4000-8000-000000000021';
+select testkit.as_user(
+  (select company_id from robust_company),
+  '18400000-0000-4000-8000-000000000001','Admin');
+select is((select variant_active from public.catalog_identity_lookup(array[
+  '18400000-0000-4000-8000-000000000021'::uuid
+])),false,'historical identity lookup resolves inactive variants');
+select is((select count(*) from public.catalog_identity_lookup(array[
+  '18400000-0000-4000-8000-000000000099'::uuid
+])),0::bigint,'unknown historical identities remain unresolved');
+select is((select count(*) from public.catalog_identity_lookup(array[
+  '18400000-0000-4000-8000-000000000021'::uuid,
+  '18400000-0000-4000-8000-000000000091'::uuid
+])),1::bigint,'historical identities remain company scoped');
+select ok(not exists(
+  select 1 from jsonb_array_elements(public.insight_attention_feed(
+    'products',(select location_id from robust_location),100,0)->'items') item
+  where item->>'entity_id'='18400000-0000-4000-8000-000000000021'
+),'inactive products are removed from operational attention');
+select throws_ok($$select * from public.catalog_identity_lookup(array(
+    select gen_random_uuid() from generate_series(1,101)
+  ))$$,'P0001','identity_batch_too_large','historical identity batches are bounded');
+
 select testkit.as_user(
   (select company_id from robust_company),
   '18400000-0000-4000-8000-000000000002','Robust staff');
@@ -204,6 +261,10 @@ select is((public.product_performance(30,(select location_id from robust_locatio
 select is(jsonb_array_length(public.product_performance(
   30,(select location_id from robust_location),10)->'leaders'->'margin'),0,
   'non-financial users receive no margin leaders');
+select ok(public.dashboard_location_snapshot(
+  (select today-6 from robust_clock),(select location_id from robust_location)
+)->'productPerformance'->>'financialsIncluded'='false',
+  'non-financial inventory users receive redacted performance in the dashboard snapshot');
 
 select * from finish();
 rollback;

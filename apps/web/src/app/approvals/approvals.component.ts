@@ -2,7 +2,8 @@ import { Component, OnInit, computed, effect, inject, signal, untracked } from '
 import { ActivatedRoute, Router } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { formatKes } from '../core/money';
-import { PosService, variantLabel } from '../pos/pos.service';
+import { CatalogIdentityLookupService } from '../core/identity-lookup.services';
+import { manufacturerLabel, productIdentity, productIdentityLabel } from '../core/product-identity';
 import { EmptyStateComponent } from '../shared/ui/empty-state.component';
 import { PageLayoutComponent } from '../shared/ui/page-layout.component';
 import { PaginationComponent } from '../shared/ui/pagination.component';
@@ -317,7 +318,7 @@ const TYPE_BADGE: Record<string, string> = {
 })
 export class ApprovalsComponent implements OnInit {
   protected readonly approvals = inject(ApprovalsService);
-  private readonly pos = inject(PosService);
+  private readonly catalogIdentities = inject(CatalogIdentityLookupService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly routeParams = toSignal(this.route.queryParamMap, {
@@ -491,13 +492,15 @@ export class ApprovalsComponent implements OnInit {
             })
         ),
       ];
-      const variants = await this.pos.variantsByIds(variantIds);
+      const variants = await this.catalogIdentities.resolve(variantIds, {
+        coverage: 'may-include-historical',
+      });
       this.variantLabelMap.set(
         new Map(
-          variants.map(v => [
-            v.variant_id!,
-            `${variantLabel(v)} · ${v.manufacturer_name || 'Manufacturer not set'}`,
-          ])
+          variantIds.map(id => {
+            const identity = productIdentity(variants.items.get(id));
+            return [id, `${productIdentityLabel(identity)} · ${manufacturerLabel(identity)}`];
+          })
         )
       );
       this.staffNameMap.set(

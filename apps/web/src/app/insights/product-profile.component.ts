@@ -4,6 +4,8 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { BusinessClockService } from '../core/business-clock.service';
 import { formatKes } from '../core/money';
 import { LocationContextService } from '../core/location-context.service';
+import type { DemandConfidence } from '../core/product-performance.models';
+import { DemandConfidenceIndicatorComponent } from '../shared/ui/demand-confidence-indicator.component';
 import { EmptyStateComponent } from '../shared/ui/empty-state.component';
 import { IconComponent } from '../shared/ui/icon.component';
 import { DataCoverageBadgeComponent } from './data-coverage-badge.component';
@@ -19,6 +21,7 @@ import { ProductActivityChartComponent } from './product-activity-chart.componen
     DatePipe,
     DecimalPipe,
     RouterLink,
+    DemandConfidenceIndicatorComponent,
     EmptyStateComponent,
     IconComponent,
     DataCoverageBadgeComponent,
@@ -109,10 +112,12 @@ import { ProductActivityChartComponent } from './product-activity-chart.componen
                 <p class="mt-1 text-sm text-base-content/70">{{ decisionReason(item) }}</p>
                 <div class="mt-2 flex flex-wrap gap-1">
                   @if (demandConfidence(item); as confidence) {
-                    <span class="badge badge-ghost badge-sm">{{ confidence }} confidence</span>
+                    <app-demand-confidence [value]="confidence" />
                   }
                   @if (outlierDetected(item)) {
-                    <span class="badge badge-warning badge-sm">Unusual spike adjusted</span>
+                    <span class="badge badge-warning badge-soft badge-sm"
+                      >Unusual spike adjusted</span
+                    >
                   }
                 </div>
                 @if (reorderQuantity(item); as quantity) {
@@ -379,9 +384,9 @@ export class ProductProfileComponent implements OnInit {
     const value = item.attention?.[key];
     return value === null || value === undefined ? null : Number(value);
   }
-  protected demandConfidence(item: ProductProfile): string | null {
+  protected demandConfidence(item: ProductProfile): DemandConfidence | null {
     const value = item.attention?.['demand_confidence'];
-    return typeof value === 'string' ? value : null;
+    return value === 'low' || value === 'medium' || value === 'high' ? value : null;
   }
   protected outlierDetected(item: ProductProfile): boolean {
     return item.attention?.['outlier_detected'] === true;

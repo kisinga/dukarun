@@ -59,6 +59,43 @@ describe('product intelligence', () => {
     ).toEqual(['trending:a-small', 'volume:b', 'margin:c', 'consistent:d']);
   });
 
+  it('keeps distinct unresolved variants instead of treating empty product ids as duplicates', () => {
+    const unresolved = (variant_id: string) => ({
+      variant_id,
+      product_id: '',
+      product_name: 'Details unavailable',
+      variant_name: '',
+      stock_unit: '',
+      current_quantity: 1,
+      robust_quantity: 1,
+      previous_robust_quantity: 0,
+      revenue: null,
+      margin: null,
+      order_count: 3,
+      active_days: 2,
+      trend_score: 0,
+      confidence: 'medium' as const,
+      outlier_detected: false,
+      outlier_share: 0,
+      stock: 0,
+      planning_daily_demand: 0.1,
+      days_of_cover: 0,
+    });
+    const performance: ProductPerformanceResponse = {
+      windowDays: 7,
+      generatedAt: '',
+      financialsIncluded: false,
+      leaders: {
+        trending: [unresolved('a')],
+        volume: [unresolved('b')],
+        margin: [],
+        consistent: [unresolved('c')],
+      },
+    };
+
+    expect(selectDashboardPerformanceLeaders(performance, false)).toHaveLength(3);
+  });
+
   it('deduplicates restock, margin, and movement candidates', () => {
     const signals: DashboardProductSignals = {
       restockRisks: [{ variant_id: 'a', quantity: 10, stock: 2, low_stock_threshold: 5 }],

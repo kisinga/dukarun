@@ -16,6 +16,7 @@ import { PartyCacheService } from '../core/party-cache.service';
 import { InsightsService } from '../insights/insights.service';
 import type { ProductProfile } from '../insights/insights.models';
 import { ProductActivityChartComponent } from '../insights/product-activity-chart.component';
+import { DemandConfidenceIndicatorComponent } from '../shared/ui/demand-confidence-indicator.component';
 import { EmptyStateComponent } from '../shared/ui/empty-state.component';
 import { IconComponent } from '../shared/ui/icon.component';
 import {
@@ -45,6 +46,7 @@ type DisplayProduct = RestockProductRow & {
   selector: 'app-restock-intelligence',
   imports: [
     RouterLink,
+    DemandConfidenceIndicatorComponent,
     EmptyStateComponent,
     IconComponent,
     ProductActivityChartComponent,
@@ -270,7 +272,12 @@ type DisplayProduct = RestockProductRow & {
                   @for (product of coverageProducts(); track product.variantId) {
                     <div class="py-3">
                       <div class="mb-1.5 flex items-center justify-between gap-3 text-xs">
-                        <span class="truncate font-medium">{{ product.label }}</span>
+                        <span class="min-w-0">
+                          <span class="block truncate font-medium">{{ product.label }}</span>
+                          <span class="type-caption block truncate">{{
+                            manufacturerName(product)
+                          }}</span>
+                        </span>
                         <span class="shrink-0 tabular-nums">{{
                           daysCover(product.daysCover)
                         }}</span>
@@ -316,7 +323,9 @@ type DisplayProduct = RestockProductRow & {
                     (change)="setFocusedProduct($event)"
                   >
                     @for (product of displayProducts(); track product.variantId) {
-                      <option [value]="product.variantId">{{ product.label }}</option>
+                      <option [value]="product.variantId">
+                        {{ product.label }} · {{ manufacturerName(product) }}
+                      </option>
                     }
                   </select>
                 </label>
@@ -333,6 +342,7 @@ type DisplayProduct = RestockProductRow & {
                         {{ product.decision.label }}
                       </span>
                     </div>
+                    <p class="type-caption mt-1">{{ manufacturerName(product) }}</p>
                     <p class="type-caption mt-1">{{ decisionExplanation(product) }}</p>
                   </div>
                   <div class="flex flex-wrap gap-2">
@@ -398,6 +408,9 @@ type DisplayProduct = RestockProductRow & {
                           {{ product.label }}
                         </a>
                         <p class="type-caption mt-1 truncate">
+                          {{ manufacturerName(product) }}
+                        </p>
+                        <p class="type-caption truncate">
                           {{ productContext(product) }}
                           @if (product.lastSoldOn) {
                             · last sold {{ shortDate(product.lastSoldOn) }}
@@ -411,12 +424,12 @@ type DisplayProduct = RestockProductRow & {
 
                     <div class="flex flex-wrap gap-1">
                       @if (product.demandConfidence) {
-                        <span class="badge badge-ghost badge-sm"
-                          >{{ product.demandConfidence }} confidence</span
-                        >
+                        <app-demand-confidence [value]="product.demandConfidence" />
                       }
                       @if (product.outlierDetected) {
-                        <span class="badge badge-warning badge-sm">Unusual spike adjusted</span>
+                        <span class="badge badge-warning badge-soft badge-sm"
+                          >Unusual spike adjusted</span
+                        >
                       }
                     </div>
 
@@ -780,6 +793,11 @@ export class RestockIntelligenceComponent implements OnInit {
     if (this.scopeMode() === 'manufacturer' && product.lastSupplierName) {
       return `Last supplied by ${product.lastSupplierName}`;
     }
+    return product.sku || 'SKU not set';
+  }
+
+  protected manufacturerName(product: DisplayProduct): string {
+    if (product.identityResolution === 'unresolved') return 'Details unavailable';
     return product.manufacturerName || 'Manufacturer not set';
   }
 

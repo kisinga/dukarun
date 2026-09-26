@@ -17,6 +17,9 @@ export interface InsightSignal {
   stock: number | null;
   refreshed_at: string;
   href: string;
+  product_id?: string | null;
+  manufacturer_name?: string | null;
+  identity_resolution?: 'resolved' | 'unresolved';
 }
 
 export interface CreditDecisionCard {
@@ -93,6 +96,9 @@ export interface DataCoverageBadge {
 
 export type DateRangePreset = 7 | 30 | 180 | 365;
 
+export type ProductDecision =
+  'stockout' | 'reorder' | 'low_cover' | 'slow' | 'insufficient_history' | 'healthy';
+
 export interface ProductDemandSummary {
   variant_id: string;
   product_id: string;
@@ -126,7 +132,21 @@ export interface ProductDemandSummary {
   order_count?: number | null;
   outlier_detected?: boolean | null;
   outlier_share?: number | null;
+  sku?: string | null;
+  identity_resolution?: 'resolved' | 'unresolved';
 }
+
+export type ProductDemandMetric = Omit<
+  ProductDemandSummary,
+  | 'product_id'
+  | 'product_name'
+  | 'variant_name'
+  | 'stock_unit'
+  | 'manufacturer_id'
+  | 'manufacturer_name'
+  | 'sku'
+  | 'identity_resolution'
+>;
 
 export interface ProductIntelligenceSummary {
   trackedVariants: number;

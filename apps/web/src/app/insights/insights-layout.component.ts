@@ -66,12 +66,6 @@ export class InsightsLayoutComponent {
     }
   );
   private readonly tabs = [
-    {
-      route: '/insights/attention',
-      label: 'Attention',
-      icon: 'heroExclamationTriangle',
-      financeOnly: false,
-    },
     { route: '/insights/credit', label: 'Credit', icon: 'heroCreditCard', financeOnly: true },
     { route: '/insights/inventory', label: 'Inventory', icon: 'heroCube', financeOnly: false },
     {
@@ -89,7 +83,7 @@ export class InsightsLayoutComponent {
     if (this.router.url.startsWith('/insights/products')) return '/insights/inventory';
     if (this.router.url.startsWith('/insights/performance')) return '/insights/sales';
     return (
-      this.tabs.find(tab => this.router.url.startsWith(tab.route))?.route ?? '/insights/attention'
+      this.tabs.find(tab => this.router.url.startsWith(tab.route))?.route ?? '/insights/inventory'
     );
   });
   protected readonly activeLabel = computed(
@@ -102,7 +96,7 @@ export class InsightsLayoutComponent {
       return 'Stock priorities, source performance, valuation, and replenishment decisions.';
     if (this.activeRoute().includes('/sales'))
       return 'Sales results and customer contribution for the selected period.';
-    return 'Prioritised credit and stock issues that need a decision.';
+    return 'Stock priorities, source performance, valuation, and replenishment decisions.';
   });
   protected readonly notice = computed(() => {
     this.navigation();

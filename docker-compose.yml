@@ -22,6 +22,7 @@ services:
         STOREFRONT_PUBLIC_URL: ${STOREFRONT_PUBLIC_URL:-https://store.dukarun.com}
         MARKETING_VIDEO_BASE_URL: ${MARKETING_VIDEO_BASE_URL:-https://dukarun.com/media/video/product-overview}
         PUBLIC_DATA_MODE: live
+        NG_BUILD_MAX_WORKERS: ${NG_BUILD_MAX_WORKERS:-2}
     volumes:
       - /var/lib/dukarun/marketing-media:/usr/share/nginx/html/media:ro
     restart: unless-stopped
@@ -40,6 +41,7 @@ services:
         GITBOOK_SITE_URL: ${GITBOOK_SITE_URL:-https://dukarun.gitbook.io/docs}
         USERTOUR_TOKEN: ${USERTOUR_TOKEN:-cmtc4ejtu01yw72cdf7nfwhil}
         USERTOUR_CONTENT_IDS_JSON: ${USERTOUR_CONTENT_IDS_JSON:-}
+        NG_BUILD_MAX_WORKERS: ${NG_BUILD_MAX_WORKERS:-2}
     restart: unless-stopped
 
   storefront:
@@ -54,6 +56,7 @@ services:
         APP_PUBLIC_URL: ${APP_PUBLIC_URL:-https://app.dukarun.com}
         STOREFRONT_PUBLIC_URL: ${STOREFRONT_PUBLIC_URL:-https://store.dukarun.com}
         PUBLIC_DATA_MODE: live
+        NG_BUILD_MAX_WORKERS: ${NG_BUILD_MAX_WORKERS:-2}
     restart: unless-stopped
 
   super-admin:
@@ -67,4 +70,5 @@ services:
         SITE_PUBLIC_URL: ${SITE_PUBLIC_URL:-https://dukarun.com}
         APP_PUBLIC_URL: ${APP_PUBLIC_URL:-https://app.dukarun.com}
         STOREFRONT_PUBLIC_URL: ${STOREFRONT_PUBLIC_URL:-https://store.dukarun.com}
+        NG_BUILD_MAX_WORKERS: ${NG_BUILD_MAX_WORKERS:-2}
     restart: unless-stopped
