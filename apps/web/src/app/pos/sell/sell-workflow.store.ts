@@ -193,13 +193,24 @@ export class SellWorkflowStore implements OnDestroy {
   readonly creditApprovalRequired = computed(
     () => this.creditExceedsLimit() && this.perms.actionMode('sale.credit_over_limit') === 'request'
   );
+  readonly overdueCreditAcknowledgementRequired = computed(() => {
+    if (this.automaticCreditAmount() <= 0) return false;
+    const decision = this.creditDecision();
+    return (decision?.overdueAmount ?? 0) > 0 || (decision?.oldestOverdueDays ?? 0) > 0;
+  });
   readonly creditRiskAcknowledgementRequired = computed(
     () =>
       this.automaticCreditAmount() > 0 &&
       ['restricted', 'high_risk'].includes(this.creditDecision()?.band ?? '')
   );
+  readonly creditAcknowledgementRequired = computed(
+    () => this.overdueCreditAcknowledgementRequired() || this.creditRiskAcknowledgementRequired()
+  );
   readonly creditWatchWarning = computed(
-    () => this.automaticCreditAmount() > 0 && this.creditDecision()?.band === 'watch'
+    () =>
+      this.automaticCreditAmount() > 0 &&
+      !this.overdueCreditAcknowledgementRequired() &&
+      this.creditDecision()?.band === 'watch'
   );
   /** Backend-derived tender methods; walk-ins may only use till-controlled accounts. */
   readonly panelMethods = computed<PaymentMethodOption[]>(() => {
@@ -955,8 +966,7 @@ export class SellWorkflowStore implements OnDestroy {
 
   confirmCreditSale(): void {
     const reason = this.creditApprovalReason.value.trim();
-    if ((this.creditApprovalRequired() || this.creditRiskAcknowledgementRequired()) && !reason)
-      return;
+    if ((this.creditApprovalRequired() || this.creditAcknowledgementRequired()) && !reason) return;
     this.creditConfirmOpenState.set(false);
     void this.completeCreditSale(reason || undefined);
     this.creditApprovalReason.setValue('');

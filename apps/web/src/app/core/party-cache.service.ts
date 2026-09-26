@@ -334,13 +334,15 @@ export class PartyCacheService {
 
   private customerWithFinancials(row: Customer, values: FinancialProjection): CachedCustomer {
     const credit = values.credit.get(row.id);
+    const arBalance = values.ar.get(row.id) ?? 0;
+    const aging = arBalance > 0 ? values.arAging.get(row.id) : undefined;
     return {
       ...row,
-      ar_balance: values.ar.get(row.id) ?? 0,
+      ar_balance: arBalance,
       downpayment_balance: values.downpayment.get(row.id) ?? 0,
       net_balance: values.net.get(row.id) ?? 0,
-      days_outstanding: values.arAging.get(row.id)?.days_outstanding ?? null,
-      bucket: values.arAging.get(row.id)?.bucket ?? null,
+      days_outstanding: aging?.days_outstanding ?? null,
+      bucket: aging?.bucket ?? null,
       credit_score: credit?.score ?? null,
       credit_band: credit?.band,
       credit_confidence: credit?.confidence,
@@ -351,11 +353,13 @@ export class PartyCacheService {
   }
 
   private supplierWithFinancials(row: Customer, values: FinancialProjection): CachedSupplier {
+    const apBalance = values.ap.get(row.id) ?? 0;
+    const aging = apBalance > 0 ? values.apAging.get(row.id) : undefined;
     return {
       ...row,
-      ap_balance: values.ap.get(row.id) ?? 0,
-      days_outstanding: values.apAging.get(row.id)?.days_outstanding ?? null,
-      bucket: values.apAging.get(row.id)?.bucket ?? null,
+      ap_balance: apBalance,
+      days_outstanding: aging?.days_outstanding ?? null,
+      bucket: aging?.bucket ?? null,
     };
   }
 
@@ -515,8 +519,12 @@ export class PartyCacheService {
   }
 
   private applySnapshot(snapshot: PartySnapshot): void {
-    this.customers.set(sortParties(snapshot.customers));
-    this.suppliers.set(sortParties(snapshot.suppliers));
+    this.customers.set(
+      sortParties(snapshot.customers.map(row => clearSettledAging(row, row.ar_balance)))
+    );
+    this.suppliers.set(
+      sortParties(snapshot.suppliers.map(row => clearSettledAging(row, row.ap_balance)))
+    );
     this.complete.set(snapshot.complete);
     this.directoryFetchedAt.set(snapshot.directory_fetched_at);
     this.financialFetchedAt.set(snapshot.financial_fetched_at);
@@ -560,4 +568,11 @@ function sortParties<T extends Pick<Customer, 'first_name' | 'last_name' | 'id'>
       (a.last_name ?? '').localeCompare(b.last_name ?? '') ||
       a.id.localeCompare(b.id)
   );
+}
+
+/** @internal Exported for the persisted-cache regression contract. */
+export function clearSettledAging<
+  T extends { days_outstanding: number | null; bucket: string | null },
+>(row: T, balance: number): T {
+  return balance > 0 ? row : { ...row, days_outstanding: null, bucket: null };
 }

@@ -26,16 +26,22 @@ import { ProductActivityChartComponent } from './product-activity-chart.componen
     ProductActivityChartComponent,
   ],
   template: `
-    @if (loading()) {
+    @if (loading() && !profile()) {
       <div class="flex min-h-64 items-center justify-center gap-2 text-sm text-base-content/60">
         <span class="loading loading-spinner"></span>Loading product profile
       </div>
-    } @else if (error()) {
+    } @else if (error() && !profile()) {
       <div role="alert" class="alert alert-error">
         <app-icon name="heroExclamationTriangle" />{{ error() }}
       </div>
     } @else if (profile(); as item) {
       <section class="space-y-4">
+        @if (error()) {
+          <div role="alert" class="alert alert-error text-sm">
+            <app-icon name="heroExclamationTriangle" />{{ error() }} The previous period remains
+            visible.
+          </div>
+        }
         <div class="flex flex-wrap items-center justify-between gap-3">
           <div class="flex flex-wrap items-center gap-2">
             <a routerLink="/insights/inventory" class="btn btn-ghost btn-sm min-h-11"
@@ -195,7 +201,11 @@ import { ProductActivityChartComponent } from './product-activity-chart.componen
               </span>
             </header>
 
-            <app-product-activity-chart [trend]="item.trend" [positions]="item.positions" />
+            <app-product-activity-chart
+              [trend]="item.trend"
+              [positions]="item.positions"
+              [loading]="loading()"
+            />
 
             <footer
               class="flex flex-wrap items-center justify-between gap-3 border-t border-base-200 pt-3"
@@ -265,6 +275,7 @@ export class ProductProfileComponent implements OnInit {
   protected readonly fmt = formatKes;
   protected readonly copy = insightCopy;
   private readonly variantId = computed(() => this.route.snapshot.paramMap.get('variantId'));
+  private request = 0;
   async ngOnInit(): Promise<void> {
     const [, today] = await Promise.all([this.locations.load(), this.businessClock.today()]);
     this.businessToday.set(today);
@@ -291,6 +302,7 @@ export class ProductProfileComponent implements OnInit {
   private async load(): Promise<void> {
     const id = this.variantId();
     const location = this.locations.activeId();
+    const request = ++this.request;
     if (!id || !location) {
       this.error.set('A product and location are required.');
       this.loading.set(false);
@@ -299,15 +311,21 @@ export class ProductProfileComponent implements OnInit {
     this.loading.set(true);
     this.error.set(null);
     try {
-      this.profile.set(
-        await this.insights.productProfile(id, location, this.rangeFrom(), this.rangeTo())
+      const profile = await this.insights.productProfile(
+        id,
+        location,
+        this.rangeFrom(),
+        this.rangeTo()
       );
+      if (request !== this.request) return;
+      this.profile.set(profile);
     } catch (error) {
+      if (request !== this.request) return;
       this.error.set(
         error instanceof Error ? error.message : 'Could not load this product profile.'
       );
     } finally {
-      this.loading.set(false);
+      if (request === this.request) this.loading.set(false);
     }
   }
   protected signal(item: ProductProfile): string {

@@ -9,6 +9,7 @@ import { PermissionsService } from '../../core/permissions.service';
 import { ReceiptDataService } from '../../shared/print/receipt-data.service';
 import { PrintService } from '../../shared/print/print.service';
 import { FulfillmentService } from '../../fulfillment/fulfillment.service';
+import { InsightsService } from '../../insights/insights.service';
 import { LearningPlatformService } from '../../learning/learning-platform.service';
 import { CartService } from '../cart.service';
 import { ConnectivityService } from '../offline/connectivity.service';
@@ -75,6 +76,7 @@ describe('SellWorkflowStore', () => {
   let mpesa: Record<string, unknown>;
   let mpesaCheckout: Record<string, ReturnType<typeof vi.fn>>;
   let learning: { track: ReturnType<typeof vi.fn> };
+  let insights: Record<string, ReturnType<typeof vi.fn>>;
 
   beforeEach(() => {
     online.set(true);
@@ -142,6 +144,20 @@ describe('SellWorkflowStore', () => {
       finalizeCash: vi.fn(),
     };
     learning = { track: vi.fn() };
+    insights = {
+      decisionSummary: vi.fn().mockResolvedValue({
+        customerId: customer.id,
+        score: 8,
+        band: 'good',
+        confidence: 'established',
+        reasonCodes: ['no_current_risk'],
+        recommendationCode: 'maintain',
+        scoreTimestamp: '2026-09-26T00:00:00Z',
+        overdueAmount: 0,
+        oldestOverdueDays: 0,
+      }),
+      recordCreditAdvisory: vi.fn().mockResolvedValue(undefined),
+    };
 
     TestBed.configureTestingModule({
       providers: [
@@ -179,6 +195,7 @@ describe('SellWorkflowStore', () => {
           useValue: { activeId: signal('location-1'), requireActiveId: () => 'location-1' },
         },
         { provide: FulfillmentService, useValue: fulfillment },
+        { provide: InsightsService, useValue: insights },
       ],
     });
   });
@@ -300,6 +317,46 @@ describe('SellWorkflowStore', () => {
     );
     expect(cart['clear']).toHaveBeenCalledOnce();
     expect(learning.track).toHaveBeenCalledWith('dukarun_credit_sale_completed');
+  });
+
+  it('requires and records a reason before adding credit to an overdue account', async () => {
+    insights['decisionSummary'].mockResolvedValue({
+      customerId: customer.id,
+      score: 7.5,
+      band: 'good',
+      confidence: 'established',
+      reasonCodes: ['overdue_1_7'],
+      recommendationCode: 'maintain',
+      scoreTimestamp: '2026-09-26T00:00:00Z',
+      overdueAmount: 500,
+      oldestOverdueDays: 3,
+    });
+    const store = TestBed.inject(SellWorkflowStore);
+    store.selectCustomer(customer as CustomerWithCredit);
+
+    await store.openCreditConfirmation(null);
+    expect(store.overdueCreditAcknowledgementRequired()).toBe(true);
+
+    store.confirmCreditSale();
+    expect(pos['postCreditSale']).not.toHaveBeenCalled();
+
+    store.creditApprovalReason.setValue('Customer committed to settle on Friday');
+    store.confirmCreditSale();
+
+    await vi.waitFor(() => expect(pos['postCreditSale']).toHaveBeenCalledOnce());
+    expect(pos['postCreditSale']).toHaveBeenCalledWith(
+      customer.id,
+      saleLines,
+      expect.any(String),
+      undefined,
+      'Customer committed to settle on Friday'
+    );
+    await vi.waitFor(() =>
+      expect(insights['recordCreditAdvisory']).toHaveBeenCalledWith(
+        'order-1',
+        'Customer committed to settle on Friday'
+      )
+    );
   });
 
   it('routes integrated M-PESA through the coordinator before clearing the cart', async () => {

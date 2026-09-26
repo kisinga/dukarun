@@ -111,7 +111,20 @@ import { ScoreBadgeComponent } from './score-badge.component';
                   class="grid gap-2 border-b border-base-200 p-4 last:border-0 sm:grid-cols-[1fr_auto_auto] sm:items-center"
                 >
                   <div>
-                    <p class="font-semibold">{{ document.document_code }}</p>
+                    <a
+                      class="font-semibold link link-hover"
+                      [routerLink]="item.side === 'supplier' ? '/purchases' : '/orders'"
+                      [queryParams]="
+                        item.side === 'supplier'
+                          ? { purchase: document.document_id }
+                          : {
+                              order: document.document_id,
+                              customer: item.party_id,
+                              range: 'all',
+                            }
+                      "
+                      >{{ document.document_code }}</a
+                    >
                     <p class="type-caption">
                       Issued {{ document.issued_on | date: 'mediumDate' }} · due
                       {{ document.due_on | date: 'mediumDate' }}
