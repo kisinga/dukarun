@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SupabaseService } from '../../core/supabase.service';
+import { CatalogIdentityLookupService } from '../../core/identity-lookup.services';
 import { PosService } from '../../pos/pos.service';
 import { ProfileService } from '../../profile/profile.service';
 import {
@@ -68,6 +69,10 @@ describe('ReceiptDataService staff attribution', () => {
         ReceiptDataService,
         { provide: SupabaseService, useValue: { client: { from: vi.fn(() => taxDocumentQuery) } } },
         { provide: PosService, useValue: pos },
+        {
+          provide: CatalogIdentityLookupService,
+          useValue: { resolve: vi.fn().mockResolvedValue({ items: new Map() }) },
+        },
         {
           provide: ProfileService,
           useValue: {

@@ -1,5 +1,6 @@
 import { packWholesaleComparison } from '@dukarun/pack-types';
 import { parseKes } from '../core/money';
+import { manufacturerLabel } from '../core/product-identity';
 import { Component, input, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import type { Variant } from '../pos/pos.service';
@@ -69,6 +70,9 @@ export interface PurchaseLinePriceContext {
       >
         <div class="col-span-2 min-w-0 md:col-span-6 xl:col-auto xl:pr-2">
           <p class="truncate text-sm font-semibold">{{ label() }}</p>
+          <p class="type-caption truncate">
+            {{ manufacturerName() }}
+          </p>
           <p class="type-caption truncate">
             {{ variant()?.sku }} · {{ variant()?.stock ?? 0 }} currently in stock
             @if (line().batchNumber) {
@@ -370,6 +374,14 @@ export interface PurchaseLinePriceContext {
   `,
 })
 export class PurchaseLineRowComponent {
+  protected manufacturerName(): string {
+    const variant = this.variant();
+    return manufacturerLabel({
+      manufacturer_name: variant?.manufacturer_name,
+      identity_resolution: variant ? 'resolved' : 'unresolved',
+    });
+  }
+
   protected packComparison(): string {
     const price = parseKes(this.line().packSalePrice ?? '');
     return price === null

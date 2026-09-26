@@ -1,17 +1,19 @@
 import { Injectable, inject } from '@angular/core';
 import type { Database } from '@dukarun/shared-types';
+import {
+  CatalogIdentityLookupService,
+  PartyIdentityLookupService,
+} from '../core/identity-lookup.services';
+import { productIdentity } from '../core/product-identity';
 import { SupabaseService } from '../core/supabase.service';
 import {
   EMPTY_PRODUCT_PERFORMANCE,
   type DemandConfidence,
+  type ProductPerformanceMetricResponse,
+  type ProductPerformanceMetricRow,
   type ProductPerformanceResponse,
+  type ProductPerformanceRow,
 } from '../core/product-performance.models';
-
-const PRODUCT_PERFORMANCE_ROLLOUT_ERROR_CODES = new Set(['PGRST202', '42883']);
-
-function isMissingProductPerformanceRpc(error: { code?: string } | null): boolean {
-  return error !== null && PRODUCT_PERFORMANCE_ROLLOUT_ERROR_CODES.has(error.code ?? '');
-}
 
 export type DailySummary = Database['public']['Views']['rpt_daily_sales_summary']['Row'];
 export type DailyProductSales = Database['public']['Views']['rpt_daily_product_sales']['Row'];
@@ -97,6 +99,23 @@ export interface RestockProductRow {
   lastPurchaseDate: string | null;
   lastSoldOn: string | null;
   trend: number[];
+  sku?: string | null;
+  identityResolution?: 'resolved' | 'unresolved';
+}
+
+type RestockProductMetricRow = Omit<
+  RestockProductRow,
+  | 'productId'
+  | 'productName'
+  | 'variantName'
+  | 'manufacturerId'
+  | 'manufacturerName'
+  | 'sku'
+  | 'identityResolution'
+>;
+
+interface RestockIntelligenceMetric extends Omit<RestockIntelligence, 'products'> {
+  products: RestockProductMetricRow[];
 }
 
 export interface RestockIntelligence {
@@ -140,6 +159,8 @@ export interface DashboardPeriodComparison {
 @Injectable({ providedIn: 'root' })
 export class ReportsService {
   private readonly supabase = inject(SupabaseService);
+  private readonly catalogIdentities = inject(CatalogIdentityLookupService);
+  private readonly partyIdentities = inject(PartyIdentityLookupService);
 
   private get db() {
     return this.supabase.client;
@@ -155,19 +176,14 @@ export class ReportsService {
       ...(locationId ? { p_location_id: locationId } : {}),
     });
     if (error) throw error;
-    const snapshot = data as unknown as Partial<DashboardSalesSnapshot> | null;
-    let performance = snapshot?.productPerformance;
-    if (!performance) {
-      const fallback = await this.db.rpc('product_performance', {
-        p_window_days: 7,
-        p_limit: 10,
-        ...(locationId ? { p_location_id: locationId } : {}),
-      });
-      if (fallback.error && !isMissingProductPerformanceRpc(fallback.error)) throw fallback.error;
-      performance = fallback.error
-        ? EMPTY_PRODUCT_PERFORMANCE
-        : (fallback.data as unknown as ProductPerformanceResponse);
-    }
+    const snapshot = data as unknown as
+      | (Omit<Partial<DashboardSalesSnapshot>, 'productPerformance'> & {
+          productPerformance?: ProductPerformanceMetricResponse;
+        })
+      | null;
+    const performance = await this.hydratePerformance(
+      snapshot?.productPerformance ?? EMPTY_PRODUCT_PERFORMANCE
+    );
     return {
       summary: snapshot?.summary ?? [],
       topVariants: snapshot?.topVariants ?? [],
@@ -202,7 +218,12 @@ export class ReportsService {
       p_limit: limit,
     });
     if (error) throw error;
-    const value = (data ?? {}) as unknown as Partial<RestockIntelligence>;
+    const value = (data ?? {}) as unknown as Partial<RestockIntelligenceMetric>;
+    const rawProducts = value.products ?? [];
+    const identities = await this.catalogIdentities.resolve(
+      rawProducts.map(product => product.variantId),
+      { coverage: 'active' }
+    );
     return {
       days: Number(value.days ?? 0),
       lowStockThreshold: Number(value.lowStockThreshold ?? 0),
@@ -221,35 +242,45 @@ export class ReportsService {
         currentRevenue: Number(point.currentRevenue ?? 0),
         previousRevenue: Number(point.previousRevenue ?? 0),
       })),
-      products: (value.products ?? []).map(product => ({
-        ...product,
-        currentQuantity: Number(product.currentQuantity ?? 0),
-        currentRevenue: Number(product.currentRevenue ?? 0),
-        currentCogs: Number(product.currentCogs ?? 0),
-        currentMargin: Number(product.currentMargin ?? 0),
-        previousQuantity: Number(product.previousQuantity ?? 0),
-        previousRevenue: Number(product.previousRevenue ?? 0),
-        stock: Number(product.stock ?? 0),
-        stockValue: Number(product.stockValue ?? 0),
-        supplierStock: Number(product.supplierStock ?? 0),
-        daysCover: product.daysCover === null ? null : Number(product.daysCover),
-        reorderQuantity:
-          product.reorderQuantity === null || product.reorderQuantity === undefined
-            ? null
-            : Number(product.reorderQuantity),
-        planningDailyDemand:
-          product.planningDailyDemand === null || product.planningDailyDemand === undefined
-            ? null
-            : Number(product.planningDailyDemand),
-        observedAverageDailyDemand:
-          product.observedAverageDailyDemand === null ||
-          product.observedAverageDailyDemand === undefined
-            ? null
-            : Number(product.observedAverageDailyDemand),
-        outlierShare: Number(product.outlierShare ?? 0),
-        lastUnitCost: product.lastUnitCost === null ? null : Number(product.lastUnitCost),
-        trend: (product.trend ?? []).map(Number),
-      })),
+      products: rawProducts.map(product => {
+        const identity = productIdentity(identities.items.get(product.variantId));
+        return {
+          ...product,
+          productId: identity.product_id,
+          productName: identity.product_name,
+          variantName: identity.variant_name,
+          manufacturerId: identity.manufacturer_id,
+          manufacturerName: identity.manufacturer_name,
+          sku: identity.sku,
+          identityResolution: identity.identity_resolution,
+          currentQuantity: Number(product.currentQuantity ?? 0),
+          currentRevenue: Number(product.currentRevenue ?? 0),
+          currentCogs: Number(product.currentCogs ?? 0),
+          currentMargin: Number(product.currentMargin ?? 0),
+          previousQuantity: Number(product.previousQuantity ?? 0),
+          previousRevenue: Number(product.previousRevenue ?? 0),
+          stock: Number(product.stock ?? 0),
+          stockValue: Number(product.stockValue ?? 0),
+          supplierStock: Number(product.supplierStock ?? 0),
+          daysCover: product.daysCover === null ? null : Number(product.daysCover),
+          reorderQuantity:
+            product.reorderQuantity === null || product.reorderQuantity === undefined
+              ? null
+              : Number(product.reorderQuantity),
+          planningDailyDemand:
+            product.planningDailyDemand === null || product.planningDailyDemand === undefined
+              ? null
+              : Number(product.planningDailyDemand),
+          observedAverageDailyDemand:
+            product.observedAverageDailyDemand === null ||
+            product.observedAverageDailyDemand === undefined
+              ? null
+              : Number(product.observedAverageDailyDemand),
+          outlierShare: Number(product.outlierShare ?? 0),
+          lastUnitCost: product.lastUnitCost === null ? null : Number(product.lastUnitCost),
+          trend: (product.trend ?? []).map(Number),
+        };
+      }),
     };
   }
 
@@ -311,18 +342,58 @@ export class ReportsService {
     return data;
   }
 
+  private async hydratePerformance(
+    payload: Partial<ProductPerformanceMetricResponse>
+  ): Promise<ProductPerformanceResponse> {
+    const leaders = payload.leaders ?? EMPTY_PRODUCT_PERFORMANCE.leaders;
+    const identities = await this.catalogIdentities.resolve(
+      Object.values(leaders).flatMap(rows => rows.map(row => row.variant_id)),
+      { coverage: 'active' }
+    );
+    const normalize = (row: ProductPerformanceMetricRow): ProductPerformanceRow => ({
+      ...row,
+      ...productIdentity(identities.items.get(row.variant_id)),
+      confidence: row.confidence ?? row.demandConfidence ?? 'low',
+      current_quantity: Number(row.current_quantity ?? 0),
+      robust_quantity: Number(row.robust_quantity ?? 0),
+      previous_robust_quantity: Number(row.previous_robust_quantity ?? 0),
+      revenue: row.revenue === null || row.revenue === undefined ? null : Number(row.revenue),
+      margin: row.margin === null || row.margin === undefined ? null : Number(row.margin),
+      order_count: Number(row.order_count ?? 0),
+      active_days: Number(row.active_days ?? 0),
+      trend_score: Number(row.trend_score ?? 0),
+      outlier_detected: Boolean(row.outlier_detected),
+      outlier_share: Number(row.outlier_share ?? 0),
+      stock: Number(row.stock ?? 0),
+      planning_daily_demand: Number(row.planning_daily_demand ?? 0),
+      days_of_cover:
+        row.days_of_cover === null || row.days_of_cover === undefined
+          ? null
+          : Number(row.days_of_cover),
+    });
+    return {
+      windowDays: Number(payload.windowDays ?? 7),
+      generatedAt: payload.generatedAt ?? '',
+      financialsIncluded: Boolean(payload.financialsIncluded),
+      leaders: {
+        trending: (leaders.trending ?? []).map(normalize),
+        volume: (leaders.volume ?? []).map(normalize),
+        margin: (leaders.margin ?? []).map(normalize),
+        consistent: (leaders.consistent ?? []).map(normalize),
+      },
+    };
+  }
+
   /** Customer display names for a set of ids (client-side join). */
   async customerNames(ids: string[]): Promise<Map<string, string>> {
     if (ids.length === 0) return new Map();
-    const { data, error } = await this.db
-      .from('customers')
-      .select('id, first_name, last_name, deleted_at')
-      .in('id', ids);
-    if (error) throw error;
+    const identities = await this.partyIdentities.resolveCustomers(ids, {
+      coverage: 'may-include-historical',
+    });
     return new Map(
-      (data ?? []).map(c => [
-        c.id,
-        `${[c.first_name, c.last_name].filter(Boolean).join(' ')}${c.deleted_at ? ' (Deleted)' : ''}`,
+      [...identities.items].map(([id, customer]) => [
+        id,
+        `${customer.name}${customer.deleted ? ' (Deleted)' : ''}`,
       ])
     );
   }

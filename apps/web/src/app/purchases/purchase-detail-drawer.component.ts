@@ -175,6 +175,9 @@ import type { PurchaseRow } from './purchase-history.store';
                           {{ store.lineLabel(line.variant_id) }}
                         </p>
                       }
+                      <p class="type-caption truncate">
+                        {{ store.manufacturerName(line.variant_id) }}
+                      </p>
                       <p class="type-caption">
                         {{ line.quantity }} {{ unitLabel(line) }} × {{ fmtCost(line.unit_cost) }}
                         @if (line.expiry_date) {

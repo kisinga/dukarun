@@ -1,10 +1,11 @@
 import { DecimalPipe } from '@angular/common';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { BusinessClockService } from '../core/business-clock.service';
 import { CatalogCacheService } from '../core/catalog-cache.service';
 import { LocationContextService } from '../core/location-context.service';
 import { formatKes } from '../core/money';
+import { manufacturerLabel } from '../core/product-identity';
 import {
   EMPTY_PRODUCT_PERFORMANCE,
   type ProductPerformanceCategory,
@@ -15,6 +16,7 @@ import { PermissionsService } from '../core/permissions.service';
 import { variantLabel } from '../pos/pos.service';
 import { RestockIntelligenceComponent } from '../reports/restock-intelligence.component';
 import { ButtonComponent } from '../shared/ui/button.component';
+import { DemandConfidenceIndicatorComponent } from '../shared/ui/demand-confidence-indicator.component';
 import { EmptyStateComponent } from '../shared/ui/empty-state.component';
 import { IconComponent } from '../shared/ui/icon.component';
 import {
@@ -28,6 +30,7 @@ import {
   insightCopy,
   type DateRangePreset,
   type ProductDemandSummary,
+  type ProductDecision,
   type ProductIntelligenceSummary,
 } from './insights.models';
 
@@ -50,6 +53,7 @@ const EMPTY_SUMMARY: ProductIntelligenceSummary = {
     DecimalPipe,
     RouterLink,
     ButtonComponent,
+    DemandConfidenceIndicatorComponent,
     EmptyStateComponent,
     IconComponent,
     SearchableFilterComponent,
@@ -123,7 +127,7 @@ const EMPTY_SUMMARY: ProductIntelligenceSummary = {
                 [attr.aria-selected]="view() === 'sources'"
                 (click)="setView('sources')"
               >
-                Supplier & manufacturer
+                Sources
               </button>
             }
           </div>
@@ -172,7 +176,7 @@ const EMPTY_SUMMARY: ProductIntelligenceSummary = {
                   class="section-tab"
                   [class.section-tab-active]="performanceCategory() === category"
                   [attr.aria-selected]="performanceCategory() === category"
-                  (click)="performanceCategory.set(category)"
+                  (click)="setPerformanceCategory(category)"
                 >
                   {{ performanceLabel(category) }}
                 </button>
@@ -184,7 +188,7 @@ const EMPTY_SUMMARY: ProductIntelligenceSummary = {
             <div role="alert" class="alert alert-error m-4 text-sm">
               <app-icon name="heroExclamationTriangle" />{{ error() }}
             </div>
-          } @else if (loading()) {
+          } @else if (loading() && performanceRows().length === 0) {
             <div
               class="flex min-h-56 items-center justify-center gap-2 text-sm text-base-content/60"
             >
@@ -205,22 +209,25 @@ const EMPTY_SUMMARY: ProductIntelligenceSummary = {
                     <div class="min-w-0">
                       <a
                         class="link block truncate font-semibold"
-                        routerLink="/inventory/products"
-                        [queryParams]="{ product: item.product_id, variant: item.variant_id }"
+                        [routerLink]="['/insights/inventory', item.variant_id]"
                       >
                         {{ item.product_name }}
                       </a>
-                      <p class="type-caption">{{ item.variant_name }} · {{ item.stock_unit }}</p>
+                      <p class="mt-0.5 text-sm text-base-content/70">
+                        {{ manufacturerName(item) }}
+                      </p>
+                      <p class="text-xs text-base-content/50">
+                        {{ item.variant_name }} · {{ item.stock_unit }}
+                      </p>
                     </div>
-                    <span
-                      class="badge badge-sm"
-                      [class]="confidenceClass(item.confidence ?? item.demandConfidence ?? 'low')"
-                    >
-                      {{ item.confidence ?? item.demandConfidence ?? 'low' }} confidence
-                    </span>
+                    <app-demand-confidence
+                      [value]="item.confidence ?? item.demandConfidence ?? 'low'"
+                    />
                   </div>
                   @if (item.outlier_detected) {
-                    <span class="badge badge-warning badge-sm mt-2">Unusual spike adjusted</span>
+                    <span class="badge badge-warning badge-soft badge-sm mt-2"
+                      >Unusual spike adjusted</span
+                    >
                   }
                   <dl class="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
                     <div>
@@ -248,7 +255,7 @@ const EMPTY_SUMMARY: ProductIntelligenceSummary = {
                     class="mt-3 flex flex-wrap justify-between gap-2 border-t border-base-200 pt-3 text-xs text-base-content/70"
                   >
                     <span
-                      >Planning pace · up to 90 days ·
+                      >{{ item.stock | number: '1.0-3' }} on hand · Planning pace · up to 90 days ·
                       {{
                         item.days_of_cover === null
                           ? 'no cover'
@@ -339,6 +346,22 @@ const EMPTY_SUMMARY: ProductIntelligenceSummary = {
                   </select>
                 </label>
               }
+              <label class="form-control min-w-48 flex-1 sm:max-w-56">
+                <span class="label-text text-xs">Decision</span>
+                <select
+                  class="select select-bordered mt-1 min-h-11 w-full"
+                  [value]="decisionFilter()"
+                  (change)="setDecision($event)"
+                >
+                  <option value="">All decisions</option>
+                  <option value="stockout">Stockout</option>
+                  <option value="reorder">Restock now</option>
+                  <option value="low_cover">Plan reorder</option>
+                  <option value="slow">Slow-moving</option>
+                  <option value="insufficient_history">Insufficient history</option>
+                  <option value="healthy">Stock healthy</option>
+                </select>
+              </label>
               <div class="form-control min-w-48 flex-1 sm:max-w-64">
                 <span class="label-text text-xs">Supplier</span>
                 <app-searchable-filter
@@ -385,10 +408,22 @@ const EMPTY_SUMMARY: ProductIntelligenceSummary = {
                 </button>
               }
             </div>
-            <p class="type-caption">
-              Ordered by urgency, then stock cover and demand. Cover and reorder use Planning pace ·
-              up to 90 days. Supplier means the latest matching posted purchase source.
-            </p>
+            <div class="flex flex-wrap items-center gap-2 text-xs text-base-content/60">
+              @if (decisionFilter()) {
+                <span class="badge badge-neutral badge-soft badge-sm">
+                  Showing {{ decisionLabel(decisionFilter()) }}
+                </span>
+              }
+              @if (loading() && products().length > 0) {
+                <span class="inline-flex items-center gap-1.5" role="status">
+                  <span class="loading loading-spinner loading-xs"></span>Updating results
+                </span>
+              }
+              <span>
+                Ordered by urgency, then stock cover and demand. Cover and reorder use Planning pace
+                · up to 90 days. Supplier means the latest matching posted purchase source.
+              </span>
+            </div>
           </div>
         </section>
 
@@ -403,8 +438,8 @@ const EMPTY_SUMMARY: ProductIntelligenceSummary = {
         } @else if (products().length === 0) {
           <app-empty-state
             icon="heroCube"
-            title="No inventory matches these filters"
-            description="Clear a source filter or search another product. New stock signals normally appear within two minutes."
+            [title]="emptyStateTitle()"
+            [description]="emptyStateDescription()"
           />
         } @else {
           <div class="card overflow-hidden bg-base-100">
@@ -428,7 +463,7 @@ const EMPTY_SUMMARY: ProductIntelligenceSummary = {
                 </thead>
                 <tbody>
                   @for (item of products(); track item.variant_id) {
-                    <tr>
+                    <tr class="align-top">
                       <td class="max-w-72">
                         <a
                           class="block truncate font-semibold link link-hover"
@@ -436,24 +471,28 @@ const EMPTY_SUMMARY: ProductIntelligenceSummary = {
                           [queryParams]="{ product: item.product_id, variant: item.variant_id }"
                           >{{ item.product_name }}</a
                         >
-                        <p class="type-caption truncate">
-                          {{ item.variant_name }} · {{ item.stock_unit }}
+                        <p class="mt-0.5 truncate text-sm text-base-content/70">
+                          {{ manufacturerName(item) }}
                         </p>
-                        <p class="type-caption truncate">{{ sourceContext(item) }}</p>
+                        <p class="truncate text-xs text-base-content/50">
+                          {{ productContext(item) }}
+                        </p>
                       </td>
                       <td class="max-w-56">
                         <span class="badge" [class]="signalClass(item.signal)">{{
                           signalLabel(item.signal)
                         }}</span>
-                        <p class="type-caption mt-1">{{ copy(item.reason_code) }}</p>
+                        <p class="mt-1 text-xs leading-relaxed text-base-content/60">
+                          {{ copy(item.reason_code) }}
+                        </p>
                         <div class="mt-1 flex flex-wrap gap-1">
                           @if (item.demand_confidence) {
-                            <span class="badge badge-ghost badge-xs"
-                              >{{ item.demand_confidence }} confidence</span
-                            >
+                            <app-demand-confidence [value]="item.demand_confidence" />
                           }
                           @if (item.outlier_detected) {
-                            <span class="badge badge-warning badge-xs">Unusual spike adjusted</span>
+                            <span class="badge badge-warning badge-soft badge-xs"
+                              >Unusual spike adjusted</span
+                            >
                           }
                         </div>
                       </td>
@@ -467,13 +506,17 @@ const EMPTY_SUMMARY: ProductIntelligenceSummary = {
                       >
                         {{ change(item) > 0 ? '+' : '' }}{{ change(item) | number: '1.0-1' }}%
                       </td>
-                      <td class="text-right tabular-nums">
+                      <td class="text-right font-semibold tabular-nums">
                         {{ item.current_stock | number: '1.0-3' }}
                       </td>
-                      <td class="text-right tabular-nums">{{ cover(item) }}</td>
+                      <td class="text-right text-base-content/65 tabular-nums">
+                        {{ cover(item) }}
+                      </td>
                       <td class="text-right font-semibold tabular-nums">{{ reorder(item) }}</td>
                       @if (financialsIncluded()) {
-                        <td class="text-right tabular-nums">{{ fmt(item.net_revenue ?? 0) }}</td>
+                        <td class="text-right text-base-content/70 tabular-nums">
+                          {{ fmt(item.net_revenue ?? 0) }}
+                        </td>
                         <td
                           class="text-right tabular-nums"
                           [class.text-success]="(item.margin ?? 0) > 0"
@@ -506,23 +549,26 @@ const EMPTY_SUMMARY: ProductIntelligenceSummary = {
                         [queryParams]="{ product: item.product_id, variant: item.variant_id }"
                         >{{ item.product_name }}</a
                       >
-                      <p class="type-caption truncate">
-                        {{ item.variant_name }} · {{ sourceContext(item) }}
+                      <p class="mt-0.5 truncate text-sm text-base-content/70">
+                        {{ manufacturerName(item) }}
+                      </p>
+                      <p class="truncate text-xs text-base-content/50">
+                        {{ productContext(item) }}
                       </p>
                     </div>
                     <span class="badge shrink-0" [class]="signalClass(item.signal)">{{
                       signalLabel(item.signal)
                     }}</span>
                   </div>
-                  <p class="text-sm">{{ copy(item.reason_code) }}</p>
+                  <p class="text-sm text-base-content/65">{{ copy(item.reason_code) }}</p>
                   <div class="flex flex-wrap gap-1">
                     @if (item.demand_confidence) {
-                      <span class="badge badge-ghost badge-xs"
-                        >{{ item.demand_confidence }} confidence</span
-                      >
+                      <app-demand-confidence [value]="item.demand_confidence" />
                     }
                     @if (item.outlier_detected) {
-                      <span class="badge badge-warning badge-xs">Unusual spike adjusted</span>
+                      <span class="badge badge-warning badge-soft badge-xs"
+                        >Unusual spike adjusted</span
+                      >
                     }
                   </div>
                   <dl class="grid grid-cols-3 gap-3 text-sm">
@@ -540,7 +586,7 @@ const EMPTY_SUMMARY: ProductIntelligenceSummary = {
                     </div>
                     <div>
                       <dt class="type-caption">Planning cover</dt>
-                      <dd class="font-semibold tabular-nums">{{ cover(item) }}</dd>
+                      <dd class="text-base-content/70 tabular-nums">{{ cover(item) }}</dd>
                     </div>
                   </dl>
                   <div class="flex items-center justify-between gap-3">
@@ -583,6 +629,8 @@ export class ProductsInsightsComponent implements OnInit {
   private readonly businessClock = inject(BusinessClockService);
   private readonly catalog = inject(CatalogCacheService);
   private readonly parties = inject(PartyCacheService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
 
   protected readonly view = signal<InventoryView>('priorities');
   protected readonly businessToday = signal('');
@@ -593,6 +641,7 @@ export class ProductsInsightsComponent implements OnInit {
   protected readonly productFilter = signal('');
   protected readonly supplierFilter = signal('');
   protected readonly manufacturerFilter = signal('');
+  protected readonly decisionFilter = signal<ProductDecision | ''>('');
   protected readonly products = signal<ProductDemandSummary[]>([]);
   protected readonly performance = signal<ProductPerformanceResponse>(EMPTY_PRODUCT_PERFORMANCE);
   protected readonly performanceCategory = signal<ProductPerformanceCategory>('trending');
@@ -657,7 +706,18 @@ export class ProductsInsightsComponent implements OnInit {
     () =>
       Number(Boolean(this.productFilter())) +
       Number(Boolean(this.supplierFilter())) +
-      Number(Boolean(this.manufacturerFilter()))
+      Number(Boolean(this.manufacturerFilter())) +
+      Number(Boolean(this.decisionFilter()))
+  );
+  protected readonly emptyStateTitle = computed(() =>
+    this.decisionFilter()
+      ? `No ${this.decisionLabel(this.decisionFilter()).toLowerCase()} products match`
+      : 'No inventory matches these filters'
+  );
+  protected readonly emptyStateDescription = computed(() =>
+    this.decisionFilter()
+      ? 'Try another decision or clear a source filter. New stock signals normally appear within two minutes.'
+      : 'Clear a source filter or search another product. New stock signals normally appear within two minutes.'
   );
 
   async ngOnInit(): Promise<void> {
@@ -669,6 +729,7 @@ export class ProductsInsightsComponent implements OnInit {
         this.businessClock.today(),
       ]);
       this.businessToday.set(today);
+      this.restoreViewFromUrl();
       const range = presetDateRange(today, 30);
       this.rangeFrom.set(range.from);
       this.rangeTo.set(range.to);
@@ -718,7 +779,14 @@ export class ProductsInsightsComponent implements OnInit {
       this.rangeTo.set(range.to);
     }
     this.view.set(value);
+    this.syncViewToUrl();
     if (value !== 'sources') void this.load();
+  }
+
+  protected setPerformanceCategory(value: ProductPerformanceCategory): void {
+    if (value === 'margin' && !this.permissions.has('ViewFinancials')) return;
+    this.performanceCategory.set(value);
+    this.syncViewToUrl();
   }
 
   protected setLocation(event: Event): void {
@@ -741,10 +809,19 @@ export class ProductsInsightsComponent implements OnInit {
     void this.load();
   }
 
+  protected setDecision(event: Event): void {
+    const value = (event.target as HTMLSelectElement).value;
+    this.decisionFilter.set(this.isProductDecision(value) ? value : '');
+    this.syncViewToUrl();
+    void this.load();
+  }
+
   protected clearFilters(): void {
     this.productFilter.set('');
     this.supplierFilter.set('');
     this.manufacturerFilter.set('');
+    this.decisionFilter.set('');
+    this.syncViewToUrl();
     void this.load();
   }
 
@@ -766,6 +843,7 @@ export class ProductsInsightsComponent implements OnInit {
         supplierId: this.supplierFilter() || null,
         manufacturerId: this.manufacturerFilter() || null,
         search: this.selectedProductSearch(),
+        decision: this.decisionFilter() || null,
       });
       if (request !== this.request) return;
       this.products.set(data.items);
@@ -817,6 +895,7 @@ export class ProductsInsightsComponent implements OnInit {
         supplierId: this.supplierFilter() || null,
         manufacturerId: this.manufacturerFilter() || null,
         search: this.selectedProductSearch(),
+        decision: this.decisionFilter() || null,
         offset,
       });
       if (request !== this.request) return;
@@ -844,12 +923,14 @@ export class ProductsInsightsComponent implements OnInit {
   }
 
   protected signalLabel(value: string | null): string {
-    return value ? value.replaceAll('_', ' ') : 'Updating';
+    return value && this.isProductDecision(value) ? this.decisionLabel(value) : 'Updating';
   }
 
   protected signalClass(value: string | null): string {
     if (value === 'stockout') return 'badge-error';
     if (value === 'reorder' || value === 'low_cover') return 'badge-warning';
+    if (value === 'slow') return 'badge-info';
+    if (value === 'insufficient_history') return 'badge-neutral';
     if (value === 'healthy') return 'badge-success';
     return 'badge-ghost';
   }
@@ -861,17 +942,32 @@ export class ProductsInsightsComponent implements OnInit {
     return 'Consistency';
   }
 
-  protected confidenceClass(value: string): string {
-    if (value === 'high') return 'badge-success';
-    if (value === 'medium') return 'badge-info';
-    return 'badge-ghost';
+  protected manufacturerName(item: {
+    manufacturer_name?: string | null;
+    identity_resolution?: 'resolved' | 'unresolved';
+  }): string {
+    return manufacturerLabel(item);
   }
 
-  protected sourceContext(item: ProductDemandSummary): string {
-    return (
-      [item.manufacturer_name, item.preferred_supplier_name].filter(Boolean).join(' · ') ||
-      'Source not set'
-    );
+  protected productContext(item: ProductDemandSummary): string {
+    return [
+      item.variant_name,
+      item.sku,
+      item.stock_unit,
+      item.preferred_supplier_name ? `Supplier: ${item.preferred_supplier_name}` : null,
+    ]
+      .filter(Boolean)
+      .join(' · ');
+  }
+
+  protected decisionLabel(value: ProductDecision | ''): string {
+    if (value === 'stockout') return 'Stockout';
+    if (value === 'reorder') return 'Restock now';
+    if (value === 'low_cover') return 'Plan reorder';
+    if (value === 'slow') return 'Slow-moving';
+    if (value === 'insufficient_history') return 'Insufficient history';
+    if (value === 'healthy') return 'Stock healthy';
+    return 'All decisions';
   }
 
   private selectedProductSearch(): string | null {
@@ -883,5 +979,47 @@ export class ProductsInsightsComponent implements OnInit {
         .find(variant => variant.variant_id === variantId)
         ?.sku?.trim() || null
     );
+  }
+
+  private restoreViewFromUrl(): void {
+    const view = this.route.snapshot.queryParamMap.get('view');
+    if (view === 'performance' || view === 'priorities') this.view.set(view);
+    if (view === 'sources' && this.permissions.has('ViewFinancials')) this.view.set(view);
+    const leader = this.route.snapshot.queryParamMap.get('leader');
+    if (
+      leader === 'trending' ||
+      leader === 'volume' ||
+      leader === 'consistent' ||
+      (leader === 'margin' && this.permissions.has('ViewFinancials'))
+    ) {
+      this.performanceCategory.set(leader);
+    }
+    const decision = this.route.snapshot.queryParamMap.get('decision');
+    if (decision && this.isProductDecision(decision)) this.decisionFilter.set(decision);
+  }
+
+  private isProductDecision(value: string): value is ProductDecision {
+    return (
+      value === 'stockout' ||
+      value === 'reorder' ||
+      value === 'low_cover' ||
+      value === 'slow' ||
+      value === 'insufficient_history' ||
+      value === 'healthy'
+    );
+  }
+
+  private syncViewToUrl(): void {
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: {
+        view: this.view() === 'priorities' ? null : this.view(),
+        leader: this.view() === 'performance' ? this.performanceCategory() : null,
+        decision:
+          this.view() === 'priorities' && this.decisionFilter() ? this.decisionFilter() : null,
+      },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
   }
 }

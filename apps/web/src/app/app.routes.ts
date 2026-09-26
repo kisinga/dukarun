@@ -367,18 +367,14 @@ export const routes: Routes = [
       {
         path: 'insights',
         canActivate: [insightsSectionGuard],
-        data: { insightsSection: 'attention' },
+        data: { insightsSection: 'inventory' },
         loadComponent: () =>
           import('./insights/insights-layout.component').then(m => m.InsightsLayoutComponent),
         children: [
           {
             path: 'attention',
-            canActivate: [insightsSectionGuard],
-            data: { insightsSection: 'attention' },
-            loadComponent: () =>
-              import('./insights/attention-insights.component').then(
-                m => m.AttentionInsightsComponent
-              ),
+            pathMatch: 'full',
+            redirectTo: preserveQueryRedirect('/insights/inventory'),
           },
           {
             path: 'credit/:side/:partyId',

@@ -25,9 +25,11 @@ export function selectDashboardPerformanceLeaders(
   const used = new Set<string>();
   const result: DashboardPerformanceLeader[] = [];
   for (const kind of order) {
-    const row = performance.leaders[kind].find(candidate => !used.has(candidate.product_id));
+    const row = performance.leaders[kind].find(
+      candidate => !used.has(candidate.product_id || candidate.variant_id)
+    );
     if (!row) continue;
-    used.add(row.product_id);
+    used.add(row.product_id || row.variant_id);
     result.push({ kind, row });
   }
   return result;

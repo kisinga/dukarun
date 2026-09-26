@@ -2507,6 +2507,96 @@ export type Database = {
           },
         ]
       }
+      credit_document_history_exclusions: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string | null
+          document_id: string
+          id: string
+          party_id: string
+          reason: string
+          side: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          document_id: string
+          id?: string
+          party_id: string
+          reason: string
+          side: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          document_id?: string
+          id?: string
+          party_id?: string
+          reason?: string
+          side?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credit_document_history_exclusions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credit_document_history_exclusions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credit_document_history_exclusions_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "customer_account_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "credit_document_history_exclusions_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "customer_ar_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "credit_document_history_exclusions_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "customer_deposit_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "credit_document_history_exclusions_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credit_document_history_exclusions_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_advance_balances"
+            referencedColumns: ["supplier_id"]
+          },
+          {
+            foreignKeyName: "credit_document_history_exclusions_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_ap_balances"
+            referencedColumns: ["supplier_id"]
+          },
+        ]
+      }
       credit_document_performance: {
         Row: {
           company_id: string
@@ -8663,8 +8753,8 @@ export type Database = {
           company_id: string
           current_stock: number
           current_value: number | null
-          demand_confidence: string | null
           days_of_cover: number | null
+          demand_confidence: string | null
           last_sale_date: string | null
           location_id: string
           observed_average_daily_demand: number | null
@@ -8685,8 +8775,8 @@ export type Database = {
           company_id: string
           current_stock?: number
           current_value?: number | null
-          demand_confidence?: string | null
           days_of_cover?: number | null
+          demand_confidence?: string | null
           last_sale_date?: string | null
           location_id: string
           observed_average_daily_demand?: number | null
@@ -8707,8 +8797,8 @@ export type Database = {
           company_id?: string
           current_stock?: number
           current_value?: number | null
-          demand_confidence?: string | null
           days_of_cover?: number | null
+          demand_confidence?: string | null
           last_sale_date?: string | null
           location_id?: string
           observed_average_daily_demand?: number | null
@@ -9165,8 +9255,8 @@ export type Database = {
         Row: {
           company_id: string
           corrected_cogs: number
-          current_from: string
           current_active_days: number | null
+          current_from: string
           current_max_quantity: number | null
           current_median_quantity: number | null
           current_order_count: number | null
@@ -9193,8 +9283,8 @@ export type Database = {
         Insert: {
           company_id: string
           corrected_cogs?: number
-          current_from: string
           current_active_days?: number | null
+          current_from: string
           current_max_quantity?: number | null
           current_median_quantity?: number | null
           current_order_count?: number | null
@@ -9221,8 +9311,8 @@ export type Database = {
         Update: {
           company_id?: string
           corrected_cogs?: number
-          current_from?: string
           current_active_days?: number | null
+          current_from?: string
           current_max_quantity?: number | null
           current_median_quantity?: number | null
           current_order_count?: number | null
@@ -14822,6 +14912,23 @@ export type Database = {
           wholesale_price: number
         }[]
       }
+      catalog_identity_lookup: {
+        Args: { p_variant_ids: string[] }
+        Returns: {
+          company_id: string
+          kind: string
+          manufacturer_id: string
+          manufacturer_name: string
+          product_active: boolean
+          product_id: string
+          product_name: string
+          sku: string
+          stock_unit: string
+          variant_active: boolean
+          variant_id: string
+          variant_name: string
+        }[]
+      }
       catalog_management_page: {
         Args: {
           p_category?: string
@@ -15502,6 +15609,15 @@ export type Database = {
         Returns: undefined
       }
       insight_attention_feed: {
+        Args: {
+          p_cursor?: number
+          p_domain?: string
+          p_limit?: number
+          p_location_id?: string
+        }
+        Returns: Json
+      }
+      insight_attention_feed_with_identity: {
         Args: {
           p_cursor?: number
           p_domain?: string
@@ -16956,6 +17072,21 @@ export type Database = {
       }
       product_intelligence: {
         Args: {
+          p_decision?: string
+          p_limit?: number
+          p_location_id?: string
+          p_manufacturer_id?: string
+          p_offset?: number
+          p_search?: string
+          p_since?: string
+          p_supplier_id?: string
+          p_until?: string
+          p_window_days?: number
+        }
+        Returns: Json
+      }
+      product_intelligence_with_identity: {
+        Args: {
           p_limit?: number
           p_location_id?: string
           p_manufacturer_id?: string
@@ -16969,6 +17100,14 @@ export type Database = {
         Returns: Json
       }
       product_performance: {
+        Args: {
+          p_limit?: number
+          p_location_id?: string
+          p_window_days?: number
+        }
+        Returns: Json
+      }
+      product_performance_with_identity: {
         Args: {
           p_limit?: number
           p_location_id?: string
@@ -17748,6 +17887,17 @@ export type Database = {
         Returns: Json
       }
       restock_product_intelligence: {
+        Args: {
+          p_limit?: number
+          p_location_id: string
+          p_manufacturer_id?: string
+          p_since: string
+          p_supplier_id?: string
+          p_until: string
+        }
+        Returns: Json
+      }
+      restock_product_intelligence_with_identity: {
         Args: {
           p_limit?: number
           p_location_id: string
@@ -18821,3 +18971,4 @@ export const Constants = {
     Enums: {},
   },
 } as const
+

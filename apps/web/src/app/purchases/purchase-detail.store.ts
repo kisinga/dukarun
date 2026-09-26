@@ -5,13 +5,18 @@ import { CashierSessionService } from '../core/cashier-session.service';
 import { formatKes, formatKesInput, parseKes } from '../core/money';
 import { PermissionsService } from '../core/permissions.service';
 import {
+  CatalogIdentityLookupService,
+  type CatalogIdentity,
+} from '../core/identity-lookup.services';
+import { manufacturerLabel } from '../core/product-identity';
+import {
   LedgerAccount,
   MoneyService,
   PurchaseExpense,
   PurchaseLine,
   PurchasePayment,
 } from '../money/money.service';
-import { PosService, Variant, variantLabel } from '../pos/pos.service';
+import { variantLabel } from '../pos/pos.service';
 import { PrintService } from '../shared/print/print.service';
 import { ReceiptDataService } from '../shared/print/receipt-data.service';
 import type { BadgeType } from '../shared/ui/status-badge.component';
@@ -39,7 +44,7 @@ export interface PurchaseDetailChangedResult {
 export class PurchaseDetailStore {
   private readonly businessClock = inject(BusinessClockService);
   private readonly money = inject(MoneyService);
-  private readonly pos = inject(PosService);
+  private readonly catalogIdentities = inject(CatalogIdentityLookupService);
   private readonly receiptData = inject(ReceiptDataService);
   private readonly print = inject(PrintService);
   readonly permissions = inject(PermissionsService);
@@ -53,7 +58,7 @@ export class PurchaseDetailStore {
   readonly expenses = this.expensesState.asReadonly();
   private readonly paymentsState = signal<PurchasePayment[]>([]);
   readonly payments = this.paymentsState.asReadonly();
-  private readonly variantsState = signal<Map<string, Variant>>(new Map());
+  private readonly variantsState = signal<Map<string, CatalogIdentity>>(new Map());
   private readonly supplierAdvanceState = signal(0);
   readonly supplierAdvance = this.supplierAdvanceState.asReadonly();
   private readonly accountsState = signal<LedgerAccount[]>([]);
@@ -313,13 +318,21 @@ export class PurchaseDetailStore {
     return purchase.paid > 0 ? 'Part paid' : 'Unpaid';
   }
 
-  variant(variantId: string): Variant | null {
+  variant(variantId: string): CatalogIdentity | null {
     return this.variantsState().get(variantId) ?? null;
   }
 
   lineLabel(variantId: string): string {
     const variant = this.variant(variantId);
     return variant ? variantLabel(variant) : 'Item';
+  }
+
+  manufacturerName(variantId: string): string {
+    const variant = this.variant(variantId);
+    return manufacturerLabel({
+      manufacturer_name: variant?.manufacturer_name,
+      identity_resolution: variant ? 'resolved' : 'unresolved',
+    });
   }
 
   date(value: string): string {
@@ -335,7 +348,7 @@ export class PurchaseDetailStore {
     expenses: PurchaseExpense[];
     payments: PurchasePayment[];
     advance: number;
-    variants: Map<string, Variant>;
+    variants: Map<string, CatalogIdentity>;
   }> {
     const [lines, expenses, payments, advance] = await Promise.all([
       this.money.purchaseLines(purchase.id),
@@ -343,15 +356,16 @@ export class PurchaseDetailStore {
       this.money.purchasePayments(purchase.id),
       this.money.supplierAdvanceAvailable(purchase.supplier_id),
     ]);
-    const variants = await this.pos.variantsByIds([...new Set(lines.map(line => line.variant_id))]);
+    const variants = await this.catalogIdentities.resolve(
+      [...new Set(lines.map(line => line.variant_id))],
+      { coverage: 'may-include-historical' }
+    );
     return {
       lines,
       expenses,
       payments,
       advance,
-      variants: new Map(
-        variants.flatMap(variant => (variant.variant_id ? [[variant.variant_id, variant]] : []))
-      ),
+      variants: variants.items,
     };
   }
 

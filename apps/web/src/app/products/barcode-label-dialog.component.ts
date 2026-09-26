@@ -87,6 +87,9 @@ const LABEL_LAYOUT_KEY = 'dukarun-barcode-label-layout';
           @if (mode() === 'single' && selected(); as selected) {
             <div class="mt-4 rounded-field border border-base-300 p-3">
               <p class="font-semibold">{{ label(selected.variant) }}</p>
+              <p class="type-caption mt-1">
+                {{ selected.variant.manufacturer_name || 'Manufacturer not set' }}
+              </p>
               <p class="type-caption mt-1 font-mono">
                 {{ selected.variant.barcode || 'No barcode' }}
               </p>

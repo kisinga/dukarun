@@ -1,7 +1,11 @@
 import { Injectable, inject } from '@angular/core';
 import { SupabaseService } from '../core/supabase.service';
+import { CatalogIdentityLookupService } from '../core/identity-lookup.services';
+import { productIdentity, productIdentityLabel } from '../core/product-identity';
 import {
   EMPTY_PRODUCT_PERFORMANCE,
+  type ProductPerformanceMetricResponse,
+  type ProductPerformanceMetricRow,
   type ProductPerformanceResponse,
   type ProductPerformanceRow,
 } from '../core/product-performance.models';
@@ -12,6 +16,8 @@ import type {
   InsightSignal,
   PartyCreditProfile,
   ProductDemandSummary,
+  ProductDemandMetric,
+  ProductDecision,
   ProductIntelligenceSummary,
   ProductProfile,
 } from './insights.models';
@@ -19,6 +25,7 @@ import type {
 @Injectable({ providedIn: 'root' })
 export class InsightsService {
   private readonly supabase = inject(SupabaseService);
+  private readonly catalogIdentities = inject(CatalogIdentityLookupService);
 
   private get db() {
     return this.supabase.client;
@@ -38,15 +45,30 @@ export class InsightsService {
     });
     if (error) throw error;
     const payload = data as unknown as {
-      items?: InsightSignal[];
+      items?: Array<Partial<InsightSignal> & Pick<InsightSignal, 'domain' | 'entity_id'>>;
       nextCursor?: number | null;
       generatedAt?: string;
     } | null;
-    return {
-      items: (payload?.items ?? []).map(item => ({
+    const rawItems = payload?.items ?? [];
+    const productIds = rawItems
+      .filter(item => item.domain === 'products')
+      .map(item => item.entity_id);
+    const identities = await this.catalogIdentities.resolve(productIds, { coverage: 'active' });
+    const items = rawItems.map(raw => {
+      const item = raw as InsightSignal;
+      if (raw.domain !== 'products') return item;
+      const identity = productIdentity(identities.items.get(raw.entity_id));
+      return {
         ...item,
-        href: item.href.replace('/insights/products/', '/insights/inventory/'),
-      })),
+        title: productIdentityLabel(identity),
+        href: `/insights/inventory/${raw.entity_id}`,
+        product_id: identity.product_id || null,
+        manufacturer_name: identity.manufacturer_name,
+        identity_resolution: identity.identity_resolution,
+      };
+    });
+    return {
+      items,
       nextCursor: payload?.nextCursor ?? null,
       generatedAt: payload?.generatedAt ?? new Date().toISOString(),
     };
@@ -197,6 +219,7 @@ export class InsightsService {
     supplierId?: string | null;
     manufacturerId?: string | null;
     search?: string | null;
+    decision?: ProductDecision | null;
     limit?: number;
     offset?: number;
   }): Promise<{
@@ -215,16 +238,25 @@ export class InsightsService {
       ...(filters.supplierId ? { p_supplier_id: filters.supplierId } : {}),
       ...(filters.manufacturerId ? { p_manufacturer_id: filters.manufacturerId } : {}),
       ...(filters.search ? { p_search: filters.search } : {}),
+      ...(filters.decision ? { p_decision: filters.decision } : {}),
     });
     if (error) throw error;
     const payload = data as unknown as {
-      items?: ProductDemandSummary[];
+      items?: ProductDemandMetric[];
       nextOffset?: number | null;
       financialsIncluded?: boolean;
       summary?: Partial<ProductIntelligenceSummary>;
     } | null;
+    const rows = payload?.items ?? [];
+    const identities = await this.catalogIdentities.resolve(
+      rows.map(row => row.variant_id),
+      { coverage: 'active' }
+    );
     return {
-      items: payload?.items ?? [],
+      items: rows.map(row => ({
+        ...row,
+        ...productIdentity(identities.items.get(row.variant_id)),
+      })),
       nextOffset: payload?.nextOffset ?? null,
       financialsIncluded: Boolean(payload?.financialsIncluded),
       summary: {
@@ -260,9 +292,15 @@ export class InsightsService {
       ...(locationId ? { p_location_id: locationId } : {}),
     });
     if (error) throw error;
-    const payload = data as unknown as Partial<ProductPerformanceResponse> | null;
-    const normalize = (row: ProductPerformanceRow): ProductPerformanceRow => ({
+    const payload = data as unknown as Partial<ProductPerformanceMetricResponse> | null;
+    const leaders = payload?.leaders ?? EMPTY_PRODUCT_PERFORMANCE.leaders;
+    const identities = await this.catalogIdentities.resolve(
+      Object.values(leaders).flatMap(rows => rows.map(row => row.variant_id)),
+      { coverage: 'active' }
+    );
+    const normalize = (row: ProductPerformanceMetricRow): ProductPerformanceRow => ({
       ...row,
+      ...productIdentity(identities.items.get(row.variant_id)),
       confidence: row.confidence ?? row.demandConfidence ?? 'low',
       current_quantity: Number(row.current_quantity ?? 0),
       robust_quantity: Number(row.robust_quantity ?? 0),
@@ -286,10 +324,10 @@ export class InsightsService {
       windowDays: Number(payload?.windowDays ?? windowDays),
       generatedAt: payload?.generatedAt ?? '',
       leaders: {
-        trending: (payload?.leaders?.trending ?? []).map(normalize),
-        volume: (payload?.leaders?.volume ?? []).map(normalize),
-        margin: (payload?.leaders?.margin ?? []).map(normalize),
-        consistent: (payload?.leaders?.consistent ?? []).map(normalize),
+        trending: (leaders.trending ?? []).map(normalize),
+        volume: (leaders.volume ?? []).map(normalize),
+        margin: (leaders.margin ?? []).map(normalize),
+        consistent: (leaders.consistent ?? []).map(normalize),
       },
       financialsIncluded: Boolean(payload?.financialsIncluded),
     };

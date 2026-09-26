@@ -3,8 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CashierSessionService } from '../core/cashier-session.service';
 import { BusinessClockService } from '../core/business-clock.service';
 import { PermissionsService } from '../core/permissions.service';
+import { CatalogIdentityLookupService } from '../core/identity-lookup.services';
 import { MoneyService } from '../money/money.service';
-import { PosService } from '../pos/pos.service';
 import { PrintService } from '../shared/print/print.service';
 import { ReceiptDataService } from '../shared/print/receipt-data.service';
 import { PurchaseDetailStore } from './purchase-detail.store';
@@ -71,7 +71,10 @@ describe('PurchaseDetailStore', () => {
           useValue: { today: vi.fn().mockResolvedValue('2026-08-27') },
         },
         { provide: MoneyService, useValue: money },
-        { provide: PosService, useValue: { variantsByIds: vi.fn().mockResolvedValue([]) } },
+        {
+          provide: CatalogIdentityLookupService,
+          useValue: { resolve: vi.fn().mockResolvedValue({ items: new Map() }) },
+        },
         { provide: PermissionsService, useValue: { has: vi.fn().mockReturnValue(true) } },
         {
           provide: CashierSessionService,

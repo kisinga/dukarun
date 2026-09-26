@@ -26,6 +26,7 @@ for (const route of [
   'contact',
   'docs',
   'docs/hardware',
+  'developers/storefront',
   'tools/daily-shop-cash-up',
   'privacy',
   'terms',
@@ -123,7 +124,7 @@ if (
   throw new Error('Public site must not install a PWA.');
 }
 
-const directory = requireFile(resolve(storefront, 'index.csr.html'));
+const directory = requireFile(resolve(storefront, 'index.html'));
 const sitemap = requireFile(resolve(storefront, 'sitemap.xml'));
 const storefrontRobots = requireFile(resolve(storefront, 'robots.txt'));
 if (!directory.includes('<title>') || !sitemap.includes('<urlset')) {
@@ -152,14 +153,35 @@ requireFile(resolve(web, 'ngsw.json'));
 requireFile(resolve(web, 'manifest.webmanifest'));
 
 const siteCsr = requireFile(resolve(site, 'index.csr.html'));
-requireFile(resolve(storefront, 'index.csr.html'));
+if (existsSync(resolve(root, 'apps/storefront/dist/storefront/server'))) {
+  throw new Error('Storefront must remain a browser-only build.');
+}
 if (!siteCsr.includes('name="robots" content="noindex, nofollow"')) {
   throw new Error('Marketing CSR fallback must remain noindex.');
 }
 const csrNginx = requireFile(resolve(root, 'apps/nginx.conf'));
 const spaNginx = requireFile(resolve(root, 'apps/nginx-spa.conf'));
-if (!csrNginx.includes('try_files $uri $uri/index.html /index.csr.html;')) {
-  throw new Error('Static apps must fall back to index.csr.html.');
+const publicCsrFallbacks =
+  csrNginx.match(/try_files \$uri \$uri\/index\.html \/__CSR_ENTRY__;/g) ?? [];
+if (publicCsrFallbacks.length !== 1) {
+  throw new Error('Public static app fallback must use the app-specific CSR entry placeholder.');
+}
+const privateRouteLocation = csrNginx.match(
+  /location ~ \^\/\(\?:statement\|document\|track\)\/ \{([\s\S]*?)\n  \}/
+)?.[1];
+if (!privateRouteLocation?.includes('try_files $uri $uri/index.html @private_csr_shell;')) {
+  throw new Error('Private token routes must use the header-preserving named CSR fallback.');
+}
+const privateCsrLocation = csrNginx.match(/location @private_csr_shell \{([\s\S]*?)\n  \}/)?.[1];
+for (const marker of [
+  'X-Robots-Tag "noindex, nofollow, noarchive" always',
+  'Referrer-Policy "no-referrer" always',
+  'Cache-Control "no-store" always',
+  'rewrite ^ /__CSR_ENTRY__ break;',
+]) {
+  if (!privateCsrLocation?.includes(marker)) {
+    throw new Error(`Private CSR fallback is missing ${marker}`);
+  }
 }
 const storefrontLocation = csrNginx.match(
   /location \^~ \/api\/storefront\/ \{([\s\S]*?)\n  \}/

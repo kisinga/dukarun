@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1
+
 # ========================================
 # v2 frontend apps (site | web | storefront | super-admin) — one Dockerfile for all.
 # Build context: repository root (.)
@@ -11,25 +13,33 @@
 #   STOREFRONT_PUBLIC_URL public storefront URL
 #   MARKETING_VIDEO_BASE_URL public base URL for optional marketing video assets
 #   GITBOOK_SITE_URL, USERTOUR_TOKEN, USERTOUR_CONTENT_IDS_JSON web-only learning config
+#   NG_BUILD_MAX_WORKERS maximum Angular workers per app build (default: 2)
 # SUPABASE_* are baked into the bundle by scripts/generate-environment.mjs (prebuild).
 # ========================================
 
-FROM node:22-alpine AS builder
-ARG APP
-RUN case "$APP" in site|web|storefront|super-admin) ;; *) echo "APP must be site|web|storefront|super-admin"; exit 1 ;; esac
-
+FROM node:22-alpine AS deps
 WORKDIR /app
 
-# Install the selected workspace from the committed dependency graph. All workspace
-# manifests are required for npm to validate the root lockfile.
+# Install the active frontend dependency union once. Keeping this stage independent
+# of APP gives all four concurrent Compose builds the same cache key.
 COPY package.json package-lock.json ./
 COPY apps/site/package.json apps/site/package.json
 COPY apps/web/package.json apps/web/package.json
 COPY apps/storefront/package.json apps/storefront/package.json
 COPY apps/super-admin/package.json apps/super-admin/package.json
 COPY apps/video/package.json apps/video/package.json
-RUN HUSKY=0 npm ci --quiet --no-audit --no-fund --include=dev \
-    --workspace "@dukarun/$APP" --include-workspace-root=false
+RUN --mount=type=cache,id=dukarun-npm,target=/root/.npm,sharing=shared \
+    HUSKY=0 npm ci --quiet --no-audit --no-fund --include=dev \
+    --workspace @dukarun/site \
+    --workspace @dukarun/web \
+    --workspace @dukarun/storefront \
+    --workspace @dukarun/super-admin \
+    --include-workspace-root=false
+
+FROM deps AS builder
+ARG APP
+ARG TARGETARCH
+RUN case "$APP" in site|web|storefront|super-admin) ;; *) echo "APP must be site|web|storefront|super-admin"; exit 1 ;; esac
 
 # Sources the build needs: the app, the env generator, and shared packages
 COPY scripts/generate-environment.mjs scripts/generate-environment.mjs
@@ -49,6 +59,7 @@ ARG GITBOOK_SITE_URL=""
 ARG USERTOUR_TOKEN=""
 ARG USERTOUR_CONTENT_IDS_JSON=""
 ARG PUBLIC_DATA_MODE=live
+ARG NG_BUILD_MAX_WORKERS=2
 ENV SUPABASE_URL=$SUPABASE_URL \
     SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY \
     SITE_PUBLIC_URL=$SITE_PUBLIC_URL \
@@ -58,9 +69,12 @@ ENV SUPABASE_URL=$SUPABASE_URL \
     GITBOOK_SITE_URL=$GITBOOK_SITE_URL \
     USERTOUR_TOKEN=$USERTOUR_TOKEN \
     USERTOUR_CONTENT_IDS_JSON=$USERTOUR_CONTENT_IDS_JSON \
-    PUBLIC_DATA_MODE=$PUBLIC_DATA_MODE
+    PUBLIC_DATA_MODE=$PUBLIC_DATA_MODE \
+    NG_BUILD_MAX_WORKERS=$NG_BUILD_MAX_WORKERS \
+    CI=true
 
-RUN cd apps/$APP && npm run build
+RUN --mount=type=cache,id=dukarun-angular-${APP}-${TARGETARCH},target=/app/apps/${APP}/.angular/cache,sharing=shared \
+    cd apps/$APP && npm run build
 
 RUN echo "🔍 Validating build output..." && \
     BUILD_DIR="/app/apps/$APP/dist/$APP/browser" && \
@@ -87,13 +101,15 @@ COPY --from=builder /app/apps/$APP/dist/$APP/browser /usr/share/nginx/html
 COPY apps/nginx.conf /tmp/nginx-csr.conf
 COPY apps/nginx-spa.conf /tmp/nginx-spa.conf
 RUN case "$APP" in \
-      site|storefront) test -n "$SUPABASE_URL" && test -n "$SUPABASE_ANON_KEY" ;; \
-      web|super-admin) cp /tmp/nginx-spa.conf /etc/nginx/conf.d/default.conf ;; \
+      site) test -n "$SUPABASE_URL" && test -n "$SUPABASE_ANON_KEY" && CSR_ENTRY=index.csr.html ;; \
+      storefront) test -n "$SUPABASE_URL" && test -n "$SUPABASE_ANON_KEY" && CSR_ENTRY=index.html ;; \
+      web|super-admin) cp /tmp/nginx-spa.conf /etc/nginx/conf.d/default.conf; CSR_ENTRY= ;; \
     esac && \
     if [ "$APP" = "site" ] || [ "$APP" = "storefront" ]; then \
       sed -e "s|__SUPABASE_URL__|${SUPABASE_URL%/}|g" \
           -e "s|__SUPABASE_ANON_KEY__|$SUPABASE_ANON_KEY|g" \
           -e "s|__APP__|$APP|g" \
+          -e "s|__CSR_ENTRY__|$CSR_ENTRY|g" \
           /tmp/nginx-csr.conf > /etc/nginx/conf.d/default.conf; \
     fi && \
     rm /tmp/nginx-csr.conf /tmp/nginx-spa.conf && nginx -t

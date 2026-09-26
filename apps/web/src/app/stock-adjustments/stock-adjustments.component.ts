@@ -17,6 +17,8 @@ import { PaginationComponent } from '../shared/ui/pagination.component';
 import { LocationContextService } from '../core/location-context.service';
 import { CatalogSearchService } from '../core/catalog-search.service';
 import { CatalogCacheService } from '../core/catalog-cache.service';
+import { CatalogIdentityLookupService } from '../core/identity-lookup.services';
+import { manufacturerLabel } from '../core/product-identity';
 import {
   StockAdjustmentsService,
   type StockAdjustmentHistoryRow,
@@ -34,6 +36,7 @@ const ADJUSTMENT_REASONS = [
 
 type StockAdjustmentHistoryDisplay = StockAdjustmentHistoryRow & {
   manufacturer_name: string | null;
+  identity_resolution: 'resolved' | 'unresolved';
 };
 
 @Component({
@@ -357,7 +360,7 @@ type StockAdjustmentHistoryDisplay = StockAdjustmentHistoryRow & {
                       <div class="min-w-0">
                         <p class="truncate text-sm font-semibold">{{ historyProduct(row) }}</p>
                         <p class="type-caption mt-0.5">
-                          {{ row.manufacturer_name || 'Manufacturer not set' }} ·
+                          {{ historyManufacturer(row) }} ·
                           {{ time(row.adjusted_at) }}
                         </p>
                       </div>
@@ -403,7 +406,7 @@ type StockAdjustmentHistoryDisplay = StockAdjustmentHistoryRow & {
                         <td>
                           <p class="font-medium">{{ historyProduct(row) }}</p>
                           <p class="type-caption">
-                            {{ row.manufacturer_name || 'Manufacturer not set' }} ·
+                            {{ historyManufacturer(row) }} ·
                             <span class="font-mono">{{ row.sku }}</span>
                           </p>
                         </td>
@@ -458,6 +461,7 @@ export class StockAdjustmentsComponent implements OnInit {
   private readonly pos = inject(PosService);
   private readonly catalogSearch = inject(CatalogSearchService);
   private readonly catalogCache = inject(CatalogCacheService);
+  private readonly catalogIdentities = inject(CatalogIdentityLookupService);
   private readonly route = inject(ActivatedRoute);
   private readonly history = inject(StockAdjustmentsService);
   protected readonly locations = inject(LocationContextService);
@@ -739,14 +743,15 @@ export class StockAdjustmentsComponent implements OnInit {
         page: this.historyPage(),
         pageSize: this.historyPageSize(),
       });
-      const variants = await this.pos.variantsByIds(result.rows.map(row => row.variant_id));
-      const manufacturerByVariant = new Map(
-        variants.map(variant => [variant.variant_id, variant.manufacturer_name])
+      const variants = await this.catalogIdentities.resolve(
+        result.rows.map(row => row.variant_id),
+        { coverage: 'may-include-historical' }
       );
       this.historyRows.set(
         result.rows.map(row => ({
           ...row,
-          manufacturer_name: manufacturerByVariant.get(row.variant_id) ?? null,
+          manufacturer_name: variants.items.get(row.variant_id)?.manufacturer_name ?? null,
+          identity_resolution: variants.items.has(row.variant_id) ? 'resolved' : 'unresolved',
         }))
       );
       this.historyTotal.set(result.total);
@@ -755,6 +760,10 @@ export class StockAdjustmentsComponent implements OnInit {
     } finally {
       this.historyLoading.set(false);
     }
+  }
+
+  protected historyManufacturer(row: StockAdjustmentHistoryDisplay): string {
+    return manufacturerLabel(row);
   }
 
   protected showAllHistory(): void {

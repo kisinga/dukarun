@@ -4,6 +4,11 @@ import type { Database } from '@dukarun/shared-types';
 import { SupabaseService } from '../core/supabase.service';
 import { rpcError } from '../pos/pos.service';
 import { PermissionsService } from '../core/permissions.service';
+import {
+  OrderIdentityLookupService,
+  PartyIdentityLookupService,
+  StaffIdentityLookupService,
+} from '../core/identity-lookup.services';
 import { offlineDb, offlineScopeKey, type NamedSnapshot } from '../pos/offline/offline-db';
 import {
   CacheJournalService,
@@ -22,6 +27,9 @@ export class ApprovalsService implements OnDestroy {
   private readonly supabase = inject(SupabaseService);
   private readonly permissions = inject(PermissionsService);
   private readonly journal = inject(CacheJournalService);
+  private readonly orderIdentities = inject(OrderIdentityLookupService);
+  private readonly partyIdentities = inject(PartyIdentityLookupService);
+  private readonly staffIdentities = inject(StaffIdentityLookupService);
 
   readonly pending = signal<Approval[]>([]);
   readonly decided = signal<Approval[]>([]);
@@ -188,12 +196,10 @@ export class ApprovalsService implements OnDestroy {
   async staffNames(userIds: Array<string | null>): Promise<Map<string, string>> {
     const ids = [...new Set(userIds.filter((id): id is string => !!id))];
     if (ids.length === 0) return new Map();
-    const { data, error } = await this.db
-      .from('company_staff_profiles')
-      .select('user_id, display_name')
-      .in('user_id', ids);
-    if (error) throw rpcError(error);
-    return new Map(data.map(profile => [profile.user_id, profile.display_name]));
+    const result = await this.staffIdentities.resolve(ids, {
+      coverage: 'may-include-historical',
+    });
+    return new Map([...result.items].map(([id, staff]) => [id, staff.displayName]));
   }
 
   /** ManageApprovals-gated; approving an order_reversal executes the void. */
@@ -221,24 +227,18 @@ export class ApprovalsService implements OnDestroy {
   /** Order codes for summary lines (client-side join from metadata order ids). */
   async orderCodes(ids: string[]): Promise<Map<string, string>> {
     if (ids.length === 0) return new Map();
-    const { data, error } = await this.db.from('orders').select('id, code').in('id', ids);
-    if (error) throw error;
-    return new Map((data ?? []).map(o => [o.id, o.code]));
+    const result = await this.orderIdentities.resolve(ids, {
+      coverage: 'may-include-historical',
+    });
+    return new Map([...result.items].map(([id, order]) => [id, order.code]));
   }
 
   async customerNames(ids: string[]): Promise<Map<string, string>> {
     if (ids.length === 0) return new Map();
-    const { data, error } = await this.db
-      .from('customers')
-      .select('id, first_name, last_name')
-      .in('id', ids);
-    if (error) throw rpcError(error);
-    return new Map(
-      data.map(customer => [
-        customer.id,
-        [customer.first_name, customer.last_name].filter(Boolean).join(' '),
-      ])
-    );
+    const result = await this.partyIdentities.resolveCustomers(ids, {
+      coverage: 'may-include-historical',
+    });
+    return new Map([...result.items].map(([id, customer]) => [id, customer.name]));
   }
 
   private stopRealtime(): void {

@@ -2,11 +2,11 @@ import { inject } from '@angular/core';
 import { type CanActivateFn, type RedirectFunction, Router } from '@angular/router';
 import { PermissionsService } from '../core/permissions.service';
 
-type InsightsSection = 'attention' | 'credit' | 'inventory' | 'sales';
+type InsightsSection = 'credit' | 'inventory' | 'sales';
 
 function firstPermitted(permissions: PermissionsService): string {
   if (permissions.has('ViewFinancials') || permissions.canAccessWorkspace('inventory')) {
-    return '/insights/attention';
+    return '/insights/inventory';
   }
   return permissions.landingRoute();
 }
