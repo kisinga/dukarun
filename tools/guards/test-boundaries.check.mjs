@@ -22,6 +22,19 @@ function fail(path, message) {
   failures.push(`${relative(root, path)}: ${message}`);
 }
 
+function usesBrowserGlobal(sourceFile) {
+  let found = false;
+  function inspect(node) {
+    if (ts.isIdentifier(node) && (node.text === 'document' || node.text === 'window')) {
+      found = true;
+      return;
+    }
+    if (!found) ts.forEachChild(node, inspect);
+  }
+  inspect(sourceFile);
+  return found;
+}
+
 for (const path of files(join(root, 'scripts'))) {
   if (/\.(?:spec|test)\.[cm]?[jt]sx?$/.test(path)) {
     fail(path, 'tests cannot live in the operational scripts directory');
@@ -47,12 +60,13 @@ for (const app of activeAngularApps) {
   for (const path of files(sourceRoot)) {
     if (!/\.(?:spec|test)\.ts$/.test(path)) continue;
     const source = readFileSync(path, 'utf8');
+    const sourceFile = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true);
     if (!/\.(?:unit|component)\.spec\.ts$/.test(path)) {
       fail(path, 'Angular tests must declare either the unit or component lane in the filename');
     }
     if (
       path.endsWith('.unit.spec.ts') &&
-      /@angular\/core\/testing|\bTestBed\b|\b(?:document|window)\b/.test(source)
+      (/@angular\/core\/testing|\bTestBed\b/.test(source) || usesBrowserGlobal(sourceFile))
     ) {
       fail(path, 'unit tests cannot use Angular TestBed or browser globals');
     }
