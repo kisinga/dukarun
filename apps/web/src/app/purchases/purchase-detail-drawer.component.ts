@@ -277,6 +277,14 @@ import type { PurchaseRow } from './purchase-history.store';
                         }
                       </select>
                     </app-form-field>
+                    <app-form-field label="Payment date">
+                      <input
+                        type="date"
+                        class="input input-bordered w-full"
+                        [max]="store.todayInput"
+                        [formControl]="store.paymentPaidOn"
+                      />
+                    </app-form-field>
                     <div class="flex gap-2 sm:col-span-2">
                       <button
                         appButton

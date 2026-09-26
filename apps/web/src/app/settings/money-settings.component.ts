@@ -4,6 +4,7 @@ import { PermissionsService } from '../core/permissions.service';
 import { ButtonComponent } from '../shared/ui/button.component';
 import { IconComponent } from '../shared/ui/icon.component';
 import { CashVarianceSettingsComponent } from './cash-variance-settings.component';
+import { CreditInsightsSettingsComponent } from './credit-insights-settings.component';
 import { CompanySettingsStore } from './company-settings.store';
 import { MoneyCommissionsSettingsComponent } from './money-commissions-settings.component';
 import { MoneySettingsStore } from './money-settings.store';
@@ -27,6 +28,7 @@ import { TaxSettingsComponent } from './tax-settings.component';
     IconComponent,
     TaxSettingsComponent,
     CashVarianceSettingsComponent,
+    CreditInsightsSettingsComponent,
     MoneyCommissionsSettingsComponent,
     PaymentAccountsSettingsComponent,
     PaymentMethodsSettingsComponent,
@@ -43,6 +45,10 @@ import { TaxSettingsComponent } from './tax-settings.component';
       <app-tax-settings />
 
       <app-cash-variance-settings />
+
+      @if (perms.has('ManageCompanySettings')) {
+        <app-credit-insights-settings />
+      }
 
       @if (entitlements.enabled('commissions') && perms.has('ManageCommissions')) {
         <app-money-commissions-settings />

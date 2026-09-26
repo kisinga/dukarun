@@ -28,6 +28,15 @@ type SupplierAging = Pick<
   Database['public']['Views']['supplier_ap_aging']['Row'],
   'supplier_id' | 'days_outstanding' | 'bucket'
 >;
+type CreditCacheSummary = {
+  party_id: string;
+  score: number | null;
+  band: NonNullable<CachedCustomer['credit_band']>;
+  confidence: NonNullable<CachedCustomer['credit_confidence']>;
+  reason_codes: string[];
+  recommendation_code: string;
+  refreshed_at: string | null;
+};
 
 interface FinancialProjection {
   ar: Map<string | null, number>;
@@ -36,6 +45,7 @@ interface FinancialProjection {
   ap: Map<string | null, number>;
   arAging: Map<string, CustomerAging>;
   apAging: Map<string, SupplierAging>;
+  credit: Map<string, CreditCacheSummary>;
 }
 
 export interface PartyQueryResult<T> {
@@ -212,6 +222,7 @@ export class PartyCacheService {
         this.fetchDirectory(),
         this.fetchFinancialProjection(),
       ]);
+      financials.credit = await this.fetchCreditSummaries(directory.rows.map(row => row.id));
       if (scope !== this.scope) return false;
       const now = new Date().toISOString();
       const snapshot: PartySnapshot = {
@@ -285,7 +296,25 @@ export class PartyCacheService {
       apAging: new Map(
         supplierAging.filter(row => row.supplier_id !== null).map(row => [row.supplier_id!, row])
       ),
+      credit: new Map(),
     };
+  }
+
+  private async fetchCreditSummaries(ids: string[]): Promise<Map<string, CreditCacheSummary>> {
+    const summaries = new Map<string, CreditCacheSummary>();
+    for (const batch of postgrestIdBatches(ids)) {
+      const { data, error } = await this.supabase.client.rpc('credit_cache_summaries', {
+        p_party_ids: batch,
+        p_limit: batch.length,
+      });
+      // Credit summaries are intentionally unavailable to inventory-only roles. Keep the
+      // shared party directory usable for those users instead of failing its whole refresh.
+      if (error?.message.includes('permission_denied')) return summaries;
+      if (error) throw error;
+      const payload = data as unknown as { items?: CreditCacheSummary[] } | null;
+      for (const row of payload?.items ?? []) summaries.set(row.party_id, row);
+    }
+    return summaries;
   }
 
   private async fetchAllPages<T>(
@@ -304,6 +333,7 @@ export class PartyCacheService {
   }
 
   private customerWithFinancials(row: Customer, values: FinancialProjection): CachedCustomer {
+    const credit = values.credit.get(row.id);
     return {
       ...row,
       ar_balance: values.ar.get(row.id) ?? 0,
@@ -311,6 +341,12 @@ export class PartyCacheService {
       net_balance: values.net.get(row.id) ?? 0,
       days_outstanding: values.arAging.get(row.id)?.days_outstanding ?? null,
       bucket: values.arAging.get(row.id)?.bucket ?? null,
+      credit_score: credit?.score ?? null,
+      credit_band: credit?.band,
+      credit_confidence: credit?.confidence,
+      credit_reason_codes: credit?.reason_codes,
+      credit_recommendation_code: credit?.recommendation_code,
+      credit_score_refreshed_at: credit?.refreshed_at ?? null,
     };
   }
 
@@ -342,23 +378,33 @@ export class PartyCacheService {
 
   private async withCustomerBalances(customers: Customer[]): Promise<CachedCustomer[]> {
     if (customers.length === 0) return [];
-    const { data, error } = await this.supabase.client
-      .from('customer_account_balances')
-      .select('customer_id, receivable_balance, downpayment_balance, net_balance')
-      .in(
-        'customer_id',
-        customers.map(row => row.id)
-      );
+    const customerIds = customers.map(row => row.id);
+    const [{ data, error }, credit] = await Promise.all([
+      this.supabase.client
+        .from('customer_account_balances')
+        .select('customer_id, receivable_balance, downpayment_balance, net_balance')
+        .in('customer_id', customerIds),
+      this.fetchCreditSummaries(customerIds),
+    ]);
     if (error) throw error;
     const balances = new Map((data ?? []).map(row => [row.customer_id, row]));
-    return customers.map(row => ({
-      ...row,
-      ar_balance: balances.get(row.id)?.receivable_balance ?? 0,
-      downpayment_balance: balances.get(row.id)?.downpayment_balance ?? 0,
-      net_balance: balances.get(row.id)?.net_balance ?? 0,
-      days_outstanding: null,
-      bucket: null,
-    }));
+    return customers.map(row => {
+      const profile = credit.get(row.id);
+      return {
+        ...row,
+        ar_balance: balances.get(row.id)?.receivable_balance ?? 0,
+        downpayment_balance: balances.get(row.id)?.downpayment_balance ?? 0,
+        net_balance: balances.get(row.id)?.net_balance ?? 0,
+        days_outstanding: null,
+        bucket: null,
+        credit_score: profile?.score ?? null,
+        credit_band: profile?.band,
+        credit_confidence: profile?.confidence,
+        credit_reason_codes: profile?.reason_codes,
+        credit_recommendation_code: profile?.recommendation_code,
+        credit_score_refreshed_at: profile?.refreshed_at ?? null,
+      };
+    });
   }
 
   private subscribeChannel(): void {
@@ -430,6 +476,7 @@ export class PartyCacheService {
       apAging: new Map(
         apAgingRows.filter(row => row.supplier_id !== null).map(row => [row.supplier_id!, row])
       ),
+      credit: await this.fetchCreditSummaries(ids),
     };
     const idSet = new Set(ids);
     let customers = this.customers().filter(row => !idSet.has(row.id));

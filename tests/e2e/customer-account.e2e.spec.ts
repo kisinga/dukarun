@@ -158,6 +158,21 @@ async function authenticateAccountUser(page: Page): Promise<{
         usage: {},
       });
     }
+    if (path.endsWith('/rest/v1/rpc/current_business_date')) return json('2026-08-27');
+    if (path.endsWith('/rest/v1/rpc/credit_decision_summary')) {
+      return json({
+        customerId,
+        score: 760,
+        band: 'good',
+        confidence: 'established',
+        reasonCodes: ['no_current_risk'],
+        recommendationCode: 'maintain',
+        scoreTimestamp: '2026-08-27T08:00:00Z',
+        balance: 300,
+        creditLimit: 1_000,
+        availableCredit: 700,
+      });
+    }
     if (path.endsWith('/rest/v1/rpc/accessible_business_locations')) {
       return json([{ id: locationId, code: 'MAIN', name: 'Main shop', is_default: true }]);
     }

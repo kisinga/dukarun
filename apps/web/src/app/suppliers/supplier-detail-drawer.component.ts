@@ -17,6 +17,8 @@ import {
   SupplierProfileFormComponent,
   type SupplierProfileFormResult,
 } from './supplier-profile-form.component';
+import { ScoreBadgeComponent } from '../insights/score-badge.component';
+import { insightCopy } from '../insights/insights.models';
 
 export interface SupplierDetailMetrics {
   purchases: number;
@@ -42,6 +44,7 @@ export interface SupplierDetailMetrics {
     StatCardComponent,
     StatusBadgeComponent,
     SupplierProfileFormComponent,
+    ScoreBadgeComponent,
   ],
   template: `
     <app-drawer [open]="true" (closed)="requestClose()" [title]="title()" [subtitle]="subtitle()">
@@ -105,6 +108,28 @@ export interface SupplierDetailMetrics {
             />
           }
         </div>
+
+        @if (store.creditProfile(); as profile) {
+          <section class="surface-card mt-3 p-4" aria-label="Our payment standing">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p class="type-caption">Our payment standing</p>
+                <p class="mt-1 text-sm">How reliably we pay this supplier.</p>
+              </div>
+              <app-score-badge
+                [score]="profile.score"
+                [band]="profile.band"
+                [confidence]="profile.confidence"
+              />
+            </div>
+            <p class="type-caption mt-2">{{ reason(profile.reason_codes[0]) }}</p>
+            <a
+              class="link type-caption mt-2 inline-block"
+              [routerLink]="['/insights/credit/supplier', supplier.id]"
+              >Full payment profile</a
+            >
+          </section>
+        }
 
         <div class="mt-3 grid grid-cols-2 gap-2">
           <app-stat-card
@@ -321,6 +346,14 @@ export interface SupplierDetailMetrics {
                           </option>
                         }
                       </select>
+                    </app-form-field>
+                    <app-form-field label="Payment date">
+                      <input
+                        type="date"
+                        class="input input-bordered w-full"
+                        [max]="store.todayInput"
+                        [formControl]="store.payPaidOn"
+                      />
                     </app-form-field>
                     <button
                       appButton
@@ -547,6 +580,7 @@ export interface SupplierDetailMetrics {
   `,
 })
 export class SupplierDetailDrawerComponent {
+  protected readonly reason = insightCopy;
   readonly supplierId = input<string | null>(null);
   readonly creating = input(false);
   readonly initialMode = input<'view' | 'edit'>('view');

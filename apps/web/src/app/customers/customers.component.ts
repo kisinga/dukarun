@@ -11,6 +11,7 @@ import {
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
+import { BusinessClockService } from '../core/business-clock.service';
 import { formatKes, formatKesInput, parseKes } from '../core/money';
 import { reconciliationLabel, reconciliationTypeForCode } from '../core/payment-methods';
 import { PermissionsService } from '../core/permissions.service';
@@ -70,12 +71,25 @@ import { FormSectionComponent } from '../shared/ui/form-section.component';
 import { PreferenceRowComponent } from '../shared/ui/preference-row.component';
 import { LEARNING_EVENT_NAMES } from '../learning/learning-content';
 import { LearningPlatformService } from '../learning/learning-platform.service';
+import type { CachedCustomer } from '../pos/offline/offline-db';
+import { ScoreBadgeComponent } from '../insights/score-badge.component';
+import { InsightsService } from '../insights/insights.service';
+import { insightCopy } from '../insights/insights.models';
 
 type CustomerWithAr = MoneyCustomer & {
   ar_balance: number;
   downpayment_balance: number;
   net_balance: number;
-} & AgingInfo;
+} & AgingInfo &
+  Pick<
+    CachedCustomer,
+    | 'credit_score'
+    | 'credit_band'
+    | 'credit_confidence'
+    | 'credit_reason_codes'
+    | 'credit_recommendation_code'
+    | 'credit_score_refreshed_at'
+  >;
 type CreditOrder = {
   id: string;
   code: string;
@@ -114,6 +128,7 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
     TaskDialogComponent,
     FormSectionComponent,
     PreferenceRowComponent,
+    ScoreBadgeComponent,
   ],
   template: `
     <app-page
@@ -512,6 +527,26 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
                 <div class="mt-4 flex flex-col gap-4">
                   <section class="surface-card p-4">
                     <h3 class="section-title mb-2">Credit</h3>
+                    @if (c.credit_band) {
+                      <div class="mb-3 rounded-field border border-base-300 bg-base-200/40 p-3">
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                          <app-score-badge
+                            [score]="c.credit_score ?? null"
+                            [band]="c.credit_band"
+                            [confidence]="c.credit_confidence ?? 'unrated'"
+                          />
+                          <a class="link type-caption" [href]="'/insights/credit/customer/' + c.id"
+                            >Full credit profile</a
+                          >
+                        </div>
+                        <p class="type-caption mt-2">
+                          {{ creditReasonText(c.credit_reason_codes?.[0]) }}
+                          @if (c.credit_score_refreshed_at) {
+                            · Updated {{ date(c.credit_score_refreshed_at) }}
+                          }
+                        </p>
+                      </div>
+                    }
                     <div class="flex flex-wrap items-center gap-2">
                       <app-status-badge
                         size="xs"
@@ -535,6 +570,25 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
                         />
                       }
                     </div>
+                    @if (!c.deleted_at && perms.has('ManageCustomers')) {
+                      <label
+                        class="mt-3 flex min-h-11 cursor-pointer items-center justify-between gap-3"
+                      >
+                        <span>
+                          <span class="block text-sm font-medium">Credit band alerts</span>
+                          <span class="type-caption"
+                            >Notify only when this customer's band changes.</span
+                          >
+                        </span>
+                        <input
+                          type="checkbox"
+                          class="toggle toggle-primary toggle-sm"
+                          [checked]="c.credit_score_notifications_enabled"
+                          [disabled]="busy()"
+                          (change)="setCreditScoreNotifications(c, $event)"
+                        />
+                      </label>
+                    }
                     @if (customerIntegrityLoading()) {
                       <p class="type-caption mt-2">Checking customer account integrity…</p>
                     } @else if (customerIntegrity()?.is_consistent === false) {
@@ -700,6 +754,22 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
                           </select>
                         </app-form-field>
                         @if (
+                          !(
+                            bulkMethod.value === 'mpesa' &&
+                            mpesa.availability().active &&
+                            !bulkMpesaManual.value
+                          )
+                        ) {
+                          <app-form-field label="Payment date">
+                            <input
+                              type="date"
+                              class="input input-bordered input-sm"
+                              [max]="todayInput"
+                              [formControl]="bulkPaidOn"
+                            />
+                          </app-form-field>
+                        }
+                        @if (
                           bulkMethod.value === 'mpesa' &&
                           mpesa.availability().active &&
                           !bulkMpesaManual.value
@@ -740,6 +810,7 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
                           class="sm:col-span-3 sm:justify-self-start"
                           [disabled]="
                             busy() ||
+                            !bulkPaidOn.value ||
                             !cashierSession.canTakePayment() ||
                             customerIntegrityLoading() ||
                             customerIntegrity()?.is_consistent !== true
@@ -1359,6 +1430,7 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
 })
 export class CustomersComponent implements OnInit {
   protected readonly cashierSession = inject(CashierSessionService);
+  private readonly businessClock = inject(BusinessClockService);
   private readonly money = inject(MoneyService);
   protected readonly partyCache = inject(PartyCacheService);
   private readonly pos = inject(PosService);
@@ -1372,10 +1444,12 @@ export class CustomersComponent implements OnInit {
   private readonly mpesaCheckout = inject(MpesaCheckoutCoordinator);
   private readonly locations = inject(LocationContextService);
   private readonly learning = inject(LearningPlatformService);
+  private readonly insights = inject(InsightsService);
   private readonly routeParams = toSignal(this.route.queryParamMap, {
     initialValue: this.route.snapshot.queryParamMap,
   });
   protected readonly fmtKes = formatKes;
+  protected readonly creditReasonText = insightCopy;
 
   protected readonly customers = computed<CustomerWithAr[]>(() =>
     this.partyCache.customerRows(true)
@@ -1449,6 +1523,8 @@ export class CustomersComponent implements OnInit {
   protected readonly bulkAmount = new FormControl('', { nonNullable: true });
   protected readonly bulkMethod = new FormControl('cash', { nonNullable: true });
   protected readonly bulkReference = new FormControl('', { nonNullable: true });
+  protected readonly bulkPaidOn = new FormControl('', { nonNullable: true });
+  private readonly todayInputState = signal('');
   protected readonly bulkMpesaPhone = new FormControl('', { nonNullable: true });
   protected readonly bulkMpesaManual = new FormControl(false, { nonNullable: true });
   protected readonly receiptReversalReason = new FormControl('', { nonNullable: true });
@@ -1657,6 +1733,8 @@ export class CustomersComponent implements OnInit {
     this.lastReceiptResult.set(null);
     this.receiptAttempt = null;
     this.depositRefundClientRef = null;
+    this.bulkPaidOn.setValue('');
+    this.todayInputState.set('');
     this.depositRefundMethod.setValue('');
     this.depositRefundReference.setValue('');
     this.orders.set([]);
@@ -1680,24 +1758,33 @@ export class CustomersComponent implements OnInit {
       const statementRequest = this.perms.has('ViewFinancials')
         ? this.money.customerStatement(customerId, undefined, CUSTOMER_STATEMENT_PAGE_SIZE)
         : Promise.resolve({ rows: [], hasMore: false });
-      const [orders, creditOrders, statementPage, company, approvals, depositBalance, integrity] =
-        await Promise.all([
-          this.pos.customerOrders(customerId),
-          this.money.creditOrders(customerId),
-          statementRequest,
-          this.receiptData.companyPrintInfo().catch(() => null),
-          this.approvals.forCustomer(customerId),
-          this.perms.has('SettleOrder') ||
-          this.perms.has('ReverseOrder') ||
-          this.perms.has('ViewFinancials')
-            ? this.money.customerDepositAvailable(customerId)
-            : Promise.resolve(0),
-          this.perms.has('ViewFinancials') ||
-          this.perms.has('SettleOrder') ||
-          this.perms.has('ManageCustomers')
-            ? this.money.customerAccountStatus(customerId)
-            : Promise.resolve(null),
-        ]);
+      const [
+        orders,
+        creditOrders,
+        statementPage,
+        company,
+        approvals,
+        depositBalance,
+        integrity,
+        businessDate,
+      ] = await Promise.all([
+        this.pos.customerOrders(customerId),
+        this.money.creditOrders(customerId),
+        statementRequest,
+        this.receiptData.companyPrintInfo().catch(() => null),
+        this.approvals.forCustomer(customerId),
+        this.perms.has('SettleOrder') ||
+        this.perms.has('ReverseOrder') ||
+        this.perms.has('ViewFinancials')
+          ? this.money.customerDepositAvailable(customerId)
+          : Promise.resolve(0),
+        this.perms.has('ViewFinancials') ||
+        this.perms.has('SettleOrder') ||
+        this.perms.has('ManageCustomers')
+          ? this.money.customerAccountStatus(customerId)
+          : Promise.resolve(null),
+        this.businessClock.today().catch(() => null),
+      ]);
       // Ignore stale results when the drawer was closed (or reopened) meanwhile.
       if (this.selectedCustomerId() !== customerId || statementSequence !== this.statementSequence)
         return;
@@ -1709,6 +1796,12 @@ export class CustomersComponent implements OnInit {
       this.customerApprovals.set(approvals);
       this.customerDepositBalance.set(depositBalance);
       this.customerIntegrity.set(integrity);
+      if (businessDate) {
+        this.todayInputState.set(businessDate);
+        this.bulkPaidOn.setValue(businessDate);
+      } else if (this.perms.has('SettleOrder')) {
+        this.error.set('Could not read the current business date from the server');
+      }
       this.customerApprovalPeople.set(
         await this.approvals.staffNames(
           approvals.flatMap(approval => [approval.requested_by, approval.decided_by])
@@ -1730,6 +1823,10 @@ export class CustomersComponent implements OnInit {
         this.customerIntegrityLoading.set(false);
       }
     }
+  }
+
+  protected get todayInput(): string {
+    return this.todayInputState();
   }
 
   /** Called by the drawer after its close transition finishes. */
@@ -2003,6 +2100,7 @@ export class CustomersComponent implements OnInit {
         amount,
         method: this.bulkMethod.value,
         reference: this.bulkReference.value.trim(),
+        paidOn: this.bulkPaidOn.value,
         phone: this.bulkMpesaPhone.value.trim(),
         manualMpesa: this.bulkMpesaManual.value,
       });
@@ -2063,7 +2161,8 @@ export class CustomersComponent implements OnInit {
         amount,
         this.bulkMethod.value,
         this.bulkReference.value.trim() || undefined,
-        this.receiptAttempt.clientRef
+        this.receiptAttempt.clientRef,
+        this.bulkPaidOn.value
       );
       if (outcome.status === 'approval_required') {
         this.notice.set('Payment sent for finance approval');
@@ -2074,8 +2173,8 @@ export class CustomersComponent implements OnInit {
         this.bulkReference.setValue('');
         this.notice.set(
           outcome.downpayment_amount > 0
-            ? 'Payment posted; the remainder is available as downpayment'
-            : 'Payment posted to the oldest invoices'
+            ? 'Payment posted; the remainder is available as downpayment. Credit profile updating.'
+            : 'Payment posted to the oldest invoices. Credit profile updating.'
         );
         await Promise.all([
           this.load(),
@@ -2276,6 +2375,28 @@ export class CustomersComponent implements OnInit {
       }
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Save failed');
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected async setCreditScoreNotifications(
+    customer: CustomerWithAr,
+    event: Event
+  ): Promise<void> {
+    const enabled = (event.target as HTMLInputElement).checked;
+    this.busy.set(true);
+    this.error.set(null);
+    try {
+      await this.insights.setCustomerScoreNotifications(customer.id, enabled);
+      this.partyCache.invalidate();
+      await this.partyCache.ensureLoaded();
+      this.notice.set(
+        `Credit band alerts ${enabled ? 'enabled' : 'paused'} for ${this.name(customer)}`
+      );
+    } catch (error) {
+      (event.target as HTMLInputElement).checked = !enabled;
+      this.error.set(error instanceof Error ? error.message : 'Could not update credit alerts');
     } finally {
       this.busy.set(false);
     }

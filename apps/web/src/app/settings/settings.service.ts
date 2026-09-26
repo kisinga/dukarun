@@ -80,6 +80,10 @@ export interface CompanySettings {
   payment_reminder_sms_fallback: boolean;
   automated_customer_notifications_enabled: boolean;
   automated_customer_notifications_override: boolean | null;
+  credit_opportunity_rate_bps: number;
+  credit_score_notifications_enabled: boolean;
+  default_reorder_lead_days: number;
+  default_reorder_safety_days: number;
 }
 
 const SELECT_COLUMNS = [
@@ -106,6 +110,10 @@ const SELECT_COLUMNS = [
   'payment_reminder_sms_fallback',
   'automated_customer_notifications_enabled',
   'automated_customer_notifications_override',
+  'credit_opportunity_rate_bps',
+  'credit_score_notifications_enabled',
+  'default_reorder_lead_days',
+  'default_reorder_safety_days',
 ].join(', ');
 
 @Injectable({ providedIn: 'root' })

@@ -377,7 +377,7 @@ interface NavSection {
                 class="bottom-nav-item flex-1 justify-center"
               >
                 <span class="bottom-nav-ico"><app-icon name="heroCube" size="lg" /></span>
-                <span class="bottom-nav-label">Products</span>
+                <span class="bottom-nav-label">Inventory</span>
               </a>
             }
           </div>
@@ -678,10 +678,11 @@ export class ShellComponent implements OnInit {
           visible: () => this.perms.has('ViewFinancials'),
         },
         {
-          route: '/reports',
-          label: 'Reports',
+          route: '/insights',
+          label: 'Insights',
           icon: 'heroChartBar',
-          visible: () => this.perms.has('ViewFinancials'),
+          visible: () =>
+            this.perms.has('ViewFinancials') || this.perms.canAccessWorkspace('inventory'),
         },
         {
           route: '/approvals',

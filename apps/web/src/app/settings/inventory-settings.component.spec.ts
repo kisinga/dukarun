@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { describe, expect, it, vi } from 'vitest';
 import { CashierSessionService } from '../core/cashier-session.service';
+import { InsightsService } from '../insights/insights.service';
 import { ReceiptDataService } from '../shared/print/receipt-data.service';
 import { IconComponent } from '../shared/ui/icon.component';
 import { CompanySettingsStore } from './company-settings.store';
@@ -32,6 +33,10 @@ const settings: CompanySettings = {
   payment_reminder_sms_fallback: true,
   automated_customer_notifications_enabled: true,
   automated_customer_notifications_override: null,
+  credit_opportunity_rate_bps: 1800,
+  credit_score_notifications_enabled: true,
+  default_reorder_lead_days: 7,
+  default_reorder_safety_days: 7,
 };
 
 describe('InventorySettingsComponent', () => {
@@ -44,6 +49,7 @@ describe('InventorySettingsComponent', () => {
       refreshConfiguration: vi.fn().mockResolvedValue(undefined),
     };
     const receiptData = { invalidateCompanyInfo: vi.fn() };
+    const insights = { updateInventorySettings: vi.fn().mockResolvedValue(undefined) };
 
     await TestBed.configureTestingModule({
       imports: [InventorySettingsComponent],
@@ -52,6 +58,7 @@ describe('InventorySettingsComponent', () => {
         { provide: SettingsService, useValue: settingsService },
         { provide: CashierSessionService, useValue: cashierSession },
         { provide: ReceiptDataService, useValue: receiptData },
+        { provide: InsightsService, useValue: insights },
       ],
     })
       .overrideComponent(IconComponent, { set: { template: '' } })
@@ -63,7 +70,7 @@ describe('InventorySettingsComponent', () => {
       fixture.detectChanges();
       expect((fixture.nativeElement as HTMLElement).textContent).toContain('Inventory');
     });
-    return { fixture, settingsService, cashierSession };
+    return { fixture, settingsService, cashierSession, insights };
   }
 
   it('loads and owns inventory controls', async () => {
@@ -76,10 +83,12 @@ describe('InventorySettingsComponent', () => {
   });
 
   it('saves inventory preferences and refreshes cashier configuration', async () => {
-    const { fixture, settingsService, cashierSession } = await render();
+    const { fixture, settingsService, cashierSession, insights } = await render();
     const component = fixture.componentInstance as any;
 
     component.lowStock.setValue(8);
+    component.leadDays.setValue(12);
+    component.safetyDays.setValue(4);
     component.lowStock.markAsDirty();
     fixture.detectChanges();
     expect((fixture.nativeElement as HTMLElement).textContent).toContain('Unsaved changes');
@@ -87,14 +96,14 @@ describe('InventorySettingsComponent', () => {
     await component.save();
     fixture.detectChanges();
 
-    expect(settingsService.updateSettings).toHaveBeenCalledWith(
-      'company-1',
-      expect.objectContaining({
-        low_stock_threshold: 8,
-        batch_expiry_enabled: true,
-      })
-    );
+    expect(settingsService.updateSettings).not.toHaveBeenCalled();
     expect(cashierSession.refreshConfiguration).toHaveBeenCalledOnce();
+    expect(insights.updateInventorySettings).toHaveBeenCalledWith({
+      lowStockThreshold: 8,
+      batchExpiryEnabled: true,
+      defaultLeadDays: 12,
+      defaultSafetyDays: 4,
+    });
     expect((fixture.nativeElement as HTMLElement).textContent).toContain('Saved');
     expect((fixture.nativeElement as HTMLElement).textContent).not.toContain('Unsaved changes');
   });

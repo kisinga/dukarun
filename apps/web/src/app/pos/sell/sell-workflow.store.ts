@@ -45,6 +45,8 @@ import {
 } from './sell-workflow-idempotency';
 import { LEARNING_EVENT_NAMES } from '../../learning/learning-content';
 import { LearningPlatformService } from '../../learning/learning-platform.service';
+import { InsightsService } from '../../insights/insights.service';
+import type { CreditDecisionCard } from '../../insights/insights.models';
 
 export interface SellWorkflowInit {
   draftId?: string | null;
@@ -74,6 +76,7 @@ export class SellWorkflowStore implements OnDestroy {
   private readonly locations = inject(LocationContextService);
   private readonly fulfillment = inject(FulfillmentService);
   private readonly learning = inject(LearningPlatformService);
+  private readonly insights = inject(InsightsService);
 
   readonly cartItemCount = computed(() =>
     this.cart.lines().reduce((total, line) => total + line.quantity, 0)
@@ -89,6 +92,9 @@ export class SellWorkflowStore implements OnDestroy {
   readonly customerSearchHasMore = this.customerSearchHasMoreState.asReadonly();
   private readonly selectedCustomerState = signal<CustomerWithCredit | null>(null);
   readonly selectedCustomer = this.selectedCustomerState.asReadonly();
+  private readonly creditDecisionState = signal<CreditDecisionCard | null>(null);
+  readonly creditDecision = this.creditDecisionState.asReadonly();
+  private creditDecisionRequest = 0;
   private readonly customerDropdownOpenState = signal(false);
   readonly customerDropdownOpen = this.customerDropdownOpenState.asReadonly();
   private readonly fulfillmentSettingsState = signal<FulfillmentSettings | null>(null);
@@ -187,6 +193,14 @@ export class SellWorkflowStore implements OnDestroy {
   readonly creditApprovalRequired = computed(
     () => this.creditExceedsLimit() && this.perms.actionMode('sale.credit_over_limit') === 'request'
   );
+  readonly creditRiskAcknowledgementRequired = computed(
+    () =>
+      this.automaticCreditAmount() > 0 &&
+      ['restricted', 'high_risk'].includes(this.creditDecision()?.band ?? '')
+  );
+  readonly creditWatchWarning = computed(
+    () => this.automaticCreditAmount() > 0 && this.creditDecision()?.band === 'watch'
+  );
   /** Backend-derived tender methods; walk-ins may only use till-controlled accounts. */
   readonly panelMethods = computed<PaymentMethodOption[]>(() => {
     const methods = this.methods();
@@ -211,6 +225,7 @@ export class SellWorkflowStore implements OnDestroy {
     searchExhaustive: this.customerSearchExhaustive(),
     searchHasMore: this.customerSearchHasMore(),
     depositBalance: this.customerDepositBalance(),
+    creditDecision: this.creditDecision(),
   }));
   readonly checkoutWorkspaceViewModel = computed<SellCheckoutWorkspaceViewModel>(() => ({
     customer: this.customerViewModel(),
@@ -277,6 +292,8 @@ export class SellWorkflowStore implements OnDestroy {
         if (routedCustomerId) {
           this.cart.setCustomer(customer.id, this.customerName(customer));
         }
+        this.creditDecisionState.set(this.cachedCreditDecision(customer));
+        void this.refreshCreditDecision(customer.id);
         await this.refreshCustomerDeposit(customerId);
       } catch {
         this.selectedCustomerState.set(null);
@@ -441,12 +458,15 @@ export class SellWorkflowStore implements OnDestroy {
     ++this.matchedCustomerRequest;
     ++this.customerDepositRequest;
     this.selectedCustomerState.set(customer);
+    this.creditDecisionState.set(customer ? this.cachedCreditDecision(customer) : null);
     this.cart.setCustomer(customer?.id ?? null, customer ? this.customerName(customer) : 'Walk-in');
     this.customerDropdownOpenState.set(false);
     this.customerSearch.setValue('', { emitEvent: false });
     this.customerResultsState.set([]);
-    if (customer) void this.refreshCustomerDeposit(customer.id);
-    else this.customerDepositBalanceState.set(0);
+    if (customer) {
+      void this.refreshCustomerDeposit(customer.id);
+      void this.refreshCreditDecision(customer.id);
+    } else this.customerDepositBalanceState.set(0);
   }
 
   handleCustomerIntent(intent: SellCustomerIntent): void {
@@ -935,7 +955,8 @@ export class SellWorkflowStore implements OnDestroy {
 
   confirmCreditSale(): void {
     const reason = this.creditApprovalReason.value.trim();
-    if (this.creditApprovalRequired() && !reason) return;
+    if ((this.creditApprovalRequired() || this.creditRiskAcknowledgementRequired()) && !reason)
+      return;
     this.creditConfirmOpenState.set(false);
     void this.completeCreditSale(reason || undefined);
     this.creditApprovalReason.setValue('');
@@ -945,6 +966,8 @@ export class SellWorkflowStore implements OnDestroy {
     if (!this.creditAllowed() || !(await this.ensureDeliveryFee())) return;
     if (this.fulfillmentMode() !== 'counter' && !fulfillmentDraft) return;
     if (fulfillmentDraft?.fulfillment.collection_kind === 'cod') return;
+    const customerId = this.selectedCustomer()?.id;
+    if (customerId && this.connectivity.online()) await this.refreshCreditDecision(customerId);
     this.activeFulfillmentDraftState.set(fulfillmentDraft);
     this.creditConfirmOpenState.set(true);
   }
@@ -997,11 +1020,21 @@ export class SellWorkflowStore implements OnDestroy {
             this.cart.draftId() ?? undefined,
             approvalReason
           );
+      const presentedDecision = this.creditDecision();
+      const presentedCreditAmount = this.automaticCreditAmount();
       this.cart.clear();
       this.saleAttempt = null;
       this.selectedCustomerState.set(null);
       this.customerDepositBalanceState.set(0);
       this.resetFulfillmentCheckout();
+      if (presentedDecision && presentedCreditAmount > 0) {
+        try {
+          await this.insights.recordCreditAdvisory(result.orderId, approvalReason);
+        } catch {
+          // The sale/approval is authoritative. Audit recording is retryable
+          // and must never turn an accepted checkout into a cashier failure.
+        }
+      }
       if (result.status === 'approval_required') {
         this.showApprovalSent();
       } else {
@@ -1023,6 +1056,36 @@ export class SellWorkflowStore implements OnDestroy {
     } finally {
       this.busyState.set(false);
     }
+  }
+
+  private async refreshCreditDecision(customerId: string): Promise<void> {
+    const request = ++this.creditDecisionRequest;
+    if (!this.connectivity.online()) return;
+    try {
+      const summary = await this.insights.decisionSummary(customerId);
+      if (request === this.creditDecisionRequest && this.selectedCustomer()?.id === customerId)
+        this.creditDecisionState.set(summary);
+    } catch {
+      if (request === this.creditDecisionRequest && this.selectedCustomer()?.id === customerId)
+        this.creditDecisionState.set(null);
+    }
+  }
+
+  private cachedCreditDecision(customer: CustomerWithCredit): CreditDecisionCard | null {
+    if (!customer.credit_band) return null;
+    return {
+      customerId: customer.id,
+      score: customer.credit_score ?? null,
+      band: customer.credit_band,
+      confidence: customer.credit_confidence ?? 'unrated',
+      reasonCodes: customer.credit_reason_codes ?? [],
+      recommendationCode: customer.credit_recommendation_code ?? 'establish_limit',
+      scoreTimestamp: customer.credit_score_refreshed_at ?? null,
+      balance: customer.ar_balance,
+      creditLimit: customer.credit_limit,
+      availableCredit:
+        customer.credit_limit > 0 ? Math.max(customer.credit_limit - customer.ar_balance, 0) : null,
+    };
   }
 
   /** Timed toast for approval-held orders (mirrors the price-floor toast). */

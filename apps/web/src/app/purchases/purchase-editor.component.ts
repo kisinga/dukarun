@@ -94,6 +94,53 @@ import { PurchaseVatPanelComponent } from './purchase-vat-panel.component';
                 (notesInput)="store.markDirty()"
               />
 
+              @if (store.recommendationsLoading()) {
+                <section class="surface-card p-4">
+                  <p class="type-caption">Loading supplier recommendations…</p>
+                </section>
+              } @else if (store.recommendations().length > 0) {
+                <section class="surface-card p-4" aria-label="Reorder recommendations">
+                  <div class="flex items-start justify-between gap-3">
+                    <div>
+                      <h2 class="section-title">Suggested for this supplier</h2>
+                      <p class="type-caption mt-1">
+                        Based on demand and stock at the receiving location.
+                      </p>
+                    </div>
+                    <a class="link type-caption" routerLink="/insights/inventory">View inventory</a>
+                  </div>
+                  <ul class="mt-3 divide-y divide-base-200">
+                    @for (item of store.recommendations(); track item.variant_id) {
+                      <li class="flex min-h-12 items-center justify-between gap-3 py-2">
+                        <div class="min-w-0">
+                          <p class="truncate text-sm font-medium">
+                            {{ item.product_name
+                            }}{{ item.variant_name === 'Default' ? '' : ' · ' + item.variant_name }}
+                          </p>
+                          <p class="type-caption">
+                            {{ item.current_stock }} in stock ·
+                            {{
+                              item.days_of_cover === null
+                                ? 'cover unavailable'
+                                : item.days_of_cover + 'd cover'
+                            }}
+                          </p>
+                        </div>
+                        <button
+                          appButton
+                          variant="soft"
+                          size="sm"
+                          type="button"
+                          (click)="store.addRecommendation(item)"
+                        >
+                          Add {{ item.reorder_quantity }}
+                        </button>
+                      </li>
+                    }
+                  </ul>
+                </section>
+              }
+
               <app-purchase-vat-panel
                 [viewModel]="store.vatPanelViewModel()"
                 [supplierTaxPin]="store.supplierTaxPin"
@@ -362,6 +409,8 @@ export class PurchaseEditorComponent implements OnInit, OnDestroy {
     await this.store.initialize({
       draftId: this.route.snapshot.paramMap.get('id'),
       supplierId: this.route.snapshot.queryParamMap.get('supplier'),
+      variantId: this.route.snapshot.queryParamMap.get('variant'),
+      quantity: Number(this.route.snapshot.queryParamMap.get('quantity')) || undefined,
     });
   }
 

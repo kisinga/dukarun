@@ -33,7 +33,7 @@ export function workspaceNavigationItems(
       ];
     case 'inventory':
       return [
-        { label: 'Products', route: '/inventory/products' },
+        { label: 'Catalogue', route: '/inventory/products' },
         ...(access.has('ManageStockAdjustments')
           ? [{ label: 'Adjustments', route: '/inventory/adjustments' }]
           : []),

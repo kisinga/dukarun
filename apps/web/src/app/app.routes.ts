@@ -8,6 +8,7 @@ import { multiLocationGuard } from './core/multi-location.guard';
 import { preserveQueryRedirect } from './core/route-redirect';
 import { legalAcceptanceGuard } from './legal/legal.guard';
 import { paidAccessGuard } from './core/paid-access.guard';
+import { insightsLandingRedirect, insightsSectionGuard } from './insights/insights-access.guard';
 
 interface UnsavedChangesComponent {
   canDeactivate(): boolean;
@@ -176,8 +177,8 @@ export const routes: Routes = [
           },
           {
             path: 'credit',
-            loadComponent: () =>
-              import('./money/credit/money-credit.component').then(m => m.MoneyCreditComponent),
+            pathMatch: 'full',
+            redirectTo: '/insights/credit',
           },
           {
             path: 'suppliers',
@@ -364,10 +365,80 @@ export const routes: Routes = [
       },
       { path: 'orders', redirectTo: 'sales' },
       {
+        path: 'insights',
+        canActivate: [insightsSectionGuard],
+        data: { insightsSection: 'attention' },
+        loadComponent: () =>
+          import('./insights/insights-layout.component').then(m => m.InsightsLayoutComponent),
+        children: [
+          {
+            path: 'attention',
+            canActivate: [insightsSectionGuard],
+            data: { insightsSection: 'attention' },
+            loadComponent: () =>
+              import('./insights/attention-insights.component').then(
+                m => m.AttentionInsightsComponent
+              ),
+          },
+          {
+            path: 'credit/:side/:partyId',
+            canActivate: [insightsSectionGuard],
+            data: { insightsSection: 'credit' },
+            loadComponent: () =>
+              import('./insights/credit-profile.component').then(m => m.CreditProfileComponent),
+          },
+          {
+            path: 'credit',
+            canActivate: [insightsSectionGuard],
+            data: { insightsSection: 'credit' },
+            loadComponent: () =>
+              import('./insights/credit-insights.component').then(m => m.CreditInsightsComponent),
+          },
+          {
+            path: 'inventory/:variantId',
+            canActivate: [insightsSectionGuard],
+            data: { insightsSection: 'inventory' },
+            loadComponent: () =>
+              import('./insights/product-profile.component').then(m => m.ProductProfileComponent),
+          },
+          {
+            path: 'inventory',
+            canActivate: [insightsSectionGuard],
+            data: { insightsSection: 'inventory' },
+            loadComponent: () =>
+              import('./insights/products-insights.component').then(
+                m => m.ProductsInsightsComponent
+              ),
+          },
+          {
+            path: 'products/:variantId',
+            canActivate: [insightsSectionGuard],
+            data: { insightsSection: 'inventory' },
+            loadComponent: () =>
+              import('./insights/product-profile.component').then(m => m.ProductProfileComponent),
+          },
+          {
+            path: 'products',
+            redirectTo: preserveQueryRedirect('/insights/inventory'),
+          },
+          {
+            path: 'sales',
+            canActivate: [insightsSectionGuard],
+            data: { insightsSection: 'sales' },
+            loadComponent: () =>
+              import('./reports/reports.component').then(m => m.ReportsComponent),
+          },
+          {
+            path: 'performance',
+            redirectTo: preserveQueryRedirect('/insights/sales'),
+          },
+          { path: '', pathMatch: 'full', redirectTo: insightsLandingRedirect },
+        ],
+      },
+      {
         path: 'reports',
-        canActivate: [permissionGuard],
-        data: { permission: 'ViewFinancials' },
-        loadComponent: () => import('./reports/reports.component').then(m => m.ReportsComponent),
+        pathMatch: 'full',
+        redirectTo: preserveQueryRedirect('/insights/sales'),
       },
       {
         path: 'approvals',

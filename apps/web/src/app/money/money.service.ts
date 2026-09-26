@@ -10,6 +10,7 @@ import { rpcError } from '../pos/pos.service';
 import { LocationContextService } from '../core/location-context.service';
 import { PartyCacheService } from '../core/party-cache.service';
 import { ActionExecutorService, type ActionOutcome } from '../core/action-executor.service';
+import { BusinessClockService } from '../core/business-clock.service';
 import { nairobiDayEndExclusive, nairobiDayStart } from '../core/nairobi-date';
 import { journalPageSelect } from './journal-query';
 
@@ -267,6 +268,7 @@ export class MoneyService {
   private readonly locations = inject(LocationContextService);
   private readonly parties = inject(PartyCacheService);
   private readonly actions = inject(ActionExecutorService);
+  private readonly businessClock = inject(BusinessClockService);
 
   private get db() {
     return this.supabase.client;
@@ -929,7 +931,8 @@ export class MoneyService {
     amount: number,
     methodCode: string,
     reference: string | undefined,
-    clientRef: string
+    clientRef: string,
+    paidOn: string
   ): Promise<CustomerReceiptOutcome> {
     const outcome = await this.actions.run(async () => {
       const { data, error } = await this.db.rpc('post_customer_receipt', {
@@ -938,7 +941,9 @@ export class MoneyService {
         p_amount: amount,
         p_method_code: methodCode,
         p_client_ref: clientRef,
-        ...(reference ? { p_reference: reference } : {}),
+        p_paid_on: paidOn,
+        p_paid_on_source: 'manual',
+        p_reference: reference ?? '',
       });
       if (error) throw rpcError(error);
       return data;
@@ -952,9 +957,17 @@ export class MoneyService {
     amount: number,
     methodCode: string,
     reference?: string,
-    clientRef: string = crypto.randomUUID()
+    clientRef: string = crypto.randomUUID(),
+    paidOn?: string
   ): Promise<CustomerReceiptOutcome> {
-    return this.postCustomerReceipt(customerId, amount, methodCode, reference, clientRef);
+    return this.postCustomerReceipt(
+      customerId,
+      amount,
+      methodCode,
+      reference,
+      clientRef,
+      paidOn?.trim() || (await this.businessClock.today())
+    );
   }
 
   async reverseCustomerReceipt(receiptId: string, reason: string): Promise<ActionOutcome> {
@@ -1594,14 +1607,18 @@ export class MoneyService {
     purchaseId: string,
     amount: number,
     accountCode: string,
-    clientRef: string
+    clientRef: string,
+    paidOn?: string
   ): Promise<string> {
+    const effectivePaidOn = paidOn?.trim() || (await this.businessClock.today());
     const { data, error } = await this.db.rpc('post_supplier_payment', {
       p_supplier_id: supplierId,
       p_purchase_id: purchaseId,
       p_amount: amount,
       p_account_code: accountCode,
       p_client_ref: clientRef,
+      p_paid_on: effectivePaidOn,
+      p_paid_on_source: 'manual',
     });
     if (error) throw rpcError(error);
     this.parties.invalidateFinancials();
@@ -1612,13 +1629,17 @@ export class MoneyService {
     supplierId: string,
     amount: number,
     accountCode: string,
-    clientRef: string
+    clientRef: string,
+    paidOn?: string
   ): Promise<string> {
+    const effectivePaidOn = paidOn?.trim() || (await this.businessClock.today());
     const { data, error } = await this.db.rpc('post_supplier_fifo_payment', {
       p_supplier_id: supplierId,
       p_amount: amount,
       p_account_code: accountCode,
       p_client_ref: clientRef,
+      p_paid_on: effectivePaidOn,
+      p_paid_on_source: 'manual',
     });
     if (error) throw rpcError(error);
     this.parties.invalidateFinancials();
