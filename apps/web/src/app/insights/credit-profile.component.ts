@@ -4,6 +4,7 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { formatKes } from '../core/money';
 import { EmptyStateComponent } from '../shared/ui/empty-state.component';
 import { IconComponent } from '../shared/ui/icon.component';
+import { creditDocumentStatus } from './credit-document-status';
 import { InsightsService } from './insights.service';
 import { insightCopy, type PartyCreditProfile } from './insights.models';
 import { ScoreBadgeComponent } from './score-badge.component';
@@ -107,6 +108,7 @@ import { ScoreBadgeComponent } from './score-badge.component';
                 />
               }
               @for (document of item.documents ?? []; track document.document_id) {
+                @let status = documentStatus(document);
                 <div
                   class="grid gap-2 border-b border-base-200 p-4 last:border-0 sm:grid-cols-[1fr_auto_auto] sm:items-center"
                 >
@@ -136,16 +138,10 @@ import { ScoreBadgeComponent } from './score-badge.component';
                   </div>
                   <span
                     class="badge"
-                    [class.badge-error]="document.overdue_days > 30"
-                    [class.badge-warning]="document.overdue_days > 0 && document.overdue_days <= 30"
-                    [class.badge-success]="document.overdue_days === 0"
-                    >{{
-                      document.outstanding_amount > 0
-                        ? document.overdue_days > 0
-                          ? document.overdue_days + 'd overdue'
-                          : 'Current'
-                        : paymentLabel(document.settled_days_late)
-                    }}</span
+                    [class.badge-error]="status.tone === 'error'"
+                    [class.badge-warning]="status.tone === 'warning'"
+                    [class.badge-success]="status.tone === 'success'"
+                    >{{ status.label }}</span
                   >
                 </div>
               }
@@ -204,6 +200,7 @@ export class CreditProfileComponent implements OnInit {
   protected readonly error = signal<string | null>(null);
   protected readonly copy = insightCopy;
   protected readonly fmt = formatKes;
+  protected readonly documentStatus = creditDocumentStatus;
 
   async ngOnInit(): Promise<void> {
     const partyId = this.route.snapshot.paramMap.get('partyId');
@@ -220,11 +217,5 @@ export class CreditProfileComponent implements OnInit {
     } finally {
       this.loading.set(false);
     }
-  }
-
-  protected paymentLabel(days: number | null): string {
-    if (days === null) return 'Settled';
-    if (days <= 0) return 'On time';
-    return `${days}d late`;
   }
 }

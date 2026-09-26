@@ -252,6 +252,25 @@ select public.process_credit_dirty_parties(100);
 select is((select outstanding_amount from public.credit_document_performance
   where document_id=(select id from late_order)),0::bigint,
   'receivable credit notes settle cached document exposure');
+select is((select overdue_days from public.credit_document_performance
+  where document_id=(select id from late_order)),0,
+  'settled customer documents do not retain current aging');
+
+insert into public.credit_document_performance(
+  company_id,side,party_id,document_id,document_code,issued_on,due_on,
+  original_amount,settled_amount,outstanding_amount,settled_on,settled_days_late,
+  punctuality_factor,overdue_days,settled_principal_days,principal_days_as_of,next_refresh_on
+)
+select company_id,'supplier','12600000-0000-4000-8000-000000000012',
+  '12600000-0000-4000-8000-000000000040','Settled supplier invoice',
+  current_date-100,current_date-90,100,100,0,current_date-5,85,0,85,8500,current_date,current_date+1
+from insight_company;
+select is((select overdue_days from public.credit_document_performance
+  where document_id='12600000-0000-4000-8000-000000000040'),0,
+  'settled supplier documents do not retain current aging');
+select is((select next_refresh_on from public.credit_document_performance
+  where document_id='12600000-0000-4000-8000-000000000040'),null::date,
+  'settled supplier documents are not scheduled for aging refresh');
 
 insert into public.stock_locations(id,company_id,code,name)
 select '12600000-0000-4000-8000-000000000030',company_id,'PRIVATE','Private warehouse'
