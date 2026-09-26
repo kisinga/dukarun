@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildStorefrontCartMessage,
+  buildStorefrontProductMessage,
   storefrontCartCount,
   storefrontCartTotal,
   storefrontLineId,
@@ -45,11 +46,11 @@ describe('storefront cart helpers', () => {
       'https://store.dukarun.com/fixture-shop'
     );
 
-    expect(message).toContain("Hello Fixture Shop! I'd like to order:");
+    expect(message).toContain("Hello Fixture Shop! I'd like to place this order:");
     expect(message).toContain('1. Sugar 1kg');
     expect(message).toContain('2. Tea · 100 bags');
-    expect(message).toContain('Estimated total: KES 650');
-    expect(message).toContain('Catalogue: https://store.dukarun.com/fixture-shop');
+    expect(message).toContain('*Estimated total:* KES 650');
+    expect(message).toContain('Shop: https://store.dukarun.com/fixture-shop');
   });
 });
 
@@ -69,5 +70,22 @@ it('keeps pack and piece basket identities separate and quotes the selected unit
   const message = buildStorefrontCartMessage('Shop', [pack], '/shop');
   expect(message).toContain('Bundle (10 packet)');
   expect(message).toContain('Qty: 2');
-  expect(message).toContain('Line: KES 3,000');
+  expect(message).toContain('Subtotal: KES 3,000');
+});
+
+it('builds a scannable single-product WhatsApp order', () => {
+  const message = buildStorefrontProductMessage(
+    'Fixture Shop',
+    'Tea · 100 bags',
+    'Carton (12 boxes)',
+    2,
+    320,
+    'https://store.dukarun.com/fixture-shop/products/tea'
+  );
+
+  expect(message).toContain("Hello Fixture Shop! I'd like to order:");
+  expect(message).toContain('*Item:* Tea · 100 bags');
+  expect(message).toContain('*Quantity:* 2');
+  expect(message).toContain('*Estimated total:* KES 640');
+  expect(message).toContain('Product: https://store.dukarun.com/fixture-shop/products/tea');
 });

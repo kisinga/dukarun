@@ -327,13 +327,22 @@ import { CreditDecisionCardComponent } from '../../insights/credit-decision-card
                   </div>
                 </dl>
 
-                @if (creditApprovalRequired() || creditRiskAcknowledgementRequired()) {
+                @if (creditApprovalRequired() || creditAcknowledgementRequired()) {
                   <div role="status" class="alert alert-warning mt-3 text-sm">
                     <app-icon name="heroExclamationTriangle" />
                     <span>
                       @if (creditApprovalRequired()) {
                         This exceeds the credit limit. The sale will wait for approval and stock
                         will not change yet.
+                      } @else if (overdueCreditAcknowledgementRequired()) {
+                        This customer has overdue credit
+                        @if ((creditDecision()?.overdueAmount ?? 0) > 0) {
+                          of <app-money [amount]="creditDecision()?.overdueAmount ?? 0" />
+                        }
+                        @if ((creditDecision()?.oldestOverdueDays ?? 0) > 0) {
+                          (oldest {{ creditDecision()?.oldestOverdueDays }} days)
+                        }
+                        . Enter a reason before adding more credit.
                       } @else {
                         This profile is restricted or high risk. Acknowledge why adding new credit
                         is appropriate.
@@ -345,7 +354,9 @@ import { CreditDecisionCardComponent } from '../../insights/credit-decision-card
                     [label]="
                       creditApprovalRequired()
                         ? 'Reason for the exception'
-                        : 'Acknowledgement reason'
+                        : overdueCreditAcknowledgementRequired()
+                          ? 'Reason for adding credit'
+                          : 'Acknowledgement reason'
                     "
                     [required]="true"
                   >
@@ -355,7 +366,9 @@ import { CreditDecisionCardComponent } from '../../insights/credit-decision-card
                       [placeholder]="
                         creditApprovalRequired()
                           ? 'Why should this customer exceed their limit?'
-                          : 'Why is adding credit appropriate now?'
+                          : overdueCreditAcknowledgementRequired()
+                            ? 'Why should this overdue customer receive more credit?'
+                            : 'Why is adding credit appropriate now?'
                       "
                     ></textarea>
                   </app-form-field>
@@ -384,7 +397,7 @@ import { CreditDecisionCardComponent } from '../../insights/credit-decision-card
                 type="button"
                 [loading]="busy()"
                 [disabled]="
-                  (creditApprovalRequired() || creditRiskAcknowledgementRequired()) &&
+                  (creditApprovalRequired() || creditAcknowledgementRequired()) &&
                   creditApprovalReason.value.trim().length === 0
                 "
                 (click)="confirmCreditSale()"
@@ -479,8 +492,9 @@ export class SellComponent implements OnInit {
   protected readonly creditExceedsLimit = this.workflow.creditExceedsLimit;
   protected readonly creditApprovalRequired = this.workflow.creditApprovalRequired;
   protected readonly creditDecision = this.workflow.creditDecision;
-  protected readonly creditRiskAcknowledgementRequired =
-    this.workflow.creditRiskAcknowledgementRequired;
+  protected readonly overdueCreditAcknowledgementRequired =
+    this.workflow.overdueCreditAcknowledgementRequired;
+  protected readonly creditAcknowledgementRequired = this.workflow.creditAcknowledgementRequired;
   protected readonly creditWatchWarning = this.workflow.creditWatchWarning;
   protected readonly panelMethods = this.workflow.panelMethods;
   protected readonly canUseDirectAccounts = this.workflow.canUseDirectAccounts;

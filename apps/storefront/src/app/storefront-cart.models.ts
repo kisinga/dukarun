@@ -59,17 +59,38 @@ export function buildStorefrontCartMessage(
   const summary = lines
     .map((line, index) => {
       const total = Math.round(line.price * line.quantity);
-      return `${index + 1}. ${storefrontCartLineLabel(line)}\n   Qty: ${line.quantity}\n   Price: ${formatCartKes(line.price)} each\n   Line: ${formatCartKes(total)}`;
+      return `${index + 1}. ${storefrontCartLineLabel(line)}\n   Qty: ${line.quantity}\n   Price: ${formatCartKes(line.price)} each\n   Subtotal: ${formatCartKes(total)}`;
     })
     .join('\n\n');
   return [
-    `Hello ${shopName}! I'd like to order:`,
+    `Hello ${shopName}! I'd like to place this order:`,
     '',
     summary,
     '',
-    `Estimated total: ${formatCartKes(storefrontCartTotal(lines))}`,
+    `*Estimated total:* ${formatCartKes(storefrontCartTotal(lines))}`,
     '',
-    `Catalogue: ${shopUrl}`,
+    `Shop: ${shopUrl}`,
+  ].join('\n');
+}
+
+export function buildStorefrontProductMessage(
+  shopName: string,
+  itemLabel: string,
+  unitLabel: string,
+  quantity: number,
+  unitPrice: number,
+  productUrl: string
+): string {
+  return [
+    `Hello ${shopName}! I'd like to order:`,
+    '',
+    `*Item:* ${itemLabel}`,
+    `*Unit:* ${unitLabel}`,
+    `*Quantity:* ${quantity}`,
+    `*Price each:* ${formatCartKes(unitPrice)}`,
+    `*Estimated total:* ${formatCartKes(quantity * unitPrice)}`,
+    '',
+    `Product: ${productUrl}`,
   ].join('\n');
 }
 

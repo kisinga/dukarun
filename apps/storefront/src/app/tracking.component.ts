@@ -95,7 +95,7 @@ import { StorefrontSeoService } from './storefront-seo.service';
               @if (order.merchant_phone) {
                 <a
                   class="btn btn-outline btn-sm"
-                  [href]="contactLink(order.merchant_phone)"
+                  [href]="contactLink(order.merchant_phone, order.merchant_name, order.order_code)"
                   target="_blank"
                   rel="noopener noreferrer"
                 >
@@ -229,8 +229,9 @@ export class TrackingComponent implements OnInit, OnDestroy {
     });
   }
 
-  protected contactLink(phone: string): string {
+  protected contactLink(phone: string, merchant: string, orderCode: string): string {
     const digits = phone.replace(/\D/g, '');
-    return `https://wa.me/${digits}`;
+    const message = `Hello ${merchant}, I have a question about order ${orderCode}.`;
+    return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
   }
 }

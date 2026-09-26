@@ -10,6 +10,7 @@ import { environment } from '../environments/environment';
 import { PoweredByDukarunComponent } from './powered-by-dukarun.component';
 import { StorefrontCartComponent } from './storefront-cart.component';
 import { StorefrontCartService } from './storefront-cart.service';
+import { buildStorefrontProductMessage } from './storefront-cart.models';
 import { sellingUnits, unitDescription, type SellingUnit } from '@dukarun/pack-types';
 
 function formatKes(amount: number): string {
@@ -350,7 +351,14 @@ export class ProductDetailComponent implements OnInit {
         ).toString();
     return this.waLink(
       shop.public_whatsapp_number,
-      `Hello ${shop.name}! I'd like to order ${this.quantity()} × ${catalogLabel(variant)} · ${this.selectedUnit() ? unitDescription(this.selectedUnit()!) : 'item'} at ${formatKes(this.selectedUnit()?.price ?? Number(variant.price))} each. Estimated total: ${formatKes(this.quantity() * (this.selectedUnit()?.price ?? Number(variant.price)))}. ${pageUrl}`
+      buildStorefrontProductMessage(
+        shop.name ?? 'the shop',
+        catalogLabel(variant),
+        this.selectedUnit() ? unitDescription(this.selectedUnit()!) : 'Item',
+        this.quantity(),
+        this.selectedUnit()?.price ?? Number(variant.price),
+        pageUrl
+      )
     );
   });
 

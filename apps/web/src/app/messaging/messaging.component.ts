@@ -283,15 +283,11 @@ const RELATED_PARTY_SEARCH_ID_LIMIT = 50;
                     <td class="font-mono text-xs">{{ message.recipient }}</td>
                     <td class="max-w-lg">
                       <p class="line-clamp-2 text-sm">{{ message.body }}</p>
-                      @if (documentOrderId(message); as orderId) {
+                      @if (sourceDocumentLink(message); as documentLink) {
                         <a
                           class="mt-1 inline-flex text-xs font-medium link link-hover"
-                          routerLink="/orders"
-                          [queryParams]="{
-                            order: orderId,
-                            customer: message.customer_id,
-                            range: 'all',
-                          }"
+                          [routerLink]="documentLink.route"
+                          [queryParams]="documentLink.queryParams"
                         >
                           Open source document
                         </a>
@@ -360,15 +356,11 @@ const RELATED_PARTY_SEARCH_ID_LIMIT = 50;
                   <span class="type-caption shrink-0">{{ time(message.created_at) }}</span>
                 </div>
                 <p class="border-t border-base-300/60 pt-3 text-sm">{{ message.body }}</p>
-                @if (documentOrderId(message); as orderId) {
+                @if (sourceDocumentLink(message); as documentLink) {
                   <a
                     class="inline-flex text-sm font-medium link link-hover"
-                    routerLink="/orders"
-                    [queryParams]="{
-                      order: orderId,
-                      customer: message.customer_id,
-                      range: 'all',
-                    }"
+                    [routerLink]="documentLink.route"
+                    [queryParams]="documentLink.queryParams"
                   >
                     Open source document
                   </a>
@@ -566,11 +558,30 @@ export class CommunicationsComponent implements OnInit, OnDestroy {
     return [message.customers.first_name, message.customers.last_name].filter(Boolean).join(' ');
   }
 
-  protected documentOrderId(message: OutboxMessageWithParty): string | null {
-    if (!message.document_subject_id) return null;
-    return ['receipt', 'invoice', 'proforma'].includes(message.document_type ?? '')
-      ? message.document_subject_id
-      : null;
+  protected sourceDocumentLink(message: OutboxMessageWithParty): {
+    route: string;
+    queryParams: Record<string, string>;
+  } | null {
+    const subjectId = message.document_subject_id;
+    if (!subjectId) return null;
+    switch (message.document_type) {
+      case 'receipt':
+      case 'invoice':
+        return {
+          route: '/orders',
+          queryParams: {
+            order: subjectId,
+            ...(message.customer_id ? { customer: message.customer_id } : {}),
+            range: 'all',
+          },
+        };
+      case 'proforma':
+        return { route: '/pos/proformas', queryParams: { order: subjectId } };
+      case 'purchase_order':
+        return { route: '/purchases', queryParams: { purchase: subjectId } };
+      default:
+        return null;
+    }
   }
 
   protected openLabel(message: OutboxMessageWithParty): string {

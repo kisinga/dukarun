@@ -7,6 +7,7 @@ import { LocationContextService } from '../core/location-context.service';
 import { formatKes } from '../core/money';
 import { PartyCacheService } from '../core/party-cache.service';
 import { PermissionsService } from '../core/permissions.service';
+import { variantLabel } from '../pos/pos.service';
 import { RestockIntelligenceComponent } from '../reports/restock-intelligence.component';
 import { ButtonComponent } from '../shared/ui/button.component';
 import { EmptyStateComponent } from '../shared/ui/empty-state.component';
@@ -220,18 +221,20 @@ const EMPTY_SUMMARY: ProductIntelligenceSummary = {
                   (valueChange)="setManufacturer($event)"
                 />
               </div>
-              <label class="input input-bordered flex min-h-11 min-w-56 flex-1 items-center gap-2">
-                <app-icon name="heroMagnifyingGlass" />
-                <input
-                  class="grow"
-                  type="search"
-                  aria-label="Search inventory"
-                  placeholder="Product, variant, or SKU"
-                  [value]="search()"
-                  (input)="updateSearch($event)"
-                  (keyup.enter)="load()"
+              <div class="form-control min-w-56 flex-1 sm:max-w-72">
+                <span class="label-text text-xs">Product</span>
+                <app-searchable-filter
+                  class="mt-1"
+                  ariaLabel="Filter inventory by product"
+                  placeholder="All products"
+                  searchPlaceholder="Search products, variants, or SKUs…"
+                  controlSize="md"
+                  [maxResults]="20"
+                  [options]="productOptions()"
+                  [value]="productFilter()"
+                  (valueChange)="setProduct($event)"
                 />
-              </label>
+              </div>
               @if (filterCount() > 0) {
                 <button appButton variant="ghost" type="button" (click)="clearFilters()">
                   Clear {{ filterCount() }}
@@ -283,7 +286,12 @@ const EMPTY_SUMMARY: ProductIntelligenceSummary = {
                   @for (item of products(); track item.variant_id) {
                     <tr>
                       <td class="max-w-72">
-                        <p class="truncate font-semibold">{{ item.product_name }}</p>
+                        <a
+                          class="block truncate font-semibold link link-hover"
+                          routerLink="/inventory/products"
+                          [queryParams]="{ product: item.product_id, variant: item.variant_id }"
+                          >{{ item.product_name }}</a
+                        >
                         <p class="type-caption truncate">
                           {{ item.variant_name }} · {{ item.stock_unit }}
                         </p>
@@ -338,7 +346,12 @@ const EMPTY_SUMMARY: ProductIntelligenceSummary = {
                 <article class="space-y-3 p-4">
                   <div class="flex items-start justify-between gap-3">
                     <div class="min-w-0">
-                      <p class="truncate font-semibold">{{ item.product_name }}</p>
+                      <a
+                        class="block truncate font-semibold link link-hover"
+                        routerLink="/inventory/products"
+                        [queryParams]="{ product: item.product_id, variant: item.variant_id }"
+                        >{{ item.product_name }}</a
+                      >
                       <p class="type-caption truncate">
                         {{ item.variant_name }} · {{ sourceContext(item) }}
                       </p>
@@ -413,7 +426,7 @@ export class ProductsInsightsComponent implements OnInit {
   protected readonly windowDays = signal<DateRangePreset>(30);
   protected readonly rangeFrom = signal('');
   protected readonly rangeTo = signal('');
-  protected readonly search = signal('');
+  protected readonly productFilter = signal('');
   protected readonly supplierFilter = signal('');
   protected readonly manufacturerFilter = signal('');
   protected readonly products = signal<ProductDemandSummary[]>([]);
@@ -444,9 +457,28 @@ export class ProductsInsightsComponent implements OnInit {
       .sort((a, b) => a.name.localeCompare(b.name))
       .map(manufacturer => ({ value: manufacturer.id, label: manufacturer.name }))
   );
+  protected readonly productOptions = computed<readonly SearchableFilterOption[]>(() =>
+    this.catalog
+      .catalog()
+      .filter(
+        variant =>
+          !!variant.variant_id &&
+          variant.variant_active &&
+          variant.product_active &&
+          variant.track_inventory &&
+          variant.kind !== 'service'
+      )
+      .map(variant => ({
+        value: variant.variant_id!,
+        label: variantLabel(variant),
+        description: [variant.sku, variant.stock_unit].filter(Boolean).join(' · '),
+        searchText: [variant.barcode, variant.manufacturer_name].filter(Boolean).join(' '),
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label) || a.description.localeCompare(b.description))
+  );
   protected readonly filterCount = computed(
     () =>
-      Number(Boolean(this.search().trim())) +
+      Number(Boolean(this.productFilter())) +
       Number(Boolean(this.supplierFilter())) +
       Number(Boolean(this.manufacturerFilter()))
   );
@@ -518,12 +550,13 @@ export class ProductsInsightsComponent implements OnInit {
     void this.load();
   }
 
-  protected updateSearch(event: Event): void {
-    this.search.set((event.target as HTMLInputElement).value);
+  protected setProduct(value: string): void {
+    this.productFilter.set(value);
+    void this.load();
   }
 
   protected clearFilters(): void {
-    this.search.set('');
+    this.productFilter.set('');
     this.supplierFilter.set('');
     this.manufacturerFilter.set('');
     void this.load();
@@ -542,7 +575,7 @@ export class ProductsInsightsComponent implements OnInit {
         locationId,
         supplierId: this.supplierFilter() || null,
         manufacturerId: this.manufacturerFilter() || null,
-        search: this.search().trim() || null,
+        search: this.selectedProductSearch(),
       });
       if (request !== this.request) return;
       this.products.set(data.items);
@@ -572,7 +605,7 @@ export class ProductsInsightsComponent implements OnInit {
         locationId,
         supplierId: this.supplierFilter() || null,
         manufacturerId: this.manufacturerFilter() || null,
-        search: this.search().trim() || null,
+        search: this.selectedProductSearch(),
         offset,
       });
       if (request !== this.request) return;
@@ -614,6 +647,17 @@ export class ProductsInsightsComponent implements OnInit {
     return (
       [item.manufacturer_name, item.preferred_supplier_name].filter(Boolean).join(' · ') ||
       'Source not set'
+    );
+  }
+
+  private selectedProductSearch(): string | null {
+    const variantId = this.productFilter();
+    if (!variantId) return null;
+    return (
+      this.catalog
+        .catalog()
+        .find(variant => variant.variant_id === variantId)
+        ?.sku?.trim() || null
     );
   }
 }

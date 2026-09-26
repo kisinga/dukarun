@@ -235,7 +235,11 @@ type DisplayProduct = RestockProductRow & {
               </div>
               <div class="p-4">
                 @if (trendHasData()) {
-                  <app-restock-trend-chart [points]="data.trend" [metric]="trendMetric()" />
+                  <app-restock-trend-chart
+                    [points]="data.trend"
+                    [metric]="trendMetric()"
+                    [loading]="loading()"
+                  />
                 } @else {
                   <app-empty-state
                     [embedded]="true"
@@ -361,6 +365,7 @@ type DisplayProduct = RestockProductRow & {
                 <app-product-activity-chart
                   [trend]="profile.trend"
                   [positions]="profile.positions"
+                  [loading]="focusLoading()"
                 />
               }
             </div>
@@ -711,7 +716,9 @@ export class RestockIntelligenceComponent implements OnInit {
     const locationId = this.selectedLocation();
     if (!variantId || !locationId) return;
     const request = ++this.focusRequest;
-    this.focusedProfile.set(null);
+    if (this.focusedProfile()?.variant.id !== variantId) {
+      this.focusedProfile.set(null);
+    }
     this.focusLoading.set(true);
     this.focusError.set(null);
     try {

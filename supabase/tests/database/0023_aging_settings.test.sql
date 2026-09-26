@@ -1,6 +1,6 @@
 -- Aging + settings tests (migration 0023).
 begin;
-select plan(6);
+select plan(14);
 
 select testkit.create_user('11111111-1111-1111-1111-111111111111', 'admin@age.local');
 create temp table age_company as
@@ -81,7 +81,165 @@ select is(
   'supplier AP bucketed 60+'
 );
 
--- 6. update_payment_method.
+-- Customer-level corrections and overpayments settle positive orders FIFO.
+insert into public.customers (id, company_id, first_name, is_credit_approved, credit_limit)
+select 'c0000000-0000-0000-0000-0000000000e3', company_id, 'FIFO Customer', true, 0
+from age_company;
+
+select testkit.as_user((select company_id from age_company),
+  '11111111-1111-1111-1111-111111111111', 'Admin');
+create temp table fifo_customer_old as
+select public.post_sale('c0000000-0000-0000-0000-0000000000e3',
+  '[{"variant_id":"aa000000-0000-0000-0000-0000000000e1","quantity":1,"unit_price":4000}]',
+  '[]') as order_id;
+create temp table fifo_customer_new as
+select public.post_sale('c0000000-0000-0000-0000-0000000000e3',
+  '[{"variant_id":"aa000000-0000-0000-0000-0000000000e1","quantity":1,"unit_price":6000}]',
+  '[]') as order_id;
+
+reset role;
+select set_config('app.allow_ledger_mutation', 'on', true);
+update public.ledger_journal_entries
+set entry_date = entry_date - case
+  when source_id = (select order_id::text from fifo_customer_old) then 60
+  else 30
+end
+where source_type = 'CreditSale'
+  and source_id in (
+    (select order_id::text from fifo_customer_old),
+    (select order_id::text from fifo_customer_new)
+  );
+select set_config('app.allow_ledger_mutation', 'off', true);
+
+select public.post_journal_entry(
+  (select company_id from age_company), 'BalanceAdjustment', 'aging-customer-fifo-1',
+  'Unlinked customer correction',
+  '[{"account_code":"BALANCE_ADJUSTMENT","debit":15000,"meta":{"customerId":"c0000000-0000-0000-0000-0000000000e3"}},
+    {"account_code":"ACCOUNTS_RECEIVABLE","credit":15000,"meta":{"customerId":"c0000000-0000-0000-0000-0000000000e3"}}]'
+);
+
+select is(
+  (select balance from public.customer_credit_aging
+   where customer_id = 'c0000000-0000-0000-0000-0000000000e3'),
+  5000::bigint,
+  'unlinked customer correction reduces the aging balance'
+);
+
+select is(
+  (select days_outstanding from public.customer_credit_aging
+   where customer_id = 'c0000000-0000-0000-0000-0000000000e3'),
+  30,
+  'customer correction settles the oldest order first'
+);
+
+select public.post_journal_entry(
+  (select company_id from age_company), 'BalanceAdjustment', 'aging-customer-fifo-2',
+  'Clear remaining customer balance',
+  '[{"account_code":"BALANCE_ADJUSTMENT","debit":5000,"meta":{"customerId":"c0000000-0000-0000-0000-0000000000e3"}},
+    {"account_code":"ACCOUNTS_RECEIVABLE","credit":5000,"meta":{"customerId":"c0000000-0000-0000-0000-0000000000e3"}}]'
+);
+
+select is(
+  (select count(*)::int from public.customer_credit_aging
+   where customer_id = 'c0000000-0000-0000-0000-0000000000e3'),
+  0,
+  'zero-balance customer has no aging row after an unlinked correction'
+);
+
+select is(
+  (select balance from public.customer_ar_balances
+   where customer_id = 'c0000000-0000-0000-0000-0000000000e3'),
+  0::bigint,
+  'customer aging disappearance agrees with authoritative AR'
+);
+
+-- Supplier-level unlinked payments settle positive purchases FIFO.
+insert into public.customers (id, company_id, first_name, is_supplier)
+select 'c0000000-0000-0000-0000-0000000000e4', company_id, 'FIFO Supplier', true
+from age_company;
+
+select testkit.as_user((select company_id from age_company),
+  '11111111-1111-1111-1111-111111111111', 'Admin');
+create temp table fifo_supplier_old as
+select public.record_purchase('c0000000-0000-0000-0000-0000000000e4',
+  '[{"variant_id":"aa000000-0000-0000-0000-0000000000e1","quantity":1,"unit_cost":4000}]',
+  true, 'FIFO-OLD') as purchase_id;
+create temp table fifo_supplier_new as
+select public.record_purchase('c0000000-0000-0000-0000-0000000000e4',
+  '[{"variant_id":"aa000000-0000-0000-0000-0000000000e1","quantity":2,"unit_cost":4000}]',
+  true, 'FIFO-NEW') as purchase_id;
+
+reset role;
+select set_config('app.allow_ledger_mutation', 'on', true);
+update public.ledger_journal_entries
+set entry_date = entry_date - case
+  when source_id = (select purchase_id::text from fifo_supplier_old) then 70
+  else 40
+end
+where source_type = 'InventoryPurchase'
+  and source_id in (
+    (select purchase_id::text from fifo_supplier_old),
+    (select purchase_id::text from fifo_supplier_new)
+  );
+select set_config('app.allow_ledger_mutation', 'off', true);
+
+select public.post_journal_entry(
+  (select company_id from age_company), 'SupplierPayment', 'aging-supplier-fifo-1',
+  'Unlinked supplier payment',
+  '[{"account_code":"ACCOUNTS_PAYABLE","debit":5000,"meta":{"supplierId":"c0000000-0000-0000-0000-0000000000e4"}},
+    {"account_code":"BALANCE_ADJUSTMENT","credit":5000,"meta":{"supplierId":"c0000000-0000-0000-0000-0000000000e4"}}]'
+);
+
+select public.post_journal_entry(
+  (select company_id from age_company), 'SupplierBalanceAdjustment',
+  'aging-supplier-adjustment', 'Temporary supplier adjustment',
+  '[{"account_code":"BALANCE_ADJUSTMENT","debit":10000,"meta":{"supplierId":"c0000000-0000-0000-0000-0000000000e4","reason":"Reversed supplier adjustment fixture"}},
+    {"account_code":"ACCOUNTS_PAYABLE","credit":10000,"meta":{"supplierId":"c0000000-0000-0000-0000-0000000000e4","reason":"Reversed supplier adjustment fixture"}}]'
+);
+
+select public.post_journal_entry(
+  (select company_id from age_company), 'OpsSupplierBalanceAdjustmentReversal',
+  'aging-supplier-adjustment-reversal', 'Reverse temporary supplier adjustment',
+  '[{"account_code":"ACCOUNTS_PAYABLE","debit":10000,"meta":{"supplierId":"c0000000-0000-0000-0000-0000000000e4","reason":"Reversed supplier adjustment fixture"}},
+    {"account_code":"BALANCE_ADJUSTMENT","credit":10000,"meta":{"supplierId":"c0000000-0000-0000-0000-0000000000e4","reason":"Reversed supplier adjustment fixture"}}]'
+);
+
+select is(
+  (select balance from public.supplier_ap_aging
+   where supplier_id = 'c0000000-0000-0000-0000-0000000000e4'),
+  7000::bigint,
+  'unlinked supplier payment reduces the aging balance'
+);
+
+select is(
+  (select days_outstanding from public.supplier_ap_aging
+   where supplier_id = 'c0000000-0000-0000-0000-0000000000e4'),
+  40,
+  'supplier payment settles the oldest purchase first'
+);
+
+select public.post_journal_entry(
+  (select company_id from age_company), 'SupplierPayment', 'aging-supplier-fifo-2',
+  'Clear remaining supplier balance',
+  '[{"account_code":"ACCOUNTS_PAYABLE","debit":7000,"meta":{"supplierId":"c0000000-0000-0000-0000-0000000000e4"}},
+    {"account_code":"BALANCE_ADJUSTMENT","credit":7000,"meta":{"supplierId":"c0000000-0000-0000-0000-0000000000e4"}}]'
+);
+
+select is(
+  (select count(*)::int from public.supplier_ap_aging
+   where supplier_id = 'c0000000-0000-0000-0000-0000000000e4'),
+  0,
+  'zero-balance supplier has no aging row after unlinked payments'
+);
+
+select is(
+  (select balance from public.supplier_ap_balances
+   where supplier_id = 'c0000000-0000-0000-0000-0000000000e4'),
+  0::bigint,
+  'supplier aging disappearance agrees with authoritative AP'
+);
+
+-- update_payment_method.
 select testkit.as_user((select company_id from age_company), '11111111-1111-1111-1111-111111111111', 'Admin');
 select public.update_payment_method('bank', false);
 

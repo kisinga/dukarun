@@ -104,8 +104,9 @@ export interface CustomerStatement {
   amount_due: number;
   downpayment_available: number;
   account_balance: number;
+  generated_at: string;
   expires_at: string;
-  orders: Array<{ code: string; sale_date: string; due_date: string; balance: number }>;
+  orders: Array<{ code: string; sale_date: string; due_date: string | null; balance: number }>;
   activities: Array<{
     id: string;
     date: string;

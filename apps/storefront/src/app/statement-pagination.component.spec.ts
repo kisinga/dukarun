@@ -15,8 +15,16 @@ const firstPage = {
   amount_due: 300,
   downpayment_available: 0,
   account_balance: 300,
+  generated_at: '2026-08-13T10:05:00Z',
   expires_at: '2026-08-20T00:00:00Z',
-  orders: [],
+  orders: [
+    {
+      code: 'COD-1',
+      sale_date: '2026-08-13',
+      due_date: null,
+      balance: 300,
+    },
+  ],
   activities: [
     {
       id: 'newest',
@@ -86,6 +94,7 @@ describe('StatementComponent pagination', () => {
       id: 'newest',
     });
     expect(fixture.nativeElement.textContent).toContain('Opening credit sale');
+    expect(fixture.nativeElement.textContent).toContain('On delivery');
     expect(fixture.nativeElement.textContent).not.toContain('Load older activity');
   });
 

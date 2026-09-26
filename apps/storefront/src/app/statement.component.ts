@@ -23,6 +23,7 @@ import { PoweredByDukarunComponent } from './powered-by-dukarun.component';
                   <div>
                     <h1 class="text-xl font-bold">{{ s.store_name }}</h1>
                     <p class="text-sm text-base-content/60">Customer statement</p>
+                    <p class="text-xs text-base-content/50">As at {{ dateTime(s.generated_at) }}</p>
                   </div>
                 </div>
                 <button
@@ -74,7 +75,7 @@ import { PoweredByDukarunComponent } from './powered-by-dukarun.component';
                       @for (order of s.orders; track order.code) {
                         <tr>
                           <td>{{ order.code }}</td>
-                          <td>{{ date(order.due_date) }}</td>
+                          <td>{{ order.due_date ? date(order.due_date) : 'On delivery' }}</td>
                           <td class="text-right font-semibold">{{ money(order.balance) }}</td>
                         </tr>
                       }
@@ -332,6 +333,12 @@ export class StatementComponent implements OnInit {
   }
   protected date(value: string): string {
     return new Date(value).toLocaleDateString('en-KE', { dateStyle: 'medium' });
+  }
+  protected dateTime(value: string): string {
+    return new Date(value).toLocaleString('en-KE', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    });
   }
   protected activityLabel(kind: string): string {
     const labels: Record<string, string> = {

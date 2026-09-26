@@ -12985,22 +12985,7 @@ export type Database = {
           days_outstanding: number | null
           oldest_unpaid_date: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "ledger_journal_lines_company_id_fkey"
-            columns: ["company_id"]
-            isOneToOne: false
-            referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ledger_journal_lines_company_id_fkey"
-            columns: ["company_id"]
-            isOneToOne: false
-            referencedRelation: "public_storefronts"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       customer_deposit_balances: {
         Row: {
@@ -13999,22 +13984,7 @@ export type Database = {
           oldest_unpaid_date: string | null
           supplier_id: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "ledger_journal_lines_company_id_fkey"
-            columns: ["company_id"]
-            isOneToOne: false
-            referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ledger_journal_lines_company_id_fkey"
-            columns: ["company_id"]
-            isOneToOne: false
-            referencedRelation: "public_storefronts"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       supplier_ap_balances: {
         Row: {
@@ -18782,4 +18752,3 @@ export const Constants = {
     Enums: {},
   },
 } as const
-

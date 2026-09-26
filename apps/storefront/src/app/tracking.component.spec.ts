@@ -51,6 +51,12 @@ describe('TrackingComponent', () => {
     expect(text).toContain('2x');
     expect(text).toContain('Pilau');
     expect(text).not.toContain('+254712345678');
+    const contact = fixture.nativeElement.querySelector(
+      'a[href^="https://wa.me/"]'
+    ) as HTMLAnchorElement;
+    expect(decodeURIComponent(contact.href)).toContain(
+      'text=Hello Dukarun Kitchen, I have a question about order ORD-1024.'
+    );
     expect(seo.set).toHaveBeenCalledWith(
       'Track order',
       'Private pickup and delivery tracking.',
