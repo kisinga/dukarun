@@ -13,6 +13,9 @@ import { CatalogCacheService } from '../core/catalog-cache.service';
 import { LocationContextService } from '../core/location-context.service';
 import { formatKes } from '../core/money';
 import { PartyCacheService } from '../core/party-cache.service';
+import { InsightsService } from '../insights/insights.service';
+import type { ProductProfile } from '../insights/insights.models';
+import { ProductActivityChartComponent } from '../insights/product-activity-chart.component';
 import { EmptyStateComponent } from '../shared/ui/empty-state.component';
 import { IconComponent } from '../shared/ui/icon.component';
 import {
@@ -40,7 +43,13 @@ type DisplayProduct = RestockProductRow & {
 
 @Component({
   selector: 'app-restock-intelligence',
-  imports: [RouterLink, EmptyStateComponent, IconComponent, RestockTrendChartComponent],
+  imports: [
+    RouterLink,
+    EmptyStateComponent,
+    IconComponent,
+    ProductActivityChartComponent,
+    RestockTrendChartComponent,
+  ],
   template: `
     <section aria-labelledby="restock-title">
       <div class="border-y border-base-300 bg-base-100 px-3 py-3 sm:px-4">
@@ -285,166 +294,198 @@ type DisplayProduct = RestockProductRow & {
             </article>
           </div>
 
-          <div
-            class="mt-4 overflow-hidden border-y border-base-300 bg-base-100 lg:rounded-box lg:border"
-          >
-            <div
-              class="flex flex-wrap items-end justify-between gap-2 border-b border-base-300 px-4 py-3"
-            >
+          <article class="card mt-4 bg-base-100" aria-labelledby="product-focus-title">
+            <div class="card-body gap-4 p-4 sm:p-5">
+              <header class="flex flex-wrap items-end justify-between gap-3">
+                <div>
+                  <h3 id="product-focus-title" class="section-title">Product explorer</h3>
+                  <p class="type-caption mt-1">
+                    Inspect one item's demand and stock without leaving this source analysis.
+                  </p>
+                </div>
+                <label class="form-control w-full sm:w-auto sm:min-w-80">
+                  <span class="label-text text-xs">Product</span>
+                  <select
+                    class="select select-bordered min-h-11 w-full"
+                    [value]="focusedVariantId()"
+                    [disabled]="focusLoading()"
+                    (change)="setFocusedProduct($event)"
+                  >
+                    @for (product of displayProducts(); track product.variantId) {
+                      <option [value]="product.variantId">{{ product.label }}</option>
+                    }
+                  </select>
+                </label>
+              </header>
+
+              @if (focusedProduct(); as product) {
+                <div
+                  class="flex flex-wrap items-start justify-between gap-3 rounded-box border border-base-300 bg-base-200/30 p-3"
+                >
+                  <div>
+                    <div class="flex flex-wrap items-center gap-2">
+                      <h4 class="font-semibold">{{ product.label }}</h4>
+                      <span class="badge badge-sm" [class]="decisionClass(product)">
+                        {{ product.decision.label }}
+                      </span>
+                    </div>
+                    <p class="type-caption mt-1">{{ decisionExplanation(product) }}</p>
+                  </div>
+                  <div class="flex flex-wrap gap-2">
+                    <a
+                      class="btn btn-primary btn-sm min-h-11"
+                      [routerLink]="['/insights/inventory', product.variantId]"
+                    >
+                      View full insight
+                    </a>
+                    <a
+                      class="btn btn-ghost btn-sm min-h-11"
+                      routerLink="/inventory/products"
+                      [queryParams]="{ product: product.productId, variant: product.variantId }"
+                    >
+                      Inventory record
+                    </a>
+                  </div>
+                </div>
+              }
+
+              @if (focusError()) {
+                <div role="alert" class="alert alert-error text-sm">
+                  <app-icon name="heroExclamationTriangle" />{{ focusError() }}
+                </div>
+              } @else if (focusLoading() && !focusedProfile()) {
+                <div class="flex min-h-56 items-center justify-center gap-2 text-sm">
+                  <span class="loading loading-spinner loading-sm"></span>Loading product activity
+                </div>
+              } @else if (focusedProfile(); as profile) {
+                <app-product-activity-chart
+                  [trend]="profile.trend"
+                  [positions]="profile.positions"
+                />
+              }
+            </div>
+          </article>
+
+          <section class="mt-4" aria-labelledby="restocking-decisions-title">
+            <header class="mb-3 flex flex-wrap items-end justify-between gap-2">
               <div>
-                <h3 class="section-title">Restocking decisions</h3>
+                <h3 id="restocking-decisions-title" class="section-title">Restocking decisions</h3>
                 <p class="type-caption mt-1">
-                  Urgent products first, based on stock and recent demand.
+                  Urgent products first. Each card explains the signal and opens its own insight.
                 </p>
               </div>
               <span class="type-caption">Top {{ data.products.length }} products</span>
-            </div>
+            </header>
 
-            <div class="divide-y divide-base-200 lg:hidden">
+            <div class="grid gap-3 lg:grid-cols-2">
               @for (product of displayProducts(); track product.variantId) {
-                <a
-                  class="block p-4 hover:bg-base-200/40"
-                  routerLink="/inventory/products"
-                  [queryParams]="{ product: product.productId, variant: product.variantId }"
+                <article
+                  class="card border border-base-300 bg-base-100"
+                  [class.border-primary]="focusedVariantId() === product.variantId"
                 >
-                  <div class="flex items-start justify-between gap-3">
-                    <div class="min-w-0">
-                      <p class="truncate font-semibold">{{ product.label }}</p>
-                      <p class="type-caption mt-1 truncate">
-                        {{ productContext(product) }}
-                      </p>
-                    </div>
-                    <span class="badge badge-sm shrink-0" [class]="decisionClass(product)">
-                      {{ product.decision.label }}
-                    </span>
-                  </div>
-                  <div class="mt-3 grid grid-cols-3 gap-3 text-sm">
-                    <div>
-                      <p class="type-caption">Sold</p>
-                      <p class="font-semibold tabular-nums">
-                        {{ quantity(product.currentQuantity) }}
-                      </p>
-                      <p
-                        class="text-xs"
-                        [class.text-success]="product.currentQuantity > product.previousQuantity"
-                        [class.text-error]="product.currentQuantity < product.previousQuantity"
-                      >
-                        {{ product.changeLabel }}
-                      </p>
-                    </div>
-                    <div>
-                      <p class="type-caption">In stock</p>
-                      <p class="font-semibold tabular-nums">{{ quantity(product.stock) }}</p>
-                      @if (scopeMode() === 'supplier') {
-                        <p class="text-xs text-base-content/60">
-                          {{ quantity(product.supplierStock) }} sourced here
-                        </p>
-                      }
-                    </div>
-                    <div>
-                      <p class="type-caption">Cover</p>
-                      <p class="font-semibold tabular-nums">{{ daysCover(product.daysCover) }}</p>
-                    </div>
-                  </div>
-                </a>
-              }
-            </div>
-
-            <div class="hidden overflow-x-auto lg:block">
-              <table class="table table-sm">
-                <thead>
-                  <tr>
-                    <th>Product</th>
-                    <th>Demand trend</th>
-                    <th class="text-right">Units sold</th>
-                    <th class="text-right">Stock</th>
-                    <th class="text-right">Cover</th>
-                    <th class="text-right">Last cost</th>
-                    <th>Decision</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @for (product of displayProducts(); track product.variantId) {
-                    <tr>
-                      <td class="max-w-64">
+                  <div class="card-body gap-4 p-4">
+                    <header class="flex items-start justify-between gap-3">
+                      <div class="min-w-0">
                         <a
-                          class="link block truncate font-medium"
-                          routerLink="/inventory/products"
-                          [queryParams]="{ product: product.productId, variant: product.variantId }"
+                          class="link block truncate font-semibold"
+                          [routerLink]="['/insights/inventory', product.variantId]"
                         >
                           {{ product.label }}
                         </a>
-                        <p class="type-caption truncate">
+                        <p class="type-caption mt-1 truncate">
                           {{ productContext(product) }}
                           @if (product.lastSoldOn) {
-                            · sold {{ shortDate(product.lastSoldOn) }}
+                            · last sold {{ shortDate(product.lastSoldOn) }}
                           }
                         </p>
-                      </td>
-                      <td class="w-36">
-                        <div
-                          class="flex h-9 items-end gap-0.5"
-                          role="img"
-                          [attr.aria-label]="product.label + ' daily sales trend'"
-                        >
-                          @for (height of product.trendHeights; track $index) {
-                            <span
-                              class="min-w-1 flex-1 rounded-t-field bg-primary/70"
-                              [style.height.%]="height"
-                            ></span>
-                          }
-                        </div>
-                      </td>
-                      <td class="text-right">
-                        <p class="font-medium tabular-nums">
+                      </div>
+                      <span class="badge badge-sm shrink-0" [class]="decisionClass(product)">
+                        {{ product.decision.label }}
+                      </span>
+                    </header>
+
+                    <div
+                      class="flex h-16 items-end gap-1 rounded-field bg-base-200/40 px-3 pt-2"
+                      role="img"
+                      [attr.aria-label]="product.label + ' daily units sold'"
+                    >
+                      @for (height of product.trendHeights; track $index) {
+                        <span
+                          class="min-w-1 flex-1 rounded-t-field bg-primary/70"
+                          [style.height.%]="height"
+                        ></span>
+                      }
+                    </div>
+
+                    <p class="text-sm">{{ decisionExplanation(product) }}</p>
+
+                    <dl class="grid grid-cols-3 gap-3 text-sm">
+                      <div>
+                        <dt class="type-caption">Sold</dt>
+                        <dd class="font-semibold tabular-nums">
                           {{ quantity(product.currentQuantity) }}
-                        </p>
-                        <p
-                          class="text-xs tabular-nums"
+                        </dd>
+                        <dd
+                          class="text-xs"
                           [class.text-success]="product.currentQuantity > product.previousQuantity"
                           [class.text-error]="product.currentQuantity < product.previousQuantity"
                         >
                           {{ product.changeLabel }}
-                        </p>
-                      </td>
-                      <td class="text-right">
-                        <p class="font-medium tabular-nums">{{ quantity(product.stock) }}</p>
-                        @if (scopeMode() === 'supplier') {
-                          <p class="text-xs text-base-content/60">
-                            {{ quantity(product.supplierStock) }} from supplier
-                          </p>
-                        } @else {
-                          <p class="text-xs text-base-content/60">
-                            {{ fmt(product.stockValue) }} value
-                          </p>
-                        }
-                      </td>
-                      <td class="text-right font-medium tabular-nums">
-                        {{ daysCover(product.daysCover) }}
-                      </td>
-                      <td class="text-right">
-                        <p class="font-medium tabular-nums">
-                          {{ product.lastUnitCost === null ? '—' : fmt(product.lastUnitCost) }}
-                        </p>
-                        <p class="type-caption">
+                        </dd>
+                      </div>
+                      <div>
+                        <dt class="type-caption">In stock</dt>
+                        <dd class="font-semibold tabular-nums">{{ quantity(product.stock) }}</dd>
+                        <dd class="text-xs text-base-content/55">
+                          {{ fmt(product.stockValue) }} at cost
+                        </dd>
+                      </div>
+                      <div>
+                        <dt class="type-caption">Cover</dt>
+                        <dd class="font-semibold tabular-nums">
+                          {{ daysCover(product.daysCover) }}
+                        </dd>
+                        <dd class="text-xs text-base-content/55">
+                          Cost
                           {{
-                            product.lastPurchaseDate
-                              ? shortDate(product.lastPurchaseDate)
-                              : 'No receipt'
+                            product.lastUnitCost === null ? 'unknown' : fmt(product.lastUnitCost)
                           }}
-                        </p>
-                      </td>
-                      <td>
-                        <span class="badge badge-sm" [class]="decisionClass(product)">
-                          {{ product.decision.label }}
-                        </span>
-                      </td>
-                    </tr>
-                  }
-                </tbody>
-              </table>
+                        </dd>
+                      </div>
+                    </dl>
+
+                    <footer
+                      class="flex flex-wrap items-center justify-between gap-2 border-t border-base-200 pt-3"
+                    >
+                      <span class="type-caption">
+                        {{
+                          product.lastPurchaseDate
+                            ? 'Last receipt ' + shortDate(product.lastPurchaseDate)
+                            : 'No posted receipt'
+                        }}
+                      </span>
+                      <div class="flex gap-2">
+                        <button
+                          type="button"
+                          class="btn btn-ghost btn-sm min-h-11"
+                          [disabled]="focusLoading() && focusedVariantId() === product.variantId"
+                          (click)="focusProduct(product.variantId)"
+                        >
+                          Show graph
+                        </button>
+                        <a
+                          class="btn btn-ghost btn-sm min-h-11"
+                          [routerLink]="['/insights/inventory', product.variantId]"
+                        >
+                          Insight
+                        </a>
+                      </div>
+                    </footer>
+                  </div>
+                </article>
+              }
             </div>
-          </div>
+          </section>
         }
       }
     </section>
@@ -456,6 +497,7 @@ export class RestockIntelligenceComponent implements OnInit {
   readonly refreshToken = input(0);
 
   private readonly reports = inject(ReportsService);
+  private readonly insights = inject(InsightsService);
   private readonly catalog = inject(CatalogCacheService);
   private readonly parties = inject(PartyCacheService);
   protected readonly locations = inject(LocationContextService);
@@ -467,10 +509,15 @@ export class RestockIntelligenceComponent implements OnInit {
   protected readonly selectedManufacturer = signal('');
   protected readonly selectedLocation = signal('');
   protected readonly report = signal<RestockIntelligence | null>(null);
+  protected readonly focusedVariantId = signal('');
+  protected readonly focusedProfile = signal<ProductProfile | null>(null);
+  protected readonly focusLoading = signal(false);
+  protected readonly focusError = signal<string | null>(null);
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
   private readonly ready = signal(false);
   private request = 0;
+  private focusRequest = 0;
 
   protected readonly supplierOptions = computed(() =>
     this.parties
@@ -527,6 +574,10 @@ export class RestockIntelligenceComponent implements OnInit {
       .filter(product => product.currentQuantity > 0 && product.daysCover !== null)
       .sort((a, b) => (a.daysCover ?? Infinity) - (b.daysCover ?? Infinity))
       .slice(0, 8)
+  );
+  protected readonly focusedProduct = computed(
+    () =>
+      this.displayProducts().find(product => product.variantId === this.focusedVariantId()) ?? null
   );
   protected readonly trendHasData = computed(() => {
     const data = this.report();
@@ -598,15 +649,30 @@ export class RestockIntelligenceComponent implements OnInit {
     void this.load();
   }
 
+  protected setFocusedProduct(event: Event): void {
+    this.focusProduct((event.target as HTMLSelectElement).value);
+  }
+
+  protected focusProduct(variantId: string): void {
+    if (!variantId) return;
+    this.focusedVariantId.set(variantId);
+    void this.loadFocusedProfile(variantId, this.since(), this.until());
+  }
+
   protected async load(since = this.since(), until = this.until()): Promise<void> {
     const locationId = this.selectedLocation();
     const supplierId = this.scopeMode() === 'supplier' ? this.selectedSupplier() : null;
     const manufacturerId = this.scopeMode() === 'manufacturer' ? this.selectedManufacturer() : null;
     const request = ++this.request;
     if (!locationId || (!supplierId && !manufacturerId)) {
+      this.focusRequest += 1;
       this.loading.set(false);
       this.error.set(null);
       this.report.set(null);
+      this.focusedVariantId.set('');
+      this.focusedProfile.set(null);
+      this.focusLoading.set(false);
+      this.focusError.set(null);
       return;
     }
     this.loading.set(true);
@@ -621,11 +687,45 @@ export class RestockIntelligenceComponent implements OnInit {
       );
       if (request !== this.request) return;
       this.report.set(report);
+      const focused = report.products.some(product => product.variantId === this.focusedVariantId())
+        ? this.focusedVariantId()
+        : (report.products[0]?.variantId ?? '');
+      this.focusedVariantId.set(focused);
+      if (focused) {
+        void this.loadFocusedProfile(focused, since, until);
+      } else {
+        this.focusRequest += 1;
+        this.focusedProfile.set(null);
+        this.focusLoading.set(false);
+        this.focusError.set(null);
+      }
     } catch (error) {
       if (request !== this.request) return;
       this.error.set(error instanceof Error ? error.message : 'Could not load restocking data');
     } finally {
       if (request === this.request) this.loading.set(false);
+    }
+  }
+
+  private async loadFocusedProfile(variantId: string, since: string, until: string): Promise<void> {
+    const locationId = this.selectedLocation();
+    if (!variantId || !locationId) return;
+    const request = ++this.focusRequest;
+    this.focusedProfile.set(null);
+    this.focusLoading.set(true);
+    this.focusError.set(null);
+    try {
+      const profile = await this.insights.productProfile(variantId, locationId, since, until);
+      if (request !== this.focusRequest || variantId !== this.focusedVariantId()) return;
+      this.focusedProfile.set(profile);
+    } catch (error) {
+      if (request !== this.focusRequest) return;
+      this.focusedProfile.set(null);
+      this.focusError.set(
+        error instanceof Error ? error.message : 'Could not load this product activity.'
+      );
+    } finally {
+      if (request === this.focusRequest) this.focusLoading.set(false);
     }
   }
 
@@ -658,5 +758,22 @@ export class RestockIntelligenceComponent implements OnInit {
 
   protected decisionClass(product: DisplayProduct): string {
     return `badge-${product.decision.tone}`;
+  }
+
+  protected decisionExplanation(product: DisplayProduct): string {
+    const stock = this.quantity(product.stock);
+    const sold = this.quantity(product.currentQuantity);
+    switch (product.decision.tone) {
+      case 'error':
+        return `${sold} units sold in the period with ${stock} left. Replenish before the next likely sale.`;
+      case 'warning':
+        return `${this.daysCover(product.daysCover)} remains at the current pace. Prepare the next purchase.`;
+      case 'info':
+        return `Demand is ${product.changeLabel} versus the previous period; watch cover as sales accelerate.`;
+      case 'success':
+        return `${this.daysCover(product.daysCover)} remains and demand is supported by current stock.`;
+      default:
+        return `No meaningful recent demand. Hold purchasing until the sales pattern becomes clearer.`;
+    }
   }
 }

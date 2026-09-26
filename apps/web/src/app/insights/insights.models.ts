@@ -129,6 +129,25 @@ export interface ProductIntelligenceSummary {
   margin: number | null;
 }
 
+export interface ProductTrendPoint {
+  day: string;
+  gross_quantity: number;
+  returned_quantity: number;
+  net_quantity: number;
+  gross_revenue: number | null;
+  refund_amount: number | null;
+  net_revenue: number | null;
+  corrected_cogs: number | null;
+  margin: number | null;
+}
+
+export interface ProductInventoryPosition {
+  day: string;
+  closing_quantity: number | null;
+  closing_value: number | null;
+  quality: 'estimated' | 'exact' | 'reconciled';
+}
+
 export interface ProductProfile {
   variant: {
     id: string;
@@ -143,13 +162,8 @@ export interface ProductProfile {
     supplierName: string | null;
   };
   attention: Record<string, unknown> | null;
-  trend: Array<Record<string, number | string | null>>;
-  positions: Array<{
-    day: string;
-    closing_quantity: number | null;
-    closing_value: number | null;
-    quality: 'estimated' | 'exact' | 'reconciled';
-  }>;
+  trend: ProductTrendPoint[];
+  positions: ProductInventoryPosition[];
   coverage: { from: string; to: string; days: number; estimatedDays: number };
   summary: {
     averageStock: number | null;

@@ -26,9 +26,11 @@ const RULES = [
   {
     id: 'inline-svg',
     exts: ['.html', '.ts'],
-    re: /<svg[\s>]/g,
+    // SVG geometry is appropriate when it carries data. Requiring an explicit
+    // marker keeps charts/maps intentional while continuing to reject ad-hoc icons.
+    re: /<svg(?![^>]*\bdata-visualization\b)[\s>]/g,
     message:
-      'Inline <svg> is banned — use <app-icon name="hero…"> (registry: provideIcons in app.config.ts).',
+      'Inline <svg> is banned for interface artwork — use <app-icon name="hero…">. Data-derived charts, plots, maps, and timelines must declare data-visualization.',
   },
   {
     id: 'arbitrary-text-size',
