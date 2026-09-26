@@ -205,6 +205,8 @@ async function mockPurchasing(
         },
       });
     }
+    if (path.endsWith('/rest/v1/rpc/current_business_date')) return json('2026-08-27');
+    if (path.endsWith('/rest/v1/rpc/party_credit_profile')) return json(null);
     if (path.endsWith('/rest/v1/rpc/accessible_business_locations')) {
       return json([
         { id: locationId, code: 'MAIN', name: 'Main shop', is_default: true, is_primary: true },

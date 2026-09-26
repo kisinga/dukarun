@@ -17160,10 +17160,7 @@ export type Database = {
         Returns: boolean
       }
       record_credit_advisory_snapshot: {
-        Args: {
-          p_acknowledgement_reason?: string
-          p_order_id: string
-        }
+        Args: { p_acknowledgement_reason?: string; p_order_id: string }
         Returns: undefined
       }
       record_customer_deposit: {
@@ -18377,6 +18374,15 @@ export type Database = {
         Args: { p_location_id: string; p_settings: Json }
         Returns: Json
       }
+      update_inventory_settings: {
+        Args: {
+          p_batch_expiry_enabled: boolean
+          p_default_lead_days: number
+          p_default_safety_days: number
+          p_low_stock_threshold: number
+        }
+        Returns: undefined
+      }
       update_location_tax_branch_code: {
         Args: { p_branch_code: string; p_location_id: string }
         Returns: string
@@ -18410,15 +18416,6 @@ export type Database = {
       }
       update_reorder_settings: {
         Args: { p_default_lead_days: number; p_default_safety_days: number }
-        Returns: undefined
-      }
-      update_inventory_settings: {
-        Args: {
-          p_batch_expiry_enabled: boolean
-          p_default_lead_days: number
-          p_default_safety_days: number
-          p_low_stock_threshold: number
-        }
         Returns: undefined
       }
       update_staff_display_name: {
@@ -18785,3 +18782,4 @@ export const Constants = {
     Enums: {},
   },
 } as const
+
