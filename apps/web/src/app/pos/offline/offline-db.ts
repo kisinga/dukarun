@@ -19,6 +19,8 @@ import type {
 
 type CashierSession = Database['public']['Tables']['cashier_sessions']['Row'];
 type Customer = Database['public']['Tables']['customers']['Row'];
+type CachedCreditBand = 'unrated' | 'strong' | 'good' | 'watch' | 'restricted' | 'high_risk';
+type CachedCreditConfidence = 'unrated' | 'provisional' | 'established';
 
 export type CachedCustomer = Customer & {
   ar_balance: number;
@@ -26,6 +28,13 @@ export type CachedCustomer = Customer & {
   net_balance: number;
   days_outstanding: number | null;
   bucket: string | null;
+  /** Optional so snapshots written before credit-v1 remain readable. */
+  credit_score?: number | null;
+  credit_band?: CachedCreditBand;
+  credit_confidence?: CachedCreditConfidence;
+  credit_reason_codes?: string[];
+  credit_recommendation_code?: string;
+  credit_score_refreshed_at?: string | null;
 };
 
 export type CachedSupplier = Customer & {

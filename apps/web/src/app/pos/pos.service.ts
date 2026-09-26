@@ -7,6 +7,7 @@ import { environment } from '../../environments/environment';
 import { LocationContextService } from '../core/location-context.service';
 import { PartyCacheService, type PartyQueryResult } from '../core/party-cache.service';
 import { ActionExecutorService, type ActionOutcome } from '../core/action-executor.service';
+import type { CachedCustomer } from './offline/offline-db';
 
 export type Product = Database['public']['Tables']['products']['Row'];
 export type Manufacturer = Database['public']['Tables']['manufacturers']['Row'];
@@ -21,7 +22,7 @@ export type Variant = Database['public']['Views']['variant_catalog']['Row'] &
 export type ProductVariant = Database['public']['Tables']['product_variants']['Row'] &
   PackCatalogue;
 export type Customer = Database['public']['Tables']['customers']['Row'];
-export type CustomerWithCredit = Customer & { ar_balance: number };
+export type CustomerWithCredit = CachedCustomer;
 export type Order = Database['public']['Tables']['orders']['Row'];
 export type OrderLine = Database['public']['Tables']['order_lines']['Row'];
 export type Payment = Database['public']['Tables']['payments']['Row'];

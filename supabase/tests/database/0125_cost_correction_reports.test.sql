@@ -37,7 +37,7 @@ select public.post_journal_entry_with_context(
     null,null,now(),(now() at time zone 'Africa/Nairobi')::date,'manual_cost_repair',null)::public.posting_context
 );
 refresh materialized view public.mv_daily_sales_summary;
-refresh materialized view public.mv_daily_product_sales;
+select public.process_analytics_dirty_buckets(1000);
 select is((select sum(l.debit)::bigint from public.ledger_journal_lines l
   join public.ledger_journal_entries e on e.id=l.entry_id join public.ledger_accounts a on a.id=l.account_id
   where l.order_id=(select id from correction_sale) and a.code='COGS' and e.source_type='InventorySaleCogs'),
@@ -70,7 +70,7 @@ select public.post_journal_entry_with_context(
     null,null,now(),(now() at time zone 'Africa/Nairobi')::date,'manual_cost_repair',null)::public.posting_context
 );
 refresh materialized view public.mv_daily_sales_summary;
-refresh materialized view public.mv_daily_product_sales;
+select public.process_analytics_dirty_buckets(1000);
 select testkit.as_user((select id from correction_company),'aa250000-0000-4000-8000-000000000001','Admin');
 select is((select cogs from public.rpt_daily_sales_summary),40::bigint,
   'gross sales summary does not confuse refund credits with buying-cost corrections');
@@ -88,7 +88,7 @@ select is((select margin from public.staff_sales_performance(current_date-1,curr
   'void leaves neither phantom margin nor original inflated cost');
 reset role;
 refresh materialized view public.mv_daily_sales_summary;
-refresh materialized view public.mv_daily_product_sales;
+select public.process_analytics_dirty_buckets(1000);
 select testkit.as_user((select id from correction_company),'aa250000-0000-4000-8000-000000000001','Admin');
 select is((select count(*)::int from public.rpt_daily_sales_summary),0,'voided sale leaves the daily summary');
 select is((select count(*)::int from public.rpt_daily_product_sales),0,'voided sale leaves the product report');

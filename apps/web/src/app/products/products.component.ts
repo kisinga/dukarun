@@ -1,5 +1,5 @@
 import { Component, OnInit, computed, effect, inject, signal, untracked } from '@angular/core';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { EmptyStateComponent } from '../shared/ui/empty-state.component';
 import { PageLayoutComponent } from '../shared/ui/page-layout.component';
 import { formatKes } from '../core/money';
@@ -84,6 +84,7 @@ const PRODUCT_SORT_OPTIONS: readonly ListSortOption[] = [
     ProductCategoriesPanelComponent,
     ProductDetailDrawerComponent,
     ProductEditorComponent,
+    RouterLink,
   ],
   template: `
     <app-page
@@ -123,6 +124,9 @@ const PRODUCT_SORT_OPTIONS: readonly ListSortOption[] = [
         >
           <app-icon name="heroQueueList" /> Categories
         </button>
+        <a overflowAction appButton variant="secondary" routerLink="/insights/inventory">
+          <app-icon name="heroChartBar" /> Inventory intelligence
+        </a>
         @if (perms.has('ManageStockAdjustments')) {
           <button
             primaryAction
@@ -397,6 +401,14 @@ const PRODUCT_SORT_OPTIONS: readonly ListSortOption[] = [
                     } @else {
                       <app-status-badge size="xs" type="neutral" label="active" />
                     }
+                    @if (singleInsightVariantId(group.variants); as variantId) {
+                      <a
+                        class="btn btn-ghost btn-xs mt-1 min-h-11"
+                        [routerLink]="['/insights/inventory', variantId]"
+                        (click)="$event.stopPropagation()"
+                        >Insights</a
+                      >
+                    }
                   </div>
                 </div>
               </div>
@@ -545,6 +557,18 @@ const PRODUCT_SORT_OPTIONS: readonly ListSortOption[] = [
                       }
                     </td>
                     <td class="table-actions" (click)="$event.stopPropagation()">
+                      @if (singleInsightVariantId(group.variants); as variantId) {
+                        <a
+                          appButton
+                          variant="ghost"
+                          [iconOnly]="true"
+                          title="View product insights"
+                          aria-label="View product insights"
+                          [routerLink]="['/insights/inventory', variantId]"
+                        >
+                          <app-icon name="heroChartBar" />
+                        </a>
+                      }
                       @if (perms.has('ManageStockAdjustments')) {
                         <button
                           appButton
@@ -1335,6 +1359,13 @@ export class ProductsComponent implements OnInit {
 
   protected familyTracksInventory(variants: Variant[]): boolean {
     return variants.some(variant => variant.kind !== 'service' && variant.track_inventory);
+  }
+
+  protected singleInsightVariantId(variants: Variant[]): string | null {
+    const eligible = variants.filter(
+      variant => variant.kind !== 'service' && variant.track_inventory && variant.variant_id
+    );
+    return eligible.length === 1 ? eligible[0].variant_id! : null;
   }
 
   protected familyStockValue(variants: Variant[]): number {

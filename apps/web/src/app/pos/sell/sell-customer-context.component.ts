@@ -4,6 +4,8 @@ import { ButtonComponent } from '../../shared/ui/button.component';
 import { IconComponent } from '../../shared/ui/icon.component';
 import { MoneyComponent } from '../../shared/ui/money.component';
 import type { CustomerWithCredit } from '../pos.service';
+import { CreditDecisionCardComponent } from '../../insights/credit-decision-card.component';
+import type { CreditDecisionCard } from '../../insights/insights.models';
 
 export interface SellCustomerViewModel {
   selected: CustomerWithCredit | null;
@@ -12,6 +14,7 @@ export interface SellCustomerViewModel {
   searchExhaustive: boolean;
   searchHasMore: boolean;
   depositBalance: number;
+  creditDecision: CreditDecisionCard | null;
 }
 
 export type SellCustomerIntent =
@@ -23,7 +26,13 @@ export type SellCustomerIntent =
 /** Customer lookup remains presentational; selection and deposit refresh belong to the workflow. */
 @Component({
   selector: 'app-sell-customer-context',
-  imports: [ReactiveFormsModule, ButtonComponent, IconComponent, MoneyComponent],
+  imports: [
+    ReactiveFormsModule,
+    ButtonComponent,
+    IconComponent,
+    MoneyComponent,
+    CreditDecisionCardComponent,
+  ],
   template: `
     <section class="p-4">
       <p class="type-caption">Customer</p>
@@ -58,6 +67,13 @@ export type SellCustomerIntent =
             </span>
           }
         </p>
+        @if (viewModel().creditDecision; as decision) {
+          <div class="mt-3">
+            <app-credit-decision-card [summary]="decision" />
+          </div>
+        } @else {
+          <p class="type-caption mt-2">Credit profile updating or unavailable offline.</p>
+        }
       } @else {
         <div class="relative mt-1">
           <input

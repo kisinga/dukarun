@@ -37,6 +37,8 @@ import { offlineDb, offlineScopeKey, type NamedSnapshot } from '../../pos/offlin
 import { CacheJournalService, type CacheStreamHandler } from '../../core/cache-journal.service';
 import { PageActionsComponent } from '../../shared/ui/page-actions.component';
 import { selectDashboardSignalCandidates } from '../../reports/product-intelligence';
+import { InsightsService } from '../../insights/insights.service';
+import { insightCopy, type InsightSignal } from '../../insights/insights.models';
 
 type TopVariant = {
   variantId: string;
@@ -506,6 +508,87 @@ type DashboardSection = 'sales' | 'attention';
             <span class="type-caption">Updates with stock activity</span>
           </div>
 
+          <div class="grid gap-4 lg:grid-cols-2">
+            @if (canViewFinancials()) {
+              <article class="card bg-base-100">
+                <div class="card-body p-4">
+                  <div class="flex items-center justify-between gap-2">
+                    <div>
+                      <h3 class="section-title">Credit attention</h3>
+                      <p class="type-caption">Customers and supplier payments</p>
+                    </div>
+                    <a routerLink="/insights/credit" class="link text-xs">View all</a>
+                  </div>
+                  @if (creditAttention().length === 0) {
+                    <app-empty-state
+                      [embedded]="true"
+                      [compact]="true"
+                      icon="heroCheckCircle"
+                      title="No credit alerts"
+                    />
+                  }
+                  @for (item of creditAttention(); track item.entity_id) {
+                    <a
+                      class="mt-2 flex min-h-14 items-center gap-3 border-t border-base-200 pt-2 hover:text-primary"
+                      [routerLink]="item.href"
+                      ><span
+                        class="status"
+                        [class.status-error]="item.urgency === 'critical'"
+                        [class.status-warning]="item.urgency === 'plan'"
+                      ></span>
+                      <div class="min-w-0 flex-1">
+                        <p class="truncate text-sm font-semibold">{{ item.title }}</p>
+                        <p class="type-caption truncate">{{ insightReason(item.reason_code) }}</p>
+                      </div>
+                      @if (item.amount !== null) {
+                        <span class="text-sm font-semibold"
+                          ><app-money [amount]="item.amount"
+                        /></span>
+                      }
+                    </a>
+                  }
+                </div>
+              </article>
+            }
+            <article class="card bg-base-100">
+              <div class="card-body p-4">
+                <div class="flex items-center justify-between gap-2">
+                  <div>
+                    <h3 class="section-title">Stock attention</h3>
+                    <p class="type-caption">Demand and cover signals</p>
+                  </div>
+                  <a routerLink="/insights/inventory" class="link text-xs">View inventory</a>
+                </div>
+                @if (stockAttention().length === 0) {
+                  <app-empty-state
+                    [embedded]="true"
+                    [compact]="true"
+                    icon="heroCheckCircle"
+                    title="No stock alerts"
+                  />
+                }
+                @for (item of stockAttention(); track item.entity_id) {
+                  <a
+                    class="mt-2 flex min-h-14 items-center gap-3 border-t border-base-200 pt-2 hover:text-primary"
+                    [routerLink]="item.href"
+                    ><span
+                      class="status"
+                      [class.status-error]="item.urgency === 'critical'"
+                      [class.status-warning]="item.urgency === 'plan'"
+                    ></span>
+                    <div class="min-w-0 flex-1">
+                      <p class="truncate text-sm font-semibold">{{ item.title }}</p>
+                      <p class="type-caption truncate">{{ insightReason(item.reason_code) }}</p>
+                    </div>
+                    @if (item.stock !== null) {
+                      <span class="text-sm font-semibold tabular-nums">{{ item.stock }} left</span>
+                    }
+                  </a>
+                }
+              </div>
+            </article>
+          </div>
+
           <div class="grid gap-4" [class.lg:grid-cols-2]="preferences.batchExpiryEnabled()">
             <article class="card h-full bg-base-100">
               <div class="card-body p-4">
@@ -638,6 +721,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   private readonly supabase = inject(SupabaseService);
   private readonly router = inject(Router);
   private readonly reports = inject(ReportsService);
+  private readonly insights = inject(InsightsService);
   private readonly pos = inject(PosService);
   protected readonly sync = inject(SyncService);
   protected readonly locations = inject(LocationContextService);
@@ -662,6 +746,18 @@ export class DashboardComponent implements OnInit, OnDestroy {
   protected readonly lowStock = signal<LowStockDisplay[]>([]);
   protected readonly lowStockTotal = signal(0);
   protected readonly expiring = signal<ExpiringDisplay[]>([]);
+  protected readonly insightAttention = signal<InsightSignal[]>([]);
+  protected readonly creditAttention = computed(() =>
+    this.insightAttention()
+      .filter(item => item.domain === 'credit')
+      .slice(0, 3)
+  );
+  protected readonly stockAttention = computed(() =>
+    this.insightAttention()
+      .filter(item => item.domain === 'products')
+      .slice(0, 3)
+  );
+  protected readonly insightReason = insightCopy;
   protected readonly locationRows = signal<DashboardLocationSummary[]>([]);
   protected readonly comparison = signal<DashboardPeriodComparison>({
     current_revenue: 0,
@@ -891,6 +987,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
               this.preferences.batchExpiryEnabled()
                 ? this.reports.expiringBatches()
                 : Promise.resolve([]),
+              this.insights
+                .attention(canView ? 'all' : 'products', attentionLocationId, 0, 8)
+                .catch(() => ({ items: [], nextCursor: null, generatedAt: '' })),
             ])
           : Promise.resolve(null);
         const [sales, attention] = await Promise.all([salesPromise, attentionPromise]);
@@ -909,6 +1008,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
             ? this.applyAttentionReport(attention[0], attention[1], attentionLocationId)
             : Promise.resolve(),
         ]);
+        if (attention) this.insightAttention.set(attention[2].items);
         if (
           requestedSections.has('attention') &&
           attentionLocationId !== this.locations.activeId()

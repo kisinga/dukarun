@@ -37,21 +37,21 @@ describe('workspace navigation', () => {
     expect(workspaceEntryRoute('activity', both)).toBe('/activity/messages');
   });
 
-  it('always exposes Products and gates inventory operations by access and location count', () => {
+  it('always exposes the catalogue and gates inventory operations by access and location count', () => {
     expect(workspaceNavigationItems('inventory', access()).map(item => item.label)).toEqual([
-      'Products',
+      'Catalogue',
     ]);
     expect(
       workspaceNavigationItems('inventory', access(['ManageStockAdjustments'])).map(
         item => item.label
       )
-    ).toEqual(['Products', 'Adjustments']);
+    ).toEqual(['Catalogue', 'Adjustments']);
     expect(
       workspaceNavigationItems(
         'inventory',
         access(['ManageStockAdjustments'], { multiLocation: true })
       ).map(item => item.label)
-    ).toEqual(['Products', 'Adjustments', 'Transfers']);
+    ).toEqual(['Catalogue', 'Adjustments', 'Transfers']);
   });
 
   it('builds Team views from independent permissions and entitlements', () => {

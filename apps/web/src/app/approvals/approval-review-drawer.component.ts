@@ -17,6 +17,9 @@ import { StatusBadgeComponent } from '../shared/ui/status-badge.component';
 import { ApprovalCustomerContextComponent } from './approval-customer-context.component';
 import { ApprovalOrderContextComponent } from './approval-order-context.component';
 import { Approval, ApprovalsService } from './approvals.service';
+import { InsightsService } from '../insights/insights.service';
+import type { CreditAdvisoryReview } from '../insights/insights.models';
+import { CreditDecisionCardComponent } from '../insights/credit-decision-card.component';
 
 export type ApprovalDecisionResult = {
   approval: Approval;
@@ -50,6 +53,7 @@ type ApprovalMetadata = {
     StatusBadgeComponent,
     ApprovalOrderContextComponent,
     ApprovalCustomerContextComponent,
+    CreditDecisionCardComponent,
   ],
   template: `
     <app-drawer
@@ -108,6 +112,26 @@ type ApprovalMetadata = {
             [payments]="payments()"
             [refunds]="refunds()"
           />
+          @if (creditReview(); as review) {
+            <section class="mt-4">
+              <div class="mb-2">
+                <p class="section-title">Credit evidence</p>
+                <p class="type-caption">Compare what the cashier saw with the latest profile.</p>
+              </div>
+              <div class="grid gap-3 sm:grid-cols-2">
+                @if (review.requested) {
+                  <div>
+                    <p class="type-caption mb-1">At request time</p>
+                    <app-credit-decision-card [summary]="review.requested" />
+                  </div>
+                }
+                <div>
+                  <p class="type-caption mb-1">Current</p>
+                  <app-credit-decision-card [summary]="review.current" />
+                </div>
+              </div>
+            </section>
+          }
         } @else if (approval().subject_type === 'customer_receipt') {
           <section class="mt-4 rounded-box border border-base-300 p-3">
             <div class="flex items-start justify-between gap-3">
@@ -222,6 +246,7 @@ type ApprovalMetadata = {
 export class ApprovalReviewDrawerComponent {
   private readonly approvals = inject(ApprovalsService);
   private readonly pos = inject(PosService);
+  private readonly insights = inject(InsightsService);
 
   readonly approval = input.required<Approval>();
   readonly closed = output<void>();
@@ -232,6 +257,7 @@ export class ApprovalReviewDrawerComponent {
   protected readonly lines = signal<OrderLineWithProduct[]>([]);
   protected readonly payments = signal<Payment[]>([]);
   protected readonly refunds = signal<Refund[]>([]);
+  protected readonly creditReview = signal<CreditAdvisoryReview | null>(null);
   protected readonly people = signal<Map<string, string>>(new Map());
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
@@ -349,6 +375,7 @@ export class ApprovalReviewDrawerComponent {
     this.lines.set([]);
     this.payments.set([]);
     this.refunds.set([]);
+    this.creditReview.set(null);
     this.decisionReason.setValue('');
     this.denying.set(false);
     try {
@@ -378,6 +405,13 @@ export class ApprovalReviewDrawerComponent {
         this.payments.set(payments);
         this.refunds.set(refunds);
         this.people.set(people);
+        if (order.customer_id && (approval.type === 'overdraft' || order.is_credit_sale)) {
+          const review = await this.insights
+            .advisoryReview(order.id, order.customer_id)
+            .catch(() => null);
+          if (sequence !== this.loadSequence) return;
+          this.creditReview.set(review);
+        }
       } else throw new Error('This request does not identify a linked record.');
     } catch (error) {
       if (sequence === this.loadSequence)

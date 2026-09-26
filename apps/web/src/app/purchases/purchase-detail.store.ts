@@ -1,5 +1,6 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
 import { FormControl } from '@angular/forms';
+import { BusinessClockService } from '../core/business-clock.service';
 import { CashierSessionService } from '../core/cashier-session.service';
 import { formatKes, formatKesInput, parseKes } from '../core/money';
 import { PermissionsService } from '../core/permissions.service';
@@ -36,6 +37,7 @@ export interface PurchaseDetailChangedResult {
  */
 @Injectable()
 export class PurchaseDetailStore {
+  private readonly businessClock = inject(BusinessClockService);
   private readonly money = inject(MoneyService);
   private readonly pos = inject(PosService);
   private readonly receiptData = inject(ReceiptDataService);
@@ -72,9 +74,11 @@ export class PurchaseDetailStore {
   readonly paymentOpen = this.paymentOpenState.asReadonly();
   private readonly reversingState = signal(false);
   readonly reversing = this.reversingState.asReadonly();
+  private readonly todayInputState = signal('');
 
   readonly paymentAmount = new FormControl('', { nonNullable: true });
   readonly paymentAccount = new FormControl('', { nonNullable: true });
+  readonly paymentPaidOn = new FormControl('', { nonNullable: true });
   readonly reversalReason = new FormControl('', { nonNullable: true });
   readonly accountSelectionError = computed(() =>
     this.accounts().length > 0 || this.loading()
@@ -133,11 +137,24 @@ export class PurchaseDetailStore {
     this.reversingState.set(false);
   }
 
-  startPayment(): void {
+  async startPayment(): Promise<void> {
     const purchase = this.purchase();
     if (!purchase) return;
-    this.paymentAmount.setValue(formatKesInput(Math.max(0, purchase.total_cost - purchase.paid)));
-    this.paymentOpenState.set(true);
+    this.errorState.set(null);
+    try {
+      const today = await this.businessClock.today();
+      if (this.purchase()?.id !== purchase.id) return;
+      this.todayInputState.set(today);
+      this.paymentAmount.setValue(formatKesInput(Math.max(0, purchase.total_cost - purchase.paid)));
+      this.paymentPaidOn.setValue(today);
+      this.paymentOpenState.set(true);
+    } catch (error) {
+      this.errorState.set(this.message(error, 'Could not read the current business date'));
+    }
+  }
+
+  get todayInput(): string {
+    return this.todayInputState();
   }
 
   closePayment(): void {
@@ -151,9 +168,13 @@ export class PurchaseDetailStore {
       this.errorState.set('Enter a valid payment amount');
       return null;
     }
-    const fingerprint = [purchase.supplier_id, purchase.id, amount, this.paymentAccount.value].join(
-      ':'
-    );
+    const fingerprint = [
+      purchase.supplier_id,
+      purchase.id,
+      amount,
+      this.paymentAccount.value,
+      this.paymentPaidOn.value,
+    ].join(':');
     if (this.paymentAttempt?.fingerprint !== fingerprint) {
       this.paymentAttempt = { fingerprint, clientRef: crypto.randomUUID() };
     }
@@ -167,7 +188,8 @@ export class PurchaseDetailStore {
         purchase.id,
         amount,
         this.paymentAccount.value,
-        this.paymentAttempt.clientRef
+        this.paymentAttempt.clientRef,
+        this.paymentPaidOn.value
       );
       this.paymentAttempt = null;
       this.paymentOpenState.set(false);

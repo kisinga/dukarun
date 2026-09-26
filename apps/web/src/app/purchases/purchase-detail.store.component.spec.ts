@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CashierSessionService } from '../core/cashier-session.service';
+import { BusinessClockService } from '../core/business-clock.service';
 import { PermissionsService } from '../core/permissions.service';
 import { MoneyService } from '../money/money.service';
 import { PosService } from '../pos/pos.service';
@@ -65,6 +66,10 @@ describe('PurchaseDetailStore', () => {
     TestBed.configureTestingModule({
       providers: [
         PurchaseDetailStore,
+        {
+          provide: BusinessClockService,
+          useValue: { today: vi.fn().mockResolvedValue('2026-08-27') },
+        },
         { provide: MoneyService, useValue: money },
         { provide: PosService, useValue: { variantsByIds: vi.fn().mockResolvedValue([]) } },
         { provide: PermissionsService, useValue: { has: vi.fn().mockReturnValue(true) } },

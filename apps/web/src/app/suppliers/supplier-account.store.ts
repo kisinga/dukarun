@@ -1,5 +1,6 @@
 import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
 import { FormControl } from '@angular/forms';
+import { BusinessClockService } from '../core/business-clock.service';
 import { CashierSessionService } from '../core/cashier-session.service';
 import { LocationContextService } from '../core/location-context.service';
 import { formatKes, formatKesInput, parseKes } from '../core/money';
@@ -15,6 +16,8 @@ import {
 } from '../money/money.service';
 import { PosService, SupplierStockRow } from '../pos/pos.service';
 import type { SupplierWithAp } from './supplier.types';
+import { InsightsService } from '../insights/insights.service';
+import type { PartyCreditProfile } from '../insights/insights.models';
 
 /**
  * Component-scoped owner for one supplier AP account.
@@ -25,10 +28,12 @@ import type { SupplierWithAp } from './supplier.types';
  */
 @Injectable()
 export class SupplierAccountStore {
+  private readonly businessClock = inject(BusinessClockService);
   private readonly money = inject(MoneyService);
   private readonly pos = inject(PosService);
   private readonly parties = inject(PartyCacheService);
   private readonly locationsContext = inject(LocationContextService);
+  private readonly insights = inject(InsightsService);
   readonly permissions = inject(PermissionsService);
   readonly cashierSession = inject(CashierSessionService);
 
@@ -38,6 +43,8 @@ export class SupplierAccountStore {
     const id = this.supplierId();
     return id ? (this.parties.suppliers().find(row => row.id === id) ?? null) : null;
   });
+  private readonly creditProfileState = signal<PartyCreditProfile | null>(null);
+  readonly creditProfile = this.creditProfileState.asReadonly();
 
   private readonly accountsState = signal<LedgerAccount[]>([]);
   readonly accounts = this.accountsState.asReadonly();
@@ -70,6 +77,8 @@ export class SupplierAccountStore {
 
   readonly payAmount = new FormControl('', { nonNullable: true });
   readonly payAccount = new FormControl('', { nonNullable: true });
+  readonly payPaidOn = new FormControl('', { nonNullable: true });
+  private readonly todayInputState = signal('');
   private readonly reversingPaymentIdState = signal<string | null>(null);
   readonly reversingPaymentId = this.reversingPaymentIdState.asReadonly();
   readonly paymentReversalReason = new FormControl('', { nonNullable: true });
@@ -136,19 +145,24 @@ export class SupplierAccountStore {
     const accountRequired =
       this.permissions.has('ViewFinancials') ||
       this.permissions.has('ManageSupplierCreditPurchases');
-    const [accounts, purchases, account, advance] = await Promise.allSettled([
-      this.money.transactableAccounts(),
-      this.money.purchasesPage({
-        page: 1,
-        pageSize: 10,
-        supplierId,
-        allLocations: true,
-        sortBy: 'purchase_date',
-        sortDirection: 'desc',
-      }),
-      accountRequired ? this.loadAccountData(supplierId) : Promise.resolve(null),
-      accountRequired ? this.loadAdvanceData(supplierId) : Promise.resolve(null),
-    ]);
+    const [accounts, purchases, account, advance, creditProfile, businessDate] =
+      await Promise.allSettled([
+        this.money.transactableAccounts(),
+        this.money.purchasesPage({
+          page: 1,
+          pageSize: 10,
+          supplierId,
+          allLocations: true,
+          sortBy: 'purchase_date',
+          sortDirection: 'desc',
+        }),
+        accountRequired ? this.loadAccountData(supplierId) : Promise.resolve(null),
+        accountRequired ? this.loadAdvanceData(supplierId) : Promise.resolve(null),
+        this.permissions.has('ViewFinancials')
+          ? this.insights.creditProfile(supplierId, 'supplier')
+          : Promise.resolve(null),
+        this.businessClock.today(),
+      ]);
     const locationId = this.locationsContext.activeId();
     if (locationId) void this.loadStock(supplierId, locationId);
     if (request !== this.loadRequest || this.supplierId() !== supplierId) return;
@@ -169,6 +183,14 @@ export class SupplierAccountStore {
     if (advance.status === 'rejected') {
       errors.push(this.message(advance.reason, 'Could not load supplier advance'));
     }
+    if (creditProfile.status === 'fulfilled') this.creditProfileState.set(creditProfile.value);
+    else errors.push(this.message(creditProfile.reason, 'Could not load payment standing'));
+    if (businessDate.status === 'fulfilled') {
+      this.todayInputState.set(businessDate.value);
+      this.payPaidOn.setValue(businessDate.value);
+    } else {
+      errors.push(this.message(businessDate.reason, 'Could not read the current business date'));
+    }
     this.errorState.set(errors.length > 0 ? errors.join('. ') : null);
     this.loadingState.set(false);
   }
@@ -180,6 +202,7 @@ export class SupplierAccountStore {
     this.purchasesState.set([]);
     this.paymentsState.set([]);
     this.accountStatusState.set(null);
+    this.creditProfileState.set(null);
     this.advanceState.set(0);
     this.advanceActivityState.set([]);
     this.stockState.set([]);
@@ -206,7 +229,9 @@ export class SupplierAccountStore {
       await this.cashierSession.assertOpen('paying a supplier');
       this.busyState.set(true);
       this.clearMessages();
-      const fingerprint = [supplier.id, amount, this.payAccount.value].join(':');
+      const fingerprint = [supplier.id, amount, this.payAccount.value, this.payPaidOn.value].join(
+        ':'
+      );
       if (this.paymentAttempt?.fingerprint !== fingerprint) {
         this.paymentAttempt = { fingerprint, clientRef: crypto.randomUUID() };
       }
@@ -214,7 +239,8 @@ export class SupplierAccountStore {
         supplier.id,
         amount,
         this.payAccount.value,
-        this.paymentAttempt.clientRef
+        this.paymentAttempt.clientRef,
+        this.payPaidOn.value
       );
       this.paymentAttempt = null;
       this.payAmount.setValue('');
@@ -457,9 +483,15 @@ export class SupplierAccountStore {
       }),
       this.loadAccountData(supplierId),
       this.loadAdvanceData(supplierId),
+      this.permissions.has('ViewFinancials')
+        ? this.insights.creditProfile(supplierId, 'supplier')
+        : Promise.resolve(null),
     ]);
     if (results[1].status === 'fulfilled' && this.supplierId() === supplierId) {
       this.purchasesState.set(results[1].value.rows);
+    }
+    if (results[4].status === 'fulfilled' && this.supplierId() === supplierId) {
+      this.creditProfileState.set(results[4].value);
     }
     if (this.supplierId() === supplierId && results.some(result => result.status === 'rejected')) {
       this.errorState.set(
@@ -482,6 +514,8 @@ export class SupplierAccountStore {
 
   private resetForms(): void {
     this.payAmount.setValue('');
+    this.payPaidOn.setValue('');
+    this.todayInputState.set('');
     this.paymentAttempt = null;
     this.cancelPaymentReversal();
     this.advanceAmount.setValue('');
@@ -492,6 +526,10 @@ export class SupplierAccountStore {
     this.advanceClientRef = null;
     this.advanceReturnClientRef = null;
     this.advanceApplicationAttempt = null;
+  }
+
+  get todayInput(): string {
+    return this.todayInputState();
   }
 
   private clearMessages(): void {

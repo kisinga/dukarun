@@ -58,6 +58,8 @@ import type {
 } from './purchase-vat-panel.component';
 import { LEARNING_EVENT_NAMES } from '../learning/learning-content';
 import { LearningPlatformService } from '../learning/learning-platform.service';
+import { InsightsService } from '../insights/insights.service';
+import type { ProductDemandSummary } from '../insights/insights.models';
 
 export type ExpenseSettlement = '' | 'supplier_bill' | 'separate';
 
@@ -81,6 +83,8 @@ export interface PurchaseFinalizeResult {
 export interface PurchaseEditorInit {
   draftId?: string | null;
   supplierId?: string | null;
+  variantId?: string | null;
+  quantity?: number;
 }
 
 type PurchaseEditorUiIntent =
@@ -106,6 +110,7 @@ export class PurchaseEditorStore implements OnDestroy {
   private readonly parties = inject(PartyCacheService);
   private readonly locationContext = inject(LocationContextService);
   private readonly learning = inject(LearningPlatformService);
+  private readonly insights = inject(InsightsService);
   readonly perms = inject(PermissionsService);
   readonly cashierSession = inject(CashierSessionService);
   readonly preferences = inject(CompanyPreferencesService);
@@ -144,6 +149,10 @@ export class PurchaseEditorStore implements OnDestroy {
   readonly supplierStockLoading = this.supplierStockLoadingState.asReadonly();
   private readonly supplierStockErrorState = signal<string | null>(null);
   readonly supplierStockError = this.supplierStockErrorState.asReadonly();
+  private readonly recommendationsState = signal<ProductDemandSummary[]>([]);
+  readonly recommendations = this.recommendationsState.asReadonly();
+  private readonly recommendationsLoadingState = signal(false);
+  readonly recommendationsLoading = this.recommendationsLoadingState.asReadonly();
   private readonly linesState = signal<PurchaseLineForm[]>([]);
   readonly lines = this.linesState.asReadonly();
   private readonly expensesState = signal<ExpenseForm[]>([]);
@@ -217,6 +226,7 @@ export class PurchaseEditorStore implements OnDestroy {
   private taxContextRequest = 0;
   private supplierAdvanceRequest = 0;
   private supplierStockRequest = 0;
+  private recommendationsRequest = 0;
   private readonly performanceLoadedKeys = new Set<string>();
   private readonly performanceLoads = new Map<string, Promise<void>>();
   private taxContextTimer: ReturnType<typeof setTimeout> | null = null;
@@ -425,6 +435,16 @@ export class PurchaseEditorStore implements OnDestroy {
       const linkedSupplier = resolveLinkedSupplier(requestedSupplier, this.parties.suppliers());
       if (linkedSupplier.supplierId) this.applySupplierSelection(linkedSupplier.supplierId, false);
       else errors.push(linkedSupplier.error ?? 'The linked supplier is unavailable');
+    }
+    if (!requestedDraft && request.variantId) {
+      const variant = this.variants().find(item => item.variant_id === request.variantId);
+      if (variant) {
+        this.addVariant(variant);
+        const line = this.lines().at(-1);
+        if (line && request.quantity && request.quantity > 0) {
+          this.quantityChanged(line, request.quantity);
+        }
+      } else errors.push('The linked product is unavailable');
     }
     this.syncSupplierPin();
     await this.refreshTaxContext();
@@ -1016,10 +1036,12 @@ export class PurchaseEditorStore implements OnDestroy {
   onReceivingLocationChange(): void {
     this.markDirty();
     void this.loadSupplierStock(this.supplier.value);
+    void this.loadRecommendations(this.supplier.value);
   }
   private applySupplierSelection(supplierId: string, dirty: boolean): void {
     ++this.supplierAdvanceRequest;
     ++this.supplierStockRequest;
+    ++this.recommendationsRequest;
     this.supplier.setValue(supplierId);
     this.syncSupplierPin();
     this.advanceAmount.setValue('0');
@@ -1029,10 +1051,13 @@ export class PurchaseEditorStore implements OnDestroy {
     this.supplierStockState.set([]);
     this.supplierStockLoadingState.set(false);
     this.supplierStockErrorState.set(null);
+    this.recommendationsState.set([]);
+    this.recommendationsLoadingState.set(false);
     if (dirty) this.markDirty();
     if (supplierId) {
       void this.loadSupplierContext(supplierId);
       void this.loadSelectedSupplierPerformance();
+      void this.loadRecommendations(supplierId);
     }
   }
   private async loadSupplierContext(supplierId: string): Promise<void> {
@@ -1085,6 +1110,49 @@ export class PurchaseEditorStore implements OnDestroy {
     } finally {
       if (request === this.supplierStockRequest) this.supplierStockLoadingState.set(false);
     }
+  }
+  private async loadRecommendations(supplierId: string): Promise<void> {
+    const locationId = this.location.value;
+    if (!supplierId || !locationId) return;
+    const request = ++this.recommendationsRequest;
+    this.recommendationsLoadingState.set(true);
+    try {
+      const result = await this.insights.products({
+        windowDays: 30,
+        locationId,
+        supplierId,
+        limit: 10,
+      });
+      if (
+        request === this.recommendationsRequest &&
+        this.supplier.value === supplierId &&
+        this.location.value === locationId
+      ) {
+        this.recommendationsState.set(
+          result.items.filter(item => (item.reorder_quantity ?? 0) > 0).slice(0, 5)
+        );
+      }
+    } catch {
+      if (request === this.recommendationsRequest) this.recommendationsState.set([]);
+    } finally {
+      if (request === this.recommendationsRequest) this.recommendationsLoadingState.set(false);
+    }
+  }
+
+  addRecommendation(item: ProductDemandSummary): void {
+    const quantity = item.reorder_quantity ?? 0;
+    if (quantity <= 0) return;
+    const existing = this.lines().find(line => line.variantId === item.variant_id);
+    if (existing) {
+      this.quantityChanged(existing, quantity);
+      this.requestUi({ kind: 'focus-line', lineKey: existing.key });
+      return;
+    }
+    const variant = this.variants().find(row => row.variant_id === item.variant_id);
+    if (!variant) return;
+    this.addVariant(variant);
+    const line = this.lines().at(-1);
+    if (line) this.quantityChanged(line, quantity);
   }
   private async loadSelectedSupplierPerformance(variantIds?: string[]): Promise<void> {
     const supplierId = this.supplier.value;
@@ -1542,6 +1610,7 @@ export class PurchaseEditorStore implements OnDestroy {
     );
     void this.loadSupplierContext(draft.supplier_id);
     void this.loadSelectedSupplierPerformance();
+    void this.loadRecommendations(draft.supplier_id);
   }
   private today(): string {
     return new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Nairobi' });
@@ -1554,5 +1623,6 @@ export class PurchaseEditorStore implements OnDestroy {
     this.taxContextRequest++;
     this.supplierAdvanceRequest++;
     this.supplierStockRequest++;
+    this.recommendationsRequest++;
   }
 }

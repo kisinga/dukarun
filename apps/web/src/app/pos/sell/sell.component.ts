@@ -51,6 +51,7 @@ import {
 } from './sell-checkout-workspace.component';
 import type { DraftFlag, SaleSuccessMessage } from './sell.types';
 import { SellWorkflowStore } from './sell-workflow.store';
+import { CreditDecisionCardComponent } from '../../insights/credit-decision-card.component';
 
 @Component({
   selector: 'app-sell',
@@ -71,6 +72,7 @@ import { SellWorkflowStore } from './sell-workflow.store';
     SellCatalogPanelComponent,
     SellCartPanelComponent,
     SellCheckoutWorkspaceComponent,
+    CreditDecisionCardComponent,
   ],
   template: `
     @if (catalog.unitSelection(); as selection) {
@@ -292,6 +294,22 @@ import { SellWorkflowStore } from './sell-workflow.store';
                   </dl>
                 }
 
+                @if (creditDecision(); as decision) {
+                  <div class="mt-3">
+                    <app-credit-decision-card [summary]="decision" />
+                  </div>
+                }
+
+                @if (creditWatchWarning()) {
+                  <div role="status" class="alert alert-warning mt-3 text-sm">
+                    <app-icon name="heroExclamationTriangle" />
+                    <span
+                      >This account is on watch. Review the recent payment pattern before adding
+                      credit.</span
+                    >
+                  </div>
+                }
+
                 <dl
                   class="mt-3 grid grid-cols-2 gap-3 rounded-field border border-info/25 bg-info/5 p-3 text-sm"
                 >
@@ -309,23 +327,36 @@ import { SellWorkflowStore } from './sell-workflow.store';
                   </div>
                 </dl>
 
-                @if (creditApprovalRequired()) {
+                @if (creditApprovalRequired() || creditRiskAcknowledgementRequired()) {
                   <div role="status" class="alert alert-warning mt-3 text-sm">
                     <app-icon name="heroExclamationTriangle" />
-                    <span
-                      >This exceeds the credit limit. The sale will wait for approval and stock will
-                      not change yet.</span
-                    >
+                    <span>
+                      @if (creditApprovalRequired()) {
+                        This exceeds the credit limit. The sale will wait for approval and stock
+                        will not change yet.
+                      } @else {
+                        This profile is restricted or high risk. Acknowledge why adding new credit
+                        is appropriate.
+                      }
+                    </span>
                   </div>
                   <app-form-field
                     class="mt-3 block"
-                    label="Reason for the exception"
+                    [label]="
+                      creditApprovalRequired()
+                        ? 'Reason for the exception'
+                        : 'Acknowledgement reason'
+                    "
                     [required]="true"
                   >
                     <textarea
                       class="textarea textarea-bordered min-h-20 w-full"
                       [formControl]="creditApprovalReason"
-                      placeholder="Why should this customer exceed their limit?"
+                      [placeholder]="
+                        creditApprovalRequired()
+                          ? 'Why should this customer exceed their limit?'
+                          : 'Why is adding credit appropriate now?'
+                      "
                     ></textarea>
                   </app-form-field>
                 }
@@ -353,7 +384,8 @@ import { SellWorkflowStore } from './sell-workflow.store';
                 type="button"
                 [loading]="busy()"
                 [disabled]="
-                  creditApprovalRequired() && creditApprovalReason.value.trim().length === 0
+                  (creditApprovalRequired() || creditRiskAcknowledgementRequired()) &&
+                  creditApprovalReason.value.trim().length === 0
                 "
                 (click)="confirmCreditSale()"
               >
@@ -446,6 +478,10 @@ export class SellComponent implements OnInit {
   protected readonly automaticCreditAmount = this.workflow.automaticCreditAmount;
   protected readonly creditExceedsLimit = this.workflow.creditExceedsLimit;
   protected readonly creditApprovalRequired = this.workflow.creditApprovalRequired;
+  protected readonly creditDecision = this.workflow.creditDecision;
+  protected readonly creditRiskAcknowledgementRequired =
+    this.workflow.creditRiskAcknowledgementRequired;
+  protected readonly creditWatchWarning = this.workflow.creditWatchWarning;
   protected readonly panelMethods = this.workflow.panelMethods;
   protected readonly canUseDirectAccounts = this.workflow.canUseDirectAccounts;
   protected readonly mixedCreditAllowed = this.workflow.mixedCreditAllowed;

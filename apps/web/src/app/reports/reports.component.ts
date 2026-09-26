@@ -1,20 +1,18 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
-import { FormControl, ReactiveFormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
+import { BusinessClockService } from '../core/business-clock.service';
 import { formatKes } from '../core/money';
-import { PosService, variantLabel } from '../pos/pos.service';
+import { DateRangePresetControlComponent } from '../insights/date-range-preset-control.component';
+import { presetDateRange, type AppliedDateRange } from '../insights/date-range';
+import type { DateRangePreset } from '../insights/insights.models';
 import { EmptyStateComponent } from '../shared/ui/empty-state.component';
 import { PaginationComponent } from '../shared/ui/pagination.component';
-import { PageLayoutComponent } from '../shared/ui/page-layout.component';
 import { DailySummary, ReportsService } from './reports.service';
 import { ButtonComponent } from '../shared/ui/button.component';
-import { DrawerComponent } from '../shared/ui/drawer.component';
-import { FormFieldComponent } from '../shared/ui/form-field.component';
 import { IconComponent } from '../shared/ui/icon.component';
 import { MobileListComponent } from '../shared/ui/mobile-list.component';
-import { PageActionsComponent } from '../shared/ui/page-actions.component';
-import { RestockIntelligenceComponent } from './restock-intelligence.component';
 
-type Tab = 'sales' | 'products' | 'customers' | 'inventory';
+type Tab = 'sales' | 'customers';
 
 type CustomerRow = {
   customerId: string;
@@ -23,157 +21,122 @@ type CustomerRow = {
   revenue: number;
   arDelta: number;
 };
-type InventoryRow = {
-  variantId: string;
-  label: string;
-  manufacturer: string;
-  stock: number;
-  value: number;
-  retailValue: number;
-  potentialMargin: number;
-};
-
 @Component({
   selector: 'app-reports',
   imports: [
-    ReactiveFormsModule,
-    PageLayoutComponent,
+    DateRangePresetControlComponent,
     EmptyStateComponent,
     PaginationComponent,
     ButtonComponent,
-    DrawerComponent,
-    FormFieldComponent,
     IconComponent,
     MobileListComponent,
-    PageActionsComponent,
-    RestockIntelligenceComponent,
+    RouterLink,
   ],
   template: `
-    <app-page title="Reports" [wide]="true">
-      <app-page-actions actions>
-        <button
-          utilityAction
-          appButton
-          variant="ghost"
-          [iconOnly]="true"
-          type="button"
-          title="Refresh reports"
-          aria-label="Refresh reports"
-          [loading]="loading()"
-          (click)="load()"
-        >
-          <app-icon name="heroArrowPath" />
-        </button>
-        <button
-          primaryAction
-          appButton
-          type="button"
-          class="md:hidden"
-          (click)="filtersOpen.set(true)"
-        >
-          <app-icon name="heroFunnel" /> Period
-        </button>
-      </app-page-actions>
-      <!-- Date range -->
-      <div class="card mb-4 hidden bg-base-100 md:block">
-        <div class="card-body flex-row flex-wrap items-end gap-3 p-4">
-          <label class="form-control">
-            <span class="label-text text-xs">From</span>
-            <input type="date" class="input input-bordered input-sm" [formControl]="from" />
-          </label>
-          <label class="form-control">
-            <span class="label-text text-xs">To</span>
-            <input type="date" class="input input-bordered input-sm" [formControl]="to" />
-          </label>
-          <button class="btn btn-primary btn-sm min-h-11" [disabled]="loading()" (click)="load()">
-            {{ loading() ? 'Loading…' : 'Apply' }}
-          </button>
-          <span class="type-caption ml-auto">Figures refresh hourly.</span>
-        </div>
-      </div>
+    <section class="space-y-4">
+      <section class="card bg-base-100" aria-labelledby="sales-workspace-title">
+        <div class="card-body gap-4 p-4 sm:p-5">
+          <header class="flex items-start justify-between gap-3">
+            <div>
+              <h2 id="sales-workspace-title" class="section-title">Sales performance</h2>
+              <p class="type-caption mt-1">
+                Compare revenue and margin, then see which customers contributed.
+              </p>
+            </div>
+            <button
+              appButton
+              variant="ghost"
+              [iconOnly]="true"
+              type="button"
+              title="Refresh sales performance"
+              aria-label="Refresh sales performance"
+              [loading]="loading()"
+              (click)="load()"
+            >
+              <app-icon name="heroArrowPath" />
+            </button>
+          </header>
 
-      @if (filtersOpen()) {
-        <app-drawer
-          [open]="true"
-          title="Report period"
-          subtitle="Choose the dates included in every report"
-          (closed)="cancelReportFilters()"
-        >
-          <div class="grid gap-3">
-            <app-form-field label="From">
-              <input type="date" class="input input-bordered w-full" [formControl]="from" />
-            </app-form-field>
-            <app-form-field label="To">
-              <input type="date" class="input input-bordered w-full" [formControl]="to" />
-            </app-form-field>
+          <app-date-range-preset-control
+            [value]="periodPreset()"
+            [from]="from()"
+            [to]="to()"
+            [maxDate]="businessToday()"
+            [advanced]="true"
+            [loading]="loading()"
+            (valueChange)="setPeriodPreset($event)"
+            (rangeChange)="setCustomRange($event)"
+          />
+
+          <div class="flex flex-wrap items-end justify-between gap-3">
+            <div role="tablist" aria-label="Sales analysis view" class="section-tabs">
+              <button
+                role="tab"
+                type="button"
+                class="section-tab"
+                [class.section-tab-active]="tab() === 'sales'"
+                [attr.aria-selected]="tab() === 'sales'"
+                (click)="tab.set('sales')"
+              >
+                Sales trend
+              </button>
+              <button
+                role="tab"
+                type="button"
+                class="section-tab"
+                [class.section-tab-active]="tab() === 'customers'"
+                [attr.aria-selected]="tab() === 'customers'"
+                (click)="tab.set('customers')"
+              >
+                Customers
+              </button>
+            </div>
+            <span class="type-caption">Figures refresh hourly.</span>
           </div>
-          <div drawerFooter class="flex justify-end gap-2">
-            <button appButton variant="ghost" type="button" (click)="cancelReportFilters()">
-              Cancel
-            </button>
-            <button appButton type="button" [loading]="loading()" (click)="applyReportFilters()">
-              View report
-            </button>
-          </div>
-        </app-drawer>
-      }
+        </div>
+      </section>
 
       @if (error()) {
         <p class="mb-2 text-sm text-error">{{ error() }}</p>
       }
 
-      <select
-        class="select select-bordered mb-3 min-h-11 w-full sm:hidden"
-        [value]="tab()"
-        (change)="setReportTab($event)"
-      >
-        <option value="sales">Sales</option>
-        <option value="products">Products</option>
-        <option value="customers">Customers</option>
-        <option value="inventory">Inventory</option>
-      </select>
-      <div role="tablist" class="section-tabs mb-4 hidden sm:flex">
-        <button
-          role="tab"
-          type="button"
-          class="section-tab"
-          [class.section-tab-active]="tab() === 'sales'"
-          [attr.aria-selected]="tab() === 'sales'"
-          (click)="tab.set('sales')"
-        >
-          Sales
-        </button>
-        <button
-          role="tab"
-          type="button"
-          class="section-tab"
-          [class.section-tab-active]="tab() === 'products'"
-          [attr.aria-selected]="tab() === 'products'"
-          (click)="tab.set('products')"
-        >
-          Products
-        </button>
-        <button
-          role="tab"
-          type="button"
-          class="section-tab"
-          [class.section-tab-active]="tab() === 'customers'"
-          [attr.aria-selected]="tab() === 'customers'"
-          (click)="tab.set('customers')"
-        >
-          Customers
-        </button>
-        <button
-          role="tab"
-          type="button"
-          class="section-tab"
-          [class.section-tab-active]="tab() === 'inventory'"
-          [attr.aria-selected]="tab() === 'inventory'"
-          (click)="tab.set('inventory')"
-        >
-          Inventory
-        </button>
-      </div>
+      @if (summary().length > 0) {
+        <section aria-label="Sales summary" class="grid grid-cols-2 gap-2 lg:grid-cols-4">
+          <div class="card bg-base-100">
+            <div class="card-body gap-1 p-3 sm:p-4">
+              <span class="type-caption">Revenue</span>
+              <strong class="text-2xl tabular-nums">{{ fmt(totals().revenue) }}</strong>
+              <span class="text-xs text-base-content/60">selected period</span>
+            </div>
+          </div>
+          <div class="card bg-base-100">
+            <div class="card-body gap-1 p-3 sm:p-4">
+              <span class="type-caption">Margin</span>
+              <strong
+                class="text-2xl tabular-nums"
+                [class.text-success]="totals().margin > 0"
+                [class.text-error]="totals().margin < 0"
+                >{{ fmt(totals().margin) }}</strong
+              >
+              <span class="text-xs text-base-content/60">after cost of goods</span>
+            </div>
+          </div>
+          <div class="card bg-base-100">
+            <div class="card-body gap-1 p-3 sm:p-4">
+              <span class="type-caption">Sales</span>
+              <strong class="text-2xl tabular-nums">{{ totals().orders }}</strong>
+              <span class="text-xs text-base-content/60">completed transactions</span>
+            </div>
+          </div>
+          <div class="card bg-base-100">
+            <div class="card-body gap-1 p-3 sm:p-4">
+              <span class="type-caption">Average sale</span>
+              <strong class="text-2xl tabular-nums">{{ fmt(averageSale()) }}</strong>
+              <span class="text-xs text-base-content/60">revenue per sale</span>
+            </div>
+          </div>
+        </section>
+      }
 
       <!-- Sales tab -->
       @if (tab() === 'sales') {
@@ -265,11 +228,6 @@ type InventoryRow = {
         }
       }
 
-      <!-- Products tab -->
-      @if (tab() === 'products') {
-        <app-restock-intelligence [since]="appliedFrom()" [until]="appliedTo()" />
-      }
-
       <!-- Customers tab -->
       @if (tab() === 'customers') {
         @if (!loading() && customers().length === 0) {
@@ -282,7 +240,12 @@ type InventoryRow = {
         } @else {
           <app-mobile-list>
             @for (c of customers(); track c.customerId) {
-              <div mobileListRow class="flex min-h-20 items-center gap-3 p-3">
+              <a
+                mobileListRow
+                class="flex min-h-20 items-center gap-3 p-3"
+                routerLink="/customers"
+                [queryParams]="{ customer: c.customerId }"
+              >
                 <div class="min-w-0 flex-1">
                   <p class="truncate font-semibold">{{ c.name }}</p>
                   <p class="type-caption mt-1">{{ c.orders }} sales</p>
@@ -297,7 +260,7 @@ type InventoryRow = {
                     AR Δ {{ fmt(c.arDelta) }}
                   </p>
                 </div>
-              </div>
+              </a>
             }
           </app-mobile-list>
           <div class="hidden bg-base-100 lg:block lg:rounded-box">
@@ -314,7 +277,14 @@ type InventoryRow = {
                 <tbody>
                   @for (c of customers(); track c.customerId) {
                     <tr>
-                      <td class="text-sm font-medium">{{ c.name }}</td>
+                      <td class="text-sm font-medium">
+                        <a
+                          class="link"
+                          routerLink="/customers"
+                          [queryParams]="{ customer: c.customerId }"
+                          >{{ c.name }}</a
+                        >
+                      </td>
                       <td class="text-right">{{ c.orders }}</td>
                       <td class="text-right">{{ fmt(c.revenue) }}</td>
                       <td
@@ -332,103 +302,24 @@ type InventoryRow = {
           </div>
         }
       }
-
-      @if (tab() === 'inventory') {
-        <div class="mb-3 grid gap-2 sm:grid-cols-3">
-          <div class="card bg-base-100">
-            <div class="card-body p-3">
-              <span class="type-caption">Stock at cost</span
-              ><strong class="text-xl">{{ fmt(inventoryTotals().cost) }}</strong>
-            </div>
-          </div>
-          <div class="card bg-base-100">
-            <div class="card-body p-3">
-              <span class="type-caption">Potential retail</span
-              ><strong class="text-xl">{{ fmt(inventoryTotals().retail) }}</strong>
-            </div>
-          </div>
-          <div class="card bg-base-100">
-            <div class="card-body p-3">
-              <span class="type-caption">Potential margin</span
-              ><strong class="text-xl text-success">{{ fmt(inventoryTotals().margin) }}</strong>
-            </div>
-          </div>
-        </div>
-        @if (!loading() && inventory().length === 0) {
-          <app-empty-state
-            [compact]="true"
-            icon="heroArchiveBox"
-            title="No stock valuation"
-            description="Opening stock and received purchases appear here."
-          />
-        } @else {
-          <app-mobile-list>
-            @for (row of inventory(); track row.variantId) {
-              <div mobileListRow class="flex min-h-20 items-center gap-3 p-3">
-                <div class="min-w-0 flex-1">
-                  <p class="truncate font-semibold">{{ row.label }}</p>
-                  <p class="type-caption mt-1 truncate">
-                    {{ row.manufacturer }} · {{ row.stock }} on hand
-                  </p>
-                </div>
-                <div class="shrink-0 text-right">
-                  <p class="font-semibold tabular-nums">{{ fmt(row.value) }}</p>
-                  <p class="type-caption tabular-nums">retail {{ fmt(row.retailValue) }}</p>
-                </div>
-              </div>
-            }
-          </app-mobile-list>
-          <div class="hidden overflow-hidden bg-base-100 lg:block lg:rounded-box">
-            <div class="hidden lg:block">
-              <table class="table table-sm">
-                <thead>
-                  <tr>
-                    <th>Variant</th>
-                    <th class="text-right">On hand</th>
-                    <th class="text-right">Cost value</th>
-                    <th class="text-right">Retail value</th>
-                    <th class="text-right">Potential margin</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @for (row of inventory(); track row.variantId) {
-                    <tr>
-                      <td>
-                        <p class="font-medium">{{ row.label }}</p>
-                        <p class="type-caption">{{ row.manufacturer }}</p>
-                      </td>
-                      <td class="text-right">{{ row.stock }}</td>
-                      <td class="text-right">{{ fmt(row.value) }}</td>
-                      <td class="text-right">{{ fmt(row.retailValue) }}</td>
-                      <td class="text-right text-success">{{ fmt(row.potentialMargin) }}</td>
-                    </tr>
-                  }
-                </tbody>
-              </table>
-            </div>
-          </div>
-        }
-      }
-    </app-page>
+    </section>
   `,
 })
 export class ReportsComponent implements OnInit {
   private readonly reports = inject(ReportsService);
-  private readonly pos = inject(PosService);
+  private readonly businessClock = inject(BusinessClockService);
 
   protected readonly fmt = formatKes;
   protected readonly tab = signal<Tab>('sales');
-  protected readonly from = new FormControl(this.daysAgoIso(29), { nonNullable: true });
-  protected readonly to = new FormControl(this.todayIso(), { nonNullable: true });
-  protected readonly appliedFrom = signal(this.from.value);
-  protected readonly appliedTo = signal(this.to.value);
+  protected readonly businessToday = signal('');
+  protected readonly periodPreset = signal<DateRangePreset | null>(30);
+  protected readonly from = signal('');
+  protected readonly to = signal('');
 
   protected readonly summary = signal<DailySummary[]>([]);
   protected readonly customers = signal<CustomerRow[]>([]);
-  protected readonly inventory = signal<InventoryRow[]>([]);
   protected readonly error = signal<string | null>(null);
   protected readonly loading = signal(false);
-  protected readonly filtersOpen = signal(false);
   protected readonly page = signal(1);
   protected readonly pageSize = 15;
   protected readonly totalPages = computed(() =>
@@ -450,60 +341,38 @@ export class ReportsComponent implements OnInit {
       { orders: 0, revenue: 0, cogs: 0, margin: 0 }
     )
   );
-  protected readonly inventoryTotals = computed(() =>
-    this.inventory().reduce(
-      (acc, row) => ({
-        cost: acc.cost + row.value,
-        retail: acc.retail + row.retailValue,
-        margin: acc.margin + row.potentialMargin,
-      }),
-      { cost: 0, retail: 0, margin: 0 }
-    )
+  protected readonly averageSale = computed(() =>
+    this.totals().orders > 0 ? Math.round(this.totals().revenue / this.totals().orders) : 0
   );
-
   async ngOnInit(): Promise<void> {
-    await this.load();
+    try {
+      const today = await this.businessClock.today();
+      this.businessToday.set(today);
+      const range = presetDateRange(today, 30);
+      this.from.set(range.from);
+      this.to.set(range.to);
+      await this.load();
+    } catch (error) {
+      this.error.set(error instanceof Error ? error.message : 'Failed to load the business date');
+    }
   }
 
   protected async load(): Promise<void> {
     this.error.set(null);
     this.page.set(1);
-    if (this.from.value > this.to.value) {
-      this.error.set('The From date must be before the To date');
+    if (!this.validRange(this.from(), this.to())) {
       return;
     }
     this.loading.set(true);
     try {
-      const since = this.from.value;
-      const until = this.to.value;
-      const [summary, customerStats, stock, catalog] = await Promise.all([
+      const since = this.from();
+      const until = this.to();
+      const [summary, customerStats] = await Promise.all([
         this.reports.salesSummary(since, until),
         this.reports.customerStats(since, until),
-        this.pos.productStock(),
-        this.pos.fetchActiveVariants(),
       ]);
       this.summary.set(summary);
       await this.aggregateCustomers(customerStats);
-      this.inventory.set(
-        catalog
-          .filter(v => v.kind !== 'service' && v.track_inventory && v.variant_id)
-          .map(v => {
-            const current = stock.get(v.variant_id!) ?? { stock: 0, stock_value: 0 };
-            const retail = Math.round(current.stock * (v.price ?? 0));
-            return {
-              variantId: v.variant_id!,
-              label: variantLabel(v),
-              manufacturer: v.manufacturer_name || 'Manufacturer not set',
-              stock: current.stock,
-              value: current.stock_value,
-              retailValue: retail,
-              potentialMargin: retail - current.stock_value,
-            };
-          })
-          .sort((a, b) => b.value - a.value)
-      );
-      this.appliedFrom.set(since);
-      this.appliedTo.set(until);
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Failed to load reports');
     } finally {
@@ -511,19 +380,41 @@ export class ReportsComponent implements OnInit {
     }
   }
 
-  protected async applyReportFilters(): Promise<void> {
-    await this.load();
-    if (!this.error()) this.filtersOpen.set(false);
+  protected setPeriodPreset(value: DateRangePreset): void {
+    const today = this.businessToday();
+    if (!today) return;
+    const range = presetDateRange(today, value);
+    this.periodPreset.set(value);
+    this.from.set(range.from);
+    this.to.set(range.to);
+    void this.load();
   }
 
-  protected cancelReportFilters(): void {
-    this.from.setValue(this.appliedFrom());
-    this.to.setValue(this.appliedTo());
-    this.filtersOpen.set(false);
+  protected setCustomRange(range: AppliedDateRange): void {
+    if (!this.validRange(range.from, range.to)) return;
+    this.periodPreset.set(null);
+    this.from.set(range.from);
+    this.to.set(range.to);
+    void this.load();
   }
 
-  protected setReportTab(event: Event): void {
-    this.tab.set((event.target as HTMLSelectElement).value as Tab);
+  private validRange(from: string, to: string): boolean {
+    if (!from || !to || from > to) {
+      this.error.set('The start date must be before the end date.');
+      return false;
+    }
+    if (this.businessToday() && to > this.businessToday()) {
+      this.error.set('The period cannot extend beyond the current business date.');
+      return false;
+    }
+    const days =
+      Math.floor((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000) +
+      1;
+    if (days > 365) {
+      this.error.set('Choose a period of up to 12 months.');
+      return false;
+    }
+    return true;
   }
 
   private async aggregateCustomers(
@@ -549,18 +440,5 @@ export class ReportsComponent implements OnInit {
         arDelta: acc.arDelta,
       }))
     );
-  }
-
-  private todayIso(): string {
-    return this.nairobiDate(new Date());
-  }
-
-  private daysAgoIso(n: number): string {
-    return this.nairobiDate(new Date(Date.now() - n * 86_400_000));
-  }
-
-  /** Business dates are Africa/Nairobi, not UTC (00:00-03:00 EAT is still "today"). */
-  private nairobiDate(date: Date): string {
-    return date.toLocaleDateString('en-CA', { timeZone: 'Africa/Nairobi' });
   }
 }

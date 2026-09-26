@@ -31,6 +31,9 @@ import { MoneyComponent } from '../shared/ui/money.component';
 import { PermissionsService } from '../core/permissions.service';
 import { StatusBadgeComponent } from '../shared/ui/status-badge.component';
 import { PublicProductLinkService } from './public-product-link.service';
+import { InsightsService } from '../insights/insights.service';
+import type { ProductProfile } from '../insights/insights.models';
+import { LocationContextService } from '../core/location-context.service';
 
 type StockInfo = { stock: number; stock_value: number };
 type DrawerVariant = Variant & { stock_value?: number | null };
@@ -133,6 +136,43 @@ type ShareFeedback = { kind: 'success' | 'error'; message: string };
               </dd>
             </div>
           </dl>
+
+          @if (selectedVariantId()) {
+            <section class="surface-card mt-3 p-4" aria-label="Product intelligence">
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <p class="type-caption">Demand and stock signal</p>
+                  @if (intelligence(); as insight) {
+                    <p class="mt-1 font-semibold capitalize">
+                      {{ attentionText(insight, 'signal', 'Updating').replaceAll('_', ' ') }}
+                    </p>
+                    <p class="type-caption mt-1">
+                      {{
+                        attentionNumber(insight, 'days_of_cover') === null
+                          ? 'Cover unavailable'
+                          : attentionNumber(insight, 'days_of_cover') + ' days of cover'
+                      }}
+                      ·
+                      {{
+                        attentionNumber(insight, 'reorder_quantity') === null
+                          ? 'Review demand history'
+                          : attentionNumber(insight, 'reorder_quantity') + ' suggested to reorder'
+                      }}
+                    </p>
+                  } @else if (intelligenceLoading()) {
+                    <p class="type-caption mt-1">Updating…</p>
+                  } @else {
+                    <p class="type-caption mt-1">No demand signal is available yet.</p>
+                  }
+                </div>
+                <a
+                  class="btn btn-ghost btn-sm min-h-11"
+                  [routerLink]="['/insights/inventory', selectedVariantId()]"
+                  >Full profile</a
+                >
+              </div>
+            </section>
+          }
 
           <dl
             class="my-4 grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-x-4 gap-y-3 text-sm"
@@ -246,6 +286,16 @@ type ShareFeedback = { kind: 'success' | 'error'; message: string };
                     </div>
 
                     <div class="my-3 flex flex-wrap gap-2 border-t border-base-300/60 pt-3">
+                      @if (v.kind !== 'service' && v.track_inventory) {
+                        <a
+                          appButton
+                          variant="ghost"
+                          size="sm"
+                          [routerLink]="['/insights/inventory', v.variant_id]"
+                        >
+                          <app-icon name="heroChartBar" /> Insights
+                        </a>
+                      }
                       @if (
                         v.kind !== 'service' &&
                         v.track_inventory &&
@@ -471,6 +521,8 @@ export class ProductDetailDrawerComponent implements OnDestroy {
   private readonly parties = inject(PartyCacheService);
   private readonly pos = inject(PosService);
   private readonly publicProductLinks = inject(PublicProductLinkService);
+  private readonly insights = inject(InsightsService);
+  private readonly locations = inject(LocationContextService);
   protected readonly perms = inject(PermissionsService);
   protected readonly preferences = inject(CompanyPreferencesService);
 
@@ -496,6 +548,8 @@ export class ProductDetailDrawerComponent implements OnDestroy {
   protected readonly loadError = signal<string | null>(null);
   protected readonly shareBusy = signal(false);
   protected readonly shareFeedback = signal<ShareFeedback | null>(null);
+  protected readonly intelligence = signal<ProductProfile | null>(null);
+  protected readonly intelligenceLoading = signal(false);
   private readonly loadedGroup = signal<ProductGroup | null>(null);
   private productRequest = 0;
   private purchaseHistoryRequest = 0;
@@ -523,6 +577,12 @@ export class ProductDetailDrawerComponent implements OnDestroy {
     });
 
     effect(() => {
+      const variantId = this.selectedVariantId();
+      const locationId = this.locations.activeId();
+      untracked(() => void this.loadIntelligence(variantId, locationId));
+    });
+
+    effect(() => {
       const group = this.group();
       const variantId = this.selectedVariantId();
       if (!group || !variantId) return;
@@ -532,6 +592,37 @@ export class ProductDetailDrawerComponent implements OnDestroy {
           ?.scrollIntoView({ block: 'nearest' })
       );
     });
+  }
+
+  private async loadIntelligence(
+    variantId: string | null,
+    locationId: string | null
+  ): Promise<void> {
+    this.intelligence.set(null);
+    if (!variantId) return;
+    if (!locationId) {
+      await this.locations.load();
+      locationId = this.locations.activeId();
+    }
+    if (!locationId || !this.connectivity.online()) return;
+    this.intelligenceLoading.set(true);
+    try {
+      this.intelligence.set(await this.insights.productProfile(variantId, locationId));
+    } catch {
+      this.intelligence.set(null);
+    } finally {
+      this.intelligenceLoading.set(false);
+    }
+  }
+
+  protected attentionNumber(profile: ProductProfile, key: string): number | null {
+    const value = profile.attention?.[key];
+    return value === null || value === undefined ? null : Number(value);
+  }
+
+  protected attentionText(profile: ProductProfile, key: string, fallback: string): string {
+    const value = profile.attention?.[key];
+    return typeof value === 'string' ? value : fallback;
   }
 
   ngOnDestroy(): void {

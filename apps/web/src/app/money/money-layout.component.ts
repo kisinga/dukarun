@@ -69,7 +69,6 @@ export class MoneyLayoutComponent {
   protected readonly tabs: MoneyTab[] = [
     { route: '/money/ledger', label: 'Ledger', icon: 'heroDocumentText' },
     { route: '/money/cashier', label: 'Cashier', icon: 'heroBanknotes' },
-    { route: '/money/credit', label: 'Credit', icon: 'heroCreditCard' },
     { route: '/money/expenses', label: 'Expenses', icon: 'heroReceiptRefund' },
     { route: '/money/transfers', label: 'Transfers', icon: 'heroArrowsRightLeft' },
     { route: '/money/reconcile', label: 'Reconcile', icon: 'heroCheckBadge' },

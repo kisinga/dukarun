@@ -31,6 +31,10 @@ const settings: CompanySettings = {
   payment_reminder_sms_fallback: true,
   automated_customer_notifications_enabled: true,
   automated_customer_notifications_override: null,
+  credit_opportunity_rate_bps: 1800,
+  credit_score_notifications_enabled: true,
+  default_reorder_lead_days: 7,
+  default_reorder_safety_days: 7,
 };
 
 describe('PosCashSettingsComponent', () => {

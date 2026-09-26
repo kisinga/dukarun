@@ -85,6 +85,115 @@ export type Database = {
           },
         ]
       }
+      analytics_dirty_buckets: {
+        Row: {
+          attempts: number
+          attention_dirty: boolean
+          available_at: string
+          company_id: string
+          day: string
+          dirty_since: string
+          last_error: string | null
+          location_id: string
+          position_dirty: boolean
+          reason: string
+          sales_dirty: boolean
+          variant_id: string
+        }
+        Insert: {
+          attempts?: number
+          attention_dirty?: boolean
+          available_at?: string
+          company_id: string
+          day: string
+          dirty_since?: string
+          last_error?: string | null
+          location_id: string
+          position_dirty?: boolean
+          reason?: string
+          sales_dirty?: boolean
+          variant_id: string
+        }
+        Update: {
+          attempts?: number
+          attention_dirty?: boolean
+          available_at?: string
+          company_id?: string
+          day?: string
+          dirty_since?: string
+          last_error?: string | null
+          location_id?: string
+          position_dirty?: boolean
+          reason?: string
+          sales_dirty?: boolean
+          variant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "analytics_dirty_buckets_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "analytics_dirty_buckets_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "analytics_dirty_buckets_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "low_stock_variants_by_location"
+            referencedColumns: ["location_id"]
+          },
+          {
+            foreignKeyName: "analytics_dirty_buckets_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "stock_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "analytics_dirty_buckets_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "low_stock_variants"
+            referencedColumns: ["variant_id"]
+          },
+          {
+            foreignKeyName: "analytics_dirty_buckets_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "low_stock_variants_by_location"
+            referencedColumns: ["variant_id"]
+          },
+          {
+            foreignKeyName: "analytics_dirty_buckets_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "product_stock"
+            referencedColumns: ["variant_id"]
+          },
+          {
+            foreignKeyName: "analytics_dirty_buckets_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "product_variants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "analytics_dirty_buckets_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "variant_catalog"
+            referencedColumns: ["variant_id"]
+          },
+        ]
+      }
       approvals: {
         Row: {
           company_id: string
@@ -1584,8 +1693,12 @@ export type Database = {
           commissions_enabled: boolean
           communication_period_end: string | null
           created_at: string
+          credit_opportunity_rate_bps: number
+          credit_score_notifications_enabled: boolean
           currency: string
           customer_payment_instructions: string | null
+          default_reorder_lead_days: number
+          default_reorder_safety_days: number
           email: string | null
           enable_printer: boolean
           id: string
@@ -1640,8 +1753,12 @@ export type Database = {
           commissions_enabled?: boolean
           communication_period_end?: string | null
           created_at?: string
+          credit_opportunity_rate_bps?: number
+          credit_score_notifications_enabled?: boolean
           currency?: string
           customer_payment_instructions?: string | null
+          default_reorder_lead_days?: number
+          default_reorder_safety_days?: number
           email?: string | null
           enable_printer?: boolean
           id?: string
@@ -1696,8 +1813,12 @@ export type Database = {
           commissions_enabled?: boolean
           communication_period_end?: string | null
           created_at?: string
+          credit_opportunity_rate_bps?: number
+          credit_score_notifications_enabled?: boolean
           currency?: string
           customer_payment_instructions?: string | null
+          default_reorder_lead_days?: number
+          default_reorder_safety_days?: number
           email?: string | null
           enable_printer?: boolean
           id?: string
@@ -2200,6 +2321,312 @@ export type Database = {
           },
         ]
       }
+      credit_band_notification_queue: {
+        Row: {
+          changed_at: string
+          company_id: string
+          customer_id: string
+          from_band: string
+          last_error: string | null
+          reason_code: string | null
+          score: number | null
+          send_after: string
+          sent_at: string | null
+          to_band: string
+        }
+        Insert: {
+          changed_at?: string
+          company_id: string
+          customer_id: string
+          from_band: string
+          last_error?: string | null
+          reason_code?: string | null
+          score?: number | null
+          send_after?: string
+          sent_at?: string | null
+          to_band: string
+        }
+        Update: {
+          changed_at?: string
+          company_id?: string
+          customer_id?: string
+          from_band?: string
+          last_error?: string | null
+          reason_code?: string | null
+          score?: number | null
+          send_after?: string
+          sent_at?: string | null
+          to_band?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credit_band_notification_queue_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credit_band_notification_queue_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credit_band_notification_queue_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_account_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "credit_band_notification_queue_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_ar_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "credit_band_notification_queue_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_deposit_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "credit_band_notification_queue_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credit_band_notification_queue_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_advance_balances"
+            referencedColumns: ["supplier_id"]
+          },
+          {
+            foreignKeyName: "credit_band_notification_queue_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_ap_balances"
+            referencedColumns: ["supplier_id"]
+          },
+        ]
+      }
+      credit_dirty_parties: {
+        Row: {
+          attempts: number
+          available_at: string
+          company_id: string
+          dirty_since: string
+          last_error: string | null
+          party_id: string
+          reason: string
+          side: string
+        }
+        Insert: {
+          attempts?: number
+          available_at?: string
+          company_id: string
+          dirty_since?: string
+          last_error?: string | null
+          party_id: string
+          reason?: string
+          side: string
+        }
+        Update: {
+          attempts?: number
+          available_at?: string
+          company_id?: string
+          dirty_since?: string
+          last_error?: string | null
+          party_id?: string
+          reason?: string
+          side?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credit_dirty_parties_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credit_dirty_parties_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credit_dirty_parties_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "customer_account_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "credit_dirty_parties_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "customer_ar_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "credit_dirty_parties_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "customer_deposit_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "credit_dirty_parties_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credit_dirty_parties_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_advance_balances"
+            referencedColumns: ["supplier_id"]
+          },
+          {
+            foreignKeyName: "credit_dirty_parties_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_ap_balances"
+            referencedColumns: ["supplier_id"]
+          },
+        ]
+      }
+      credit_document_performance: {
+        Row: {
+          company_id: string
+          document_code: string
+          document_id: string
+          due_on: string
+          issued_on: string
+          next_refresh_on: string | null
+          original_amount: number
+          outstanding_amount: number
+          overdue_days: number
+          party_id: string
+          principal_days_as_of: string
+          punctuality_factor: number | null
+          refreshed_at: string
+          settled_amount: number
+          settled_days_late: number | null
+          settled_on: string | null
+          settled_principal_days: number
+          side: string
+        }
+        Insert: {
+          company_id: string
+          document_code: string
+          document_id: string
+          due_on: string
+          issued_on: string
+          next_refresh_on?: string | null
+          original_amount: number
+          outstanding_amount?: number
+          overdue_days?: number
+          party_id: string
+          principal_days_as_of: string
+          punctuality_factor?: number | null
+          refreshed_at?: string
+          settled_amount?: number
+          settled_days_late?: number | null
+          settled_on?: string | null
+          settled_principal_days?: number
+          side: string
+        }
+        Update: {
+          company_id?: string
+          document_code?: string
+          document_id?: string
+          due_on?: string
+          issued_on?: string
+          next_refresh_on?: string | null
+          original_amount?: number
+          outstanding_amount?: number
+          overdue_days?: number
+          party_id?: string
+          principal_days_as_of?: string
+          punctuality_factor?: number | null
+          refreshed_at?: string
+          settled_amount?: number
+          settled_days_late?: number | null
+          settled_on?: string | null
+          settled_principal_days?: number
+          side?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credit_document_performance_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credit_document_performance_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credit_document_performance_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "customer_account_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "credit_document_performance_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "customer_ar_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "credit_document_performance_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "customer_deposit_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "credit_document_performance_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credit_document_performance_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_advance_balances"
+            referencedColumns: ["supplier_id"]
+          },
+          {
+            foreignKeyName: "credit_document_performance_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_ap_balances"
+            referencedColumns: ["supplier_id"]
+          },
+        ]
+      }
       credit_notification_checkpoints: {
         Row: {
           bucket: string
@@ -2275,6 +2702,102 @@ export type Database = {
           {
             foreignKeyName: "credit_notification_checkpoints_customer_id_fkey"
             columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_ap_balances"
+            referencedColumns: ["supplier_id"]
+          },
+        ]
+      }
+      credit_profile_events: {
+        Row: {
+          band: string
+          company_id: string
+          confidence: string
+          created_at: string
+          id: number
+          model_version: string
+          party_id: string
+          reason_codes: string[]
+          score: number | null
+          side: string
+        }
+        Insert: {
+          band: string
+          company_id: string
+          confidence: string
+          created_at?: string
+          id?: never
+          model_version: string
+          party_id: string
+          reason_codes?: string[]
+          score?: number | null
+          side: string
+        }
+        Update: {
+          band?: string
+          company_id?: string
+          confidence?: string
+          created_at?: string
+          id?: never
+          model_version?: string
+          party_id?: string
+          reason_codes?: string[]
+          score?: number | null
+          side?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credit_profile_events_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credit_profile_events_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credit_profile_events_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "customer_account_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "credit_profile_events_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "customer_ar_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "credit_profile_events_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "customer_deposit_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "credit_profile_events_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credit_profile_events_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_advance_balances"
+            referencedColumns: ["supplier_id"]
+          },
+          {
+            foreignKeyName: "credit_profile_events_party_id_fkey"
+            columns: ["party_id"]
             isOneToOne: false
             referencedRelation: "supplier_ap_balances"
             referencedColumns: ["supplier_id"]
@@ -2800,6 +3323,8 @@ export type Database = {
           ledger_account_code: string | null
           location_id: string
           method_code: string
+          paid_on: string
+          paid_on_source: string
           posted_at: string | null
           reference: string | null
           request_fingerprint: string
@@ -2823,6 +3348,8 @@ export type Database = {
           ledger_account_code?: string | null
           location_id: string
           method_code: string
+          paid_on: string
+          paid_on_source?: string
           posted_at?: string | null
           reference?: string | null
           request_fingerprint: string
@@ -2846,6 +3373,8 @@ export type Database = {
           ledger_account_code?: string | null
           location_id?: string
           method_code?: string
+          paid_on?: string
+          paid_on_source?: string
           posted_at?: string | null
           reference?: string | null
           request_fingerprint?: string
@@ -3056,6 +3585,7 @@ export type Database = {
           created_at: string
           credit_approved_by: string | null
           credit_limit: number
+          credit_score_notifications_enabled: boolean
           credit_terms_days: number | null
           customer_origin: string
           deleted_at: string | null
@@ -3087,6 +3617,7 @@ export type Database = {
           created_at?: string
           credit_approved_by?: string | null
           credit_limit?: number
+          credit_score_notifications_enabled?: boolean
           credit_terms_days?: number | null
           customer_origin?: string
           deleted_at?: string | null
@@ -3118,6 +3649,7 @@ export type Database = {
           created_at?: string
           credit_approved_by?: string | null
           credit_limit?: number
+          credit_score_notifications_enabled?: boolean
           credit_terms_days?: number | null
           customer_origin?: string
           deleted_at?: string | null
@@ -4135,6 +4667,103 @@ export type Database = {
           },
           {
             foreignKeyName: "inventory_movements_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "variant_catalog"
+            referencedColumns: ["variant_id"]
+          },
+        ]
+      }
+      inventory_position_days: {
+        Row: {
+          closing_quantity: number
+          closing_value: number | null
+          company_id: string
+          day: string
+          location_id: string
+          quality: string
+          refreshed_at: string
+          variant_id: string
+        }
+        Insert: {
+          closing_quantity: number
+          closing_value?: number | null
+          company_id: string
+          day: string
+          location_id: string
+          quality: string
+          refreshed_at?: string
+          variant_id: string
+        }
+        Update: {
+          closing_quantity?: number
+          closing_value?: number | null
+          company_id?: string
+          day?: string
+          location_id?: string
+          quality?: string
+          refreshed_at?: string
+          variant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_position_days_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_position_days_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_position_days_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "low_stock_variants_by_location"
+            referencedColumns: ["location_id"]
+          },
+          {
+            foreignKeyName: "inventory_position_days_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "stock_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_position_days_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "low_stock_variants"
+            referencedColumns: ["variant_id"]
+          },
+          {
+            foreignKeyName: "inventory_position_days_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "low_stock_variants_by_location"
+            referencedColumns: ["variant_id"]
+          },
+          {
+            foreignKeyName: "inventory_position_days_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "product_stock"
+            referencedColumns: ["variant_id"]
+          },
+          {
+            foreignKeyName: "inventory_position_days_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "product_variants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_position_days_variant_id_fkey"
             columns: ["variant_id"]
             isOneToOne: false
             referencedRelation: "variant_catalog"
@@ -6893,6 +7522,141 @@ export type Database = {
           },
         ]
       }
+      party_credit_profile: {
+        Row: {
+          available_credit: number | null
+          balance: number
+          band: string
+          company_id: string
+          confidence: string
+          credit_limit: number
+          history_days: number
+          model_version: string
+          next_refresh_on: string | null
+          oldest_due_on: string | null
+          oldest_overdue_days: number
+          opportunity_cost: number
+          overdue_amount: number
+          party_id: string
+          party_name: string
+          punctuality: number | null
+          reason_codes: string[]
+          recommendation_code: string
+          refreshed_at: string
+          score: number | null
+          settled_documents: number
+          side: string
+          utilization: number | null
+        }
+        Insert: {
+          available_credit?: number | null
+          balance?: number
+          band: string
+          company_id: string
+          confidence: string
+          credit_limit?: number
+          history_days?: number
+          model_version?: string
+          next_refresh_on?: string | null
+          oldest_due_on?: string | null
+          oldest_overdue_days?: number
+          opportunity_cost?: number
+          overdue_amount?: number
+          party_id: string
+          party_name: string
+          punctuality?: number | null
+          reason_codes?: string[]
+          recommendation_code: string
+          refreshed_at?: string
+          score?: number | null
+          settled_documents?: number
+          side: string
+          utilization?: number | null
+        }
+        Update: {
+          available_credit?: number | null
+          balance?: number
+          band?: string
+          company_id?: string
+          confidence?: string
+          credit_limit?: number
+          history_days?: number
+          model_version?: string
+          next_refresh_on?: string | null
+          oldest_due_on?: string | null
+          oldest_overdue_days?: number
+          opportunity_cost?: number
+          overdue_amount?: number
+          party_id?: string
+          party_name?: string
+          punctuality?: number | null
+          reason_codes?: string[]
+          recommendation_code?: string
+          refreshed_at?: string
+          score?: number | null
+          settled_documents?: number
+          side?: string
+          utilization?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "party_credit_profile_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "party_credit_profile_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "party_credit_profile_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "customer_account_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "party_credit_profile_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "customer_ar_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "party_credit_profile_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "customer_deposit_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "party_credit_profile_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "party_credit_profile_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_advance_balances"
+            referencedColumns: ["supplier_id"]
+          },
+          {
+            foreignKeyName: "party_credit_profile_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_ap_balances"
+            referencedColumns: ["supplier_id"]
+          },
+        ]
+      }
       payment_collection_allocations: {
         Row: {
           allocated_by: string | null
@@ -7892,6 +8656,115 @@ export type Database = {
           },
         ]
       }
+      product_attention: {
+        Row: {
+          average_daily_demand: number | null
+          company_id: string
+          current_stock: number
+          current_value: number | null
+          days_of_cover: number | null
+          last_sale_date: string | null
+          location_id: string
+          reason_code: string
+          refreshed_at: string
+          reorder_quantity: number | null
+          signal: string
+          variant_id: string
+        }
+        Insert: {
+          average_daily_demand?: number | null
+          company_id: string
+          current_stock?: number
+          current_value?: number | null
+          days_of_cover?: number | null
+          last_sale_date?: string | null
+          location_id: string
+          reason_code: string
+          refreshed_at?: string
+          reorder_quantity?: number | null
+          signal: string
+          variant_id: string
+        }
+        Update: {
+          average_daily_demand?: number | null
+          company_id?: string
+          current_stock?: number
+          current_value?: number | null
+          days_of_cover?: number | null
+          last_sale_date?: string | null
+          location_id?: string
+          reason_code?: string
+          refreshed_at?: string
+          reorder_quantity?: number | null
+          signal?: string
+          variant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_attention_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_attention_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_attention_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "low_stock_variants_by_location"
+            referencedColumns: ["location_id"]
+          },
+          {
+            foreignKeyName: "product_attention_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "stock_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_attention_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "low_stock_variants"
+            referencedColumns: ["variant_id"]
+          },
+          {
+            foreignKeyName: "product_attention_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "low_stock_variants_by_location"
+            referencedColumns: ["variant_id"]
+          },
+          {
+            foreignKeyName: "product_attention_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "product_stock"
+            referencedColumns: ["variant_id"]
+          },
+          {
+            foreignKeyName: "product_attention_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "product_variants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_attention_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "variant_catalog"
+            referencedColumns: ["variant_id"]
+          },
+        ]
+      }
       product_categories: {
         Row: {
           category_id: string
@@ -7946,6 +8819,121 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "variant_catalog"
             referencedColumns: ["product_id"]
+          },
+        ]
+      }
+      product_daily_facts: {
+        Row: {
+          company_id: string
+          corrected_cogs: number
+          day: string
+          gross_quantity: number
+          gross_revenue: number
+          location_id: string
+          margin: number
+          net_quantity: number
+          net_revenue: number
+          order_count: number
+          refreshed_at: string
+          refund_amount: number
+          returned_quantity: number
+          variant_id: string
+        }
+        Insert: {
+          company_id: string
+          corrected_cogs?: number
+          day: string
+          gross_quantity?: number
+          gross_revenue?: number
+          location_id: string
+          margin?: number
+          net_quantity?: number
+          net_revenue?: number
+          order_count?: number
+          refreshed_at?: string
+          refund_amount?: number
+          returned_quantity?: number
+          variant_id: string
+        }
+        Update: {
+          company_id?: string
+          corrected_cogs?: number
+          day?: string
+          gross_quantity?: number
+          gross_revenue?: number
+          location_id?: string
+          margin?: number
+          net_quantity?: number
+          net_revenue?: number
+          order_count?: number
+          refreshed_at?: string
+          refund_amount?: number
+          returned_quantity?: number
+          variant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_daily_facts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_daily_facts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_daily_facts_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "low_stock_variants_by_location"
+            referencedColumns: ["location_id"]
+          },
+          {
+            foreignKeyName: "product_daily_facts_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "stock_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_daily_facts_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "low_stock_variants"
+            referencedColumns: ["variant_id"]
+          },
+          {
+            foreignKeyName: "product_daily_facts_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "low_stock_variants_by_location"
+            referencedColumns: ["variant_id"]
+          },
+          {
+            foreignKeyName: "product_daily_facts_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "product_stock"
+            referencedColumns: ["variant_id"]
+          },
+          {
+            foreignKeyName: "product_daily_facts_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "product_variants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_daily_facts_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "variant_catalog"
+            referencedColumns: ["variant_id"]
           },
         ]
       }
@@ -8072,6 +9060,8 @@ export type Database = {
           name: string
           price: number
           product_id: string
+          reorder_lead_days: number | null
+          reorder_safety_days: number | null
           sku: string
           stock_unit: string
           track_inventory: boolean
@@ -8089,6 +9079,8 @@ export type Database = {
           name: string
           price: number
           product_id: string
+          reorder_lead_days?: number | null
+          reorder_safety_days?: number | null
           sku: string
           stock_unit?: string
           track_inventory?: boolean
@@ -8106,6 +9098,8 @@ export type Database = {
           name?: string
           price?: number
           product_id?: string
+          reorder_lead_days?: number | null
+          reorder_safety_days?: number | null
           sku?: string
           stock_unit?: string
           track_inventory?: boolean
@@ -8140,6 +9134,124 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "variant_catalog"
             referencedColumns: ["product_id"]
+          },
+        ]
+      }
+      product_window_metrics: {
+        Row: {
+          company_id: string
+          corrected_cogs: number
+          current_from: string
+          current_quantity: number
+          current_to: string
+          gross_revenue: number
+          location_id: string
+          margin: number
+          net_revenue: number
+          previous_net_revenue: number
+          previous_quantity: number
+          refreshed_at: string
+          refund_amount: number
+          variant_id: string
+          window_days: number
+        }
+        Insert: {
+          company_id: string
+          corrected_cogs?: number
+          current_from: string
+          current_quantity?: number
+          current_to: string
+          gross_revenue?: number
+          location_id: string
+          margin?: number
+          net_revenue?: number
+          previous_net_revenue?: number
+          previous_quantity?: number
+          refreshed_at?: string
+          refund_amount?: number
+          variant_id: string
+          window_days: number
+        }
+        Update: {
+          company_id?: string
+          corrected_cogs?: number
+          current_from?: string
+          current_quantity?: number
+          current_to?: string
+          gross_revenue?: number
+          location_id?: string
+          margin?: number
+          net_revenue?: number
+          previous_net_revenue?: number
+          previous_quantity?: number
+          refreshed_at?: string
+          refund_amount?: number
+          variant_id?: string
+          window_days?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_window_metrics_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_window_metrics_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_window_metrics_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "low_stock_variants_by_location"
+            referencedColumns: ["location_id"]
+          },
+          {
+            foreignKeyName: "product_window_metrics_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "stock_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_window_metrics_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "low_stock_variants"
+            referencedColumns: ["variant_id"]
+          },
+          {
+            foreignKeyName: "product_window_metrics_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "low_stock_variants_by_location"
+            referencedColumns: ["variant_id"]
+          },
+          {
+            foreignKeyName: "product_window_metrics_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "product_stock"
+            referencedColumns: ["variant_id"]
+          },
+          {
+            foreignKeyName: "product_window_metrics_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "product_variants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_window_metrics_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "variant_catalog"
+            referencedColumns: ["variant_id"]
           },
         ]
       }
@@ -9416,6 +10528,115 @@ export type Database = {
           },
         ]
       }
+      sale_credit_advisory_snapshots: {
+        Row: {
+          acknowledged_by: string | null
+          acknowledgement_reason: string | null
+          band: string
+          company_id: string
+          confidence: string
+          customer_id: string
+          order_id: string
+          presented_at: string
+          reason_codes: string[]
+          recommendation_code: string
+          score: number | null
+          score_refreshed_at: string | null
+        }
+        Insert: {
+          acknowledged_by?: string | null
+          acknowledgement_reason?: string | null
+          band: string
+          company_id: string
+          confidence: string
+          customer_id: string
+          order_id: string
+          presented_at?: string
+          reason_codes?: string[]
+          recommendation_code: string
+          score?: number | null
+          score_refreshed_at?: string | null
+        }
+        Update: {
+          acknowledged_by?: string | null
+          acknowledgement_reason?: string | null
+          band?: string
+          company_id?: string
+          confidence?: string
+          customer_id?: string
+          order_id?: string
+          presented_at?: string
+          reason_codes?: string[]
+          recommendation_code?: string
+          score?: number | null
+          score_refreshed_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sale_credit_advisory_snapshots_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sale_credit_advisory_snapshots_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sale_credit_advisory_snapshots_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_account_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "sale_credit_advisory_snapshots_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_ar_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "sale_credit_advisory_snapshots_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_deposit_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "sale_credit_advisory_snapshots_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sale_credit_advisory_snapshots_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_advance_balances"
+            referencedColumns: ["supplier_id"]
+          },
+          {
+            foreignKeyName: "sale_credit_advisory_snapshots_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_ap_balances"
+            referencedColumns: ["supplier_id"]
+          },
+          {
+            foreignKeyName: "sale_credit_advisory_snapshots_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: true
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stock_locations: {
         Row: {
           code: string
@@ -10247,6 +11468,8 @@ export type Database = {
           created_by: string | null
           id: string
           location_id: string
+          paid_on: string
+          paid_on_source: string
           purchase_id: string | null
           reversal_reason: string | null
           reversed_at: string | null
@@ -10264,6 +11487,8 @@ export type Database = {
           created_by?: string | null
           id?: string
           location_id: string
+          paid_on: string
+          paid_on_source?: string
           purchase_id?: string | null
           reversal_reason?: string | null
           reversed_at?: string | null
@@ -10281,6 +11506,8 @@ export type Database = {
           created_by?: string | null
           id?: string
           location_id?: string
+          paid_on?: string
+          paid_on_source?: string
           purchase_id?: string | null
           reversal_reason?: string | null
           reversed_at?: string | null
@@ -12081,69 +13308,87 @@ export type Database = {
           revenue: number | null
           variant_id: string | null
         }
+        Insert: {
+          cogs?: number | null
+          company_id?: string | null
+          day?: string | null
+          location_id?: string | null
+          quantity?: number | null
+          revenue?: number | null
+          variant_id?: string | null
+        }
+        Update: {
+          cogs?: number | null
+          company_id?: string | null
+          day?: string | null
+          location_id?: string | null
+          quantity?: number | null
+          revenue?: number | null
+          variant_id?: string | null
+        }
         Relationships: [
           {
-            foreignKeyName: "order_lines_variant_id_fkey"
-            columns: ["variant_id"]
-            isOneToOne: false
-            referencedRelation: "low_stock_variants"
-            referencedColumns: ["variant_id"]
-          },
-          {
-            foreignKeyName: "order_lines_variant_id_fkey"
-            columns: ["variant_id"]
-            isOneToOne: false
-            referencedRelation: "low_stock_variants_by_location"
-            referencedColumns: ["variant_id"]
-          },
-          {
-            foreignKeyName: "order_lines_variant_id_fkey"
-            columns: ["variant_id"]
-            isOneToOne: false
-            referencedRelation: "product_stock"
-            referencedColumns: ["variant_id"]
-          },
-          {
-            foreignKeyName: "order_lines_variant_id_fkey"
-            columns: ["variant_id"]
-            isOneToOne: false
-            referencedRelation: "product_variants"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "order_lines_variant_id_fkey"
-            columns: ["variant_id"]
-            isOneToOne: false
-            referencedRelation: "variant_catalog"
-            referencedColumns: ["variant_id"]
-          },
-          {
-            foreignKeyName: "orders_company_id_fkey"
+            foreignKeyName: "product_daily_facts_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "orders_company_id_fkey"
+            foreignKeyName: "product_daily_facts_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "public_storefronts"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "orders_location_id_fkey"
+            foreignKeyName: "product_daily_facts_location_id_fkey"
             columns: ["location_id"]
             isOneToOne: false
             referencedRelation: "low_stock_variants_by_location"
             referencedColumns: ["location_id"]
           },
           {
-            foreignKeyName: "orders_location_id_fkey"
+            foreignKeyName: "product_daily_facts_location_id_fkey"
             columns: ["location_id"]
             isOneToOne: false
             referencedRelation: "stock_locations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_daily_facts_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "low_stock_variants"
+            referencedColumns: ["variant_id"]
+          },
+          {
+            foreignKeyName: "product_daily_facts_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "low_stock_variants_by_location"
+            referencedColumns: ["variant_id"]
+          },
+          {
+            foreignKeyName: "product_daily_facts_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "product_stock"
+            referencedColumns: ["variant_id"]
+          },
+          {
+            foreignKeyName: "product_daily_facts_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "product_variants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_daily_facts_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "variant_catalog"
+            referencedColumns: ["variant_id"]
           },
         ]
       }
@@ -12185,53 +13430,53 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "order_lines_variant_id_fkey"
-            columns: ["variant_id"]
-            isOneToOne: false
-            referencedRelation: "low_stock_variants"
-            referencedColumns: ["variant_id"]
-          },
-          {
-            foreignKeyName: "order_lines_variant_id_fkey"
-            columns: ["variant_id"]
-            isOneToOne: false
-            referencedRelation: "low_stock_variants_by_location"
-            referencedColumns: ["variant_id"]
-          },
-          {
-            foreignKeyName: "order_lines_variant_id_fkey"
-            columns: ["variant_id"]
-            isOneToOne: false
-            referencedRelation: "product_stock"
-            referencedColumns: ["variant_id"]
-          },
-          {
-            foreignKeyName: "order_lines_variant_id_fkey"
-            columns: ["variant_id"]
-            isOneToOne: false
-            referencedRelation: "product_variants"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "order_lines_variant_id_fkey"
-            columns: ["variant_id"]
-            isOneToOne: false
-            referencedRelation: "variant_catalog"
-            referencedColumns: ["variant_id"]
-          },
-          {
-            foreignKeyName: "orders_company_id_fkey"
+            foreignKeyName: "product_daily_facts_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "orders_company_id_fkey"
+            foreignKeyName: "product_daily_facts_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "public_storefronts"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_daily_facts_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "low_stock_variants"
+            referencedColumns: ["variant_id"]
+          },
+          {
+            foreignKeyName: "product_daily_facts_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "low_stock_variants_by_location"
+            referencedColumns: ["variant_id"]
+          },
+          {
+            foreignKeyName: "product_daily_facts_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "product_stock"
+            referencedColumns: ["variant_id"]
+          },
+          {
+            foreignKeyName: "product_daily_facts_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "product_variants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_daily_facts_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "variant_catalog"
+            referencedColumns: ["variant_id"]
           },
         ]
       }
@@ -12556,53 +13801,53 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "order_lines_variant_id_fkey"
-            columns: ["variant_id"]
-            isOneToOne: false
-            referencedRelation: "low_stock_variants"
-            referencedColumns: ["variant_id"]
-          },
-          {
-            foreignKeyName: "order_lines_variant_id_fkey"
-            columns: ["variant_id"]
-            isOneToOne: false
-            referencedRelation: "low_stock_variants_by_location"
-            referencedColumns: ["variant_id"]
-          },
-          {
-            foreignKeyName: "order_lines_variant_id_fkey"
-            columns: ["variant_id"]
-            isOneToOne: false
-            referencedRelation: "product_stock"
-            referencedColumns: ["variant_id"]
-          },
-          {
-            foreignKeyName: "order_lines_variant_id_fkey"
-            columns: ["variant_id"]
-            isOneToOne: false
-            referencedRelation: "product_variants"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "order_lines_variant_id_fkey"
-            columns: ["variant_id"]
-            isOneToOne: false
-            referencedRelation: "variant_catalog"
-            referencedColumns: ["variant_id"]
-          },
-          {
-            foreignKeyName: "orders_company_id_fkey"
+            foreignKeyName: "product_daily_facts_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "orders_company_id_fkey"
+            foreignKeyName: "product_daily_facts_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "public_storefronts"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_daily_facts_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "low_stock_variants"
+            referencedColumns: ["variant_id"]
+          },
+          {
+            foreignKeyName: "product_daily_facts_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "low_stock_variants_by_location"
+            referencedColumns: ["variant_id"]
+          },
+          {
+            foreignKeyName: "product_daily_facts_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "product_stock"
+            referencedColumns: ["variant_id"]
+          },
+          {
+            foreignKeyName: "product_daily_facts_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "product_variants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_daily_facts_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "variant_catalog"
+            referencedColumns: ["variant_id"]
           },
         ]
       }
@@ -13435,6 +14680,15 @@ export type Database = {
         Args: { p_invitation_id: string }
         Returns: string
       }
+      capture_inventory_position: {
+        Args: {
+          p_company_id: string
+          p_location_id: string
+          p_quality?: string
+          p_variant_id: string
+        }
+        Returns: undefined
+      }
       cash_custody_holdings: {
         Args: { p_location_id: string }
         Returns: {
@@ -13825,9 +15079,18 @@ export type Database = {
         Args: { p_code: string; p_is_default?: boolean; p_name: string }
         Returns: string
       }
+      credit_cache_summaries: {
+        Args: { p_after?: string; p_limit?: number; p_party_ids?: string[] }
+        Returns: Json
+      }
+      credit_decision_summary: {
+        Args: { p_customer_id: string }
+        Returns: Json
+      }
       credit_health_dashboard: { Args: { p_days?: number }; Returns: Json }
       credit_reminder_scan: { Args: never; Returns: number }
       current_access_snapshot: { Args: never; Returns: Json }
+      current_business_date: { Args: never; Returns: string }
       current_company_id: { Args: never; Returns: string }
       current_company_id_unchecked: { Args: never; Returns: string }
       current_company_legal_status: { Args: never; Returns: Json }
@@ -13954,6 +15217,10 @@ export type Database = {
         Args: { p_approval_id: string; p_reason?: string }
         Returns: string
       }
+      dispatch_credit_band_notifications: {
+        Args: { p_limit?: number }
+        Returns: number
+      }
       dispatch_due_platform_campaigns: { Args: never; Returns: number }
       dispatch_fulfillment: {
         Args: { p_expected_version: number; p_fulfillment_id: string }
@@ -14000,6 +15267,30 @@ export type Database = {
         Args: { p_event: string; p_invitation_id: string; p_version: number }
         Returns: Json
       }
+      enqueue_analytics_bucket: {
+        Args: {
+          p_attention_dirty?: boolean
+          p_company_id: string
+          p_day: string
+          p_location_id: string
+          p_position_dirty?: boolean
+          p_reason?: string
+          p_sales_dirty?: boolean
+          p_variant_id: string
+        }
+        Returns: undefined
+      }
+      enqueue_credit_party: {
+        Args: {
+          p_company_id: string
+          p_party_id: string
+          p_reason?: string
+          p_side: string
+        }
+        Returns: undefined
+      }
+      enqueue_due_credit_profiles: { Args: never; Returns: number }
+      enqueue_product_window_rollover: { Args: never; Returns: number }
       ensure_mpesa_money_account: {
         Args: { p_company_id: string; p_name?: string }
         Returns: string
@@ -14179,6 +15470,15 @@ export type Database = {
         Args: { p_company_id: string }
         Returns: undefined
       }
+      insight_attention_feed: {
+        Args: {
+          p_cursor?: number
+          p_domain?: string
+          p_limit?: number
+          p_location_id?: string
+        }
+        Returns: Json
+      }
       invite_team_member: {
         Args: { p_display_name: string; p_phone: string; p_role_id: string }
         Returns: Json
@@ -14305,6 +15605,19 @@ export type Database = {
           received_at: string
           result_code: string
         }[]
+      }
+      list_party_credit_profiles: {
+        Args: {
+          p_band?: string
+          p_confidence?: string
+          p_cursor?: string
+          p_limit?: number
+          p_overdue_only?: boolean
+          p_recommendation?: string
+          p_search?: string
+          p_side?: string
+        }
+        Returns: Json
       }
       list_reconcilable_accounts: {
         Args: { p_location_id?: string }
@@ -14663,6 +15976,15 @@ export type Database = {
       order_vat_reporting_date: {
         Args: { p_order_id: string; p_tax_point: string; p_timezone: string }
         Returns: string
+      }
+      party_credit_profile: {
+        Args: {
+          p_before?: string
+          p_document_limit?: number
+          p_party_id: string
+          p_side?: string
+        }
+        Returns: Json
       }
       patch_product_categories: {
         Args: {
@@ -15177,17 +16499,31 @@ export type Database = {
         }
         Returns: Json
       }
-      post_customer_receipt: {
-        Args: {
-          p_amount: number
-          p_client_ref?: string
-          p_customer_id: string
-          p_location_id: string
-          p_method_code: string
-          p_reference?: string
-        }
-        Returns: Json
-      }
+      post_customer_receipt:
+        | {
+            Args: {
+              p_amount: number
+              p_client_ref?: string
+              p_customer_id: string
+              p_location_id: string
+              p_method_code: string
+              p_reference?: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_amount: number
+              p_client_ref: string
+              p_customer_id: string
+              p_location_id: string
+              p_method_code: string
+              p_paid_on: string
+              p_paid_on_source?: string
+              p_reference: string
+            }
+            Returns: Json
+          }
       post_customer_receipt_reversal: {
         Args: { p_reason: string; p_receipt_id: string }
         Returns: Json
@@ -15424,25 +16760,50 @@ export type Database = {
         Args: { p_amount: number; p_reason: string; p_supplier_id: string }
         Returns: string
       }
-      post_supplier_fifo_payment: {
-        Args: {
-          p_account_code: string
-          p_amount: number
-          p_client_ref: string
-          p_supplier_id: string
-        }
-        Returns: string
-      }
-      post_supplier_payment: {
-        Args: {
-          p_account_code: string
-          p_amount: number
-          p_client_ref?: string
-          p_purchase_id: string
-          p_supplier_id: string
-        }
-        Returns: string
-      }
+      post_supplier_fifo_payment:
+        | {
+            Args: {
+              p_account_code: string
+              p_amount: number
+              p_client_ref: string
+              p_supplier_id: string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_account_code: string
+              p_amount: number
+              p_client_ref: string
+              p_paid_on: string
+              p_paid_on_source?: string
+              p_supplier_id: string
+            }
+            Returns: string
+          }
+      post_supplier_payment:
+        | {
+            Args: {
+              p_account_code: string
+              p_amount: number
+              p_client_ref?: string
+              p_purchase_id: string
+              p_supplier_id: string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_account_code: string
+              p_amount: number
+              p_client_ref: string
+              p_paid_on: string
+              p_paid_on_source?: string
+              p_purchase_id: string
+              p_supplier_id: string
+            }
+            Returns: string
+          }
       post_transfer: {
         Args: {
           p_fee?: number
@@ -15554,6 +16915,37 @@ export type Database = {
         Returns: Json
       }
       primary_contact_notification_settings: { Args: never; Returns: Json }
+      process_analytics_dirty_buckets: {
+        Args: { p_limit?: number }
+        Returns: number
+      }
+      process_credit_dirty_parties: {
+        Args: { p_limit?: number }
+        Returns: number
+      }
+      product_intelligence: {
+        Args: {
+          p_limit?: number
+          p_location_id?: string
+          p_manufacturer_id?: string
+          p_offset?: number
+          p_search?: string
+          p_since?: string
+          p_supplier_id?: string
+          p_until?: string
+          p_window_days?: number
+        }
+        Returns: Json
+      }
+      product_profile: {
+        Args: {
+          p_location_id: string
+          p_since?: string
+          p_until?: string
+          p_variant_id: string
+        }
+        Returns: Json
+      }
       product_workbook_snapshot: {
         Args: { p_location_id: string }
         Returns: Json
@@ -15727,6 +17119,15 @@ export type Database = {
         }
         Returns: string
       }
+      rebuild_product_daily_fact: {
+        Args: {
+          p_company_id: string
+          p_day: string
+          p_location_id: string
+          p_variant_id: string
+        }
+        Returns: undefined
+      }
       reconcile_all_company_usage: { Args: never; Returns: number }
       reconcile_company_usage: {
         Args: { p_company_id?: string }
@@ -15757,6 +17158,13 @@ export type Database = {
           p_visitor_id: string
         }
         Returns: boolean
+      }
+      record_credit_advisory_snapshot: {
+        Args: {
+          p_acknowledgement_reason?: string
+          p_order_id: string
+        }
+        Returns: undefined
       }
       record_customer_deposit: {
         Args: {
@@ -15945,8 +17353,33 @@ export type Database = {
         Args: { p_variant_id: string }
         Returns: undefined
       }
+      refresh_credit_party: {
+        Args: {
+          p_baseline?: boolean
+          p_company_id: string
+          p_party_id: string
+          p_side: string
+        }
+        Returns: undefined
+      }
       refresh_payment_collection_status: {
         Args: { p_collection_id: string }
+        Returns: undefined
+      }
+      refresh_product_attention: {
+        Args: {
+          p_company_id: string
+          p_location_id: string
+          p_variant_id: string
+        }
+        Returns: undefined
+      }
+      refresh_product_window_metrics: {
+        Args: {
+          p_company_id: string
+          p_location_id: string
+          p_variant_id: string
+        }
         Returns: undefined
       }
       refund_customer_deposit: {
@@ -16895,6 +18328,13 @@ export type Database = {
         Args: { p_profile_id: string; p_tax_registration_number: string }
         Returns: string
       }
+      update_credit_insight_settings: {
+        Args: {
+          p_notifications_enabled: boolean
+          p_opportunity_rate_bps: number
+        }
+        Returns: undefined
+      }
       update_customer: {
         Args: {
           p_customer_id: string
@@ -16924,6 +18364,10 @@ export type Database = {
           p_terms_days?: number
         }
         Returns: string
+      }
+      update_customer_credit_score_notifications: {
+        Args: { p_customer_id: string; p_enabled: boolean }
+        Returns: undefined
       }
       update_customer_tax_registration: {
         Args: { p_customer_id: string; p_tax_registration_number: string }
@@ -16964,6 +18408,19 @@ export type Database = {
         }
         Returns: string
       }
+      update_reorder_settings: {
+        Args: { p_default_lead_days: number; p_default_safety_days: number }
+        Returns: undefined
+      }
+      update_inventory_settings: {
+        Args: {
+          p_batch_expiry_enabled: boolean
+          p_default_lead_days: number
+          p_default_safety_days: number
+          p_low_stock_threshold: number
+        }
+        Returns: undefined
+      }
       update_staff_display_name: {
         Args: { p_display_name: string; p_membership_id: string }
         Returns: string
@@ -17000,6 +18457,14 @@ export type Database = {
           p_role_id?: string
         }
         Returns: string
+      }
+      update_variant_reorder_settings: {
+        Args: {
+          p_lead_days: number
+          p_safety_days: number
+          p_variant_id: string
+        }
+        Returns: undefined
       }
       upsert_category: {
         Args: {
@@ -17320,4 +18785,3 @@ export const Constants = {
     Enums: {},
   },
 } as const
-

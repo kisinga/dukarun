@@ -115,17 +115,6 @@ type DisplayProduct = RestockProductRow & {
               }
             </select>
           </label>
-
-          <button
-            type="button"
-            class="btn btn-ghost btn-square min-h-11 min-w-11"
-            title="Refresh restocking data"
-            aria-label="Refresh restocking data"
-            [disabled]="loading() || !hasScope()"
-            (click)="load()"
-          >
-            <app-icon name="heroArrowPath" />
-          </button>
         </div>
       </div>
 
@@ -163,7 +152,9 @@ type DisplayProduct = RestockProductRow & {
           }
         </header>
 
-        <div class="grid grid-cols-2 border-y border-base-300 bg-base-100 xl:grid-cols-5">
+        <div
+          class="grid grid-cols-2 border-y border-base-300 bg-base-100 lg:grid-cols-3 xl:grid-cols-6"
+        >
           <div class="border-b border-r border-base-300 px-4 py-3 xl:border-b-0">
             <p class="type-caption">Products</p>
             <p class="type-title mt-1 tabular-nums">{{ data.summary.products }}</p>
@@ -179,6 +170,10 @@ type DisplayProduct = RestockProductRow & {
           <div class="border-b border-base-300 px-4 py-3 xl:border-b-0 xl:border-r">
             <p class="type-caption">Stock on hand</p>
             <p class="type-title mt-1 tabular-nums">{{ quantity(data.summary.stock) }}</p>
+          </div>
+          <div class="border-b border-r border-base-300 px-4 py-3 xl:border-b-0">
+            <p class="type-caption">Stock at cost</p>
+            <p class="type-title mt-1 tabular-nums">{{ fmt(data.summary.stockValue) }}</p>
           </div>
           <div class="col-span-2 px-4 py-3 xl:col-span-1">
             <p class="type-caption">Needs attention</p>
@@ -458,6 +453,7 @@ type DisplayProduct = RestockProductRow & {
 export class RestockIntelligenceComponent implements OnInit {
   readonly since = input.required<string>();
   readonly until = input.required<string>();
+  readonly refreshToken = input(0);
 
   private readonly reports = inject(ReportsService);
   private readonly catalog = inject(CatalogCacheService);
@@ -546,6 +542,7 @@ export class RestockIntelligenceComponent implements OnInit {
     effect(() => {
       const since = this.since();
       const until = this.until();
+      this.refreshToken();
       if (!this.ready()) return;
       untracked(() => void this.load(since, until));
     });
@@ -595,7 +592,9 @@ export class RestockIntelligenceComponent implements OnInit {
   }
 
   protected setLocation(event: Event): void {
-    this.selectedLocation.set((event.target as HTMLSelectElement).value);
+    const locationId = (event.target as HTMLSelectElement).value;
+    this.selectedLocation.set(locationId);
+    this.locations.select(locationId);
     void this.load();
   }
 

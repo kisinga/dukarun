@@ -2,6 +2,7 @@ import { signal, type WritableSignal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CashierSessionService } from '../core/cashier-session.service';
+import { BusinessClockService } from '../core/business-clock.service';
 import { LocationContextService } from '../core/location-context.service';
 import { PartyCacheService } from '../core/party-cache.service';
 import { PermissionsService } from '../core/permissions.service';
@@ -63,6 +64,10 @@ describe('SupplierAccountStore', () => {
     TestBed.configureTestingModule({
       providers: [
         SupplierAccountStore,
+        {
+          provide: BusinessClockService,
+          useValue: { today: vi.fn().mockResolvedValue('2026-08-27') },
+        },
         { provide: MoneyService, useValue: money },
         {
           provide: PosService,

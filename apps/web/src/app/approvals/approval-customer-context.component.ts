@@ -6,12 +6,20 @@ import { IconComponent } from '../shared/ui/icon.component';
 import { MoneyComponent } from '../shared/ui/money.component';
 import { StatusBadgeComponent } from '../shared/ui/status-badge.component';
 import { Approval } from './approvals.service';
+import { ScoreBadgeComponent } from '../insights/score-badge.component';
 
 type Policy = { credit_limit: number; is_credit_approved: boolean; credit_terms_days: number };
 
 @Component({
   selector: 'app-approval-customer-context',
-  imports: [RouterLink, ButtonComponent, IconComponent, MoneyComponent, StatusBadgeComponent],
+  imports: [
+    RouterLink,
+    ButtonComponent,
+    IconComponent,
+    MoneyComponent,
+    StatusBadgeComponent,
+    ScoreBadgeComponent,
+  ],
   template: `
     <div class="mt-4 flex items-center justify-between gap-3">
       <div>
@@ -28,7 +36,16 @@ type Policy = { credit_limit: number; is_credit_approved: boolean; credit_terms_
       /></a>
     </div>
     <div class="mt-2 rounded-box border border-base-300 p-3">
-      <p class="font-semibold">{{ customerName() }}</p>
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <p class="font-semibold">{{ customerName() }}</p>
+        @if (customer().credit_band) {
+          <app-score-badge
+            [score]="customer().credit_score ?? null"
+            [band]="customer().credit_band!"
+            [confidence]="customer().credit_confidence ?? 'unrated'"
+          />
+        }
+      </div>
       <p class="type-caption">Current receivable balance</p>
       <p class="mt-1 font-bold"><app-money [amount]="customer().ar_balance" /></p>
     </div>

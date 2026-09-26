@@ -1,6 +1,7 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { CashierSessionService } from '../core/cashier-session.service';
+import { InsightsService } from '../insights/insights.service';
 import { ButtonComponent } from '../shared/ui/button.component';
 import { IconComponent } from '../shared/ui/icon.component';
 import { CompanySettingsStore } from './company-settings.store';
@@ -40,7 +41,7 @@ import type { CompanySettings } from './settings.service';
           <div class="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h2 class="section-title">Inventory</h2>
-              <p class="type-caption mt-1">Stock warnings and batch-expiry intake behavior.</p>
+              <p class="type-caption mt-1">Stock warnings, replenishment and expiry behavior.</p>
             </div>
             @if (dirty()) {
               <span class="badge badge-warning badge-sm">Unsaved changes</span>
@@ -62,6 +63,44 @@ import type { CompanySettings } from './settings.service';
                   class="input input-bordered input-sm w-20 text-right"
                   [formControl]="lowStock"
                 />
+              </div>
+              <div class="grid grid-cols-[1fr_auto] items-center gap-4 py-3">
+                <span>
+                  <span class="block text-sm font-medium">Default supplier lead time</span>
+                  <span class="block text-xs text-base-content/60">
+                    Days between placing a purchase and receiving stock.
+                  </span>
+                </span>
+                <label class="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="0"
+                    max="365"
+                    class="input input-bordered input-sm w-20 text-right"
+                    aria-label="Default supplier lead days"
+                    [formControl]="leadDays"
+                  />
+                  <span class="text-xs text-base-content/60">days</span>
+                </label>
+              </div>
+              <div class="grid grid-cols-[1fr_auto] items-center gap-4 py-3">
+                <span>
+                  <span class="block text-sm font-medium">Default safety stock</span>
+                  <span class="block text-xs text-base-content/60">
+                    Extra days of demand included in reorder suggestions.
+                  </span>
+                </span>
+                <label class="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="0"
+                    max="365"
+                    class="input input-bordered input-sm w-20 text-right"
+                    aria-label="Default safety days"
+                    [formControl]="safetyDays"
+                  />
+                  <span class="text-xs text-base-content/60">days</span>
+                </label>
               </div>
               <label class="flex cursor-pointer items-center justify-between gap-4 py-3">
                 <span>
@@ -111,6 +150,7 @@ import type { CompanySettings } from './settings.service';
 export class InventorySettingsComponent implements OnInit {
   private readonly companySettings = inject(CompanySettingsStore);
   private readonly cashierSession = inject(CashierSessionService);
+  private readonly insights = inject(InsightsService);
 
   protected readonly loading = this.companySettings.loading;
   protected readonly loadError = this.companySettings.error;
@@ -119,6 +159,8 @@ export class InventorySettingsComponent implements OnInit {
   protected readonly message = signal<{ ok: boolean; text: string } | null>(null);
 
   protected readonly lowStock = new FormControl(0, { nonNullable: true });
+  protected readonly leadDays = new FormControl(7, { nonNullable: true });
+  protected readonly safetyDays = new FormControl(7, { nonNullable: true });
   protected readonly batchExpiry = new FormControl(false, { nonNullable: true });
 
   async ngOnInit(): Promise<void> {
@@ -149,11 +191,20 @@ export class InventorySettingsComponent implements OnInit {
     this.busy.set(true);
     this.message.set(null);
     try {
-      const settings = await this.companySettings.update({
+      await this.insights.updateInventorySettings({
+        lowStockThreshold: this.lowStock.value,
+        batchExpiryEnabled: this.batchExpiry.value,
+        defaultLeadDays: this.leadDays.value,
+        defaultSafetyDays: this.safetyDays.value,
+      });
+      this.companySettings.patchLocal({
         low_stock_threshold: this.lowStock.value,
         batch_expiry_enabled: this.batchExpiry.value,
+        default_reorder_lead_days: this.leadDays.value,
+        default_reorder_safety_days: this.safetyDays.value,
       });
-      this.applySettings(settings);
+      const current = this.settings();
+      if (current) this.applySettings(current);
       await this.cashierSession.refreshConfiguration();
       this.message.set({ ok: true, text: 'Saved' });
     } catch (error) {
@@ -168,6 +219,8 @@ export class InventorySettingsComponent implements OnInit {
 
   private applySettings(settings: CompanySettings): void {
     this.lowStock.setValue(settings.low_stock_threshold);
+    this.leadDays.setValue(settings.default_reorder_lead_days);
+    this.safetyDays.setValue(settings.default_reorder_safety_days);
     this.batchExpiry.setValue(settings.batch_expiry_enabled);
     for (const control of this.controls()) {
       control.markAsPristine();
@@ -175,6 +228,6 @@ export class InventorySettingsComponent implements OnInit {
   }
 
   private controls(): Array<FormControl<number> | FormControl<boolean>> {
-    return [this.lowStock, this.batchExpiry];
+    return [this.lowStock, this.leadDays, this.safetyDays, this.batchExpiry];
   }
 }
