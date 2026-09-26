@@ -202,10 +202,11 @@ meaning, daisyUI tokens only.
   so an icon cannot work in one component scope and silently disappear in another; the design
   guard rejects unregistered literal Heroicon names.
 - **No hand-authored inline `<svg>` for interface icons, and no emoji** — the guard rejects them.
-  Machine-generated, non-interface vector artifacts whose geometry carries data (currently printed
-  Code 128 barcodes) may use inline SVG only when retaining vector output is necessary for fidelity.
-  Each exception must be documented at its renderer and count-ratcheted by
-  `design-guard.allowlist.json`; it must not be used to bypass `<app-icon>` for visual icons.
+  Inline SVG is appropriate when its geometry carries data: charts, plots, maps, timelines, and
+  similar visualizations must declare `data-visualization="…"` on the root `<svg>`. The marker is a
+  semantic exception, not an icon escape hatch: decorative and interface artwork still uses
+  `<app-icon>`. Machine-generated non-interface artifacts such as printed Code 128 barcodes may be
+  count-ratcheted in `design-guard.allowlist.json` when their source cannot carry the marker.
 - Always use `<app-icon name="hero…">` (`IconComponent`) — sizes: `sm` (14px, with
   `text-xs`), `md` (16px, with `text-sm`, the default), `lg` (20px, standalone),
   `xl` (40px, decorative only: empty states and large placeholders). No other values.

@@ -11,6 +11,7 @@ import { DateRangePresetControlComponent } from './date-range-preset-control.com
 import { presetDateRange, type AppliedDateRange } from './date-range';
 import { InsightsService } from './insights.service';
 import { insightCopy, type DateRangePreset, type ProductProfile } from './insights.models';
+import { ProductActivityChartComponent } from './product-activity-chart.component';
 
 @Component({
   selector: 'app-product-profile',
@@ -22,6 +23,7 @@ import { insightCopy, type DateRangePreset, type ProductProfile } from './insigh
     IconComponent,
     DataCoverageBadgeComponent,
     DateRangePresetControlComponent,
+    ProductActivityChartComponent,
   ],
   template: `
     @if (loading()) {
@@ -60,8 +62,8 @@ import { insightCopy, type DateRangePreset, type ProductProfile } from './insigh
           />
         </div>
         <article class="card bg-base-100">
-          <div class="card-body p-4 sm:p-6">
-            <div class="flex flex-wrap items-start justify-between gap-3">
+          <div class="card-body gap-5 p-4 sm:p-6">
+            <header class="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <p class="type-caption">{{ item.variant.sku }}</p>
                 <h2 class="text-xl font-bold">
@@ -74,238 +76,170 @@ import { insightCopy, type DateRangePreset, type ProductProfile } from './insigh
                   }
                 </p>
               </div>
-              <span
-                class="badge badge-lg"
-                [class.badge-error]="signal(item) === 'stockout'"
-                [class.badge-warning]="signal(item) === 'reorder' || signal(item) === 'low_cover'"
-                >{{ signal(item).replaceAll('_', ' ') }}</span
+              <span class="badge badge-lg" [class]="signalClass(item)">{{
+                signalLabel(item)
+              }}</span>
+            </header>
+
+            <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-12">
+              <section
+                class="rounded-box border p-4 sm:col-span-2 xl:col-span-4"
+                [class.border-error/30]="signal(item) === 'stockout'"
+                [class.bg-error/5]="signal(item) === 'stockout'"
+                [class.border-warning/30]="
+                  signal(item) === 'reorder' || signal(item) === 'low_cover'
+                "
+                [class.bg-warning/5]="signal(item) === 'reorder' || signal(item) === 'low_cover'"
+                [class.border-base-300]="
+                  signal(item) !== 'stockout' &&
+                  signal(item) !== 'reorder' &&
+                  signal(item) !== 'low_cover'
+                "
               >
-            </div>
-            <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-              <div class="rounded-box bg-base-200 p-3">
-                <p class="type-caption">Current stock</p>
-                <p class="text-lg font-bold">
-                  {{ attentionNumber(item, 'current_stock') | number: '1.0-3' }}
+                <p class="text-xs font-semibold uppercase tracking-wide text-base-content/55">
+                  Recommended next step
                 </p>
-              </div>
-              <div class="rounded-box bg-base-200 p-3">
-                <p class="type-caption">Days of cover</p>
-                <p class="text-lg font-bold">
-                  @if (attentionNumber(item, 'days_of_cover') !== null) {
-                    {{ attentionNumber(item, 'days_of_cover') | number: '1.0-1' }}
-                  } @else {
-                    —
-                  }
-                </p>
-              </div>
-              <div class="rounded-box bg-base-200 p-3">
-                <p class="type-caption">Units sold</p>
-                <p class="text-lg font-bold">{{ item.summary.unitsSold | number: '1.0-3' }}</p>
-              </div>
-              <div class="rounded-box bg-base-200 p-3">
-                <p class="type-caption">Average stock</p>
-                <p class="text-lg font-bold">{{ item.summary.averageStock | number: '1.0-3' }}</p>
-              </div>
-              <div class="rounded-box bg-base-200 p-3">
-                <p class="type-caption">Stockout days</p>
-                <p class="text-lg font-bold">{{ item.summary.stockoutDays }}</p>
-              </div>
-              @if (item.summary.netRevenue !== null) {
-                <div class="rounded-box bg-base-200 p-3">
-                  <p class="type-caption">Net sales / margin</p>
-                  <p class="text-lg font-bold">{{ fmt(item.summary.netRevenue) }}</p>
-                  <p class="type-caption">{{ fmt(item.summary.margin ?? 0) }} margin</p>
+                <p class="mt-2 font-semibold">{{ decisionHeadline(item) }}</p>
+                <p class="mt-1 text-sm text-base-content/70">{{ decisionReason(item) }}</p>
+                @if (reorderQuantity(item); as quantity) {
+                  <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
+                    <p class="text-sm">
+                      Suggested order:
+                      <strong>{{ quantity | number: '1.0-3' }} {{ item.variant.stockUnit }}</strong>
+                    </p>
+                    <a
+                      class="btn btn-primary btn-sm min-h-11"
+                      routerLink="/purchases/new"
+                      [queryParams]="{
+                        supplier: item.variant.supplierId,
+                        variant: item.variant.id,
+                        quantity: quantity,
+                      }"
+                      >Start purchase</a
+                    >
+                  </div>
+                }
+              </section>
+
+              <section class="rounded-box border border-base-300 p-4 xl:col-span-2">
+                <p class="type-caption">Stock health</p>
+                <div class="mt-1 flex items-end justify-between gap-2">
+                  <p class="text-2xl font-bold tabular-nums">
+                    {{ attentionNumber(item, 'current_stock') | number: '1.0-3' }}
+                  </p>
+                  <p class="text-xs text-base-content/60">{{ coverLabel(item) }}</p>
                 </div>
+                <div class="relative mt-3 h-2 overflow-hidden rounded-field bg-base-200">
+                  <span
+                    class="absolute inset-y-0 left-[23.33%] z-10 border-l border-warning"
+                  ></span>
+                  <span
+                    class="block h-full rounded-field bg-primary"
+                    [style.width.%]="coverageWidth(item)"
+                  ></span>
+                </div>
+                <p class="mt-2 text-xs text-base-content/55">Marker: 14 days cover</p>
+              </section>
+
+              <section class="rounded-box border border-base-300 p-4 xl:col-span-2">
+                <p class="type-caption">Demand</p>
+                <p class="mt-1 text-2xl font-bold tabular-nums">
+                  {{ item.summary.unitsSold | number: '1.0-3' }}
+                </p>
+                <p class="mt-1 text-xs text-base-content/60">
+                  {{ activeDays(item) }} active days · {{ averageDailyDemand(item) }} per day
+                </p>
+              </section>
+
+              <section class="rounded-box border border-base-300 p-4 xl:col-span-2">
+                <p class="type-caption">Availability</p>
+                <p
+                  class="mt-1 text-2xl font-bold tabular-nums"
+                  [class.text-error]="item.summary.stockoutDays > 0"
+                >
+                  {{ item.summary.stockoutDays }} days
+                </p>
+                <p class="mt-1 text-xs text-base-content/60">
+                  {{ stockoutShare(item) }} of the selected period out of stock
+                </p>
+              </section>
+
+              @if (item.summary.netRevenue !== null) {
+                <section class="rounded-box border border-base-300 p-4 xl:col-span-2">
+                  <p class="type-caption">Sales contribution</p>
+                  <p class="mt-1 text-xl font-bold tabular-nums">
+                    {{ fmt(item.summary.netRevenue) }}
+                  </p>
+                  <p class="mt-1 text-xs text-base-content/60">
+                    {{ fmt(item.summary.margin ?? 0) }} margin · {{ marginRate(item) }}
+                  </p>
+                </section>
               }
             </div>
-            @if (reorderQuantity(item); as quantity) {
-              <div
-                class="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-field bg-warning/10 p-3"
-              >
-                <p class="text-sm">
-                  Suggested reorder: <strong>{{ quantity | number: '1.0-3' }}</strong>
-                  {{ item.variant.stockUnit }}
-                  @if (item.variant.supplierName) {
-                    from {{ item.variant.supplierName }}
-                  }
-                </p>
-                <a
-                  class="btn btn-primary btn-sm min-h-11"
-                  routerLink="/purchases/new"
-                  [queryParams]="{
-                    supplier: item.variant.supplierId,
-                    variant: item.variant.id,
-                    quantity: quantity,
-                  }"
-                  >Start purchase</a
-                >
-              </div>
-            }
           </div>
         </article>
-        <div class="grid items-start gap-4 xl:grid-cols-3">
-          <article class="card bg-base-100 xl:col-span-2">
-            <div class="card-body p-0">
-              <header class="border-b border-base-200 p-4">
-                <h3 class="section-title">Demand trend</h3>
-                <p class="type-caption">Gross sales, returns, and net demand remain separate.</p>
-              </header>
-              <div class="hidden overflow-x-auto lg:block">
-                <table class="table table-sm">
-                  <thead>
-                    <tr>
-                      <th>Day</th>
-                      <th class="text-right">Gross units</th>
-                      <th class="text-right">Returns</th>
-                      <th class="text-right">Net units</th>
-                      @if (item.summary.netRevenue !== null) {
-                        <th class="text-right">Net sales</th>
-                        <th class="text-right">Margin</th>
-                      }
-                    </tr>
-                  </thead>
-                  <tbody>
-                    @for (point of item.trend; track point['day']) {
-                      <tr>
-                        <td>{{ point['day'] | date: 'mediumDate' }}</td>
-                        <td class="text-right">{{ point['gross_quantity'] | number: '1.0-3' }}</td>
-                        <td class="text-right">
-                          {{ point['returned_quantity'] | number: '1.0-3' }}
-                        </td>
-                        <td class="text-right font-semibold">
-                          {{ point['net_quantity'] | number: '1.0-3' }}
-                        </td>
-                        @if (item.summary.netRevenue !== null) {
-                          <td class="text-right">{{ fmtNumber(point['net_revenue']) }}</td>
-                          <td class="text-right">{{ fmtNumber(point['margin']) }}</td>
-                        }
-                      </tr>
-                    }
-                  </tbody>
-                </table>
+
+        <article class="card bg-base-100">
+          <div class="card-body gap-4 p-4 sm:p-5">
+            <header class="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <h3 class="section-title">Product activity</h3>
+                <p class="type-caption mt-1">
+                  Demand and stock movement for this item—not its manufacturer or supplier group.
+                </p>
               </div>
-              <div class="divide-y divide-base-200 lg:hidden">
-                @for (point of item.trend; track point['day']) {
-                  <article class="space-y-2 p-4">
-                    <p class="font-semibold">{{ point['day'] | date: 'mediumDate' }}</p>
-                    <dl class="grid grid-cols-3 gap-3 text-sm">
-                      <div>
-                        <dt class="type-caption">Gross</dt>
-                        <dd class="tabular-nums">
-                          {{ point['gross_quantity'] | number: '1.0-3' }}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt class="type-caption">Returns</dt>
-                        <dd class="tabular-nums">
-                          {{ point['returned_quantity'] | number: '1.0-3' }}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt class="type-caption">Net</dt>
-                        <dd class="font-semibold tabular-nums">
-                          {{ point['net_quantity'] | number: '1.0-3' }}
-                        </dd>
-                      </div>
-                    </dl>
-                    @if (item.summary.netRevenue !== null) {
-                      <p class="type-caption">
-                        Net sales {{ fmtNumber(point['net_revenue']) }} · margin
-                        {{ fmtNumber(point['margin']) }}
-                      </p>
-                    }
-                  </article>
-                }
-              </div>
-            </div>
-          </article>
-          <article class="card bg-base-100">
-            <div class="card-body p-4">
-              <h3 class="section-title">Stock coverage</h3>
-              <p class="type-caption">
+              <span class="type-caption">
                 {{ item.coverage.from | date: 'mediumDate' }}–{{
                   item.coverage.to | date: 'mediumDate'
                 }}
-              </p>
-              <div class="mt-3 flex flex-wrap gap-2">
+              </span>
+            </header>
+
+            <app-product-activity-chart [trend]="item.trend" [positions]="item.positions" />
+
+            <footer
+              class="flex flex-wrap items-center justify-between gap-3 border-t border-base-200 pt-3"
+            >
+              <div class="flex flex-wrap items-center gap-2">
                 <app-data-coverage-badge
                   [quality]="item.coverage.estimatedDays > 0 ? 'estimated' : 'exact'"
-                /><span class="type-caption">{{ item.coverage.estimatedDays }} estimated days</span>
+                />
+                <span class="type-caption">
+                  {{ item.coverage.estimatedDays }} of {{ item.coverage.days }} stock days estimated
+                </span>
               </div>
-              <p class="mt-3 text-sm">
+              <p class="type-caption">
                 Historical value is omitted when cost evidence is incomplete.
               </p>
-            </div>
-          </article>
-        </div>
-        <article class="card bg-base-100">
-          <div class="card-body p-0">
-            <header class="border-b border-base-200 p-4">
-              <h3 class="section-title">Sparse stock positions</h3>
-              <p class="type-caption">
-                Expanded only for this product; the selected range never exceeds 366 days.
-              </p>
-            </header>
-            <div class="hidden overflow-x-auto lg:block">
-              <table class="table table-sm">
-                <thead>
-                  <tr>
-                    <th>Day</th>
-                    <th class="text-right">Closing stock</th>
-                    <th class="text-right">Closing value</th>
-                    <th>Coverage</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @for (position of item.positions; track position.day) {
-                    <tr>
-                      <td>{{ position.day | date: 'mediumDate' }}</td>
-                      <td class="text-right">
-                        {{
-                          position.closing_quantity === null
-                            ? '—'
-                            : (position.closing_quantity | number: '1.0-3')
-                        }}
-                      </td>
-                      <td class="text-right">
-                        {{ position.closing_value === null ? '—' : fmt(position.closing_value) }}
-                      </td>
-                      <td><app-data-coverage-badge [quality]="position.quality" /></td>
-                    </tr>
-                  }
-                </tbody>
-              </table>
-            </div>
-            <div class="divide-y divide-base-200 lg:hidden">
-              @for (position of item.positions; track position.day) {
-                <article class="space-y-2 p-4">
-                  <div class="flex items-center justify-between gap-3">
-                    <p class="font-semibold">{{ position.day | date: 'mediumDate' }}</p>
-                    <app-data-coverage-badge [quality]="position.quality" />
-                  </div>
-                  <dl class="grid grid-cols-2 gap-3 text-sm">
-                    <div>
-                      <dt class="type-caption">Closing stock</dt>
-                      <dd class="font-semibold tabular-nums">
-                        {{
-                          position.closing_quantity === null
-                            ? '—'
-                            : (position.closing_quantity | number: '1.0-3')
-                        }}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt class="type-caption">Closing value</dt>
-                      <dd class="font-semibold tabular-nums">
-                        {{ position.closing_value === null ? '—' : fmt(position.closing_value) }}
-                      </dd>
-                    </div>
-                  </dl>
-                </article>
-              }
-            </div>
+            </footer>
           </div>
         </article>
+
+        <section class="grid gap-3 sm:grid-cols-3" aria-label="Product context">
+          <div class="card bg-base-100">
+            <div class="card-body gap-1 p-4">
+              <p class="type-caption">Preferred supplier</p>
+              <p class="font-semibold">{{ item.variant.supplierName || 'Not established' }}</p>
+              <p class="text-xs text-base-content/55">Latest posted purchase source</p>
+            </div>
+          </div>
+          <div class="card bg-base-100">
+            <div class="card-body gap-1 p-4">
+              <p class="type-caption">Manufacturer</p>
+              <p class="font-semibold">{{ item.variant.manufacturerName || 'Not assigned' }}</p>
+              <p class="text-xs text-base-content/55">Used for range-level comparison</p>
+            </div>
+          </div>
+          <div class="card bg-base-100">
+            <div class="card-body gap-1 p-4">
+              <p class="type-caption">Average stock</p>
+              <p class="font-semibold tabular-nums">
+                {{ item.summary.averageStock ?? 0 | number: '1.0-3' }} {{ item.variant.stockUnit }}
+              </p>
+              <p class="text-xs text-base-content/55">Across the selected period</p>
+            </div>
+          </div>
+        </section>
       </section>
     } @else {
       <app-empty-state
@@ -379,6 +313,35 @@ export class ProductProfileComponent implements OnInit {
   protected signal(item: ProductProfile): string {
     return String(item.attention?.['signal'] ?? 'updating');
   }
+  protected signalLabel(item: ProductProfile): string {
+    return this.signal(item).replaceAll('_', ' ');
+  }
+  protected signalClass(item: ProductProfile): string {
+    const signal = this.signal(item);
+    if (signal === 'stockout') return 'badge-error';
+    if (signal === 'reorder' || signal === 'low_cover') return 'badge-warning';
+    if (signal === 'healthy') return 'badge-success';
+    return 'badge-ghost';
+  }
+  protected decisionHeadline(item: ProductProfile): string {
+    switch (this.signal(item)) {
+      case 'stockout':
+        return 'Replenish before the next sale';
+      case 'reorder':
+        return 'Prepare the next purchase';
+      case 'low_cover':
+        return 'Stock may run out during lead time';
+      case 'slow':
+        return 'Hold purchasing and watch demand';
+      case 'healthy':
+        return 'Stock is currently healthy';
+      default:
+        return 'Build more demand history';
+    }
+  }
+  protected decisionReason(item: ProductProfile): string {
+    return this.copy(String(item.attention?.['reason_code'] ?? 'insufficient_demand_history'));
+  }
   protected reorderQuantity(item: ProductProfile): number | null {
     const value = Number(item.attention?.['reorder_quantity'] ?? 0);
     return value > 0 ? value : null;
@@ -387,7 +350,34 @@ export class ProductProfileComponent implements OnInit {
     const value = item.attention?.[key];
     return value === null || value === undefined ? null : Number(value);
   }
-  protected fmtNumber(value: number | string | null): string {
-    return formatKes(Number(value ?? 0));
+  protected coverLabel(item: ProductProfile): string {
+    const cover = this.attentionNumber(item, 'days_of_cover');
+    return cover === null
+      ? 'No demand pace'
+      : `${cover.toLocaleString('en-KE', { maximumFractionDigits: 1 })} days cover`;
+  }
+  protected coverageWidth(item: ProductProfile): number {
+    const cover = this.attentionNumber(item, 'days_of_cover');
+    return cover === null ? 0 : Math.min(Math.max((cover / 60) * 100, 0), 100);
+  }
+  protected activeDays(item: ProductProfile): number {
+    return item.trend.filter(
+      point => Number(point.net_quantity) !== 0 || Number(point.returned_quantity) > 0
+    ).length;
+  }
+  protected averageDailyDemand(item: ProductProfile): string {
+    const days = Math.max(item.coverage.days, 1);
+    return (item.summary.unitsSold / days).toLocaleString('en-KE', {
+      maximumFractionDigits: 2,
+    });
+  }
+  protected stockoutShare(item: ProductProfile): string {
+    if (item.coverage.days <= 0) return '0%';
+    return `${Math.round((item.summary.stockoutDays / item.coverage.days) * 100)}%`;
+  }
+  protected marginRate(item: ProductProfile): string {
+    const revenue = item.summary.netRevenue ?? 0;
+    if (revenue <= 0) return '0% margin';
+    return `${Math.round(((item.summary.margin ?? 0) / revenue) * 100)}% margin`;
   }
 }

@@ -6,6 +6,7 @@ import { CatalogCacheService } from '../core/catalog-cache.service';
 import { LocationContextService } from '../core/location-context.service';
 import { PartyCacheService } from '../core/party-cache.service';
 import { IconComponent } from '../shared/ui/icon.component';
+import { InsightsService } from '../insights/insights.service';
 import { RestockIntelligenceComponent } from './restock-intelligence.component';
 import { ReportsService, type RestockIntelligence } from './reports.service';
 
@@ -82,6 +83,7 @@ describe('RestockIntelligenceComponent', () => {
       providers: [
         provideRouter([]),
         { provide: ReportsService, useValue: { restockIntelligence } },
+        { provide: InsightsService, useValue: { productProfile: vi.fn().mockResolvedValue(null) } },
         {
           provide: CatalogCacheService,
           useValue: {
