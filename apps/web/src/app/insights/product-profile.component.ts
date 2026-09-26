@@ -107,11 +107,22 @@ import { ProductActivityChartComponent } from './product-activity-chart.componen
                 </p>
                 <p class="mt-2 font-semibold">{{ decisionHeadline(item) }}</p>
                 <p class="mt-1 text-sm text-base-content/70">{{ decisionReason(item) }}</p>
+                <div class="mt-2 flex flex-wrap gap-1">
+                  @if (demandConfidence(item); as confidence) {
+                    <span class="badge badge-ghost badge-sm">{{ confidence }} confidence</span>
+                  }
+                  @if (outlierDetected(item)) {
+                    <span class="badge badge-warning badge-sm">Unusual spike adjusted</span>
+                  }
+                </div>
                 @if (reorderQuantity(item); as quantity) {
                   <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
                     <p class="text-sm">
                       Suggested order:
                       <strong>{{ quantity | number: '1.0-3' }} {{ item.variant.stockUnit }}</strong>
+                      <span class="block text-xs text-base-content/60">
+                        Planning pace · up to {{ planningWindow(item) }} days
+                      </span>
                     </p>
                     <a
                       class="btn btn-primary btn-sm min-h-11"
@@ -128,7 +139,7 @@ import { ProductActivityChartComponent } from './product-activity-chart.componen
               </section>
 
               <section class="rounded-box border border-base-300 p-4 xl:col-span-2">
-                <p class="type-caption">Stock health</p>
+                <p class="type-caption">Planning stock health</p>
                 <div class="mt-1 flex items-end justify-between gap-2">
                   <p class="text-2xl font-bold tabular-nums">
                     {{ attentionNumber(item, 'current_stock') | number: '1.0-3' }}
@@ -367,6 +378,16 @@ export class ProductProfileComponent implements OnInit {
   protected attentionNumber(item: ProductProfile, key: string): number | null {
     const value = item.attention?.[key];
     return value === null || value === undefined ? null : Number(value);
+  }
+  protected demandConfidence(item: ProductProfile): string | null {
+    const value = item.attention?.['demand_confidence'];
+    return typeof value === 'string' ? value : null;
+  }
+  protected outlierDetected(item: ProductProfile): boolean {
+    return item.attention?.['outlier_detected'] === true;
+  }
+  protected planningWindow(item: ProductProfile): number {
+    return this.attentionNumber(item, 'planning_window_days') ?? 30;
   }
   protected coverLabel(item: ProductProfile): string {
     const cover = this.attentionNumber(item, 'days_of_cover');

@@ -3,6 +3,35 @@ import type {
   DashboardRestockRisk,
   DashboardTopVariant,
 } from './reports.service';
+import type {
+  ProductPerformanceCategory,
+  ProductPerformanceResponse,
+  ProductPerformanceRow,
+} from '../core/product-performance.models';
+
+export interface DashboardPerformanceLeader {
+  kind: ProductPerformanceCategory;
+  row: ProductPerformanceRow;
+}
+
+/** Select one leader per category, advancing past products already used above it. */
+export function selectDashboardPerformanceLeaders(
+  performance: ProductPerformanceResponse,
+  includeMargin = true
+): DashboardPerformanceLeader[] {
+  const order: ProductPerformanceCategory[] = includeMargin
+    ? ['trending', 'volume', 'margin', 'consistent']
+    : ['trending', 'volume', 'consistent'];
+  const used = new Set<string>();
+  const result: DashboardPerformanceLeader[] = [];
+  for (const kind of order) {
+    const row = performance.leaders[kind].find(candidate => !used.has(candidate.product_id));
+    if (!row) continue;
+    used.add(row.product_id);
+    result.push({ kind, row });
+  }
+  return result;
+}
 
 export type DashboardSignalCandidate =
   | { kind: 'restock'; row: DashboardRestockRisk }

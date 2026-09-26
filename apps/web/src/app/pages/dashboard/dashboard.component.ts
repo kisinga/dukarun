@@ -14,12 +14,11 @@ import { formatKes } from '../../core/money';
 import { Company, SupabaseService } from '../../core/supabase.service';
 import { PermissionsService } from '../../core/permissions.service';
 import { SyncService } from '../../pos/offline/sync.service';
-import { PosService, variantLabel, type Variant } from '../../pos/pos.service';
+import { PosService } from '../../pos/pos.service';
 import {
   DashboardDailySummary,
   DashboardLocationSummary,
   DashboardPeriodComparison,
-  DashboardProductSignals,
   DashboardTopVariant,
   ExpiringBatch,
   LowStockVariant,
@@ -36,9 +35,14 @@ import { CompanyPreferencesService } from '../../core/company-preferences.servic
 import { offlineDb, offlineScopeKey, type NamedSnapshot } from '../../pos/offline/offline-db';
 import { CacheJournalService, type CacheStreamHandler } from '../../core/cache-journal.service';
 import { PageActionsComponent } from '../../shared/ui/page-actions.component';
-import { selectDashboardSignalCandidates } from '../../reports/product-intelligence';
+import { selectDashboardPerformanceLeaders } from '../../reports/product-intelligence';
 import { InsightsService } from '../../insights/insights.service';
 import { insightCopy, type InsightSignal } from '../../insights/insights.models';
+import type {
+  DemandConfidence,
+  ProductPerformanceCategory,
+  ProductPerformanceResponse,
+} from '../../core/product-performance.models';
 
 type TopVariant = {
   variantId: string;
@@ -48,10 +52,23 @@ type TopVariant = {
   revenue: number;
   margin: number;
 };
-type ProductSignal = TopVariant & {
-  productId: string | null;
-  kind: 'restock' | 'margin' | 'movement';
-  stock: number | null;
+type ProductSignal = {
+  locationName?: string;
+  variantId: string;
+  productId: string;
+  label: string;
+  kind: ProductPerformanceCategory;
+  currentQuantity: number;
+  robustQuantity: number;
+  previousRobustQuantity: number;
+  revenue: number;
+  margin: number;
+  orderCount: number;
+  activeDays: number;
+  confidence: DemandConfidence;
+  outlierDetected: boolean;
+  stock: number;
+  daysCover: number | null;
 };
 type LowStockDisplay = LowStockVariant & {
   manufacturer_name: string | null;
@@ -425,15 +442,12 @@ type DashboardSection = 'sales' | 'attention';
                 class="flex flex-wrap items-end justify-between gap-2 border-b border-base-300 px-4 py-3"
               >
                 <div>
-                  <h2 class="section-title">Product signals</h2>
-                  <p class="type-caption mt-1">Useful product movement over 7 days.</p>
+                  <h2 class="section-title">Product performance</h2>
+                  <p class="type-caption mt-1">
+                    Distinct leaders over 7 days, adjusted for unusual spikes.
+                  </p>
                 </div>
-                <a
-                  class="link text-xs"
-                  routerLink="/inventory/products"
-                  [queryParams]="{ stock: 'needs_restock' }"
-                  >View restock list</a
-                >
+                <a class="link text-xs" routerLink="/insights/inventory">View performance</a>
               </div>
 
               @if (initialLoading()) {
@@ -449,8 +463,8 @@ type DashboardSection = 'sales' | 'attention';
                   [embedded]="true"
                   [compact]="true"
                   icon="heroCube"
-                  title="No product signals yet"
-                  description="Product movement appears here after completed sales."
+                  title="No performance leaders yet"
+                  description="Leaders appear after enough repeat selling activity is available."
                 />
               } @else {
                 <div class="divide-y divide-base-200">
@@ -462,18 +476,28 @@ type DashboardSection = 'sales' | 'attention';
                     >
                       <div class="min-w-0 flex-1">
                         <p class="truncate font-medium">{{ signal.label }}</p>
+                        @if (signal.locationName) {
+                          <p class="type-caption truncate">{{ signal.locationName }}</p>
+                        }
                         <p class="type-caption truncate">
-                          {{ signal.manufacturer }} · {{ quantity(signal.quantity) }} sold
-                          @if (signal.stock !== null) {
-                            · {{ quantity(signal.stock) }} in stock
-                          }
+                          Adjusted {{ quantity(signal.robustQuantity) }} vs
+                          {{ quantity(signal.previousRobustQuantity) }} ·
+                          {{ signal.orderCount }} orders · {{ signal.activeDays }} active days
                         </p>
+                        <div class="mt-1 flex flex-wrap gap-1">
+                          <span class="badge badge-ghost badge-xs"
+                            >{{ signal.confidence }} confidence</span
+                          >
+                          @if (signal.outlierDetected) {
+                            <span class="badge badge-warning badge-xs">Unusual spike adjusted</span>
+                          }
+                        </div>
                       </div>
                       <div class="shrink-0 text-right">
                         <p class="text-xs font-semibold uppercase text-base-content/70">
                           {{ signalLabel(signal.kind) }}
                         </p>
-                        @if (signal.kind === 'margin') {
+                        @if (canViewFinancials()) {
                           <p
                             class="type-caption"
                             [class.text-success]="signal.margin > 0"
@@ -481,11 +505,15 @@ type DashboardSection = 'sales' | 'attention';
                           >
                             <app-money [amount]="signal.margin" /> margin
                           </p>
-                        } @else if (signal.kind === 'movement') {
-                          <p class="type-caption"><app-money [amount]="signal.revenue" /> sales</p>
-                        } @else {
-                          <p class="type-caption">Needs attention</p>
                         }
+                        <p class="type-caption">
+                          {{ quantity(signal.currentQuantity) }} factual units ·
+                          {{
+                            signal.daysCover === null
+                              ? 'no cover'
+                              : quantity(signal.daysCover) + 'd cover'
+                          }}
+                        </p>
                       </div>
                     </a>
                   }
@@ -1039,7 +1067,17 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.summary.set(sales.summary);
     this.locationRows.set(sales.locations);
     this.comparison.set(sales.comparison);
-    await this.computeProductPerformance(sales.topVariants, sales.productSignals);
+    this.topVariants.set(
+      sales.topVariants.map(row => ({
+        variantId: row.variant_id,
+        label: row.variant_id.slice(0, 8),
+        manufacturer: 'Manufacturer not set',
+        quantity: Number(row.quantity),
+        revenue: Number(row.revenue),
+        margin: Number(row.margin),
+      }))
+    );
+    this.computeProductPerformance(sales.productPerformance);
     if (sales.refreshAfter) this.scheduleSnapshotRefresh(sales.refreshAfter);
     else this.clearSnapshotRefresh();
   }
@@ -1159,7 +1197,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
     };
     this.summary.set(value.summary);
     this.topVariants.set(value.topVariants);
-    this.productSignals.set(value.productSignals ?? []);
+    this.productSignals.set(
+      (value.productSignals ?? []).filter(signal => Number.isFinite(signal.robustQuantity))
+    );
     if (value.attentionLocationId === this.locations.activeId()) {
       this.lowStock.set(value.lowStock);
       this.lowStockTotal.set(value.lowStockTotal ?? value.lowStock.length);
@@ -1227,70 +1267,39 @@ export class DashboardComponent implements OnInit, OnDestroy {
     });
   }
 
-  private async computeProductPerformance(
-    rows: DashboardTopVariant[],
-    signals: DashboardProductSignals
-  ): Promise<void> {
-    const variantIds = [
-      ...new Set([
-        ...rows.map(row => row.variant_id),
-        ...signals.fastVariants.map(row => row.variant_id),
-        ...signals.restockRisks.map(row => row.variant_id),
-      ]),
-    ];
-    let variants: Variant[] = [];
-    try {
-      variants = await this.pos.variantsByIds(variantIds);
-    } catch {
-      // Snapshot totals remain useful when catalog metadata is temporarily unavailable.
-    }
-    const byId = new Map(variants.map(variant => [variant.variant_id, variant]));
-    const displayRow = (row: DashboardTopVariant): TopVariant => ({
-      variantId: row.variant_id,
-      label: byId.has(row.variant_id)
-        ? variantLabel(byId.get(row.variant_id) as Variant)
-        : row.variant_id.slice(0, 8),
-      manufacturer: byId.get(row.variant_id)?.manufacturer_name || 'Manufacturer not set',
-      quantity: Number(row.quantity),
-      revenue: row.revenue,
-      margin: row.margin,
-    });
-    const top = rows.map(displayRow);
-    this.topVariants.set(top);
-
-    const result = selectDashboardSignalCandidates(
-      rows,
-      signals,
-      variantId => byId.get(variantId)?.product_id ?? variantId
-    ).map(candidate => {
-      const variant = byId.get(candidate.row.variant_id);
-      if (candidate.kind === 'restock') {
-        return {
-          variantId: candidate.row.variant_id,
-          productId: variant?.product_id ?? null,
-          label: variant ? variantLabel(variant) : candidate.row.variant_id.slice(0, 8),
-          manufacturer: variant?.manufacturer_name || 'Manufacturer not set',
-          quantity: Number(candidate.row.quantity),
-          revenue: 0,
-          margin: 0,
-          kind: candidate.kind,
-          stock: Number(candidate.row.stock),
-        } satisfies ProductSignal;
-      }
-      return {
-        ...displayRow(candidate.row),
-        productId: variant?.product_id ?? null,
-        kind: candidate.kind,
-        stock: null,
-      } satisfies ProductSignal;
-    });
+  private computeProductPerformance(performance: ProductPerformanceResponse): void {
+    const result = selectDashboardPerformanceLeaders(performance, this.canViewFinancials()).map(
+      ({ kind, row }) =>
+        ({
+          ...(row.location_name ? { locationName: row.location_name } : {}),
+          variantId: row.variant_id,
+          productId: row.product_id,
+          label:
+            !row.variant_name || row.variant_name === 'Default'
+              ? row.product_name
+              : `${row.product_name} — ${row.variant_name}`,
+          kind,
+          currentQuantity: Number(row.current_quantity),
+          robustQuantity: Number(row.robust_quantity),
+          previousRobustQuantity: Number(row.previous_robust_quantity),
+          revenue: Number(row.revenue ?? 0),
+          margin: Number(row.margin ?? 0),
+          orderCount: Number(row.order_count),
+          activeDays: Number(row.active_days),
+          confidence: row.confidence ?? row.demandConfidence ?? 'low',
+          outlierDetected: Boolean(row.outlier_detected),
+          stock: Number(row.stock),
+          daysCover: row.days_of_cover === null ? null : Number(row.days_of_cover),
+        }) satisfies ProductSignal
+    );
     this.productSignals.set(result);
   }
 
   protected signalLabel(kind: ProductSignal['kind']): string {
-    if (kind === 'restock') return 'Restock risk';
+    if (kind === 'trending') return 'Trending now';
+    if (kind === 'volume') return 'Volume leader';
     if (kind === 'margin') return 'Margin leader';
-    return 'Fast mover';
+    return 'Consistent seller';
   }
 
   /** Coalesce a burst of sale invalidations before asking for the shared snapshot. */

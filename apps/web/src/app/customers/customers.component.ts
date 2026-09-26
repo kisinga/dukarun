@@ -9,7 +9,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { BusinessClockService } from '../core/business-clock.service';
 import { formatKes, formatKesInput, parseKes } from '../core/money';
@@ -101,6 +101,7 @@ type CreditOrder = {
 };
 const CUSTOMER_STATEMENT_PAGE_SIZE = 25;
 const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
+type CustomerRiskFilter = 'all' | 'review' | 'restricted' | 'healthy' | 'unrated';
 
 @Component({
   selector: 'app-customers',
@@ -129,6 +130,7 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
     FormSectionComponent,
     PreferenceRowComponent,
     ScoreBadgeComponent,
+    RouterLink,
   ],
   template: `
     <app-page
@@ -177,7 +179,9 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
 
       <!-- Shared list summary and search toolbar -->
       <app-list-search-bar
-        placeholder="Search name or phone…"
+        [placeholder]="
+          perms.has('ViewFinancials') ? 'Search customer, phone, or risk…' : 'Search name or phone…'
+        "
         [searchQuery]="query()"
         (searchQueryChange)="query.set($event); customerPage.set(1)"
         [sortOptions]="customerSortOptions()"
@@ -186,22 +190,51 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
         [sortDirection]="customerSortDirection()"
         (sortDirectionChange)="customerSortDirection.set($event); customerPage.set(1)"
         [filtersEnabled]="true"
-        [activeFilterCount]="accountStatus() === 'active' ? 0 : 1"
+        [activeFilterCount]="
+          (accountStatus() === 'active' ? 0 : 1) + (creditRisk() === 'all' ? 0 : 1)
+        "
         (clearFilters)="clearCustomerFilters()"
       >
-        <app-stat-bar summary [stats]="customerStats()" />
-        <div filters class="flex items-center gap-2">
-          <label for="customer-account-status" class="text-sm font-medium">Account status</label>
-          <select
-            id="customer-account-status"
-            class="select select-bordered select-sm"
-            [value]="accountStatus()"
-            (change)="setAccountStatus($event)"
-          >
-            <option value="active">Active</option>
-            <option value="deleted">Deleted</option>
-            <option value="all">All</option>
-          </select>
+        <app-stat-bar
+          summary
+          [stats]="customerStats()"
+          (select)="toggleCustomerSummaryFilter($event)"
+        />
+        <div filters class="flex flex-wrap items-end gap-3">
+          <div>
+            <label for="customer-account-status" class="mb-1 block text-xs font-medium"
+              >Account status</label
+            >
+            <select
+              id="customer-account-status"
+              class="select select-bordered min-h-11 select-sm"
+              [value]="accountStatus()"
+              (change)="setAccountStatus($event)"
+            >
+              <option value="active">Active</option>
+              <option value="deleted">Deleted</option>
+              <option value="all">All</option>
+            </select>
+          </div>
+          @if (perms.has('ViewFinancials')) {
+            <div>
+              <label for="customer-credit-risk" class="mb-1 block text-xs font-medium"
+                >Credit risk</label
+              >
+              <select
+                id="customer-credit-risk"
+                class="select select-bordered min-h-11 select-sm"
+                [value]="creditRisk()"
+                (change)="setCreditRisk($event)"
+              >
+                <option value="all">All scores</option>
+                <option value="review">Needs review</option>
+                <option value="restricted">Restricted / high risk</option>
+                <option value="healthy">Good / strong</option>
+                <option value="unrated">Unrated</option>
+              </select>
+            </div>
+          }
         </div>
       </app-list-search-bar>
 
@@ -223,7 +256,7 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
                 <tr>
                   <th>Customer</th>
                   <th>Contact</th>
-                  <th>Credit</th>
+                  <th>Credit standing</th>
                   <th>Aging</th>
                   <th class="text-right">Owed to us</th>
                   <th class="text-right">Actions</th>
@@ -248,7 +281,13 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
                         />
                         <div class="min-w-0">
                           <div class="flex items-center gap-2">
-                            <p class="table-primary truncate">{{ name(c) }}</p>
+                            <a
+                              class="table-primary truncate rounded-field hover:text-primary hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                              [routerLink]="['/customers']"
+                              [queryParams]="{ customer: c.id }"
+                              (click)="$event.stopPropagation()"
+                              >{{ name(c) }}</a
+                            >
                             @if (c.deleted_at) {
                               <app-status-badge size="xs" type="error" label="Deleted" />
                             }
@@ -262,7 +301,31 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
                       <p class="table-secondary">{{ c.email || 'No email' }}</p>
                     </td>
                     <td>
-                      <div class="flex flex-wrap items-center gap-1">
+                      @if (perms.has('ViewFinancials')) {
+                        @if (c.credit_band; as band) {
+                          <a
+                            class="group -mx-2 flex min-h-11 max-w-64 items-center gap-2 rounded-field px-2 hover:bg-base-200/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                            [routerLink]="['/insights/credit/customer', c.id]"
+                            [attr.aria-label]="'Open credit risk profile for ' + name(c)"
+                            (click)="$event.stopPropagation()"
+                          >
+                            <app-score-badge
+                              class="shrink-0"
+                              [score]="c.credit_score ?? null"
+                              [band]="band"
+                              [confidence]="c.credit_confidence ?? 'unrated'"
+                            />
+                            <span
+                              class="min-w-0 flex-1 truncate type-caption group-hover:text-base-content"
+                              [title]="creditRiskSummary(c)"
+                              >{{ creditRiskSummary(c) }}</span
+                            >
+                          </a>
+                        } @else {
+                          <span class="type-caption">Not scored</span>
+                        }
+                      }
+                      <div class="flex flex-wrap items-center gap-1" [class.mt-1]="c.credit_band">
                         <app-status-badge
                           size="xs"
                           [type]="c.is_credit_approved ? 'success' : 'neutral'"
@@ -360,15 +423,14 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
           @for (c of pagedCustomers(); track c.id) {
             <div
               mobileListRow
-              class="cursor-pointer"
-              role="button"
-              tabindex="0"
               [class.border-primary]="selectedCustomerId() === c.id"
               [class.opacity-60]="c.deleted_at !== null"
-              (click)="openCustomer(c.id)"
-              (keydown.enter)="openCustomer(c.id)"
             >
-              <div class="flex min-h-20 items-center gap-3 p-3">
+              <a
+                class="flex min-h-20 items-center gap-3 rounded-field p-3 hover:bg-base-200/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                [routerLink]="['/customers']"
+                [queryParams]="{ customer: c.id }"
+              >
                 <app-entity-avatar
                   size="sm"
                   [firstName]="c.first_name"
@@ -399,7 +461,33 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
                   </p>
                   <p class="type-caption">owed to us</p>
                 </div>
-              </div>
+              </a>
+              @if (perms.has('ViewFinancials') && c.credit_band; as band) {
+                <div class="border-t border-base-300/60 px-2 py-1.5">
+                  <a
+                    class="group flex min-h-11 items-center gap-2 rounded-field px-1.5 hover:bg-base-200/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                    [routerLink]="['/insights/credit/customer', c.id]"
+                    [attr.aria-label]="'Open credit risk profile for ' + name(c)"
+                  >
+                    <app-score-badge
+                      [score]="c.credit_score ?? null"
+                      [band]="band"
+                      [confidence]="c.credit_confidence ?? 'unrated'"
+                    />
+                    <span
+                      class="min-w-0 flex-1 truncate type-caption"
+                      [title]="creditRiskSummary(c)"
+                    >
+                      {{ creditRiskSummary(c) }}
+                    </span>
+                    <app-icon
+                      name="heroChevronRight"
+                      size="sm"
+                      class="shrink-0 text-base-content/40 transition-transform group-hover:translate-x-0.5"
+                    />
+                  </a>
+                </div>
+              }
             </div>
           }
         </app-mobile-list>
@@ -535,7 +623,9 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
                             [band]="c.credit_band"
                             [confidence]="c.credit_confidence ?? 'unrated'"
                           />
-                          <a class="link type-caption" [href]="'/insights/credit/customer/' + c.id"
+                          <a
+                            class="link type-caption"
+                            [routerLink]="['/insights/credit/customer', c.id]"
                             >Full credit profile</a
                           >
                         </div>
@@ -974,7 +1064,12 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
                           <li class="py-2">
                             <div class="flex items-center gap-2">
                               <div class="min-w-0 flex-1">
-                                <p class="font-mono text-sm font-medium">{{ o.code }}</p>
+                                <a
+                                  class="link font-mono text-sm font-medium"
+                                  [routerLink]="['/orders']"
+                                  [queryParams]="{ customer: c.id, range: 'all', order: o.id }"
+                                  >{{ o.code }}</a
+                                >
                                 <p class="type-caption">{{ date(o.created_at) }}</p>
                               </div>
                               <app-status-badge
@@ -987,16 +1082,16 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
                                   [amount]="o.outstanding"
                                   [masked]="!perms.has('ViewFinancials')"
                               /></span>
-                              <button
+                              <a
                                 appButton
                                 variant="ghost"
                                 size="sm"
-                                type="button"
                                 title="View order details"
-                                (click)="viewSale(c.id, o.id)"
+                                [routerLink]="['/orders']"
+                                [queryParams]="{ customer: c.id, range: 'all', order: o.id }"
                               >
                                 View
-                              </button>
+                              </a>
                             </div>
                           </li>
                         }
@@ -1007,13 +1102,13 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
                   <section class="surface-card p-4">
                     <div class="mb-2 flex items-center justify-between gap-2">
                       <h3 class="section-title">Recent sales</h3>
-                      <button
+                      <a
                         class="btn btn-ghost btn-xs"
-                        type="button"
-                        (click)="viewAllSales(c.id)"
+                        [routerLink]="['/orders']"
+                        [queryParams]="{ customer: c.id, range: 'all' }"
                       >
                         View all sales <app-icon name="heroArrowRight" size="sm" />
-                      </button>
+                      </a>
                     </div>
                     @if (orders().length === 0) {
                       <app-empty-state
@@ -1024,36 +1119,36 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
                     } @else {
                       <ul class="max-h-80 divide-y divide-base-200 overflow-y-auto">
                         @for (o of orders(); track o.id) {
-                          <li
-                            class="flex cursor-pointer items-center gap-2 rounded-field py-2 hover:bg-base-200/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
-                            role="button"
-                            tabindex="0"
-                            (click)="viewSale(c.id, o.id)"
-                            (keydown.enter)="viewSale(c.id, o.id)"
-                          >
-                            <div class="min-w-0 flex-1">
-                              <p class="font-mono text-sm font-medium">{{ o.code }}</p>
-                              <p class="type-caption">{{ date(o.created_at) }}</p>
-                            </div>
-                            <app-status-badge
-                              size="xs"
-                              [type]="orderStatusType(o.status)"
-                              [label]="o.status"
-                            />
-                            @if (o.is_credit_sale) {
-                              <app-status-badge size="xs" type="warning" label="credit" />
-                            }
-                            <span class="text-sm font-semibold tabular-nums">
-                              <app-money
-                                [amount]="o.total"
-                                [masked]="!perms.has('ViewFinancials')"
+                          <li>
+                            <a
+                              class="flex min-h-11 items-center gap-2 rounded-field py-2 hover:bg-base-200/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                              [routerLink]="['/orders']"
+                              [queryParams]="{ customer: c.id, range: 'all', order: o.id }"
+                            >
+                              <div class="min-w-0 flex-1">
+                                <p class="font-mono text-sm font-medium">{{ o.code }}</p>
+                                <p class="type-caption">{{ date(o.created_at) }}</p>
+                              </div>
+                              <app-status-badge
+                                size="xs"
+                                [type]="orderStatusType(o.status)"
+                                [label]="o.status"
                               />
-                            </span>
-                            <app-icon
-                              name="heroChevronRight"
-                              size="sm"
-                              class="text-base-content/40"
-                            />
+                              @if (o.is_credit_sale) {
+                                <app-status-badge size="xs" type="warning" label="credit" />
+                              }
+                              <span class="text-sm font-semibold tabular-nums">
+                                <app-money
+                                  [amount]="o.total"
+                                  [masked]="!perms.has('ViewFinancials')"
+                                />
+                              </span>
+                              <app-icon
+                                name="heroChevronRight"
+                                size="sm"
+                                class="text-base-content/40"
+                              />
+                            </a>
                           </li>
                         }
                       </ul>
@@ -1152,7 +1247,16 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
                                         track allocation.order_id
                                       ) {
                                         <li class="rounded-field bg-base-100 px-2 py-1 text-xs">
-                                          <span class="font-mono">{{ allocation.order_code }}</span>
+                                          <a
+                                            class="link font-mono"
+                                            [routerLink]="['/orders']"
+                                            [queryParams]="{
+                                              customer: c.id,
+                                              range: 'all',
+                                              order: allocation.order_id,
+                                            }"
+                                            >{{ allocation.order_code }}</a
+                                          >
                                           · {{ fmtKes(allocation.amount) }}
                                         </li>
                                       }
@@ -1222,22 +1326,22 @@ const CUSTOMER_STATEMENT_PRINT_PAGE_SIZE = 100;
                             agreement.
                           </p>
                           <div class="mt-3 grid gap-2 sm:grid-cols-2">
-                            <button
+                            <a
                               appButton
                               variant="outline"
-                              type="button"
-                              (click)="recordMissingSale(c.id)"
+                              [routerLink]="['/pos/sell']"
+                              [queryParams]="{ customer: c.id }"
                             >
                               <app-icon name="heroShoppingCart" /> Missing sale
-                            </button>
-                            <button
+                            </a>
+                            <a
                               appButton
                               variant="ghost"
-                              type="button"
-                              (click)="viewAllSales(c.id)"
+                              [routerLink]="['/orders']"
+                              [queryParams]="{ customer: c.id, range: 'all' }"
                             >
                               <app-icon name="heroDocumentText" /> Wrong sale
-                            </button>
+                            </a>
                           </div>
                           <p class="type-caption mt-2">
                             Missing amount owed? Record the sale. Wrong sale? Open it from sales.
@@ -1485,6 +1589,7 @@ export class CustomersComponent implements OnInit {
 
   protected readonly query = signal('');
   protected readonly accountStatus = signal<'active' | 'deleted' | 'all'>('active');
+  protected readonly creditRisk = signal<CustomerRiskFilter>('all');
   protected readonly customerSort = signal('name');
   protected readonly customerSortDirection = signal<ListSortDirection>('asc');
   protected readonly customerSortOptions = computed<readonly ListSortOption[]>(() => [
@@ -1495,6 +1600,7 @@ export class CustomersComponent implements OnInit {
       ? [
           { value: 'balance', label: 'Amount owed' },
           { value: 'credit_limit', label: 'Credit limit' },
+          { value: 'risk', label: 'Credit risk' },
         ]
       : []),
   ]);
@@ -1568,12 +1674,19 @@ export class CustomersComponent implements OnInit {
   protected readonly filtered = computed(() => {
     const q = this.query().toLowerCase();
     const status = this.accountStatus();
+    const creditRisk = this.creditRisk();
     const sortKey = this.customerSort();
     const rows = this.customers().filter(c => {
       if (status === 'active' && c.deleted_at !== null) return false;
       if (status === 'deleted' && c.deleted_at === null) return false;
+      if (this.perms.has('ViewFinancials') && !this.matchesCreditRisk(c, creditRisk)) return false;
+      if (!q) return true;
+      const identityMatches =
+        this.name(c).toLowerCase().includes(q) || (c.phone ?? '').toLowerCase().includes(q);
+      if (identityMatches) return true;
       return (
-        !q || this.name(c).toLowerCase().includes(q) || (c.phone ?? '').toLowerCase().includes(q)
+        this.perms.has('ViewFinancials') &&
+        `${c.credit_band ?? 'unrated'} ${this.creditRiskSummary(c)}`.toLowerCase().includes(q)
       );
     });
     return sortList(
@@ -1589,6 +1702,8 @@ export class CustomersComponent implements OnInit {
             return customer.ar_balance;
           case 'credit_limit':
             return customer.credit_limit;
+          case 'risk':
+            return this.creditRiskOrder(customer.credit_band);
           default:
             return this.name(customer);
         }
@@ -1632,6 +1747,11 @@ export class CustomersComponent implements OnInit {
       customer =>
         customer.ar_balance > 0 && customer.bucket !== null && customer.bucket !== 'current'
     ).length;
+    const riskReview = active.filter(customer => this.matchesCreditRisk(customer, 'review')).length;
+    const restricted = active.filter(customer =>
+      this.matchesCreditRisk(customer, 'restricted')
+    ).length;
+    const riskTone: 'error' | 'warning' = restricted > 0 ? 'error' : 'warning';
     return [
       {
         label: 'Active customers',
@@ -1649,6 +1769,18 @@ export class CustomersComponent implements OnInit {
         value: active.filter(customer => customer.is_credit_approved).length,
         mobilePriority: 'secondary' as const,
       },
+      ...(this.perms.has('ViewFinancials')
+        ? [
+            {
+              label: 'Needs risk review',
+              value: riskReview,
+              tone: riskTone,
+              filter: 'risk-review',
+              active: this.creditRisk() === 'review',
+              mobilePriority: 'secondary' as const,
+            },
+          ]
+        : []),
       {
         label: 'Overdue to us',
         value: overdue,
@@ -1916,6 +2048,18 @@ export class CustomersComponent implements OnInit {
 
   protected clearCustomerFilters(): void {
     this.accountStatus.set('active');
+    this.creditRisk.set('all');
+    this.customerPage.set(1);
+  }
+
+  protected setCreditRisk(event: Event): void {
+    this.creditRisk.set((event.target as HTMLSelectElement).value as CustomerRiskFilter);
+    this.customerPage.set(1);
+  }
+
+  protected toggleCustomerSummaryFilter(filter: string): void {
+    if (filter !== 'risk-review') return;
+    this.creditRisk.update(value => (value === 'review' ? 'all' : 'review'));
     this.customerPage.set(1);
   }
 
@@ -1971,22 +2115,6 @@ export class CustomersComponent implements OnInit {
     } else {
       this.drawerEditing.set(false);
     }
-  }
-
-  protected viewAllSales(customerId: string): void {
-    void this.router.navigate(['/orders'], {
-      queryParams: { customer: customerId, range: 'all' },
-    });
-  }
-
-  protected recordMissingSale(customerId: string): void {
-    void this.router.navigate(['/pos/sell'], { queryParams: { customer: customerId } });
-  }
-
-  protected viewSale(customerId: string, orderId: string): void {
-    void this.router.navigate(['/orders'], {
-      queryParams: { customer: customerId, range: 'all', order: orderId },
-    });
   }
 
   protected async save(): Promise<void> {
@@ -2458,6 +2586,59 @@ export class CustomersComponent implements OnInit {
         return 'error';
       default:
         return 'neutral';
+    }
+  }
+
+  protected creditRiskSummary(customer: CustomerWithAr): string {
+    const primaryReason = customer.credit_reason_codes?.[0];
+    switch (primaryReason) {
+      case 'over_limit':
+        return 'Balance exceeds the credit limit.';
+      case 'overdue_60_plus':
+        return 'Credit is over 60 days overdue.';
+      case 'overdue_31_60':
+        return 'Credit is 31–60 days overdue.';
+      case 'overdue_8_30':
+        return 'Credit is 8–30 days overdue.';
+      case 'overdue_1_7':
+        return 'A payment recently became overdue.';
+      case 'frequently_late':
+        return 'Recent invoices were often paid late.';
+      case 'no_current_risk':
+        return 'No material current risk detected.';
+    }
+    if (primaryReason) return insightCopy(primaryReason);
+    if (customer.credit_band === 'unrated' || !customer.credit_band) {
+      return 'Not enough payment history to score yet.';
+    }
+    return 'Open the full profile for the score details.';
+  }
+
+  private matchesCreditRisk(customer: CustomerWithAr, filter: CustomerRiskFilter): boolean {
+    if (filter === 'all') return true;
+    const band = customer.credit_band ?? 'unrated';
+    if (filter === 'review') return ['watch', 'restricted', 'high_risk'].includes(band);
+    if (filter === 'restricted') return band === 'restricted' || band === 'high_risk';
+    if (filter === 'healthy') return band === 'strong' || band === 'good';
+    return band === 'unrated';
+  }
+
+  /** Ascending puts the accounts needing attention first. */
+  private creditRiskOrder(band: CustomerWithAr['credit_band']): number {
+    switch (band) {
+      case 'high_risk':
+        return 0;
+      case 'restricted':
+        return 1;
+      case 'watch':
+        return 2;
+      case 'unrated':
+      case undefined:
+        return 3;
+      case 'good':
+        return 4;
+      case 'strong':
+        return 5;
     }
   }
 

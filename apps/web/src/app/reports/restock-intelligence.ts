@@ -9,9 +9,27 @@ export interface RestockDecision {
 }
 
 export function restockDecision(
-  product: Pick<RestockProductRow, 'currentQuantity' | 'previousQuantity' | 'stock' | 'daysCover'>,
+  product: Pick<
+    RestockProductRow,
+    'currentQuantity' | 'previousQuantity' | 'stock' | 'daysCover' | 'signal'
+  >,
   lowStockThreshold: number
 ): RestockDecision {
+  if (product.signal === 'stockout') {
+    return { label: 'Restock now', tone: 'error', priority: 0 };
+  }
+  if (product.signal === 'reorder') {
+    return { label: 'Restock soon', tone: 'warning', priority: 1 };
+  }
+  if (product.signal === 'low_cover') {
+    return { label: 'Plan reorder', tone: 'warning', priority: 2 };
+  }
+  if (product.signal === 'healthy') {
+    return { label: 'Stock healthy', tone: 'success', priority: 3 };
+  }
+  if (product.signal === 'slow' || product.signal === 'insufficient_history') {
+    return { label: 'Slow-moving', tone: 'neutral', priority: 4 };
+  }
   const hasRecentDemand = product.currentQuantity > 0 || product.previousQuantity > 0;
   if (hasRecentDemand && product.stock <= lowStockThreshold) {
     return { label: 'Restock now', tone: 'error', priority: 0 };

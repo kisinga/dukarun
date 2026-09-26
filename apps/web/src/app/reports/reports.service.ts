@@ -1,6 +1,17 @@
 import { Injectable, inject } from '@angular/core';
 import type { Database } from '@dukarun/shared-types';
 import { SupabaseService } from '../core/supabase.service';
+import {
+  EMPTY_PRODUCT_PERFORMANCE,
+  type DemandConfidence,
+  type ProductPerformanceResponse,
+} from '../core/product-performance.models';
+
+const PRODUCT_PERFORMANCE_ROLLOUT_ERROR_CODES = new Set(['PGRST202', '42883']);
+
+function isMissingProductPerformanceRpc(error: { code?: string } | null): boolean {
+  return error !== null && PRODUCT_PERFORMANCE_ROLLOUT_ERROR_CODES.has(error.code ?? '');
+}
 
 export type DailySummary = Database['public']['Views']['rpt_daily_sales_summary']['Row'];
 export type DailyProductSales = Database['public']['Views']['rpt_daily_product_sales']['Row'];
@@ -44,6 +55,7 @@ export interface DashboardSalesSnapshot {
   productSignals: DashboardProductSignals;
   locations: DashboardLocationSummary[];
   comparison: DashboardPeriodComparison;
+  productPerformance: ProductPerformanceResponse;
   refreshAfter?: string;
 }
 
@@ -72,6 +84,13 @@ export interface RestockProductRow {
   stockValue: number;
   supplierStock: number;
   daysCover: number | null;
+  reorderQuantity?: number | null;
+  signal?: string | null;
+  demandConfidence?: DemandConfidence | null;
+  outlierDetected?: boolean;
+  outlierShare?: number;
+  planningDailyDemand?: number | null;
+  observedAverageDailyDemand?: number | null;
   lastSupplierId: string | null;
   lastSupplierName: string | null;
   lastUnitCost: number | null;
@@ -137,10 +156,23 @@ export class ReportsService {
     });
     if (error) throw error;
     const snapshot = data as unknown as Partial<DashboardSalesSnapshot> | null;
+    let performance = snapshot?.productPerformance;
+    if (!performance) {
+      const fallback = await this.db.rpc('product_performance', {
+        p_window_days: 7,
+        p_limit: 10,
+        ...(locationId ? { p_location_id: locationId } : {}),
+      });
+      if (fallback.error && !isMissingProductPerformanceRpc(fallback.error)) throw fallback.error;
+      performance = fallback.error
+        ? EMPTY_PRODUCT_PERFORMANCE
+        : (fallback.data as unknown as ProductPerformanceResponse);
+    }
     return {
       summary: snapshot?.summary ?? [],
       topVariants: snapshot?.topVariants ?? [],
       productSignals: snapshot?.productSignals ?? { restockRisks: [], fastVariants: [] },
+      productPerformance: performance,
       locations: snapshot?.locations ?? [],
       comparison: snapshot?.comparison ?? {
         current_revenue: 0,
@@ -201,6 +233,20 @@ export class ReportsService {
         stockValue: Number(product.stockValue ?? 0),
         supplierStock: Number(product.supplierStock ?? 0),
         daysCover: product.daysCover === null ? null : Number(product.daysCover),
+        reorderQuantity:
+          product.reorderQuantity === null || product.reorderQuantity === undefined
+            ? null
+            : Number(product.reorderQuantity),
+        planningDailyDemand:
+          product.planningDailyDemand === null || product.planningDailyDemand === undefined
+            ? null
+            : Number(product.planningDailyDemand),
+        observedAverageDailyDemand:
+          product.observedAverageDailyDemand === null ||
+          product.observedAverageDailyDemand === undefined
+            ? null
+            : Number(product.observedAverageDailyDemand),
+        outlierShare: Number(product.outlierShare ?? 0),
         lastUnitCost: product.lastUnitCost === null ? null : Number(product.lastUnitCost),
         trend: (product.trend ?? []).map(Number),
       })),

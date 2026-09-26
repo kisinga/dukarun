@@ -1,17 +1,25 @@
 import { DatePipe } from '@angular/common';
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { formatKes } from '../core/money';
 import { EmptyStateComponent } from '../shared/ui/empty-state.component';
 import { IconComponent } from '../shared/ui/icon.component';
 import { creditDocumentStatus } from './credit-document-status';
+import { CreditScoreExplainerDialogComponent } from './credit-score-explainer-dialog.component';
 import { InsightsService } from './insights.service';
 import { insightCopy, type PartyCreditProfile } from './insights.models';
 import { ScoreBadgeComponent } from './score-badge.component';
 
 @Component({
   selector: 'app-credit-profile',
-  imports: [DatePipe, RouterLink, EmptyStateComponent, IconComponent, ScoreBadgeComponent],
+  imports: [
+    DatePipe,
+    RouterLink,
+    EmptyStateComponent,
+    IconComponent,
+    ScoreBadgeComponent,
+    CreditScoreExplainerDialogComponent,
+  ],
   template: `
     @if (loading()) {
       <div class="flex min-h-64 items-center justify-center gap-2 text-sm text-base-content/60">
@@ -48,6 +56,16 @@ import { ScoreBadgeComponent } from './score-badge.component';
                 <p class="type-caption mt-1">
                   Updated {{ item.refreshed_at | date: 'MMM d, h:mm a' }}
                 </p>
+                <button
+                  type="button"
+                  class="btn btn-ghost btn-sm mt-1 min-h-11"
+                  aria-haspopup="dialog"
+                  [attr.aria-expanded]="scoreExplainerOpen()"
+                  (click)="scoreExplainerOpen.set(true)"
+                >
+                  <app-icon name="heroQuestionMarkCircle" size="sm" />
+                  How the score works
+                </button>
               </div>
             </div>
             <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -182,6 +200,8 @@ import { ScoreBadgeComponent } from './score-badge.component';
             </article>
           </div>
         </div>
+
+        <app-credit-score-explainer-dialog [(open)]="scoreExplainerOpen" [profile]="item" />
       </section>
     } @else {
       <app-empty-state
@@ -198,6 +218,7 @@ export class CreditProfileComponent implements OnInit {
   protected readonly profile = signal<PartyCreditProfile | null>(null);
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
+  protected readonly scoreExplainerOpen = signal(false);
   protected readonly copy = insightCopy;
   protected readonly fmt = formatKes;
   protected readonly documentStatus = creditDocumentStatus;

@@ -29,6 +29,15 @@ describe('restock intelligence presentation', () => {
     expect(restockDecision(facts(0, 4, 0, null), 5).label).toBe('Restock now');
   });
 
+  it('uses the authoritative planning signal when selected-period sales disagree', () => {
+    expect(restockDecision({ ...facts(30, 1, 50, 100), signal: 'reorder' }, 5).label).toBe(
+      'Restock soon'
+    );
+    expect(restockDecision({ ...facts(0, 0, 10, 20), signal: 'healthy' }, 5).label).toBe(
+      'Stock healthy'
+    );
+  });
+
   it('describes demand changes without infinite percentages', () => {
     expect(quantityChangeLabel(5, 0)).toBe('New demand');
     expect(quantityChangeLabel(12, 10)).toBe('+20%');

@@ -270,6 +270,73 @@ test('financial forms keep account choices when history fails', async ({ page })
   await expect(page.getByRole('button', { name: 'Post transfer' })).toBeVisible();
 });
 
+test('credit profile explains score weights and guardrails', async ({ page }) => {
+  await authenticateFinancialUser(page, ['ViewFinancials']);
+  await page.route('http://127.0.0.1:54321/rest/v1/rpc/party_credit_profile', route =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        party_id: 'supplier-1',
+        side: 'supplier',
+        party_name: 'Green Hills Cable Company',
+        score: 6.9,
+        band: 'watch',
+        confidence: 'provisional',
+        balance: 109081,
+        credit_limit: 200000,
+        available_credit: 90919,
+        utilization: 0.545405,
+        overdue_amount: 18488,
+        oldest_due_on: '2026-09-15',
+        oldest_overdue_days: 11,
+        settled_documents: 0,
+        history_days: 200,
+        punctuality: 1,
+        recommendation_code: 'pause_increases_target_down_10',
+        reason_codes: ['overdue_8_30'],
+        opportunity_cost: 0,
+        refreshed_at: '2026-09-26T18:44:16Z',
+        documents: [],
+        events: [],
+      }),
+    })
+  );
+
+  await page.goto('http://127.0.0.1:4203/insights/credit/supplier/supplier-1');
+  await expect(
+    page.getByRole('heading', { name: 'Green Hills Cable Company', exact: true })
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'How the score works' }).click();
+
+  const dialog = page.getByRole('dialog', { name: 'How the score works' });
+  const panel = dialog.locator('.task-dialog-panel');
+  await expect(dialog).toBeVisible();
+  await expect(
+    dialog.getByRole('img', {
+      name: /Payment timeliness 45 percent, overdue exposure 30 percent/i,
+    })
+  ).toBeVisible();
+  await expect(dialog.getByText('This profile: KES 18,488 of KES 109,081 overdue')).toBeVisible();
+  await expect(dialog.getByText('Applies now')).toBeVisible();
+  await expect(dialog.getByText(/Corrective adjustments can change exposure/)).toBeVisible();
+
+  const [viewport, box] = await Promise.all([page.viewportSize(), panel.boundingBox()]);
+  expect(viewport).not.toBeNull();
+  expect(box).not.toBeNull();
+  if (viewport && box) {
+    expect(box.x).toBeGreaterThanOrEqual(-1);
+    expect(box.x + box.width).toBeLessThanOrEqual(viewport.width + 1);
+    expect(box.y).toBeGreaterThanOrEqual(-1);
+    expect(box.y + box.height).toBeLessThanOrEqual(viewport.height + 1);
+  }
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+    )
+  ).toBeLessThanOrEqual(1);
+});
+
 test('operations navigation consolidates workspaces and preserves progressive disclosure', async ({
   page,
   isMobile,
