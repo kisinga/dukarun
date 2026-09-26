@@ -1,5 +1,10 @@
 import { Injectable, inject } from '@angular/core';
 import { SupabaseService } from '../core/supabase.service';
+import {
+  EMPTY_PRODUCT_PERFORMANCE,
+  type ProductPerformanceResponse,
+  type ProductPerformanceRow,
+} from '../core/product-performance.models';
 import type {
   CreditAdvisoryReview,
   CreditDecisionCard,
@@ -241,6 +246,52 @@ export class InsightsService {
             ? null
             : Number(payload.summary.margin),
       },
+    };
+  }
+
+  async productPerformance(
+    windowDays: DateRangePreset,
+    locationId: string | null,
+    limit = 10
+  ): Promise<ProductPerformanceResponse> {
+    const { data, error } = await this.db.rpc('product_performance', {
+      p_window_days: windowDays,
+      p_limit: limit,
+      ...(locationId ? { p_location_id: locationId } : {}),
+    });
+    if (error) throw error;
+    const payload = data as unknown as Partial<ProductPerformanceResponse> | null;
+    const normalize = (row: ProductPerformanceRow): ProductPerformanceRow => ({
+      ...row,
+      confidence: row.confidence ?? row.demandConfidence ?? 'low',
+      current_quantity: Number(row.current_quantity ?? 0),
+      robust_quantity: Number(row.robust_quantity ?? 0),
+      previous_robust_quantity: Number(row.previous_robust_quantity ?? 0),
+      revenue: row.revenue === null || row.revenue === undefined ? null : Number(row.revenue),
+      margin: row.margin === null || row.margin === undefined ? null : Number(row.margin),
+      order_count: Number(row.order_count ?? 0),
+      active_days: Number(row.active_days ?? 0),
+      trend_score: Number(row.trend_score ?? 0),
+      outlier_share: Number(row.outlier_share ?? 0),
+      stock: Number(row.stock ?? 0),
+      planning_daily_demand: Number(row.planning_daily_demand ?? 0),
+      days_of_cover:
+        row.days_of_cover === null || row.days_of_cover === undefined
+          ? null
+          : Number(row.days_of_cover),
+    });
+    return {
+      ...EMPTY_PRODUCT_PERFORMANCE,
+      ...payload,
+      windowDays: Number(payload?.windowDays ?? windowDays),
+      generatedAt: payload?.generatedAt ?? '',
+      leaders: {
+        trending: (payload?.leaders?.trending ?? []).map(normalize),
+        volume: (payload?.leaders?.volume ?? []).map(normalize),
+        margin: (payload?.leaders?.margin ?? []).map(normalize),
+        consistent: (payload?.leaders?.consistent ?? []).map(normalize),
+      },
+      financialsIncluded: Boolean(payload?.financialsIncluded),
     };
   }
 

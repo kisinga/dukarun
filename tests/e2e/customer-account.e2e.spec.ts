@@ -159,6 +159,21 @@ async function authenticateAccountUser(page: Page): Promise<{
       });
     }
     if (path.endsWith('/rest/v1/rpc/current_business_date')) return json('2026-08-27');
+    if (path.endsWith('/rest/v1/rpc/credit_cache_summaries')) {
+      return json({
+        items: [
+          {
+            party_id: customerId,
+            score: 4.8,
+            band: 'restricted',
+            confidence: 'established',
+            reason_codes: ['frequently_late'],
+            recommendation_code: 'manager_review_target_down_25',
+            refreshed_at: '2026-08-27T08:00:00Z',
+          },
+        ],
+      });
+    }
     if (path.endsWith('/rest/v1/rpc/credit_decision_summary')) {
       return json({
         customerId,
@@ -394,6 +409,43 @@ test('overpayment preview explains FIFO allocations and the resulting downpaymen
   const remainder = page.getByText('Available after receipt').locator('..');
   await expect(remainder).toContainText('50');
   await expect(remainder).toContainText('downpayment');
+});
+
+test('customer list surfaces credit risk and exposes durable deep links', async ({ page }) => {
+  await authenticateAccountUser(page);
+  await page.goto('http://127.0.0.1:4203/customers');
+
+  const riskProfile = page.getByRole('link', {
+    name: 'Open credit risk profile for Amina Kamau',
+  });
+  await expect(riskProfile).toBeVisible();
+  await expect(riskProfile).toContainText('4.8');
+  await expect(riskProfile).toContainText('Restricted');
+  await expect(riskProfile).toHaveAttribute('href', `/insights/credit/customer/${customerId}`);
+
+  const customerLinks = page.locator(`a[href="/customers?customer=${customerId}"]`);
+  await expect(customerLinks.first()).toContainText('Amina Kamau');
+
+  const filterButton = page.getByRole('button', { name: 'Filter list' });
+  if (await filterButton.isVisible()) await filterButton.click();
+  await page.getByLabel('Credit risk', { exact: true }).selectOption('healthy');
+  const applyFilters = page.getByRole('button', { name: 'View results' });
+  if (await applyFilters.isVisible()) await applyFilters.click();
+  await expect(page.getByRole('heading', { name: 'No customers found' })).toBeVisible();
+
+  if (await filterButton.isVisible()) await filterButton.click();
+  await page.getByLabel('Credit risk', { exact: true }).selectOption('review');
+  if (await applyFilters.isVisible()) await applyFilters.click();
+  await expect(riskProfile).toBeVisible();
+
+  await page.goto(`http://127.0.0.1:4203/customers?customer=${customerId}`);
+  const drawer = page.getByRole('dialog', { name: 'Amina Kamau' });
+  await expect(drawer).toBeVisible();
+  const invoiceLink = drawer.getByRole('link', { name: 'INV-OLD' }).first();
+  await expect(invoiceLink).toHaveAttribute(
+    'href',
+    `/orders?customer=${customerId}&range=all&order=${orderId}`
+  );
 });
 
 test('credit checkout shows the projected split and confirms the server-owned result', async ({

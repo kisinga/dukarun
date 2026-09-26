@@ -1,3 +1,5 @@
+import type { DemandConfidence } from '../core/product-performance.models';
+
 export type CreditBand = 'unrated' | 'strong' | 'good' | 'watch' | 'restricted' | 'high_risk';
 export type CreditConfidence = 'unrated' | 'provisional' | 'established';
 export type InsightUrgency = 'critical' | 'plan';
@@ -116,6 +118,14 @@ export interface ProductDemandSummary {
   last_sale_date: string | null;
   reason_code: string | null;
   refreshed_at: string | null;
+  planning_daily_demand?: number | null;
+  observed_average_daily_demand?: number | null;
+  planning_window_days?: number | null;
+  demand_confidence?: DemandConfidence | null;
+  active_sale_days?: number | null;
+  order_count?: number | null;
+  outlier_detected?: boolean | null;
+  outlier_share?: number | null;
 }
 
 export interface ProductIntelligenceSummary {
@@ -195,6 +205,10 @@ export const INSIGHT_COPY: Record<string, string> = {
   demand_without_stock: 'Recent demand exists, but there is no stock available.',
   below_lead_time_cover: 'Stock may run out before a typical replenishment arrives.',
   below_target_cover: 'Stock is below the lead-time and safety-day target.',
+  low_confidence_reorder:
+    'Demand history is still limited, so the suggested reorder is conservatively capped.',
+  outlier_adjusted_reorder:
+    'An unusual sales spike was reduced when calculating the planning pace.',
   insufficient_demand_history: 'There is not enough recent demand to estimate cover.',
   review_reorder: 'Review the suggested quantity before starting a purchase.',
   review_demand_history: 'Review sales history before deciding how much to buy.',

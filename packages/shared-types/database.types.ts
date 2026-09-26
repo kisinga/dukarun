@@ -8658,13 +8658,21 @@ export type Database = {
       }
       product_attention: {
         Row: {
+          active_sale_days: number | null
           average_daily_demand: number | null
           company_id: string
           current_stock: number
           current_value: number | null
+          demand_confidence: string | null
           days_of_cover: number | null
           last_sale_date: string | null
           location_id: string
+          observed_average_daily_demand: number | null
+          order_count: number | null
+          outlier_detected: boolean | null
+          outlier_share: number | null
+          planning_daily_demand: number | null
+          planning_window_days: number | null
           reason_code: string
           refreshed_at: string
           reorder_quantity: number | null
@@ -8672,13 +8680,21 @@ export type Database = {
           variant_id: string
         }
         Insert: {
+          active_sale_days?: number | null
           average_daily_demand?: number | null
           company_id: string
           current_stock?: number
           current_value?: number | null
+          demand_confidence?: string | null
           days_of_cover?: number | null
           last_sale_date?: string | null
           location_id: string
+          observed_average_daily_demand?: number | null
+          order_count?: number | null
+          outlier_detected?: boolean | null
+          outlier_share?: number | null
+          planning_daily_demand?: number | null
+          planning_window_days?: number | null
           reason_code: string
           refreshed_at?: string
           reorder_quantity?: number | null
@@ -8686,13 +8702,21 @@ export type Database = {
           variant_id: string
         }
         Update: {
+          active_sale_days?: number | null
           average_daily_demand?: number | null
           company_id?: string
           current_stock?: number
           current_value?: number | null
+          demand_confidence?: string | null
           days_of_cover?: number | null
           last_sale_date?: string | null
           location_id?: string
+          observed_average_daily_demand?: number | null
+          order_count?: number | null
+          outlier_detected?: boolean | null
+          outlier_share?: number | null
+          planning_daily_demand?: number | null
+          planning_window_days?: number | null
           reason_code?: string
           refreshed_at?: string
           reorder_quantity?: number | null
@@ -9142,14 +9166,25 @@ export type Database = {
           company_id: string
           corrected_cogs: number
           current_from: string
+          current_active_days: number | null
+          current_max_quantity: number | null
+          current_median_quantity: number | null
+          current_order_count: number | null
           current_quantity: number
+          current_robust_quantity: number | null
           current_to: string
           gross_revenue: number
           location_id: string
           margin: number
           net_revenue: number
+          previous_active_days: number | null
+          previous_margin: number | null
+          previous_max_quantity: number | null
+          previous_median_quantity: number | null
           previous_net_revenue: number
+          previous_order_count: number | null
           previous_quantity: number
+          previous_robust_quantity: number | null
           refreshed_at: string
           refund_amount: number
           variant_id: string
@@ -9159,14 +9194,25 @@ export type Database = {
           company_id: string
           corrected_cogs?: number
           current_from: string
+          current_active_days?: number | null
+          current_max_quantity?: number | null
+          current_median_quantity?: number | null
+          current_order_count?: number | null
           current_quantity?: number
+          current_robust_quantity?: number | null
           current_to: string
           gross_revenue?: number
           location_id: string
           margin?: number
           net_revenue?: number
+          previous_active_days?: number | null
+          previous_margin?: number | null
+          previous_max_quantity?: number | null
+          previous_median_quantity?: number | null
           previous_net_revenue?: number
+          previous_order_count?: number | null
           previous_quantity?: number
+          previous_robust_quantity?: number | null
           refreshed_at?: string
           refund_amount?: number
           variant_id: string
@@ -9176,14 +9222,25 @@ export type Database = {
           company_id?: string
           corrected_cogs?: number
           current_from?: string
+          current_active_days?: number | null
+          current_max_quantity?: number | null
+          current_median_quantity?: number | null
+          current_order_count?: number | null
           current_quantity?: number
+          current_robust_quantity?: number | null
           current_to?: string
           gross_revenue?: number
           location_id?: string
           margin?: number
           net_revenue?: number
+          previous_active_days?: number | null
+          previous_margin?: number | null
+          previous_max_quantity?: number | null
+          previous_median_quantity?: number | null
           previous_net_revenue?: number
+          previous_order_count?: number | null
           previous_quantity?: number
+          previous_robust_quantity?: number | null
           refreshed_at?: string
           refund_amount?: number
           variant_id?: string
@@ -15173,6 +15230,10 @@ export type Database = {
         Args: { p_location_id?: string; p_since?: string }
         Returns: Json
       }
+      dashboard_location_snapshot_legacy: {
+        Args: { p_location_id?: string; p_since?: string }
+        Returns: Json
+      }
       dashboard_sales_snapshot: { Args: { p_since?: string }; Returns: Json }
       declare_mpesa_manual_fallback: {
         Args: { p_intent_id: string; p_provider_receipt: string }
@@ -16903,6 +16964,14 @@ export type Database = {
           p_since?: string
           p_supplier_id?: string
           p_until?: string
+          p_window_days?: number
+        }
+        Returns: Json
+      }
+      product_performance: {
+        Args: {
+          p_limit?: number
+          p_location_id?: string
           p_window_days?: number
         }
         Returns: Json

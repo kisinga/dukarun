@@ -255,7 +255,7 @@ type DisplayProduct = RestockProductRow & {
             <article class="card overflow-hidden bg-base-100 xl:col-span-4">
               <div class="border-b border-base-300 px-4 py-3">
                 <h3 class="section-title">Stock coverage</h3>
-                <p class="type-caption mt-1">Days on hand at the current sales pace.</p>
+                <p class="type-caption mt-1">Planning pace · up to 90 days.</p>
               </div>
               @if (coverageProducts().length === 0) {
                 <app-empty-state
@@ -409,6 +409,17 @@ type DisplayProduct = RestockProductRow & {
                       </span>
                     </header>
 
+                    <div class="flex flex-wrap gap-1">
+                      @if (product.demandConfidence) {
+                        <span class="badge badge-ghost badge-sm"
+                          >{{ product.demandConfidence }} confidence</span
+                        >
+                      }
+                      @if (product.outlierDetected) {
+                        <span class="badge badge-warning badge-sm">Unusual spike adjusted</span>
+                      }
+                    </div>
+
                     <div
                       class="flex h-16 items-end gap-1 rounded-field bg-base-200/40 px-3 pt-2"
                       role="img"
@@ -458,6 +469,15 @@ type DisplayProduct = RestockProductRow & {
                         </dd>
                       </div>
                     </dl>
+
+                    @if (
+                      product.reorderQuantity !== null && product.reorderQuantity !== undefined
+                    ) {
+                      <p class="rounded-field bg-base-200/50 px-3 py-2 text-sm">
+                        Suggested reorder <strong>{{ quantity(product.reorderQuantity) }}</strong>
+                        · Planning pace · up to 90 days
+                      </p>
+                    }
 
                     <footer
                       class="flex flex-wrap items-center justify-between gap-2 border-t border-base-200 pt-3"
@@ -774,7 +794,7 @@ export class RestockIntelligenceComponent implements OnInit {
       case 'error':
         return `${sold} units sold in the period with ${stock} left. Replenish before the next likely sale.`;
       case 'warning':
-        return `${this.daysCover(product.daysCover)} remains at the current pace. Prepare the next purchase.`;
+        return `${this.daysCover(product.daysCover)} remains at the robust planning pace. Prepare the next purchase.`;
       case 'info':
         return `Demand is ${product.changeLabel} versus the previous period; watch cover as sales accelerate.`;
       case 'success':

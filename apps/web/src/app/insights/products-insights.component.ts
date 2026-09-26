@@ -5,6 +5,11 @@ import { BusinessClockService } from '../core/business-clock.service';
 import { CatalogCacheService } from '../core/catalog-cache.service';
 import { LocationContextService } from '../core/location-context.service';
 import { formatKes } from '../core/money';
+import {
+  EMPTY_PRODUCT_PERFORMANCE,
+  type ProductPerformanceCategory,
+  type ProductPerformanceResponse,
+} from '../core/product-performance.models';
 import { PartyCacheService } from '../core/party-cache.service';
 import { PermissionsService } from '../core/permissions.service';
 import { variantLabel } from '../pos/pos.service';
@@ -26,7 +31,7 @@ import {
   type ProductIntelligenceSummary,
 } from './insights.models';
 
-type InventoryView = 'priorities' | 'sources';
+type InventoryView = 'priorities' | 'performance' | 'sources';
 
 const EMPTY_SUMMARY: ProductIntelligenceSummary = {
   trackedVariants: 0,
@@ -82,24 +87,34 @@ const EMPTY_SUMMARY: ProductIntelligenceSummary = {
             [from]="rangeFrom()"
             [to]="rangeTo()"
             [maxDate]="businessToday()"
-            [advanced]="true"
+            [advanced]="view() !== 'performance'"
             [loading]="loading()"
             (valueChange)="setWindow($event)"
             (rangeChange)="setCustomRange($event)"
           />
 
-          @if (permissions.has('ViewFinancials')) {
-            <div role="tablist" aria-label="Inventory analysis view" class="section-tabs">
-              <button
-                role="tab"
-                type="button"
-                class="section-tab"
-                [class.section-tab-active]="view() === 'priorities'"
-                [attr.aria-selected]="view() === 'priorities'"
-                (click)="setView('priorities')"
-              >
-                Priorities
-              </button>
+          <div role="tablist" aria-label="Inventory analysis view" class="section-tabs">
+            <button
+              role="tab"
+              type="button"
+              class="section-tab"
+              [class.section-tab-active]="view() === 'priorities'"
+              [attr.aria-selected]="view() === 'priorities'"
+              (click)="setView('priorities')"
+            >
+              Priorities
+            </button>
+            <button
+              role="tab"
+              type="button"
+              class="section-tab"
+              [class.section-tab-active]="view() === 'performance'"
+              [attr.aria-selected]="view() === 'performance'"
+              (click)="setView('performance')"
+            >
+              Performance
+            </button>
+            @if (permissions.has('ViewFinancials')) {
               <button
                 role="tab"
                 type="button"
@@ -110,8 +125,8 @@ const EMPTY_SUMMARY: ProductIntelligenceSummary = {
               >
                 Supplier & manufacturer
               </button>
-            </div>
-          }
+            }
+          </div>
         </div>
       </section>
 
@@ -123,6 +138,135 @@ const EMPTY_SUMMARY: ProductIntelligenceSummary = {
             [refreshToken]="sourceRefreshToken()"
           />
         }
+      } @else if (view() === 'performance') {
+        <section class="card overflow-hidden bg-base-100" aria-labelledby="performance-title">
+          <div class="border-b border-base-300 p-4">
+            <div class="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <h3 id="performance-title" class="section-title">Product performance</h3>
+                <p class="type-caption mt-1">
+                  Separate, explainable leaders. Factual sales stay visible while unusual spikes are
+                  adjusted for ranking.
+                </p>
+              </div>
+              @if (locations.isMultiLocation()) {
+                <label class="form-control min-w-48">
+                  <span class="label-text text-xs">Location</span>
+                  <select
+                    class="select select-bordered min-h-11"
+                    [value]="locations.activeId()"
+                    (change)="setLocation($event)"
+                  >
+                    @for (location of locations.locations(); track location.id) {
+                      <option [value]="location.id">{{ location.name }}</option>
+                    }
+                  </select>
+                </label>
+              }
+            </div>
+            <div role="tablist" aria-label="Performance category" class="section-tabs mt-4">
+              @for (category of performanceCategories(); track category) {
+                <button
+                  role="tab"
+                  type="button"
+                  class="section-tab"
+                  [class.section-tab-active]="performanceCategory() === category"
+                  [attr.aria-selected]="performanceCategory() === category"
+                  (click)="performanceCategory.set(category)"
+                >
+                  {{ performanceLabel(category) }}
+                </button>
+              }
+            </div>
+          </div>
+
+          @if (error()) {
+            <div role="alert" class="alert alert-error m-4 text-sm">
+              <app-icon name="heroExclamationTriangle" />{{ error() }}
+            </div>
+          } @else if (loading()) {
+            <div
+              class="flex min-h-56 items-center justify-center gap-2 text-sm text-base-content/60"
+            >
+              <span class="loading loading-spinner"></span>Loading performance
+            </div>
+          } @else if (performanceRows().length === 0) {
+            <app-empty-state
+              [embedded]="true"
+              icon="heroChartBar"
+              title="No eligible leaders yet"
+              description="This category needs repeat orders and selling days before a product can lead."
+            />
+          } @else {
+            <div class="grid gap-3 p-4 lg:grid-cols-2">
+              @for (item of performanceRows(); track item.variant_id) {
+                <article class="rounded-box border border-base-300 p-4">
+                  <div class="flex items-start justify-between gap-3">
+                    <div class="min-w-0">
+                      <a
+                        class="link block truncate font-semibold"
+                        routerLink="/inventory/products"
+                        [queryParams]="{ product: item.product_id, variant: item.variant_id }"
+                      >
+                        {{ item.product_name }}
+                      </a>
+                      <p class="type-caption">{{ item.variant_name }} · {{ item.stock_unit }}</p>
+                    </div>
+                    <span
+                      class="badge badge-sm"
+                      [class]="confidenceClass(item.confidence ?? item.demandConfidence ?? 'low')"
+                    >
+                      {{ item.confidence ?? item.demandConfidence ?? 'low' }} confidence
+                    </span>
+                  </div>
+                  @if (item.outlier_detected) {
+                    <span class="badge badge-warning badge-sm mt-2">Unusual spike adjusted</span>
+                  }
+                  <dl class="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+                    <div>
+                      <dt class="type-caption">Factual units</dt>
+                      <dd class="font-semibold">{{ item.current_quantity | number: '1.0-3' }}</dd>
+                    </div>
+                    <div>
+                      <dt class="type-caption">Adjusted units</dt>
+                      <dd class="font-semibold">{{ item.robust_quantity | number: '1.0-3' }}</dd>
+                    </div>
+                    <div>
+                      <dt class="type-caption">Previous adjusted</dt>
+                      <dd class="font-semibold">
+                        {{ item.previous_robust_quantity | number: '1.0-3' }}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt class="type-caption">Breadth</dt>
+                      <dd class="font-semibold">
+                        {{ item.order_count }} orders · {{ item.active_days }} days
+                      </dd>
+                    </div>
+                  </dl>
+                  <div
+                    class="mt-3 flex flex-wrap justify-between gap-2 border-t border-base-200 pt-3 text-xs text-base-content/70"
+                  >
+                    <span
+                      >Planning pace · up to 90 days ·
+                      {{
+                        item.days_of_cover === null
+                          ? 'no cover'
+                          : (item.days_of_cover | number: '1.0-1') + ' days cover'
+                      }}</span
+                    >
+                    @if (performance().financialsIncluded && permissions.has('ViewFinancials')) {
+                      <span
+                        >Margin {{ fmt(item.margin ?? 0) }} · sales
+                        {{ fmt(item.revenue ?? 0) }}</span
+                      >
+                    }
+                  </div>
+                </article>
+              }
+            </div>
+          }
+        </section>
       } @else {
         <section aria-label="Inventory summary" class="grid grid-cols-2 gap-2 lg:grid-cols-4">
           <div class="card bg-base-100">
@@ -242,8 +386,8 @@ const EMPTY_SUMMARY: ProductIntelligenceSummary = {
               }
             </div>
             <p class="type-caption">
-              Ordered by urgency, then stock cover and demand. Supplier means the latest matching
-              posted purchase source.
+              Ordered by urgency, then stock cover and demand. Cover and reorder use Planning pace ·
+              up to 90 days. Supplier means the latest matching posted purchase source.
             </p>
           </div>
         </section>
@@ -273,7 +417,7 @@ const EMPTY_SUMMARY: ProductIntelligenceSummary = {
                     <th class="text-right">Sold</th>
                     <th class="text-right">Change</th>
                     <th class="text-right">On hand</th>
-                    <th class="text-right">Cover</th>
+                    <th class="text-right">Planning cover</th>
                     <th class="text-right">Reorder</th>
                     @if (financialsIncluded()) {
                       <th class="text-right">Net sales</th>
@@ -302,6 +446,16 @@ const EMPTY_SUMMARY: ProductIntelligenceSummary = {
                           signalLabel(item.signal)
                         }}</span>
                         <p class="type-caption mt-1">{{ copy(item.reason_code) }}</p>
+                        <div class="mt-1 flex flex-wrap gap-1">
+                          @if (item.demand_confidence) {
+                            <span class="badge badge-ghost badge-xs"
+                              >{{ item.demand_confidence }} confidence</span
+                            >
+                          }
+                          @if (item.outlier_detected) {
+                            <span class="badge badge-warning badge-xs">Unusual spike adjusted</span>
+                          }
+                        </div>
                       </td>
                       <td class="text-right tabular-nums">
                         {{ item.current_quantity | number: '1.0-3' }}
@@ -361,6 +515,16 @@ const EMPTY_SUMMARY: ProductIntelligenceSummary = {
                     }}</span>
                   </div>
                   <p class="text-sm">{{ copy(item.reason_code) }}</p>
+                  <div class="flex flex-wrap gap-1">
+                    @if (item.demand_confidence) {
+                      <span class="badge badge-ghost badge-xs"
+                        >{{ item.demand_confidence }} confidence</span
+                      >
+                    }
+                    @if (item.outlier_detected) {
+                      <span class="badge badge-warning badge-xs">Unusual spike adjusted</span>
+                    }
+                  </div>
                   <dl class="grid grid-cols-3 gap-3 text-sm">
                     <div>
                       <dt class="type-caption">Sold</dt>
@@ -375,7 +539,7 @@ const EMPTY_SUMMARY: ProductIntelligenceSummary = {
                       </dd>
                     </div>
                     <div>
-                      <dt class="type-caption">Cover</dt>
+                      <dt class="type-caption">Planning cover</dt>
                       <dd class="font-semibold tabular-nums">{{ cover(item) }}</dd>
                     </div>
                   </dl>
@@ -430,6 +594,8 @@ export class ProductsInsightsComponent implements OnInit {
   protected readonly supplierFilter = signal('');
   protected readonly manufacturerFilter = signal('');
   protected readonly products = signal<ProductDemandSummary[]>([]);
+  protected readonly performance = signal<ProductPerformanceResponse>(EMPTY_PRODUCT_PERFORMANCE);
+  protected readonly performanceCategory = signal<ProductPerformanceCategory>('trending');
   protected readonly summary = signal<ProductIntelligenceSummary>(EMPTY_SUMMARY);
   protected readonly financialsIncluded = signal(false);
   protected readonly nextOffset = signal<number | null>(null);
@@ -440,6 +606,17 @@ export class ProductsInsightsComponent implements OnInit {
   protected readonly copy = insightCopy;
   protected readonly fmt = formatKes;
   private request = 0;
+
+  protected readonly performanceCategories = computed<ProductPerformanceCategory[]>(() =>
+    this.permissions.has('ViewFinancials')
+      ? ['trending', 'volume', 'margin', 'consistent']
+      : ['trending', 'volume', 'consistent']
+  );
+  protected readonly performanceRows = computed(() =>
+    this.performanceCategory() === 'margin' && !this.permissions.has('ViewFinancials')
+      ? []
+      : this.performance().leaders[this.performanceCategory()]
+  );
 
   protected readonly supplierOptions = computed<readonly SearchableFilterOption[]>(() =>
     this.parties
@@ -511,10 +688,11 @@ export class ProductsInsightsComponent implements OnInit {
     this.windowDays.set(value);
     this.rangeFrom.set(range.from);
     this.rangeTo.set(range.to);
-    if (this.view() === 'priorities') void this.load();
+    if (this.view() !== 'sources') void this.load();
   }
 
   protected setCustomRange(range: AppliedDateRange): void {
+    if (this.view() === 'performance') return;
     this.periodPreset.set(null);
     this.rangeFrom.set(range.from);
     this.rangeTo.set(range.to);
@@ -531,8 +709,16 @@ export class ProductsInsightsComponent implements OnInit {
 
   protected setView(value: InventoryView): void {
     if (this.view() === value) return;
+    if (value === 'performance' && this.periodPreset() === null) {
+      const today = this.businessToday();
+      const range = presetDateRange(today, 30);
+      this.periodPreset.set(30);
+      this.windowDays.set(30);
+      this.rangeFrom.set(range.from);
+      this.rangeTo.set(range.to);
+    }
     this.view.set(value);
-    if (value === 'priorities') void this.load();
+    if (value !== 'sources') void this.load();
   }
 
   protected setLocation(event: Event): void {
@@ -565,6 +751,10 @@ export class ProductsInsightsComponent implements OnInit {
   protected async load(): Promise<void> {
     const locationId = this.locations.activeId();
     if (!locationId) return;
+    if (this.view() === 'performance') {
+      await this.loadPerformance(locationId);
+      return;
+    }
     const request = ++this.request;
     this.loading.set(true);
     this.error.set(null);
@@ -586,6 +776,27 @@ export class ProductsInsightsComponent implements OnInit {
       if (request !== this.request) return;
       this.error.set(
         error instanceof Error ? error.message : 'Could not load inventory intelligence.'
+      );
+    } finally {
+      if (request === this.request) this.loading.set(false);
+    }
+  }
+
+  private async loadPerformance(locationId: string): Promise<void> {
+    const request = ++this.request;
+    this.loading.set(true);
+    this.error.set(null);
+    try {
+      const performance = await this.insights.productPerformance(this.windowDays(), locationId, 25);
+      if (request !== this.request) return;
+      this.performance.set(performance);
+      if (this.performanceCategory() === 'margin' && !performance.financialsIncluded) {
+        this.performanceCategory.set('trending');
+      }
+    } catch (error) {
+      if (request !== this.request) return;
+      this.error.set(
+        error instanceof Error ? error.message : 'Could not load product performance.'
       );
     } finally {
       if (request === this.request) this.loading.set(false);
@@ -640,6 +851,19 @@ export class ProductsInsightsComponent implements OnInit {
     if (value === 'stockout') return 'badge-error';
     if (value === 'reorder' || value === 'low_cover') return 'badge-warning';
     if (value === 'healthy') return 'badge-success';
+    return 'badge-ghost';
+  }
+
+  protected performanceLabel(value: ProductPerformanceCategory): string {
+    if (value === 'trending') return 'Trending';
+    if (value === 'volume') return 'Volume';
+    if (value === 'margin') return 'Margin';
+    return 'Consistency';
+  }
+
+  protected confidenceClass(value: string): string {
+    if (value === 'high') return 'badge-success';
+    if (value === 'medium') return 'badge-info';
     return 'badge-ghost';
   }
 
