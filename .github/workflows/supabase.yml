@@ -77,10 +77,14 @@ jobs:
         run: npm run test:db:concurrency
 
       - name: Verify generated types are checked in
+        # gen types runs postgres-meta as a one-shot container. Keep it on GHCR
+        # so GitHub-hosted runners do not depend on Public ECR's shared rate limit.
+        env:
+          SUPABASE_INTERNAL_IMAGE_REGISTRY: ghcr.io
         run: |
           if [ -f packages/shared-types/database.types.ts ]; then
             supabase gen types typescript --local > /tmp/database.types.ts
-            diff /tmp/database.types.ts packages/shared-types/database.types.ts \
+            diff --ignore-blank-lines /tmp/database.types.ts packages/shared-types/database.types.ts \
               || (echo "::error::packages/shared-types/database.types.ts does not match committed migrations. Run npm run sb:types (this resets the local database)." && exit 1)
           else
             echo "No generated types file yet; skipping check."

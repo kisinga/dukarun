@@ -15,6 +15,7 @@ const statement: CustomerStatement = {
   amount_due: 0,
   downpayment_available: 450,
   account_balance: -450,
+  generated_at: '2026-08-13T10:05:00Z',
   expires_at: '2026-09-01T00:00:00Z',
   orders: [],
   activities: [
@@ -61,6 +62,7 @@ describe('StatementComponent', () => {
 
     const text = fixture.nativeElement.textContent as string;
     expect(text).toContain('Downpayment available');
+    expect(text).toContain('As at');
     expect(text).toContain('KES 450');
     expect(text).toContain('Payment received');
     expect(text).toContain('MPESA-ABC');

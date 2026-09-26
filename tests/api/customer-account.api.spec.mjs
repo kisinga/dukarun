@@ -141,6 +141,8 @@ test('public statements return the unified account shape', async () => {
     assert.equal(statement.downpayment_available, 0);
     assert.equal(statement.account_balance, 0);
     assert.equal(statement.outstanding_total, statement.amount_due);
+    assert.equal(typeof statement.generated_at, 'string');
+    assert.ok(Number.isFinite(Date.parse(statement.generated_at)));
     assert.deepEqual(statement.orders, []);
     assert.deepEqual(statement.activities, []);
   } finally {
