@@ -1,11 +1,19 @@
 -- Aging + settings tests (migration 0023).
 begin;
-select plan(14);
+select plan(15);
+
+-- Keep session and business dates different at every time of day so aging
+-- fixtures cannot accidentally rely on the purchase RPC's current_date default.
+set local timezone to 'Etc/GMT+12';
 
 select testkit.create_user('11111111-1111-1111-1111-111111111111', 'admin@age.local');
 create temp table age_company as
 select testkit.provision('11111111-1111-1111-1111-111111111111', 'Age Co') as company_id;
 grant select on pg_temp.age_company to authenticated;
+
+update public.companies
+set business_timezone = 'Pacific/Kiritimati'
+where id = (select company_id from age_company);
 
 insert into public.products (id, company_id, name)
 select 'a0000000-0000-0000-0000-0000000000e1', company_id, 'Soap' from age_company;
@@ -20,6 +28,15 @@ select 'c0000000-0000-0000-0000-0000000000e2', company_id, 'Old Supplier', true 
 select testkit.as_user((select company_id from age_company), '11111111-1111-1111-1111-111111111111', 'Admin');
 select testkit.ensure_open_session();
 
+-- Aging uses the company's business date, not the session date or the original
+-- posting date. Anchor every backdated fixture to that same clock.
+create temp table age_clock as
+select public.current_business_date() as today;
+select ok(
+  (select today from age_clock) > current_date,
+  'aging fixtures exercise different business and session dates'
+);
+
 -- Credit sale today + an OLD credit sale (backdated entry).
 create temp table age_sale as
 select public.post_sale('c0000000-0000-0000-0000-0000000000e1',
@@ -30,11 +47,11 @@ reset role;
 -- Posted ledger rows are immutable unless the backfill escape hatch is set.
 select set_config('app.allow_ledger_mutation', 'on', true);
 update public.ledger_journal_entries
-set entry_date = entry_date - 45
+set entry_date = (select today from age_clock) - 45
 where source_id = (select order_id::text from age_sale) and source_type = 'CreditSale';
 select set_config('app.allow_ledger_mutation', 'off', true);
 
--- 1-3. Customer aging view.
+-- Customer aging view.
 select is(
   (select balance from public.customer_credit_aging where customer_id = 'c0000000-0000-0000-0000-0000000000e1'),
   10000::bigint,
@@ -63,7 +80,7 @@ select is(
   'fully repaid customer drops out of aging'
 );
 
--- 4-5. Supplier aging via a backdated credit purchase.
+-- Supplier aging via a backdated credit purchase.
 select public.record_purchase('c0000000-0000-0000-0000-0000000000e2',
   '[{"variant_id":"aa000000-0000-0000-0000-0000000000e1","quantity":2,"unit_cost":4000}]',
   true, 'PO-OLD');
@@ -71,7 +88,7 @@ select public.record_purchase('c0000000-0000-0000-0000-0000000000e2',
 reset role;
 select set_config('app.allow_ledger_mutation', 'on', true);
 update public.ledger_journal_entries
-set entry_date = entry_date - 70
+set entry_date = (select today from age_clock) - 70
 where source_type = 'InventoryPurchase';
 select set_config('app.allow_ledger_mutation', 'off', true);
 
@@ -100,7 +117,7 @@ select public.post_sale('c0000000-0000-0000-0000-0000000000e3',
 reset role;
 select set_config('app.allow_ledger_mutation', 'on', true);
 update public.ledger_journal_entries
-set entry_date = entry_date - case
+set entry_date = (select today from age_clock) - case
   when source_id = (select order_id::text from fifo_customer_old) then 60
   else 30
 end
@@ -172,7 +189,7 @@ select public.record_purchase('c0000000-0000-0000-0000-0000000000e4',
 reset role;
 select set_config('app.allow_ledger_mutation', 'on', true);
 update public.ledger_journal_entries
-set entry_date = entry_date - case
+set entry_date = (select today from age_clock) - case
   when source_id = (select purchase_id::text from fifo_supplier_old) then 70
   else 40
 end

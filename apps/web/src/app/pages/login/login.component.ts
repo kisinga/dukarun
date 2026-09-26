@@ -6,77 +6,255 @@ import { normalizeKenyanPhone } from '../../core/phone';
 import { LegalService } from '../../legal/legal.service';
 import { siteUrl } from '../../core/public-url';
 import { hasRegistrationIntent } from '../../core/registration-intent';
+import { IconComponent } from '../../shared/ui/icon.component';
 
 const RESEND_COOLDOWN_SECONDS = 60;
 
 @Component({
   selector: 'app-login',
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, IconComponent],
   template: `
-    <main class="dashboard-main flex min-h-screen items-center justify-center bg-base-200 p-4">
-      <div class="card w-full max-w-sm bg-base-100">
-        <div class="card-body">
-          <h1 class="type-title">Dukarun</h1>
-          <p class="text-sm text-base-content/70">Sign in with your phone number</p>
-
-          @if (step() === 'phone') {
-            <form (submit)="$event.preventDefault(); sendOtp()" class="mt-4 flex flex-col gap-4">
-              <label class="form-control">
-                <span class="label-text mb-1">Phone number</span>
-                <input
-                  type="tel"
-                  class="input input-bordered w-full"
-                  placeholder="0712 345 678"
-                  autocomplete="tel"
-                  [formControl]="phone"
-                />
-              </label>
-              <button type="submit" class="btn btn-primary" [disabled]="sending()">
-                {{ sending() ? 'Sending…' : 'Send code' }}
-              </button>
-            </form>
-          } @else {
-            <form (submit)="$event.preventDefault(); verifyOtp()" class="mt-4 flex flex-col gap-4">
-              <p class="text-sm">
-                Enter the 6-digit code sent by SMS and WhatsApp to
-                <strong>{{ phoneE164() }}</strong>
-              </p>
-              <input
-                type="text"
-                inputmode="numeric"
-                class="input input-bordered w-full text-center tracking-widest"
-                placeholder="123456"
-                maxlength="6"
-                autocomplete="one-time-code"
-                [formControl]="otp"
+    <main
+      class="dashboard-main flex min-h-screen items-center justify-center bg-base-200 p-4 sm:p-6"
+    >
+      <section class="surface-card grid w-full max-w-4xl overflow-hidden lg:grid-cols-2">
+        <aside
+          class="hidden flex-col justify-between border-r border-base-300 bg-base-200/50 p-8 lg:flex"
+          aria-label="About Dukarun"
+        >
+          <div>
+            <div class="flex items-center gap-3">
+              <img
+                src="/assets/logo/dukarun-icon-dark.svg"
+                alt=""
+                class="h-11 w-11"
+                width="44"
+                height="48"
               />
-              <button type="submit" class="btn btn-primary" [disabled]="sending()">
-                {{ sending() ? 'Verifying…' : 'Verify' }}
-              </button>
-              <button
-                type="button"
-                class="btn btn-ghost btn-sm"
-                [disabled]="cooldown() > 0"
-                (click)="sendOtp()"
-              >
-                {{ cooldown() > 0 ? 'Resend in ' + cooldown() + 's' : 'Resend code' }}
-              </button>
-              <button type="button" class="btn btn-link btn-sm" (click)="step.set('phone')">
-                Change number
-              </button>
-            </form>
-          }
+              <span class="type-title">Dukarun</span>
+            </div>
 
-          @if (error()) {
-            <p class="mt-2 text-sm text-error">{{ error() }}</p>
-          }
-          <p class="mt-5 text-center text-xs text-base-content/55">
-            <a [href]="siteUrl('/privacy')" class="link link-hover">Privacy</a>
-            <span aria-hidden="true"> · </span>
-            <a [href]="siteUrl('/terms')" class="link link-hover">Terms</a>
+            <div class="mt-12 max-w-sm">
+              <h2 class="type-hero">Your shop, clearly in hand.</h2>
+              <p class="mt-3 text-sm leading-relaxed text-base-content/70">
+                Sales, stock, customers, and cash stay together so every shift starts with a clear
+                picture.
+              </p>
+
+              <ul class="mt-8 space-y-4 text-sm" aria-label="Dukarun benefits">
+                <li class="flex items-start gap-3">
+                  <span
+                    class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-field bg-primary/10 text-primary"
+                  >
+                    <app-icon name="heroShoppingCart" />
+                  </span>
+                  <span>
+                    <strong class="block font-semibold">Keep the counter moving</strong>
+                    <span class="mt-0.5 block text-base-content/65"
+                      >Fast selling tools built for busy shops.</span
+                    >
+                  </span>
+                </li>
+                <li class="flex items-start gap-3">
+                  <span
+                    class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-field bg-primary/10 text-primary"
+                  >
+                    <app-icon name="heroChartBar" />
+                  </span>
+                  <span>
+                    <strong class="block font-semibold">Know where the money went</strong>
+                    <span class="mt-0.5 block text-base-content/65"
+                      >A reliable view of sales, credit, and cash.</span
+                    >
+                  </span>
+                </li>
+                <li class="flex items-start gap-3">
+                  <span
+                    class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-field bg-primary/10 text-primary"
+                  >
+                    <app-icon name="heroSignalSlash" />
+                  </span>
+                  <span>
+                    <strong class="block font-semibold">Stay useful when the network drops</strong>
+                    <span class="mt-0.5 block text-base-content/65"
+                      >Supported work saves and syncs after reconnecting.</span
+                    >
+                  </span>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <p class="type-caption flex items-center gap-2">
+            <app-icon name="heroLockClosed" size="sm" />
+            Password-free sign-in for your team
           </p>
+        </aside>
+
+        <div class="flex min-h-[32rem] flex-col p-6 sm:p-8">
+          <div class="flex items-center gap-3 lg:hidden">
+            <img
+              src="/assets/logo/dukarun-icon-dark.svg"
+              alt=""
+              class="h-10 w-10"
+              width="40"
+              height="44"
+            />
+            <span class="type-title">Dukarun</span>
+          </div>
+
+          <div class="my-auto py-8 lg:py-4">
+            <div class="mb-6">
+              <h1 class="type-title">Sign in to Dukarun</h1>
+              <p class="mt-1.5 text-sm text-base-content/70">
+                Use your Kenyan mobile number to receive a secure sign-in code.
+              </p>
+            </div>
+
+            @if (step() === 'phone') {
+              <form
+                (submit)="$event.preventDefault(); sendOtp()"
+                class="flex flex-col gap-4"
+                novalidate
+              >
+                <label class="form-control" for="phone-number">
+                  <span class="label-text mb-1 flex items-center justify-between gap-2">
+                    <span>Phone number</span>
+                    <span class="type-caption">Kenya</span>
+                  </span>
+                  <input
+                    id="phone-number"
+                    type="tel"
+                    inputmode="tel"
+                    class="input input-bordered min-h-11 w-full"
+                    placeholder="0712 345 678"
+                    autocomplete="tel"
+                    autofocus
+                    [attr.aria-describedby]="error() ? 'phone-hint auth-error' : 'phone-hint'"
+                    [attr.aria-invalid]="error() ? 'true' : null"
+                    [formControl]="phone"
+                  />
+                  <span id="phone-hint" class="type-caption mt-1.5">
+                    Enter 07… or +254… — both formats work.
+                  </span>
+                </label>
+
+                @if (error()) {
+                  <div id="auth-error" role="alert" class="alert alert-error py-3 text-sm">
+                    <app-icon name="heroExclamationTriangle" />
+                    <span>{{ error() }}</span>
+                  </div>
+                }
+
+                <button
+                  type="submit"
+                  class="btn btn-primary min-h-11 w-full"
+                  [disabled]="sending()"
+                >
+                  @if (sending()) {
+                    <span class="loading loading-spinner loading-sm" aria-hidden="true"></span>
+                    Sending code
+                  } @else {
+                    Send code
+                    <app-icon name="heroArrowRight" />
+                  }
+                </button>
+              </form>
+            } @else {
+              <form
+                (submit)="$event.preventDefault(); verifyOtp()"
+                class="flex flex-col gap-4"
+                novalidate
+              >
+                <div class="surface-inset flex items-start gap-3 p-3 text-sm">
+                  <span
+                    class="flex h-9 w-9 shrink-0 items-center justify-center rounded-field bg-base-100 text-primary"
+                  >
+                    <app-icon name="heroDevicePhoneMobile" />
+                  </span>
+                  <span class="min-w-0">
+                    <span class="block text-base-content/65">Code sent by SMS and WhatsApp</span>
+                    <strong class="mt-0.5 block truncate font-semibold tabular-nums">{{
+                      phoneE164()
+                    }}</strong>
+                  </span>
+                </div>
+
+                <label class="form-control" for="otp-code">
+                  <span class="label-text mb-1">6-digit code</span>
+                  <input
+                    id="otp-code"
+                    type="text"
+                    inputmode="numeric"
+                    pattern="[0-9]*"
+                    class="input input-bordered min-h-11 w-full text-center font-semibold tracking-widest tabular-nums"
+                    placeholder="123456"
+                    maxlength="6"
+                    autocomplete="one-time-code"
+                    autofocus
+                    [attr.aria-describedby]="error() ? 'otp-hint auth-error' : 'otp-hint'"
+                    [attr.aria-invalid]="error() ? 'true' : null"
+                    [formControl]="otp"
+                  />
+                  <span id="otp-hint" class="type-caption mt-1.5">
+                    The code may take a few moments to arrive.
+                  </span>
+                </label>
+
+                @if (error()) {
+                  <div id="auth-error" role="alert" class="alert alert-error py-3 text-sm">
+                    <app-icon name="heroExclamationTriangle" />
+                    <span>{{ error() }}</span>
+                  </div>
+                }
+
+                <button
+                  type="submit"
+                  class="btn btn-primary min-h-11 w-full"
+                  [disabled]="sending()"
+                >
+                  @if (sending()) {
+                    <span class="loading loading-spinner loading-sm" aria-hidden="true"></span>
+                    Checking code
+                  } @else {
+                    Verify and continue
+                    <app-icon name="heroArrowRight" />
+                  }
+                </button>
+
+                <div
+                  class="flex flex-wrap items-center justify-between gap-2 border-t border-base-300 pt-2"
+                >
+                  <button type="button" class="btn btn-ghost btn-sm min-h-11" (click)="editPhone()">
+                    Change number
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-ghost btn-sm min-h-11"
+                    [disabled]="cooldown() > 0"
+                    (click)="sendOtp()"
+                  >
+                    {{ cooldown() > 0 ? 'Resend in ' + cooldown() + 's' : 'Resend code' }}
+                  </button>
+                </div>
+              </form>
+            }
+          </div>
+
+          <div class="text-center">
+            <p class="type-caption">By continuing, you agree to Dukarun's policies.</p>
+            <nav class="mt-1 flex items-center justify-center gap-1" aria-label="Legal policies">
+              <a [href]="siteUrl('/terms')" class="btn btn-ghost btn-xs min-h-11 font-medium"
+                >Terms</a
+              >
+              <span class="type-caption" aria-hidden="true">·</span>
+              <a [href]="siteUrl('/privacy')" class="btn btn-ghost btn-xs min-h-11 font-medium"
+                >Privacy Policy</a
+              >
+            </nav>
+          </div>
         </div>
-      </div>
+      </section>
     </main>
   `,
 })
@@ -128,12 +306,17 @@ export class LoginComponent {
   }
 
   protected async verifyOtp(): Promise<void> {
+    const token = this.otp.value.trim();
+    if (!/^\d{6}$/.test(token)) {
+      this.error.set('Enter the complete 6-digit code.');
+      return;
+    }
     this.sending.set(true);
     this.error.set(null);
     try {
       const { error } = await this.supabase.client.auth.verifyOtp({
         phone: this.phoneE164(),
-        token: this.otp.value.trim(),
+        token,
         type: 'sms',
       });
       if (error) throw error;
@@ -173,6 +356,12 @@ export class LoginComponent {
     } finally {
       this.sending.set(false);
     }
+  }
+
+  protected editPhone(): void {
+    this.step.set('phone');
+    this.otp.setValue('');
+    this.error.set(null);
   }
 
   private startCooldown(): void {
