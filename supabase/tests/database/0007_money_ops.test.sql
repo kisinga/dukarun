@@ -115,8 +115,12 @@ select is(
 );
 
 -- 10-12. Payment reversal.
+-- Use a separate sale: refunded collections cannot be paid out twice.
+create temp table reversible_sale_m as select public.post_sale(null,
+  '[{"variant_id":"aa000000-0000-0000-0000-0000000000bb","quantity":1,"unit_price":10000}]',
+  '[{"method":"cash","amount":10000}]') order_id;
 create temp table pay_m as
-select id as payment_id from public.payments where order_id = (select order_id from sale_m) limit 1;
+select id as payment_id from public.payments where order_id = (select order_id from reversible_sale_m) limit 1;
 
 create temp table prev1 as
 select (public.post_payment_reversal((select payment_id from pay_m), 'duplicate collection')

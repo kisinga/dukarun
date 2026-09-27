@@ -520,8 +520,8 @@ const SALE_SORT_OPTIONS: readonly ListSortOption[] = [
               @if (order.is_credit_sale && order.status === 'completed') {
                 <app-stat-card
                   label="Paid so far"
-                  [value]="fmtKes(creditPaid().get(order.id) ?? 0)"
-                  [tone]="(creditPaid().get(order.id) ?? 0) >= order.total ? 'success' : 'warning'"
+                  [value]="creditPaid().has(order.id) ? fmtKes(creditPaid().get(order.id)!) : '—'"
+                  [tone]="creditBadge(order).type"
                   [sub]="paymentLabel(order)"
                 />
               } @else {
@@ -979,6 +979,8 @@ export class OrdersComponent implements OnInit, OnDestroy {
   protected readonly orders = signal<OrderWithCustomer[]>([]);
   /** Paid-so-far totals (shillings) for the credit sales currently listed. */
   protected readonly creditPaid = signal<Map<string, number>>(new Map());
+  protected readonly orderDues = signal<Map<string, number>>(new Map());
+  private detailSequence = 0;
   protected readonly fulfillmentByOrder = signal<Map<string, OrderFulfillmentSummary>>(new Map());
   protected readonly selectedOrderId = signal<string | null>(null);
   private readonly selectedOrderRecord = signal<OrderWithCustomer | null>(null);
@@ -1114,11 +1116,7 @@ export class OrdersComponent implements OnInit, OnDestroy {
   }
 
   protected canSendReceipt(order: OrderWithCustomer): boolean {
-    if (order.status !== 'completed') return false;
-    const paid = this.payments()
-      .filter(payment => payment.status === 'settled')
-      .reduce((sum, payment) => sum + payment.amount, 0);
-    return paid >= order.total;
+    return order.status === 'completed' && this.orderDues().get(order.id) === 0;
   }
 
   protected readonly salesStats = computed(() => {
@@ -1232,6 +1230,7 @@ export class OrdersComponent implements OnInit, OnDestroy {
   protected async load(): Promise<void> {
     const sequence = ++this.loadSequence;
     this.loading.set(true);
+    this.orderDues.set(new Map());
     try {
       await this.pos.expireProformas();
       const statuses = this.status.value === 'all' ? ALL_STATUSES : [this.status.value];
@@ -1252,9 +1251,8 @@ export class OrdersComponent implements OnInit, OnDestroy {
         sortBy: this.saleSort() as 'created_at' | 'code' | 'total' | 'status',
         sortDirection: this.saleSortDirection(),
       });
-      const creditIds = result.rows.filter(order => order.is_credit_sale).map(order => order.id);
-      const [paidTotals, fulfillmentRows] = await Promise.all([
-        this.pos.paidTotalsByOrder(creditIds),
+      const [receivables, fulfillmentRows] = await Promise.all([
+        this.money.orderReceivableStatuses(result.rows.map(order => order.id)),
         this.fulfillment.orderSummaries(result.rows.map(order => order.id)),
       ]);
       if (sequence !== this.loadSequence) return;
@@ -1262,7 +1260,8 @@ export class OrdersComponent implements OnInit, OnDestroy {
       // succeeds; journal revisions never patch only one part of this state.
       this.orders.set(result.rows);
       this.totalItems.set(result.count);
-      this.creditPaid.set(paidTotals);
+      this.creditPaid.set(new Map(receivables.map(row => [row.order_id, row.settled_amount])));
+      this.orderDues.set(new Map(receivables.map(row => [row.order_id, row.outstanding])));
       this.fulfillmentByOrder.set(new Map(fulfillmentRows.map(row => [row.order_id, row])));
       this.authoritativeLoaded = true;
       await this.loadPageApprovals();
@@ -1344,21 +1343,34 @@ export class OrdersComponent implements OnInit, OnDestroy {
 
   /** Refetch lines + payments for the open drawer; ignores stale results. */
   protected async refreshDetail(orderId: string): Promise<void> {
+    const sequence = ++this.detailSequence;
+    this.orderDues.update(values => {
+      const next = new Map(values);
+      next.delete(orderId);
+      return next;
+    });
     try {
-      const [lines, payments, history] = await Promise.all([
+      const [lines, payments, history, receivables] = await Promise.all([
         this.pos.orderLines(orderId),
         this.pos.orderPayments(orderId),
         this.approvals.forOrder(orderId),
+        this.money.orderReceivableStatuses([orderId]),
       ]);
-      if (this.selectedOrderId() !== orderId) return;
+      if (this.selectedOrderId() !== orderId || sequence !== this.detailSequence) return;
       this.lines.set(lines);
       this.payments.set(payments);
       this.setApprovalHistory(history);
+      this.orderDues.update(values => new Map(values).set(orderId, receivables[0].outstanding));
+      this.creditPaid.update(values => new Map(values).set(orderId, receivables[0].settled_amount));
       await this.recentSales.rememberDetail(orderId, { lines, payments, history });
     } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Failed to load order details');
+      if (this.selectedOrderId() === orderId && sequence === this.detailSequence) {
+        this.error.set(err instanceof Error ? err.message : 'Failed to load order details');
+      }
     } finally {
-      if (this.selectedOrderId() === orderId) this.detailLoading.set(false);
+      if (this.selectedOrderId() === orderId && sequence === this.detailSequence) {
+        this.detailLoading.set(false);
+      }
     }
   }
 
@@ -1396,6 +1408,7 @@ export class OrdersComponent implements OnInit, OnDestroy {
 
   /** Called by the drawer after its close transition finishes. */
   protected closeOrderDrawer(updateUrl = true): void {
+    this.detailSequence++;
     this.selectedOrderId.set(null);
     this.selectedOrderRecord.set(null);
     this.voidingFor.set(null);
@@ -1688,10 +1701,10 @@ export class OrdersComponent implements OnInit, OnDestroy {
     if (order.status === 'expired') return 'Expired';
     if (order.status === 'voided') return 'Voided';
     if (!order.is_credit_sale) return 'Paid';
-    const paid = this.creditPaid().get(order.id) ?? 0;
-    if (paid <= 0) return 'Credit · Unpaid';
-    if (paid >= order.total) return 'Credit · Settled';
-    return `Credit · Part-paid (${formatKes(paid)} of ${formatKes(order.total)})`;
+    const due = this.orderDues().get(order.id);
+    if (due === undefined) return 'Credit · Balance unavailable';
+    if (due === 0) return 'Credit · Settled';
+    return `Credit · ${formatKes(due)} outstanding`;
   }
 
   protected pendingApprovalHold(orderId: string): Approval | null {
@@ -1705,11 +1718,15 @@ export class OrdersComponent implements OnInit, OnDestroy {
   }
 
   /** Badge for a credit sale: warning while anything is outstanding, success once settled. */
-  protected creditBadge(order: OrderWithCustomer): { type: 'warning' | 'success'; label: string } {
-    const paid = this.creditPaid().get(order.id) ?? 0;
-    return paid >= order.total
+  protected creditBadge(order: OrderWithCustomer): {
+    type: 'neutral' | 'warning' | 'success';
+    label: string;
+  } {
+    const due = this.orderDues().get(order.id);
+    if (due === undefined) return { type: 'neutral', label: 'credit · balance unavailable' };
+    return due === 0
       ? { type: 'success', label: 'credit · settled' }
-      : { type: 'warning', label: paid > 0 ? 'credit · part-paid' : 'credit' };
+      : { type: 'warning', label: 'credit · outstanding' };
   }
 
   protected noPaymentsMessage(order: OrderWithCustomer): string {
@@ -1717,10 +1734,10 @@ export class OrdersComponent implements OnInit, OnDestroy {
     if (order.status === 'draft') return 'No payments on this proforma.';
     if (order.status === 'expired') return 'This proforma expired without being converted.';
     if (order.is_credit_sale) {
-      const paid = this.creditPaid().get(order.id) ?? 0;
-      if (paid >= order.total) return 'Credit sale — fully repaid.';
-      if (paid > 0) return `Credit sale — ${formatKes(order.total - paid)} still outstanding.`;
-      return 'Credit sale — no payment collected yet.';
+      const due = this.orderDues().get(order.id);
+      if (due === undefined) return 'Credit sale — balance unavailable.';
+      if (due === 0) return 'Credit sale — no outstanding balance.';
+      return `Credit sale — ${formatKes(due)} still outstanding.`;
     }
     return 'No payments recorded.';
   }

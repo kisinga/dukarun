@@ -34,6 +34,7 @@ const claims = () =>
 async function asUser(client, sql, params = []) {
   await client.query('begin');
   try {
+    await client.query(`set local statement_timeout='10s'`);
     await client.query('set local role authenticated');
     await client.query(`select set_config('request.jwt.claims',$1,true)`, [claims()]);
     const result = await client.query(sql, params);
@@ -173,7 +174,216 @@ try {
     throw new Error(`Receipt-versus-sale balance is inconsistent: ${JSON.stringify(row)}`);
   }
 
-  console.log('customer account concurrency: receipts, sales, and mixed race serialized');
+  // Refunds and collections must serialize on the invoice, without acquiring
+  // customer/order locks in opposite orders. Either winner preserves all money.
+  for (const mode of ['collection', 'reversal']) {
+    const customerId = crypto.randomUUID();
+    await pool.query(
+      `insert into public.customers(id,company_id,first_name,is_credit_approved,credit_limit)
+       values($1,$2,'Refund race',true,1000)`,
+      [customerId, companyId]
+    );
+    const sale = await asUser(
+      clients[0],
+      `select public.post_sale_at_location(null,$1,$2::jsonb,'[]'::jsonb,false,$3) result`,
+      [
+        customerId,
+        JSON.stringify([{ variant_id: variantId, quantity: 1, unit_price: 100 }]),
+        `refund-${mode}-${companyId}`,
+      ]
+    );
+    const funding = await receipt(
+      clients[0],
+      customerId,
+      40,
+      `refund-funding-${mode}-${companyId}`
+    );
+    const results = await Promise.allSettled([
+      asUser(
+        clients[0],
+        `select public.post_full_refund($1,'cash','Race test','write_off') result`,
+        [sale.order_id]
+      ),
+      mode === 'collection'
+        ? receipt(clients[1], customerId, 60, `refund-collection-${companyId}`)
+        : asUser(
+            clients[1],
+            `select public.post_customer_receipt_reversal($1,'Race test') result`,
+            [funding.receipt_id]
+          ),
+    ]);
+    if (results[0].status !== 'fulfilled') throw results[0].reason;
+    if (
+      results[1].status === 'rejected' &&
+      (mode !== 'reversal' || !results[1].reason.message.includes('refunded_order'))
+    ) {
+      throw results[1].reason;
+    }
+    const checked = await pool.query(
+      `select public.order_receivable_ledger_balance_core($1) due,
+         (select downpayment_balance from public.customer_account_balances
+           where customer_id=$2 and company_id=$3) deposit,
+         (select coalesce(sum(l.credit-l.debit),0) from public.ledger_journal_lines l
+           join public.ledger_journal_entries e on e.id=l.entry_id
+           join public.ledger_accounts a on a.id=l.account_id
+           where l.order_id=$1 and e.source_type='Refund' and a.code='CASH_ON_HAND') payout`,
+      [sale.order_id, customerId, companyId]
+    );
+    const actual = checked.rows[0];
+    const expected = mode === 'collection' ? 100 : results[1].status === 'fulfilled' ? 0 : 40;
+    if (Number(actual.due) !== 0 || Number(actual.payout) + Number(actual.deposit) !== expected) {
+      throw new Error(`Refund ${mode} race diverged: ${JSON.stringify(actual)}`);
+    }
+    const duplicate = await asUser(
+      clients[0],
+      `select public.post_full_refund($1,'cash','Duplicate','write_off') result`,
+      [sale.order_id]
+    ).then(
+      () => null,
+      error => error
+    );
+    if (!duplicate?.message.includes('sale_already_refunded')) {
+      throw new Error('Duplicate credit note was not rejected');
+    }
+  }
+
+  // Force each side to win instead of relying on scheduler timing. The waiter
+  // must block before taking any order/payment/application lock needed by the
+  // winner; otherwise the second RPC reproduces the old lock inversion.
+  for (const mode of ['allocation', 'deposit', 'payment-reversal', 'deposit-reversal']) {
+    for (const winner of ['refund', 'operation']) {
+      const customerId = crypto.randomUUID();
+      await pool.query(
+        `insert into public.customers(id,company_id,first_name,is_credit_approved,credit_limit)
+         values($1,$2,'Deterministic refund race',true,1000)`,
+        [customerId, companyId]
+      );
+      const sale = await asUser(
+        clients[0],
+        `select public.post_sale_at_location(null,$1,$2::jsonb,'[]'::jsonb,false,$3) result`,
+        [
+          customerId,
+          JSON.stringify([{ variant_id: variantId, quantity: 1, unit_price: 100 }]),
+          `lock-${mode}-${winner}-${companyId}`,
+        ]
+      );
+      let paymentId;
+      let applicationId;
+      if (mode.startsWith('deposit')) {
+        await asUser(clients[0], `select public.record_customer_deposit($1,100,'cash') result`, [
+          customerId,
+        ]);
+        if (mode === 'deposit-reversal') {
+          applicationId = await asUser(
+            clients[0],
+            `select public.apply_customer_deposit($1,40,$2) result`,
+            [sale.order_id, `seed-${customerId}`]
+          );
+        }
+      } else {
+        paymentId = await asUser(
+          clients[0],
+          `select public.post_payment_allocation($1,40,'cash') result`,
+          [sale.order_id]
+        );
+      }
+      const refund = [
+        `select public.post_full_refund($1,'cash','Lock order test','write_off') result`,
+        [sale.order_id],
+      ];
+      const operation =
+        mode === 'allocation'
+          ? [`select public.post_payment_allocation($1,10,'cash') result`, [sale.order_id]]
+          : mode === 'deposit'
+            ? [
+                `select public.apply_customer_deposit($1,10,$2) result`,
+                [sale.order_id, `apply-${customerId}`],
+              ]
+            : mode === 'payment-reversal'
+              ? [`select public.post_payment_reversal($1,'Lock order test') result`, [paymentId]]
+              : [
+                  `select public.reverse_customer_deposit_application($1,'Lock order test') result`,
+                  [applicationId],
+                ];
+      const first = winner === 'refund' ? refund : operation;
+      const second = winner === 'refund' ? operation : refund;
+      const holder = clients[0];
+      const waiter = clients[1];
+      const holderPid = (await holder.query('select pg_backend_pid() pid')).rows[0].pid;
+      const waiterPid = (await waiter.query('select pg_backend_pid() pid')).rows[0].pid;
+      let pending;
+      let result;
+      try {
+        await holder.query('begin');
+        await holder.query(`set local statement_timeout='10s'`);
+        await holder.query(`select set_config('request.jwt.claims',$1,true)`, [claims()]);
+        // This is the actual production lock helper; only the deterministic
+        // barrier needs owner privileges. Both business RPCs run authenticated.
+        await holder.query('select public.lock_receivable_order_customer($1)', [sale.order_id]);
+        await holder.query('set local role authenticated');
+        pending = asUser(waiter, ...second).then(
+          value => ({ value }),
+          error => ({ error })
+        );
+        const deadline = Date.now() + 3000;
+        while (true) {
+          const blocked = await pool.query('select $1=any(pg_blocking_pids($2)) blocked', [
+            holderPid,
+            waiterPid,
+          ]);
+          if (blocked.rows[0].blocked) break;
+          if (Date.now() >= deadline)
+            throw new Error(`${mode}: contender never reached lock barrier`);
+          await new Promise(resolve => setTimeout(resolve, 10));
+        }
+        await holder.query(...first);
+        await holder.query('commit');
+        result = await pending;
+      } finally {
+        await holder.query('rollback');
+        if (pending) await pending;
+      }
+      if (winner === 'operation' && result.error) throw result.error;
+      if (winner === 'refund') {
+        const expected = mode.endsWith('reversal') ? 'refunded_order' : 'ar_overpayment';
+        if (!result.error?.message.includes(expected)) {
+          throw new Error(
+            `${mode}: expected ${expected}, got ${result.error?.message ?? 'success'}`
+          );
+        }
+      }
+      const checked = (
+        await pool.query(
+          `select public.order_receivable_ledger_balance_core($1) due,
+           (select net_balance from public.customer_account_balances where customer_id=$2) net,
+           (select downpayment_balance from public.customer_account_balances where customer_id=$2) deposit,
+           (select coalesce(sum(l.credit-l.debit),0) from public.ledger_journal_lines l
+             join public.ledger_journal_entries e on e.id=l.entry_id
+             join public.ledger_accounts a on a.id=l.account_id
+             where l.order_id=$1 and e.source_type='Refund' and a.code='CASH_ON_HAND') payout`,
+          [sale.order_id, customerId]
+        )
+      ).rows[0];
+      const expectedMoney = mode.startsWith('deposit')
+        ? 100
+        : mode === 'allocation' && winner === 'operation'
+          ? 50
+          : mode === 'payment-reversal' && winner === 'operation'
+            ? 0
+            : 40;
+      if (
+        Number(checked.due) !== 0 ||
+        Number(checked.net) !== -Number(checked.deposit) ||
+        Number(checked.payout) + Number(checked.deposit) !== expectedMoney
+      ) {
+        throw new Error(`${mode}/${winner}: money diverged: ${JSON.stringify(checked)}`);
+      }
+    }
+  }
+
+  console.log(
+    'customer account concurrency: receipts, sales, refunds, allocations, deposits, and reversals serialized'
+  );
 } finally {
   for (const client of clients) {
     await client.query('rollback').catch(() => undefined);

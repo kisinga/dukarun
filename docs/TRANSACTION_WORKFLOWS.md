@@ -174,6 +174,32 @@ one transaction. Per-order allocation remains available. Statements are built fr
 payments, reversals and adjustments. Refunds, reversals and balance corrections remain explicit,
 permissioned RPCs with journal provenance.
 
+The AR ledger is authoritative for current invoice dues and customer exposure.
+`customer_receivable_documents` exposes the tenant- and permission-checked invoice view.
+Sales screens use `order_receivable_statuses` for the same ledger-derived due; missing balance
+data is unavailable, never implicitly settled. Credit-limit-only users do not load account details.
+
+Full credit notes refund evidenced collections and clear ledger AR. A verified sale-specific
+legacy correction is unwound with a linked reversal, never by editing its original journal or
+paying out a non-cash write-off. Missing or ambiguous correction provenance requires review.
+Refunded collections cannot subsequently be reversed or reallocated to another invoice.
+Receipt allocation/preview, deposit application, reminders and external invoice balances use
+the same order-scoped AR amounts, not invoice-minus-payment arithmetic or a reconciliation table.
+
+New AR lines must link an order in the same company belonging to the same customer. Deferred
+checks reject negative order balances and inconsistent settlement evidence. Corrections append
+linked journals rather than rewrite ledger history. AR writes enqueue the existing credit refresh;
+credit balances remain rebuildable projections. Payment records retain settlement and timing
+evidence: zero current debt does not erase genuine late-payment history.
+
+For AR, the ledger line's typed `customer_id` is the authoritative party link. Balance and
+aging views, statement activities/totals, message previews, dashboard totals, and credit-limit
+checks use that link, including when descriptive `meta.customerId` is absent. Customer
+deposit metadata retains its existing posting contract; it does not identify AR ownership.
+Direct invoice allocations, deposit applications and their reversals acquire the existing
+customer-account/customer lock before order or settlement-record locks, like receipts and
+credit notes. Nested checkout and approval paths preserve the same ordering.
+
 ## Platform operations
 
 The super-admin Operations page exposes pending registrations, outbound delivery failures,

@@ -4,8 +4,8 @@ set local timezone to 'Africa/Nairobi';
 select plan(99);
 
 select has_table('public','tax_rate_versions','VAT rates are effective-dated');
-select has_table('public','legacy_customer_account_reconciliations',
-  'legacy UI balances have explicit document reconciliation records');
+select hasnt_table('public','legacy_customer_account_reconciliations',
+  'receivables have no parallel reconciliation balance table');
 select has_table('public','company_tax_profiles','company VAT profiles are versioned');
 select has_table('public','tax_documents','statutory document snapshots are durable');
 select has_table('public','tax_export_artifacts','provider exports are immutable artifacts');

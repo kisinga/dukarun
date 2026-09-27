@@ -1,5 +1,5 @@
 begin;
-select plan(6);
+select plan(11);
 
 select testkit.create_user(
   '11800000-0000-4000-8000-000000000001',
@@ -26,7 +26,7 @@ select '11800000-0000-4000-8000-000000000002',company_id,
 from legacy_account_fixture;
 
 -- Model a migrated account whose source documents say 2,522 while the
--- immutable AR journal and the balance preserved at migration say 1,900.
+-- immutable AR journal says 1,900. The stale document arithmetic is never debt.
 -- Both sides are written in one transaction because the account-integrity
 -- constraints are deferred until transaction completion.
 insert into public.orders(
@@ -34,14 +34,6 @@ insert into public.orders(
 )
 select '11800000-0000-4000-8000-000000000003',company_id,'LEGACY-ACCOUNT-1',
   '11800000-0000-4000-8000-000000000002','completed',2522,true,'credit'
-from legacy_account_fixture;
-
-insert into public.legacy_customer_account_reconciliations(
-  id,company_id,customer_id,amount,ledger_balance,prior_document_balance,reason
-)
-select '11800000-0000-4000-8000-000000000004',company_id,
-  '11800000-0000-4000-8000-000000000002',-622,1900,2522,
-  'Regression fixture: preserve migrated customer balance'
 from legacy_account_fixture;
 
 select public.post_journal_entry(
@@ -69,11 +61,8 @@ select public.post_journal_entry(
 );
 
 select ok(
-  position(
-    'legacy_customer_account_reconciliations'
-    in pg_get_functiondef('public.customer_document_balance(uuid,uuid)'::regprocedure)
-  ) > 0,
-  'customer document balance retains the explicit migration reconciliation source'
+  to_regclass('public.legacy_customer_account_reconciliations') is null,
+  'the parallel migration reconciliation source is removed'
 );
 select is(
   (select sum(o.total-coalesce(paid.amount,0))::bigint
@@ -94,7 +83,7 @@ select is(
     '11800000-0000-4000-8000-000000000002'
   ),
   1900::bigint,
-  'document balance applies the durable migration reconciliation'
+  'document balance is computed only from the ledger'
 );
 select is(
   public.customer_ledger_balance(
@@ -110,12 +99,38 @@ select lives_ok(
     (select company_id from legacy_account_fixture),
     '11800000-0000-4000-8000-000000000002'
   ),
-  'legacy reconciliation satisfies the canonical account invariant'
+  'ledger projection satisfies the canonical account invariant'
 );
 select lives_ok(
-  'set constraints orders_account_consistency, journal_lines_account_consistency immediate',
-  'deferred account constraints accept the reconciled legacy account'
+  'set constraints all immediate',
+  'all deferred constraints accept the ledger-backed account'
 );
+
+select is((select outstanding from public.customer_receivable_documents(
+  '11800000-0000-4000-8000-000000000002')),1900::bigint,
+  'open-invoice RPC returns ledger due, not invoice minus payments');
+select is((public.customer_receipt_preview(
+  '11800000-0000-4000-8000-000000000002',2000)->>'applied_amount')::bigint,1900::bigint,
+  'FIFO receipt preview uses the same ledger due');
+select throws_like(
+  $$insert into public.payments(company_id,order_id,method_code,amount,status)
+    select company_id,'11800000-0000-4000-8000-000000000003','cash',100,'settled'
+    from legacy_account_fixture$$,
+  '%payment_ledger_evidence_mismatch%',
+  'unbacked settlement evidence cannot be committed');
+set constraints all deferred;
+select throws_ok(
+  $$select public.post_journal_entry((select company_id from legacy_account_fixture),
+    'InvalidUnscopedAR','invalid-unscoped-ar','Invalid',jsonb_build_array(
+      jsonb_build_object('account_code','ACCOUNTS_RECEIVABLE','debit',10,
+        'meta',jsonb_build_object('customerId','11800000-0000-4000-8000-000000000002')),
+      jsonb_build_object('account_code','SALES','credit',10)))$$,
+  'P0001','ar_order_required','new AR must belong to an order');
+select public.refresh_credit_party((select company_id from legacy_account_fixture),
+  'customer','11800000-0000-4000-8000-000000000002',true);
+select is((select balance from public.party_credit_profile
+  where party_id='11800000-0000-4000-8000-000000000002'),1900::bigint,
+  'credit scoring exposure is also ledger-backed');
 
 select * from finish();
 rollback;

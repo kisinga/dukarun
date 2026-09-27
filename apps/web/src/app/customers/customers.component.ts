@@ -1043,55 +1043,56 @@ type CustomerRiskFilter = 'all' | 'review' | 'restricted' | 'healthy' | 'unrated
                     }
                   </section>
 
-                  <section class="surface-card p-4">
-                    <h3 class="section-title mb-2">Open invoices</h3>
-                    @if (creditOrders().length === 0) {
-                      <app-empty-state
-                        [compact]="true"
-                        icon="heroCreditCard"
-                        title="No open invoices"
-                      />
-                    } @else {
-                      <ul class="divide-y divide-base-200">
-                        @for (o of creditOrders(); track o.id) {
-                          <li class="py-2">
-                            <div class="flex items-center gap-2">
-                              <div class="min-w-0 flex-1">
+                  @if (canReadCustomerAccount()) {
+                    <section class="surface-card p-4">
+                      <h3 class="section-title mb-2">Open invoices</h3>
+                      @if (creditOrders().length === 0) {
+                        <app-empty-state
+                          [compact]="true"
+                          icon="heroCreditCard"
+                          title="No open invoices"
+                        />
+                      } @else {
+                        <ul class="divide-y divide-base-200">
+                          @for (o of creditOrders(); track o.id) {
+                            <li class="py-2">
+                              <div class="flex items-center gap-2">
+                                <div class="min-w-0 flex-1">
+                                  <a
+                                    class="link font-mono text-sm font-medium"
+                                    [routerLink]="['/orders']"
+                                    [queryParams]="{ customer: c.id, range: 'all', order: o.id }"
+                                    >{{ o.code }}</a
+                                  >
+                                  <p class="type-caption">{{ date(o.created_at) }}</p>
+                                </div>
+                                <app-status-badge
+                                  size="xs"
+                                  [type]="orderStatusType(o.status)"
+                                  [label]="o.status"
+                                />
+                                <span class="text-sm font-semibold tabular-nums"
+                                  ><app-money
+                                    [amount]="o.outstanding"
+                                    [masked]="!perms.has('ViewFinancials')"
+                                /></span>
                                 <a
-                                  class="link font-mono text-sm font-medium"
+                                  appButton
+                                  variant="ghost"
+                                  size="sm"
+                                  title="View order details"
                                   [routerLink]="['/orders']"
                                   [queryParams]="{ customer: c.id, range: 'all', order: o.id }"
-                                  >{{ o.code }}</a
                                 >
-                                <p class="type-caption">{{ date(o.created_at) }}</p>
+                                  View
+                                </a>
                               </div>
-                              <app-status-badge
-                                size="xs"
-                                [type]="orderStatusType(o.status)"
-                                [label]="o.status"
-                              />
-                              <span class="text-sm font-semibold tabular-nums"
-                                ><app-money
-                                  [amount]="o.outstanding"
-                                  [masked]="!perms.has('ViewFinancials')"
-                              /></span>
-                              <a
-                                appButton
-                                variant="ghost"
-                                size="sm"
-                                title="View order details"
-                                [routerLink]="['/orders']"
-                                [queryParams]="{ customer: c.id, range: 'all', order: o.id }"
-                              >
-                                View
-                              </a>
-                            </div>
-                          </li>
-                        }
-                      </ul>
-                    }
-                  </section>
-
+                            </li>
+                          }
+                        </ul>
+                      }
+                    </section>
+                  }
                   <section class="surface-card p-4">
                     <div class="mb-2 flex items-center justify-between gap-2">
                       <h3 class="section-title">Recent sales</h3>
@@ -1534,6 +1535,13 @@ export class CustomersComponent implements OnInit {
   private readonly receiptData = inject(ReceiptDataService);
   private readonly print = inject(PrintService);
   protected readonly perms = inject(PermissionsService);
+  protected canReadCustomerAccount(): boolean {
+    return (
+      this.perms.has('ViewFinancials') ||
+      this.perms.has('SettleOrder') ||
+      this.perms.has('ManageCustomers')
+    );
+  }
   private readonly approvals = inject(ApprovalsService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
@@ -1894,7 +1902,7 @@ export class CustomersComponent implements OnInit {
         businessDate,
       ] = await Promise.all([
         this.pos.customerOrders(customerId),
-        this.money.creditOrders(customerId),
+        this.loadCreditOrders(customerId),
         statementRequest,
         this.receiptData.companyPrintInfo().catch(() => null),
         this.approvals.forCustomer(customerId),
@@ -1903,9 +1911,7 @@ export class CustomersComponent implements OnInit {
         this.perms.has('ViewFinancials')
           ? this.money.customerDepositAvailable(customerId)
           : Promise.resolve(0),
-        this.perms.has('ViewFinancials') ||
-        this.perms.has('SettleOrder') ||
-        this.perms.has('ManageCustomers')
+        this.canReadCustomerAccount()
           ? this.money.customerAccountStatus(customerId)
           : Promise.resolve(null),
         this.businessClock.today().catch(() => null),
@@ -2271,7 +2277,7 @@ export class CustomersComponent implements OnInit {
         this.notice.set('M-PESA payment posted to the customer account');
         await Promise.all([
           this.load(),
-          this.money.creditOrders(customerId).then(rows => this.creditOrders.set(rows)),
+          this.loadCreditOrders(customerId).then(rows => this.creditOrders.set(rows)),
           this.refreshCustomerStatement(customerId),
           this.refreshCustomerDepositData(customerId),
         ]);
@@ -2299,7 +2305,7 @@ export class CustomersComponent implements OnInit {
         );
         await Promise.all([
           this.load(),
-          this.money.creditOrders(customerId).then(rows => this.creditOrders.set(rows)),
+          this.loadCreditOrders(customerId).then(rows => this.creditOrders.set(rows)),
           this.refreshCustomerStatement(customerId),
           this.refreshCustomerDepositData(customerId),
         ]);
@@ -2340,7 +2346,7 @@ export class CustomersComponent implements OnInit {
       if (outcome.status === 'completed') {
         await Promise.all([
           this.load(),
-          this.money.creditOrders(customerId).then(rows => this.creditOrders.set(rows)),
+          this.loadCreditOrders(customerId).then(rows => this.creditOrders.set(rows)),
           this.refreshCustomerStatement(customerId),
           this.refreshCustomerDepositData(customerId),
         ]);
@@ -2350,6 +2356,10 @@ export class CustomersComponent implements OnInit {
     } finally {
       this.busy.set(false);
     }
+  }
+
+  private async loadCreditOrders(customerId: string): Promise<CreditOrder[]> {
+    return this.canReadCustomerAccount() ? this.money.creditOrders(customerId) : [];
   }
 
   private async refreshCustomerStatement(customerId: string): Promise<void> {

@@ -283,6 +283,14 @@ insert into public.orders(id,company_id,code,customer_id,status,total,is_credit_
 select '69696969-6969-4696-9696-696969696965',company_id,'COMM-FUTURE',
   '69696969-6969-4696-9696-696969696962','completed',10000,true,
   (now() at time zone 'Africa/Nairobi')::date+1 from communications_fixture;
+-- A document alone is not debt. Give this reminder fixture real AR evidence.
+select testkit.ensure_open_session();
+select public.post_journal_entry((select company_id from communications_fixture),
+  'CreditSale','69696969-6969-4696-9696-696969696965','Reminder fixture',jsonb_build_array(
+    jsonb_build_object('account_code','ACCOUNTS_RECEIVABLE','debit',10000,
+      'order_id','69696969-6969-4696-9696-696969696965'),
+    jsonb_build_object('account_code','SALES','credit',10000,
+      'order_id','69696969-6969-4696-9696-696969696965')));
 select public.credit_reminder_scan();
 select is(
   (select count(*)::int from public.outbox where source='reminder'
