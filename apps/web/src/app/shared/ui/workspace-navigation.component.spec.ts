@@ -50,18 +50,15 @@ describe('WorkspaceNavigationComponent', () => {
     fixture.detectChanges();
   }
 
-  it('hides redundant navigation when only one view is available', async () => {
+  it('hides redundant navigation when only one section is available', async () => {
     items = [{ label: 'Messages', route: '/activity/messages' }];
     await render();
 
-    expect(fixture.nativeElement.querySelector('[role="tablist"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('nav')).toBeNull();
     expect(fixture.nativeElement.querySelector('select')).toBeNull();
-    expect(
-      fixture.nativeElement.querySelector('[aria-label="Current view"]')?.textContent
-    ).toContain('Messages');
   });
 
-  it('renders desktop tabs and a mobile selector for multiple views', async () => {
+  it('renders desktop route navigation and a mobile selector for multiple sections', async () => {
     items = [
       { label: 'Messages', route: '/activity/messages' },
       { label: 'Audit trail', route: '/activity/audit' },
@@ -69,15 +66,15 @@ describe('WorkspaceNavigationComponent', () => {
     await router.navigateByUrl('/activity/messages');
     await render();
 
-    const tablist = fixture.nativeElement.querySelector('[role="tablist"]') as HTMLElement;
+    const navigation = fixture.nativeElement.querySelector('nav') as HTMLElement;
     const select = fixture.nativeElement.querySelector('select') as HTMLSelectElement;
-    expect(tablist.textContent).toContain('Messages');
-    expect(tablist.textContent).toContain('Audit trail');
-    expect(select.getAttribute('aria-label')).toBe('Activity view');
+    expect(navigation.textContent).toContain('Messages');
+    expect(navigation.textContent).toContain('Audit trail');
+    expect(select.getAttribute('aria-label')).toBe('Activity section');
     expect(select.value).toBe('/activity/messages');
-    const activeTab = tablist.querySelector('[aria-selected="true"]') as HTMLElement;
-    expect(activeTab.textContent).toContain('Messages');
-    expect(activeTab.classList.contains('section-tab-active')).toBe(true);
+    const activeLink = navigation.querySelector('[aria-current="page"]') as HTMLElement;
+    expect(activeLink.textContent).toContain('Messages');
+    expect(activeLink.classList.contains('nav-item-active')).toBe(true);
 
     select.value = '/activity/audit';
     select.dispatchEvent(new Event('change'));

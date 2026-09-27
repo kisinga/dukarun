@@ -11,6 +11,7 @@ import { DailySummary, ReportsService } from './reports.service';
 import { ButtonComponent } from '../shared/ui/button.component';
 import { IconComponent } from '../shared/ui/icon.component';
 import { MobileListComponent } from '../shared/ui/mobile-list.component';
+import { SectionTabsComponent } from '../shared/ui/section-tabs.component';
 
 type Tab = 'sales' | 'customers';
 
@@ -30,6 +31,7 @@ type CustomerRow = {
     ButtonComponent,
     IconComponent,
     MobileListComponent,
+    SectionTabsComponent,
     RouterLink,
   ],
   template: `
@@ -69,28 +71,12 @@ type CustomerRow = {
           />
 
           <div class="flex flex-wrap items-end justify-between gap-3">
-            <div role="tablist" aria-label="Sales analysis view" class="section-tabs">
-              <button
-                role="tab"
-                type="button"
-                class="section-tab"
-                [class.section-tab-active]="tab() === 'sales'"
-                [attr.aria-selected]="tab() === 'sales'"
-                (click)="tab.set('sales')"
-              >
-                Sales trend
-              </button>
-              <button
-                role="tab"
-                type="button"
-                class="section-tab"
-                [class.section-tab-active]="tab() === 'customers'"
-                [attr.aria-selected]="tab() === 'customers'"
-                (click)="tab.set('customers')"
-              >
-                Customers
-              </button>
-            </div>
+            <app-section-tabs
+              [items]="analysisViews"
+              [value]="tab()"
+              ariaLabel="Sales analysis view"
+              (valueChange)="setTab($event)"
+            />
             <span class="type-caption">Figures refresh hourly.</span>
           </div>
         </div>
@@ -310,6 +296,10 @@ export class ReportsComponent implements OnInit {
   private readonly businessClock = inject(BusinessClockService);
 
   protected readonly fmt = formatKes;
+  protected readonly analysisViews = [
+    { value: 'sales', label: 'Sales trend' },
+    { value: 'customers', label: 'Customers' },
+  ] as const;
   protected readonly tab = signal<Tab>('sales');
   protected readonly businessToday = signal('');
   protected readonly periodPreset = signal<DateRangePreset | null>(30);
@@ -344,6 +334,11 @@ export class ReportsComponent implements OnInit {
   protected readonly averageSale = computed(() =>
     this.totals().orders > 0 ? Math.round(this.totals().revenue / this.totals().orders) : 0
   );
+
+  protected setTab(value: string): void {
+    if (value === 'sales' || value === 'customers') this.tab.set(value);
+  }
+
   async ngOnInit(): Promise<void> {
     try {
       const today = await this.businessClock.today();

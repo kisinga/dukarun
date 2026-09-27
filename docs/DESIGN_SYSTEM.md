@@ -129,6 +129,9 @@ interactive content is a design-language violation.
   Editing and destructive actions belong in the record task sheet.
 - Tables are desktop-only from `lg` (1024px) and must be paired with a phone list through the
   responsive data pattern. `table-scroll` and page-level horizontal overflow are prohibited.
+- Primary desktop datasets use `<app-data-table-shell>`. Long tables receive one bounded,
+  keyboard-focusable scroll region with sticky column headers; short tables remain in natural
+  document flow. Consumers must not add their own height, overflow, or sticky-header rules.
 - Phone list toolbars keep search visible. Sort uses the anchored menu; Filters opens the bottom
   sheet, applies changes immediately, exposes active filter chips/count, and ends with View results
   and Clear all. Phone summaries expose exactly two primary metrics before More summary.
@@ -311,6 +314,16 @@ Compose pages from these — never hand-roll what a primitive owns:
   `[primaryAction]`, an optional refresh/status control into `[utilityAction]`, and secondary
   controls into `[overflowAction]`. Overflow controls render inline on desktop and in one menu
   on phones.
+- **`<app-route-navigation>`** — cross-route navigation inside one workspace. Pass related
+  `{ route, label, icon? }` items and a short workspace label. It renders a quiet desktop row and
+  a labeled phone selector, owns active-route matching, and disappears when only one route is
+  available. Permission-aware workspaces use `<app-workspace-navigation>`, which composes this
+  primitive from `WorkspaceNavigationService`.
+- **`<app-section-tabs>`** — state-backed switching within a page. Pass `{ value, label }` items,
+  the active value, and an accessible label. Use `presentation="primary"` when those values are the
+  page's primary sections (Settings), and the default segmented presentation for secondary peer
+  views inside a selected section. Use `mobileSelect` when a long set should collapse to a selector
+  on phones.
 - **`<app-mobile-list>` / `<app-responsive-data-view>`** — the shared phone list surface and
   desktop/mobile pairing boundary. Domain pages own row content; the primitives own visibility,
   border, radius, and dividers.
@@ -370,9 +383,13 @@ Every list page is the same four blocks, top to bottom — no improvisation:
    table footer or a floating row. Related navigation uses a domain icon; reserve `heroPlus`
    for create. Refresh includes a tooltip, accessible label, and loading state but no visible
    text label.
-2. **`<app-list-search-bar>`** — the common list top bar. Its first row hosts the compact
-   search field and lightweight `app-stat-bar` in `[summary]`. Optional `[filters]` sit in a
-   quieter divided row below so dense filter controls never distort the shared list identity;
+2. **`<app-list-search-bar>`** — the common compact list top bar. Search, summary, and sort share
+   one desktop row; at medium widths the summary can move below search and sort. Search and sort
+   use matching control borders, field radii, and 44px heights. Metric values align at the top;
+   interactive and read-only metrics use identical straight dividers. Optional `[filters]` always
+   own a full-width divided row below, keeping their compact sizes and permanent labels. Never
+   squeeze filters between search and sort, add a full-width KPI strip, or enlarge every filter
+   to match the search height;
    `[badges]` may wrap underneath. The primitive owns block layout, `p-4`, and `mb-4`, aligning
    its contents with table-shell headers and cells while guaranteeing the same gap before every
    data surface. Pages must not wrap it just to recreate that spacing. No detached stat-card
@@ -380,7 +397,10 @@ Every list page is the same four blocks, top to bottom — no improvisation:
    The primitive owns its single clear button and applies `search-with-custom-clear` to suppress
    the browser's native cancel control. Any other search that supplies a custom clear action must
    use the same class; searches without a custom action keep native clearing. Two clear controls
-   are always a design-language defect.
+   are always a design-language defect. Give every consumer a domain-specific `searchLabel`
+   (for example, “Search customers”); the placeholder may describe searchable fields but is not
+   the accessible name. Filter controls use `app-form-field` so Customers, Suppliers, and other
+   directories share the same permanent-label alignment.
 3. **Data surface** — desktop: `<app-data-table-shell>` containing a semantic table with
    row-click navigation to the detail view (no "View" buttons); mobile: `<app-mobile-list>`
    with compact domain-owned rows. Use `<app-responsive-data-view>` when the two forms share
@@ -520,12 +540,21 @@ bars, dots, gradients, or weight games on top of it. Apply the active class via
 
 ### Section tabs
 
-Peer views inside a workspace use the global `.section-tabs` surface and `.section-tab` items.
-The group is content-width, horizontally scrollable when necessary, and uses the standard box and
-field radii. `.section-tab-active` is the only active signifier: a quiet primary tint with readable
+Navigation has two visual levels, based on hierarchy rather than implementation. Primary sections
+use the quiet row with one tinted active item and a labeled phone selector. Use
+`<app-route-navigation>` (or `<app-workspace-navigation>`) when sections are routes, and
+`<app-section-tabs presentation="primary">` when they are local page state, as in Settings.
+
+Secondary peer views inside the selected section use `<app-section-tabs>` with its default
+segmented presentation, which owns the global `.section-tabs` surface and `.section-tab` items. The
+group is content-width, horizontally scrollable when necessary, and uses the standard box and field
+radii. `.section-tab-active` is the only active signifier: a quiet primary tint with readable
 `--text-accent` text. Inactive labels use `--text-muted`. Do not use underline-only tabs, square
 outlines, full-width empty tab bars, or page-specific tab geometry. On phones, multi-view workspaces
-may replace the strip with a labeled select.
+may replace either presentation with a labeled select.
+
+Ranking, sorting, dates, locations, search, and filters are scope controls—not navigation. Put them
+in the page toolbar or filter row with permanent labels; never represent them as another tab level.
 
 Wizard steps and in-flow choices such as payment methods are not section navigation and keep their
 own purpose-specific patterns.
@@ -535,6 +564,12 @@ own purpose-specific patterns.
 Header chrome is encoded globally (`.dashboard-main .table thead th`): uppercase 12px
 semibold, shared `--text-muted`, hairline divider. `type-caption`, table supporting text and catalog
 metadata use this same readable 70% tone instead of ad-hoc 50–55% text. Never style `<th>` per page.
+
+Customer and supplier account tables add `.account-table`, a shared fixed six-column rhythm:
+identity, contact, domain context, aging/terms, balance, and actions. Archive/deleted status stays
+beside the entity name rather than consuming a column; money remains right-aligned and actions stay
+compact. Do not add a seventh status or metadata column when the information belongs to identity or
+account context.
 Rows follow one vocabulary — same meaning, same shape; different data, different cells:
 
 - **Density**: cells are `vertical-align: middle` (encoded); one line per cell where

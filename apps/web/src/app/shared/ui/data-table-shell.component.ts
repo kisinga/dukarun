@@ -1,8 +1,9 @@
 import { Component, input } from '@angular/core';
 
 /**
- * Shared surface for primary datasets. Keeps heading, table overflow and footer
- * visually consistent while allowing each page to own its semantic columns.
+ * Shared surface for primary datasets. Keeps heading, bounded desktop scrolling,
+ * table overflow and footer visually consistent while allowing each page to own
+ * its semantic columns.
  */
 @Component({
   selector: 'app-data-table-shell',
@@ -24,7 +25,17 @@ import { Component, input } from '@angular/core';
           <div class="sm:ml-auto"><ng-content select="[tableActions]" /></div>
         </header>
       }
-      <div class="overflow-x-auto"><ng-content /></div>
+      <div
+        class="data-table-viewport"
+        [class.data-table-viewport-bounded]="stickyHeader()"
+        [attr.role]="stickyHeader() ? 'region' : null"
+        [attr.aria-label]="
+          stickyHeader() ? (heading() ? heading() + ' table' : 'Scrollable data table') : null
+        "
+        [attr.tabindex]="stickyHeader() ? 0 : null"
+      >
+        <ng-content />
+      </div>
       <footer><ng-content select="[tableFooter]" /></footer>
     </section>
   `,
@@ -32,4 +43,9 @@ import { Component, input } from '@angular/core';
 export class DataTableShellComponent {
   readonly heading = input<string>();
   readonly description = input<string>();
+  /**
+   * Primary desktop datasets keep column labels visible once their rows exceed
+   * the viewport-aware table region. Disable only for short, document-flow tables.
+   */
+  readonly stickyHeader = input(true);
 }

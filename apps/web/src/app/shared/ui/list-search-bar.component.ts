@@ -25,17 +25,20 @@ export type ListSortDirection = 'asc' | 'desc';
   template: `
     <section class="card flex min-w-0 flex-col gap-3 bg-base-100 p-3 md:p-4">
       <div
-        class="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-3 md:flex md:items-center md:gap-4"
+        class="list-toolbar-grid grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 md:grid-cols-[minmax(0,1fr)_auto] xl:grid-cols-[minmax(14rem,18rem)_minmax(0,1fr)_auto] xl:gap-4"
       >
-        <div class="relative col-span-2 min-w-0 md:w-72 md:flex-none xl:w-80">
+        <div
+          class="list-toolbar-search relative col-span-2 min-w-0 md:col-span-1 md:w-72 xl:w-full"
+        >
           <ng-icon
             name="heroMagnifyingGlass"
             size="1rem"
-            class="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted"
+            class="pointer-events-none absolute top-1/2 left-3 z-1 -translate-y-1/2 text-muted"
           />
           <input
             type="search"
             [placeholder]="placeholder()"
+            [attr.aria-label]="searchLabel()"
             class="search-with-custom-clear input input-bordered min-h-11 w-full pr-11 pl-9"
             [value]="searchQuery()"
             (input)="onSearchInput($event)"
@@ -52,7 +55,9 @@ export type ListSortDirection = 'asc' | 'desc';
           }
         </div>
 
-        <div class="min-w-0 flex-1">
+        <div
+          class="list-toolbar-summary min-w-0 md:col-span-2 md:row-start-2 xl:col-span-1 xl:col-start-2 xl:row-start-1"
+        >
           <ng-content select="[summary]" />
         </div>
 
@@ -129,28 +134,21 @@ export type ListSortDirection = 'asc' | 'desc';
 
         @if (sortOptions().length > 0) {
           <div
-            class="hidden w-fit max-w-full overflow-hidden rounded-field border border-base-300 bg-base-100 shadow-xs transition focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/10 md:ml-auto md:inline-flex md:flex-none"
+            class="list-toolbar-sort list-sort-control hidden w-56 min-w-0 items-stretch overflow-hidden rounded-field md:col-start-2 md:row-start-1 md:flex xl:col-start-3"
           >
-            <div class="relative min-w-0">
-              <select
-                class="sort-select select min-h-11 w-52 min-w-0 cursor-pointer rounded-none border-0 bg-transparent pr-10 select-sm"
-                aria-label="Sort by"
-                [value]="sortKey()"
-                (change)="onSortKeyChange($event)"
-              >
-                @for (option of sortOptions(); track option.value) {
-                  <option [value]="option.value">{{ option.label }}</option>
-                }
-              </select>
-              <ng-icon
-                name="heroChevronDown"
-                size="0.875rem"
-                class="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-muted"
-              />
-            </div>
+            <select
+              class="sort-select select min-h-11 min-w-0 flex-1 cursor-pointer rounded-none select-sm"
+              aria-label="Sort by"
+              [value]="sortKey()"
+              (change)="onSortKeyChange($event)"
+            >
+              @for (option of sortOptions(); track option.value) {
+                <option [value]="option.value">{{ option.label }}</option>
+              }
+            </select>
             <button
               type="button"
-              class="btn min-h-11 w-11 shrink-0 rounded-none border-0 border-l border-base-300/70 btn-ghost btn-sm hover:bg-base-200"
+              class="sort-direction btn min-h-11 w-11 shrink-0 rounded-none btn-ghost btn-sm"
               [attr.aria-label]="directionTitle()"
               (click)="toggleSortDirection()"
             >
@@ -228,11 +226,42 @@ export type ListSortDirection = 'asc' | 'desc';
     </section>
   `,
   styles: `
-    .sort-select {
-      appearance: none;
-      background-image: none;
+    .list-toolbar-summary:empty {
+      display: none;
+    }
+
+    .list-sort-control {
+      height: 2.75rem;
+      border: 1px solid var(--control-border);
+      background: var(--surface-inset);
+    }
+
+    .list-sort-control:focus-within {
+      border-color: var(--color-primary);
+      outline: 2px solid var(--color-primary);
+      outline-offset: 2px;
+    }
+
+    .list-sort-control .sort-select {
+      height: 100%;
+      min-height: 0;
+      border: 0;
       box-shadow: none;
       outline: none;
+      background-color: transparent;
+    }
+
+    .sort-direction {
+      height: 100%;
+      min-height: 0;
+      border: 0;
+      border-left: 1px solid var(--control-border);
+      background: transparent;
+      box-shadow: none;
+    }
+
+    .sort-direction:hover {
+      background: var(--surface-action);
     }
 
     .list-filter-panel {
@@ -270,7 +299,7 @@ export type ListSortDirection = 'asc' | 'desc';
         display: block;
         max-height: none;
         border: 0;
-        border-top: 1px solid color-mix(in oklab, var(--color-base-300) 60%, transparent);
+        border-top: 1px solid var(--surface-border);
         border-radius: 0;
         box-shadow: none;
         transform: none;
@@ -293,6 +322,7 @@ export type ListSortDirection = 'asc' | 'desc';
 export class ListSearchBarComponent implements OnDestroy {
   readonly searchQuery = model<string>('');
   readonly placeholder = input<string>('Search...');
+  readonly searchLabel = input('Search list');
   readonly sortOptions = input<readonly ListSortOption[]>([]);
   readonly sortKey = model<string>('');
   readonly sortDirection = model<ListSortDirection>('asc');

@@ -170,34 +170,81 @@ type DashboardSection = 'sales' | 'attention';
                 [value]="initialLoading() ? '—' : String(today()?.orders ?? 0)"
                 sub="Completed checkouts"
               />
-              <app-stat-card
-                label="Sales volume"
-                [value]="initialLoading() ? '—' : quantity(todayQuantity())"
-                sub="Net item quantity sold"
-              />
-              <app-stat-card
-                label="Margin"
-                [value]="initialLoading() ? '—' : fmt(today()?.margin ?? 0)"
-                sub="Revenue less stock cost"
-                [tone]="
-                  (today()?.margin ?? 0) > 0
-                    ? 'success'
-                    : (today()?.margin ?? 0) < 0
-                      ? 'error'
-                      : 'neutral'
-                "
-              />
-              <app-stat-card
-                label="Sales to sync"
-                [value]="String(pendingCount())"
-                [sub]="
-                  sync.failedCount() > 0 ? sync.failedCount() + ' need attention' : 'Offline queue'
-                "
-                [tone]="
-                  sync.failedCount() > 0 ? 'error' : pendingCount() > 0 ? 'warning' : 'neutral'
-                "
-              />
+              <div class="hidden lg:contents">
+                <app-stat-card
+                  label="Sales volume"
+                  [value]="initialLoading() ? '—' : quantity(todayQuantity())"
+                  sub="Net item quantity sold"
+                />
+                <app-stat-card
+                  label="Margin"
+                  [value]="initialLoading() ? '—' : fmt(today()?.margin ?? 0)"
+                  sub="Revenue less stock cost"
+                  [tone]="
+                    (today()?.margin ?? 0) > 0
+                      ? 'success'
+                      : (today()?.margin ?? 0) < 0
+                        ? 'error'
+                        : 'neutral'
+                  "
+                />
+                <app-stat-card
+                  label="Sales to sync"
+                  [value]="String(pendingCount())"
+                  [sub]="
+                    sync.failedCount() > 0
+                      ? sync.failedCount() + ' need attention'
+                      : 'Offline queue'
+                  "
+                  [tone]="
+                    sync.failedCount() > 0 ? 'error' : pendingCount() > 0 ? 'warning' : 'neutral'
+                  "
+                />
+              </div>
             </div>
+
+            <details class="surface-card group lg:hidden">
+              <summary
+                class="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold [&::-webkit-details-marker]:hidden"
+              >
+                More summary
+                <app-icon name="heroChevronDown" class="group-open:hidden" />
+                <app-icon name="heroChevronUp" class="hidden group-open:inline" />
+              </summary>
+              <div class="divide-y divide-base-200 border-t border-base-300">
+                <div class="flex min-h-14 items-center justify-between gap-3 px-4 py-2">
+                  <span class="type-caption">Sales volume</span>
+                  <span class="font-semibold tabular-nums">{{
+                    initialLoading() ? '—' : quantity(todayQuantity())
+                  }}</span>
+                </div>
+                <div class="flex min-h-14 items-center justify-between gap-3 px-4 py-2">
+                  <span class="type-caption">Margin</span>
+                  <span
+                    class="font-semibold tabular-nums"
+                    [class.text-success]="(today()?.margin ?? 0) > 0"
+                    [class.text-error]="(today()?.margin ?? 0) < 0"
+                    >{{ initialLoading() ? '—' : fmt(today()?.margin ?? 0) }}</span
+                  >
+                </div>
+                <div class="flex min-h-14 items-center justify-between gap-3 px-4 py-2">
+                  <span>
+                    <span class="type-caption block">Sales to sync</span>
+                    @if (sync.failedCount() > 0) {
+                      <span class="type-caption block text-error"
+                        >{{ sync.failedCount() }} need attention</span
+                      >
+                    }
+                  </span>
+                  <span
+                    class="font-semibold tabular-nums"
+                    [class.text-error]="sync.failedCount() > 0"
+                    [class.text-warning]="sync.failedCount() === 0 && pendingCount() > 0"
+                    >{{ pendingCount() }}</span
+                  >
+                </div>
+              </div>
+            </details>
           } @else {
             <div class="grid grid-cols-2 gap-3 lg:grid-cols-3">
               <a routerLink="/pos/sell" class="card bg-base-100 transition-shadow hover:shadow-md">
@@ -328,9 +375,9 @@ type DashboardSection = 'sales' | 'attention';
           </section>
         }
 
-        <section aria-label="Sales performance" class="grid items-start gap-4 xl:grid-cols-12">
+        <section aria-label="Sales performance" class="grid items-start gap-4 xl:grid-cols-2">
           @if (canViewFinancials()) {
-            <article class="card overflow-hidden bg-base-100 xl:col-span-7">
+            <article class="card overflow-hidden bg-base-100">
               <div
                 class="flex flex-wrap items-end justify-between gap-2 border-b border-base-300 px-4 py-3"
               >
@@ -363,7 +410,6 @@ type DashboardSection = 'sales' | 'attention';
                   [compact]="true"
                   icon="heroBanknotes"
                   title="No sales this week"
-                  description="Revenue and margin appear after the first completed sale."
                 />
               } @else {
                 <div class="px-4 pb-3 pt-2">
@@ -440,26 +486,24 @@ type DashboardSection = 'sales' | 'attention';
             </article>
           }
 
-          <article
-            class="card overflow-hidden bg-base-100"
-            [class.xl:col-span-5]="canViewFinancials()"
-            [class.xl:col-span-12]="!canViewFinancials()"
-          >
-            <div
-              class="flex flex-wrap items-end justify-between gap-2 border-b border-base-300 px-4 py-3"
-            >
-              <div>
+          <article class="card overflow-hidden bg-base-100">
+            <div class="flex items-start justify-between gap-2 border-b border-base-300 px-4 py-3">
+              <div class="min-w-0 flex-1">
                 <h2 class="section-title">Product performance</h2>
                 <p class="type-caption mt-1">
                   Distinct leaders over 7 days, adjusted for unusual spikes.
                 </p>
               </div>
               <a
-                class="link text-xs"
+                appButton
+                variant="ghost"
+                size="sm"
                 routerLink="/insights/inventory"
                 [queryParams]="{ view: 'performance', leader: 'trending' }"
-                >View performance</a
               >
+                View all
+                <app-icon name="heroArrowRight" />
+              </a>
             </div>
 
             @if (initialLoading()) {
@@ -476,7 +520,6 @@ type DashboardSection = 'sales' | 'attention';
                 [compact]="true"
                 icon="heroCube"
                 title="No performance leaders yet"
-                description="Leaders appear after enough repeat selling activity is available."
               />
             } @else {
               <div class="divide-y divide-base-200">
@@ -545,10 +588,14 @@ type DashboardSection = 'sales' | 'attention';
               <h2 id="attention-heading" class="section-title">Operational priorities</h2>
               <p class="type-caption mt-1">The exceptions most likely to affect the next sale.</p>
             </div>
-            <span class="type-caption">Updates with stock activity</span>
+            <span class="type-caption hidden md:inline">Updates with stock activity</span>
           </div>
 
-          <div class="grid gap-4 lg:grid-cols-3">
+          <div
+            class="grid gap-4"
+            [class.lg:grid-cols-2]="canViewFinancials() || preferences.batchExpiryEnabled()"
+            [class.xl:grid-cols-3]="canViewFinancials() && preferences.batchExpiryEnabled()"
+          >
             @if (canViewFinancials()) {
               <article class="card bg-base-100">
                 <div class="card-body p-4">
@@ -557,7 +604,10 @@ type DashboardSection = 'sales' | 'attention';
                       <h3 class="section-title">Credit attention</h3>
                       <p class="type-caption">Customers and supplier payments</p>
                     </div>
-                    <a routerLink="/insights/credit" class="link text-xs">View all</a>
+                    <a appButton variant="ghost" size="sm" routerLink="/insights/credit">
+                      View all
+                      <app-icon name="heroArrowRight" />
+                    </a>
                   </div>
                   @if (creditAttention().length === 0) {
                     <app-empty-state
@@ -597,7 +647,10 @@ type DashboardSection = 'sales' | 'attention';
                     <h3 class="section-title">Inventory priorities</h3>
                     <p class="type-caption">Robust demand and planning cover</p>
                   </div>
-                  <a routerLink="/insights/inventory" class="link text-xs">View inventory</a>
+                  <a appButton variant="ghost" size="sm" routerLink="/insights/inventory">
+                    View all
+                    <app-icon name="heroArrowRight" />
+                  </a>
                 </div>
                 @if (stockAttention().length === 0) {
                   <app-empty-state

@@ -29,10 +29,11 @@ const settings: FulfillmentSettings = {
 };
 
 describe('FulfillmentSettingsComponent', () => {
-  async function render() {
+  async function render(overrides: Partial<FulfillmentSettings> = {}) {
     const fulfillment = {
       settings: vi.fn().mockImplementation(async (locationId: string) => ({
         ...settings,
+        ...overrides,
         location_id: locationId,
       })),
       updateSettings: vi.fn().mockImplementation(async (locationId: string, update: object) => ({
@@ -94,6 +95,7 @@ describe('FulfillmentSettingsComponent', () => {
   it('uses one save action for the complete location draft', async () => {
     const { fixture, fulfillment } = await render();
     const root = fixture.nativeElement as HTMLElement;
+    expect(root.querySelector('.surface-card')).not.toBeNull();
     expect(
       [...root.querySelectorAll('button')].filter(button => button.textContent?.includes('Save'))
     ).toHaveLength(0);
@@ -145,5 +147,23 @@ describe('FulfillmentSettingsComponent', () => {
     ) as HTMLButtonElement;
     discardAndSwitch.click();
     await vi.waitFor(() => expect(fulfillment.settings).toHaveBeenCalledWith('location-2'));
+  });
+
+  it('disables timing for an unavailable method without blocking the active method', async () => {
+    const { fixture } = await render({ pickup_enabled: false, pickup_sla_minutes: 0 });
+    const root = fixture.nativeElement as HTMLElement;
+    const promises = [...root.querySelectorAll('input[type="number"]')] as HTMLInputElement[];
+
+    expect(promises[0].disabled).toBe(true);
+    expect(promises[1].disabled).toBe(false);
+
+    promises[1].value = '90';
+    promises[1].dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    const save = [...root.querySelectorAll('button')].find(button =>
+      button.textContent?.includes('Save changes')
+    ) as HTMLButtonElement;
+    expect(save.disabled).toBe(false);
   });
 });

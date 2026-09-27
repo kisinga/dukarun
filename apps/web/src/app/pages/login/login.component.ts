@@ -37,51 +37,8 @@ const RESEND_COOLDOWN_SECONDS = 60;
             <div class="mt-12 max-w-sm">
               <h2 class="type-hero">Your shop, clearly in hand.</h2>
               <p class="mt-3 text-sm leading-relaxed text-base-content/70">
-                Sales, stock, customers, and cash stay together so every shift starts with a clear
-                picture.
+                Sales, stock, customers, and cash in one place.
               </p>
-
-              <ul class="mt-8 space-y-4 text-sm" aria-label="Dukarun benefits">
-                <li class="flex items-start gap-3">
-                  <span
-                    class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-field bg-primary/10 text-primary"
-                  >
-                    <app-icon name="heroShoppingCart" />
-                  </span>
-                  <span>
-                    <strong class="block font-semibold">Keep the counter moving</strong>
-                    <span class="mt-0.5 block text-base-content/65"
-                      >Fast selling tools built for busy shops.</span
-                    >
-                  </span>
-                </li>
-                <li class="flex items-start gap-3">
-                  <span
-                    class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-field bg-primary/10 text-primary"
-                  >
-                    <app-icon name="heroChartBar" />
-                  </span>
-                  <span>
-                    <strong class="block font-semibold">Know where the money went</strong>
-                    <span class="mt-0.5 block text-base-content/65"
-                      >A reliable view of sales, credit, and cash.</span
-                    >
-                  </span>
-                </li>
-                <li class="flex items-start gap-3">
-                  <span
-                    class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-field bg-primary/10 text-primary"
-                  >
-                    <app-icon name="heroSignalSlash" />
-                  </span>
-                  <span>
-                    <strong class="block font-semibold">Stay useful when the network drops</strong>
-                    <span class="mt-0.5 block text-base-content/65"
-                      >Supported work saves and syncs after reconnecting.</span
-                    >
-                  </span>
-                </li>
-              </ul>
             </div>
           </div>
 
@@ -107,7 +64,7 @@ const RESEND_COOLDOWN_SECONDS = 60;
             <div class="mb-6">
               <h1 class="type-title">Sign in to Dukarun</h1>
               <p class="mt-1.5 text-sm text-base-content/70">
-                Use your Kenyan mobile number to receive a secure sign-in code.
+                We'll send a secure code to your phone.
               </p>
             </div>
 
@@ -134,9 +91,7 @@ const RESEND_COOLDOWN_SECONDS = 60;
                     [attr.aria-invalid]="error() ? 'true' : null"
                     [formControl]="phone"
                   />
-                  <span id="phone-hint" class="type-caption mt-1.5">
-                    Enter 07… or +254… — both formats work.
-                  </span>
+                  <span id="phone-hint" class="type-caption mt-1.5"> Use 07… or +254… </span>
                 </label>
 
                 @if (error()) {
@@ -173,7 +128,7 @@ const RESEND_COOLDOWN_SECONDS = 60;
                     <app-icon name="heroDevicePhoneMobile" />
                   </span>
                   <span class="min-w-0">
-                    <span class="block text-base-content/65">Code sent by SMS and WhatsApp</span>
+                    <span class="block text-base-content/65">Sent by SMS and WhatsApp</span>
                     <strong class="mt-0.5 block truncate font-semibold tabular-nums">{{
                       phoneE164()
                     }}</strong>
@@ -197,7 +152,7 @@ const RESEND_COOLDOWN_SECONDS = 60;
                     [formControl]="otp"
                   />
                   <span id="otp-hint" class="type-caption mt-1.5">
-                    The code may take a few moments to arrive.
+                    It may take a moment to arrive.
                   </span>
                 </label>
 
@@ -242,8 +197,7 @@ const RESEND_COOLDOWN_SECONDS = 60;
           </div>
 
           <div class="text-center">
-            <p class="type-caption">By continuing, you agree to Dukarun's policies.</p>
-            <nav class="mt-1 flex items-center justify-center gap-1" aria-label="Legal policies">
+            <nav class="flex items-center justify-center gap-1" aria-label="Legal policies">
               <a [href]="siteUrl('/terms')" class="btn btn-ghost btn-xs min-h-11 font-medium"
                 >Terms</a
               >
