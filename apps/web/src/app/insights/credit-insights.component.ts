@@ -5,6 +5,7 @@ import { formatKes } from '../core/money';
 import { ButtonComponent } from '../shared/ui/button.component';
 import { EmptyStateComponent } from '../shared/ui/empty-state.component';
 import { IconComponent } from '../shared/ui/icon.component';
+import { SectionTabsComponent } from '../shared/ui/section-tabs.component';
 import { MoneyCreditComponent } from '../money/credit/money-credit.component';
 import { InsightsService } from './insights.service';
 import { insightCopy, type PartyCreditProfile } from './insights.models';
@@ -20,6 +21,7 @@ import { ScoreBadgeComponent } from './score-badge.component';
     IconComponent,
     MoneyCreditComponent,
     ScoreBadgeComponent,
+    SectionTabsComponent,
   ],
   template: `
     <section class="space-y-6">
@@ -46,28 +48,12 @@ import { ScoreBadgeComponent } from './score-badge.component';
             </button>
           </header>
 
-          <div role="tablist" aria-label="Credit portfolio side" class="section-tabs">
-            <button
-              role="tab"
-              type="button"
-              class="section-tab"
-              [class.section-tab-active]="side() === 'customer'"
-              [attr.aria-selected]="side() === 'customer'"
-              (click)="setSide('customer')"
-            >
-              Customers
-            </button>
-            <button
-              role="tab"
-              type="button"
-              class="section-tab"
-              [class.section-tab-active]="side() === 'supplier'"
-              [attr.aria-selected]="side() === 'supplier'"
-              (click)="setSide('supplier')"
-            >
-              Our supplier standing
-            </button>
-          </div>
+          <app-section-tabs
+            [items]="portfolioSides"
+            [value]="side()"
+            ariaLabel="Credit portfolio side"
+            (valueChange)="setSide($event)"
+          />
 
           <div
             class="grid items-end gap-3 md:grid-cols-[minmax(10rem,14rem)_auto_minmax(16rem,1fr)]"
@@ -259,6 +245,10 @@ import { ScoreBadgeComponent } from './score-badge.component';
 })
 export class CreditInsightsComponent implements OnInit {
   private readonly insights = inject(InsightsService);
+  protected readonly portfolioSides = [
+    { value: 'customer', label: 'Customers' },
+    { value: 'supplier', label: 'Our supplier standing' },
+  ];
   protected readonly side = signal<'customer' | 'supplier'>('customer');
   protected readonly band = signal('');
   protected readonly overdueOnly = signal(false);
@@ -278,7 +268,8 @@ export class CreditInsightsComponent implements OnInit {
     void this.load();
   }
 
-  protected setSide(side: 'customer' | 'supplier'): void {
+  protected setSide(side: string): void {
+    if (side !== 'customer' && side !== 'supplier') return;
     this.side.set(side);
     void this.load();
   }

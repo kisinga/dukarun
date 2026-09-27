@@ -14,6 +14,7 @@ import { MobileListComponent } from '../shared/ui/mobile-list.component';
 import { DrawerComponent } from '../shared/ui/drawer.component';
 import { PageActionsComponent } from '../shared/ui/page-actions.component';
 import { WorkspaceNavigationComponent } from '../shared/ui/workspace-navigation.component';
+import { SectionTabsComponent } from '../shared/ui/section-tabs.component';
 import {
   CommissionAssignment,
   CommissionPeriod,
@@ -40,6 +41,7 @@ import {
     DrawerComponent,
     PageActionsComponent,
     WorkspaceNavigationComponent,
+    SectionTabsComponent,
   ],
   template: `
     <app-page
@@ -97,39 +99,13 @@ import {
         </div>
       }
 
-      <label class="form-control mb-4 md:hidden">
-        <span
-          class="label-text mb-1 text-xs font-semibold uppercase tracking-wide text-base-content/60"
-        >
-          Commission view
-        </span>
-        <select
-          class="select select-bordered min-h-11 w-full"
-          aria-label="Commission view"
-          [value]="activeTab()"
-          (change)="selectCommissionTab($event)"
-        >
-          @for (item of commissionTabs; track item.value) {
-            <option [value]="item.value">{{ item.label }}</option>
-          }
-        </select>
-      </label>
-      <nav class="mb-4 hidden md:block" aria-label="Commission views">
-        <div role="tablist" class="section-tabs">
-          @for (item of commissionTabs; track item.value) {
-            <button
-              role="tab"
-              type="button"
-              class="section-tab"
-              [class.section-tab-active]="activeTab() === item.value"
-              [attr.aria-selected]="activeTab() === item.value"
-              (click)="activeTab.set(item.value)"
-            >
-              {{ item.label }}
-            </button>
-          }
-        </div>
-      </nav>
+      <app-section-tabs
+        class="mb-4"
+        [items]="commissionTabs"
+        [value]="activeTab()"
+        ariaLabel="Commission view"
+        (valueChange)="selectCommissionTab($event)"
+      />
 
       <div class="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <app-stat-card
@@ -847,8 +823,7 @@ export class CommissionsComponent implements OnInit {
     await this.load();
   }
 
-  protected selectCommissionTab(event: Event): void {
-    const value = (event.target as HTMLSelectElement).value;
+  protected selectCommissionTab(value: string): void {
     const tab = this.commissionTabs.find(item => item.value === value);
     if (tab) this.activeTab.set(tab.value);
   }

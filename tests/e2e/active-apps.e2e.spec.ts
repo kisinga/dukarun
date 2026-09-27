@@ -382,13 +382,14 @@ test('settings keeps compact navigation and groups fulfillment in one surface', 
   );
 
   const settingsSelect = page.getByRole('combobox', { name: 'Settings section' });
-  const visibleSettingsNav = page.locator('nav[aria-label="Settings sections"]:visible');
+  const visibleSettingsNav = page.getByRole('tablist', { name: 'Settings sections' });
   if (isMobile) {
     await expect(settingsSelect).toBeVisible();
-    await expect(visibleSettingsNav).toHaveCount(0);
+    await expect(settingsSelect).toHaveValue('fulfillment');
+    await expect(visibleSettingsNav).toBeHidden();
   } else {
     await expect(settingsSelect).toBeHidden();
-    await expect(visibleSettingsNav).toHaveCount(1);
+    await expect(visibleSettingsNav).toBeVisible();
     await expect(page.locator('main aside nav[aria-label="Settings sections"]')).toHaveCount(0);
     await expect(
       visibleSettingsNav.getByRole('tab', { name: 'Pickup & Delivery' })
@@ -413,6 +414,59 @@ test('settings keeps compact navigation and groups fulfillment in one surface', 
       fullPage: true,
     });
   }
+});
+
+test('mobile section navigation stays selected and contained across both Insights levels', async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(!isMobile, 'Exercises phone dropdowns and the desktop breakpoint in one journey.');
+  await authenticateFinancialUser(page, ['ViewFinancials', 'ManageCatalog']);
+  await page.route('**/rest/v1/rpc/current_business_date', route =>
+    route.fulfill({ contentType: 'application/json', body: JSON.stringify('2026-09-27') })
+  );
+  await page.goto('http://127.0.0.1:4203/insights/inventory?view=performance');
+
+  const sections = page.getByRole('combobox', { name: 'Insights section', exact: true });
+  const views = page.getByRole('combobox', { name: 'Inventory analysis view', exact: true });
+  await expect(sections).toHaveValue('/insights/inventory');
+  await expect(views).toHaveValue('performance');
+
+  for (const width of [320, 390, 767]) {
+    await page.setViewportSize({ width, height: 844 });
+    await expect(sections).toBeVisible();
+    await expect(views).toBeVisible();
+    await expect(page.getByRole('tablist', { name: 'Inventory analysis view' })).toBeHidden();
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+      )
+    ).toBeLessThanOrEqual(1);
+  }
+
+  await views.selectOption('sources');
+  await expect(page).toHaveURL(/view=sources/);
+  await expect(views).toHaveValue('sources');
+  await page.reload();
+  await expect(sections).toHaveValue('/insights/inventory');
+  await expect(views).toHaveValue('sources');
+
+  await sections.selectOption('/insights/sales');
+  await expect(page.getByRole('heading', { name: 'Sales insights', exact: true })).toBeVisible();
+  await expect(sections).toHaveValue('/insights/sales');
+  await page.goBack();
+  await expect(sections).toHaveValue('/insights/inventory');
+  await expect(views).toHaveValue('sources');
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await expect(sections).toBeHidden();
+  await expect(views).toBeHidden();
+  await expect(
+    page.getByRole('tab', { name: 'Supplier performance', exact: true })
+  ).toHaveAttribute('aria-selected', 'true');
+  await page.getByRole('tab', { name: 'Stock priorities', exact: true }).click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(views).toHaveValue('priorities');
 });
 
 for (const app of apps) {

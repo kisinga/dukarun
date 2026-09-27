@@ -322,8 +322,8 @@ Compose pages from these — never hand-roll what a primitive owns:
 - **`<app-section-tabs>`** — state-backed switching within a page. Pass `{ value, label }` items,
   the active value, and an accessible label. Use `presentation="primary"` when those values are the
   page's primary sections (Settings), and the default segmented presentation for secondary peer
-  views inside a selected section. Use `mobileSelect` when a long set should collapse to a selector
-  on phones.
+  views inside a selected section. Both presentations always use a labeled native dropdown below
+  768px; no per-page opt-in or horizontally scrolling phone tabs.
 - **`<app-mobile-list>` / `<app-responsive-data-view>`** — the shared phone list surface and
   desktop/mobile pairing boundary. Domain pages own row content; the primitives own visibility,
   border, radius, and dividers.
@@ -550,8 +550,10 @@ segmented presentation, which owns the global `.section-tabs` surface and `.sect
 group is content-width, horizontally scrollable when necessary, and uses the standard box and field
 radii. `.section-tab-active` is the only active signifier: a quiet primary tint with readable
 `--text-accent` text. Inactive labels use `--text-muted`. Do not use underline-only tabs, square
-outlines, full-width empty tab bars, or page-specific tab geometry. On phones, multi-view workspaces
-may replace either presentation with a labeled select.
+outlines, full-width empty tab bars, or page-specific tab geometry. Below 768px, both navigation
+levels use labeled native dropdowns, with the active value synchronized on first render, route
+changes, and permission-filtered options. Keep selectors within their container and leave compact
+toolbars unchanged. Use the shared components rather than duplicating mobile/desktop markup.
 
 Ranking, sorting, dates, locations, search, and filters are scope controls—not navigation. Put them
 in the page toolbar or filter row with permanent labels; never represent them as another tab level.
