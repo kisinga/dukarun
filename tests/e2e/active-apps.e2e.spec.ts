@@ -158,6 +158,38 @@ async function authenticateFinancialUser(
         },
       ]);
     }
+    if (path.endsWith('/rest/v1/rpc/fulfillment_settings_at_location')) {
+      return json({
+        company_id: companyId,
+        location_id: locationId,
+        enabled: true,
+        feature_available: true,
+        pickup_enabled: true,
+        delivery_enabled: true,
+        cod_enabled: false,
+        default_delivery_fee_variant_id: '00000000-0000-4000-8000-000000000020',
+        pickup_sla_minutes: 30,
+        delivery_sla_minutes: 90,
+        notification_channel: 'whatsapp',
+        sms_fallback: true,
+        notify_initial: true,
+        notify_ready: true,
+        notify_in_transit: true,
+        notify_failed: true,
+        notify_fulfilled: false,
+        tracking_token_ttl_days: 14,
+      });
+    }
+    if (path.endsWith('/rest/v1/product_variants')) {
+      return json([
+        {
+          id: '00000000-0000-4000-8000-000000000020',
+          name: 'Default',
+          price: 150,
+          products: { name: 'Local delivery' },
+        },
+      ]);
+    }
     if (path.endsWith('/rest/v1/ledger_accounts')) {
       return json([
         {
@@ -201,6 +233,37 @@ async function authenticateFinancialUser(
           subscription_exempt_until: null,
         });
       }
+      if (select.includes('public_storefront_enabled')) {
+        return json({
+          id: companyId,
+          name: 'Test shop',
+          address: 'Market Road',
+          email: 'owner@example.test',
+          logo_path: null,
+          public_storefront_enabled: false,
+          public_slug: null,
+          public_whatsapp_number: null,
+          notification_category_preferences: null,
+          enable_printer: false,
+          proforma_validity_days: 14,
+          low_stock_threshold: 10,
+          cashier_flow_enabled: false,
+          batch_expiry_enabled: false,
+          cash_control_enabled: false,
+          require_opening_count: false,
+          variance_notification_threshold: 100,
+          commissions_enabled: true,
+          payment_reminders_enabled: true,
+          payment_reminder_channel: 'whatsapp',
+          payment_reminder_sms_fallback: true,
+          automated_customer_notifications_enabled: true,
+          automated_customer_notifications_override: null,
+          credit_opportunity_rate_bps: 1200,
+          credit_score_notifications_enabled: true,
+          default_reorder_lead_days: 7,
+          default_reorder_safety_days: 3,
+        });
+      }
       return json(
         select.includes('cashier_flow_enabled')
           ? [
@@ -241,6 +304,116 @@ const apps = [
     heading: 'Welcome back',
   },
 ];
+
+test('dashboard keeps the phone summary focused and its detail reachable', async ({
+  page,
+  isMobile,
+}) => {
+  await authenticateFinancialUser(page, [
+    'ViewFinancials',
+    'SettleOrder',
+    'ManageCatalog',
+    'ManageStockAdjustments',
+  ]);
+  if (!isMobile) await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.goto('http://127.0.0.1:4203/dashboard');
+  await expect(page.getByRole('heading', { name: 'Dashboard', exact: true })).toBeVisible();
+  const summary = page.locator('details').filter({ hasText: 'More summary' });
+
+  if (isMobile) {
+    await expect(page.locator('app-stat-card:visible')).toHaveCount(2);
+    await expect(summary).toBeVisible();
+    await expect(summary.getByText('Sales volume', { exact: true })).toBeHidden();
+    await summary.locator('summary').click();
+    await expect(summary.getByText('Sales volume', { exact: true })).toBeVisible();
+    await expect(summary.getByText('Margin', { exact: true })).toBeVisible();
+    await expect(summary.getByText('Sales to sync', { exact: true })).toBeVisible();
+  } else {
+    await expect(page.locator('app-stat-card:visible')).toHaveCount(5);
+    await expect(summary).toBeHidden();
+
+    const canvas = page.locator('.dashboard-main > .page');
+    const performance = page.locator('section[aria-label="Sales performance"]');
+    const priorities = page.locator('section[aria-labelledby="attention-heading"] > div.grid');
+    const geometry = await Promise.all([
+      canvas.evaluate(element => element.getBoundingClientRect().width),
+      performance
+        .locator(':scope > article')
+        .evaluateAll(cards => cards.map(card => card.getBoundingClientRect().width)),
+      priorities.evaluate(grid => ({
+        width: grid.getBoundingClientRect().width,
+        cards: [...grid.children].map(card => card.getBoundingClientRect().width),
+      })),
+    ]);
+
+    expect(geometry[0]).toBeGreaterThanOrEqual(1279);
+    expect(geometry[0]).toBeLessThanOrEqual(1281);
+    expect(geometry[1]).toHaveLength(2);
+    expect(Math.abs(geometry[1][0] - geometry[1][1])).toBeLessThanOrEqual(1);
+    expect(geometry[2].cards).toHaveLength(2);
+    expect(Math.abs(geometry[2].cards[0] - geometry[2].cards[1])).toBeLessThanOrEqual(1);
+    expect(geometry[2].width - geometry[2].cards[0] - geometry[2].cards[1]).toBeLessThanOrEqual(17);
+  }
+
+  if (process.env.DESIGN_REVIEW_DIR) {
+    await page.screenshot({
+      path: `${process.env.DESIGN_REVIEW_DIR}/dashboard-${isMobile ? 'phone' : 'desktop'}.png`,
+      fullPage: true,
+    });
+  }
+});
+
+test('settings keeps compact navigation and groups fulfillment in one surface', async ({
+  page,
+  isMobile,
+}) => {
+  await authenticateFinancialUser(page, [
+    'ManageCompanySettings',
+    'ManageCommunications',
+    'ManageCatalog',
+  ]);
+  await page.goto('http://127.0.0.1:4203/settings?tab=fulfillment');
+
+  await expect(page.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Pickup & Delivery', exact: true })).toBeVisible();
+  await expect(page.getByText('Location-specific settings', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('Pickup and delivery location')).toHaveValue(
+    '00000000-0000-4000-8000-000000000003'
+  );
+
+  const settingsSelect = page.getByRole('combobox', { name: 'Settings section' });
+  const visibleSettingsNav = page.locator('nav[aria-label="Settings sections"]:visible');
+  if (isMobile) {
+    await expect(settingsSelect).toBeVisible();
+    await expect(visibleSettingsNav).toHaveCount(0);
+  } else {
+    await expect(settingsSelect).toBeHidden();
+    await expect(visibleSettingsNav).toHaveCount(1);
+    await expect(page.locator('main aside nav[aria-label="Settings sections"]')).toHaveCount(0);
+    await expect(
+      visibleSettingsNav.getByRole('tab', { name: 'Pickup & Delivery' })
+    ).toHaveAttribute('aria-selected', 'true');
+  }
+
+  const pickup = page.locator('label').filter({ hasText: 'Collect from this location.' });
+  await pickup.locator('input[type="checkbox"]').uncheck();
+  await expect(page.getByLabel('Ready in')).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Save changes' })).toBeVisible();
+
+  await page.getByRole('heading', { name: 'Customer updates' }).scrollIntoViewIfNeeded();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+    )
+  ).toBeLessThanOrEqual(1);
+
+  if (process.env.DESIGN_REVIEW_DIR) {
+    await page.screenshot({
+      path: `${process.env.DESIGN_REVIEW_DIR}/settings-fulfillment-${isMobile ? 'phone' : 'desktop'}.png`,
+      fullPage: true,
+    });
+  }
+});
 
 for (const app of apps) {
   test(`${app.name} renders its primary route`, async ({ page }) => {

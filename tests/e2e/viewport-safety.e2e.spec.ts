@@ -682,6 +682,53 @@ test('shared actions, navigation and metadata retain their contrast and hierarch
   }
 });
 
+test('primary desktop tables bound long data and keep column headers visible', async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(isMobile, 'Desktop table behavior is paired with mobile record lists.');
+  await mockOperationsApp(page);
+  await page.goto('http://127.0.0.1:4203/inventory/products');
+
+  const viewport = page.locator('.data-table-viewport-bounded').first();
+  const header = viewport.locator('thead th').first();
+  await expect(viewport).toBeVisible();
+  await expect(viewport).toHaveAttribute('role', 'region');
+  await expect(viewport).toHaveAttribute('tabindex', '0');
+
+  await viewport.locator('tbody').evaluate(body => {
+    const row = body.querySelector('tr');
+    if (!row) return;
+    for (let index = 0; index < 24; index++) body.append(row.cloneNode(true));
+  });
+
+  const styles = await viewport.evaluate(element => {
+    const heading = element.querySelector('th');
+    return {
+      overflowY: getComputedStyle(element).overflowY,
+      maxHeight: getComputedStyle(element).maxHeight,
+      headerPosition: heading ? getComputedStyle(heading).position : null,
+    };
+  });
+  expect(styles.overflowY).toBe('auto');
+  expect(styles.maxHeight).not.toBe('none');
+  expect(styles.headerPosition).toBe('sticky');
+
+  await viewport.evaluate(element => (element.scrollTop = element.scrollHeight));
+  const geometry = await Promise.all([viewport.boundingBox(), header.boundingBox()]);
+  expect(await viewport.evaluate(element => element.scrollTop)).toBeGreaterThan(0);
+  expect(geometry[0]).not.toBeNull();
+  expect(geometry[1]).not.toBeNull();
+  if (geometry[0] && geometry[1]) {
+    expect(Math.abs(geometry[1].y - geometry[0].y)).toBeLessThanOrEqual(2);
+  }
+  if (process.env.DESIGN_REVIEW_DIR) {
+    await viewport.screenshot({
+      path: `${process.env.DESIGN_REVIEW_DIR}/table-sticky-desktop.png`,
+    });
+  }
+});
+
 test('header actions and avatars retain the compact historical brand treatment', async ({
   page,
   isMobile,

@@ -88,6 +88,23 @@ describe('SupplierAccountsListComponent', () => {
     expect(fixture.componentInstance.opened).toBe('supplier-1');
   });
 
+  it('uses the shared six-column account table hierarchy', async () => {
+    const fixture = await render();
+    const root = fixture.nativeElement as HTMLElement;
+    const table = root.querySelector('table') as HTMLTableElement;
+    const headings = [...table.querySelectorAll('th')].map(cell => cell.textContent?.trim());
+
+    expect(table.classList.contains('account-table')).toBe(true);
+    expect(headings).toEqual([
+      'Supplier',
+      'Contact',
+      'Purchase activity',
+      'Terms & aging',
+      'We owe',
+      'Actions',
+    ]);
+  });
+
   it('emits typed filter changes from the search controls', async () => {
     const fixture = await render();
     const root = fixture.nativeElement as HTMLElement;

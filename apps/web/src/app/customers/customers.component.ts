@@ -179,6 +179,7 @@ type CustomerRiskFilter = 'all' | 'review' | 'restricted' | 'healthy' | 'unrated
 
       <!-- Shared list summary and search toolbar -->
       <app-list-search-bar
+        searchLabel="Search customers"
         [placeholder]="
           perms.has('ViewFinancials') ? 'Search customer, phone, or risk…' : 'Search name or phone…'
         "
@@ -200,30 +201,22 @@ type CustomerRiskFilter = 'all' | 'review' | 'restricted' | 'healthy' | 'unrated
           [stats]="customerStats()"
           (select)="toggleCustomerSummaryFilter($event)"
         />
-        <div filters class="flex flex-wrap items-end gap-3">
-          <div>
-            <label for="customer-account-status" class="mb-1 block text-xs font-medium"
-              >Account status</label
-            >
+        <div filters class="grid gap-2 sm:grid-cols-2 lg:flex lg:items-end">
+          <app-form-field label="Account status" class="lg:w-44">
             <select
-              id="customer-account-status"
-              class="select select-bordered min-h-11 select-sm"
+              class="select select-bordered select-sm w-full"
               [value]="accountStatus()"
               (change)="setAccountStatus($event)"
             >
               <option value="active">Active</option>
-              <option value="deleted">Deleted</option>
-              <option value="all">All</option>
+              <option value="deleted">Archived</option>
+              <option value="all">All customers</option>
             </select>
-          </div>
+          </app-form-field>
           @if (perms.has('ViewFinancials')) {
-            <div>
-              <label for="customer-credit-risk" class="mb-1 block text-xs font-medium"
-                >Credit risk</label
-              >
+            <app-form-field label="Credit risk" class="lg:w-52">
               <select
-                id="customer-credit-risk"
-                class="select select-bordered min-h-11 select-sm"
+                class="select select-bordered select-sm w-full"
                 [value]="creditRisk()"
                 (change)="setCreditRisk($event)"
               >
@@ -233,7 +226,7 @@ type CustomerRiskFilter = 'all' | 'review' | 'restricted' | 'healthy' | 'unrated
                 <option value="healthy">Good / strong</option>
                 <option value="unrated">Unrated</option>
               </select>
-            </div>
+            </app-form-field>
           }
         </div>
       </app-list-search-bar>
@@ -246,17 +239,17 @@ type CustomerRiskFilter = 'all' | 'review' | 'restricted' | 'healthy' | 'unrated
           description="Add a customer with the + button to sell on credit, or clear the search."
         />
       } @else {
-        <div class="mb-3 hidden lg:block">
+        <div class="mb-4 hidden lg:block">
           <app-data-table-shell
             heading="Customer accounts"
             [description]="filtered().length + ' matching customers'"
           >
-            <table class="table">
+            <table class="table account-table">
               <thead>
                 <tr>
                   <th>Customer</th>
                   <th>Contact</th>
-                  <th>Credit standing</th>
+                  <th>Credit & risk</th>
                   <th>Aging</th>
                   <th class="text-right">Owed to us</th>
                   <th class="text-right">Actions</th>
@@ -325,7 +318,7 @@ type CustomerRiskFilter = 'all' | 'review' | 'restricted' | 'healthy' | 'unrated
                           <span class="type-caption">Not scored</span>
                         }
                       }
-                      <div class="flex flex-wrap items-center gap-1" [class.mt-1]="c.credit_band">
+                      <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
                         <app-status-badge
                           size="xs"
                           [type]="c.is_credit_approved ? 'success' : 'neutral'"
@@ -342,14 +335,14 @@ type CustomerRiskFilter = 'all' | 'review' | 'restricted' | 'healthy' | 'unrated
                             "
                           />
                         }
+                        <span class="table-secondary mt-0">
+                          @if (c.credit_limit > 0) {
+                            <app-money [amount]="c.credit_limit" /> limit
+                          } @else {
+                            No credit cap
+                          }
+                        </span>
                       </div>
-                      <p class="table-secondary">
-                        @if (c.credit_limit > 0) {
-                          Limit <app-money [amount]="c.credit_limit" />
-                        } @else {
-                          No credit cap
-                        }
-                      </p>
                     </td>
                     <td>
                       @if (c.days_outstanding !== null) {

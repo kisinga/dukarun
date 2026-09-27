@@ -1,56 +1,24 @@
 import { Component, computed, inject } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import {
-  ActivatedRoute,
-  NavigationEnd,
-  Router,
-  RouterLink,
-  RouterLinkActive,
-  RouterOutlet,
-} from '@angular/router';
+import { ActivatedRoute, NavigationEnd, Router, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs';
 import { PermissionsService } from '../core/permissions.service';
 import { IconComponent } from '../shared/ui/icon.component';
 import { PageLayoutComponent } from '../shared/ui/page-layout.component';
+import { RouteNavigationComponent } from '../shared/ui/route-navigation.component';
 
 @Component({
   selector: 'app-insights-layout',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, PageLayoutComponent, IconComponent],
+  imports: [RouterOutlet, PageLayoutComponent, IconComponent, RouteNavigationComponent],
   template: `
-    <app-page [title]="activeLabel()" [subtitle]="subtitle()" [wide]="true">
+    <app-page [title]="activeLabel() + ' insights'" [subtitle]="subtitle()" [wide]="true">
       @if (notice()) {
         <div role="status" class="alert alert-info mb-4 py-2 text-sm">
           <app-icon name="heroInformationCircle" />
           <span>{{ notice() }}</span>
         </div>
       }
-      <label class="form-control mb-3 md:hidden">
-        <span
-          class="label-text mb-1 text-xs font-semibold uppercase tracking-wide text-base-content/60"
-          >Insights section</span
-        >
-        <select
-          class="select select-bordered min-h-11 w-full"
-          [value]="activeRoute()"
-          (change)="navigate($event)"
-        >
-          @for (tab of visibleTabs(); track tab.route) {
-            <option [value]="tab.route">{{ tab.label }}</option>
-          }
-        </select>
-      </label>
-      <nav aria-label="Insights sections" class="section-tabs mb-4 hidden md:flex">
-        @for (tab of visibleTabs(); track tab.route) {
-          <a
-            class="section-tab"
-            [routerLink]="tab.route"
-            routerLinkActive="section-tab-active"
-            ariaCurrentWhenActive="page"
-          >
-            <app-icon [name]="tab.icon" />{{ tab.label }}
-          </a>
-        }
-      </nav>
+      <app-route-navigation [items]="visibleTabs()" label="Insights" />
       <router-outlet />
     </app-page>
   `,
@@ -102,8 +70,4 @@ export class InsightsLayoutComponent {
     this.navigation();
     return this.route.snapshot.queryParamMap.get('notice');
   });
-
-  protected navigate(event: Event): void {
-    void this.router.navigateByUrl((event.target as HTMLSelectElement).value);
-  }
 }

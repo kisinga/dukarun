@@ -6,16 +6,17 @@ import type { DateRangePreset } from './insights.models';
 @Component({
   selector: 'app-date-range-preset-control',
   imports: [IconComponent],
+  host: { class: 'block' },
   template: `
-    <section class="rounded-box border border-base-300 bg-base-200/30" aria-label="Analysis period">
-      <div class="flex flex-wrap items-center gap-3 p-3 sm:p-4">
+    <section class="space-y-3" aria-label="Analysis period">
+      <div class="flex flex-wrap items-end gap-3">
         <div class="min-w-44 flex-1">
           <p class="text-xs font-semibold uppercase tracking-wide text-base-content/55">Period</p>
           <p class="mt-0.5 text-sm font-medium">{{ rangeLabel() }}</p>
         </div>
 
         <div
-          class="flex min-h-11 rounded-field border border-base-300 bg-base-100 p-1"
+          class="flex min-h-11 rounded-field border border-base-300 bg-base-200/50 p-1"
           role="group"
           aria-label="Period presets"
         >
@@ -27,6 +28,8 @@ import type { DateRangePreset } from './insights.models';
               [class.text-primary-content]="value() === option.value"
               [class.text-base-content/70]="value() !== option.value"
               [attr.aria-pressed]="value() === option.value"
+              [attr.aria-label]="option.ariaLabel"
+              [attr.title]="option.ariaLabel"
               (click)="selectPreset(option.value)"
             >
               {{ option.label }}
@@ -49,7 +52,7 @@ import type { DateRangePreset } from './insights.models';
       </div>
 
       @if (advanced() && advancedOpen()) {
-        <div class="border-t border-base-300 px-3 py-4 sm:px-4">
+        <div class="border-t border-base-200 pt-3">
           <div class="grid items-end gap-3 sm:grid-cols-[minmax(10rem,1fr)_minmax(10rem,1fr)_auto]">
             <label class="form-control">
               <span class="label-text text-xs">From</span>
@@ -109,10 +112,14 @@ export class DateRangePresetControlComponent {
   protected readonly advancedOpen = signal(false);
   protected readonly draftFrom = signal('');
   protected readonly draftTo = signal('');
-  protected readonly options: ReadonlyArray<{ value: DateRangePreset; label: string }> = [
-    { value: 30, label: '1m' },
-    { value: 180, label: '6m' },
-    { value: 365, label: '12m' },
+  protected readonly options: ReadonlyArray<{
+    value: DateRangePreset;
+    label: string;
+    ariaLabel: string;
+  }> = [
+    { value: 30, label: '30d', ariaLabel: 'Last 30 days' },
+    { value: 180, label: '6m', ariaLabel: 'Last 6 months' },
+    { value: 365, label: '12m', ariaLabel: 'Last 12 months' },
   ];
   protected readonly fromMax = computed(() => {
     const to = this.draftTo();

@@ -41,6 +41,7 @@ type SupplierStats = {
   ],
   template: `
     <app-list-search-bar
+      searchLabel="Search suppliers"
       placeholder="Search supplier name, phone, or email…"
       [searchQuery]="searchQuery()"
       (searchQueryChange)="searchQueryChange.emit($event)"
@@ -103,15 +104,14 @@ type SupplierStats = {
           heading="Supplier accounts"
           [description]="filteredCount() + ' matching suppliers'"
         >
-          <table class="table">
+          <table class="table account-table">
             <thead>
               <tr>
                 <th>Supplier</th>
                 <th>Contact</th>
-                <th>Purchasing</th>
-                <th>Credit terms</th>
+                <th>Purchase activity</th>
+                <th>Terms & aging</th>
                 <th class="text-right">We owe</th>
-                <th>Status</th>
                 <th class="text-right">Actions</th>
               </tr>
             </thead>
@@ -130,7 +130,12 @@ type SupplierStats = {
                     <div class="table-entity">
                       <app-entity-avatar size="sm" [firstName]="supplierName()(supplier)" />
                       <div class="min-w-0">
-                        <p class="table-primary truncate">{{ supplierName()(supplier) }}</p>
+                        <div class="flex items-center gap-2">
+                          <p class="table-primary truncate">{{ supplierName()(supplier) }}</p>
+                          @if (!supplier.supplier_active) {
+                            <app-status-badge size="xs" type="neutral" label="Archived" />
+                          }
+                        </div>
                         <p class="table-secondary truncate">
                           {{ supplier.notes || 'No notes' }}
                         </p>
@@ -156,8 +161,13 @@ type SupplierStats = {
                       <p class="table-primary">No credit cap</p>
                     }
                     <p class="table-secondary">
-                      {{ supplier.supplier_credit_terms_days || 0 }} days
+                      {{ supplier.supplier_credit_terms_days || 0 }}-day terms
                     </p>
+                    @if (supplier.days_outstanding !== null) {
+                      <p class="table-secondary">
+                        {{ supplier.days_outstanding }} days · {{ supplier.bucket }}
+                      </p>
+                    }
                   </td>
                   <td
                     class="table-number"
@@ -165,18 +175,6 @@ type SupplierStats = {
                     [class.text-base-content/50]="supplier.ap_balance === 0"
                   >
                     <app-money [amount]="supplier.ap_balance" [masked]="!canViewFinancials()" />
-                  </td>
-                  <td>
-                    <app-status-badge
-                      size="xs"
-                      [type]="supplier.supplier_active ? 'success' : 'neutral'"
-                      [label]="supplier.supplier_active ? 'Active' : 'Archived'"
-                    />
-                    @if (supplier.days_outstanding !== null) {
-                      <p class="table-secondary">
-                        {{ supplier.days_outstanding }} days · {{ supplier.bucket }}
-                      </p>
-                    }
                   </td>
                   <td class="table-actions" (click)="$event.stopPropagation()">
                     <button

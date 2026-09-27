@@ -1,6 +1,5 @@
 import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { PageLayoutComponent } from '../shared/ui/page-layout.component';
 import { EntitlementsService } from '../core/entitlements.service';
@@ -17,6 +16,7 @@ import { MoneySettingsComponent } from './money-settings.component';
 import { CommunicationsSettingsComponent } from './communications-settings.component';
 import { CompanySettingsStore } from './company-settings.store';
 import { BillingComponent } from '../billing/billing.component';
+import { SectionTabsComponent } from '../shared/ui/section-tabs.component';
 
 type SettingsTab =
   'business' | 'operations' | 'fulfillment' | 'money' | 'communications' | 'billing' | 'data';
@@ -71,7 +71,6 @@ const SETTINGS_TABS: ReadonlyArray<{ key: SettingsTab; label: string; descriptio
 @Component({
   selector: 'app-settings',
   imports: [
-    FormsModule,
     PageLayoutComponent,
     ButtonComponent,
     IconComponent,
@@ -84,6 +83,7 @@ const SETTINGS_TABS: ReadonlyArray<{ key: SettingsTab; label: string; descriptio
     MoneySettingsComponent,
     CommunicationsSettingsComponent,
     BillingComponent,
+    SectionTabsComponent,
   ],
   template: `
     <app-page title="Settings" subtitle="Manage how Dukarun works for this business." [wide]="true">
@@ -93,41 +93,17 @@ const SETTINGS_TABS: ReadonlyArray<{ key: SettingsTab; label: string; descriptio
 
       @if (settings()) {
         <div class="space-y-4">
-          <label class="form-control md:hidden">
-            <span
-              class="label-text mb-1 text-xs font-semibold uppercase tracking-wide text-base-content/60"
-            >
-              Settings section
-            </span>
-            <select
-              class="select select-bordered min-h-11 w-full"
-              aria-label="Settings section"
-              [ngModel]="activeTab()"
-              (ngModelChange)="selectTabFromValue($event)"
-            >
-              @for (tab of settingsTabs(); track tab.key) {
-                <option [value]="tab.key">{{ tab.label }}</option>
-              }
-            </select>
-          </label>
-          <nav class="hidden md:block" aria-label="Settings sections">
-            <div role="tablist" class="section-tabs">
-              @for (tab of settingsTabs(); track tab.key) {
-                <button
-                  role="tab"
-                  type="button"
-                  class="section-tab"
-                  [class.section-tab-active]="activeTab() === tab.key"
-                  [attr.aria-selected]="activeTab() === tab.key"
-                  (click)="selectTab(tab.key)"
-                >
-                  {{ tab.label }}
-                </button>
-              }
-            </div>
-          </nav>
+          <app-section-tabs
+            [items]="settingsNavigationItems()"
+            [value]="activeTab()"
+            ariaLabel="Settings sections"
+            mobileLabel="Settings section"
+            [mobileSelect]="true"
+            presentation="primary"
+            (valueChange)="selectTabFromValue($event)"
+          />
 
-          <header class="border-b border-base-300/60 pb-3">
+          <header class="pt-1">
             <h2 class="type-heading">{{ activeTabMeta().label }}</h2>
             <p class="type-caption mt-1">{{ activeTabMeta().description }}</p>
           </header>
@@ -201,6 +177,9 @@ export class SettingsComponent implements OnInit {
           this.perms.has('ManageTeam')) &&
         (tab.key !== 'data' || this.canTransferData())
     )
+  );
+  protected readonly settingsNavigationItems = computed(() =>
+    this.settingsTabs().map(tab => ({ value: tab.key, label: tab.label }))
   );
   private readonly activeTabState = signal<SettingsTab>('business');
   protected readonly activeTab = this.activeTabState.asReadonly();

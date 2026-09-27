@@ -19,6 +19,7 @@ import { ButtonComponent } from '../shared/ui/button.component';
 import { DemandConfidenceIndicatorComponent } from '../shared/ui/demand-confidence-indicator.component';
 import { EmptyStateComponent } from '../shared/ui/empty-state.component';
 import { IconComponent } from '../shared/ui/icon.component';
+import { SectionTabsComponent } from '../shared/ui/section-tabs.component';
 import {
   SearchableFilterComponent,
   type SearchableFilterOption,
@@ -56,22 +57,25 @@ const EMPTY_SUMMARY: ProductIntelligenceSummary = {
     DemandConfidenceIndicatorComponent,
     EmptyStateComponent,
     IconComponent,
+    SectionTabsComponent,
     SearchableFilterComponent,
     DateRangePresetControlComponent,
     RestockIntelligenceComponent,
   ],
   template: `
     <section class="space-y-4">
-      <section class="card overflow-hidden bg-base-100">
-        <div class="card-body gap-4 p-4 sm:p-5">
-          <header class="flex items-start justify-between gap-3">
-            <div class="max-w-2xl">
-              <h2 id="inventory-workspace-title" class="section-title">Inventory decisions</h2>
-              <p class="type-caption mt-1">
-                Start with stock risk and replenishment. Switch to source analysis when deciding
-                what to buy from a supplier or how a manufacturer's range is performing.
-              </p>
-            </div>
+      <section class="space-y-3" aria-label="Inventory analysis controls">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <app-section-tabs
+            [items]="inventoryViews()"
+            [value]="view()"
+            ariaLabel="Inventory analysis view"
+            (valueChange)="setView($event)"
+          />
+          <div class="flex items-center gap-2">
+            @if (loading()) {
+              <span class="type-caption" role="status">Updating</span>
+            }
             <button
               appButton
               variant="ghost"
@@ -84,51 +88,49 @@ const EMPTY_SUMMARY: ProductIntelligenceSummary = {
             >
               <app-icon name="heroArrowPath" />
             </button>
-          </header>
+          </div>
+        </div>
 
-          <app-date-range-preset-control
-            [value]="periodPreset()"
-            [from]="rangeFrom()"
-            [to]="rangeTo()"
-            [maxDate]="businessToday()"
-            [advanced]="view() !== 'performance'"
-            [loading]="loading()"
-            (valueChange)="setWindow($event)"
-            (rangeChange)="setCustomRange($event)"
-          />
-
-          <div role="tablist" aria-label="Inventory analysis view" class="section-tabs">
-            <button
-              role="tab"
-              type="button"
-              class="section-tab"
-              [class.section-tab-active]="view() === 'priorities'"
-              [attr.aria-selected]="view() === 'priorities'"
-              (click)="setView('priorities')"
-            >
-              Priorities
-            </button>
-            <button
-              role="tab"
-              type="button"
-              class="section-tab"
-              [class.section-tab-active]="view() === 'performance'"
-              [attr.aria-selected]="view() === 'performance'"
-              (click)="setView('performance')"
-            >
-              Performance
-            </button>
-            @if (permissions.has('ViewFinancials')) {
-              <button
-                role="tab"
-                type="button"
-                class="section-tab"
-                [class.section-tab-active]="view() === 'sources'"
-                [attr.aria-selected]="view() === 'sources'"
-                (click)="setView('sources')"
-              >
-                Sources
-              </button>
+        <div class="rounded-box border border-base-300 bg-base-100 p-3 sm:p-4">
+          <div class="flex flex-wrap items-end gap-3">
+            <app-date-range-preset-control
+              class="min-w-0 flex-1 md:min-w-[28rem]"
+              [value]="periodPreset()"
+              [from]="rangeFrom()"
+              [to]="rangeTo()"
+              [maxDate]="businessToday()"
+              [advanced]="view() !== 'performance'"
+              [loading]="loading()"
+              (valueChange)="setWindow($event)"
+              (rangeChange)="setCustomRange($event)"
+            />
+            @if (locations.isMultiLocation() && view() !== 'sources') {
+              <label class="form-control w-full sm:w-52">
+                <span class="label-text text-xs">Location</span>
+                <select
+                  class="select select-bordered mt-1 min-h-11 w-full"
+                  [value]="locations.activeId()"
+                  (change)="setLocation($event)"
+                >
+                  @for (location of locations.locations(); track location.id) {
+                    <option [value]="location.id">{{ location.name }}</option>
+                  }
+                </select>
+              </label>
+            }
+            @if (view() === 'performance') {
+              <label class="form-control w-full sm:w-52">
+                <span class="label-text text-xs">Rank by</span>
+                <select
+                  class="select select-bordered mt-1 min-h-11 w-full"
+                  [value]="performanceCategory()"
+                  (change)="setPerformanceCategory($event)"
+                >
+                  @for (category of performanceCategories(); track category) {
+                    <option [value]="category">{{ performanceLabel(category) }}</option>
+                  }
+                </select>
+              </label>
             }
           </div>
         </div>
@@ -145,43 +147,12 @@ const EMPTY_SUMMARY: ProductIntelligenceSummary = {
       } @else if (view() === 'performance') {
         <section class="card overflow-hidden bg-base-100" aria-labelledby="performance-title">
           <div class="border-b border-base-300 p-4">
-            <div class="flex flex-wrap items-end justify-between gap-3">
-              <div>
-                <h3 id="performance-title" class="section-title">Product performance</h3>
-                <p class="type-caption mt-1">
-                  Separate, explainable leaders. Factual sales stay visible while unusual spikes are
-                  adjusted for ranking.
-                </p>
-              </div>
-              @if (locations.isMultiLocation()) {
-                <label class="form-control min-w-48">
-                  <span class="label-text text-xs">Location</span>
-                  <select
-                    class="select select-bordered min-h-11"
-                    [value]="locations.activeId()"
-                    (change)="setLocation($event)"
-                  >
-                    @for (location of locations.locations(); track location.id) {
-                      <option [value]="location.id">{{ location.name }}</option>
-                    }
-                  </select>
-                </label>
-              }
-            </div>
-            <div role="tablist" aria-label="Performance category" class="section-tabs mt-4">
-              @for (category of performanceCategories(); track category) {
-                <button
-                  role="tab"
-                  type="button"
-                  class="section-tab"
-                  [class.section-tab-active]="performanceCategory() === category"
-                  [attr.aria-selected]="performanceCategory() === category"
-                  (click)="setPerformanceCategory(category)"
-                >
-                  {{ performanceLabel(category) }}
-                </button>
-              }
-            </div>
+            <h2 id="performance-title" class="section-title">
+              {{ performanceHeading(performanceCategory()) }}
+            </h2>
+            <p class="type-caption mt-1">
+              Rankings adjust unusual spikes while keeping factual sales visible.
+            </p>
           </div>
 
           @if (error()) {
@@ -195,12 +166,31 @@ const EMPTY_SUMMARY: ProductIntelligenceSummary = {
               <span class="loading loading-spinner"></span>Loading performance
             </div>
           } @else if (performanceRows().length === 0) {
-            <app-empty-state
-              [embedded]="true"
-              icon="heroChartBar"
-              title="No eligible leaders yet"
-              description="This category needs repeat orders and selling days before a product can lead."
-            />
+            <div class="flex flex-wrap items-center gap-3 p-4 sm:p-5">
+              <div
+                class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-base-200 text-base-content/30"
+              >
+                <app-icon name="heroChartBar" size="lg" />
+              </div>
+              <div class="min-w-52 flex-1">
+                <h3 class="text-sm font-semibold">
+                  No {{ performanceLabel(performanceCategory()).toLowerCase() }} products yet
+                </h3>
+                <p class="type-caption mt-0.5">
+                  Products need repeat orders across multiple selling days to qualify. Try a longer
+                  period.
+                </p>
+              </div>
+              @if (periodPreset() === 30) {
+                <button appButton variant="soft" type="button" (click)="setWindow(180)">
+                  Use 6 months
+                </button>
+              } @else if (periodPreset() === 180) {
+                <button appButton variant="soft" type="button" (click)="setWindow(365)">
+                  Use 12 months
+                </button>
+              }
+            </div>
           } @else {
             <div class="grid gap-3 p-4 lg:grid-cols-2">
               @for (item of performanceRows(); track item.variant_id) {
@@ -332,20 +322,6 @@ const EMPTY_SUMMARY: ProductIntelligenceSummary = {
         <section class="card bg-base-100">
           <div class="card-body gap-3 p-4">
             <div class="flex flex-wrap items-end gap-3">
-              @if (locations.isMultiLocation()) {
-                <label class="form-control min-w-48">
-                  <span class="label-text text-xs">Location</span>
-                  <select
-                    class="select select-bordered min-h-11 w-full"
-                    [value]="locations.activeId()"
-                    (change)="setLocation($event)"
-                  >
-                    @for (location of locations.locations(); track location.id) {
-                      <option [value]="location.id">{{ location.name }}</option>
-                    }
-                  </select>
-                </label>
-              }
               <label class="form-control min-w-48 flex-1 sm:max-w-56">
                 <span class="label-text text-xs">Decision</span>
                 <select
@@ -661,6 +637,13 @@ export class ProductsInsightsComponent implements OnInit {
       ? ['trending', 'volume', 'margin', 'consistent']
       : ['trending', 'volume', 'consistent']
   );
+  protected readonly inventoryViews = computed(() => [
+    { value: 'priorities', label: 'Stock priorities' },
+    { value: 'performance', label: 'Product performance' },
+    ...(this.permissions.has('ViewFinancials')
+      ? [{ value: 'sources', label: 'Supplier performance' }]
+      : []),
+  ]);
   protected readonly performanceRows = computed(() =>
     this.performanceCategory() === 'margin' && !this.permissions.has('ViewFinancials')
       ? []
@@ -768,7 +751,9 @@ export class ProductsInsightsComponent implements OnInit {
     }
   }
 
-  protected setView(value: InventoryView): void {
+  protected setView(value: string): void {
+    if (value !== 'priorities' && value !== 'performance' && value !== 'sources') return;
+    if (value === 'sources' && !this.permissions.has('ViewFinancials')) return;
     if (this.view() === value) return;
     if (value === 'performance' && this.periodPreset() === null) {
       const today = this.businessToday();
@@ -783,7 +768,9 @@ export class ProductsInsightsComponent implements OnInit {
     if (value !== 'sources') void this.load();
   }
 
-  protected setPerformanceCategory(value: ProductPerformanceCategory): void {
+  protected setPerformanceCategory(event: Event): void {
+    const value = (event.target as HTMLSelectElement).value as ProductPerformanceCategory;
+    if (!this.performanceCategories().includes(value)) return;
     if (value === 'margin' && !this.permissions.has('ViewFinancials')) return;
     this.performanceCategory.set(value);
     this.syncViewToUrl();
@@ -937,9 +924,16 @@ export class ProductsInsightsComponent implements OnInit {
 
   protected performanceLabel(value: ProductPerformanceCategory): string {
     if (value === 'trending') return 'Trending';
-    if (value === 'volume') return 'Volume';
-    if (value === 'margin') return 'Margin';
-    return 'Consistency';
+    if (value === 'volume') return 'Top volume';
+    if (value === 'margin') return 'Best margin';
+    return 'Most consistent';
+  }
+
+  protected performanceHeading(value: ProductPerformanceCategory): string {
+    if (value === 'trending') return 'Trending products';
+    if (value === 'volume') return 'Top-volume products';
+    if (value === 'margin') return 'Best-margin products';
+    return 'Most consistent products';
   }
 
   protected manufacturerName(item: {

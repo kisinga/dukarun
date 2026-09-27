@@ -23,36 +23,34 @@ const VALUE_TONE: Record<string, string> = {
 };
 
 /**
- * Compact, single-line page summary — a wrapping row of "value label" metrics
- * (ported from the old app; zero counts are never painted as alerts).
+ * Compact page summary. Metrics wrap with the space available in the toolbar;
+ * zero counts are never painted as alerts.
  */
 @Component({
   selector: 'app-stat-bar',
+  host: { class: 'block min-w-0' },
   template: `
-    <div class="grid w-full min-w-0 grid-cols-2 gap-x-3 gap-y-2 md:grid-cols-3">
+    <div class="stat-bar-grid">
       @for (s of stats(); track s.label; let index = $index) {
         @if (s.filter) {
           <button
             type="button"
             (click)="select.emit(s.filter!)"
             [attr.aria-pressed]="!!s.active"
-            class="min-h-11 w-full cursor-pointer flex-col items-start justify-center gap-0.5 rounded-field border px-3 py-1.5 text-left transition-colors"
+            class="stat-bar-item cursor-pointer text-left transition-colors"
             [class]="itemClass(s, index, true)"
           >
-            <span class="text-sm font-bold leading-none tabular-nums" [class]="toneClass(s)">{{
+            <span class="text-sm font-semibold leading-5 tabular-nums" [class]="toneClass(s)">{{
               s.value
             }}</span>
-            <span class="text-xs leading-tight text-base-content/60">{{ s.label }}</span>
+            <span class="stat-bar-label text-xs leading-4 text-muted">{{ s.label }}</span>
           </button>
         } @else {
-          <span
-            class="min-w-0 flex-col items-start justify-center gap-0.5 border-l border-base-300 pl-3"
-            [class]="itemClass(s, index, false)"
-          >
-            <span class="text-sm font-bold leading-none tabular-nums" [class]="toneClass(s)">{{
+          <span class="stat-bar-item" [class]="itemClass(s, index, false)">
+            <span class="text-sm font-semibold leading-5 tabular-nums" [class]="toneClass(s)">{{
               s.value
             }}</span>
-            <span class="text-xs leading-tight text-base-content/60">{{ s.label }}</span>
+            <span class="stat-bar-label text-xs leading-4 text-muted">{{ s.label }}</span>
           </span>
         }
       }
@@ -66,6 +64,38 @@ const VALUE_TONE: Record<string, string> = {
       >
         {{ expanded() ? 'Less summary' : 'More summary' }}
       </button>
+    }
+  `,
+  styles: `
+    .stat-bar-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.5rem;
+    }
+
+    .stat-bar-item {
+      min-width: 0;
+      min-height: 2.75rem;
+      flex-direction: column;
+      align-items: flex-start;
+      justify-content: flex-start;
+      gap: 0.125rem;
+      border: 0;
+      border-radius: 0;
+      padding: 0.125rem 0.5rem;
+      box-shadow: inset 1px 0 var(--surface-border);
+    }
+
+    .stat-bar-item:focus-visible {
+      outline: 2px solid var(--color-primary);
+      outline-offset: 2px;
+    }
+
+    @media (min-width: 768px) {
+      .stat-bar-grid {
+        grid-template-columns: repeat(auto-fit, minmax(min(6rem, 100%), 1fr));
+        align-items: stretch;
+      }
     }
   `,
 })
@@ -83,9 +113,7 @@ export class StatBarComponent {
         ? 'hidden md:inline-flex'
         : 'inline-flex';
     if (!interactive) return responsive;
-    const state = s.active
-      ? 'border-base-content/25 bg-base-200'
-      : 'border-base-300 bg-base-100 hover:bg-base-200/60';
+    const state = s.active ? 'bg-primary/10' : 'hover:bg-base-200/60';
     return `${responsive} ${state}`;
   }
 

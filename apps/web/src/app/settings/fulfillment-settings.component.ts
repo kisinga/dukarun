@@ -48,37 +48,41 @@ const EDITABLE_SETTING_KEYS: readonly EditableSettingKey[] = [
   selector: 'app-fulfillment-settings',
   imports: [FormsModule, ButtonComponent, IconComponent],
   template: `
-    <div>
+    <div class="surface-card min-w-0 overflow-hidden p-4 sm:p-5">
       <section
-        class="grid gap-4 border-b border-base-300/70 pb-5 md:grid-cols-[minmax(15rem,20rem)_minmax(0,1fr)] md:items-end md:gap-8"
+        class="surface-inset grid gap-4 p-4 md:grid-cols-[minmax(15rem,20rem)_minmax(0,1fr)] md:items-center md:gap-6"
       >
-        <label class="block">
-          <span class="mb-1 block text-sm font-medium">Location</span>
-          <select
-            class="select select-bordered min-h-11 w-full"
-            aria-label="Pickup and delivery location"
-            [ngModel]="selectedLocationId()"
-            [disabled]="loading() || busy()"
-            (ngModelChange)="requestLocationChange($event)"
-          >
-            @for (location of locations.locations(); track location.id) {
-              <option [value]="location.id">{{ location.name }}</option>
-            }
-          </select>
-          <span class="type-caption mt-1 block">Settings apply only to this location.</span>
-        </label>
+        <div>
+          <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-base-content/55">
+            Location-specific settings
+          </p>
+          <label class="block">
+            <span class="mb-1 block text-sm font-medium">Location</span>
+            <select
+              class="select select-bordered min-h-11 w-full bg-base-100"
+              aria-label="Pickup and delivery location"
+              [ngModel]="selectedLocationId()"
+              [disabled]="loading() || busy()"
+              (ngModelChange)="requestLocationChange($event)"
+            >
+              @for (location of locations.locations(); track location.id) {
+                <option [value]="location.id">{{ location.name }}</option>
+              }
+            </select>
+          </label>
+        </div>
 
         @if (draft(); as current) {
           <label
-            class="flex min-h-16 cursor-pointer items-center justify-between gap-4 border-y border-base-300/70 py-3 md:border-b-0 md:border-t-0 md:border-l md:py-0 md:pl-8"
+            class="flex min-h-16 cursor-pointer items-center justify-between gap-4 border-t border-base-300/70 pt-4 md:border-l md:border-t-0 md:pl-6 md:pt-0"
           >
             <span class="min-w-0">
-              <span class="block text-sm font-semibold">Accept pickup and delivery orders</span>
+              <span class="block text-sm font-semibold">Accept off-counter orders</span>
               <span class="type-caption mt-0.5 block">
                 @if (current.enabled) {
-                  Orders can use the methods configured below.
+                  Pickup and delivery are available at checkout.
                 } @else {
-                  This location continues to accept counter sales only.
+                  This location accepts counter sales only.
                 }
               </span>
             </span>
@@ -109,6 +113,14 @@ const EDITABLE_SETTING_KEYS: readonly EditableSettingKey[] = [
             <app-icon name="heroInformationCircle" class="mt-0.5 text-warning" />
             <p>Pickup and delivery are unavailable on the current plan.</p>
           </div>
+        } @else if (!current.enabled) {
+          <div
+            role="status"
+            class="mt-4 flex items-start gap-3 border-y border-base-300/70 px-3 py-3 text-sm text-base-content/70"
+          >
+            <app-icon name="heroInformationCircle" class="mt-0.5" />
+            <p>Turn on off-counter orders to edit the options below.</p>
+          </div>
         }
 
         <fieldset
@@ -124,52 +136,60 @@ const EDITABLE_SETTING_KEYS: readonly EditableSettingKey[] = [
               <p class="type-caption mt-1">Choose how customers receive orders from here.</p>
             </header>
 
-            <div class="divide-y divide-base-300/70 border-y border-base-300/70">
-              <label class="flex min-h-16 cursor-pointer items-center justify-between gap-4 py-3">
-                <span>
-                  <span class="block text-sm font-medium">Pickup</span>
-                  <span class="type-caption mt-0.5 block"
-                    >Prepare for collection at this location.</span
-                  >
-                </span>
-                <input
-                  type="checkbox"
-                  class="toggle toggle-primary shrink-0"
-                  [ngModel]="current.pickup_enabled"
-                  (ngModelChange)="updateDraft('pickup_enabled', $event)"
-                />
-              </label>
-              <label class="flex min-h-16 cursor-pointer items-center justify-between gap-4 py-3">
-                <span>
-                  <span class="block text-sm font-medium">Delivery</span>
-                  <span class="type-caption mt-0.5 block">Dispatch orders to a recipient.</span>
-                </span>
-                <input
-                  type="checkbox"
-                  class="toggle toggle-primary shrink-0"
-                  [ngModel]="current.delivery_enabled"
-                  (ngModelChange)="setDeliveryEnabled($event)"
-                />
-              </label>
-              <label
-                class="flex min-h-16 items-center justify-between gap-4 py-3"
-                [class.cursor-pointer]="current.delivery_enabled"
-                [class.opacity-55]="!current.delivery_enabled"
-              >
-                <span>
-                  <span class="block text-sm font-medium">Cash on delivery</span>
-                  <span class="type-caption mt-0.5 block">
-                    Invoice on dispatch and collect the exact balance.
+            <div class="grid gap-3 sm:grid-cols-2">
+              <div class="surface-inset p-4">
+                <label class="flex min-h-11 cursor-pointer items-center justify-between gap-4">
+                  <span class="flex min-w-0 items-start gap-3">
+                    <app-icon name="heroMapPin" class="mt-0.5 text-base-content/60" />
+                    <span>
+                      <span class="block text-sm font-medium">Pickup</span>
+                      <span class="type-caption mt-0.5 block">Collect from this location.</span>
+                    </span>
                   </span>
-                </span>
-                <input
-                  type="checkbox"
-                  class="toggle toggle-primary shrink-0"
-                  [ngModel]="current.cod_enabled"
-                  [disabled]="!current.delivery_enabled"
-                  (ngModelChange)="updateDraft('cod_enabled', $event)"
-                />
-              </label>
+                  <input
+                    type="checkbox"
+                    class="toggle toggle-primary shrink-0"
+                    [ngModel]="current.pickup_enabled"
+                    (ngModelChange)="updateDraft('pickup_enabled', $event)"
+                  />
+                </label>
+              </div>
+
+              <div class="surface-inset p-4">
+                <label class="flex min-h-11 cursor-pointer items-center justify-between gap-4">
+                  <span class="flex min-w-0 items-start gap-3">
+                    <app-icon name="heroTruck" class="mt-0.5 text-base-content/60" />
+                    <span>
+                      <span class="block text-sm font-medium">Delivery</span>
+                      <span class="type-caption mt-0.5 block">Send to the customer.</span>
+                    </span>
+                  </span>
+                  <input
+                    type="checkbox"
+                    class="toggle toggle-primary shrink-0"
+                    [ngModel]="current.delivery_enabled"
+                    (ngModelChange)="setDeliveryEnabled($event)"
+                  />
+                </label>
+
+                <label
+                  class="mt-3 flex min-h-11 items-center justify-between gap-4 border-t border-base-300/70 pt-3"
+                  [class.cursor-pointer]="current.delivery_enabled"
+                  [class.opacity-55]="!current.delivery_enabled"
+                >
+                  <span>
+                    <span class="block text-sm font-medium">Cash on delivery</span>
+                    <span class="type-caption mt-0.5 block">Collect the balance on dispatch.</span>
+                  </span>
+                  <input
+                    type="checkbox"
+                    class="toggle toggle-primary shrink-0"
+                    [ngModel]="current.cod_enabled"
+                    [disabled]="!current.delivery_enabled"
+                    (ngModelChange)="updateDraft('cod_enabled', $event)"
+                  />
+                </label>
+              </div>
             </div>
 
             @if (!current.pickup_enabled && !current.delivery_enabled) {
@@ -183,81 +203,110 @@ const EDITABLE_SETTING_KEYS: readonly EditableSettingKey[] = [
             class="grid gap-4 border-b border-base-300/70 py-6 lg:grid-cols-[13rem_minmax(0,1fr)] lg:gap-8"
           >
             <header>
-              <h3 class="section-title">Pricing and promises</h3>
-              <p class="type-caption mt-1">Set the fee and expected preparation time.</p>
+              <h3 class="section-title">Fees & timing</h3>
+              <p class="type-caption mt-1">Set what customers pay and when orders are ready.</p>
             </header>
 
-            <div class="grid gap-x-5 gap-y-5 sm:grid-cols-2">
-              <label class="block sm:col-span-2" [class.opacity-55]="!current.delivery_enabled">
-                <span class="mb-1 block text-sm font-medium">Delivery fee product</span>
-                <select
-                  class="select select-bordered min-h-11 w-full"
-                  [class.select-error]="
-                    current.delivery_enabled && !current.default_delivery_fee_variant_id
-                  "
-                  [ngModel]="current.default_delivery_fee_variant_id"
-                  [disabled]="!current.delivery_enabled"
-                  (ngModelChange)="updateDraft('default_delivery_fee_variant_id', $event)"
-                >
-                  <option [ngValue]="null">Choose a non-stock service</option>
-                  @for (variant of feeVariants(); track variant.id) {
-                    <option [value]="variant.id">
-                      {{ variant.name }} | KES {{ money(variant.price) }}
-                    </option>
-                  }
-                </select>
-                @if (current.delivery_enabled && !current.default_delivery_fee_variant_id) {
-                  <span class="mt-1 block text-xs text-error">
-                    A delivery fee product is required when delivery is on.
-                  </span>
-                } @else {
-                  <span class="type-caption mt-1 block">
-                    Added to the cart using the product's normal price and tax rules.
-                  </span>
-                }
-              </label>
+            <div class="grid gap-3 xl:grid-cols-2">
+              <div class="surface-inset p-4" [class.opacity-55]="!current.pickup_enabled">
+                <div class="flex items-start gap-3">
+                  <app-icon name="heroMapPin" class="mt-0.5 text-base-content/60" />
+                  <div>
+                    <h4 class="text-sm font-medium">Pickup timing</h4>
+                    <p class="type-caption mt-0.5">Shown at checkout.</p>
+                  </div>
+                </div>
+                <label class="mt-4 block">
+                  <span class="mb-1 block text-sm font-medium">Ready in</span>
+                  <div class="join flex">
+                    <input
+                      class="input input-bordered join-item min-h-11 min-w-0 flex-1 bg-base-100"
+                      [class.input-error]="
+                        current.pickup_enabled && !validMinutes(current.pickup_sla_minutes)
+                      "
+                      type="number"
+                      min="5"
+                      max="10080"
+                      inputmode="numeric"
+                      [ngModel]="current.pickup_sla_minutes"
+                      [disabled]="!current.pickup_enabled"
+                      (ngModelChange)="updateMinutes('pickup_sla_minutes', $event)"
+                    />
+                    <span
+                      class="join-item flex items-center border border-base-300 bg-base-100 px-3 text-sm"
+                    >
+                      min
+                    </span>
+                  </div>
+                </label>
+              </div>
 
-              <label class="block">
-                <span class="mb-1 block text-sm font-medium">Pickup promise</span>
-                <div class="join flex">
-                  <input
-                    class="input input-bordered join-item min-h-11 min-w-0 flex-1"
-                    [class.input-error]="!validMinutes(current.pickup_sla_minutes)"
-                    type="number"
-                    min="5"
-                    max="10080"
-                    inputmode="numeric"
-                    [ngModel]="current.pickup_sla_minutes"
-                    (ngModelChange)="updateMinutes('pickup_sla_minutes', $event)"
-                  />
-                  <span class="join-item flex items-center border border-base-300 px-3 text-sm">
-                    min
-                  </span>
+              <div class="surface-inset p-4" [class.opacity-55]="!current.delivery_enabled">
+                <div class="flex items-start gap-3">
+                  <app-icon name="heroTruck" class="mt-0.5 text-base-content/60" />
+                  <div>
+                    <h4 class="text-sm font-medium">Delivery fee & timing</h4>
+                    <p class="type-caption mt-0.5">Applied at checkout.</p>
+                  </div>
                 </div>
-              </label>
-              <label class="block">
-                <span class="mb-1 block text-sm font-medium">Delivery promise</span>
-                <div class="join flex">
-                  <input
-                    class="input input-bordered join-item min-h-11 min-w-0 flex-1"
-                    [class.input-error]="!validMinutes(current.delivery_sla_minutes)"
-                    type="number"
-                    min="5"
-                    max="10080"
-                    inputmode="numeric"
-                    [ngModel]="current.delivery_sla_minutes"
-                    (ngModelChange)="updateMinutes('delivery_sla_minutes', $event)"
-                  />
-                  <span class="join-item flex items-center border border-base-300 px-3 text-sm">
-                    min
-                  </span>
-                </div>
-              </label>
+
+                <label class="mt-4 block">
+                  <span class="mb-1 block text-sm font-medium">Delivery fee product</span>
+                  <select
+                    class="select select-bordered min-h-11 w-full bg-base-100"
+                    [class.select-error]="
+                      current.delivery_enabled && !current.default_delivery_fee_variant_id
+                    "
+                    [ngModel]="current.default_delivery_fee_variant_id"
+                    [disabled]="!current.delivery_enabled"
+                    (ngModelChange)="updateDraft('default_delivery_fee_variant_id', $event)"
+                  >
+                    <option [ngValue]="null">Choose a non-stock service</option>
+                    @for (variant of feeVariants(); track variant.id) {
+                      <option [value]="variant.id">
+                        {{ variant.name }} | KES {{ money(variant.price) }}
+                      </option>
+                    }
+                  </select>
+                  @if (current.delivery_enabled && !current.default_delivery_fee_variant_id) {
+                    <span class="mt-1 block text-xs text-error">
+                      Choose a delivery fee product.
+                    </span>
+                  } @else {
+                    <span class="type-caption mt-1 block">Uses the product's price and tax.</span>
+                  }
+                </label>
+
+                <label class="mt-4 block">
+                  <span class="mb-1 block text-sm font-medium">Deliver within</span>
+                  <div class="join flex">
+                    <input
+                      class="input input-bordered join-item min-h-11 min-w-0 flex-1 bg-base-100"
+                      [class.input-error]="
+                        current.delivery_enabled && !validMinutes(current.delivery_sla_minutes)
+                      "
+                      type="number"
+                      min="5"
+                      max="10080"
+                      inputmode="numeric"
+                      [ngModel]="current.delivery_sla_minutes"
+                      [disabled]="!current.delivery_enabled"
+                      (ngModelChange)="updateMinutes('delivery_sla_minutes', $event)"
+                    />
+                    <span
+                      class="join-item flex items-center border border-base-300 bg-base-100 px-3 text-sm"
+                    >
+                      min
+                    </span>
+                  </div>
+                </label>
+              </div>
+
               @if (
-                !validMinutes(current.pickup_sla_minutes) ||
-                !validMinutes(current.delivery_sla_minutes)
+                (current.pickup_enabled && !validMinutes(current.pickup_sla_minutes)) ||
+                (current.delivery_enabled && !validMinutes(current.delivery_sla_minutes))
               ) {
-                <p class="text-xs text-error sm:col-span-2" role="alert">
+                <p class="text-xs text-error xl:col-span-2" role="alert">
                   Promises must be between 5 minutes and 7 days.
                 </p>
               }
@@ -275,12 +324,12 @@ const EDITABLE_SETTING_KEYS: readonly EditableSettingKey[] = [
               }
             </header>
 
-            <div [class.opacity-55]="!canConfigureMessages()">
+            <div class="surface-inset p-4" [class.opacity-55]="!canConfigureMessages()">
               <div class="grid gap-5 sm:grid-cols-2">
                 <label class="block">
                   <span class="mb-1 block text-sm font-medium">Primary channel</span>
                   <select
-                    class="select select-bordered min-h-11 w-full"
+                    class="select select-bordered min-h-11 w-full bg-base-100"
                     [ngModel]="current.notification_channel"
                     [disabled]="!canConfigureMessages()"
                     (ngModelChange)="updateDraft('notification_channel', $event)"
@@ -312,10 +361,11 @@ const EDITABLE_SETTING_KEYS: readonly EditableSettingKey[] = [
 
               <fieldset class="mt-5" [disabled]="!canConfigureMessages()">
                 <legend class="text-sm font-medium">Send an update when the order is</legend>
-                <div class="mt-2 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <p class="type-caption mt-1">Order confirmation is always sent.</p>
+                <div class="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                   @for (milestone of milestones; track milestone.key) {
                     <label
-                      class="flex min-h-10 cursor-pointer items-center gap-2 border-y border-base-300/70 py-2 text-sm"
+                      class="flex min-h-11 cursor-pointer items-center gap-2 border-y border-base-300/70 py-2 text-sm"
                     >
                       <input
                         type="checkbox"
@@ -332,25 +382,18 @@ const EDITABLE_SETTING_KEYS: readonly EditableSettingKey[] = [
           </section>
         </fieldset>
 
-        @if (dirty() || message()) {
+        @if (dirty()) {
           <footer
             class="sticky bottom-[calc(4rem+env(safe-area-inset-bottom)+0.75rem)] z-20 mt-2 flex flex-col gap-3 rounded-box border border-base-300/80 bg-base-100/95 px-4 py-3 shadow-overlay backdrop-blur sm:flex-row sm:items-center lg:bottom-3"
           >
             <div class="flex min-w-0 items-start gap-2 sm:mr-auto">
-              @if (message()?.ok) {
-                <app-icon name="heroCheckCircle" class="mt-0.5 text-success" />
-              } @else if (message()) {
+              @if (message()) {
                 <app-icon name="heroExclamationTriangle" class="mt-0.5 text-error" />
               } @else {
                 <app-icon name="heroPencilSquare" class="mt-0.5 text-warning" />
               }
               <div class="min-w-0">
-                <p
-                  class="text-sm font-medium"
-                  [class.text-success]="message()?.ok"
-                  [class.text-error]="message() && !message()?.ok"
-                  role="status"
-                >
+                <p class="text-sm font-medium" [class.text-error]="message()" role="status">
                   @if (message()) {
                     {{ message()?.text }}
                   } @else {
@@ -363,29 +406,35 @@ const EDITABLE_SETTING_KEYS: readonly EditableSettingKey[] = [
               </div>
             </div>
 
-            @if (dirty()) {
-              <div class="flex items-center justify-end gap-2">
-                <button
-                  appButton
-                  variant="ghost"
-                  type="button"
-                  [disabled]="busy()"
-                  (click)="resetDraft()"
-                >
-                  Discard
-                </button>
-                <button
-                  appButton
-                  type="button"
-                  [loading]="busy()"
-                  [disabled]="!valid()"
-                  (click)="save()"
-                >
-                  Save changes
-                </button>
-              </div>
-            }
+            <div class="flex items-center justify-end gap-2">
+              <button
+                appButton
+                variant="ghost"
+                type="button"
+                [disabled]="busy()"
+                (click)="resetDraft()"
+              >
+                Discard
+              </button>
+              <button
+                appButton
+                type="button"
+                [loading]="busy()"
+                [disabled]="!valid()"
+                (click)="save()"
+              >
+                Save changes
+              </button>
+            </div>
           </footer>
+        } @else if (message()?.ok) {
+          <div
+            role="status"
+            class="mt-4 flex items-center gap-2 border-y border-success/35 bg-success/5 px-3 py-3 text-sm text-success"
+          >
+            <app-icon name="heroCheckCircle" />
+            <span>{{ message()?.text }}</span>
+          </div>
         }
       } @else if (message()) {
         <div
@@ -491,13 +540,13 @@ export class FulfillmentSettingsComponent implements OnInit {
   protected readonly validationMessage = computed(() => {
     const draft = this.draft();
     if (!draft) return null;
-    if (!this.validMinutes(draft.pickup_sla_minutes)) {
+    if (!draft.enabled) return null;
+    if (draft.pickup_enabled && !this.validMinutes(draft.pickup_sla_minutes)) {
       return 'Pickup promise must be between 5 minutes and 7 days.';
     }
-    if (!this.validMinutes(draft.delivery_sla_minutes)) {
+    if (draft.delivery_enabled && !this.validMinutes(draft.delivery_sla_minutes)) {
       return 'Delivery promise must be between 5 minutes and 7 days.';
     }
-    if (!draft.enabled) return null;
     if (!draft.pickup_enabled && !draft.delivery_enabled) {
       return 'Choose pickup, delivery, or both.';
     }

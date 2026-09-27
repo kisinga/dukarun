@@ -311,6 +311,33 @@ input.search-with-custom-clear::-ms-clear {
     padding: 0 1rem 0.75rem;
   }
 
+  .data-table-viewport {
+    overflow-x: auto;
+  }
+
+  .data-table-viewport:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: -2px;
+  }
+
+  /* Long primary datasets own one bounded desktop scroll region. This keeps
+     labels in view without making short tables or phone card lists scroll. */
+  @media (min-width: 1024px) {
+    .data-table-viewport-bounded {
+      max-height: min(64dvh, 48rem);
+      overflow: auto;
+      overscroll-behavior: contain;
+      scrollbar-gutter: stable;
+      scroll-padding-top: 3rem;
+    }
+
+    .data-table-viewport-bounded .table thead th {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+  }
+
   .table-entity {
     display: flex;
     min-width: 12rem;
@@ -342,6 +369,42 @@ input.search-with-custom-clear::-ms-clear {
   .table-actions {
     text-align: right;
     white-space: nowrap;
+  }
+
+  /* Customer and supplier ledgers share one six-column account rhythm:
+     identity, contact, account context, aging/terms, balance, actions. */
+  .account-table {
+    min-width: 64rem;
+    table-layout: fixed;
+
+    th:nth-child(1) {
+      width: 22%;
+    }
+
+    th:nth-child(2) {
+      width: 17%;
+    }
+
+    th:nth-child(3) {
+      width: 25%;
+    }
+
+    th:nth-child(4) {
+      width: 16%;
+    }
+
+    th:nth-child(5) {
+      width: 12%;
+    }
+
+    th:nth-child(6) {
+      width: 8%;
+    }
+
+    tbody tr[role='button']:focus-visible {
+      outline: 2px solid var(--color-primary);
+      outline-offset: -2px;
+    }
   }
 
   /* ONE form-field recipe: caption label above the control, consistent gap.
