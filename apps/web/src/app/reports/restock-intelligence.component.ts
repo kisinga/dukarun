@@ -1,3 +1,4 @@
+import { bindListQuery, listQueryField } from '../shared/list/list-query';
 import {
   Component,
   OnInit,
@@ -8,7 +9,7 @@ import {
   signal,
   untracked,
 } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { CatalogCacheService } from '../core/catalog-cache.service';
 import { LocationContextService } from '../core/location-context.service';
 import { formatKes } from '../core/money';
@@ -349,6 +350,7 @@ type DisplayProduct = RestockProductRow & {
                     <a
                       class="btn btn-primary btn-sm min-h-11"
                       [routerLink]="['/insights/inventory', product.variantId]"
+                      [queryParams]="reviewParams()"
                     >
                       View full insight
                     </a>
@@ -395,6 +397,7 @@ type DisplayProduct = RestockProductRow & {
             <div class="grid gap-3 lg:grid-cols-2">
               @for (product of displayProducts(); track product.variantId) {
                 <article
+                  [attr.data-list-record]="product.variantId"
                   class="card border border-base-300 bg-base-100"
                   [class.border-primary]="focusedVariantId() === product.variantId"
                 >
@@ -404,6 +407,7 @@ type DisplayProduct = RestockProductRow & {
                         <a
                           class="link block truncate font-semibold"
                           [routerLink]="['/insights/inventory', product.variantId]"
+                          [queryParams]="reviewParams()"
                         >
                           {{ product.label }}
                         </a>
@@ -514,6 +518,7 @@ type DisplayProduct = RestockProductRow & {
                         <a
                           class="btn btn-ghost btn-sm min-h-11"
                           [routerLink]="['/insights/inventory', product.variantId]"
+                          [queryParams]="reviewParams()"
                         >
                           Insight
                         </a>
@@ -535,6 +540,14 @@ export class RestockIntelligenceComponent implements OnInit {
   readonly refreshToken = input(0);
 
   private readonly reports = inject(ReportsService);
+  private readonly router = inject(Router, { optional: true });
+  protected reviewParams() {
+    return {
+      returnTo: this.router?.url ?? '/insights/inventory?view=sources',
+      from: this.since(),
+      to: this.until(),
+    };
+  }
   private readonly insights = inject(InsightsService);
   private readonly catalog = inject(CatalogCacheService);
   private readonly parties = inject(PartyCacheService);
@@ -628,6 +641,19 @@ export class RestockIntelligenceComponent implements OnInit {
   });
 
   constructor() {
+    bindListQuery(
+      {
+        sourceMode: listQueryField(this.scopeMode, { values: ['supplier', 'manufacturer'] }),
+        sourceSupplier: listQueryField(this.selectedSupplier),
+        sourceManufacturer: listQueryField(this.selectedManufacturer),
+        sourceLocation: listQueryField(this.selectedLocation),
+        trend: listQueryField(this.trendMetric, { values: ['quantity', 'revenue'] }),
+        focus: listQueryField(this.focusedVariantId),
+      },
+      () => {
+        if (this.ready()) void this.load();
+      }
+    );
     effect(() => {
       const since = this.since();
       const until = this.until();
@@ -645,16 +671,22 @@ export class RestockIntelligenceComponent implements OnInit {
     ]);
     const suppliers = this.supplierOptions();
     const manufacturers = this.manufacturerOptions();
-    if (suppliers.length > 0) {
+    if (suppliers.length > 0 && !suppliers.some(item => item.id === this.selectedSupplier())) {
       this.selectedSupplier.set(suppliers[0].id);
-    } else if (manufacturers.length > 0) {
+    } else if (!suppliers.length && manufacturers.length > 0) {
       this.scopeMode.set('manufacturer');
       this.selectedManufacturer.set(manufacturers[0].id);
     }
-    if (manufacturers.length > 0 && !this.selectedManufacturer()) {
+    if (
+      manufacturers.length > 0 &&
+      !manufacturers.some(item => item.id === this.selectedManufacturer())
+    ) {
       this.selectedManufacturer.set(manufacturers[0].id);
     }
-    this.selectedLocation.set(this.locations.activeId() ?? this.locations.locations()[0]?.id ?? '');
+    if (!this.locations.locations().some(item => item.id === this.selectedLocation()))
+      this.selectedLocation.set(
+        this.locations.activeId() ?? this.locations.locations()[0]?.id ?? ''
+      );
     this.ready.set(true);
   }
 

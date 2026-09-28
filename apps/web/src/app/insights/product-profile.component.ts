@@ -1,6 +1,7 @@
 import { DatePipe, DecimalPipe } from '@angular/common';
+import { productIdentityLabel } from '../core/product-identity';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { BusinessClockService } from '../core/business-clock.service';
 import { formatKes } from '../core/money';
 import { LocationContextService } from '../core/location-context.service';
@@ -47,8 +48,8 @@ import { ProductActivityChartComponent } from './product-activity-chart.componen
         }
         <div class="flex flex-wrap items-center justify-between gap-3">
           <div class="flex flex-wrap items-center gap-2">
-            <a routerLink="/insights/inventory" class="btn btn-ghost btn-sm min-h-11"
-              ><app-icon name="heroChevronLeft" />Inventory</a
+            <a [routerLink]="returnUrl" class="btn btn-ghost btn-sm min-h-11"
+              ><app-icon name="heroChevronLeft" />{{ returnLabel }}</a
             >
             <a
               class="btn btn-outline btn-sm min-h-11"
@@ -76,7 +77,12 @@ import { ProductActivityChartComponent } from './product-activity-chart.componen
               <div>
                 <p class="type-caption">{{ item.variant.sku }}</p>
                 <h2 class="text-xl font-bold">
-                  {{ item.variant.productName }} · {{ item.variant.variantName }}
+                  {{
+                    productLabel({
+                      product_name: item.variant.productName,
+                      variant_name: item.variant.variantName,
+                    })
+                  }}
                 </h2>
                 <p class="type-caption mt-1">
                   {{ item.variant.stockUnit }}
@@ -289,15 +295,48 @@ export class ProductProfileComponent implements OnInit {
   protected readonly rangeFrom = signal('');
   protected readonly rangeTo = signal('');
   protected readonly fmt = formatKes;
+  protected readonly productLabel = productIdentityLabel;
   protected readonly copy = insightCopy;
   private readonly variantId = computed(() => this.route.snapshot.paramMap.get('variantId'));
   private request = 0;
+  protected readonly returnUrl = (() => {
+    const router = inject(Router);
+    const value = this.route.snapshot.queryParamMap.get('returnTo');
+    return router.parseUrl(
+      value && /^\/(dashboard|insights\/(inventory|products)|inventory\/products)(\?|$)/.test(value)
+        ? value
+        : '/insights/inventory'
+    );
+  })();
+  protected readonly returnLabel = this.returnUrl.toString().startsWith('/dashboard')
+    ? 'Dashboard'
+    : 'Inventory';
+
   async ngOnInit(): Promise<void> {
     const [, today] = await Promise.all([this.locations.load(), this.businessClock.today()]);
     this.businessToday.set(today);
-    const range = presetDateRange(today, 30);
-    this.rangeFrom.set(range.from);
-    this.rangeTo.set(range.to);
+    const params = this.route.snapshot.queryParamMap;
+    const period = Number(params.get('period') ?? 30);
+    const preset = period === 7 || period === 180 || period === 365 ? period : 30;
+    this.periodPreset.set(preset);
+    const range = presetDateRange(today, preset);
+    const from = params.get('from'),
+      to = params.get('to');
+    if (
+      from &&
+      to &&
+      /^\d{4}-\d{2}-\d{2}$/.test(from) &&
+      /^\d{4}-\d{2}-\d{2}$/.test(to) &&
+      from <= to &&
+      to <= today
+    ) {
+      if (!params.has('period')) this.periodPreset.set(null);
+      this.rangeFrom.set(from);
+      this.rangeTo.set(to);
+    } else {
+      this.rangeFrom.set(range.from);
+      this.rangeTo.set(range.to);
+    }
     await this.load();
   }
   protected setWindow(value: DateRangePreset): void {

@@ -37,6 +37,11 @@ import type { DateRangePreset } from './insights.models';
           }
         </div>
 
+        @if (value() !== 30) {
+          <button type="button" class="btn btn-ghost btn-sm min-h-11" (click)="selectPreset(30)">
+            Reset dates
+          </button>
+        }
         @if (advanced()) {
           <button
             type="button"

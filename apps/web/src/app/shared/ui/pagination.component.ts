@@ -1,5 +1,6 @@
-import { Component, computed, input, output } from '@angular/core';
+import { Component, ElementRef, computed, inject, input, output } from '@angular/core';
 import { NgIcon } from '@ng-icons/core';
+import { ListReturnDirective } from '../list/list-return.directive';
 
 /**
  * Pagination controls with page numbers (ported from the old app,
@@ -101,6 +102,8 @@ import { NgIcon } from '@ng-icons/core';
   `,
 })
 export class PaginationComponent {
+  private readonly element = inject(ElementRef<HTMLElement>);
+  private readonly listReturn = inject(ListReturnDirective, { optional: true });
   readonly currentPage = input.required<number>();
   readonly totalPages = input.required<number>();
   readonly totalItems = input.required<number>();
@@ -131,7 +134,24 @@ export class PaginationComponent {
   });
 
   protected onPageChange(page: number): void {
-    if (page >= 1 && page <= this.totalPages()) this.pageChange.emit(page);
+    if (page < 1 || page > this.totalPages() || page === this.currentPage()) return;
+    const host: HTMLElement = this.element.nativeElement;
+    const surface = host.closest('.list-scroll-page');
+    const records = surface
+      ? Array.from(
+          surface.querySelectorAll<HTMLElement>(
+            '.data-table-records, app-mobile-list, app-journal-list'
+          )
+        )
+          .filter(
+            element =>
+              element.getClientRects().length > 0 &&
+              !!(element.compareDocumentPosition(host) & Node.DOCUMENT_POSITION_FOLLOWING)
+          )
+          .at(-1)
+      : null;
+    if (records) this.listReturn?.scrollToRecords(records);
+    this.pageChange.emit(page);
   }
 
   protected onItemsPerPageSelect(event: Event): void {

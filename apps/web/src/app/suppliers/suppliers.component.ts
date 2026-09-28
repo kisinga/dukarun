@@ -1,3 +1,4 @@
+import { bindListQuery, listQueryField } from '../shared/list/list-query';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { formatKes } from '../core/money';
@@ -269,6 +270,19 @@ export class SuppliersComponent implements OnInit {
       openPurchases: Number(metric?.open_purchase_count ?? 0),
     };
   };
+
+  constructor() {
+    bindListQuery({
+      search: listQueryField(this.query),
+      sort: listQueryField(this.sort),
+      direction: listQueryField(this.sortDirection),
+      status: listQueryField(this.statusFilter),
+      balance: listQueryField(this.balanceFilter),
+      age: listQueryField(this.ageFilter),
+      page: listQueryField(this.page),
+      pageSize: listQueryField(this.pageSize, { max: 100 }),
+    });
+  }
 
   async ngOnInit(): Promise<void> {
     await this.load();

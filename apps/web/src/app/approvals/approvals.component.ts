@@ -1,3 +1,4 @@
+import { bindListQuery, listQueryField } from '../shared/list/list-query';
 import { Component, OnInit, computed, effect, inject, signal, untracked } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
@@ -9,7 +10,11 @@ import { PageLayoutComponent } from '../shared/ui/page-layout.component';
 import { PaginationComponent } from '../shared/ui/pagination.component';
 import { Approval, ApprovalsService } from './approvals.service';
 import { ButtonComponent } from '../shared/ui/button.component';
-import { DataTableShellComponent } from '../shared/ui/data-table-shell.component';
+import {
+  DataTableShellComponent,
+  TableRowsDirective,
+  type TableColumn,
+} from '../shared/ui/data-table-shell.component';
 import { IconComponent } from '../shared/ui/icon.component';
 import {
   ListSearchBarComponent,
@@ -52,6 +57,7 @@ const TYPE_BADGE: Record<string, string> = {
     PaginationComponent,
     ButtonComponent,
     DataTableShellComponent,
+    TableRowsDirective,
     IconComponent,
     ListSearchBarComponent,
     StatBarComponent,
@@ -86,6 +92,9 @@ const TYPE_BADGE: Record<string, string> = {
         <div role="alert" class="alert alert-error mb-3 text-sm">
           <app-icon name="heroExclamationTriangle" />
           <span>{{ error() }}</span>
+          <button appButton variant="ghost" size="sm" type="button" (click)="refresh()">
+            Retry
+          </button>
         </div>
       }
       @if (notice()) {
@@ -125,6 +134,7 @@ const TYPE_BADGE: Record<string, string> = {
       </details>
 
       <app-list-search-bar
+        searchLabel="Search approval requests"
         placeholder="Search request type, order, or details…"
         [searchQuery]="query()"
         (searchQueryChange)="query.set($event); pendingPage.set(1); decidedPage.set(1)"
@@ -140,7 +150,7 @@ const TYPE_BADGE: Record<string, string> = {
       </app-list-search-bar>
 
       <!-- Pending inbox -->
-      @if (filteredPending().length === 0) {
+      @if (!loading() && !error() && filteredPending().length === 0) {
         <app-empty-state
           [compact]="query().length > 0"
           icon="heroCheckCircle"
@@ -150,7 +160,7 @@ const TYPE_BADGE: Record<string, string> = {
       } @else {
         <app-mobile-list>
           @for (a of pagedPending(); track a.id) {
-            <div mobileListRow>
+            <div [attr.data-list-record]="a.id" mobileListRow>
               <div class="flex min-h-20 items-center gap-3 p-3">
                 <div class="min-w-0 flex-1">
                   <div class="flex items-center gap-2">
@@ -170,37 +180,28 @@ const TYPE_BADGE: Record<string, string> = {
 
         <div class="hidden lg:block">
           <app-data-table-shell
+            [columns]="tableColumns1"
+            tableClass="table-sm"
             heading="Pending decisions"
             [description]="filteredPending().length + ' awaiting review'"
           >
-            <table class="table table-sm">
-              <thead>
-                <tr>
-                  <th>Requested</th>
-                  <th>Type</th>
-                  <th>Request</th>
-                  <th>Requested by</th>
-                  <th class="text-right">Decision</th>
+            <ng-template tableRows>
+              @for (a of pagedPending(); track a.id) {
+                <tr [attr.data-list-record]="a.id">
+                  <td>{{ age(a.created_at) }}</td>
+                  <td>
+                    <span class="badge badge-xs" [class]="typeBadge(a.type)">
+                      {{ typeLabel(a.type) }}
+                    </span>
+                  </td>
+                  <td class="max-w-xl">{{ summary(a) }}</td>
+                  <td class="text-xs">{{ personName(a.requested_by) }}</td>
+                  <td class="table-actions">
+                    <button appButton size="sm" (click)="openReview(a)">Review</button>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                @for (a of pagedPending(); track a.id) {
-                  <tr>
-                    <td>{{ age(a.created_at) }}</td>
-                    <td>
-                      <span class="badge badge-xs" [class]="typeBadge(a.type)">
-                        {{ typeLabel(a.type) }}
-                      </span>
-                    </td>
-                    <td class="max-w-xl">{{ summary(a) }}</td>
-                    <td class="text-xs">{{ personName(a.requested_by) }}</td>
-                    <td class="table-actions">
-                      <button appButton size="sm" (click)="openReview(a)">Review</button>
-                    </td>
-                  </tr>
-                }
-              </tbody>
-            </table>
+              }
+            </ng-template>
           </app-data-table-shell>
         </div>
 
@@ -224,6 +225,7 @@ const TYPE_BADGE: Record<string, string> = {
         <app-mobile-list class="mt-2">
           @for (a of pagedDecided(); track a.id) {
             <button
+              [attr.data-list-record]="a.id"
               mobileListRow
               type="button"
               class="flex min-h-20 w-full items-center gap-3 p-3 text-left"
@@ -251,47 +253,37 @@ const TYPE_BADGE: Record<string, string> = {
         </app-mobile-list>
         <div class="mt-2 hidden lg:block">
           <app-data-table-shell
+            [columns]="tableColumns2"
+            tableClass="table-sm"
             heading="Decided requests"
             [description]="filteredDecided().length + ' recent decisions'"
           >
-            <table class="table table-sm">
-              <thead>
-                <tr>
-                  <th>Type</th>
-                  <th>Summary</th>
-                  <th>Status</th>
-                  <th>Decided by</th>
-                  <th>Reason</th>
-                  <th class="text-right">Details</th>
+            <ng-template tableRows>
+              @for (a of pagedDecided(); track a.id) {
+                <tr [attr.data-list-record]="a.id">
+                  <td>
+                    <span class="badge badge-xs" [class]="typeBadge(a.type)">{{
+                      typeLabel(a.type)
+                    }}</span>
+                  </td>
+                  <td class="text-sm">{{ summary(a) }}</td>
+                  <td>
+                    <app-status-badge
+                      size="xs"
+                      [type]="a.status === 'approved' ? 'success' : 'error'"
+                      [label]="a.status"
+                    />
+                  </td>
+                  <td class="type-caption">{{ personName(a.decided_by) }}</td>
+                  <td class="text-xs text-base-content/60">{{ a.decision_reason ?? '—' }}</td>
+                  <td class="table-actions">
+                    <button appButton variant="ghost" size="sm" (click)="openReview(a)">
+                      View
+                    </button>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                @for (a of pagedDecided(); track a.id) {
-                  <tr>
-                    <td>
-                      <span class="badge badge-xs" [class]="typeBadge(a.type)">{{
-                        typeLabel(a.type)
-                      }}</span>
-                    </td>
-                    <td class="text-sm">{{ summary(a) }}</td>
-                    <td>
-                      <app-status-badge
-                        size="xs"
-                        [type]="a.status === 'approved' ? 'success' : 'error'"
-                        [label]="a.status"
-                      />
-                    </td>
-                    <td class="type-caption">{{ personName(a.decided_by) }}</td>
-                    <td class="text-xs text-base-content/60">{{ a.decision_reason ?? '—' }}</td>
-                    <td class="table-actions">
-                      <button appButton variant="ghost" size="sm" (click)="openReview(a)">
-                        View
-                      </button>
-                    </td>
-                  </tr>
-                }
-              </tbody>
-            </table>
+              }
+            </ng-template>
           </app-data-table-shell>
         </div>
         <div class="mt-3">
@@ -317,6 +309,21 @@ const TYPE_BADGE: Record<string, string> = {
   `,
 })
 export class ApprovalsComponent implements OnInit {
+  protected readonly tableColumns1: TableColumn[] = [
+    { key: 'column0', label: 'Requested', pinned: true },
+    { key: 'column1', label: 'Type' },
+    { key: 'column2', label: 'Request' },
+    { key: 'column3', label: 'Requested by' },
+    { key: 'column4', label: 'Decision', align: 'right' },
+  ];
+  protected readonly tableColumns2: TableColumn[] = [
+    { key: 'column0', label: 'Type', pinned: true },
+    { key: 'column1', label: 'Summary' },
+    { key: 'column2', label: 'Status' },
+    { key: 'column3', label: 'Decided by' },
+    { key: 'column4', label: 'Reason' },
+    { key: 'column5', label: 'Details', align: 'right' },
+  ];
   protected readonly approvals = inject(ApprovalsService);
   private readonly catalogIdentities = inject(CatalogIdentityLookupService);
   private readonly route = inject(ActivatedRoute);
@@ -397,6 +404,15 @@ export class ApprovalsComponent implements OnInit {
   private routeLoadSequence = 0;
 
   constructor() {
+    bindListQuery({
+      search: listQueryField(this.query),
+      sort: listQueryField(this.approvalSort),
+      direction: listQueryField(this.approvalSortDirection),
+      pendingPage: listQueryField(this.pendingPage),
+      decidedPage: listQueryField(this.decidedPage),
+      pageSize: listQueryField(this.pageSize, { max: 100 }),
+    });
+
     effect(() => {
       const params = this.routeParams();
       if (!this.routeReady()) return;

@@ -1,5 +1,13 @@
-import { DecimalPipe } from '@angular/common';
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import {
+  DataTableShellComponent,
+  TableRowsDirective,
+  type TableColumn,
+} from '../shared/ui/data-table-shell.component';
+import { ListSearchBarComponent } from '../shared/ui/list-search-bar.component';
+import { StatBarComponent, type StatItem } from '../shared/ui/stat-bar.component';
+import { ListStateService } from '../shared/list/list-state';
+import { DecimalPipe, formatNumber } from '@angular/common';
+import { Component, OnInit, OnDestroy, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { BusinessClockService } from '../core/business-clock.service';
 import { CatalogCacheService } from '../core/catalog-cache.service';
@@ -31,7 +39,8 @@ import {
   insightCopy,
   type DateRangePreset,
   type ProductDemandSummary,
-  type ProductDecision,
+  type ProductDecisionFilter,
+  type ProductDecisionCounts,
   type ProductIntelligenceSummary,
 } from './insights.models';
 
@@ -51,6 +60,10 @@ const EMPTY_SUMMARY: ProductIntelligenceSummary = {
 @Component({
   selector: 'app-products-insights',
   imports: [
+    DataTableShellComponent,
+    TableRowsDirective,
+    ListSearchBarComponent,
+    StatBarComponent,
     DecimalPipe,
     RouterLink,
     ButtonComponent,
@@ -65,8 +78,9 @@ const EMPTY_SUMMARY: ProductIntelligenceSummary = {
   template: `
     <section class="space-y-4">
       <section class="space-y-3" aria-label="Inventory analysis controls">
-        <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center justify-between gap-3">
           <app-section-tabs
+            class="min-w-0 flex-1"
             [items]="inventoryViews()"
             [value]="view()"
             ariaLabel="Inventory analysis view"
@@ -91,8 +105,30 @@ const EMPTY_SUMMARY: ProductIntelligenceSummary = {
           </div>
         </div>
 
-        <div class="rounded-box border border-base-300 bg-base-100 p-3 sm:p-4">
-          <div class="flex flex-wrap items-end gap-3">
+        @if (locations.isMultiLocation() && view() !== 'sources') {
+          <label class="flex min-w-0 items-center gap-3">
+            <span class="label-text text-xs">Location</span>
+            <select
+              class="select select-bordered min-h-11 min-w-0 flex-1"
+              [value]="locations.activeId()"
+              (change)="setLocation($event)"
+            >
+              @for (location of locations.locations(); track location.id) {
+                <option [value]="location.id">{{ location.name }}</option>
+              }
+            </select>
+          </label>
+        }
+        <section
+          class="rounded-box border border-base-300 bg-base-100 p-3 sm:px-4"
+          aria-label="Sales period"
+        >
+          <p class="text-sm font-medium mb-2">Sales in selected period</p>
+          <p class="type-caption mb-3">
+            Sales evidence uses this period. Stock cover and suggested reorder are current planning
+            estimates.
+          </p>
+          <div class="flex flex-wrap items-end gap-3 pb-3">
             <app-date-range-preset-control
               class="min-w-0 flex-1 md:min-w-[28rem]"
               [value]="periodPreset()"
@@ -104,20 +140,6 @@ const EMPTY_SUMMARY: ProductIntelligenceSummary = {
               (valueChange)="setWindow($event)"
               (rangeChange)="setCustomRange($event)"
             />
-            @if (locations.isMultiLocation() && view() !== 'sources') {
-              <label class="form-control w-full sm:w-52">
-                <span class="label-text text-xs">Location</span>
-                <select
-                  class="select select-bordered mt-1 min-h-11 w-full"
-                  [value]="locations.activeId()"
-                  (change)="setLocation($event)"
-                >
-                  @for (location of locations.locations(); track location.id) {
-                    <option [value]="location.id">{{ location.name }}</option>
-                  }
-                </select>
-              </label>
-            }
             @if (view() === 'performance') {
               <label class="form-control w-full sm:w-52">
                 <span class="label-text text-xs">Rank by</span>
@@ -133,7 +155,7 @@ const EMPTY_SUMMARY: ProductIntelligenceSummary = {
               </label>
             }
           </div>
-        </div>
+        </section>
       </section>
 
       @if (view() === 'sources' && permissions.has('ViewFinancials')) {
@@ -194,12 +216,16 @@ const EMPTY_SUMMARY: ProductIntelligenceSummary = {
           } @else {
             <div class="grid gap-3 p-4 lg:grid-cols-2">
               @for (item of performanceRows(); track item.variant_id) {
-                <article class="rounded-box border border-base-300 p-4">
+                <article
+                  [attr.data-list-record]="item.variant_id"
+                  class="rounded-box border border-base-300 p-4"
+                >
                   <div class="flex items-start justify-between gap-3">
                     <div class="min-w-0">
                       <a
                         class="link block truncate font-semibold"
                         [routerLink]="['/insights/inventory', item.variant_id]"
+                        [queryParams]="reviewParams()"
                       >
                         {{ item.product_name }}
                       </a>
@@ -265,194 +291,154 @@ const EMPTY_SUMMARY: ProductIntelligenceSummary = {
           }
         </section>
       } @else {
-        <section aria-label="Inventory summary" class="grid grid-cols-2 gap-2 lg:grid-cols-4">
-          <div class="card bg-base-100">
-            <div class="card-body gap-1 p-3 sm:p-4">
-              <span class="type-caption">Needs action</span>
-              <strong
-                class="text-2xl tabular-nums"
-                [class.text-error]="summary().needsAttention > 0"
-                >{{ summary().needsAttention }}</strong
+        <app-list-search-bar
+          searchLabel="Search products"
+          placeholder="Search products, variants, or SKUs…"
+          [searchQuery]="query()"
+          (searchQueryChange)="setQuery($event)"
+          [filtersEnabled]="true"
+          [activeFilterCount]="filterCount()"
+          [activeFilters]="filterChips()"
+          (removeFilter)="removeFilter($event)"
+          (clearFilters)="clearFilters()"
+        >
+          <div summary class="grid gap-4 lg:grid-cols-[2fr_3fr_3fr]">
+            <section class="min-w-0" aria-label="Priority overview">
+              <p class="type-caption mb-2 lg:min-h-8">
+                Priorities · {{ decisionCounts().all }} variants before priority filtering
+              </p>
+              <app-stat-bar [stats]="priorityStats()" (select)="toggleDecision($event)" />
+            </section>
+            <section class="min-w-0" aria-label="Matching inventory summary">
+              <p class="type-caption mb-2 lg:min-h-8">Current inventory · matching results</p>
+              <app-stat-bar [stats]="inventoryStats()" />
+            </section>
+            <section class="min-w-0" aria-label="Matching sales summary">
+              <p class="type-caption mb-2 lg:min-h-8">Sales · selected period · matching results</p>
+              <app-stat-bar [stats]="salesStats()" />
+            </section>
+          </div>
+          <div filters class="flex flex-wrap items-end gap-3">
+            <label class="form-control min-w-48 flex-1 sm:max-w-56">
+              <span class="label-text text-xs">Decision</span>
+              <select
+                class="select select-bordered mt-1 min-h-11 w-full"
+                [value]="decisionFilter()"
+                (change)="setDecision($event)"
               >
-              <span class="text-xs text-base-content/60">{{ summary().stockouts }} stockouts</span>
+                <option value="">All decisions</option>
+                <option value="needs_attention">Needs attention</option>
+                <option value="stockout">Stockout</option>
+                <option value="reorder">Restock now</option>
+                <option value="low_cover">Plan reorder</option>
+                <option value="slow">Slow-moving</option>
+                <option value="insufficient_history">Insufficient history</option>
+                <option value="healthy">Stock healthy</option>
+              </select>
+            </label>
+            <div class="form-control min-w-48 flex-1 sm:max-w-64">
+              <span class="label-text text-xs">Supplier</span>
+              <app-searchable-filter
+                class="mt-1"
+                ariaLabel="Filter inventory by supplier"
+                placeholder="All suppliers"
+                searchPlaceholder="Search suppliers…"
+                controlSize="md"
+                [options]="supplierOptions()"
+                [value]="supplierFilter()"
+                (valueChange)="setSupplier($event)"
+              />
+            </div>
+            <div class="form-control min-w-48 flex-1 sm:max-w-64">
+              <span class="label-text text-xs">Manufacturer</span>
+              <app-searchable-filter
+                class="mt-1"
+                ariaLabel="Filter inventory by manufacturer"
+                placeholder="All manufacturers"
+                searchPlaceholder="Search manufacturers…"
+                controlSize="md"
+                [options]="manufacturerOptions()"
+                [value]="manufacturerFilter()"
+                (valueChange)="setManufacturer($event)"
+              />
+            </div>
+            <div class="form-control min-w-56 flex-1 sm:max-w-72">
+              <span class="label-text text-xs">Product</span>
+              <app-searchable-filter
+                class="mt-1"
+                ariaLabel="Filter inventory by product"
+                placeholder="All products"
+                searchPlaceholder="Search products, variants, or SKUs…"
+                controlSize="md"
+                [maxResults]="20"
+                [options]="productOptions()"
+                [value]="productFilter()"
+                (valueChange)="setProduct($event)"
+              />
             </div>
           </div>
-          <div class="card bg-base-100">
-            <div class="card-body gap-1 p-3 sm:p-4">
-              <span class="type-caption">Units sold</span>
-              <strong class="text-2xl tabular-nums">{{
-                summary().unitsSold | number: '1.0-3'
-              }}</strong>
-              <span class="text-xs text-base-content/60">selected period</span>
-            </div>
-          </div>
-          <div class="card bg-base-100">
-            <div class="card-body gap-1 p-3 sm:p-4">
-              <span class="type-caption">Stock on hand</span>
-              <strong class="text-2xl tabular-nums">{{
-                summary().stockOnHand | number: '1.0-3'
-              }}</strong>
-              <span class="text-xs text-base-content/60"
-                >{{ summary().trackedVariants }} tracked variants</span
-              >
-            </div>
-          </div>
-          @if (financialsIncluded()) {
-            <div class="card bg-base-100">
-              <div class="card-body gap-1 p-3 sm:p-4">
-                <span class="type-caption">Stock at cost</span>
-                <strong class="text-2xl tabular-nums">{{ fmt(summary().stockValue ?? 0) }}</strong>
-                <span class="text-xs text-base-content/60"
-                  >Net sales {{ fmt(summary().netRevenue ?? 0) }} · margin
-                  {{ fmt(summary().margin ?? 0) }}</span
-                >
-              </div>
-            </div>
-          } @else {
-            <div class="card bg-base-100">
-              <div class="card-body gap-1 p-3 sm:p-4">
-                <span class="type-caption">Tracked range</span>
-                <strong class="text-2xl tabular-nums">{{ summary().trackedVariants }}</strong>
-                <span class="text-xs text-base-content/60">active inventory variants</span>
-              </div>
-            </div>
-          }
-        </section>
-
-        <section class="card bg-base-100">
-          <div class="card-body gap-3 p-4">
-            <div class="flex flex-wrap items-end gap-3">
-              <label class="form-control min-w-48 flex-1 sm:max-w-56">
-                <span class="label-text text-xs">Decision</span>
-                <select
-                  class="select select-bordered mt-1 min-h-11 w-full"
-                  [value]="decisionFilter()"
-                  (change)="setDecision($event)"
-                >
-                  <option value="">All decisions</option>
-                  <option value="stockout">Stockout</option>
-                  <option value="reorder">Restock now</option>
-                  <option value="low_cover">Plan reorder</option>
-                  <option value="slow">Slow-moving</option>
-                  <option value="insufficient_history">Insufficient history</option>
-                  <option value="healthy">Stock healthy</option>
-                </select>
-              </label>
-              <div class="form-control min-w-48 flex-1 sm:max-w-64">
-                <span class="label-text text-xs">Supplier</span>
-                <app-searchable-filter
-                  class="mt-1"
-                  ariaLabel="Filter inventory by supplier"
-                  placeholder="All suppliers"
-                  searchPlaceholder="Search suppliers…"
-                  controlSize="md"
-                  [options]="supplierOptions()"
-                  [value]="supplierFilter()"
-                  (valueChange)="setSupplier($event)"
-                />
-              </div>
-              <div class="form-control min-w-48 flex-1 sm:max-w-64">
-                <span class="label-text text-xs">Manufacturer</span>
-                <app-searchable-filter
-                  class="mt-1"
-                  ariaLabel="Filter inventory by manufacturer"
-                  placeholder="All manufacturers"
-                  searchPlaceholder="Search manufacturers…"
-                  controlSize="md"
-                  [options]="manufacturerOptions()"
-                  [value]="manufacturerFilter()"
-                  (valueChange)="setManufacturer($event)"
-                />
-              </div>
-              <div class="form-control min-w-56 flex-1 sm:max-w-72">
-                <span class="label-text text-xs">Product</span>
-                <app-searchable-filter
-                  class="mt-1"
-                  ariaLabel="Filter inventory by product"
-                  placeholder="All products"
-                  searchPlaceholder="Search products, variants, or SKUs…"
-                  controlSize="md"
-                  [maxResults]="20"
-                  [options]="productOptions()"
-                  [value]="productFilter()"
-                  (valueChange)="setProduct($event)"
-                />
-              </div>
-              @if (filterCount() > 0) {
-                <button appButton variant="ghost" type="button" (click)="clearFilters()">
-                  Clear {{ filterCount() }}
-                </button>
-              }
-            </div>
-            <div class="flex flex-wrap items-center gap-2 text-xs text-base-content/60">
-              @if (decisionFilter()) {
-                <span class="badge badge-neutral badge-soft badge-sm">
-                  Showing {{ decisionLabel(decisionFilter()) }}
-                </span>
-              }
-              @if (loading() && products().length > 0) {
-                <span class="inline-flex items-center gap-1.5" role="status">
-                  <span class="loading loading-spinner loading-xs"></span>Updating results
-                </span>
-              }
-              <span>
-                Ordered by urgency, then stock cover and demand. Cover and reorder use Planning pace
-                · up to 90 days. Supplier means the latest matching posted purchase source.
-              </span>
-            </div>
-          </div>
-        </section>
+        </app-list-search-bar>
+        <p class="type-caption">
+          Current planning estimates: stock cover and reorder use up to 90 days of demand. Ordered
+          by urgency, then stock cover and demand. Supplier means the latest matching posted
+          purchase source.
+        </p>
+        @if (decisionFilter()) {
+          <p class="type-caption" role="status">
+            Matching results after priority filtering: {{ summary().trackedVariants }} variants ·
+            {{ summary().needsAttention }} need attention · {{ summary().stockouts }} stockouts.
+          </p>
+        }
 
         @if (error()) {
           <div role="alert" class="alert alert-error text-sm">
             <app-icon name="heroExclamationTriangle" />{{ error() }}
+            <button appButton variant="ghost" (click)="load()">Retry</button>
           </div>
-        } @else if (loading() && products().length === 0) {
+        }
+        @if (loading() && products().length === 0) {
           <div class="flex min-h-56 items-center justify-center gap-2 text-sm text-base-content/60">
             <span class="loading loading-spinner"></span>Loading inventory decisions
           </div>
-        } @else if (products().length === 0) {
+        } @else if (products().length === 0 && !error()) {
           <app-empty-state
             icon="heroCube"
             [title]="emptyStateTitle()"
             [description]="emptyStateDescription()"
           />
-        } @else {
-          <div class="card overflow-hidden bg-base-100">
-            <div class="hidden overflow-x-auto lg:block">
-              <table class="table">
-                <thead>
-                  <tr>
-                    <th>Product</th>
-                    <th>Decision</th>
-                    <th class="text-right">Sold</th>
-                    <th class="text-right">Change</th>
-                    <th class="text-right">On hand</th>
-                    <th class="text-right">Planning cover</th>
-                    <th class="text-right">Reorder</th>
-                    @if (financialsIncluded()) {
-                      <th class="text-right">Net sales</th>
-                      <th class="text-right">Margin</th>
-                    }
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
+        } @else if (products().length > 0) {
+          <div class="bg-base-100 rounded-box">
+            <div class="hidden lg:block">
+              <app-data-table-shell
+                heading="Stock priorities"
+                [columns]="priorityColumns"
+                tableClass="list-priority-table"
+              >
+                <ng-template tableRows>
                   @for (item of products(); track item.variant_id) {
-                    <tr class="align-top">
+                    <tr [attr.data-list-record]="item.variant_id" class="align-top">
                       <td class="max-w-72">
                         <a
-                          class="block truncate font-semibold link link-hover"
+                          class="block whitespace-normal break-words font-semibold link link-hover"
                           routerLink="/inventory/products"
                           [queryParams]="{ product: item.product_id, variant: item.variant_id }"
                           >{{ item.product_name }}</a
                         >
-                        <p class="mt-0.5 truncate text-sm text-base-content/70">
+                        <p
+                          class="mt-0.5 whitespace-normal break-words text-sm text-base-content/70"
+                        >
                           {{ manufacturerName(item) }}
                         </p>
-                        <p class="truncate text-xs text-base-content/50">
+                        <p class="whitespace-normal break-words text-xs text-base-content/60">
                           {{ productContext(item) }}
                         </p>
+                        @if (item.preferred_supplier_name) {
+                          <p
+                            class="mt-0.5 whitespace-normal break-words text-xs text-base-content/60"
+                          >
+                            Supplier: {{ item.preferred_supplier_name }}
+                          </p>
+                        }
                       </td>
                       <td class="max-w-56">
                         <span class="badge" [class]="signalClass(item.signal)">{{
@@ -473,69 +459,80 @@ const EMPTY_SUMMARY: ProductIntelligenceSummary = {
                         </div>
                       </td>
                       <td class="text-right tabular-nums">
-                        {{ item.current_quantity | number: '1.0-3' }}
+                        <p class="font-medium">
+                          {{ item.current_quantity | number: '1.0-3' }} {{ item.stock_unit }}
+                        </p>
+                        <p class="type-caption whitespace-normal">{{ salesChange(item) }}</p>
                       </td>
-                      <td
-                        class="text-right tabular-nums"
-                        [class.text-success]="change(item) > 0"
-                        [class.text-error]="change(item) < 0"
-                      >
-                        {{ change(item) > 0 ? '+' : '' }}{{ change(item) | number: '1.0-1' }}%
-                      </td>
-                      <td class="text-right font-semibold tabular-nums">
-                        {{ item.current_stock | number: '1.0-3' }}
-                      </td>
-                      <td class="text-right text-base-content/65 tabular-nums">
-                        {{ cover(item) }}
+                      <td class="text-right tabular-nums">{{ cover(item) }}</td>
+                      <td class="text-right tabular-nums">
+                        {{ item.current_stock | number: '1.0-3' }} {{ item.stock_unit }}
                       </td>
                       <td class="text-right font-semibold tabular-nums">{{ reorder(item) }}</td>
-                      @if (financialsIncluded()) {
-                        <td class="text-right text-base-content/70 tabular-nums">
-                          {{ fmt(item.net_revenue ?? 0) }}
-                        </td>
-                        <td
-                          class="text-right tabular-nums"
-                          [class.text-success]="(item.margin ?? 0) > 0"
-                          [class.text-error]="(item.margin ?? 0) < 0"
-                        >
-                          {{ fmt(item.margin ?? 0) }}
-                        </td>
-                      }
                       <td>
                         <a
-                          class="btn btn-ghost btn-sm min-h-11"
+                          class="btn btn-ghost btn-sm min-h-11 whitespace-nowrap px-2"
                           [routerLink]="['/insights/inventory', item.variant_id]"
-                          >Profile</a
+                          [queryParams]="reviewParams()"
+                          >Review</a
                         >
                       </td>
                     </tr>
                   }
-                </tbody>
-              </table>
+                </ng-template>
+              </app-data-table-shell>
             </div>
 
             <div class="divide-y divide-base-200 lg:hidden">
               @for (item of products(); track item.variant_id) {
-                <article class="space-y-3 p-4">
+                <article [attr.data-list-record]="item.variant_id" class="space-y-3 p-4">
                   <div class="flex items-start justify-between gap-3">
                     <div class="min-w-0">
                       <a
-                        class="block truncate font-semibold link link-hover"
+                        class="block whitespace-normal break-words font-semibold link link-hover"
                         routerLink="/inventory/products"
                         [queryParams]="{ product: item.product_id, variant: item.variant_id }"
                         >{{ item.product_name }}</a
                       >
-                      <p class="mt-0.5 truncate text-sm text-base-content/70">
+                      <p class="mt-0.5 whitespace-normal break-words text-sm text-base-content/70">
                         {{ manufacturerName(item) }}
                       </p>
-                      <p class="truncate text-xs text-base-content/50">
+                      <p class="whitespace-normal break-words text-xs text-base-content/60">
                         {{ productContext(item) }}
                       </p>
+                      @if (item.preferred_supplier_name) {
+                        <p
+                          class="mt-0.5 whitespace-normal break-words text-xs text-base-content/60"
+                        >
+                          Supplier: {{ item.preferred_supplier_name }}
+                        </p>
+                      }
                     </div>
                     <span class="badge shrink-0" [class]="signalClass(item.signal)">{{
                       signalLabel(item.signal)
                     }}</span>
                   </div>
+                  <p class="text-sm">
+                    <span class="font-medium">Sales in selected period:</span>
+                    {{ item.current_quantity | number: '1.0-3' }} {{ item.stock_unit }} ·
+                    {{ salesChange(item) }}
+                  </p>
+                  <dl class="grid grid-cols-3 gap-3 text-sm">
+                    <div>
+                      <dt class="type-caption">Suggested reorder</dt>
+                      <dd class="font-semibold tabular-nums">{{ reorder(item) }}</dd>
+                    </div>
+                    <div>
+                      <dt class="type-caption">On hand</dt>
+                      <dd class="font-semibold tabular-nums">
+                        {{ item.current_stock | number: '1.0-3' }} {{ item.stock_unit }}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt class="type-caption">Planning cover</dt>
+                      <dd class="text-base-content/70 tabular-nums">{{ cover(item) }}</dd>
+                    </div>
+                  </dl>
                   <p class="text-sm text-base-content/65">{{ copy(item.reason_code) }}</p>
                   <div class="flex flex-wrap gap-1">
                     @if (item.demand_confidence) {
@@ -547,32 +544,13 @@ const EMPTY_SUMMARY: ProductIntelligenceSummary = {
                       >
                     }
                   </div>
-                  <dl class="grid grid-cols-3 gap-3 text-sm">
-                    <div>
-                      <dt class="type-caption">Sold</dt>
-                      <dd class="font-semibold tabular-nums">
-                        {{ item.current_quantity | number: '1.0-3' }}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt class="type-caption">On hand</dt>
-                      <dd class="font-semibold tabular-nums">
-                        {{ item.current_stock | number: '1.0-3' }}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt class="type-caption">Planning cover</dt>
-                      <dd class="text-base-content/70 tabular-nums">{{ cover(item) }}</dd>
-                    </div>
-                  </dl>
-                  <div class="flex items-center justify-between gap-3">
-                    <p class="type-caption">
-                      Reorder <strong>{{ reorder(item) }}</strong>
-                    </p>
+
+                  <div class="flex items-center justify-end gap-3">
                     <a
                       class="btn btn-ghost btn-sm min-h-11"
                       [routerLink]="['/insights/inventory', item.variant_id]"
-                      >Profile</a
+                      [queryParams]="reviewParams()"
+                      >Review</a
                     >
                   </div>
                 </article>
@@ -598,7 +576,113 @@ const EMPTY_SUMMARY: ProductIntelligenceSummary = {
     </section>
   `,
 })
-export class ProductsInsightsComponent implements OnInit {
+export class ProductsInsightsComponent implements OnInit, OnDestroy {
+  protected readonly priorityColumns: TableColumn[] = [
+    { key: 'product', label: 'Product', pinned: true, width: '22%' },
+    { key: 'priority', label: 'Priority', width: '23%' },
+    { key: 'sales', label: 'Period sales', align: 'right', width: '15%' },
+    { key: 'cover', label: 'Cover (days)', align: 'right', width: '8%' },
+    { key: 'stock', label: 'On hand', align: 'right', width: '9%' },
+    { key: 'reorder', label: 'Suggested reorder', align: 'right', width: '13%' },
+    { key: 'review', label: 'Review', width: '10%' },
+  ];
+  private readonly listState = inject(ListStateService);
+  protected readonly query = signal('');
+  protected readonly decisionCounts = signal<ProductDecisionCounts>({
+    all: 0,
+    needsAttention: 0,
+    stockouts: 0,
+  });
+  protected readonly priorityStats = computed<StatItem[]>(() => [
+    {
+      label: 'Needs attention',
+      value: this.decisionCounts().needsAttention,
+      tone: 'warning',
+      emphasis: 'primary',
+      filter: 'needs_attention',
+      active: this.decisionFilter() === 'needs_attention',
+    },
+    {
+      label: 'Stockouts',
+      value: this.decisionCounts().stockouts,
+      tone: 'error',
+      emphasis: 'primary',
+      filter: 'stockout',
+      active: this.decisionFilter() === 'stockout',
+    },
+  ]);
+  protected readonly inventoryStats = computed<StatItem[]>(() => [
+    {
+      label: 'Matching variants',
+      value: this.summary().trackedVariants,
+    },
+    {
+      label: 'Stock on hand',
+      value: formatNumber(this.summary().stockOnHand, 'en', '1.0-3'),
+    },
+    ...(this.financialsIncluded()
+      ? [
+          {
+            label: 'Stock at cost',
+            value: this.fmt(this.summary().stockValue ?? 0),
+          },
+        ]
+      : []),
+  ]);
+  protected readonly salesStats = computed<StatItem[]>(() => [
+    {
+      label: 'Units sold',
+      value: formatNumber(this.summary().unitsSold, 'en', '1.0-3'),
+    },
+    ...(this.financialsIncluded()
+      ? [
+          {
+            label: 'Net sales',
+            value: this.fmt(this.summary().netRevenue ?? 0),
+          },
+          {
+            label: 'Margin',
+            value: this.fmt(this.summary().margin ?? 0),
+            tone: (this.summary().margin ?? 0) < 0 ? ('error' as const) : undefined,
+          },
+        ]
+      : []),
+  ]);
+  protected readonly filterChips = computed(() => [
+    ...(this.decisionFilter()
+      ? [{ key: 'decision', label: this.decisionLabel(this.decisionFilter()) }]
+      : []),
+    ...(this.supplierFilter()
+      ? [
+          {
+            key: 'supplier',
+            label:
+              this.supplierOptions().find(o => o.value === this.supplierFilter())?.label ??
+              'Supplier',
+          },
+        ]
+      : []),
+    ...(this.manufacturerFilter()
+      ? [
+          {
+            key: 'manufacturer',
+            label:
+              this.manufacturerOptions().find(o => o.value === this.manufacturerFilter())?.label ??
+              'Manufacturer',
+          },
+        ]
+      : []),
+    ...(this.productFilter()
+      ? [
+          {
+            key: 'product',
+            label:
+              this.productOptions().find(o => o.value === this.productFilter())?.label ??
+              'Exact product',
+          },
+        ]
+      : []),
+  ]);
   protected readonly locations = inject(LocationContextService);
   protected readonly permissions = inject(PermissionsService);
   private readonly insights = inject(InsightsService);
@@ -617,7 +701,7 @@ export class ProductsInsightsComponent implements OnInit {
   protected readonly productFilter = signal('');
   protected readonly supplierFilter = signal('');
   protected readonly manufacturerFilter = signal('');
-  protected readonly decisionFilter = signal<ProductDecision | ''>('');
+  protected readonly decisionFilter = signal<ProductDecisionFilter | ''>('');
   protected readonly products = signal<ProductDemandSummary[]>([]);
   protected readonly performance = signal<ProductPerformanceResponse>(EMPTY_PRODUCT_PERFORMANCE);
   protected readonly performanceCategory = signal<ProductPerformanceCategory>('trending');
@@ -625,12 +709,14 @@ export class ProductsInsightsComponent implements OnInit {
   protected readonly financialsIncluded = signal(false);
   protected readonly nextOffset = signal<number | null>(null);
   protected readonly sourceRefreshToken = signal(0);
-  protected readonly loading = signal(false);
+  protected readonly loading = signal(true);
   protected readonly loadingMore = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly copy = insightCopy;
   protected readonly fmt = formatKes;
   private request = 0;
+  private currentListUrl = '';
+  private snapshotScope = '';
 
   protected readonly performanceCategories = computed<ProductPerformanceCategory[]>(() =>
     this.permissions.has('ViewFinancials')
@@ -687,6 +773,7 @@ export class ProductsInsightsComponent implements OnInit {
   );
   protected readonly filterCount = computed(
     () =>
+      Number(Boolean(this.query())) +
       Number(Boolean(this.productFilter())) +
       Number(Boolean(this.supplierFilter())) +
       Number(Boolean(this.manufacturerFilter())) +
@@ -695,7 +782,9 @@ export class ProductsInsightsComponent implements OnInit {
   protected readonly emptyStateTitle = computed(() =>
     this.decisionFilter()
       ? `No ${this.decisionLabel(this.decisionFilter()).toLowerCase()} products match`
-      : 'No inventory matches these filters'
+      : this.filterCount()
+        ? 'No inventory matches these filters'
+        : 'No tracked inventory yet'
   );
   protected readonly emptyStateDescription = computed(() =>
     this.decisionFilter()
@@ -711,16 +800,30 @@ export class ProductsInsightsComponent implements OnInit {
         this.parties.ensureLoaded(),
         this.businessClock.today(),
       ]);
+      this.snapshotScope = this.listState.scopeToken();
       this.businessToday.set(today);
       this.restoreViewFromUrl();
-      const range = presetDateRange(today, 30);
-      this.rangeFrom.set(range.from);
-      this.rangeTo.set(range.to);
-      await this.load();
+      this.currentListUrl = this.router.url;
+      const cached = this.listState.read<{
+        items: ProductDemandSummary[];
+        summary: ProductIntelligenceSummary;
+        decisionCounts: ProductDecisionCounts;
+        nextOffset: number | null;
+        financialsIncluded: boolean;
+      }>(this.router.url);
+      if (cached && this.view() === 'priorities') {
+        this.products.set(cached.items);
+        this.summary.set(cached.summary);
+        this.decisionCounts.set(cached.decisionCounts);
+        this.nextOffset.set(cached.nextOffset);
+        this.financialsIncluded.set(cached.financialsIncluded);
+        this.loading.set(false);
+      } else await this.load();
     } catch (error) {
       this.error.set(
         error instanceof Error ? error.message : 'Could not prepare inventory intelligence.'
       );
+      this.loading.set(false);
     }
   }
 
@@ -732,6 +835,7 @@ export class ProductsInsightsComponent implements OnInit {
     this.windowDays.set(value);
     this.rangeFrom.set(range.from);
     this.rangeTo.set(range.to);
+    this.syncViewToUrl();
     if (this.view() !== 'sources') void this.load();
   }
 
@@ -740,6 +844,7 @@ export class ProductsInsightsComponent implements OnInit {
     this.periodPreset.set(null);
     this.rangeFrom.set(range.from);
     this.rangeTo.set(range.to);
+    this.syncViewToUrl();
     if (this.view() === 'priorities') void this.load();
   }
 
@@ -813,6 +918,8 @@ export class ProductsInsightsComponent implements OnInit {
   }
 
   protected async load(): Promise<void> {
+    this.syncViewToUrl();
+    this.loadingMore.set(false);
     const locationId = this.locations.activeId();
     if (!locationId) return;
     if (this.view() === 'performance') {
@@ -829,12 +936,15 @@ export class ProductsInsightsComponent implements OnInit {
         locationId,
         supplierId: this.supplierFilter() || null,
         manufacturerId: this.manufacturerFilter() || null,
-        search: this.selectedProductSearch(),
+        search: this.query() || null,
+        variantId: this.productFilter() || null,
         decision: this.decisionFilter() || null,
       });
       if (request !== this.request) return;
+      this.snapshotScope = this.listState.scopeToken();
       this.products.set(data.items);
       this.summary.set(data.summary);
+      this.decisionCounts.set(data.decisionCounts);
       this.nextOffset.set(data.nextOffset);
       this.financialsIncluded.set(data.financialsIncluded);
     } catch (error) {
@@ -871,7 +981,7 @@ export class ProductsInsightsComponent implements OnInit {
   protected async loadMore(): Promise<void> {
     const locationId = this.locations.activeId();
     const offset = this.nextOffset();
-    if (!locationId || offset === null) return;
+    if (!locationId || offset === null || this.loadingMore() || this.loading()) return;
     const request = this.request;
     this.loadingMore.set(true);
     try {
@@ -881,11 +991,13 @@ export class ProductsInsightsComponent implements OnInit {
         locationId,
         supplierId: this.supplierFilter() || null,
         manufacturerId: this.manufacturerFilter() || null,
-        search: this.selectedProductSearch(),
+        search: this.query() || null,
+        variantId: this.productFilter() || null,
         decision: this.decisionFilter() || null,
         offset,
       });
       if (request !== this.request) return;
+      this.snapshotScope = this.listState.scopeToken();
       this.products.update(items => [...items, ...data.items]);
       this.nextOffset.set(data.nextOffset);
     } catch (error) {
@@ -894,6 +1006,13 @@ export class ProductsInsightsComponent implements OnInit {
     } finally {
       if (request === this.request) this.loadingMore.set(false);
     }
+  }
+
+  protected salesChange(item: ProductDemandSummary): string {
+    if (item.previous_quantity === 0)
+      return item.current_quantity === 0 ? 'No sales in either period' : 'No previous sales';
+    const change = this.change(item);
+    return `${change > 0 ? '+' : ''}${change.toLocaleString('en-KE', { maximumFractionDigits: 1 })}% vs previous period`;
   }
 
   protected change(item: ProductDemandSummary): number {
@@ -906,7 +1025,9 @@ export class ProductsInsightsComponent implements OnInit {
   }
 
   protected reorder(item: ProductDemandSummary): string {
-    return item.reorder_quantity === null ? 'Review' : String(item.reorder_quantity);
+    return item.reorder_quantity === null
+      ? 'Review history'
+      : `${item.reorder_quantity} ${item.stock_unit}`;
   }
 
   protected signalLabel(value: string | null): string {
@@ -944,17 +1065,11 @@ export class ProductsInsightsComponent implements OnInit {
   }
 
   protected productContext(item: ProductDemandSummary): string {
-    return [
-      item.variant_name,
-      item.sku,
-      item.stock_unit,
-      item.preferred_supplier_name ? `Supplier: ${item.preferred_supplier_name}` : null,
-    ]
-      .filter(Boolean)
-      .join(' · ');
+    return [item.variant_name, item.sku, item.stock_unit].filter(Boolean).join(' · ');
   }
 
-  protected decisionLabel(value: ProductDecision | ''): string {
+  protected decisionLabel(value: ProductDecisionFilter | ''): string {
+    if (value === 'needs_attention') return 'Needs attention';
     if (value === 'stockout') return 'Stockout';
     if (value === 'reorder') return 'Restock now';
     if (value === 'low_cover') return 'Plan reorder';
@@ -964,19 +1079,78 @@ export class ProductsInsightsComponent implements OnInit {
     return 'All decisions';
   }
 
-  private selectedProductSearch(): string | null {
-    const variantId = this.productFilter();
-    if (!variantId) return null;
-    return (
-      this.catalog
-        .catalog()
-        .find(variant => variant.variant_id === variantId)
-        ?.sku?.trim() || null
+  protected setQuery(value: string): void {
+    this.query.set(value);
+    void this.load();
+  }
+  protected toggleDecision(value: string): void {
+    this.decisionFilter.set(
+      this.decisionFilter() === value ? '' : (value as ProductDecisionFilter)
     );
+    void this.load();
+  }
+  protected removeFilter(key: string): void {
+    if (key === 'query') this.query.set('');
+    if (key === 'decision') this.decisionFilter.set('');
+    if (key === 'supplier') this.supplierFilter.set('');
+    if (key === 'manufacturer') this.manufacturerFilter.set('');
+    if (key === 'product') this.productFilter.set('');
+    void this.load();
+  }
+  protected reviewParams(): Record<string, string | number | null> {
+    return {
+      returnTo: this.router.url,
+      period: this.periodPreset(),
+      from: this.rangeFrom(),
+      to: this.rangeTo(),
+    };
+  }
+  ngOnDestroy(): void {
+    this.request++;
+    if (this.view() === 'priorities' && this.products().length && !this.loading() && !this.error())
+      this.listState.save(
+        this.currentListUrl,
+        {
+          items: this.products(),
+          summary: this.summary(),
+          decisionCounts: this.decisionCounts(),
+          nextOffset: this.nextOffset(),
+          financialsIncluded: this.financialsIncluded(),
+        },
+        this.snapshotScope
+      );
   }
 
   private restoreViewFromUrl(): void {
-    const view = this.route.snapshot.queryParamMap.get('view');
+    const params = this.route.snapshot.queryParamMap;
+    this.query.set(params.get('search') ?? '');
+    this.productFilter.set(params.get('product') ?? params.get('variant') ?? '');
+    this.supplierFilter.set(params.get('supplier') ?? '');
+    this.manufacturerFilter.set(params.get('manufacturer') ?? '');
+    const period = Number(params.get('period') ?? 30);
+    const validPeriod: DateRangePreset =
+      period === 7 || period === 180 || period === 365 ? period : 30;
+    this.periodPreset.set(validPeriod);
+    this.windowDays.set(validPeriod);
+    const range = presetDateRange(this.businessToday(), validPeriod);
+    const from = params.get('from'),
+      to = params.get('to');
+    if (
+      from &&
+      to &&
+      /^\d{4}-\d{2}-\d{2}$/.test(from) &&
+      /^\d{4}-\d{2}-\d{2}$/.test(to) &&
+      from <= to &&
+      to <= this.businessToday()
+    ) {
+      this.periodPreset.set(null);
+      this.rangeFrom.set(from);
+      this.rangeTo.set(to);
+    } else {
+      this.rangeFrom.set(range.from);
+      this.rangeTo.set(range.to);
+    }
+    const view = params.get('view');
     if (view === 'performance' || view === 'priorities') this.view.set(view);
     if (view === 'sources' && this.permissions.has('ViewFinancials')) this.view.set(view);
     const leader = this.route.snapshot.queryParamMap.get('leader');
@@ -992,8 +1166,9 @@ export class ProductsInsightsComponent implements OnInit {
     if (decision && this.isProductDecision(decision)) this.decisionFilter.set(decision);
   }
 
-  private isProductDecision(value: string): value is ProductDecision {
+  private isProductDecision(value: string): value is ProductDecisionFilter {
     return (
+      value === 'needs_attention' ||
       value === 'stockout' ||
       value === 'reorder' ||
       value === 'low_cover' ||
@@ -1004,16 +1179,25 @@ export class ProductsInsightsComponent implements OnInit {
   }
 
   private syncViewToUrl(): void {
-    void this.router.navigate([], {
+    const tree = this.router.createUrlTree([], {
       relativeTo: this.route,
       queryParams: {
+        search: this.query() || null,
+        product: this.productFilter() || null,
+        supplier: this.supplierFilter() || null,
+        manufacturer: this.manufacturerFilter() || null,
+        period: this.periodPreset() === 30 ? null : this.periodPreset(),
+        from: this.periodPreset() === null ? this.rangeFrom() : null,
+        to: this.periodPreset() === null ? this.rangeTo() : null,
         view: this.view() === 'priorities' ? null : this.view(),
         leader: this.view() === 'performance' ? this.performanceCategory() : null,
         decision:
           this.view() === 'priorities' && this.decisionFilter() ? this.decisionFilter() : null,
       },
       queryParamsHandling: 'merge',
-      replaceUrl: true,
     });
+    this.currentListUrl = tree.toString();
+    if (this.currentListUrl !== this.router.url)
+      void this.router.navigateByUrl(tree, { replaceUrl: true });
   }
 }

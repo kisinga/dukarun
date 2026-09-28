@@ -107,14 +107,14 @@ export const routes: Routes = [
       {
         path: 'pos/proformas',
         canActivate: [permissionGuard],
-        data: { permission: 'SettleOrder' },
+        data: { listPage: true, permission: 'SettleOrder' },
         loadComponent: () =>
           import('./pos/proformas/proformas.component').then(m => m.ProformasComponent),
       },
       {
         path: 'pos/cashier',
         canActivate: [permissionGuard],
-        data: { permission: 'SettleOrder' },
+        data: { listPage: true, permission: 'SettleOrder' },
         loadComponent: () =>
           import('./pos/cashier/cashier-queue.component').then(m => m.CashierQueueComponent),
       },
@@ -129,6 +129,7 @@ export const routes: Routes = [
         path: 'fulfillment',
         canActivate: [permissionGuard, featureGuard],
         data: {
+          listPage: true,
           anyPermission: [
             'ProcessFulfillments',
             'CompleteFulfillments',
@@ -149,18 +150,20 @@ export const routes: Routes = [
         children: [
           {
             path: 'ledger',
+            data: { listPage: true },
             loadComponent: () =>
               import('./money/ledger/money-ledger.component').then(m => m.MoneyLedgerComponent),
           },
           {
             path: 'cashier',
+            data: { listPage: true },
             loadComponent: () =>
               import('./money/cashier/money-cashier.component').then(m => m.MoneyCashierComponent),
           },
           {
             path: 'expenses',
             canActivate: [permissionGuard],
-            data: { permission: 'CreateInterAccountTransfer' },
+            data: { listPage: true, permission: 'CreateInterAccountTransfer' },
             loadComponent: () =>
               import('./money/expenses/money-expenses.component').then(
                 m => m.MoneyExpensesComponent
@@ -169,7 +172,7 @@ export const routes: Routes = [
           {
             path: 'transfers',
             canActivate: [permissionGuard],
-            data: { permission: 'CreateInterAccountTransfer' },
+            data: { listPage: true, permission: 'CreateInterAccountTransfer' },
             loadComponent: () =>
               import('./money/transfers/money-transfers.component').then(
                 m => m.MoneyTransfersComponent
@@ -186,6 +189,7 @@ export const routes: Routes = [
           },
           {
             path: 'periods',
+            data: { listPage: true },
             loadComponent: () =>
               import('./money/periods/money-periods.component').then(m => m.MoneyPeriodsComponent),
           },
@@ -198,6 +202,7 @@ export const routes: Routes = [
           },
           {
             path: 'reconcile',
+            data: { listPage: true },
             loadComponent: () =>
               import('./money/reconciliation/money-reconciliation.component').then(
                 m => m.MoneyReconciliationComponent
@@ -217,14 +222,14 @@ export const routes: Routes = [
         children: [
           {
             path: 'products',
-            data: { preload: true },
+            data: { listPage: true, preload: true },
             loadComponent: () =>
               import('./products/products.component').then(m => m.ProductsComponent),
           },
           {
             path: 'adjustments',
             canActivate: [permissionGuard],
-            data: { permission: 'ManageStockAdjustments' },
+            data: { listPage: true, permission: 'ManageStockAdjustments' },
             loadComponent: () =>
               import('./stock-adjustments/stock-adjustments.component').then(
                 m => m.StockAdjustmentsComponent
@@ -233,7 +238,7 @@ export const routes: Routes = [
           {
             path: 'transfers',
             canActivate: [permissionGuard, multiLocationGuard],
-            data: { permission: 'ManageStockAdjustments' },
+            data: { listPage: true, permission: 'ManageStockAdjustments' },
             loadComponent: () =>
               import('./inventory/stock-transfers.component').then(m => m.StockTransfersComponent),
           },
@@ -252,14 +257,14 @@ export const routes: Routes = [
       {
         path: 'customers',
         canActivate: [permissionGuard],
-        data: { preload: true, workspaceAccess: 'customers' },
+        data: { listPage: true, preload: true, workspaceAccess: 'customers' },
         loadComponent: () =>
           import('./customers/customers.component').then(m => m.CustomersComponent),
       },
       {
         path: 'suppliers',
         canActivate: [permissionGuard],
-        data: { workspaceAccess: 'purchasing' },
+        data: { listPage: true, workspaceAccess: 'purchasing' },
         loadComponent: () =>
           import('./suppliers/suppliers.component').then(m => m.SuppliersComponent),
       },
@@ -282,7 +287,7 @@ export const routes: Routes = [
       {
         path: 'purchases',
         canActivate: [permissionGuard],
-        data: { workspaceAccess: 'purchasing' },
+        data: { listPage: true, workspaceAccess: 'purchasing' },
         loadComponent: () =>
           import('./purchases/purchases.component').then(m => m.PurchasesComponent),
       },
@@ -306,19 +311,23 @@ export const routes: Routes = [
           {
             path: 'members',
             canActivate: [permissionGuard],
-            data: { permission: 'ManageTeam', teamView: 'members', preload: true },
+            data: { listPage: true, permission: 'ManageTeam', teamView: 'members', preload: true },
             loadComponent: () => import('./team/team.component').then(m => m.TeamComponent),
           },
           {
             path: 'roles',
             canActivate: [permissionGuard],
-            data: { permission: 'ManageTeam', teamView: 'roles' },
+            data: { listPage: true, permission: 'ManageTeam', teamView: 'roles' },
             loadComponent: () => import('./team/team.component').then(m => m.TeamComponent),
           },
           {
             path: 'performance',
             canActivate: [featureGuard, permissionGuard],
-            data: { feature: 'staffPerformance', permission: 'ViewStaffPerformance' },
+            data: {
+              listPage: true,
+              feature: 'staffPerformance',
+              permission: 'ViewStaffPerformance',
+            },
             loadComponent: () =>
               import('./performance/staff-performance.component').then(
                 m => m.StaffPerformanceComponent
@@ -328,6 +337,7 @@ export const routes: Routes = [
             path: 'commissions',
             canActivate: [featureGuard, permissionGuard],
             data: {
+              listPage: true,
               feature: 'commissions',
               requiresCommissionOptIn: true,
               permission: 'ManageCommissions',
@@ -360,7 +370,7 @@ export const routes: Routes = [
       {
         path: 'sales',
         canActivate: [permissionGuard],
-        data: { preload: true, workspaceAccess: 'sales' },
+        data: { listPage: true, preload: true, workspaceAccess: 'sales' },
         loadComponent: () => import('./orders/orders.component').then(m => m.OrdersComponent),
       },
       { path: 'orders', redirectTo: 'sales' },
@@ -386,7 +396,7 @@ export const routes: Routes = [
           {
             path: 'credit',
             canActivate: [insightsSectionGuard],
-            data: { insightsSection: 'credit' },
+            data: { listPage: true, insightsSection: 'credit' },
             loadComponent: () =>
               import('./insights/credit-insights.component').then(m => m.CreditInsightsComponent),
           },
@@ -400,7 +410,7 @@ export const routes: Routes = [
           {
             path: 'inventory',
             canActivate: [insightsSectionGuard],
-            data: { insightsSection: 'inventory' },
+            data: { listPage: true, insightsSection: 'inventory' },
             loadComponent: () =>
               import('./insights/products-insights.component').then(
                 m => m.ProductsInsightsComponent
@@ -420,7 +430,7 @@ export const routes: Routes = [
           {
             path: 'sales',
             canActivate: [insightsSectionGuard],
-            data: { insightsSection: 'sales' },
+            data: { listPage: true, insightsSection: 'sales' },
             loadComponent: () =>
               import('./reports/reports.component').then(m => m.ReportsComponent),
           },
@@ -439,7 +449,7 @@ export const routes: Routes = [
       {
         path: 'approvals',
         canActivate: [permissionGuard],
-        data: { anyPermission: ['ManageApprovals', 'ViewFinancials'] },
+        data: { listPage: true, anyPermission: ['ManageApprovals', 'ViewFinancials'] },
         loadComponent: () =>
           import('./approvals/approvals.component').then(m => m.ApprovalsComponent),
       },
@@ -449,14 +459,14 @@ export const routes: Routes = [
           {
             path: 'messages',
             canActivate: [permissionGuard],
-            data: { permission: 'ManageCommunications' },
+            data: { listPage: true, permission: 'ManageCommunications' },
             loadComponent: () =>
               import('./messaging/messaging.component').then(m => m.CommunicationsComponent),
           },
           {
             path: 'audit',
             canActivate: [permissionGuard],
-            data: { permission: 'ViewAuditTrail' },
+            data: { listPage: true, permission: 'ViewAuditTrail' },
             loadComponent: () => import('./audit/audit.component').then(m => m.AuditComponent),
           },
           {

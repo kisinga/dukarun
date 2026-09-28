@@ -1,8 +1,13 @@
+import { bindListQuery, listQueryField } from '../shared/list/list-query';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { formatKes } from '../core/money';
 import { ButtonComponent } from '../shared/ui/button.component';
-import { DataTableShellComponent } from '../shared/ui/data-table-shell.component';
+import {
+  DataTableShellComponent,
+  TableRowsDirective,
+  type TableColumn,
+} from '../shared/ui/data-table-shell.component';
 import { EmptyStateComponent } from '../shared/ui/empty-state.component';
 import { FormFieldComponent } from '../shared/ui/form-field.component';
 import { IconComponent } from '../shared/ui/icon.component';
@@ -30,6 +35,7 @@ import {
     ReactiveFormsModule,
     ButtonComponent,
     DataTableShellComponent,
+    TableRowsDirective,
     EmptyStateComponent,
     FormFieldComponent,
     IconComponent,
@@ -90,6 +96,7 @@ import {
         <div role="alert" class="alert alert-error mb-4 text-sm">
           <app-icon name="heroExclamationTriangle" />
           <span>{{ error() }}</span>
+          <button appButton variant="ghost" type="button" (click)="load()">Retry</button>
         </div>
       }
       @if (notice()) {
@@ -132,7 +139,10 @@ import {
         />
       </div>
 
-      <section class="mb-6 grid items-start gap-4 xl:grid-cols-2">
+      @if (loading()) {
+        <p role="status" class="type-caption mb-3">Updating commissions…</p>
+      }
+      <section class="mb-6 space-y-4">
         @if (activeTab() === 'plans') {
           <div class="card bg-base-100">
             <div class="card-body p-4">
@@ -145,7 +155,7 @@ import {
               @if (plans().length > 0) {
                 <app-mobile-list class="mt-4 border-t border-base-300 pt-3">
                   @for (plan of plans(); track plan.id) {
-                    <div mobileListRow class="p-3">
+                    <div [attr.data-list-record]="plan.id" mobileListRow class="p-3">
                       <div class="flex items-center gap-3">
                         <div class="min-w-0 flex-1">
                           <div class="flex items-center gap-2">
@@ -187,23 +197,22 @@ import {
                   }
                 </app-mobile-list>
                 <div class="mt-4 hidden border-t border-base-300 pt-3 lg:block">
-                  <table class="table table-sm">
-                    <thead>
-                      <tr>
-                        <th>Plan</th>
-                        <th class="text-right">Rate</th>
-                        <th>Effective dates</th>
-                        <th class="text-right">State</th>
-                      </tr>
-                    </thead>
-                    <tbody>
+                  <app-data-table-shell [columns]="plansColumns"
+                    ><ng-template tableRows>
                       @for (plan of plans(); track plan.id) {
-                        <tr>
+                        <tr [attr.data-list-record]="plan.id">
                           <td class="font-medium">{{ plan.name }}</td>
                           <td class="text-right">{{ rate(plan.rate_bps) }}</td>
                           <td>{{ plan.effective_from }} → {{ plan.effective_to || 'ongoing' }}</td>
+                          <td>
+                            <app-status-badge
+                              size="xs"
+                              [type]="plan.active ? 'success' : 'neutral'"
+                              [label]="plan.active ? 'Active' : 'Inactive'"
+                            />
+                          </td>
                           <td class="text-right">
-                            <div class="flex justify-end gap-1">
+                            <div class="flex flex-wrap justify-end gap-1">
                               <button
                                 appButton
                                 variant="ghost"
@@ -226,9 +235,17 @@ import {
                           </td>
                         </tr>
                       }
-                    </tbody>
-                  </table>
+                    </ng-template></app-data-table-shell
+                  >
                 </div>
+              } @else if (!loading() && !error()) {
+                <app-empty-state
+                  [embedded]="true"
+                  [compact]="true"
+                  icon="heroBanknotes"
+                  title="No commission plans"
+                  description="Create a plan to define staff commission rates."
+                />
               }
             </div>
           </div>
@@ -243,7 +260,7 @@ import {
                   One non-overlapping plan can apply to a staff member at a time.
                 </p>
               </div>
-              @if (staff().length === 0) {
+              @if (!loading() && !error() && staff().length === 0) {
                 <app-empty-state
                   [embedded]="true"
                   [compact]="true"
@@ -251,7 +268,7 @@ import {
                   title="No staff profiles"
                   description="Add and name team members before assigning commission plans."
                 />
-              } @else if (activePlans().length === 0) {
+              } @else if (!loading() && !error() && activePlans().length === 0) {
                 <app-empty-state
                   [embedded]="true"
                   [compact]="true"
@@ -265,6 +282,7 @@ import {
                 <app-mobile-list class="mt-4 border-t border-base-300 pt-3">
                   @for (assignment of assignments(); track assignment.id) {
                     <button
+                      [attr.data-list-record]="assignment.id"
                       mobileListRow
                       type="button"
                       class="flex min-h-20 w-full items-center gap-3 p-3 text-left"
@@ -284,18 +302,10 @@ import {
                   }
                 </app-mobile-list>
                 <div class="mt-4 hidden border-t border-base-300 pt-3 lg:block">
-                  <table class="table table-sm">
-                    <thead>
-                      <tr>
-                        <th>Staff member</th>
-                        <th>Plan</th>
-                        <th>Effective dates</th>
-                        <th class="text-right">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
+                  <app-data-table-shell [columns]="assignmentsColumns"
+                    ><ng-template tableRows>
                       @for (assignment of assignments(); track assignment.id) {
-                        <tr>
+                        <tr [attr.data-list-record]="assignment.id">
                           <td class="font-medium">{{ staffName(assignment.staff_user_id) }}</td>
                           <td>{{ planNameFor(assignment.plan_id) }}</td>
                           <td>
@@ -315,8 +325,8 @@ import {
                           </td>
                         </tr>
                       }
-                    </tbody>
-                  </table>
+                    </ng-template></app-data-table-shell
+                  >
                 </div>
               }
             </div>
@@ -333,7 +343,7 @@ import {
             </p>
           </div>
 
-          @if (!loading() && periods().length === 0) {
+          @if (!loading() && !error() && periods().length === 0) {
             <app-empty-state
               [compact]="true"
               icon="heroBanknotes"
@@ -344,6 +354,7 @@ import {
             <app-mobile-list>
               @for (period of periods(); track period.id) {
                 <button
+                  [attr.data-list-record]="period.id"
                   mobileListRow
                   type="button"
                   class="flex min-h-20 w-full items-center gap-3 p-3 text-left"
@@ -369,84 +380,69 @@ import {
             </app-mobile-list>
             <div class="hidden lg:block">
               <app-data-table-shell
+                [columns]="tableColumns1"
+                tableClass="table-sm"
                 heading="Statements"
                 [description]="
                   periods().length + ' generated periods · collected basis is net of reversals'
                 "
               >
-                <table class="table table-sm">
-                  <thead>
-                    <tr>
-                      <th>Period</th>
-                      <th>Status</th>
-                      <th class="text-right">Staff</th>
-                      <th class="text-right">Net collected basis</th>
-                      <th class="text-right">Commission</th>
-                      <th class="text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    @for (period of periods(); track period.id) {
-                      <tr>
-                        <td>
-                          <p class="font-medium">{{ period.start_date }} → {{ period.end_date }}</p>
-                          @if (period.paid_at || period.approved_at) {
-                            <p class="type-caption mt-0.5">
-                              {{
-                                period.paid_at
-                                  ? 'Paid ' + dateTime(period.paid_at)
-                                  : 'Approved ' + dateTime(period.approved_at)
-                              }}
-                            </p>
-                          }
-                        </td>
-                        <td>
-                          <app-status-badge
-                            size="xs"
-                            [type]="periodBadge(period.status)"
-                            [label]="period.status"
-                          />
-                        </td>
-                        <td class="text-right">{{ period.staff_count }}</td>
-                        <td class="text-right"><app-money [amount]="period.basis_total" /></td>
-                        <td class="text-right font-semibold">
-                          <app-money [amount]="period.commission_total" />
-                        </td>
-                        <td class="table-actions">
+                <ng-template tableRows>
+                  @for (period of periods(); track period.id) {
+                    <tr [attr.data-list-record]="period.id">
+                      <td>
+                        <p class="font-medium">{{ period.start_date }} → {{ period.end_date }}</p>
+                        @if (period.paid_at || period.approved_at) {
+                          <p class="type-caption mt-0.5">
+                            {{
+                              period.paid_at
+                                ? 'Paid ' + dateTime(period.paid_at)
+                                : 'Approved ' + dateTime(period.approved_at)
+                            }}
+                          </p>
+                        }
+                      </td>
+                      <td>
+                        <app-status-badge
+                          size="xs"
+                          [type]="periodBadge(period.status)"
+                          [label]="period.status"
+                        />
+                      </td>
+                      <td class="text-right font-semibold">
+                        <app-money [amount]="period.commission_total" />
+                      </td>
+                      <td class="text-right">{{ period.staff_count }}</td>
+                      <td class="text-right"><app-money [amount]="period.basis_total" /></td>
+                      <td class="table-actions">
+                        <button appButton variant="ghost" size="sm" (click)="openStatement(period)">
+                          Review
+                        </button>
+                        @if (period.status === 'draft') {
                           <button
                             appButton
-                            variant="ghost"
+                            variant="outline"
                             size="sm"
-                            (click)="openStatement(period)"
+                            [disabled]="busy()"
+                            (click)="transition(period, 'approved')"
                           >
-                            Review
+                            Approve
                           </button>
-                          @if (period.status === 'draft') {
-                            <button
-                              appButton
-                              variant="outline"
-                              size="sm"
-                              [disabled]="busy()"
-                              (click)="transition(period, 'approved')"
-                            >
-                              Approve
-                            </button>
-                          } @else if (period.status === 'approved') {
-                            <button
-                              appButton
-                              variant="outline"
-                              size="sm"
-                              [disabled]="busy()"
-                              (click)="transition(period, 'paid')"
-                            >
-                              Mark paid
-                            </button>
-                          }
-                        </td>
-                      </tr>
-                    }
-                  </tbody>
-                </table>
+                        } @else if (period.status === 'approved') {
+                          <button
+                            appButton
+                            variant="outline"
+                            size="sm"
+                            [disabled]="busy()"
+                            (click)="transition(period, 'paid')"
+                          >
+                            Mark paid
+                          </button>
+                        }
+                      </td>
+                    </tr>
+                  }
+                </ng-template>
               </app-data-table-shell>
             </div>
           }
@@ -660,7 +656,11 @@ import {
             } @else {
               <app-mobile-list class="mt-4">
                 @for (row of statement(); track row.staff_user_id) {
-                  <div mobileListRow class="flex min-h-20 items-center gap-3 p-3">
+                  <div
+                    [attr.data-list-record]="row.staff_user_id"
+                    mobileListRow
+                    class="flex min-h-20 items-center gap-3 p-3"
+                  >
                     <div class="min-w-0 flex-1">
                       <p class="truncate font-semibold">{{ row.staff_name }}</p>
                       <p class="type-caption mt-1">
@@ -686,7 +686,7 @@ import {
                   </thead>
                   <tbody>
                     @for (row of statement(); track row.staff_user_id) {
-                      <tr>
+                      <tr [attr.data-list-record]="row.staff_user_id">
                         <td class="font-medium">{{ row.staff_name }}</td>
                         <td class="text-right">{{ row.event_count }}</td>
                         <td class="text-right"><app-money [amount]="row.basis_total" /></td>
@@ -772,6 +772,27 @@ import {
   `,
 })
 export class CommissionsComponent implements OnInit {
+  protected readonly plansColumns: TableColumn[] = [
+    { key: 'column0', label: 'Plan', pinned: true },
+    { key: 'column1', label: 'Rate', align: 'right' },
+    { key: 'column2', label: 'Effective dates' },
+    { key: 'column3', label: 'State' },
+    { key: 'actions', label: 'Actions', align: 'right' },
+  ];
+  protected readonly assignmentsColumns: TableColumn[] = [
+    { key: 'column0', label: 'Staff member', pinned: true },
+    { key: 'column1', label: 'Plan' },
+    { key: 'column2', label: 'Effective dates' },
+    { key: 'column3', label: 'Actions' },
+  ];
+  protected readonly tableColumns1: TableColumn[] = [
+    { key: 'period', label: 'Period', pinned: true },
+    { key: 'state', label: 'State' },
+    { key: 'commission', label: 'Commission', align: 'right' },
+    { key: 'staff', label: 'Staff', align: 'right' },
+    { key: 'basis', label: 'Net collected basis', align: 'right' },
+    { key: 'actions', label: 'Actions', align: 'right' },
+  ];
   private readonly commissions = inject(CommissionsService);
 
   protected readonly fmt = formatKes;
@@ -818,6 +839,12 @@ export class CommissionsComponent implements OnInit {
 
   protected readonly activePlans = computed(() => this.plans().filter(plan => plan.active));
   protected readonly activePlanCount = computed(() => this.activePlans().length);
+
+  constructor() {
+    bindListQuery({
+      tab: listQueryField(this.activeTab, { values: ['plans', 'assignments', 'statements'] }),
+    });
+  }
 
   async ngOnInit(): Promise<void> {
     await this.load();

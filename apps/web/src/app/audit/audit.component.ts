@@ -1,3 +1,9 @@
+import { bindListQuery, listQueryField } from '../shared/list/list-query';
+import {
+  DataTableShellComponent,
+  TableRowsDirective,
+  type TableColumn,
+} from '../shared/ui/data-table-shell.component';
 import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import type { Json } from '@dukarun/shared-types';
@@ -86,6 +92,8 @@ const REASON_FIELDS = new Set(['decision_reason', 'void_reason', 'reason', 'note
 @Component({
   selector: 'app-audit',
   imports: [
+    DataTableShellComponent,
+    TableRowsDirective,
     RouterLink,
     DrawerComponent,
     EmptyStateComponent,
@@ -125,10 +133,15 @@ const REASON_FIELDS = new Set(['decision_reason', 'void_reason', 'reason', 'note
       <app-workspace-navigation workspace="activity" label="Activity" />
 
       <app-list-search-bar
+        searchLabel="Search activity"
+        [activeFilters]="activeListFilters()"
+        (removeFilter)="removeListFilter($event)"
         placeholder="Search activity, record, reason, or person…"
         [searchQuery]="search()"
         (searchQueryChange)="onSearch($event)"
         [filtersEnabled]="true"
+        [activeFilterCount]="activeListFilters().length"
+        (clearFilters)="clearListFilters()"
       >
         <span summary class="type-caption">
           @if (loading() && events().length === 0) {
@@ -178,6 +191,9 @@ const REASON_FIELDS = new Set(['decision_reason', 'void_reason', 'reason', 'note
               }
             </select>
           </app-form-field>
+        </div>
+
+        <div scope class="flex flex-wrap items-end gap-2">
           <app-form-field label="Time" class="sm:w-44">
             <select
               class="select select-bordered select-sm w-full"
@@ -190,19 +206,20 @@ const REASON_FIELDS = new Set(['decision_reason', 'void_reason', 'reason', 'note
               <option value="30">Last 30 days</option>
             </select>
           </app-form-field>
-        </div>
-        @if (hasFilters()) {
-          <div badges class="flex flex-wrap items-center gap-2">
-            <span class="type-caption">Filters applied</span>
-            <button type="button" class="btn btn-ghost btn-xs" (click)="clearFilters()">
-              Clear all
+          @if (period()) {
+            <button
+              class="btn btn-ghost btn-sm min-h-11"
+              type="button"
+              (click)="period.set(''); reloadFromStart()"
+            >
+              Reset dates
             </button>
-          </div>
-        }
-      </app-list-search-bar>
+          }
+        </div></app-list-search-bar
+      >
 
       @if (error()) {
-        <div class="alert mb-4 border border-error/20 bg-error/5 text-sm">
+        <div role="alert" class="alert mb-4 border border-error/20 bg-error/5 text-sm">
           <app-icon name="heroExclamationTriangle" />
           <span class="flex-1">{{ error() }}</span>
           <button type="button" class="btn btn-ghost btn-sm" (click)="load()">Try again</button>
@@ -223,7 +240,7 @@ const REASON_FIELDS = new Set(['decision_reason', 'void_reason', 'reason', 'note
             </div>
           }
         </div>
-      } @else if (!loading() && events().length === 0) {
+      } @else if (!loading() && !error() && events().length === 0) {
         <app-empty-state
           icon="heroClipboardDocumentList"
           [title]="hasFilters() ? 'No activity matches these filters' : 'No activity recorded yet'"
@@ -233,27 +250,34 @@ const REASON_FIELDS = new Set(['decision_reason', 'void_reason', 'reason', 'note
               : 'Changes to sales, stock, people, cash control, and settings will appear here.'
           "
         >
-          @if (hasFilters()) {
-            <button actions type="button" class="btn btn-primary btn-sm" (click)="clearFilters()">
-              Clear filters
-            </button>
-          }
+          <div actions>
+            @if (activeListFilters().length) {
+              <button type="button" class="btn btn-primary btn-sm" (click)="clearFilters()">
+                Clear filters
+              </button>
+            } @else if (search()) {
+              <button type="button" class="btn btn-primary btn-sm" (click)="onSearch('')">
+                Clear search
+              </button>
+            } @else if (period()) {
+              <button
+                type="button"
+                class="btn btn-primary btn-sm"
+                (click)="period.set(''); reloadFromStart()"
+              >
+                Reset dates
+              </button>
+            }
+          </div>
         </app-empty-state>
       } @else {
-        <div class="card hidden overflow-hidden bg-base-100 lg:block">
+        <div class="card hidden bg-base-100 lg:block">
           <div>
-            <table class="table">
-              <thead>
-                <tr>
-                  <th>When</th>
-                  <th>Activity</th>
-                  <th>Person</th>
-                  <th>Area</th>
-                </tr>
-              </thead>
-              <tbody>
+            <app-data-table-shell [columns]="tableColumns1" tableClass="table-sm"
+              ><ng-template tableRows>
                 @for (event of events(); track event.event_id) {
                   <tr
+                    [attr.data-list-record]="event.event_id"
                     role="button"
                     tabindex="0"
                     class="cursor-pointer"
@@ -288,14 +312,15 @@ const REASON_FIELDS = new Set(['decision_reason', 'void_reason', 'reason', 'note
                     </td>
                   </tr>
                 }
-              </tbody>
-            </table>
+              </ng-template></app-data-table-shell
+            >
           </div>
         </div>
 
         <app-mobile-list>
           @for (event of events(); track event.event_id) {
             <article
+              [attr.data-list-record]="event.event_id"
               mobileListRow
               class="cursor-pointer"
               role="button"
@@ -433,6 +458,39 @@ const REASON_FIELDS = new Set(['decision_reason', 'void_reason', 'reason', 'note
   `,
 })
 export class AuditComponent implements OnInit, OnDestroy {
+  protected readonly activeListFilters = computed(() => [
+    ...(this.action() !== ''
+      ? [{ key: 'action', label: 'Action: ' + this.action().replaceAll('_', ' ') }]
+      : []),
+    ...(this.area() !== ''
+      ? [{ key: 'area', label: 'Area: ' + this.area().replaceAll('_', ' ') }]
+      : []),
+    ...(this.actor() !== ''
+      ? [{ key: 'actor', label: 'Person: ' + this.actor().replaceAll('_', ' ') }]
+      : []),
+  ]);
+  protected clearListFilters(): void {
+    this.action.set('');
+    this.area.set('');
+    this.actor.set('');
+    this.page.set(1);
+    void this.load();
+  }
+  protected removeListFilter(key: string): void {
+    if (key === 'action') this.action.set('');
+    if (key === 'area') this.area.set('');
+    if (key === 'actor') this.actor.set('');
+    if (key === 'period') this.period.set('');
+    this.page.set(1);
+    void this.load();
+  }
+
+  protected readonly tableColumns1: TableColumn[] = [
+    { key: 'column0', label: 'When', pinned: true },
+    { key: 'column1', label: 'Activity' },
+    { key: 'column2', label: 'Person' },
+    { key: 'column3', label: 'Area' },
+  ];
   private readonly audit = inject(AuditService);
   private readonly supabase = inject(SupabaseService);
   private readonly permissions = inject(PermissionsService);
@@ -463,6 +521,21 @@ export class AuditComponent implements OnInit, OnDestroy {
   protected readonly hasFilters = computed(
     () => !!(this.search() || this.action() || this.area() || this.actor() || this.period())
   );
+
+  constructor() {
+    bindListQuery(
+      {
+        search: listQueryField(this.search),
+        action: listQueryField(this.action),
+        area: listQueryField(this.area),
+        actor: listQueryField(this.actor),
+        period: listQueryField(this.period),
+        page: listQueryField(this.page),
+        pageSize: listQueryField(this.pageSize, { max: 100 }),
+      },
+      () => void this.load()
+    );
+  }
 
   async ngOnInit(): Promise<void> {
     const [actors] = await Promise.all([this.loadActors(), this.load()]);
@@ -504,7 +577,7 @@ export class AuditComponent implements OnInit, OnDestroy {
   protected onSearch(value: string): void {
     this.search.set(value);
     if (this.searchTimer) clearTimeout(this.searchTimer);
-    this.searchTimer = setTimeout(() => this.reloadFromStart(), 300);
+    this.searchTimer = setTimeout(() => this.reloadFromStart(), 0);
   }
 
   protected setFilter(target: { set(value: string): void }, event: Event): void {
@@ -513,11 +586,9 @@ export class AuditComponent implements OnInit, OnDestroy {
   }
 
   protected clearFilters(): void {
-    this.search.set('');
     this.action.set('');
     this.area.set('');
     this.actor.set('');
-    this.period.set('');
     this.reloadFromStart();
   }
 
@@ -727,7 +798,7 @@ export class AuditComponent implements OnInit, OnDestroy {
     }
   }
 
-  private reloadFromStart(): void {
+  protected reloadFromStart(): void {
     this.page.set(1);
     void this.load();
   }

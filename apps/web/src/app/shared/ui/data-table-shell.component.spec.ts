@@ -1,40 +1,115 @@
+import { Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { describe, expect, it } from 'vitest';
-import { DataTableShellComponent } from './data-table-shell.component';
+import { describe, expect, it, beforeEach, vi } from 'vitest';
+import {
+  DataTableShellComponent,
+  TableHeaderDirective,
+  TableRowsDirective,
+  type TableColumn,
+} from './data-table-shell.component';
+
+@Component({
+  imports: [DataTableShellComponent, TableRowsDirective, TableHeaderDirective],
+  template: `<app-data-table-shell
+    heading="Products"
+    [columns]="columns()"
+    [stickyHeader]="sticky()"
+  >
+    <ng-template tableHeader="select"
+      ><input type="checkbox" aria-label="Select all products" (change)="selected.set(!selected())"
+    /></ng-template>
+    <ng-template tableRows
+      ><tr>
+        <td>Selection</td>
+        <td>Tea · Acme</td>
+        @if (columns().length > 2) {
+          <td>12</td>
+        }
+      </tr>
+      <tr class="row-detail">
+        <td [attr.colspan]="columns().length">
+          Details
+          <table>
+            <thead>
+              <tr>
+                <th>Nested</th>
+              </tr>
+            </thead>
+          </table>
+        </td>
+      </tr>
+    </ng-template>
+    <tfoot tableTotals>
+      <tr>
+        <td colspan="2">Total: 12</td>
+      </tr>
+    </tfoot>
+    <span tableFooter>50 matching products</span>
+  </app-data-table-shell>`,
+})
+class TableFixture {
+  columns = signal<TableColumn[]>([
+    { key: 'select', label: 'Selection', pinned: true },
+    { key: 'product', label: 'Product', pinned: true },
+  ]);
+  sticky = signal(true);
+  selected = signal(false);
+}
 
 describe('DataTableShellComponent', () => {
-  it('makes primary table overflow keyboard accessible with sticky headers by default', async () => {
-    await TestBed.configureTestingModule({
-      imports: [DataTableShellComponent],
-    }).compileComponents();
-    const fixture = TestBed.createComponent(DataTableShellComponent);
-    fixture.componentRef.setInput('heading', 'Sales history');
-    fixture.detectChanges();
-
-    const viewport = (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>(
-      '.data-table-viewport'
+  beforeEach(() => {
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe() {}
+        disconnect() {}
+      }
     );
-    expect(viewport).not.toBeNull();
-    expect(viewport?.classList.contains('data-table-viewport-bounded')).toBe(true);
-    expect(viewport?.getAttribute('role')).toBe('region');
-    expect(viewport?.getAttribute('aria-label')).toBe('Sales history table');
-    expect(viewport?.tabIndex).toBe(0);
   });
 
-  it('allows short document-flow tables to opt out of the bounded region', async () => {
-    await TestBed.configureTestingModule({
-      imports: [DataTableShellComponent],
-    }).compileComponents();
-    const fixture = TestBed.createComponent(DataTableShellComponent);
-    fixture.componentRef.setInput('stickyHeader', false);
+  it('renders one operable header control and native accessible headers, keeping row detail and footer', async () => {
+    await TestBed.configureTestingModule({ imports: [TableFixture] }).compileComponents();
+    const fixture = TestBed.createComponent(TableFixture);
     fixture.detectChanges();
-
-    const viewport = (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>(
-      '.data-table-viewport'
+    const element = fixture.nativeElement as HTMLElement;
+    expect(element.querySelectorAll('input[type=checkbox]')).toHaveLength(1);
+    const checkbox = element.querySelector('input')!;
+    checkbox.dispatchEvent(new Event('change'));
+    expect(fixture.componentInstance.selected()).toBe(true);
+    expect(
+      Array.from(element.querySelectorAll('.data-table-semantic-header th'), th =>
+        th.textContent?.trim()
+      )
+    ).toEqual(['Selection', 'Product']);
+    expect(element.querySelectorAll('.data-table-semantic-header th[scope=col]')).toHaveLength(2);
+    expect(element.querySelector('.data-table-viewport')?.getAttribute('aria-label')).toBe(
+      'Products table'
     );
-    expect(viewport?.classList.contains('data-table-viewport-bounded')).toBe(false);
-    expect(viewport?.hasAttribute('role')).toBe(false);
-    expect(viewport?.hasAttribute('aria-label')).toBe(false);
-    expect(viewport?.hasAttribute('tabindex')).toBe(false);
+    expect(element.querySelector('.data-table-viewport')?.getAttribute('tabindex')).toBe('0');
+    expect(element.querySelector('.data-table-viewport table > tfoot')?.textContent).toContain(
+      'Total: 12'
+    );
+    expect(element.querySelector('footer')?.textContent).toContain('50 matching products');
+    expect(element.querySelector('.row-detail table th')?.textContent).toBe('Nested');
+    expect(element.querySelectorAll('.data-table-header-band')).toHaveLength(1);
+    fixture.destroy();
+  });
+
+  it('updates conditional columns and can opt out of sticky positioning without losing keyboard scrolling', async () => {
+    await TestBed.configureTestingModule({ imports: [TableFixture] }).compileComponents();
+    const fixture = TestBed.createComponent(TableFixture);
+    fixture.detectChanges();
+    fixture.componentInstance.columns.update(columns => [
+      ...columns,
+      { key: 'stock', label: 'Stock' },
+    ]);
+    fixture.componentInstance.sticky.set(false);
+    fixture.detectChanges();
+    const element = fixture.nativeElement as HTMLElement;
+    expect(element.querySelectorAll('.data-table-header-band th')).toHaveLength(3);
+    expect(element.querySelectorAll('.data-table-semantic-header th')).toHaveLength(3);
+    expect(element.querySelector('.data-table-header-sticky')).toBeNull();
+    expect(element.querySelector('.data-table-viewport')?.getAttribute('tabindex')).toBe('0');
+    fixture.destroy();
   });
 });

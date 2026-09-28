@@ -99,6 +99,14 @@ export type DateRangePreset = 7 | 30 | 180 | 365;
 export type ProductDecision =
   'stockout' | 'reorder' | 'low_cover' | 'slow' | 'insufficient_history' | 'healthy';
 
+export type ProductDecisionFilter = ProductDecision | 'needs_attention';
+
+export interface ProductDecisionCounts {
+  all: number;
+  needsAttention: number;
+  stockouts: number;
+}
+
 export interface ProductDemandSummary {
   variant_id: string;
   product_id: string;

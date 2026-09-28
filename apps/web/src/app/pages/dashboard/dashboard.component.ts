@@ -1,3 +1,4 @@
+import { DemandConfidenceIndicatorComponent } from '../../shared/ui/demand-confidence-indicator.component';
 import {
   Component,
   OnDestroy,
@@ -14,7 +15,11 @@ import { formatKes } from '../../core/money';
 import { Company, SupabaseService } from '../../core/supabase.service';
 import { PermissionsService } from '../../core/permissions.service';
 import { CatalogIdentityLookupService } from '../../core/identity-lookup.services';
-import { manufacturerLabel, productIdentity } from '../../core/product-identity';
+import {
+  manufacturerLabel,
+  productIdentity,
+  productIdentityLabel,
+} from '../../core/product-identity';
 import { SyncService } from '../../pos/offline/sync.service';
 import {
   DashboardDailySummary,
@@ -26,7 +31,6 @@ import {
 } from '../../reports/reports.service';
 import { LocationContextService } from '../../core/location-context.service';
 import { ButtonComponent } from '../../shared/ui/button.component';
-import { DemandConfidenceIndicatorComponent } from '../../shared/ui/demand-confidence-indicator.component';
 import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
 import { IconComponent } from '../../shared/ui/icon.component';
 import { MoneyComponent } from '../../shared/ui/money.component';
@@ -86,8 +90,8 @@ type DashboardSection = 'sales' | 'attention';
 @Component({
   selector: 'app-dashboard',
   imports: [
-    ButtonComponent,
     DemandConfidenceIndicatorComponent,
+    ButtonComponent,
     EmptyStateComponent,
     IconComponent,
     MoneyComponent,
@@ -375,7 +379,7 @@ type DashboardSection = 'sales' | 'attention';
           </section>
         }
 
-        <section aria-label="Sales performance" class="grid items-start gap-4 xl:grid-cols-2">
+        <section aria-label="Sales performance" class="grid items-stretch gap-4 xl:grid-cols-2">
           @if (canViewFinancials()) {
             <article class="card overflow-hidden bg-base-100">
               <div
@@ -392,7 +396,7 @@ type DashboardSection = 'sales' | 'attention';
                   [attr.aria-expanded]="salesChartExpanded()"
                   (click)="salesChartExpanded.set(!salesChartExpanded())"
                 >
-                  {{ salesChartExpanded() ? 'Show less' : 'Expand' }}
+                  {{ salesChartExpanded() ? 'Hide details' : 'Daily details' }}
                 </button>
               </div>
 
@@ -412,13 +416,17 @@ type DashboardSection = 'sales' | 'attention';
                   title="No sales this week"
                 />
               } @else {
-                <div class="px-4 pb-3 pt-2">
-                  <div class="mb-2 flex items-end justify-between gap-3">
+                <div class="flex flex-1 flex-col px-4 pb-3 pt-2">
+                  <div
+                    class="mb-2 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between sm:gap-3"
+                  >
                     <div>
                       <p class="type-caption">7-day revenue</p>
-                      <p class="type-title tabular-nums">{{ fmt(weekRevenue()) }}</p>
+                      <p class="type-title whitespace-nowrap tabular-nums">
+                        {{ fmt(weekRevenue()) }}
+                      </p>
                     </div>
-                    <p class="type-caption text-right">
+                    <p class="type-caption sm:text-right">
                       {{ weekOrders() }} sales · {{ quantity(weekQuantity()) }} items ·
                       {{ fmt(weekMargin()) }} margin
                     </p>
@@ -426,15 +434,14 @@ type DashboardSection = 'sales' | 'attention';
 
                   <div
                     class="relative overflow-hidden rounded-box border border-base-300/70 bg-base-200/30"
-                    [class.h-32]="!salesChartExpanded()"
-                    [class.h-60]="salesChartExpanded()"
+                    [class]="salesChartExpanded() ? 'h-60 shrink-0' : 'min-h-36 flex-1 sm:min-h-44'"
                   >
                     @if (salesChartExpanded()) {
                       <span class="absolute inset-x-0 top-1/3 border-t border-base-300/60"></span>
                       <span class="absolute inset-x-0 top-2/3 border-t border-base-300/60"></span>
                     }
                     <div
-                      class="relative grid h-full grid-cols-7 items-end gap-2 px-4 pb-2 pt-3 sm:gap-3 sm:px-6"
+                      class="absolute inset-0 grid grid-cols-7 items-end gap-2 px-4 pb-2 pt-3 sm:gap-3 sm:px-6"
                       role="img"
                       aria-label="Sales revenue for the last seven days"
                     >
@@ -456,11 +463,12 @@ type DashboardSection = 'sales' | 'attention';
                         <p class="truncate text-xs font-medium text-base-content/60">
                           {{ chartDay(point.day) }}
                         </p>
-                        @if (salesChartExpanded()) {
-                          <p class="mt-0.5 truncate text-xs tabular-nums">
-                            {{ compactKes(point.revenue) }}
-                          </p>
-                        }
+                        <p
+                          class="mt-0.5 text-xs tabular-nums"
+                          [attr.aria-label]="shortDay(point.day) + ': ' + fmt(point.revenue)"
+                        >
+                          {{ compactKes(point.revenue) }}
+                        </p>
                       </div>
                     }
                   </div>
@@ -486,12 +494,19 @@ type DashboardSection = 'sales' | 'attention';
             </article>
           }
 
-          <article class="card overflow-hidden bg-base-100">
+          <article
+            class="card overflow-hidden bg-base-100"
+            [class.xl:col-span-2]="!canViewFinancials()"
+          >
             <div class="flex items-start justify-between gap-2 border-b border-base-300 px-4 py-3">
               <div class="min-w-0 flex-1">
                 <h2 class="section-title">Product performance</h2>
                 <p class="type-caption mt-1">
-                  Distinct leaders over 7 days, adjusted for unusual spikes.
+                  Last 7 days
+                  @if (performanceLocationName()) {
+                    · {{ performanceLocationName() }}
+                  }
+                  . Rankings adjust unusual spikes.
                 </p>
               </div>
               <a
@@ -499,7 +514,7 @@ type DashboardSection = 'sales' | 'attention';
                 variant="ghost"
                 size="sm"
                 routerLink="/insights/inventory"
-                [queryParams]="{ view: 'performance', leader: 'trending' }"
+                [queryParams]="{ view: 'performance', leader: 'trending', period: 7 }"
               >
                 View all
                 <app-icon name="heroArrowRight" />
@@ -522,56 +537,128 @@ type DashboardSection = 'sales' | 'attention';
                 title="No performance leaders yet"
               />
             } @else {
-              <div class="divide-y divide-base-200">
+              <div class="grid flex-1 gap-px bg-base-300/70" [class]="'sm:grid-cols-2'">
                 @for (signal of productSignals(); track signal.kind + signal.variantId) {
-                  <a
-                    class="flex min-h-20 items-center gap-3 px-4 py-3 hover:bg-base-200/40"
-                    [routerLink]="['/insights/inventory', signal.variantId]"
+                  <article
+                    class="flex min-w-0 flex-col bg-base-100 p-4"
+                    [attr.aria-label]="signalLabel(signal.kind)"
                   >
-                    <div class="min-w-0 flex-1">
-                      <p class="truncate font-medium">{{ signal.label }}</p>
-                      <p class="type-caption truncate">{{ signal.manufacturer }}</p>
-                      @if (signal.locationName) {
-                        <p class="type-caption truncate">{{ signal.locationName }}</p>
-                      }
-                      <p class="type-caption truncate">
-                        Adjusted {{ quantity(signal.robustQuantity) }} vs
-                        {{ quantity(signal.previousRobustQuantity) }} ·
-                        {{ signal.orderCount }} orders · {{ signal.activeDays }} active days
-                      </p>
-                      <div class="mt-1 flex flex-wrap gap-1">
-                        <app-demand-confidence [value]="signal.confidence" />
-                        @if (signal.outlierDetected) {
-                          <span class="badge badge-warning badge-soft badge-xs"
-                            >Unusual spike adjusted</span
-                          >
+                    <p class="text-xs font-semibold text-base-content/70">
+                      {{ signalLabel(signal.kind) }}
+                    </p>
+                    <a
+                      class="mt-1 break-words font-semibold leading-snug link link-hover"
+                      [routerLink]="['/insights/inventory', signal.variantId]"
+                      [queryParams]="{ period: 7, returnTo: '/dashboard' }"
+                      >{{ signal.label }}</a
+                    >
+                    <p class="type-caption mt-0.5 break-words">{{ signal.manufacturer }}</p>
+                    @if (!performanceLocationName() && signal.locationName) {
+                      <p class="type-caption">{{ signal.locationName }}</p>
+                    }
+                    <div class="mt-3">
+                      @switch (signal.kind) {
+                        @case ('trending') {
+                          <p class="text-lg font-semibold tabular-nums">
+                            {{ changeLabel(signal.robustQuantity, signal.previousRobustQuantity) }}
+                          </p>
+                          <p class="type-caption">Adjusted demand vs previous 7 days</p>
+                          <p class="type-caption">
+                            {{ quantity(signal.robustQuantity) }} vs
+                            {{ quantity(signal.previousRobustQuantity) }} adjusted units
+                          </p>
                         }
-                      </div>
-                    </div>
-                    <div class="shrink-0 text-right">
-                      <p class="text-xs font-semibold uppercase text-base-content/70">
-                        {{ signalLabel(signal.kind) }}
-                      </p>
-                      @if (canViewFinancials()) {
-                        <p
-                          class="type-caption"
-                          [class.text-success]="signal.margin > 0"
-                          [class.text-error]="signal.margin < 0"
-                        >
-                          <app-money [amount]="signal.margin" /> margin
-                        </p>
+                        @case ('volume') {
+                          <p class="text-lg font-semibold tabular-nums">
+                            {{ quantity(signal.currentQuantity) }} units sold
+                          </p>
+                          <p class="type-caption">{{ signal.orderCount }} orders in 7 days</p>
+                        }
+                        @case ('margin') {
+                          @if (canViewFinancials()) {
+                            <p
+                              class="text-lg font-semibold tabular-nums"
+                              [class.text-error]="signal.margin < 0"
+                            >
+                              {{ fmt(signal.margin) }}
+                            </p>
+                            <p class="type-caption">Margin in 7 days</p>
+                          }
+                        }
+                        @case ('consistent') {
+                          <p class="text-lg font-semibold tabular-nums">
+                            {{ signal.activeDays }} selling days
+                          </p>
+                          <p class="type-caption">{{ signal.orderCount }} orders in 7 days</p>
+                        }
                       }
-                      <p class="type-caption">
-                        {{ quantity(signal.currentQuantity) }} factual units ·
-                        {{ quantity(signal.stock) }} on hand ·
-                        {{
-                          signal.daysCover === null
-                            ? 'no cover'
-                            : quantity(signal.daysCover) + 'd cover'
-                        }}
-                      </p>
                     </div>
-                  </a>
+                    <app-demand-confidence class="mt-1" [value]="signal.confidence" />
+                    <p class="type-caption mt-1">
+                      {{ quantity(signal.stock) }} on hand ·
+                      {{
+                        signal.daysCover === null
+                          ? 'Cover: not enough history'
+                          : quantity(signal.daysCover) + ' days planning cover'
+                      }}
+                    </p>
+                    @if (signal.stock <= 0) {
+                      <p class="mt-1 text-xs font-semibold text-error">Out of stock</p>
+                    }
+                    @if (signal.outlierDetected) {
+                      <p class="mt-1 text-xs text-warning">Unusual spike adjusted</p>
+                    }
+                    <details class="mt-3 text-xs">
+                      <summary class="min-h-11 cursor-pointer py-2 font-medium">
+                        Evidence &amp; stock
+                      </summary>
+                      <dl class="mt-2 grid grid-cols-2 gap-x-3 gap-y-2">
+                        <div>
+                          <dt class="text-base-content/60">Units sold</dt>
+                          <dd>{{ quantity(signal.currentQuantity) }}</dd>
+                        </div>
+                        <div>
+                          <dt class="text-base-content/60">Adjusted units</dt>
+                          <dd>{{ quantity(signal.robustQuantity) }}</dd>
+                        </div>
+                        <div>
+                          <dt class="text-base-content/60">Previous adjusted</dt>
+                          <dd>{{ quantity(signal.previousRobustQuantity) }}</dd>
+                        </div>
+                        <div>
+                          <dt class="text-base-content/60">Orders / selling days</dt>
+                          <dd>{{ signal.orderCount }} / {{ signal.activeDays }}</dd>
+                        </div>
+                        <div>
+                          <dt class="text-base-content/60">On hand</dt>
+                          <dd>{{ quantity(signal.stock) }}</dd>
+                        </div>
+                        <div>
+                          <dt class="text-base-content/60">Planning cover</dt>
+                          <dd>
+                            {{
+                              signal.daysCover === null
+                                ? 'Not enough history'
+                                : quantity(signal.daysCover) + ' days'
+                            }}
+                          </dd>
+                        </div>
+                        @if (canViewFinancials()) {
+                          <div>
+                            <dt class="text-base-content/60">Net sales</dt>
+                            <dd>{{ fmt(signal.revenue) }}</dd>
+                          </div>
+                          <div>
+                            <dt class="text-base-content/60">Margin</dt>
+                            <dd [class.text-error]="signal.margin < 0">{{ fmt(signal.margin) }}</dd>
+                          </div>
+                        }
+                      </dl>
+                      @if (signal.locationName) {
+                        <p class="type-caption mt-2">{{ signal.locationName }} · last 7 days</p>
+                      }
+                    </details>
+                  </article>
                 }
               </div>
             }
@@ -767,6 +854,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
   protected readonly summary = signal<DashboardDailySummary[]>([]);
   protected readonly topVariants = signal<TopVariant[]>([]);
   protected readonly productSignals = signal<ProductSignal[]>([]);
+  protected readonly performanceLocationName = computed(() => {
+    const names = new Set(this.productSignals().map(item => item.locationName));
+    return names.size === 1 ? [...names][0] : null;
+  });
   protected readonly expiring = signal<ExpiringDisplay[]>([]);
   protected readonly insightAttention = signal<InsightSignal[]>([]);
   protected readonly creditAttention = computed(() =>
@@ -1255,10 +1346,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
           ...(row.location_name ? { locationName: row.location_name } : {}),
           variantId: row.variant_id,
           productId: row.product_id,
-          label:
-            !row.variant_name || row.variant_name === 'Default'
-              ? row.product_name
-              : `${row.product_name} — ${row.variant_name}`,
+          label: productIdentityLabel(row),
           manufacturer: manufacturerLabel(row),
           kind,
           currentQuantity: Number(row.current_quantity),
@@ -1360,7 +1448,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   protected chartDay(day: string): string {
     return new Date(`${day}T12:00:00+03:00`).toLocaleDateString('en-KE', {
       timeZone: 'Africa/Nairobi',
-      weekday: 'narrow',
+      weekday: 'short',
     });
   }
 

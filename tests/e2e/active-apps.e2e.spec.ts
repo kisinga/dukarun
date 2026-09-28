@@ -363,6 +363,144 @@ test('dashboard keeps the phone summary focused and its detail reachable', async
   }
 });
 
+for (const financials of [true, false]) {
+  test(`dashboard leaders surface relevant measures and preserve evidence (${financials ? 'financial' : 'operational'})`, async ({
+    page,
+  }) => {
+    await authenticateFinancialUser(page, [
+      'ManageCatalog',
+      'ManageStockAdjustments',
+      ...(financials ? ['ViewFinancials'] : []),
+    ]);
+    const identities = [
+      'Tea · Small pack',
+      'Fresh eggs',
+      'Dishwashing liquid',
+      'Drinking chocolate',
+    ].map((name, index) => ({
+      variant_id: `98000000-0000-4000-8000-00000000000${index}`,
+      product_id: `98000000-0000-4000-8000-00000000001${index}`,
+      product_name: name,
+      variant_name: index === 0 ? 'Small pack' : 'Default',
+      manufacturer_name: 'Highland Foods',
+      manufacturer_id: '98000000-0000-4000-8000-000000000099',
+      kind: 'good',
+      stock_unit: 'pack',
+      sku: `LEADER-${index}`,
+      stock: 4,
+      price: 100,
+      track_inventory: true,
+      packs: [],
+      product_active: true,
+      variant_active: true,
+    }));
+    const rows = identities.map((item, index) => ({
+      variant_id: item.variant_id,
+      location_name: 'Main shop',
+      current_quantity: index === 1 ? 52 : 24,
+      robust_quantity: 18,
+      previous_robust_quantity: 9,
+      revenue: 5000,
+      margin: 2124,
+      order_count: 16,
+      active_days: 4,
+      trend_score: 2,
+      confidence: index === 1 ? 'low' : 'medium',
+      outlier_detected: index === 0,
+      outlier_share: 0.1,
+      stock: index === 1 ? 0 : 8,
+      planning_daily_demand: 2,
+      days_of_cover: index === 1 ? 0 : 4,
+    }));
+    await page.route('**/rest/v1/rpc/catalog_cache_page', r => r.fulfill({ json: identities }));
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Nairobi' });
+    await page.route('**/rest/v1/rpc/dashboard_location_snapshot', r =>
+      r.fulfill({
+        json: {
+          summary: [{ day: today, revenue: 5000, margin: 2124, orders: 16, quantity: 24 }],
+          topVariants: [],
+          productSignals: { restockRisks: [], fastVariants: [] },
+          locations: [],
+          productPerformance: {
+            windowDays: 7,
+            generatedAt: new Date().toISOString(),
+            financialsIncluded: true,
+            leaders: {
+              trending: [rows[0]],
+              volume: [rows[1]],
+              margin: [rows[2]],
+              consistent: [rows[3]],
+            },
+          },
+        },
+      })
+    );
+    await page.goto('http://127.0.0.1:4203/dashboard');
+    const section = page.locator('section[aria-label="Sales performance"]');
+    const trending = section.locator('article[aria-label="Trending now"]');
+    await expect(
+      trending.getByRole('link', { name: 'Tea · Small pack', exact: true })
+    ).toBeVisible();
+    await expect(trending).toContainText('Highland Foods');
+    await expect(trending).toContainText('+100.0%');
+    await expect(trending).toContainText(/medium confidence/i);
+    await expect(trending).toContainText('Unusual spike adjusted');
+    const volume = section.locator('article[aria-label="Volume leader"]');
+    await expect(volume).toContainText('52 units sold');
+    await expect(volume.getByText('Out of stock', { exact: true })).toBeVisible();
+    await expect(section.locator('article[aria-label="Consistent seller"]')).toContainText(
+      '4 selling days'
+    );
+    await expect(section.locator('article[aria-label="Margin leader"]')).toHaveCount(
+      financials ? 1 : 0
+    );
+    await expect(section.getByRole('heading', { name: 'Sales trend', exact: true })).toHaveCount(
+      financials ? 1 : 0
+    );
+    await expect(trending.getByText(/on hand ·/)).toBeVisible();
+    const confidence = trending.getByLabel('Explain Medium demand confidence');
+    await confidence.focus();
+    await page.keyboard.press('Enter');
+    await expect(
+      trending.getByText(
+        'Medium confidence: useful evidence with limited history or an adjusted spike.',
+        { exact: true }
+      )
+    ).toBeVisible();
+    await page.keyboard.press('Enter');
+    const disclosure = trending.locator('summary').filter({ hasText: 'Evidence & stock' });
+    await disclosure.focus();
+    await page.keyboard.press('Enter');
+    for (const label of [
+      'Units sold',
+      'Adjusted units',
+      'Previous adjusted',
+      'Orders / selling days',
+      'On hand',
+      'Planning cover',
+    ]) {
+      await expect(trending.getByText(label, { exact: true })).toBeVisible();
+    }
+    await expect(trending.getByText('Margin', { exact: true })).toHaveCount(financials ? 1 : 0);
+    await expect(trending.getByText('Net sales', { exact: true })).toHaveCount(financials ? 1 : 0);
+    await page.keyboard.press('Enter');
+    await expect(trending.getByText('On hand', { exact: true })).toBeHidden();
+    const href = await trending.getByRole('link').getAttribute('href');
+    expect(new URL(href!, 'http://127.0.0.1:4203').searchParams.get('period')).toBe('7');
+    expect(new URL(href!, 'http://127.0.0.1:4203').searchParams.get('returnTo')).toBe('/dashboard');
+    await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'));
+    for (const width of [1280, 390, 320]) {
+      await page.setViewportSize({ width, height: 844 });
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+        )
+      ).toBeLessThanOrEqual(1);
+      await expect(trending.getByText('Highland Foods', { exact: true })).toBeVisible();
+    }
+  });
+}
+
 test('settings keeps compact navigation and groups fulfillment in one surface', async ({
   page,
   isMobile,
@@ -599,13 +737,15 @@ test('operations navigation consolidates workspaces and preserves progressive di
   await sidebar.getByRole('link', { name: 'Activity', exact: true }).click();
   await expect(page).toHaveURL(/\/activity\/messages$/);
   await expect(page.getByRole('heading', { name: 'Activity', exact: true })).toBeVisible();
-  if (isMobile) {
-    const activitySection = page.getByRole('combobox', { name: 'Activity view' });
-    await expect(activitySection).toBeVisible();
-    await activitySection.selectOption('/activity/audit');
-  } else {
-    await page.getByRole('tab', { name: 'Audit trail', exact: true }).click();
-  }
+  if (isMobile)
+    await page
+      .getByRole('combobox', { name: 'Activity section', exact: true })
+      .selectOption('/activity/audit');
+  else
+    await page
+      .getByRole('navigation', { name: 'Activity sections' })
+      .getByRole('link', { name: 'Audit trail', exact: true })
+      .click();
   await expect(page).toHaveURL(/\/activity\/audit$/);
   await expect(page.getByRole('heading', { name: 'Activity', exact: true })).toBeVisible();
 
@@ -637,4 +777,629 @@ test('@critical local Supabase serves real financial form options', async ({ pag
   await page.getByRole('button', { name: 'New transfer' }).click();
   await expect(page.locator('#transfer-form select').first().locator('option')).not.toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Post transfer' })).toBeVisible();
+});
+
+const operationalListRoutes = [
+  '/inventory/products',
+  '/inventory/adjustments',
+  '/inventory/transfers',
+  '/sales',
+  '/pos/proformas',
+  '/purchases',
+  '/customers',
+  '/suppliers',
+  '/pos/cashier',
+  '/money/ledger',
+  '/money/expenses',
+  '/money/transfers',
+  '/money/cashier',
+  '/money/reconcile',
+  '/money/periods',
+  '/team/members',
+  '/team/roles',
+  '/team/performance',
+  '/team/commissions',
+  '/approvals',
+  '/activity/messages',
+  '/activity/audit',
+  '/insights/credit',
+  '/insights/inventory',
+  '/insights/sales',
+  '/fulfillment',
+];
+test('staff performance preserves useful measures on mobile and in review', async ({ page }) => {
+  await authenticateFinancialUser(page, ['ViewFinancials', 'ViewStaffPerformance']);
+  const staff = {
+    staff_user_id: '00000000-0000-4000-8000-000000000002',
+    display_name: 'Amina Wanjiku',
+    role_name: 'Cashier',
+    authorization_status: 'approved',
+    transactions: 4,
+    quantity: 12,
+    gross_sales: 250,
+    refunds: 30,
+    voided_sales: 20,
+    net_sales: 200,
+    collected: 160,
+    margin: 60,
+    average_sale: 50,
+    held_count: 2,
+    held_value: 90,
+  };
+  await page.route('**/rest/v1/rpc/staff_sales_performance', route =>
+    route.fulfill({ json: [staff] })
+  );
+  await page.route('**/rest/v1/rpc/staff_sales_daily', route => route.fulfill({ json: [] }));
+  await page.goto('http://127.0.0.1:4203/team/performance?from=2026-09-01&to=2026-09-27');
+  const record = page.locator('[data-list-record]:visible').first();
+  await expect(record).toContainText('2 held');
+  await expect(record.getByText('Refunds / voids:', { exact: false }).first()).toBeVisible();
+  await expect(record).toContainText('unpaid');
+  await expect(record).toContainText('160');
+  await expect(record).toContainText('60');
+  await record.getByText('Amina Wanjiku', { exact: true }).click();
+  const review = page.getByRole('dialog');
+  for (const label of [
+    'Gross sales',
+    'Margin',
+    'Refunds / voids',
+    'Average sale',
+    'Quantity',
+    'Held sales',
+  ]) {
+    await expect(review.getByText(label, { exact: true })).toBeVisible();
+  }
+  await expect(review.getByText('Daily movement', { exact: true })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(review).toHaveCount(0);
+  staff.held_count = 0;
+  staff.margin = -60;
+  await page.reload();
+  await expect(record).toContainText('0 held');
+  await expect(record).toContainText('90');
+  await expect(record.getByText('Refunds / voids:', { exact: false }).first()).toBeVisible();
+  await expect(record.locator('.text-error').filter({ hasText: '60' })).toBeVisible();
+  await page.getByRole('searchbox').fill('No matching staff name');
+  await expect(page.getByText('No matching staff', { exact: true })).toBeVisible();
+});
+
+test('commission plans show state separately from actions and retain records on failure', async ({
+  page,
+  isMobile,
+}) => {
+  await authenticateFinancialUser(page, ['ViewFinancials', 'ManageCommissions']);
+  let fail = false;
+  const plans = [true, false].map((active, index) => ({
+    id: `00000000-0000-4000-8000-00000000001${index}`,
+    name: active ? 'Standard commission' : 'Legacy commission',
+    rate_bps: 200,
+    effective_from: '2026-09-01',
+    effective_to: null,
+    active,
+  }));
+  await page.route('**/rest/v1/commission_plans?*', route =>
+    fail
+      ? route.fulfill({ status: 500, json: { message: 'Plans unavailable' } })
+      : route.fulfill({ json: plans })
+  );
+  await page.goto('http://127.0.0.1:4203/team/commissions');
+  const records = page.locator('[data-list-record]:visible');
+  await expect(records).toHaveCount(2);
+  await expect(records.first().getByText('Active', { exact: true })).toBeVisible();
+  await expect(records.last().getByText('Inactive', { exact: true })).toBeVisible();
+  if (!isMobile) {
+    await page.setViewportSize({ width: 1024, height: 720 });
+    const viewport = page.locator('.data-table-viewport');
+    await expect(viewport.getByRole('columnheader', { name: 'State', exact: true })).toHaveCount(1);
+    await expect(viewport.getByRole('columnheader', { name: 'Actions', exact: true })).toHaveCount(
+      1
+    );
+    expect(await viewport.evaluate(e => e.scrollWidth - e.clientWidth)).toBe(0);
+  }
+  fail = true;
+  await page.getByRole('button', { name: 'Refresh commissions', exact: true }).click();
+  await expect(page.getByRole('alert')).toBeVisible();
+  await expect(records).toHaveCount(2);
+  await expect(page.getByText('No commission plans', { exact: true })).toHaveCount(0);
+  fail = false;
+  await page.getByRole('button', { name: 'Retry', exact: true }).click();
+  await expect(page.getByRole('alert')).toHaveCount(0);
+  await expect(records).toHaveCount(2);
+});
+
+const listPermissions = [
+  'ManageApprovals',
+  'ManageStockAdjustments',
+  'ManageCustomers',
+  'ManageCatalog',
+  'ManageCommunications',
+  'ManageCompanySettings',
+  'SettleOrder',
+  'ManageSupplierCreditPurchases',
+  'ViewFinancials',
+  'ManageReconciliation',
+  'CloseAccountingPeriod',
+  'CreateInterAccountTransfer',
+  'ManageTeam',
+  'ViewAuditTrail',
+  'ViewStaffPerformance',
+  'ManageCommissions',
+  'ProcessFulfillments',
+  'CompleteFulfillments',
+  'ManageFulfillments',
+];
+for (const path of operationalListRoutes) {
+  test(`operational collection ${path} keeps document scrolling and reachable controls`, async ({
+    page,
+  }) => {
+    await authenticateFinancialUser(page, listPermissions);
+    await page.route('**/rest/v1/rpc/current_access_snapshot', route =>
+      route.fulfill({
+        json: {
+          company_id: '00000000-0000-4000-8000-000000000001',
+          user_id: '00000000-0000-4000-8000-000000000002',
+          permissions: listPermissions,
+          workspaces: [
+            'dashboard',
+            'sell',
+            'sales',
+            'inventory',
+            'customers',
+            'purchasing',
+            'fulfillment',
+          ],
+          actions: {},
+        },
+      })
+    );
+    await page.route('**/rest/v1/rpc/current_entitlements', route =>
+      route.fulfill({
+        json: {
+          companyId: '00000000-0000-4000-8000-000000000001',
+          status: 'active',
+          tierCode: 'pro',
+          tierName: 'Pro',
+          features: {
+            staffPerformance: true,
+            commissions: true,
+            fulfillment: true,
+            multipleLocations: true,
+          },
+          settings: { commissionsEnabled: true },
+          limits: {},
+          usage: {
+            stockLocations: 1,
+            products: 0,
+            ordersThisMonth: 0,
+            teamMembers: 1,
+            sms: {},
+            whatsapp: {},
+          },
+        },
+      })
+    );
+    await page.route('**/rest/v1/rpc/current_business_date', route =>
+      route.fulfill({ json: '2026-09-27' })
+    );
+    // Route smoke checks use an empty history; the financial-form test covers load failure.
+    // WebKit cannot fulfill the helper's intentional PostgREST 300 response.
+    await page.route('**/rest/v1/ledger_journal_entries?*', route =>
+      route.fulfill({ json: [], headers: { 'content-range': '0-0/0' } })
+    );
+    await page.route('**/rest/v1/rpc/accessible_business_locations', route =>
+      route.fulfill({
+        json: [
+          {
+            id: '00000000-0000-4000-8000-000000000003',
+            code: 'MAIN',
+            name: 'Main shop',
+            is_default: true,
+            is_primary: true,
+          },
+          {
+            id: '00000000-0000-4000-8000-000000000004',
+            code: 'SECOND',
+            name: 'Second shop',
+            is_default: false,
+            is_primary: false,
+          },
+        ],
+      })
+    );
+    await page.goto('http://127.0.0.1:4203' + path);
+    await expect(page).toHaveURL(new RegExp(path.replaceAll('/', '\\/') + '(\\?|$)'));
+    const surface = page.locator('main.list-scroll-page');
+    await expect(surface).toBeVisible();
+    await expect(surface.locator('h1').first()).toBeVisible();
+    expect(await surface.evaluate(element => getComputedStyle(element).overflowY)).toBe('visible');
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+      )
+    ).toBeLessThanOrEqual(1);
+    if (['/sales', '/purchases', '/activity/messages'].includes(path)) {
+      const originalViewport = page.viewportSize()!;
+      const toolbar = surface.locator('app-list-search-bar');
+      for (const [width, textScale] of [
+        [1600, 1],
+        [1024, 1],
+        [390, 1],
+        [320, 1],
+        [1280, 2],
+      ]) {
+        await page.setViewportSize({ width, height: 844 });
+        await page.evaluate(scale => {
+          document.documentElement.style.fontSize = `${scale * 100}%`;
+        }, textScale);
+        await expect(async () => {
+          const geometry = await toolbar.evaluate(element => {
+            const controls = Array.from(
+              element.querySelectorAll<HTMLElement>(
+                ':is(.list-toolbar-scope, .list-quick-filters) :is(.input, .select, .counter-btn, .btn)'
+              )
+            ).filter(control => control.getClientRects().length);
+            const fields = controls.filter(control => control.matches('input, select'));
+            const search = element.querySelector('input[type="search"]')!.getBoundingClientRect();
+            const summary = element.querySelector('.list-toolbar-summary')!.getBoundingClientRect();
+            const sort = element.querySelector('.list-toolbar-sort')!.getBoundingClientRect();
+            return {
+              heights: controls.map(control => control.getBoundingClientRect().height),
+              labelGaps: fields.map(control => {
+                const label = control.closest('label')?.querySelector('.form-field-label');
+                return label
+                  ? control.getBoundingClientRect().top - label.getBoundingClientRect().bottom
+                  : -1;
+              }),
+              overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+              searchBottom: search.bottom,
+              scopeTop: element.querySelector('.list-toolbar-context')!.getBoundingClientRect().top,
+              searchWidth: search.width,
+              headerCenters: [search, summary, sort].map(box => box.y + box.height / 2),
+              summaryBetweenControls: summary.left >= search.right && summary.right <= sort.left,
+              toolbarHeight: element.getBoundingClientRect().height,
+            };
+          });
+          expect(geometry.heights.length).toBeGreaterThanOrEqual(5);
+          expect(Math.min(...geometry.heights)).toBeGreaterThanOrEqual(
+            (width >= 1024 ? 36 : 44) * textScale - 1
+          );
+          expect(Math.max(...geometry.heights) - Math.min(...geometry.heights)).toBeLessThanOrEqual(
+            1
+          );
+          expect(geometry.labelGaps.length).toBeGreaterThanOrEqual(3);
+          for (const gap of geometry.labelGaps) expect(gap).toBeCloseTo(6 * textScale, 0);
+          expect(geometry.overflow).toBeLessThanOrEqual(1);
+          expect(geometry.searchBottom).toBeLessThanOrEqual(geometry.scopeTop + 1);
+          if (width === 1600 && textScale === 1) {
+            expect(geometry.searchWidth).toBeLessThanOrEqual(320);
+            expect(geometry.summaryBetweenControls).toBe(true);
+            expect(
+              Math.max(...geometry.headerCenters) - Math.min(...geometry.headerCenters)
+            ).toBeLessThanOrEqual(1);
+            expect(geometry.toolbarHeight).toBeLessThanOrEqual(170);
+          }
+        }).toPass();
+        await expect(toolbar.locator('.stat-bar-item:visible')).toHaveCount(4);
+        if (path === '/sales') await expect(toolbar.locator('app-searchable-filter')).toBeVisible();
+      }
+      await page.evaluate(() => document.documentElement.style.removeProperty('font-size'));
+      await page.setViewportSize(originalViewport);
+    }
+    const search = surface.locator('app-list-search-bar').getByRole('searchbox');
+    if (await search.count()) {
+      await search.first().fill('unmatched record');
+      await expect.poll(() => new URL(page.url()).search).toMatch(/(?:search|q)=unmatched/);
+    }
+    const filters = surface.getByRole('button', { name: 'Filter list', exact: true });
+    if (await filters.count()) {
+      await filters.first().click();
+      await expect(filters.first()).toHaveAttribute('aria-expanded', 'true');
+      await page.keyboard.press('Escape');
+      await expect(filters.first()).toHaveAttribute('aria-expanded', 'false');
+    }
+  });
+}
+
+test('history date modes preserve applied scope while filters clear independently', async ({
+  page,
+}) => {
+  await authenticateFinancialUser(page);
+  const calls: URL[] = [];
+  await page.route('**/rest/v1/ledger_journal_entries?*', route => {
+    calls.push(new URL(route.request().url()));
+    return route.fulfill({ json: [], headers: { 'content-range': '0-0/0' } });
+  });
+  await page.goto('http://127.0.0.1:4203/money/ledger?from=2026-09-01&search=rent&source=Expense');
+  const control = page.locator('app-history-date-range');
+  await expect(control.getByRole('combobox', { name: 'Date mode' })).toHaveValue('since');
+  await expect.poll(() => calls.length).toBeGreaterThan(0);
+  await expect(page.getByRole('button', { name: 'Filter list', exact: true })).toContainText('1');
+  await page.getByRole('button', { name: 'Clear filters', exact: true }).click();
+  await expect(page).not.toHaveURL(/source=/);
+  await expect(page).toHaveURL(/from=2026-09-01/);
+  await expect(page.getByRole('searchbox')).toHaveValue('rent');
+  await control.getByRole('combobox').selectOption('until');
+  await expect(control.getByRole('status')).toContainText('Showing the last applied dates');
+  await expect(page).toHaveURL(/from=2026-09-01/);
+  await control.getByLabel('Until', { exact: true }).fill('2026-09-20');
+  await control.getByLabel('Until', { exact: true }).dispatchEvent('change');
+  await expect(page).toHaveURL(/to=2026-09-20/);
+  await expect(page).not.toHaveURL(/from=/);
+  await control.getByRole('combobox').selectOption('between');
+  await control.getByLabel('From', { exact: true }).fill('2026-10-01');
+  await control.getByLabel('From', { exact: true }).dispatchEvent('change');
+  await expect(control.getByRole('status')).toContainText('on or before');
+  await expect(page).not.toHaveURL(/from=/);
+  await control.getByLabel('From', { exact: true }).fill('2020-01-01');
+  await control.getByLabel('From', { exact: true }).dispatchEvent('change');
+  await expect(page).toHaveURL(/from=2020-01-01/);
+  await expect.poll(() => calls.at(-1)?.searchParams.getAll('posted_at').length).toBe(2);
+  await control.getByRole('button', { name: 'Reset dates' }).click();
+  await expect(page).not.toHaveURL(/from=|to=/);
+  await expect(page.getByRole('searchbox')).toHaveValue('rent');
+});
+
+test('purchase and proforma histories restore one-ended date links', async ({ page }) => {
+  await authenticateFinancialUser(page, [
+    'ViewFinancials',
+    'SettleOrder',
+    'ManageSupplierCreditPurchases',
+  ]);
+  for (const route of [
+    '/pos/proformas?from=2026-09-01',
+    '/purchases?to=2026-09-20&q=tea&payment=unpaid',
+  ]) {
+    await page.goto('http://127.0.0.1:4203' + route);
+    const control = page.locator('app-history-date-range');
+    await expect(control.getByRole('combobox')).toHaveValue(
+      route.includes('from=') ? 'since' : 'until'
+    );
+    if (route.includes('/purchases')) {
+      await expect(page.getByRole('combobox', { name: 'Payment', exact: true })).toBeVisible();
+      await page.getByRole('button', { name: 'Clear filters', exact: true }).click();
+      await expect(page).toHaveURL(/to=2026-09-20/);
+      await expect(page).not.toHaveURL(/from=|payment=/);
+      await expect(page.getByRole('searchbox')).toHaveValue('tea');
+    }
+  }
+});
+
+test('expense rows keep account context visible without empty disclosure space', async ({
+  page,
+  isMobile,
+}) => {
+  await authenticateFinancialUser(page);
+  const entries = ['Electricity tokens', 'Packaging supplies'].map((memo, index) => ({
+    id: `expense-${index}`,
+    entry_date: '2026-09-27',
+    posted_at: '2026-09-27T10:00:00Z',
+    memo,
+    source_type: 'Expense',
+    ledger_journal_lines: [
+      {
+        id: `debit-${index}`,
+        debit: 175,
+        credit: 0,
+        ledger_accounts: { code: 'EXPENSES', name: 'General expenses' },
+      },
+      {
+        id: `credit-${index}`,
+        debit: 0,
+        credit: 175,
+        ledger_accounts: { code: 'CASH_ON_HAND', name: 'Cash on hand' },
+      },
+    ],
+  }));
+  await page.route('**/rest/v1/ledger_journal_entries?*', route =>
+    route.fulfill({
+      json: entries,
+      headers: { 'content-range': '0-1/2', 'access-control-expose-headers': 'content-range' },
+    })
+  );
+  await page.goto('http://127.0.0.1:4203/money/expenses');
+  const rows = page.locator('app-journal-list [data-list-record]');
+  await expect(rows).toHaveCount(2);
+  await expect(page.getByText('2 matching expenses', { exact: false })).toBeVisible();
+  await expect(rows.first().getByText('Paid from: Cash on hand')).toBeVisible();
+  await expect(rows.first().getByText('General expenses', { exact: true })).not.toBeVisible();
+  const collapsedHeight = (await rows.first().boundingBox())!.height;
+  expect(collapsedHeight).toBeLessThan(isMobile ? 150 : 115);
+  await rows.first().locator('summary').click();
+  await expect(rows.first().getByText('General expenses', { exact: true })).toBeVisible();
+  expect((await rows.first().boundingBox())!.height).toBeGreaterThan(collapsedHeight);
+  await rows.first().locator('summary').click();
+  await expect.poll(async () => (await rows.first().boundingBox())!.height).toBe(collapsedHeight);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBe(0);
+});
+
+test('proforma toolbar groups its controls and distinguishes an empty collection', async ({
+  page,
+  isMobile,
+}) => {
+  await authenticateFinancialUser(page, ['ViewFinancials', 'SettleOrder']);
+  if (!isMobile) await page.setViewportSize({ width: 1600, height: 900 });
+  await page.goto('http://127.0.0.1:4203/pos/proformas');
+  await expect(page.getByText('No proformas yet', { exact: true })).toBeVisible();
+  const toolbar = page.locator('app-list-search-bar');
+  await expect(toolbar.locator('.stat-bar-item:visible')).toHaveCount(4);
+  const date = toolbar.getByRole('combobox', { name: 'Date mode' });
+  const status = toolbar.getByRole('combobox', { name: 'Status', exact: true });
+  const search = toolbar.getByRole('searchbox');
+  if (!isMobile) {
+    const boxes = await Promise.all([date, status].map(control => control.boundingBox()));
+    const bottoms = boxes.map(box => box!.y + box!.height);
+    expect(Math.max(...bottoms) - Math.min(...bottoms)).toBeLessThanOrEqual(1);
+    expect((await search.boundingBox())!.y).toBeLessThan(boxes[0]!.y);
+    expect((await toolbar.boundingBox())!.height).toBeLessThan(170);
+  }
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBe(0);
+  await status.selectOption('expired');
+  await expect(page.getByText('No matching proformas', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Clear filters', exact: true }).click();
+  await expect(page.getByText('No proformas yet', { exact: true })).toBeVisible();
+});
+
+function journalHistoryEntry(index: number) {
+  return {
+    id: `history-${index}`,
+    entry_date: '2026-09-27',
+    posted_at: '2026-09-27T10:00:00Z',
+    memo: `History entry ${index}`,
+    source_type: 'Expense',
+    ledger_journal_lines: [
+      {
+        id: `debit-${index}`,
+        debit: 175,
+        credit: 0,
+        ledger_accounts: { code: 'EXPENSES', name: 'General expenses' },
+      },
+      {
+        id: `credit-${index}`,
+        debit: 0,
+        credit: 175,
+        ledger_accounts: { code: 'CASH_ON_HAND', name: 'Cash on hand' },
+      },
+    ],
+  };
+}
+
+test('journal search reloads results and resets pagination after the shared debounce', async ({
+  page,
+}) => {
+  await authenticateFinancialUser(page);
+  const requests: URL[] = [];
+  await page.route('**/rest/v1/ledger_journal_entries?*', route => {
+    const url = new URL(route.request().url());
+    requests.push(url);
+    const searching = url.searchParams.get('or')?.includes('packaging');
+    return route.fulfill({
+      json: searching
+        ? [{ ...journalHistoryEntry(60), memo: 'Packaging supplies' }]
+        : Array.from({ length: 25 }, (_, i) => journalHistoryEntry(i)),
+      headers: {
+        'content-range': searching ? '0-0/1' : '25-49/60',
+        'access-control-expose-headers': 'content-range',
+      },
+    });
+  });
+  await page.goto('http://127.0.0.1:4203/money/ledger?page=2');
+  const records = page.locator('[data-list-record]:visible');
+  await expect(records).toHaveCount(25);
+  await page.getByRole('searchbox', { name: 'Search journal entries' }).fill('packaging');
+  await expect(records).toHaveCount(1);
+  await expect(records.first()).toContainText('Packaging supplies');
+  await expect(page).not.toHaveURL(/page=2/);
+  await expect(page).toHaveURL(/search=packaging/);
+  expect(requests.at(-1)?.searchParams.get('offset')).toBe('0');
+  await page.getByRole('button', { name: 'Clear search', exact: true }).click();
+  await expect(records).toHaveCount(25);
+  expect(requests.at(-1)?.searchParams.has('or')).toBe(false);
+});
+
+for (const history of ['ledger', 'expenses', 'transfers']) {
+  test(`${history} pagination returns to records after URL scrolling, including revisited pages`, async ({
+    page,
+    isMobile,
+  }) => {
+    await authenticateFinancialUser(page);
+    await page.route('**/rest/v1/ledger_journal_entries?*', route => {
+      const offset = Number(new URL(route.request().url()).searchParams.get('offset') ?? 0);
+      return route.fulfill({
+        json: Array.from({ length: 10 }, (_, i) => journalHistoryEntry(offset + i)),
+        headers: {
+          'content-range': `${offset}-${offset + 9}/60`,
+          'access-control-expose-headers': 'content-range',
+        },
+      });
+    });
+    await page.goto(`http://127.0.0.1:4203/money/${history}?pageSize=10`);
+    // The development-only persona switcher floats over the phone pagination.
+    await page.addStyleTag({ content: 'app-persona-switcher { display: none !important; }' });
+    const records = page.locator('[data-list-record]:visible');
+    await expect(records).toHaveCount(10);
+    const area = page.locator(
+      history === 'ledger'
+        ? isMobile
+          ? 'app-mobile-list'
+          : '.data-table-records'
+        : 'app-journal-list'
+    );
+    for (const pageNumber of [2, 1, 2]) {
+      const changePage = page.getByRole('button', {
+        name: pageNumber === 1 ? 'Previous page' : 'Next page',
+        exact: true,
+      });
+      await changePage.evaluate(element => element.scrollIntoView({ block: 'center' }));
+      await changePage.click();
+      await expect(records.first()).toContainText(`History entry ${(pageNumber - 1) * 10}`);
+      await expect
+        .poll(() => new URL(page.url()).searchParams.get('page') ?? '1')
+        .toBe(String(pageNumber));
+      // Observe the settled position after both router scrolling and list rendering.
+      await page.evaluate(
+        () =>
+          new Promise<void>(resolve =>
+            requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+          )
+      );
+      await expect
+        .poll(() =>
+          area.evaluate(element => {
+            const top = element.getBoundingClientRect().top + window.scrollY;
+            const maximum = document.documentElement.scrollHeight - window.innerHeight;
+            // A short page can reach the document bottom before its records reach the navbar.
+            return Math.round(window.scrollY - Math.min(maximum, Math.max(0, top - 64)));
+          })
+        )
+        .toBe(0);
+    }
+  });
+}
+
+test('staff invalid dates during refresh retain the valid results and release loading', async ({
+  page,
+}) => {
+  await authenticateFinancialUser(page, ['ViewFinancials', 'ViewStaffPerformance']);
+  let hold = false;
+  let pending = 0;
+  let release!: () => void;
+  const response = new Promise<void>(resolve => {
+    release = resolve;
+  });
+  const staff = {
+    staff_user_id: '00000000-0000-4000-8000-000000000002',
+    display_name: 'Amina Wanjiku',
+    role_name: 'Cashier',
+    authorization_status: 'approved',
+    transactions: 4,
+    quantity: 12,
+    gross_sales: 250,
+    refunds: 30,
+    voided_sales: 20,
+    net_sales: 200,
+    collected: 160,
+    margin: 60,
+    average_sale: 50,
+    held_count: 2,
+    held_value: 90,
+  };
+  await page.route('**/rest/v1/rpc/staff_sales_performance', async route => {
+    if (hold) {
+      pending++;
+      await response;
+    }
+    await route.fulfill({ json: [staff] });
+  });
+  await page.goto('http://127.0.0.1:4203/team/performance?from=2026-09-01&to=2026-09-27');
+  await expect(page.locator('[data-list-record]:visible').first()).toContainText('Amina');
+  hold = true;
+  await page.getByRole('button', { name: 'Refresh performance' }).click();
+  await expect.poll(() => pending).toBe(2);
+  await page.getByLabel('From', { exact: true }).fill('2026-10-01');
+  await page.getByLabel('From', { exact: true }).dispatchEvent('change');
+  await expect(page.getByRole('alert')).toContainText('From date must be before');
+  release();
+  await expect(page.getByRole('button', { name: 'Refresh performance' })).toBeEnabled();
+  await expect(page.locator('[data-list-record]:visible').first()).toContainText('Amina');
+  await expect(page.getByRole('alert')).toContainText('From date must be before');
 });

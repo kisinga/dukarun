@@ -1,4 +1,5 @@
-import { Component, OnInit, effect, inject, signal } from '@angular/core';
+import { StatBarComponent } from '../../shared/ui/stat-bar.component';
+import { Component, computed, OnInit, effect, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { CashierSessionDialogService } from '../../core/cashier-session-dialog.service';
 import { CashierSessionService } from '../../core/cashier-session.service';
@@ -20,6 +21,7 @@ import {
 @Component({
   selector: 'app-money-cashier',
   imports: [
+    StatBarComponent,
     RouterLink,
     ButtonComponent,
     MoneyComponent,
@@ -109,6 +111,13 @@ import {
       </div>
     }
 
+    <app-stat-bar
+      class="block mb-3"
+      [stats]="[
+        { label: 'Sessions shown', value: sessions().length },
+        { label: 'Open sessions shown', value: openHistoryCount() },
+      ]"
+    />
     <h2 class="section-title mb-2">Recent sessions</h2>
     <p class="type-caption mb-3">Review account variances from the dedicated Reconcile section.</p>
     @if (!loading() && sessions().length === 0) {
@@ -120,7 +129,7 @@ import {
     } @else {
       <div class="flex flex-col gap-2">
         @for (session of sessions(); track session.id) {
-          <div class="card bg-base-100">
+          <div class="card bg-base-100" [attr.data-list-record]="session.id">
             <div class="card-body p-4">
               <div class="flex flex-wrap items-center gap-3">
                 <span class="text-sm font-semibold">{{ time(session.opened_at) }}</span>
@@ -197,6 +206,9 @@ import {
   `,
 })
 export class MoneyCashierComponent implements OnInit {
+  protected readonly openHistoryCount = computed(
+    () => this.sessions().filter(session => session.status === 'open').length
+  );
   private readonly money = inject(MoneyService);
   protected readonly cashierSession = inject(CashierSessionService);
   protected readonly perms = inject(PermissionsService);

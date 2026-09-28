@@ -313,6 +313,7 @@ input.search-with-custom-clear::-ms-clear {
 
   .data-table-viewport {
     overflow-x: auto;
+    overflow-y: hidden;
   }
 
   .data-table-viewport:focus-visible {
@@ -320,21 +321,112 @@ input.search-with-custom-clear::-ms-clear {
     outline-offset: -2px;
   }
 
-  /* Long primary datasets own one bounded desktop scroll region. This keeps
-     labels in view without making short tables or phone card lists scroll. */
+  .data-table-records {
+    position: relative;
+  }
+  .data-table-header-band {
+    position: relative;
+    z-index: 20;
+  }
+  .data-table-header-viewport {
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+  }
+  .data-table-header-viewport::-webkit-scrollbar {
+    display: none;
+  }
+  .data-table-enhanced .data-table-viewport {
+    margin-top: calc(-1 * var(--table-header-height));
+  }
+  .data-table-semantic-header {
+    opacity: 0;
+  }
+  .data-table-header-band th {
+    background: var(--color-base-200);
+  }
+  .list-scroll-page {
+    overflow: visible;
+  }
+  .list-scroll-page :is(button, a, input, select, [tabindex]) {
+    scroll-margin-top: 8rem;
+  }
   @media (min-width: 1024px) {
-    .data-table-viewport-bounded {
-      max-height: min(64dvh, 48rem);
-      overflow: auto;
-      overscroll-behavior: contain;
-      scrollbar-gutter: stable;
-      scroll-padding-top: 3rem;
-    }
-
-    .data-table-viewport-bounded .table thead th {
+    .list-scroll-page .data-table-header-sticky {
       position: sticky;
-      top: 0;
-      z-index: 10;
+      top: 3.5rem;
+    }
+    .data-table-enhanced .data-table-pinned {
+      position: sticky;
+      z-index: 1;
+      background: var(--color-base-100);
+    }
+    .data-table-enhanced .data-table-header-band .data-table-pinned {
+      background: var(--color-base-200);
+    }
+  }
+  @media print {
+    .data-table-header-band {
+      display: none;
+    }
+    .data-table-enhanced .data-table-viewport {
+      margin-top: 0;
+      overflow: visible;
+    }
+    .data-table-semantic-header {
+      opacity: 1;
+    }
+    .data-table-enhanced .data-table-pinned {
+      position: static;
+    }
+  }
+
+  .data-table-shell .list-account-table {
+    table-layout: fixed;
+    th,
+    td {
+      padding-inline: 0.75rem;
+    }
+    thead th {
+      white-space: normal;
+      overflow-wrap: anywhere;
+    }
+    .table-entity {
+      min-width: 0;
+    }
+    .table-secondary {
+      overflow-wrap: anywhere;
+    }
+    .table-actions {
+      white-space: normal;
+    }
+    .account-row-actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+  }
+
+  .data-table-shell .list-priority-table {
+    table-layout: fixed;
+    thead th,
+    td {
+      white-space: normal;
+      overflow-wrap: anywhere;
+    }
+    thead th {
+      overflow-wrap: normal;
+    }
+    .badge {
+      white-space: normal;
+      height: auto;
+      min-height: 1.5rem;
+    }
+  }
+
+  .data-table-shell .list-catalog-table {
+    thead th {
+      white-space: normal;
     }
   }
 
@@ -980,6 +1072,26 @@ input.search-with-custom-clear::-ms-clear {
 /* DaisyUI controls are emitted in utilities. Keep the shared control contract in that same
    layer so it overrides component defaults without !important or per-screen fixes. */
 @layer utilities {
+  .data-table-shell .list-priority-table :is(th, td) {
+    padding-inline: 0.5rem;
+  }
+  .data-table-shell .list-catalog-table :is(th, td) {
+    padding-inline: 0.75rem;
+  }
+  @media (min-width: 1024px) {
+    /* Rich catalog actions wrap below the title before compressing its context. */
+    app-products .page-header {
+      display: flex;
+      flex-wrap: wrap;
+      > :first-child {
+        flex: 1 1 18rem;
+      }
+      > :last-child {
+        margin-left: auto;
+      }
+    }
+  }
+
   /* Legacy DaisyUI actions and appButton share emphasis, type and interaction colours. */
   .btn-primary {
     --btn-color: var(--color-primary);
@@ -1120,6 +1232,25 @@ body {
   font-size: 0.875rem; // Counter body role
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* List filters are compact on desktop; phone controls retain full touch targets. */
+app-list-search-bar .list-toolbar-context {
+  --list-filter-height: 2.75rem;
+}
+
+app-list-search-bar .list-toolbar-context :is(.input, .select, .counter-btn, .btn) {
+  min-height: var(--list-filter-height);
+}
+
+app-list-search-bar .list-toolbar-context :is(.input, .select) {
+  height: var(--list-filter-height);
+}
+
+@media (min-width: 1024px) {
+  app-list-search-bar .list-toolbar-context {
+    --list-filter-height: 2.25rem;
+  }
 }
 
 /* ============================================

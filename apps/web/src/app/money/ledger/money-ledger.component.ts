@@ -1,8 +1,17 @@
+import {
+  HistoryDateRangeComponent,
+  type HistoryDateRange,
+} from '../../shared/ui/history-date-range.component';
+import { bindListQuery, listQueryField } from '../../shared/list/list-query';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { formatKes } from '../../core/money';
-import { DataTableShellComponent } from '../../shared/ui/data-table-shell.component';
+import {
+  DataTableShellComponent,
+  TableRowsDirective,
+  type TableColumn,
+} from '../../shared/ui/data-table-shell.component';
 import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
 import {
   ListSearchBarComponent,
@@ -22,9 +31,11 @@ const JOURNAL_SORT_OPTIONS: readonly ListSortOption[] = [
 @Component({
   selector: 'app-money-ledger',
   imports: [
+    HistoryDateRangeComponent,
     DatePipe,
     FormsModule,
     DataTableShellComponent,
+    TableRowsDirective,
     EmptyStateComponent,
     ListSearchBarComponent,
     PaginationComponent,
@@ -66,37 +77,41 @@ const JOURNAL_SORT_OPTIONS: readonly ListSortOption[] = [
       </section>
 
       <app-list-search-bar
+        searchLabel="Search journal entries"
         placeholder="Description or source reference…"
-        [(searchQuery)]="search"
+        [searchQuery]="search()"
+        (searchQueryChange)="search.set($event); applyFilters()"
         [sortOptions]="journalSortOptions"
         [sortKey]="journalSort()"
         (sortKeyChange)="changeSort($event, journalSortDirection())"
         [sortDirection]="journalSortDirection()"
         (sortDirectionChange)="changeSort(journalSort(), $event)"
         [filtersEnabled]="true"
-        [activeFilterCount]="ledgerActiveFilterCount()"
+        [activeFilters]="filterChips()"
+        (removeFilter)="removeChip($event)"
         (clearFilters)="clearFilters()"
       >
         <div filters class="flex flex-wrap items-end gap-2">
           <label class="form-control">
             <span class="label-text text-xs">Source</span>
-            <select class="select select-bordered select-sm" [(ngModel)]="sourceType">
+            <select
+              class="select select-bordered select-sm"
+              [(ngModel)]="sourceType"
+              (ngModelChange)="applyFilters()"
+            >
               <option value="">All sources</option>
               @for (source of sourceTypes(); track source) {
                 <option [value]="source">{{ source }}</option>
               }
             </select>
           </label>
-          <label class="form-control">
-            <span class="label-text text-xs">From</span>
-            <input class="input input-bordered input-sm" type="date" [(ngModel)]="from" />
-          </label>
-          <label class="form-control">
-            <span class="label-text text-xs">To</span>
-            <input class="input input-bordered input-sm" type="date" [(ngModel)]="to" />
-          </label>
-          <button class="btn btn-primary btn-sm min-h-11" (click)="applyFilters()">Apply</button>
-          <button class="btn btn-ghost btn-sm min-h-11" (click)="clearFilters()">Clear</button>
+        </div>
+        <div scope>
+          <app-history-date-range
+            [from]="from()"
+            [to]="to()"
+            (rangeChange)="applyHistoryDates($event)"
+          />
         </div>
       </app-list-search-bar>
 
@@ -114,23 +129,26 @@ const JOURNAL_SORT_OPTIONS: readonly ListSortOption[] = [
         </div>
       }
       @if (error()) {
-        <p class="text-sm text-error">{{ error() }}</p>
+        <div role="alert" class="alert alert-error text-sm">
+          {{ error() }}
+          <button class="btn btn-ghost btn-sm min-h-11" (click)="load()">Retry</button>
+        </div>
       }
       @if (loading() && rows().length === 0) {
         <div class="flex justify-center p-8">
           <span class="loading loading-spinner loading-md"></span>
         </div>
-      } @else if (rows().length === 0) {
+      } @else if (rows().length === 0 && !error()) {
         <app-empty-state
           [compact]="true"
           icon="heroDocumentText"
           title="No journal entries"
           description="Try a wider date range or clear the filters."
         />
-      } @else {
+      } @else if (rows().length > 0) {
         <app-mobile-list>
           @for (entry of rows(); track entry.id) {
-            <div mobileListRow>
+            <div [attr.data-list-record]="entry.id" mobileListRow>
               <button
                 type="button"
                 class="flex min-h-20 w-full items-center gap-3 p-3 text-left"
@@ -174,65 +192,58 @@ const JOURNAL_SORT_OPTIONS: readonly ListSortOption[] = [
           }
         </app-mobile-list>
         <div class="hidden lg:block">
-          <app-data-table-shell heading="Journal" [description]="total() + ' entries'">
-            <table class="table table-sm">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Source</th>
-                  <th>Description</th>
-                  <th class="text-right">Debit</th>
-                  <th class="text-right">Credit</th>
-                  <th></th>
+          <app-data-table-shell
+            [columns]="tableColumns1"
+            tableClass="table-sm"
+            heading="Journal"
+            [description]="total() + ' entries'"
+          >
+            <ng-template tableRows>
+              @for (entry of rows(); track entry.id) {
+                <tr [attr.data-list-record]="entry.id">
+                  <td class="whitespace-nowrap text-sm">
+                    {{ entry.posted_at | date: 'medium' }}
+                  </td>
+                  <td>
+                    <span class="badge badge-ghost badge-sm">{{ entry.source_type }}</span>
+                    <div class="max-w-36 truncate font-mono text-xs text-base-content/50">
+                      {{ entry.source_id }}
+                    </div>
+                  </td>
+                  <td>{{ entry.memo }}</td>
+                  <td class="text-right font-medium">{{ fmt(entryDebit(entry)) }}</td>
+                  <td class="text-right font-medium">{{ fmt(entryCredit(entry)) }}</td>
+                  <td class="text-right">
+                    <button class="btn btn-ghost btn-xs" (click)="toggle(entry.id)">
+                      {{ expanded() === entry.id ? 'Hide' : 'Details' }}
+                    </button>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                @for (entry of rows(); track entry.id) {
-                  <tr>
-                    <td class="whitespace-nowrap text-sm">
-                      {{ entry.posted_at | date: 'medium' }}
-                    </td>
-                    <td>
-                      <span class="badge badge-ghost badge-sm">{{ entry.source_type }}</span>
-                      <div class="max-w-36 truncate font-mono text-xs text-base-content/50">
-                        {{ entry.source_id }}
+                @if (expanded() === entry.id) {
+                  <tr class="row-detail">
+                    <td colspan="6">
+                      <div class="grid gap-2 sm:grid-cols-2">
+                        @for (line of entry.ledger_journal_lines; track line.id) {
+                          <div
+                            class="flex items-center gap-3 rounded-field border border-base-300/60 bg-base-100 p-2 text-sm"
+                          >
+                            <span
+                              ><strong class="font-mono">{{ line.ledger_accounts?.code }}</strong
+                              ><br /><span class="text-base-content/60">{{
+                                line.ledger_accounts?.name
+                              }}</span></span
+                            >
+                            <span class="ml-auto tabular-nums">{{
+                              line.debit ? 'Dr ' + fmt(line.debit) : 'Cr ' + fmt(line.credit)
+                            }}</span>
+                          </div>
+                        }
                       </div>
                     </td>
-                    <td>{{ entry.memo }}</td>
-                    <td class="text-right font-medium">{{ fmt(entryDebit(entry)) }}</td>
-                    <td class="text-right font-medium">{{ fmt(entryCredit(entry)) }}</td>
-                    <td class="text-right">
-                      <button class="btn btn-ghost btn-xs" (click)="toggle(entry.id)">
-                        {{ expanded() === entry.id ? 'Hide' : 'Details' }}
-                      </button>
-                    </td>
                   </tr>
-                  @if (expanded() === entry.id) {
-                    <tr class="row-detail">
-                      <td colspan="6">
-                        <div class="grid gap-2 sm:grid-cols-2">
-                          @for (line of entry.ledger_journal_lines; track line.id) {
-                            <div
-                              class="flex items-center gap-3 rounded-field border border-base-300/60 bg-base-100 p-2 text-sm"
-                            >
-                              <span
-                                ><strong class="font-mono">{{ line.ledger_accounts?.code }}</strong
-                                ><br /><span class="text-base-content/60">{{
-                                  line.ledger_accounts?.name
-                                }}</span></span
-                              >
-                              <span class="ml-auto tabular-nums">{{
-                                line.debit ? 'Dr ' + fmt(line.debit) : 'Cr ' + fmt(line.credit)
-                              }}</span>
-                            </div>
-                          }
-                        </div>
-                      </td>
-                    </tr>
-                  }
                 }
-              </tbody>
-            </table>
+              }
+            </ng-template>
           </app-data-table-shell>
         </div>
         <div class="mt-3">
@@ -252,6 +263,14 @@ const JOURNAL_SORT_OPTIONS: readonly ListSortOption[] = [
   `,
 })
 export class MoneyLedgerComponent implements OnInit {
+  protected readonly tableColumns1: TableColumn[] = [
+    { key: 'column0', label: 'Date', pinned: true },
+    { key: 'column1', label: 'Source' },
+    { key: 'column2', label: 'Description' },
+    { key: 'column3', label: 'Debit', align: 'right' },
+    { key: 'column4', label: 'Credit', align: 'right' },
+    { key: 'column5', label: 'Details' },
+  ];
   private readonly money = inject(MoneyService);
   protected readonly fmt = formatKes;
   protected readonly accounts = signal<LedgerAccountWithBalance[]>([]);
@@ -279,6 +298,23 @@ export class MoneyLedgerComponent implements OnInit {
    */
   protected readonly sourceTypes = signal<string[]>([]);
 
+  constructor() {
+    bindListQuery(
+      {
+        account: listQueryField(this.accountCode),
+        source: listQueryField(this.sourceType),
+        search: listQueryField(this.search),
+        sort: listQueryField(this.journalSort),
+        direction: listQueryField(this.journalSortDirection),
+        from: listQueryField(this.from),
+        to: listQueryField(this.to),
+        page: listQueryField(this.page),
+        pageSize: listQueryField(this.pageSize, { max: 100 }),
+      },
+      () => void this.load()
+    );
+  }
+
   async ngOnInit(): Promise<void> {
     try {
       await Promise.all([this.loadAccounts(), this.load()]);
@@ -289,7 +325,10 @@ export class MoneyLedgerComponent implements OnInit {
   protected async loadAccounts(): Promise<void> {
     this.accounts.set(await this.money.ledgerAccountsWithBalances());
   }
+  private listRequest = 0;
   protected async load(): Promise<void> {
+    if (this.from() && this.to() && this.from() > this.to()) return;
+    const request = ++this.listRequest;
     this.loading.set(true);
     this.error.set(null);
     try {
@@ -304,17 +343,25 @@ export class MoneyLedgerComponent implements OnInit {
         sortBy: this.journalSort() as 'posted_at' | 'source_type' | 'memo',
         sortDirection: this.journalSortDirection(),
       });
+      if (request !== this.listRequest) return;
       this.rows.set(result.rows);
       this.total.set(result.count);
       this.sourceTypes.update(types =>
         [...new Set([...types, ...result.rows.map(row => row.source_type)])].sort()
       );
     } catch (error) {
+      if (request !== this.listRequest) return;
       this.error.set(error instanceof Error ? error.message : 'Failed to load ledger');
     } finally {
-      this.loading.set(false);
+      if (request === this.listRequest) this.loading.set(false);
     }
   }
+  protected async applyHistoryDates(range: HistoryDateRange): Promise<void> {
+    this.from.set(range.from);
+    this.to.set(range.to);
+    await this.applyFilters();
+  }
+
   protected async applyFilters(): Promise<void> {
     this.page.set(1);
     await this.load();
@@ -330,24 +377,26 @@ export class MoneyLedgerComponent implements OnInit {
     if (code) void this.filterByAccount(code);
     else void this.clearAccountFilter();
   }
-  protected ledgerActiveFilterCount(): number {
-    return (
-      Number(Boolean(this.accountCode())) +
-      Number(Boolean(this.sourceType())) +
-      Number(Boolean(this.from())) +
-      Number(Boolean(this.to()))
-    );
+  protected readonly filterChips = computed(() => [
+    ...(this.accountCode() ? [{ key: 'account', label: 'Account: ' + this.accountCode() }] : []),
+    ...(this.sourceType() ? [{ key: 'source', label: 'Source: ' + this.sourceType() }] : []),
+  ]);
+  protected removeChip(key: string): void {
+    if (key === 'account') this.accountCode.set('');
+    if (key === 'source') this.sourceType.set('');
+    if (key === 'dates') {
+      this.from.set('');
+      this.to.set('');
+    }
+    void this.applyFilters();
   }
   protected async clearAccountFilter(): Promise<void> {
     this.accountCode.set('');
     await this.applyFilters();
   }
   protected async clearFilters(): Promise<void> {
-    this.search.set('');
     this.accountCode.set('');
     this.sourceType.set('');
-    this.from.set('');
-    this.to.set('');
     await this.applyFilters();
   }
   protected async changePage(page: number): Promise<void> {

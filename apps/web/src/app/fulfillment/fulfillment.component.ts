@@ -1,3 +1,5 @@
+import { StatBarComponent } from '../shared/ui/stat-bar.component';
+import { bindListQuery, listQueryField } from '../shared/list/list-query';
 import { Component, OnInit, computed, effect, inject, signal } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -30,6 +32,7 @@ type FulfillmentAction =
 @Component({
   selector: 'app-fulfillment',
   imports: [
+    StatBarComponent,
     FormsModule,
     NgTemplateOutlet,
     PageLayoutComponent,
@@ -114,6 +117,15 @@ type FulfillmentAction =
             <div class="alert alert-success mb-4 text-sm" role="status">{{ notice() }}</div>
           }
 
+          @if (tab() !== 'cash') {
+            <app-stat-bar
+              class="mb-3 block"
+              [stats]="[
+                { label: 'Active at this location', value: activeRows().length },
+                { label: 'Ready at this location', value: readyRowsCount() },
+              ]"
+            />
+          }
           @if (tab() === 'cash') {
             <section class="grid gap-6" [class.xl:grid-cols-2]="canComplete()">
               @if (canComplete()) {
@@ -266,6 +278,7 @@ type FulfillmentAction =
                     <div class="space-y-2">
                       @for (row of rowsFor(status); track row.id) {
                         <button
+                          [attr.data-list-record]="row.id"
                           type="button"
                           class="block w-full border border-base-300 bg-base-100 p-3 text-left shadow-sm transition hover:border-base-content/30 hover:shadow"
                           (click)="openDetail(row)"
@@ -283,6 +296,7 @@ type FulfillmentAction =
               <section class="space-y-2 md:hidden">
                 @for (row of rowsFor(mobileStatus()); track row.id) {
                   <button
+                    [attr.data-list-record]="row.id"
                     type="button"
                     class="block w-full border-y border-base-300 bg-base-100 p-3 text-left"
                     (click)="openDetail(row)"
@@ -311,6 +325,7 @@ type FulfillmentAction =
                 <div class="grid gap-x-5 sm:grid-cols-2 xl:grid-cols-4">
                   @for (row of recentRows(); track row.id) {
                     <button
+                      [attr.data-list-record]="row.id"
                       type="button"
                       class="flex min-h-14 items-center justify-between gap-3 border-b border-base-300 py-2 text-left"
                       (click)="openDetail(row)"
@@ -840,6 +855,9 @@ export class FulfillmentComponent implements OnInit {
   protected readonly canSettle = computed(() => this.permissions.has('SettleOrder'));
   protected readonly canConfigure = computed(() => this.permissions.has('ManageCompanySettings'));
   protected readonly canReconcile = computed(() => this.permissions.has('ManageReconciliation'));
+  protected readonly readyRowsCount = computed(
+    () => this.activeRows().filter(row => row.status === 'ready').length
+  );
   protected readonly activeRows = computed(() =>
     this.rows().filter(row => !['fulfilled', 'cancelled'].includes(row.status))
   );
@@ -850,6 +868,10 @@ export class FulfillmentComponent implements OnInit {
   );
 
   constructor() {
+    bindListQuery({
+      tab: listQueryField(this.tab, { values: ['board', 'mine', 'cash'] }),
+      status: listQueryField(this.mobileStatus, { values: this.statuses }),
+    });
     let priorLocation: string | null = null;
     effect(() => {
       if (this.permissions.ready() && !this.initialTabSelected) {

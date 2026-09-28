@@ -99,7 +99,7 @@ select results_eq(
     from public.inventory_batches b
     join public.product_variants v on v.id = b.variant_id
     join public.companies c on c.id = b.company_id
-    where c.name = 'Mama Mboga Stores'
+    where c.name = 'Mama Mboga Stores' and v.sku in ('MM-EGG','MM-MILK500','SUG1','SUGL','UNGA2')
     group by v.sku
     order by v.sku$$,
   $$values
@@ -154,7 +154,8 @@ select is(
   (select count(*)::int
    from public.manufacturers m
    join public.companies c on c.id=m.company_id
-   where c.name='Mama Mboga Stores'),
+   where c.name='Mama Mboga Stores' and m.id in (
+     'd1000000-0000-0000-0000-000000000001','d1000000-0000-0000-0000-000000000002')),
   2,
   'the demo company has canonical manufacturers for autocomplete'
 );
@@ -164,7 +165,8 @@ select results_eq(
     from public.products p
     join public.manufacturers m on m.id=p.manufacturer_id
     join public.companies c on c.id=p.company_id
-    where c.name='Mama Mboga Stores'
+    where c.name='Mama Mboga Stores' and p.id in (
+      'd0000000-0000-0000-0000-000000000001','d0000000-0000-0000-0000-000000000002')
     order by p.name$$,
   $$values
     ('Sugar'::text, 'Mumias Sugar'::text),

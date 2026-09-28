@@ -1,6 +1,10 @@
-import { Component, input, output } from '@angular/core';
+import { Component, computed, input, output } from '@angular/core';
 import { ButtonComponent } from '../shared/ui/button.component';
-import { DataTableShellComponent } from '../shared/ui/data-table-shell.component';
+import {
+  DataTableShellComponent,
+  TableRowsDirective,
+  type TableColumn,
+} from '../shared/ui/data-table-shell.component';
 import { EmptyStateComponent } from '../shared/ui/empty-state.component';
 import { EntityAvatarComponent } from '../shared/ui/entity-avatar.component';
 import { FormFieldComponent } from '../shared/ui/form-field.component';
@@ -28,6 +32,7 @@ type SupplierStats = {
   imports: [
     ButtonComponent,
     DataTableShellComponent,
+    TableRowsDirective,
     EmptyStateComponent,
     EntityAvatarComponent,
     FormFieldComponent,
@@ -51,10 +56,20 @@ type SupplierStats = {
       [sortDirection]="sortDirection()"
       (sortDirectionChange)="sortDirectionChange.emit($event)"
       [filtersEnabled]="true"
-      [activeFilterCount]="activeFilterCount()"
+      [activeFilters]="filterChips()"
+      (removeFilter)="removeChip($event)"
       (clearFilters)="clearFilters.emit()"
     >
-      <app-stat-bar summary [stats]="summary()" />
+      <div summary class="grid gap-3 lg:grid-cols-[1fr_2fr]">
+        <section>
+          <p class="type-caption mb-1">Suppliers · Entire business</p>
+          <app-stat-bar [stats]="summary().slice(0, 1)" />
+        </section>
+        <section>
+          <p class="type-caption mb-1">Money owed · Entire business</p>
+          <app-stat-bar [stats]="summary().slice(1)" />
+        </section>
+      </div>
       <div filters class="grid gap-2 sm:grid-cols-2 lg:flex lg:items-end">
         <app-form-field label="Account status" class="lg:w-44">
           <select
@@ -67,17 +82,7 @@ type SupplierStats = {
             <option value="archived">Archived</option>
           </select>
         </app-form-field>
-        <app-form-field label="Balance" class="lg:w-44">
-          <select
-            class="select select-bordered select-sm w-full"
-            [value]="balanceFilter()"
-            (change)="filterChange.emit({ kind: 'balance', value: selectValue($event) })"
-          >
-            <option value="all">Any balance</option>
-            <option value="owed">We owe</option>
-            <option value="clear">Nothing owed</option>
-          </select>
-        </app-form-field>
+
         <app-form-field label="Age" class="lg:w-44">
           <select
             class="select select-bordered select-sm w-full"
@@ -87,6 +92,19 @@ type SupplierStats = {
             <option value="all">Any age</option>
             <option value="overdue">Over 30 days</option>
             <option value="current">Current or clear</option>
+          </select>
+        </app-form-field>
+      </div>
+      <div quickFilters class="flex flex-wrap items-end gap-3">
+        <app-form-field label="Balance" class="lg:w-44">
+          <select
+            class="select select-bordered select-sm min-h-11 w-full"
+            [value]="balanceFilter()"
+            (change)="filterChange.emit({ kind: 'balance', value: selectValue($event) })"
+          >
+            <option value="all">Any balance</option>
+            <option value="owed">We owe</option>
+            <option value="clear">Nothing owed</option>
           </select>
         </app-form-field>
       </div>
@@ -101,82 +119,84 @@ type SupplierStats = {
     } @else {
       <div class="mb-4 hidden lg:block">
         <app-data-table-shell
+          [columns]="tableColumns1"
+          tableClass="list-account-table"
           heading="Supplier accounts"
           [description]="filteredCount() + ' matching suppliers'"
         >
-          <table class="table account-table">
-            <thead>
-              <tr>
-                <th>Supplier</th>
-                <th>Contact</th>
-                <th>Purchase activity</th>
-                <th>Terms & aging</th>
-                <th class="text-right">We owe</th>
-                <th class="text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (supplier of suppliers(); track supplier.id) {
-                <tr
-                  role="button"
-                  tabindex="0"
-                  class="cursor-pointer"
-                  [class.opacity-60]="!supplier.supplier_active"
-                  [class.table-row-active]="selectedSupplierId() === supplier.id"
-                  (click)="openSupplier.emit(supplier)"
-                  (keydown.enter)="openSupplier.emit(supplier)"
-                >
-                  <td>
-                    <div class="table-entity">
-                      <app-entity-avatar size="sm" [firstName]="supplierName()(supplier)" />
-                      <div class="min-w-0">
-                        <div class="flex items-center gap-2">
-                          <p class="table-primary truncate">{{ supplierName()(supplier) }}</p>
-                          @if (!supplier.supplier_active) {
-                            <app-status-badge size="xs" type="neutral" label="Archived" />
-                          }
-                        </div>
-                        <p class="table-secondary truncate">
-                          {{ supplier.notes || 'No notes' }}
-                        </p>
+          <ng-template tableRows>
+            @for (supplier of suppliers(); track supplier.id) {
+              <tr
+                [attr.data-list-record]="supplier.id"
+                tabindex="0"
+                class="cursor-pointer"
+                [class.opacity-60]="!supplier.supplier_active"
+                [class.table-row-active]="selectedSupplierId() === supplier.id"
+                (click)="openSupplier.emit(supplier)"
+                (keydown.enter)="openSupplier.emit(supplier)"
+              >
+                <td>
+                  <div class="table-entity">
+                    <app-entity-avatar size="sm" [firstName]="supplierName()(supplier)" />
+                    <div class="min-w-0">
+                      <div class="flex items-center gap-2">
+                        <p class="table-primary truncate">{{ supplierName()(supplier) }}</p>
+                        @if (!supplier.supplier_active) {
+                          <app-status-badge size="xs" type="neutral" label="Archived" />
+                        }
                       </div>
+                      @if (supplier.notes) {
+                        <p class="table-secondary whitespace-normal">{{ supplier.notes }}</p>
+                      }
                     </div>
-                  </td>
-                  <td>
+                  </div>
+                  <div class="table-secondary mt-1">
                     <p class="table-primary">{{ supplier.phone || '—' }}</p>
-                    <p class="table-secondary">{{ supplier.email || 'No email' }}</p>
-                  </td>
-                  <td>
-                    @if (supplierStats()(supplier.id); as stats) {
-                      <p class="table-primary">{{ stats.purchases }} purchases</p>
-                      <p class="table-secondary">{{ stats.openPurchases }} still open</p>
+                    @if (supplier.email) {
+                      <p class="table-secondary">{{ supplier.email }}</p>
                     }
-                  </td>
-                  <td>
-                    @if (supplier.supplier_credit_limit > 0) {
-                      <p class="table-primary">
-                        <app-money [amount]="supplier.supplier_credit_limit" /> limit
-                      </p>
-                    } @else {
-                      <p class="table-primary">No credit cap</p>
-                    }
-                    <p class="table-secondary">
-                      {{ supplier.supplier_credit_terms_days || 0 }}-day terms
+                  </div>
+                </td>
+                <td>
+                  @if (supplierStats()(supplier.id); as stats) {
+                    <p class="table-primary">{{ stats.purchases }} purchases</p>
+                    <p class="table-secondary">{{ stats.openPurchases }} still open</p>
+                  }
+                </td>
+                <td>
+                  @if (supplier.supplier_credit_limit > 0) {
+                    <p class="table-primary">
+                      <app-money [amount]="supplier.supplier_credit_limit" /> limit
                     </p>
-                    @if (supplier.days_outstanding !== null) {
-                      <p class="table-secondary">
-                        {{ supplier.days_outstanding }} days · {{ supplier.bucket }}
-                      </p>
-                    }
-                  </td>
-                  <td
-                    class="table-number"
-                    [class.text-warning]="supplier.ap_balance > 0"
-                    [class.text-base-content/50]="supplier.ap_balance === 0"
-                  >
-                    <app-money [amount]="supplier.ap_balance" [masked]="!canViewFinancials()" />
-                  </td>
-                  <td class="table-actions" (click)="$event.stopPropagation()">
+                  } @else {
+                    <p class="table-primary">No credit cap</p>
+                  }
+                  <p class="table-secondary">
+                    {{ supplier.supplier_credit_terms_days || 0 }}-day terms
+                  </p>
+                  @if (supplier.days_outstanding !== null) {
+                    <p class="table-secondary">
+                      {{ supplier.days_outstanding }} days · {{ supplier.bucket }}
+                    </p>
+                  }
+                </td>
+                <td
+                  class="table-number"
+                  [class.text-warning]="supplier.ap_balance > 0"
+                  [class.text-base-content/50]="supplier.ap_balance === 0"
+                >
+                  <app-money [amount]="supplier.ap_balance" [masked]="!canViewFinancials()" />
+                </td>
+                <td class="table-actions" (click)="$event.stopPropagation()">
+                  <div class="account-row-actions">
+                    <button
+                      appButton
+                      variant="ghost"
+                      type="button"
+                      (click)="openSupplier.emit(supplier)"
+                    >
+                      Review
+                    </button>
                     <button
                       appButton
                       variant="ghost"
@@ -208,11 +228,11 @@ type SupplierStats = {
                         />
                       </button>
                     }
-                  </td>
-                </tr>
-              }
-            </tbody>
-          </table>
+                  </div>
+                </td>
+              </tr>
+            }
+          </ng-template>
         </app-data-table-shell>
       </div>
     }
@@ -222,6 +242,7 @@ type SupplierStats = {
         <app-mobile-list>
           @for (supplier of suppliers(); track supplier.id) {
             <div
+              [attr.data-list-record]="supplier.id"
               mobileListRow
               class="cursor-pointer"
               role="button"
@@ -282,6 +303,13 @@ type SupplierStats = {
   `,
 })
 export class SupplierAccountsListComponent {
+  protected readonly tableColumns1: TableColumn[] = [
+    { key: 'supplier', label: 'Supplier / contact', pinned: true, width: '26%' },
+    { key: 'activity', label: 'Purchase activity', width: '18%' },
+    { key: 'terms', label: 'Terms & aging', width: '22%' },
+    { key: 'owed', label: 'We owe', align: 'right', width: '14%' },
+    { key: 'review', label: 'Review', align: 'right', width: '20%' },
+  ];
   readonly loading = input.required<boolean>();
   readonly busy = input.required<boolean>();
   readonly suppliers = input.required<SupplierWithAp[]>();
@@ -315,6 +343,27 @@ export class SupplierAccountsListComponent {
   readonly toggleSupplierActive = output<SupplierWithAp>();
   readonly pageChange = output<number>();
   readonly itemsPerPageChange = output<number>();
+
+  protected readonly filterChips = computed(() => [
+    ...(this.statusFilter() !== 'all'
+      ? [{ key: 'status', label: 'Status: ' + this.statusFilter() }]
+      : []),
+    ...(this.balanceFilter() !== 'all'
+      ? [{ key: 'balance', label: this.balanceFilter() === 'owed' ? 'We owe' : 'Nothing owed' }]
+      : []),
+    ...(this.ageFilter() !== 'all'
+      ? [
+          {
+            key: 'age',
+            label: this.ageFilter() === 'overdue' ? 'Over 30 days' : 'Current or clear',
+          },
+        ]
+      : []),
+  ]);
+  protected removeChip(key: string): void {
+    if (key === 'status' || key === 'balance' || key === 'age')
+      this.filterChange.emit({ kind: key, value: 'all' });
+  }
 
   protected selectValue(event: Event): string {
     return (event.target as HTMLSelectElement).value;

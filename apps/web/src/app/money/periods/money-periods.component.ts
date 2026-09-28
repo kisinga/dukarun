@@ -1,4 +1,10 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { StatBarComponent } from '../../shared/ui/stat-bar.component';
+import {
+  DataTableShellComponent,
+  TableRowsDirective,
+  type TableColumn,
+} from '../../shared/ui/data-table-shell.component';
+import { Component, computed, OnInit, inject, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import type { DailyCloseStatus, PeriodClosingPack } from '@dukarun/tax-types';
 import { formatKes } from '../../core/money';
@@ -16,6 +22,9 @@ import { AccountingPeriod, MoneyService, PeriodLock } from '../money.service';
 @Component({
   selector: 'app-money-periods',
   imports: [
+    StatBarComponent,
+    DataTableShellComponent,
+    TableRowsDirective,
     ReactiveFormsModule,
     FormFieldComponent,
     ButtonComponent,
@@ -275,6 +284,13 @@ import { AccountingPeriod, MoneyService, PeriodLock } from '../money.service';
 
     <!-- Periods list -->
     <h2 class="section-title mb-2">Periods</h2>
+    <app-stat-bar
+      class="block mb-3"
+      [stats]="[
+        { label: 'Periods shown', value: periods().length },
+        { label: 'Closed periods shown', value: closedPeriodCount() },
+      ]"
+    />
     @if (periods().length === 0) {
       <app-empty-state
         icon="heroClipboardDocumentList"
@@ -284,7 +300,7 @@ import { AccountingPeriod, MoneyService, PeriodLock } from '../money.service';
     } @else {
       <app-mobile-list>
         @for (p of periods(); track p.id) {
-          <div mobileListRow>
+          <div [attr.data-list-record]="p.id" mobileListRow>
             <div class="flex min-h-16 items-center justify-between gap-3 p-3">
               <div class="min-w-0">
                 <p class="font-semibold">{{ p.start_date }} – {{ p.end_date }}</p>
@@ -296,17 +312,10 @@ import { AccountingPeriod, MoneyService, PeriodLock } from '../money.service';
         }
       </app-mobile-list>
       <div class="hidden lg:block">
-        <table class="table table-sm rounded-box border border-base-300 bg-base-100">
-          <thead>
-            <tr>
-              <th>Start</th>
-              <th>End</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
+        <app-data-table-shell [columns]="tableColumns1" tableClass="table-sm"
+          ><ng-template tableRows>
             @for (p of periods(); track p.id) {
-              <tr>
+              <tr [attr.data-list-record]="p.id">
                 <td>{{ p.start_date }}</td>
                 <td>{{ p.end_date }}</td>
                 <td>
@@ -323,8 +332,8 @@ import { AccountingPeriod, MoneyService, PeriodLock } from '../money.service';
                 </td>
               </tr>
             }
-          </tbody>
-        </table>
+          </ng-template></app-data-table-shell
+        >
       </div>
     }
     @if (closingPack(); as pack) {
@@ -375,6 +384,14 @@ import { AccountingPeriod, MoneyService, PeriodLock } from '../money.service';
   `,
 })
 export class MoneyPeriodsComponent implements OnInit {
+  protected readonly closedPeriodCount = computed(
+    () => this.periods().filter(period => period.status === 'closed').length
+  );
+  protected readonly tableColumns1: TableColumn[] = [
+    { key: 'column0', label: 'Start', pinned: true },
+    { key: 'column1', label: 'End' },
+    { key: 'column2', label: 'Status' },
+  ];
   private readonly money = inject(MoneyService);
   private readonly tax = inject(TaxService);
   protected readonly perms = inject(PermissionsService);

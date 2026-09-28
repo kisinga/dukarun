@@ -17019,6 +17019,7 @@ export type Database = {
       }
       product_intelligence: {
         Args: {
+          p_variant_id?: string
           p_decision?: string
           p_limit?: number
           p_location_id?: string

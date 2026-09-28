@@ -17,7 +17,8 @@ import type {
   PartyCreditProfile,
   ProductDemandSummary,
   ProductDemandMetric,
-  ProductDecision,
+  ProductDecisionFilter,
+  ProductDecisionCounts,
   ProductIntelligenceSummary,
   ProductProfile,
 } from './insights.models';
@@ -219,7 +220,8 @@ export class InsightsService {
     supplierId?: string | null;
     manufacturerId?: string | null;
     search?: string | null;
-    decision?: ProductDecision | null;
+    decision?: ProductDecisionFilter | null;
+    variantId?: string | null;
     limit?: number;
     offset?: number;
   }): Promise<{
@@ -227,6 +229,7 @@ export class InsightsService {
     nextOffset: number | null;
     financialsIncluded: boolean;
     summary: ProductIntelligenceSummary;
+    decisionCounts: ProductDecisionCounts;
   }> {
     const { data, error } = await this.db.rpc('product_intelligence', {
       p_window_days: filters.windowDays,
@@ -238,6 +241,7 @@ export class InsightsService {
       ...(filters.supplierId ? { p_supplier_id: filters.supplierId } : {}),
       ...(filters.manufacturerId ? { p_manufacturer_id: filters.manufacturerId } : {}),
       ...(filters.search ? { p_search: filters.search } : {}),
+      ...(filters.variantId ? { p_variant_id: filters.variantId } : {}),
       ...(filters.decision ? { p_decision: filters.decision } : {}),
     });
     if (error) throw error;
@@ -246,6 +250,7 @@ export class InsightsService {
       nextOffset?: number | null;
       financialsIncluded?: boolean;
       summary?: Partial<ProductIntelligenceSummary>;
+      decisionCounts?: ProductDecisionCounts;
     } | null;
     const rows = payload?.items ?? [];
     const identities = await this.catalogIdentities.resolve(
@@ -259,6 +264,7 @@ export class InsightsService {
       })),
       nextOffset: payload?.nextOffset ?? null,
       financialsIncluded: Boolean(payload?.financialsIncluded),
+      decisionCounts: payload?.decisionCounts ?? { all: 0, needsAttention: 0, stockouts: 0 },
       summary: {
         trackedVariants: Number(payload?.summary?.trackedVariants ?? 0),
         needsAttention: Number(payload?.summary?.needsAttention ?? 0),

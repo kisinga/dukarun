@@ -12,7 +12,11 @@ export interface StockTransferListRow extends StockTransfer {
   stock_transfer_lines: Array<{
     quantity: number;
     variant_id: string;
-    product_variants: { name: string; sku: string; products: { name: string } | null } | null;
+    product_variants: {
+      name: string;
+      sku: string;
+      products: { name: string; manufacturers?: { name: string } | null } | null;
+    } | null;
   }>;
 }
 
@@ -24,7 +28,7 @@ export class StockTransfersService {
     const { data, error } = await this.supabase.client
       .from('stock_transfers')
       .select(
-        '*, from_location:stock_locations!stock_transfers_from_location_id_fkey(name), to_location:stock_locations!stock_transfers_to_location_id_fkey(name), stock_transfer_lines(quantity, variant_id, product_variants(name, sku, products(name)))'
+        '*, from_location:stock_locations!stock_transfers_from_location_id_fkey(name), to_location:stock_locations!stock_transfers_to_location_id_fkey(name), stock_transfer_lines(quantity, variant_id, product_variants(name, sku, products(name, manufacturers(name))))'
       )
       .order('created_at', { ascending: false })
       .limit(50);
@@ -43,7 +47,7 @@ export class StockTransfersService {
     let query = this.supabase.client
       .from('stock_transfers')
       .select(
-        '*, from_location:stock_locations!stock_transfers_from_location_id_fkey(name), to_location:stock_locations!stock_transfers_to_location_id_fkey(name), stock_transfer_lines(quantity, variant_id, product_variants(name, sku, products(name)))',
+        '*, from_location:stock_locations!stock_transfers_from_location_id_fkey(name), to_location:stock_locations!stock_transfers_to_location_id_fkey(name), stock_transfer_lines(quantity, variant_id, product_variants(name, sku, products(name, manufacturers(name))))',
         { count: 'exact' }
       );
     if (input.fromLocationId) query = query.eq('from_location_id', input.fromLocationId);
