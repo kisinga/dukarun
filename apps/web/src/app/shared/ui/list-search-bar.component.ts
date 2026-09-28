@@ -33,7 +33,7 @@ export type ListSortDirection = 'asc' | 'desc';
   host: { class: 'block', '[class.mb-4]': '!embedded()' },
   template: `
     <section
-      class="card flex min-w-0 flex-col gap-3 bg-base-100 p-3 md:p-4"
+      class="card flex min-w-0 flex-col gap-3 bg-base-100 p-3 md:px-4"
       [class.list-toolbar-embedded]="embedded()"
     >
       <div class="list-toolbar-grid">

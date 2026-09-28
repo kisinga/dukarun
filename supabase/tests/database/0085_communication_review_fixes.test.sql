@@ -12,6 +12,16 @@ select '85858585-8585-4585-8585-858585858583',company_id,'Amina','+254700000853'
 insert into public.customers(id,company_id,first_name,phone)
 select '85858585-8585-4585-8585-858585858584',company_id,'Benta','+254700000854' from followup_b;
 
+-- Platform totals include other tenants and demo seeds. Keep background work
+-- present and assert the exact increase from this test's deliveries and link.
+insert into public.outbox(company_id,channel,recipient,body,status,source)
+select company_id,'sms','+254700000852','Existing background delivery','pending','direct'
+from followup_b cross join generate_series(1,3);
+set local role authenticated;
+set local request.jwt.claims='{"sub":"85858585-8585-4585-8585-858585858589","role":"authenticated","is_platform_admin":true}';
+create temp table metric_baseline as select public.platform_external_communication_metrics(now()-interval '1 hour') value;
+reset role;
+
 insert into public.external_document_links(id,company_id,party_id,document_type,subject_id,token_hash,snapshot,expires_at,open_count,audience_role)
 select '85858585-8585-4585-8585-858585858585',company_id,'85858585-8585-4585-8585-858585858583',
   'invoice',gen_random_uuid(),encode(extensions.digest('followup-document','sha256'),'hex'),'{}',now()+interval '1 day',2,'company_copy'
@@ -34,11 +44,16 @@ select company_id,'sms','+254700000851','Direct','pending','direct' from followu
 set local role authenticated;
 set local request.jwt.claims='{"sub":"85858585-8585-4585-8585-858585858589","role":"authenticated","is_platform_admin":true}';
 create temp table metric_result as select public.platform_external_communication_metrics(now()-interval '1 hour') value;
-select is((select (value->>'provider_accepted')::int from metric_result),1,'company-copy acceptance is included');
-select is((select (value->>'failed')::int from metric_result),1,'customer campaign failure is included');
-select is((select (value->>'pending')::int from metric_result),1,'direct pending delivery is included');
-select is((select (value->>'documents_opened')::int from metric_result),1,'tracked link counted once');
-select is((select (value->>'link_opens')::int from metric_result),2,'tracked link opens are not duplicated');
+select is((select (r.value->>'provider_accepted')::int-(b.value->>'provider_accepted')::int
+  from metric_result r cross join metric_baseline b),1,'company-copy acceptance is included');
+select is((select (r.value->>'failed')::int-(b.value->>'failed')::int
+  from metric_result r cross join metric_baseline b),1,'customer campaign failure is included');
+select is((select (r.value->>'pending')::int-(b.value->>'pending')::int
+  from metric_result r cross join metric_baseline b),1,'direct pending delivery is included');
+select is((select (r.value->>'documents_opened')::int-(b.value->>'documents_opened')::int
+  from metric_result r cross join metric_baseline b),1,'tracked link counted once');
+select is((select (r.value->>'link_opens')::int-(b.value->>'link_opens')::int
+  from metric_result r cross join metric_baseline b),2,'tracked link opens are not duplicated');
 reset role;
 
 insert into public.message_campaigns(id,scope,name,audience,audience_config,channel,title,body,status,recipient_count)

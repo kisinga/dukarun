@@ -156,6 +156,7 @@ import { ScoreBadgeComponent } from './score-badge.component';
 
         <div
           id="credit-records"
+          tabindex="-1"
           class="scroll-mt-20 flex flex-wrap items-center justify-between gap-3"
         >
           <div class="text-sm" aria-live="polite" aria-atomic="true">
@@ -667,7 +668,10 @@ export class CreditInsightsComponent implements OnInit, OnDestroy {
       this.currentListUrl = this.profileUrl();
       if (scroll) {
         const records = this.host.nativeElement.querySelector<HTMLElement>('#credit-records');
-        if (records) this.listReturn?.scrollToRecords(records);
+        if (records) {
+          records.focus({ preventScroll: true });
+          this.listReturn?.scrollToRecords(records);
+        }
       }
     } catch (error) {
       if (request !== this.loadRequest) return;

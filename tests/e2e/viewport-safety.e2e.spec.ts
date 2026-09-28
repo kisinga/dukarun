@@ -1638,6 +1638,7 @@ test('credit page size, filters, final pages and failed navigation keep useful r
   await expect(top.getByRole('button', { name: 'Next', exact: true })).toBeDisabled();
   await expect(portfolio.locator('#credit-records')).toContainText('26–50 of 50 customer profiles');
   await expect(top).toBeInViewport();
+  await expect(portfolio.locator('#credit-records')).toBeFocused();
 
   await size.selectOption('10');
   await expect(records).toHaveCount(10);
