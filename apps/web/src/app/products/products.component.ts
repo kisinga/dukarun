@@ -1,3 +1,4 @@
+import { bindListQuery, listQueryField } from '../shared/list/list-query';
 import { Component, OnInit, computed, effect, inject, signal, untracked } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { EmptyStateComponent } from '../shared/ui/empty-state.component';
@@ -14,11 +15,17 @@ import {
 import { sortList } from '../shared/ui/list-sort';
 import { StatusBadgeComponent } from '../shared/ui/status-badge.component';
 import { PaginationComponent } from '../shared/ui/pagination.component';
-import { DataTableShellComponent } from '../shared/ui/data-table-shell.component';
+import {
+  DataTableShellComponent,
+  TableRowsDirective,
+  TableHeaderDirective,
+  type TableColumn,
+} from '../shared/ui/data-table-shell.component';
 import { ButtonComponent } from '../shared/ui/button.component';
 import { IconComponent } from '../shared/ui/icon.component';
 import { MoneyComponent } from '../shared/ui/money.component';
 import { StatBarComponent } from '../shared/ui/stat-bar.component';
+import { FormFieldComponent } from '../shared/ui/form-field.component';
 import { MobileListComponent } from '../shared/ui/mobile-list.component';
 import { PageActionsComponent } from '../shared/ui/page-actions.component';
 import { WorkspaceNavigationComponent } from '../shared/ui/workspace-navigation.component';
@@ -71,10 +78,13 @@ const PRODUCT_SORT_OPTIONS: readonly ListSortOption[] = [
     ListSearchBarComponent,
     PaginationComponent,
     DataTableShellComponent,
+    TableRowsDirective,
+    TableHeaderDirective,
     ButtonComponent,
     IconComponent,
     MoneyComponent,
     StatBarComponent,
+    FormFieldComponent,
     BarcodeLabelDialogComponent,
     SearchableFilterComponent,
     BatchProductCategoriesDialogComponent,
@@ -187,84 +197,100 @@ const PRODUCT_SORT_OPTIONS: readonly ListSortOption[] = [
 
       <!-- Search -->
       <app-list-search-bar
+        searchLabel="Search products"
+        [activeFilters]="activeListFilters()"
+        (removeFilter)="removeListFilter($event)"
         placeholder="Search product, manufacturer, variant, SKU, or barcode…"
         [(searchQuery)]="query"
         [sortOptions]="productSortOptions"
         [(sortKey)]="productSort"
         [(sortDirection)]="productSortDirection"
-        [filtersEnabled]="true"
         [activeFilterCount]="productActiveFilterCount()"
         (clearFilters)="clearProductFilters()"
       >
-        <app-stat-bar summary [stats]="productStats()" />
-        <div filters class="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-          <span class="type-caption mr-1 font-semibold uppercase tracking-wide">Filters</span>
-          <select
-            class="select select-bordered min-h-10 w-full select-sm sm:w-40"
-            aria-label="Product status"
-            title="Product status"
-            [value]="productStatusFilter()"
-            (change)="setProductStatusFilter($event)"
-          >
-            <option value="all">All statuses</option>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-          </select>
-          <select
-            class="select select-bordered min-h-10 w-full select-sm sm:w-44"
-            aria-label="Stock status"
-            title="Stock status"
-            [value]="stockStatusFilter()"
-            (change)="setStockStatusFilter($event)"
-          >
-            <option value="all">All stock states</option>
-            <option value="needs_restock">Needs restock</option>
-            <option value="in_stock">In stock</option>
-            <option value="out_of_stock">Out of stock</option>
-            <option value="not_tracked">Not tracked</option>
-          </select>
-          <app-searchable-filter
-            class="w-full sm:w-56"
-            ariaLabel="Filter products by supplier"
-            placeholder="All suppliers"
-            emptyValue="all"
-            searchPlaceholder="Search suppliers…"
-            [options]="supplierOptions()"
-            [value]="supplierFilter()"
-            (valueChange)="setSupplierFilter($event)"
-          />
-          <app-searchable-filter
-            class="w-full sm:w-56"
-            ariaLabel="Filter products by manufacturer"
-            placeholder="All manufacturers"
-            emptyValue="all"
-            searchPlaceholder="Search manufacturers…"
-            [options]="manufacturerFilterOptions()"
-            [value]="manufacturerFilter()"
-            (valueChange)="setManufacturerFilter($event)"
-          />
-          @if (categoryMembershipsComplete()) {
-            <app-searchable-filter
-              class="w-full sm:w-56"
-              ariaLabel="Filter products by category"
-              placeholder="All categories"
-              emptyValue="all"
-              searchPlaceholder="Search categories…"
-              [options]="categoryFilterOptions()"
-              [value]="categoryFilter()"
-              (valueChange)="setCategoryFilter($event)"
-            />
-          }
-          @if (hasProductFilters()) {
-            <button
-              appButton
-              type="button"
-              variant="ghost"
-              size="sm"
-              (click)="clearProductFilters()"
+        <div summary class="grid gap-4 lg:grid-cols-2">
+          <section class="min-w-0" aria-label="Product counts">
+            <p class="type-caption mb-2">
+              {{
+                serverMode()
+                  ? 'Matching products · variant counts on this page'
+                  : 'Matching catalogue'
+              }}
+            </p>
+            <app-stat-bar [stats]="productStats().slice(0, 3)" />
+          </section>
+          <section class="min-w-0" aria-label="Stock valuation">
+            <p class="type-caption mb-2">
+              Stock value · {{ serverMode() ? 'current page' : 'matching results' }}
+            </p>
+            <app-stat-bar [stats]="productStats().slice(3)" />
+          </section>
+        </div>
+        <div quickFilters class="catalogue-filters">
+          <app-form-field label="Status">
+            <select
+              class="select select-bordered w-full select-sm"
+              aria-label="Product status"
+              title="Product status"
+              [value]="productStatusFilter()"
+              (change)="setProductStatusFilter($event)"
             >
-              Clear filters
-            </button>
+              <option value="all">All statuses</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </app-form-field>
+          <app-form-field label="Stock status">
+            <select
+              class="select select-bordered w-full select-sm"
+              aria-label="Stock status"
+              [value]="stockStatusFilter()"
+              (change)="setStockStatusFilter($event)"
+            >
+              <option value="all">All stock states</option>
+              <option value="needs_restock">Needs restock</option>
+              <option value="in_stock">In stock</option>
+              <option value="out_of_stock">Out of stock</option>
+              <option value="not_tracked">Not tracked</option>
+            </select>
+          </app-form-field>
+          <app-form-field label="Supplier">
+            <app-searchable-filter
+              class="block min-w-0"
+              ariaLabel="Filter products by supplier"
+              placeholder="All suppliers"
+              emptyValue="all"
+              searchPlaceholder="Search suppliers…"
+              [options]="supplierOptions()"
+              [value]="supplierFilter()"
+              (valueChange)="setSupplierFilter($event)"
+            />
+          </app-form-field>
+          <app-form-field label="Manufacturer">
+            <app-searchable-filter
+              class="block min-w-0"
+              ariaLabel="Filter products by manufacturer"
+              placeholder="All manufacturers"
+              emptyValue="all"
+              searchPlaceholder="Search manufacturers…"
+              [options]="manufacturerFilterOptions()"
+              [value]="manufacturerFilter()"
+              (valueChange)="setManufacturerFilter($event)"
+            />
+          </app-form-field>
+          @if (categoryMembershipsComplete()) {
+            <app-form-field label="Category" class="catalogue-category-filter">
+              <app-searchable-filter
+                class="block min-w-0"
+                ariaLabel="Filter products by category"
+                placeholder="All categories"
+                emptyValue="all"
+                searchPlaceholder="Search categories…"
+                [options]="categoryFilterOptions()"
+                [value]="categoryFilter()"
+                (valueChange)="setCategoryFilter($event)"
+              />
+            </app-form-field>
           }
         </div>
       </app-list-search-bar>
@@ -324,7 +350,7 @@ const PRODUCT_SORT_OPTIONS: readonly ListSortOption[] = [
       }
 
       <!-- Grouped list -->
-      @if (!loading() && grouped().length === 0) {
+      @if (!loading() && !error() && grouped().length === 0) {
         <app-empty-state
           icon="heroCube"
           title="No products found"
@@ -338,6 +364,7 @@ const PRODUCT_SORT_OPTIONS: readonly ListSortOption[] = [
         <app-mobile-list>
           @for (group of pagedGroups(); track group.family.id) {
             <div
+              [attr.data-list-record]="group.family.id"
               mobileListRow
               class="cursor-pointer"
               role="button"
@@ -369,7 +396,31 @@ const PRODUCT_SORT_OPTIONS: readonly ListSortOption[] = [
                     }
                   }
                   <div class="min-w-0 flex-1">
-                    <span class="block truncate font-semibold">{{ group.family.name }}</span>
+                    <span class="block whitespace-normal break-words font-semibold">{{
+                      group.family.name
+                    }}</span>
+
+                    @if (!categoryMembershipsComplete()) {
+                      <p class="type-caption">{{ categoryDataStatusLabel() }}</p>
+                    } @else {
+                      @let categories = productCategoryNames(group.family.id);
+                      <div class="flex flex-wrap items-center gap-1 text-xs text-muted">
+                        <span class="whitespace-normal">{{
+                          categories[0] || 'Uncategorized'
+                        }}</span>
+                        @if (categories.length > 1) {
+                          <button
+                            type="button"
+                            class="btn btn-ghost btn-xs min-h-11"
+                            [attr.aria-label]="'View all categories for ' + group.family.name"
+                            (click)="$event.stopPropagation(); openProduct(group.family.id)"
+                            (keydown.enter)="$event.stopPropagation()"
+                          >
+                            +{{ categories.length - 1 }} categories
+                          </button>
+                        }
+                      </div>
+                    }
                     @if (taxCategoryName(group.family.tax_category_id); as taxName) {
                       <span class="badge badge-outline badge-xs mt-1">{{ taxName }}</span>
                     }
@@ -405,6 +456,7 @@ const PRODUCT_SORT_OPTIONS: readonly ListSortOption[] = [
                       <a
                         class="btn btn-ghost btn-xs mt-1 min-h-11"
                         [routerLink]="['/insights/inventory', variantId]"
+                        [queryParams]="{ returnTo: reviewReturnUrl() }"
                         (click)="$event.stopPropagation()"
                         >Insights</a
                       >
@@ -417,176 +469,164 @@ const PRODUCT_SORT_OPTIONS: readonly ListSortOption[] = [
         </app-mobile-list>
         <div class="hidden lg:block">
           <app-data-table-shell
+            [columns]="tableColumns1()"
+            tableClass="table-sm list-catalog-table"
             heading="Product catalog"
             [description]="grouped().length + ' matching products'"
           >
-            <table class="table table-sm">
-              <thead>
-                <tr>
+            <ng-template tableHeader="selection"
+              ><input
+                type="checkbox"
+                class="checkbox checkbox-sm"
+                aria-label="Select products on this page"
+                [checked]="allPageProductsSelected()"
+                [indeterminate]="somePageProductsSelected()"
+                (change)="togglePageSelection()" /></ng-template
+            ><ng-template tableRows>
+              @for (group of pagedGroups(); track group.family.id) {
+                <tr
+                  [attr.data-list-record]="group.family.id"
+                  tabindex="0"
+                  class="cursor-pointer"
+                  [class.table-row-active]="selectedProductId() === group.family.id"
+                  (click)="openProduct(group.family.id)"
+                  (keydown.enter)="openProduct(group.family.id)"
+                >
                   @if (perms.has('ManageCatalog') && categoryMembershipsComplete()) {
-                    <th class="w-10">
+                    <td (click)="$event.stopPropagation()">
                       <input
                         type="checkbox"
                         class="checkbox checkbox-sm"
-                        aria-label="Select products on this page"
-                        [checked]="allPageProductsSelected()"
-                        [indeterminate]="somePageProductsSelected()"
-                        (change)="togglePageSelection()"
+                        [checked]="selectedProductIds().has(group.family.id)"
+                        [attr.aria-label]="'Select ' + group.family.name"
+                        (change)="toggleProductSelection(group.family.id)"
                       />
-                    </th>
+                    </td>
                   }
-                  <th>Product</th>
-                  <th>Manufacturer</th>
-                  <th>Categories</th>
-                  <th class="text-right">Variants</th>
-                  <th class="text-right">Inventory</th>
-                  <th>Status</th>
-                  <th class="text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                @for (group of pagedGroups(); track group.family.id) {
-                  <tr
-                    role="button"
-                    tabindex="0"
-                    class="cursor-pointer"
-                    [class.table-row-active]="selectedProductId() === group.family.id"
-                    (click)="openProduct(group.family.id)"
-                    (keydown.enter)="openProduct(group.family.id)"
-                  >
-                    @if (perms.has('ManageCatalog') && categoryMembershipsComplete()) {
-                      <td (click)="$event.stopPropagation()">
-                        <input
-                          type="checkbox"
-                          class="checkbox checkbox-sm"
-                          [checked]="selectedProductIds().has(group.family.id)"
-                          [attr.aria-label]="'Select ' + group.family.name"
-                          (change)="toggleProductSelection(group.family.id)"
-                        />
-                      </td>
-                    }
-                    <td>
-                      <div class="flex min-w-0 items-center gap-3">
-                        <div
-                          class="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-field border border-base-300 bg-base-200 text-base-content/35"
-                          aria-hidden="true"
-                        >
-                          @if (imageUrl(group.family.image_path); as thumb) {
-                            @if (!brokenImages().has(group.family.image_path!)) {
-                              <img
-                                [src]="thumb"
-                                alt=""
-                                loading="lazy"
-                                decoding="async"
-                                class="h-full w-full object-cover"
-                                (error)="markBroken(group.family.image_path!)"
-                              />
-                            } @else {
-                              <app-icon name="heroCube" size="lg" />
-                            }
+                  <td>
+                    <div class="flex min-w-0 items-center gap-3">
+                      <div
+                        class="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-field border border-base-300 bg-base-200 text-base-content/35"
+                        aria-hidden="true"
+                      >
+                        @if (imageUrl(group.family.image_path); as thumb) {
+                          @if (!brokenImages().has(group.family.image_path!)) {
+                            <img
+                              [src]="thumb"
+                              alt=""
+                              loading="lazy"
+                              decoding="async"
+                              class="h-full w-full object-cover"
+                              (error)="markBroken(group.family.image_path!)"
+                            />
                           } @else {
                             <app-icon name="heroCube" size="lg" />
                           }
-                        </div>
-                        <div class="min-w-0">
-                          <span
-                            class="block max-w-64 truncate font-semibold"
-                            [title]="group.family.name"
-                          >
-                            {{ group.family.name }}
-                          </span>
-                          @if (taxCategoryName(group.family.tax_category_id); as taxName) {
-                            <span class="badge badge-outline badge-xs mt-1">{{ taxName }}</span>
-                          }
-                          <p class="type-caption mt-0.5 truncate font-mono">
-                            {{ group.family.barcode || 'No shared barcode' }}
-                          </p>
-                        </div>
-                      </div>
-                    </td>
-                    <td>
-                      @if (manufacturerName(group.family.manufacturer_id); as manufacturer) {
-                        <span class="badge badge-ghost badge-sm">{{ manufacturer }}</span>
-                      } @else {
-                        <span class="type-caption">—</span>
-                      }
-                    </td>
-                    <td>
-                      @if (!categoryMembershipsComplete()) {
-                        <span class="type-caption">{{ categoryDataStatusLabel() }}</span>
-                      } @else if (productCategoryNames(group.family.id); as categoryNames) {
-                        @if (categoryNames.length === 0) {
-                          <span class="type-caption">Uncategorized</span>
                         } @else {
-                          <div class="flex max-w-56 flex-wrap gap-1">
-                            @for (name of categoryNames.slice(0, 2); track name) {
-                              <span class="badge badge-ghost badge-sm">{{ name }}</span>
-                            }
-                            @if (categoryNames.length > 2) {
-                              <span class="badge badge-ghost badge-sm"
-                                >+{{ categoryNames.length - 2 }}</span
+                          <app-icon name="heroCube" size="lg" />
+                        }
+                      </div>
+                      <div class="min-w-0">
+                        <span
+                          class="block max-w-64 whitespace-normal break-words font-semibold"
+                          [title]="group.family.name"
+                        >
+                          {{ group.family.name }}
+                        </span>
+                        <p class="table-secondary">
+                          {{
+                            manufacturerName(group.family.manufacturer_id) || 'Manufacturer not set'
+                          }}
+                        </p>
+
+                        @if (!categoryMembershipsComplete()) {
+                          <p class="type-caption">{{ categoryDataStatusLabel() }}</p>
+                        } @else {
+                          @let categories = productCategoryNames(group.family.id);
+                          <div class="flex flex-wrap items-center gap-1 text-xs text-muted">
+                            <span class="whitespace-normal">{{
+                              categories[0] || 'Uncategorized'
+                            }}</span>
+                            @if (categories.length > 1) {
+                              <button
+                                type="button"
+                                class="btn btn-ghost btn-xs min-h-11"
+                                [attr.aria-label]="'View all categories for ' + group.family.name"
+                                (click)="$event.stopPropagation(); openProduct(group.family.id)"
+                                (keydown.enter)="$event.stopPropagation()"
                               >
+                                +{{ categories.length - 1 }} categories
+                              </button>
                             }
                           </div>
                         }
-                      }
-                    </td>
-                    <td class="text-right font-medium">
-                      {{ group.variants.length }}
-                    </td>
-                    <td class="text-right">
-                      @if (familyTracksInventory(group.variants)) {
-                        <p class="font-medium tabular-nums">{{ familyStock(group.variants) }}</p>
-                        @if (supplierFilter() !== 'all') {
-                          <p class="type-caption tabular-nums">
-                            {{ familySupplierStock(group.variants) }} from supplier
+                        @if (taxCategoryName(group.family.tax_category_id); as taxName) {
+                          <span class="badge badge-outline badge-xs mt-1">{{ taxName }}</span>
+                        }
+                        @if (group.family.barcode) {
+                          <p class="type-caption mt-0.5 break-all font-mono">
+                            {{ group.family.barcode }}
                           </p>
                         }
+                      </div>
+                    </div>
+                  </td>
+                  <td class="text-right font-medium">
+                    {{ group.variants.length }}
+                  </td>
+                  <td class="text-right">
+                    @if (familyTracksInventory(group.variants)) {
+                      <p class="font-medium tabular-nums">{{ familyStock(group.variants) }}</p>
+                      @if (supplierFilter() !== 'all') {
                         <p class="type-caption tabular-nums">
-                          Retail <app-money [amount]="familyRetailStockValue(group.variants)" />
+                          {{ familySupplierStock(group.variants) }} from supplier
                         </p>
-                      } @else {
-                        <span class="text-sm text-base-content/50">Not tracked</span>
                       }
-                    </td>
-                    <td>
-                      @if (group.family.active) {
-                        <app-status-badge size="xs" type="neutral" label="active" />
-                      } @else {
-                        <app-status-badge size="xs" type="warning" label="inactive" />
-                      }
-                    </td>
-                    <td class="table-actions" (click)="$event.stopPropagation()">
-                      @if (singleInsightVariantId(group.variants); as variantId) {
-                        <a
-                          appButton
-                          variant="ghost"
-                          [iconOnly]="true"
-                          title="View product insights"
-                          aria-label="View product insights"
-                          [routerLink]="['/insights/inventory', variantId]"
-                        >
-                          <app-icon name="heroChartBar" />
-                        </a>
-                      }
-                      @if (perms.has('ManageStockAdjustments')) {
-                        <button
-                          appButton
-                          variant="ghost"
-                          [iconOnly]="true"
-                          type="button"
-                          title="Edit product"
-                          aria-label="Edit product"
-                          (click)="startFamilyEdit(group.family)"
-                        >
-                          <app-icon name="heroPencilSquare" />
-                        </button>
-                      }
-                    </td>
-                  </tr>
-                }
-              </tbody>
-            </table>
+                      <p class="type-caption tabular-nums">
+                        Retail <app-money [amount]="familyRetailStockValue(group.variants)" />
+                      </p>
+                    } @else {
+                      <span class="text-sm text-base-content/50">Not tracked</span>
+                    }
+                  </td>
+                  <td>
+                    @if (group.family.active) {
+                      <app-status-badge size="xs" type="neutral" label="active" />
+                    } @else {
+                      <app-status-badge size="xs" type="warning" label="inactive" />
+                    }
+                  </td>
+                  <td class="table-actions" (click)="$event.stopPropagation()">
+                    @if (singleInsightVariantId(group.variants); as variantId) {
+                      <a
+                        appButton
+                        variant="ghost"
+                        [iconOnly]="true"
+                        title="View product insights"
+                        aria-label="View product insights"
+                        [routerLink]="['/insights/inventory', variantId]"
+                        [queryParams]="{ returnTo: reviewReturnUrl() }"
+                      >
+                        <app-icon name="heroChartBar" />
+                      </a>
+                    }
+                    @if (perms.has('ManageStockAdjustments')) {
+                      <button
+                        appButton
+                        variant="ghost"
+                        [iconOnly]="true"
+                        type="button"
+                        title="Edit product"
+                        aria-label="Edit product"
+                        (click)="startFamilyEdit(group.family)"
+                      >
+                        <app-icon name="heroPencilSquare" />
+                      </button>
+                    }
+                  </td>
+                </tr>
+              }
+            </ng-template>
           </app-data-table-shell>
         </div>
         <div class="mt-3">
@@ -635,12 +675,103 @@ const PRODUCT_SORT_OPTIONS: readonly ListSortOption[] = [
       }
     </app-page>
   `,
+  styles: `
+    .catalogue-filters {
+      display: grid;
+      width: 100%;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      align-items: end;
+      gap: 0.75rem;
+    }
+
+    .catalogue-filters > app-form-field {
+      min-width: 0;
+    }
+
+    .catalogue-category-filter {
+      grid-column: 1 / -1;
+    }
+
+    @container (min-width: 44rem) {
+      .catalogue-filters {
+        grid-template-columns: 0.8fr 1fr repeat(3, minmax(0, 1.2fr));
+      }
+
+      .catalogue-category-filter {
+        grid-column: auto;
+      }
+    }
+  `,
 })
 export class ProductsComponent implements OnInit {
+  protected readonly activeListFilters = computed(() => [
+    ...(this.productStatusFilter() !== 'active'
+      ? [{ key: 'status', label: 'Status: ' + this.productStatusFilter().replaceAll('_', ' ') }]
+      : []),
+    ...(this.stockStatusFilter() !== 'all'
+      ? [{ key: 'stock', label: 'Stock: ' + this.stockStatusFilter().replaceAll('_', ' ') }]
+      : []),
+    ...(this.supplierFilter() !== 'all'
+      ? [
+          {
+            key: 'supplier',
+            label:
+              'Supplier: ' +
+              (this.supplierOptions().find(option => option.value === this.supplierFilter())
+                ?.label ?? 'Selected supplier'),
+          },
+        ]
+      : []),
+    ...(this.manufacturerFilter() !== 'all'
+      ? [
+          {
+            key: 'manufacturer',
+            label:
+              'Manufacturer: ' +
+              (this.manufacturerFilterOptions().find(
+                option => option.value === this.manufacturerFilter()
+              )?.label ?? 'Selected manufacturer'),
+          },
+        ]
+      : []),
+    ...(this.categoryFilter() !== 'all'
+      ? [
+          {
+            key: 'category',
+            label:
+              'Category: ' +
+              (this.categoryFilterOptions().find(option => option.value === this.categoryFilter())
+                ?.label ?? 'Selected category'),
+          },
+        ]
+      : []),
+  ]);
+  protected removeListFilter(key: string): void {
+    if (key === 'status') this.productStatusFilter.set('active');
+    if (key === 'stock') this.stockStatusFilter.set('all');
+    if (key === 'supplier') this.supplierFilter.set('all');
+    if (key === 'manufacturer') this.manufacturerFilter.set('all');
+    if (key === 'category') this.categoryFilter.set('all');
+    this.page.set(1);
+  }
+
+  protected readonly tableColumns1 = computed<TableColumn[]>(() => [
+    ...(this.perms.has('ManageCatalog') && this.categoryMembershipsComplete()
+      ? [{ key: 'selection', label: 'Select', width: '3rem', pinned: true }]
+      : []),
+    { key: 'product', label: 'Product', pinned: true, minWidth: '16rem' },
+    { key: 'variants', label: 'Variants', align: 'right' },
+    { key: 'stock', label: 'Available stock', align: 'right' },
+    { key: 'status', label: 'Status' },
+    { key: 'actions', label: 'Actions', align: 'right' },
+  ]);
   private readonly pos = inject(PosService);
   private readonly supabase = inject(SupabaseService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  protected reviewReturnUrl(): string {
+    return this.router.url;
+  }
   private readonly catalogCache = inject(CatalogCacheService);
   private readonly parties = inject(PartyCacheService);
   private readonly locationContext = inject(LocationContextService);
@@ -898,11 +1029,15 @@ export class ProductsComponent implements OnInit {
     );
     return [
       {
-        label: 'Matches',
+        label: 'Products',
         value: this.serverMode() && this.serverLoaded() ? this.serverTotal() : groups.length,
         mobilePriority: 'primary' as const,
       },
-      { label: 'Variants', value: variants, mobilePriority: 'secondary' as const },
+      {
+        label: 'Variants',
+        value: variants,
+        mobilePriority: 'secondary' as const,
+      },
       {
         label: 'Needs restock',
         value: needsRestock,
@@ -910,17 +1045,17 @@ export class ProductsComponent implements OnInit {
         mobilePriority: 'primary' as const,
       },
       {
-        label: 'Cost',
+        label: 'At cost',
         value: this.fmt(this.totalStockValue()),
         mobilePriority: 'secondary' as const,
       },
       {
-        label: 'Wholesale',
+        label: 'At wholesale',
         value: this.fmt(this.totalWholesaleStockValue()),
         mobilePriority: 'secondary' as const,
       },
       {
-        label: 'Retail',
+        label: 'At retail',
         value: this.fmt(this.totalRetailStockValue()),
         mobilePriority: 'secondary' as const,
       },
@@ -974,8 +1109,22 @@ export class ProductsComponent implements OnInit {
   protected readonly supplierStockValue = computed(() => this.supplierStockSummary().value);
 
   constructor() {
+    bindListQuery({
+      search: listQueryField(this.query),
+      status: listQueryField(this.productStatusFilter),
+      stock: listQueryField(this.stockStatusFilter),
+      supplier: listQueryField(this.supplierFilter),
+      manufacturer: listQueryField(this.manufacturerFilter),
+      category: listQueryField(this.categoryFilter),
+      sort: listQueryField(this.productSort),
+      direction: listQueryField(this.productSortDirection),
+      page: listQueryField(this.page),
+      pageSize: listQueryField(this.pageSize, { max: 100 }),
+    });
+
     // Search is pure client-side filtering over the cached catalog (grouped());
-    // typing only resets pagination. Skip the effect's initial run.
+    // typing resets pagination. Preserve the restored page on the initial run,
+    // while still fetching views that need the management endpoint.
     let firstRun = true;
     effect(() => {
       this.query();
@@ -988,6 +1137,7 @@ export class ProductsComponent implements OnInit {
       this.productSortDirection();
       if (firstRun) {
         firstRun = false;
+        if (this.serverMode()) this.scheduleManagementLoad();
         return;
       }
       this.page.set(1);
@@ -1134,7 +1284,6 @@ export class ProductsComponent implements OnInit {
   }
 
   protected clearProductFilters(): void {
-    this.query.set('');
     this.productStatusFilter.set(DEFAULT_PRODUCT_STATUS_FILTER);
     this.stockStatusFilter.set('all');
     this.supplierFilter.set('all');
@@ -1210,7 +1359,7 @@ export class ProductsComponent implements OnInit {
 
   private scheduleManagementLoad(): void {
     if (this.serverSearchTimer) clearTimeout(this.serverSearchTimer);
-    this.serverSearchTimer = setTimeout(() => void this.loadManagementPage(), 250);
+    this.serverSearchTimer = setTimeout(() => void this.loadManagementPage(), 0);
   }
 
   private async loadManagementPage(): Promise<void> {

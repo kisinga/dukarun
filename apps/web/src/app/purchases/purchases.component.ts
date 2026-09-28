@@ -1,8 +1,20 @@
-import { Component, OnInit, effect, inject, untracked } from '@angular/core';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { HistoryDateRangeComponent } from '../shared/ui/history-date-range.component';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { Component, computed, OnInit, effect, inject, untracked } from '@angular/core';
+import {
+  ActivatedRoute,
+  NavigationStart,
+  NavigationEnd,
+  Router,
+  RouterLink,
+} from '@angular/router';
 import { formatKes } from '../core/money';
 import { ButtonComponent } from '../shared/ui/button.component';
-import { DataTableShellComponent } from '../shared/ui/data-table-shell.component';
+import {
+  DataTableShellComponent,
+  TableRowsDirective,
+  type TableColumn,
+} from '../shared/ui/data-table-shell.component';
 import { EmptyStateComponent } from '../shared/ui/empty-state.component';
 import { FormFieldComponent } from '../shared/ui/form-field.component';
 import { IconComponent } from '../shared/ui/icon.component';
@@ -27,9 +39,11 @@ import { PurchaseHistoryStore } from './purchase-history.store';
   selector: 'app-purchases',
   providers: [PurchaseHistoryStore],
   imports: [
+    HistoryDateRangeComponent,
     RouterLink,
     ButtonComponent,
     DataTableShellComponent,
+    TableRowsDirective,
     EmptyStateComponent,
     FormFieldComponent,
     IconComponent,
@@ -119,6 +133,7 @@ import { PurchaseHistoryStore } from './purchase-history.store';
       }
 
       <app-list-search-bar
+        searchLabel="Search purchases"
         placeholder="Search supplier or reference…"
         [searchQuery]="store.query()"
         (searchQueryChange)="store.search($event)"
@@ -128,7 +143,8 @@ import { PurchaseHistoryStore } from './purchase-history.store';
         [sortDirection]="store.sortDirection()"
         (sortDirectionChange)="setSortDirection($event)"
         [filtersEnabled]="true"
-        [activeFilterCount]="store.activeFilterCount()"
+        [activeFilters]="purchaseFilterChips()"
+        (removeFilter)="removePurchaseFilter($event)"
         (clearFilters)="store.clearFilters()"
       >
         <app-stat-bar summary [stats]="store.summary()" />
@@ -144,47 +160,8 @@ import { PurchaseHistoryStore } from './purchase-history.store';
               (valueChange)="store.setSupplier($event)"
             />
           </app-form-field>
-          <app-form-field label="Payment" class="lg:w-44">
-            <select
-              class="select select-bordered select-sm w-full"
-              [value]="store.paymentFilter()"
-              (change)="store.setPayment($any($event.target).value)"
-            >
-              <option value="all">Any status</option>
-              <option value="paid">Paid</option>
-              <option value="part_paid">Part-paid</option>
-              <option value="unpaid">Unpaid</option>
-            </select>
-          </app-form-field>
-          @if (store.locations().length > 1) {
-            <app-form-field label="Location" class="lg:w-48">
-              <select
-                class="select select-bordered select-sm w-full"
-                [value]="store.locationFilter()"
-                (change)="store.setLocation($any($event.target).value)"
-              >
-                @for (location of store.locations(); track location.id) {
-                  <option [value]="location.id">{{ location.name }}</option>
-                }
-              </select>
-            </app-form-field>
-          }
-          <app-form-field label="From" class="lg:w-40">
-            <input
-              type="date"
-              class="input input-bordered input-sm w-full"
-              [value]="store.from()"
-              (change)="store.setDate('from', $any($event.target).value)"
-            />
-          </app-form-field>
-          <app-form-field label="To" class="lg:w-40">
-            <input
-              type="date"
-              class="input input-bordered input-sm w-full"
-              [value]="store.to()"
-              (change)="store.setDate('to', $any($event.target).value)"
-            />
-          </app-form-field>
+        </div>
+        <div scope class="flex flex-wrap items-end gap-3">
           <div class="flex flex-wrap gap-2 sm:col-span-2">
             <button
               appButton
@@ -203,6 +180,46 @@ import { PurchaseHistoryStore } from './purchase-history.store';
               All time
             </button>
           </div>
+          <app-form-field label="Location" class="lg:w-48">
+            <select
+              class="select select-bordered select-sm w-full"
+              [value]="store.locationFilter()"
+              (change)="store.setLocation($any($event.target).value)"
+            >
+              @for (location of store.locations(); track location.id) {
+                <option [value]="location.id">{{ location.name }}</option>
+              }
+            </select> </app-form-field
+          ><app-history-date-range
+            [from]="store.from()"
+            [to]="store.to()"
+            [defaultFrom]="store.defaultFrom()"
+            [defaultTo]="store.defaultTo()"
+            (rangeChange)="store.setDates($event)"
+          />
+          @if (!store.currentLocationActive()) {
+            <button
+              type="button"
+              class="btn btn-ghost btn-sm min-h-11"
+              (click)="store.resetLocation()"
+            >
+              Current location
+            </button>
+          }
+        </div>
+        <div quickFilters class="flex flex-wrap items-end gap-3">
+          <app-form-field label="Payment" class="lg:w-44">
+            <select
+              class="select select-bordered select-sm min-h-11 w-full"
+              [value]="store.paymentFilter()"
+              (change)="store.setPayment($any($event.target).value)"
+            >
+              <option value="all">Any status</option>
+              <option value="paid">Paid</option>
+              <option value="part_paid">Part-paid</option>
+              <option value="unpaid">Unpaid</option>
+            </select>
+          </app-form-field>
         </div>
       </app-list-search-bar>
 
@@ -224,6 +241,7 @@ import { PurchaseHistoryStore } from './purchase-history.store';
         <app-mobile-list>
           @for (purchase of store.purchases(); track purchase.id) {
             <div
+              [attr.data-list-record]="purchase.id"
               mobileListRow
               class="cursor-pointer"
               role="button"
@@ -262,50 +280,52 @@ import { PurchaseHistoryStore } from './purchase-history.store';
 
         <div class="hidden lg:block">
           <app-data-table-shell
+            [columns]="tableColumns1"
+            tableClass="table-sm"
             heading="Purchase history"
             [description]="store.total() + ' matching purchases'"
           >
-            <table class="table table-sm">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Supplier</th>
-                  <th>Payment</th>
-                  <th>Reference</th>
-                  <th class="text-right">Total</th>
-                  <th class="text-right">Status</th>
+            <ng-template tableRows>
+              @for (purchase of store.purchases(); track purchase.id) {
+                <tr
+                  [attr.data-list-record]="purchase.id"
+                  tabindex="0"
+                  class="cursor-pointer"
+                  [class.table-row-active]="store.selectedPurchase()?.id === purchase.id"
+                  (click)="store.openPurchase(purchase)"
+                  (keydown.enter)="store.openPurchase(purchase)"
+                >
+                  <td>
+                    {{ purchase.reference || '—' }}
+                    <div class="table-secondary mt-1">{{ store.date(purchase.purchase_date) }}</div>
+                  </td>
+                  <td class="font-medium">{{ store.supplierName(purchase.supplier_id) }}</td>
+                  <td class="text-right">
+                    <app-status-badge
+                      [type]="store.statusType(purchase)"
+                      [label]="store.statusLabel(purchase)"
+                    />
+                  </td>
+                  <td>{{ store.settlementLabel(purchase) }}</td>
+                  <td class="text-right font-semibold">
+                    <app-money
+                      [amount]="purchase.total_cost"
+                      [masked]="!store.permissions.has('ViewFinancials')"
+                    />
+                  </td>
+                  <td>
+                    <button
+                      type="button"
+                      appButton
+                      variant="ghost"
+                      (click)="$event.stopPropagation(); store.openPurchase(purchase)"
+                    >
+                      Review
+                    </button>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                @for (purchase of store.purchases(); track purchase.id) {
-                  <tr
-                    role="button"
-                    tabindex="0"
-                    class="cursor-pointer"
-                    [class.table-row-active]="store.selectedPurchase()?.id === purchase.id"
-                    (click)="store.openPurchase(purchase)"
-                    (keydown.enter)="store.openPurchase(purchase)"
-                  >
-                    <td class="whitespace-nowrap">{{ store.date(purchase.purchase_date) }}</td>
-                    <td class="font-medium">{{ store.supplierName(purchase.supplier_id) }}</td>
-                    <td>{{ store.settlementLabel(purchase) }}</td>
-                    <td class="type-caption">{{ purchase.reference || '—' }}</td>
-                    <td class="text-right font-semibold">
-                      <app-money
-                        [amount]="purchase.total_cost"
-                        [masked]="!store.permissions.has('ViewFinancials')"
-                      />
-                    </td>
-                    <td class="text-right">
-                      <app-status-badge
-                        [type]="store.statusType(purchase)"
-                        [label]="store.statusLabel(purchase)"
-                      />
-                    </td>
-                  </tr>
-                }
-              </tbody>
-            </table>
+              }
+            </ng-template>
           </app-data-table-shell>
         </div>
 
@@ -334,12 +354,46 @@ import { PurchaseHistoryStore } from './purchase-history.store';
   `,
 })
 export class PurchasesComponent implements OnInit {
+  protected readonly purchaseFilterChips = computed(() => [
+    ...(this.store.supplierFilter() !== 'all'
+      ? [
+          {
+            key: 'supplier',
+            label: 'Supplier: ' + this.store.supplierName(this.store.supplierFilter()),
+          },
+        ]
+      : []),
+    ...(this.store.paymentFilter() !== 'all'
+      ? [{ key: 'payment', label: 'Payment: ' + this.store.paymentFilter().replaceAll('_', ' ') }]
+      : []),
+  ]);
+  protected removePurchaseFilter(key: string): void {
+    if (key === 'supplier') void this.store.setSupplier('all');
+    if (key === 'payment') void this.store.setPayment('all');
+  }
+  protected readonly tableColumns1: TableColumn[] = [
+    { key: 'reference', label: 'Reference / date', pinned: true },
+    { key: 'supplier', label: 'Supplier' },
+    { key: 'receiving', label: 'Receiving status' },
+    { key: 'payment', label: 'Payment status' },
+    { key: 'total', label: 'Total', align: 'right' },
+    { key: 'review', label: 'Review', align: 'right' },
+  ];
   protected readonly store = inject(PurchaseHistoryStore);
   protected readonly fmt = formatKes;
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
 
   constructor() {
+    let historyNavigation = false;
+    this.router.events.pipe(takeUntilDestroyed()).subscribe(event => {
+      if (event instanceof NavigationStart)
+        historyNavigation = event.navigationTrigger === 'popstate';
+      if (event instanceof NavigationEnd && historyNavigation) {
+        historyNavigation = false;
+        void this.restoreList();
+      }
+    });
     effect(() => {
       const request = this.store.urlRequest();
       if (!request) return;
@@ -355,11 +409,21 @@ export class PurchasesComponent implements OnInit {
   }
 
   async ngOnInit(): Promise<void> {
+    await this.restoreList();
+  }
+
+  private async restoreList(): Promise<void> {
     const params = this.route.snapshot.queryParamMap;
     await this.store.initialize({
       supplierId: params.get('supplier'),
       paymentStatus: params.get('payment'),
       query: params.get('q'),
+      pageSize: Number(params.get('pageSize')) || undefined,
+      sort: params.get('sort'),
+      direction: params.get('direction'),
+      locationId: params.get('location'),
+      from: params.get('from'),
+      to: params.get('to'),
       page: Number(params.get('page') ?? 1) || 1,
       allTime: params.get('range') === 'all',
       purchaseId: params.get('purchase'),

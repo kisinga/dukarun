@@ -307,7 +307,10 @@ function responsiveTableProblems(content, ext) {
   const problems = [];
   for (const fragment of templateFragments(content, ext)) {
     const root = elementTree(fragment.content);
-    for (const table of collectNodes(root, 'table')) {
+    for (const table of [
+      ...collectNodes(root, 'table'),
+      ...collectNodes(root, 'app-data-table-shell'),
+    ]) {
       let boundary = table.parent;
       while (boundary && boundary.name !== '#root') {
         const classes = staticClasses(boundary);
@@ -436,7 +439,9 @@ if (!seed) {
     const rel = path.relative(APP, file);
     if (rel.startsWith(`shared${path.sep}print${path.sep}`)) continue;
     const content = fs.readFileSync(file, 'utf8');
-    if (!content.includes('<table')) continue;
+    // The shared factory renders native tables; its callers own the mobile representation.
+    if (rel === `shared${path.sep}ui${path.sep}data-table-shell.component.ts`) continue;
+    if (!content.includes('<table') && !content.includes('<app-data-table-shell')) continue;
     const problems = responsiveTableProblems(content, path.extname(file));
     if (problems.length > 0) {
       failures++;

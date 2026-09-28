@@ -1,5 +1,8 @@
+import { ListReturnDirective } from '../shared/list/list-return.directive';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { filter } from 'rxjs';
 import { Component, OnInit, computed, effect, inject, signal } from '@angular/core';
-import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { Company, SupabaseService } from '../core/supabase.service';
 import { PermissionsService } from '../core/permissions.service';
 import { ThemeService } from '../core/theme.service';
@@ -51,6 +54,7 @@ interface NavSection {
   selector: 'app-shell',
   imports: [
     RouterOutlet,
+    ListReturnDirective,
     RouterLink,
     RouterLinkActive,
     IconComponent,
@@ -275,7 +279,10 @@ interface NavSection {
 
         <!-- Page content -->
         <main
-          class="flex-1 overflow-auto bg-base-200/40 pb-[calc(4rem+env(safe-area-inset-bottom,0px))] lg:pb-0"
+          [appListReturn]="listPage()"
+          [class.overflow-auto]="!listPage()"
+          [class.list-scroll-page]="listPage()"
+          class="flex-1 bg-base-200/40 pb-[calc(4rem+env(safe-area-inset-bottom,0px))] lg:pb-0"
         >
           @if (legal.status(); as legalStatus) {
             @if (
@@ -556,6 +563,15 @@ export class ShellComponent implements OnInit {
   protected readonly siteUrl = siteUrl;
   private readonly supabase = inject(SupabaseService);
   private readonly router = inject(Router);
+  private readonly navigation = toSignal(
+    this.router.events.pipe(filter(event => event instanceof NavigationEnd))
+  );
+  protected readonly listPage = computed(() => {
+    this.navigation();
+    let route = this.router.routerState.snapshot.root;
+    while (route.firstChild) route = route.firstChild;
+    return route.data['listPage'] === true;
+  });
   protected readonly theme = inject(ThemeService);
   protected readonly perms = inject(PermissionsService);
   protected readonly approvals = inject(ApprovalsService);

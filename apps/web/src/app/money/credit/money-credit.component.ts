@@ -1,13 +1,11 @@
 import { DatePipe } from '@angular/common';
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, ElementRef, OnInit, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { formatKes } from '../../core/money';
 import { ButtonComponent } from '../../shared/ui/button.component';
 import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
-import { EntityAvatarComponent } from '../../shared/ui/entity-avatar.component';
 import { IconComponent } from '../../shared/ui/icon.component';
 import { MoneyComponent } from '../../shared/ui/money.component';
-import { StatCardComponent } from '../../shared/ui/stat-card.component';
 import {
   CreditHealthAgingBucket,
   CreditHealthDashboard,
@@ -34,18 +32,16 @@ const EMPTY_METRICS: CreditHealthDashboard['metrics'] = {
     RouterLink,
     ButtonComponent,
     EmptyStateComponent,
-    EntityAvatarComponent,
     IconComponent,
     MoneyComponent,
-    StatCardComponent,
   ],
   template: `
     <section class="space-y-4">
-      <div class="flex items-start gap-3">
+      <div class="flex flex-wrap items-center gap-3">
         <div class="min-w-0 flex-1">
           <h2 class="section-title">Credit health</h2>
           <p class="type-caption mt-1">
-            Collection risk, upcoming supplier obligations, and credit exposure.
+            Entire business · Customer balances and supplier obligations.
             @if (dashboard(); as data) {
               <span>Updated {{ data.generated_at | date: 'MMM d, h:mm a' }}.</span>
             }
@@ -87,63 +83,56 @@ const EMPTY_METRICS: CreditHealthDashboard['metrics'] = {
         <section
           aria-label="Credit health summary"
           data-learning-anchor="financial-credit"
-          class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
+          class="credit-summary card bg-base-100"
         >
-          <a
-            class="block rounded-box focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-            [routerLink]="[]"
-            fragment="credit-aging"
-            aria-label="View receivables aging"
+          <button
+            type="button"
+            class="credit-summary-item"
+            (click)="focusSection('credit-aging')"
+            [disabled]="!hasExposure()"
           >
-            <app-stat-card
-              label="Net receivables"
-              [value]="fmt(metrics().receivables)"
-              [sub]="fmt(metrics().overdue_receivables) + ' in overdue invoices'"
-              action="View aging"
-            />
-          </a>
-          <a
-            class="block rounded-box focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-            [routerLink]="[]"
-            fragment="credit-aging"
-            aria-label="View invoices over 60 days"
+            <span class="type-caption">Owed to us</span>
+            <strong class="type-hero">{{ fmt(metrics().receivables) }}</strong>
+            <span class="type-caption" [class.text-error]="metrics().overdue_receivables > 0"
+              >{{ fmt(metrics().overdue_receivables) }} in overdue invoices</span
+            >
+          </button>
+          <button
+            type="button"
+            class="credit-summary-item"
+            (click)="focusSection('credit-aging')"
+            [disabled]="!hasExposure()"
           >
-            <app-stat-card
-              label="Over 60 days"
-              [value]="fmt(metrics().severe_receivables)"
-              [sub]="severeSummary()"
-              [tone]="metrics().severe_receivables > 0 ? 'error' : 'neutral'"
-              action="View aging"
-            />
-          </a>
-          <a
-            class="block rounded-box focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-            [routerLink]="[]"
-            fragment="credit-actions"
-            aria-label="View supplier bills requiring attention"
+            <span class="type-caption">Over 60 days overdue</span>
+            <strong class="type-hero" [class.text-error]="metrics().severe_receivables > 0">{{
+              fmt(metrics().severe_receivables)
+            }}</strong>
+            <span class="type-caption">{{ severeSummary() }}</span>
+          </button>
+          <button
+            type="button"
+            class="credit-summary-item"
+            (click)="focusSection('credit-actions')"
+            [disabled]="!hasExposure()"
           >
-            <app-stat-card
-              label="Supplier bills due by 7d"
-              [value]="fmt(metrics().payables_due_soon)"
-              [sub]="fmt(metrics().payables) + ' total payables'"
-              [tone]="metrics().payables_due_soon > 0 ? 'warning' : 'neutral'"
-              action="Review suppliers"
-            />
-          </a>
-          <a
-            class="block rounded-box focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-            [routerLink]="[]"
-            fragment="credit-risk"
-            aria-label="View customer credit-limit risk"
+            <span class="type-caption">We owe suppliers</span>
+            <strong class="type-hero">{{ fmt(metrics().payables) }}</strong>
+            <span class="type-caption" [class.text-warning]="metrics().payables_due_soon > 0"
+              >{{ fmt(metrics().payables_due_soon) }} due now or within 7 days</span
+            >
+          </button>
+          <button
+            type="button"
+            class="credit-summary-item"
+            (click)="focusSection('credit-risk')"
+            [disabled]="!hasRiskAnalysis()"
           >
-            <app-stat-card
-              label="Accounts over limit"
-              [value]="countLabel(metrics().over_limit_parties)"
-              [sub]="overLimitSummary()"
-              [tone]="metrics().over_limit_parties > 0 ? 'error' : 'neutral'"
-              action="View limit usage"
-            />
-          </a>
+            <span class="type-caption">Accounts over limit</span>
+            <strong class="type-hero" [class.text-error]="metrics().over_limit_parties > 0">{{
+              countLabel(metrics().over_limit_parties)
+            }}</strong>
+            <span class="type-caption">{{ overLimitSummary() }}</span>
+          </button>
         </section>
 
         @if (!hasExposure()) {
@@ -156,15 +145,13 @@ const EMPTY_METRICS: CreditHealthDashboard['metrics'] = {
             />
           </article>
         } @else {
-          <section
-            aria-label="Credit exposure insights"
-            class="grid items-start gap-4 xl:grid-cols-12"
-          >
+          <section aria-label="Credit exposure insights" class="credit-exposure-grid">
             <article
               id="credit-aging"
-              class="card scroll-mt-4 overflow-hidden bg-base-100 xl:col-span-7"
+              tabindex="-1"
+              class="card scroll-mt-20 overflow-hidden bg-base-100"
             >
-              <div class="border-b border-base-300/60 px-4 py-3">
+              <div class="credit-exposure-heading border-b border-base-300/60 px-4 py-3">
                 <h3 class="section-title">Exposure by due status</h3>
                 <p class="type-caption mt-1">Open invoice balances grouped by days past due.</p>
               </div>
@@ -199,32 +186,29 @@ const EMPTY_METRICS: CreditHealthDashboard['metrics'] = {
                           ></span>
                         }
                       </div>
-                      <div class="mt-3 grid gap-2 sm:grid-cols-2">
+                      <div class="mt-2 divide-y divide-base-200">
                         @for (bucket of activeAgingRows(side); track bucket.bucket) {
                           <button
                             type="button"
-                            class="rounded-field border border-base-300/70 px-2.5 py-2 text-left text-xs transition-colors hover:border-primary/50 hover:bg-primary/5"
-                            [class.border-primary]="agingSelected(side, bucket.bucket)"
+                            class="credit-aging-row"
                             [class.bg-base-200]="agingSelected(side, bucket.bucket)"
                             [attr.aria-pressed]="agingSelected(side, bucket.bucket)"
                             (click)="toggleAging(side, bucket.bucket)"
                           >
-                            <span class="flex items-center gap-2">
-                              <span
-                                class="h-2.5 w-2.5 shrink-0 rounded-sm"
+                            <span class="flex min-w-0 items-center gap-2"
+                              ><span
+                                class="h-2 w-2 shrink-0 rounded-sm"
                                 [class]="agingTone(bucket.bucket)"
-                              ></span>
-                              <span class="min-w-0 flex-1 text-base-content/70">
-                                {{ agingLabel(bucket.bucket) }}
-                              </span>
-                              <span class="shrink-0 font-semibold tabular-nums">
-                                <app-money [amount]="bucket.amount" />
-                              </span>
-                            </span>
-                            <span class="mt-1 block pl-4 text-base-content/50">
-                              {{ documentCountLabel(bucket.documents) }} ·
-                              {{ agingShare(bucket, side) }}% of open {{ sideNoun(side) }}
-                            </span>
+                              ></span
+                              >{{ agingLabel(bucket.bucket) }}</span
+                            >
+                            <span class="credit-aging-evidence type-caption"
+                              >{{ documentCountLabel(bucket.documents) }} ·
+                              {{ agingShare(bucket, side) }}%</span
+                            >
+                            <span class="credit-aging-amount font-semibold tabular-nums"
+                              ><app-money [amount]="bucket.amount"
+                            /></span>
                           </button>
                         }
                       </div>
@@ -261,9 +245,9 @@ const EMPTY_METRICS: CreditHealthDashboard['metrics'] = {
               </div>
             </article>
 
-            <article class="card overflow-hidden bg-base-100 xl:col-span-5">
+            <article class="credit-trend-card card overflow-hidden bg-base-100">
               <div
-                class="flex flex-wrap items-start justify-between gap-2 border-b border-base-300/60 px-4 py-3"
+                class="credit-exposure-heading flex flex-wrap items-start justify-between gap-2 border-b border-base-300/60 px-4 py-3"
               >
                 <div>
                   <h3 class="section-title">Balance trend</h3>
@@ -284,7 +268,7 @@ const EMPTY_METRICS: CreditHealthDashboard['metrics'] = {
                   }
                 </div>
               </div>
-              <div class="p-4">
+              <div class="credit-trend-body p-4">
                 @if (!trendHasExposure()) {
                   <app-empty-state
                     [embedded]="true"
@@ -294,7 +278,7 @@ const EMPTY_METRICS: CreditHealthDashboard['metrics'] = {
                     description="The trend appears after credit sales or purchases are posted."
                   />
                 } @else {
-                  <div class="mb-3 grid gap-2 text-xs sm:grid-cols-2">
+                  <div class="credit-trend-legend mb-3 text-xs">
                     <div class="flex items-start gap-2 rounded-field bg-error/5 px-2.5 py-2">
                       <span class="mt-1.5 h-0.5 w-5 shrink-0 bg-error"></span>
                       <div>
@@ -319,7 +303,7 @@ const EMPTY_METRICS: CreditHealthDashboard['metrics'] = {
                     </div>
                   </div>
                   <div
-                    class="relative h-44 overflow-hidden rounded-field bg-base-200/40 px-3 pb-2 pt-5"
+                    class="credit-trend-plot relative overflow-hidden rounded-field bg-base-200/40"
                   >
                     <span class="absolute right-2 top-1 text-xs text-base-content/45">
                       Scale {{ fmt(trendScale()) }}
@@ -328,7 +312,7 @@ const EMPTY_METRICS: CreditHealthDashboard['metrics'] = {
                     <span class="absolute inset-x-0 top-1/2 border-t border-base-300/60"></span>
                     <span class="absolute inset-x-0 top-3/4 border-t border-base-300/60"></span>
                     <div
-                      class="relative flex h-full items-end gap-1"
+                      class="absolute inset-x-3 bottom-2 top-5 flex items-end gap-1"
                       role="img"
                       [attr.aria-label]="
                         'Receivables and payables trend over ' + trendDays() + ' days'
@@ -360,22 +344,141 @@ const EMPTY_METRICS: CreditHealthDashboard['metrics'] = {
             </article>
           </section>
 
+          <section
+            id="credit-actions"
+            tabindex="-1"
+            aria-labelledby="credit-actions-heading"
+            class="scroll-mt-20 space-y-3"
+          >
+            <div>
+              <h3 id="credit-actions-heading" class="section-title">Needs attention</h3>
+              <p class="type-caption mt-1">
+                Entire business · Open an account to collect payment or review a supplier bill.
+              </p>
+            </div>
+
+            @if (!hasActions()) {
+              <article class="card overflow-hidden bg-base-100">
+                <app-empty-state
+                  [embedded]="true"
+                  [compact]="true"
+                  icon="heroCheckCircle"
+                  title="No urgent credit actions"
+                  description="Current balances are within limits and payment windows."
+                />
+              </article>
+            } @else {
+              <div class="credit-dual-grid">
+                @if (data.collect_now.length > 0) {
+                  <article class="card overflow-hidden bg-base-100">
+                    <div
+                      class="flex flex-wrap items-start justify-between gap-3 border-b border-base-300/60 px-4 py-3"
+                    >
+                      <div>
+                        <h4 class="section-title">Collect now</h4>
+                        <p class="type-caption mt-1">Highest-risk customer accounts first.</p>
+                      </div>
+                      <a appButton variant="ghost" size="sm" routerLink="/customers">
+                        All customers
+                      </a>
+                    </div>
+                    <div class="divide-y divide-base-200">
+                      @for (party of data.collect_now; track party.party_id) {
+                        <a
+                          class="credit-action-row px-4 py-2 hover:bg-base-200/40"
+                          [routerLink]="['/customers']"
+                          [queryParams]="{ customer: party.party_id }"
+                        >
+                          <div class="min-w-0 flex-1">
+                            <div class="flex flex-wrap items-center gap-2">
+                              <p class="break-words text-sm font-semibold">
+                                {{ party.party_name }}
+                              </p>
+                              <span class="badge badge-error badge-outline badge-xs">
+                                {{ party.reason }}
+                              </span>
+                            </div>
+                            <p class="type-caption mt-1">
+                              @if (party.days_overdue > 0) {
+                                {{ party.days_overdue }} days overdue ·
+                              }
+                              <app-money [amount]="party.overdue_amount" /> overdue
+                            </p>
+                          </div>
+                          <div class="credit-action-amount">
+                            <p class="text-sm font-bold text-error">
+                              <app-money [amount]="party.outstanding" />
+                            </p>
+                            <p class="type-caption">outstanding</p>
+                          </div>
+                        </a>
+                      }
+                    </div>
+                  </article>
+                }
+
+                @if (data.pay_soon.length > 0) {
+                  <article class="card overflow-hidden bg-base-100">
+                    <div
+                      class="flex flex-wrap items-start justify-between gap-3 border-b border-base-300/60 px-4 py-3"
+                    >
+                      <div>
+                        <h4 class="section-title">Pay soon</h4>
+                        <p class="type-caption mt-1">Supplier obligations due within 30 days.</p>
+                      </div>
+                      <a appButton variant="ghost" size="sm" routerLink="/suppliers">
+                        All suppliers
+                      </a>
+                    </div>
+                    <div class="divide-y divide-base-200">
+                      @for (party of data.pay_soon; track party.party_id) {
+                        <a
+                          class="credit-action-row px-4 py-2 hover:bg-base-200/40"
+                          [routerLink]="['/suppliers']"
+                          [queryParams]="{ supplier: party.party_id }"
+                        >
+                          <div class="min-w-0 flex-1">
+                            <p class="break-words text-sm font-semibold">{{ party.party_name }}</p>
+                            <p class="type-caption mt-1">
+                              @if (party.next_due_date) {
+                                {{ party.days_overdue > 0 ? 'Overdue since' : 'Next due' }}
+                                {{ party.next_due_date | date: 'mediumDate' }}
+                              } @else {
+                                Due date unavailable
+                              }
+                            </p>
+                          </div>
+                          <div class="credit-action-amount">
+                            <p class="text-sm font-bold text-warning">
+                              <app-money [amount]="party.due_amount || party.outstanding" />
+                            </p>
+                            <p class="type-caption">due within 30d</p>
+                          </div>
+                        </a>
+                      }
+                    </div>
+                  </article>
+                }
+              </div>
+            }
+          </section>
           @if (hasRiskAnalysis()) {
             <article
               id="credit-risk"
+              tabindex="-1"
               aria-label="Customer credit risk"
-              class="card scroll-mt-4 overflow-hidden bg-base-100"
+              class="scroll-mt-20 space-y-3"
             >
-              <div class="border-b border-base-300/60 px-4 py-3">
+              <div>
                 <h3 class="section-title">Customer credit risk</h3>
                 <p class="type-caption mt-1">
                   Limit usage and the customers holding the largest balances.
                 </p>
               </div>
-              <div class="grid lg:grid-cols-2 lg:divide-x lg:divide-base-200">
+              <div class="credit-dual-grid">
                 @if (utilizationParties() > 0) {
-                  <section class="p-4" aria-labelledby="limit-utilization-heading">
-                    <div class="mb-3 flex items-baseline justify-between gap-3">
+                  <section class="card bg-base-100 p-4" aria-labelledby="limit-utilization-heading">
+                    <div class="mb-3 flex flex-wrap items-baseline justify-between gap-3">
                       <h4 id="limit-utilization-heading" class="text-sm font-semibold">
                         Limit utilization
                       </h4>
@@ -395,7 +498,7 @@ const EMPTY_METRICS: CreditHealthDashboard['metrics'] = {
                         ></span>
                       }
                     </div>
-                    <div class="mt-4 grid gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-1">
+                    <div class="mt-2 divide-y divide-base-200">
                       @for (bucket of activeUtilizationRows(); track bucket.bucket) {
                         <button
                           type="button"
@@ -409,7 +512,7 @@ const EMPTY_METRICS: CreditHealthDashboard['metrics'] = {
                             [class]="utilizationTone(bucket.bucket)"
                           ></span>
                           <div class="min-w-0 flex-1">
-                            <div class="flex justify-between gap-3 text-sm">
+                            <div class="flex flex-wrap justify-between gap-x-3 gap-y-1 text-sm">
                               <span>{{ utilizationLabel(bucket.bucket) }}</span>
                               <span class="font-semibold tabular-nums">
                                 {{ partyCountLabel(bucket.parties) }}
@@ -439,8 +542,8 @@ const EMPTY_METRICS: CreditHealthDashboard['metrics'] = {
                 }
 
                 @if (data.concentration.length > 0) {
-                  <section class="p-4" aria-labelledby="concentration-heading">
-                    <div class="mb-1 flex items-baseline justify-between gap-3">
+                  <section class="card bg-base-100 p-4" aria-labelledby="concentration-heading">
+                    <div class="mb-1 flex flex-wrap items-baseline justify-between gap-3">
                       <h4 id="concentration-heading" class="text-sm font-semibold">
                         Largest balances
                       </h4>
@@ -451,23 +554,20 @@ const EMPTY_METRICS: CreditHealthDashboard['metrics'] = {
                     <div class="divide-y divide-base-200">
                       @for (party of data.concentration; track party.party_id) {
                         <a
-                          class="flex min-h-14 items-center gap-3 py-2 hover:text-primary"
+                          class="flex min-h-11 items-center gap-3 py-2 hover:text-primary"
                           [routerLink]="['/customers']"
                           [queryParams]="{ customer: party.party_id }"
                         >
-                          <app-entity-avatar size="sm" [firstName]="party.party_name" />
                           <div class="min-w-0 flex-1">
-                            <div class="flex items-center justify-between gap-3">
-                              <p class="truncate text-sm font-semibold">{{ party.party_name }}</p>
+                            <div
+                              class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1"
+                            >
+                              <p class="break-words text-sm font-semibold">
+                                {{ party.party_name }}
+                              </p>
                               <p class="shrink-0 text-sm font-semibold">
                                 <app-money [amount]="party.amount" />
                               </p>
-                            </div>
-                            <div class="mt-1.5 h-1.5 overflow-hidden rounded-full bg-base-200">
-                              <div
-                                class="h-full rounded-full bg-primary"
-                                [style.width.%]="party.share"
-                              ></div>
                             </div>
                             <p class="type-caption mt-1">{{ party.share }}% of receivables</p>
                           </div>
@@ -479,129 +579,143 @@ const EMPTY_METRICS: CreditHealthDashboard['metrics'] = {
               </div>
             </article>
           }
-
-          <section
-            id="credit-actions"
-            aria-labelledby="credit-actions-heading"
-            class="scroll-mt-4 space-y-3"
-          >
-            <div>
-              <h3 id="credit-actions-heading" class="section-title">Needs attention</h3>
-              <p class="type-caption mt-1">Prioritized collection and supplier-payment work.</p>
-            </div>
-
-            @if (!hasActions()) {
-              <article class="card overflow-hidden bg-base-100">
-                <app-empty-state
-                  [embedded]="true"
-                  [compact]="true"
-                  icon="heroCheckCircle"
-                  title="No urgent credit actions"
-                  description="Current balances are within limits and payment windows."
-                />
-              </article>
-            } @else {
-              <div class="grid items-start gap-4 lg:grid-cols-2">
-                @if (data.collect_now.length > 0) {
-                  <article class="card overflow-hidden bg-base-100">
-                    <div
-                      class="flex items-start justify-between gap-3 border-b border-base-300/60 px-4 py-3"
-                    >
-                      <div>
-                        <h4 class="section-title">Collect now</h4>
-                        <p class="type-caption mt-1">Highest-risk customer accounts first.</p>
-                      </div>
-                      <a appButton variant="ghost" size="sm" routerLink="/customers">
-                        All customers
-                      </a>
-                    </div>
-                    <div class="divide-y divide-base-200">
-                      @for (party of data.collect_now; track party.party_id) {
-                        <a
-                          class="flex min-h-20 items-center gap-3 px-4 py-3 hover:bg-base-200/40"
-                          [routerLink]="['/customers']"
-                          [queryParams]="{ customer: party.party_id }"
-                        >
-                          <app-entity-avatar size="sm" [firstName]="party.party_name" />
-                          <div class="min-w-0 flex-1">
-                            <div class="flex flex-wrap items-center gap-2">
-                              <p class="truncate text-sm font-semibold">{{ party.party_name }}</p>
-                              <span class="badge badge-error badge-outline badge-xs">
-                                {{ party.reason }}
-                              </span>
-                            </div>
-                            <p class="type-caption mt-1">
-                              @if (party.days_overdue > 0) {
-                                {{ party.days_overdue }} days overdue ·
-                              }
-                              <app-money [amount]="party.overdue_amount" /> overdue
-                            </p>
-                          </div>
-                          <div class="shrink-0 text-right">
-                            <p class="text-sm font-bold text-error">
-                              <app-money [amount]="party.outstanding" />
-                            </p>
-                            <p class="type-caption">outstanding</p>
-                          </div>
-                        </a>
-                      }
-                    </div>
-                  </article>
-                }
-
-                @if (data.pay_soon.length > 0) {
-                  <article class="card overflow-hidden bg-base-100">
-                    <div
-                      class="flex items-start justify-between gap-3 border-b border-base-300/60 px-4 py-3"
-                    >
-                      <div>
-                        <h4 class="section-title">Pay soon</h4>
-                        <p class="type-caption mt-1">Supplier obligations due within 30 days.</p>
-                      </div>
-                      <a appButton variant="ghost" size="sm" routerLink="/suppliers">
-                        All suppliers
-                      </a>
-                    </div>
-                    <div class="divide-y divide-base-200">
-                      @for (party of data.pay_soon; track party.party_id) {
-                        <a
-                          class="flex min-h-20 items-center gap-3 px-4 py-3 hover:bg-base-200/40"
-                          [routerLink]="['/suppliers']"
-                          [queryParams]="{ supplier: party.party_id }"
-                        >
-                          <app-entity-avatar size="sm" [firstName]="party.party_name" />
-                          <div class="min-w-0 flex-1">
-                            <p class="truncate text-sm font-semibold">{{ party.party_name }}</p>
-                            <p class="type-caption mt-1">
-                              @if (party.next_due_date) {
-                                {{ party.days_overdue > 0 ? 'Overdue since' : 'Next due' }}
-                                {{ party.next_due_date | date: 'mediumDate' }}
-                              } @else {
-                                Due date unavailable
-                              }
-                            </p>
-                          </div>
-                          <div class="shrink-0 text-right">
-                            <p class="text-sm font-bold text-warning">
-                              <app-money [amount]="party.due_amount || party.outstanding" />
-                            </p>
-                            <p class="type-caption">due within 30d</p>
-                          </div>
-                        </a>
-                      }
-                    </div>
-                  </article>
-                }
-              </div>
-            }
-          </section>
         }
       }
     </section>
   `,
+  styles: `
+    :host {
+      display: block;
+      container-type: inline-size;
+    }
+    :host([hidden]) {
+      display: none;
+    }
+    .credit-summary {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr));
+      padding: 0.5rem;
+    }
+    .credit-summary-item {
+      display: flex;
+      min-width: 0;
+      flex-direction: column;
+      gap: 0.25rem;
+      padding: 0.5rem 0.75rem;
+      text-align: left;
+      overflow-wrap: anywhere;
+      border-radius: 0.25rem;
+      border-left: 1px solid var(--color-base-300);
+    }
+    .credit-summary-item:enabled:hover,
+    .credit-aging-row:hover {
+      background: var(--color-base-200);
+    }
+    .credit-summary-item:focus-visible,
+    .credit-aging-row:focus-visible {
+      outline: 2px solid var(--color-primary);
+      outline-offset: 2px;
+    }
+    .credit-exposure-grid {
+      display: grid;
+      gap: 1rem;
+      align-items: start;
+    }
+    .credit-exposure-heading {
+      min-height: 4.25rem;
+    }
+    .credit-trend-card,
+    .credit-trend-body {
+      display: flex;
+      flex-direction: column;
+    }
+    .credit-trend-body {
+      flex: 1;
+    }
+    .credit-trend-plot {
+      min-height: 11rem;
+      flex: 1;
+    }
+    .credit-dual-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr));
+      gap: 1rem;
+      align-items: start;
+    }
+    .credit-trend-legend {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+      gap: 0.5rem;
+    }
+    .credit-aging-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 0.125rem 0.75rem;
+      width: 100%;
+      min-height: 44px;
+      align-items: center;
+      padding: 0.375rem 0;
+      text-align: left;
+      font-size: 0.875rem;
+    }
+    .credit-aging-row > :first-child {
+      grid-column: 1;
+      grid-row: 1;
+    }
+    .credit-aging-evidence {
+      grid-column: 1;
+      grid-row: 2;
+      padding-left: 1rem;
+    }
+    .credit-aging-amount {
+      grid-column: 2;
+      grid-row: 1 / 3;
+    }
+    .credit-action-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.25rem 0.75rem;
+      align-items: center;
+    }
+    .credit-action-row > :first-child {
+      flex: 1 1 12rem;
+    }
+    .credit-action-amount {
+      margin-left: auto;
+      text-align: right;
+    }
+    @container (min-width: 50rem) {
+      .credit-aging-row {
+        grid-template-columns: minmax(0, 1fr) auto minmax(5rem, auto);
+      }
+      .credit-aging-evidence {
+        grid-column: 2;
+        grid-row: 1;
+        padding-left: 0;
+      }
+      .credit-aging-amount {
+        grid-column: 3;
+        grid-row: 1;
+        text-align: right;
+      }
+    }
+    @container (min-width: 56rem) {
+      .credit-exposure-grid {
+        grid-template-columns: minmax(0, 11fr) minmax(0, 9fr);
+        align-items: stretch;
+      }
+    }
+  `,
 })
 export class MoneyCreditComponent implements OnInit {
   private readonly money = inject(MoneyService);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+
+  protected focusSection(id: string): void {
+    const section = this.host.nativeElement.querySelector<HTMLElement>('#' + id);
+    section?.focus({ preventScroll: true });
+    section?.scrollIntoView({ block: 'start' });
+  }
 
   protected readonly dashboard = signal<CreditHealthDashboard | null>(null);
   protected readonly loading = signal(false);

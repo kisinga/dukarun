@@ -30,14 +30,57 @@ describe('SectionTabsComponent', () => {
     expect(changed).toHaveBeenCalledWith('performance');
   });
 
-  it('can expose a labeled mobile selector for long tab sets', () => {
-    fixture.componentRef.setInput('mobileSelect', true);
+  it('provides a labeled mobile selector by default', () => {
     fixture.componentRef.setInput('mobileLabel', 'Settings section');
     fixture.detectChanges();
 
     const select = fixture.nativeElement.querySelector('select') as HTMLSelectElement;
-    expect(select.getAttribute('aria-label')).toBe('Inventory analysis view');
+    expect(select.getAttribute('aria-label')).toBe('Settings section');
     expect(fixture.nativeElement.textContent).toContain('Settings section');
+  });
+
+  it('selects a non-first view on initial render', async () => {
+    fixture = TestBed.createComponent(SectionTabsComponent);
+    fixture.componentRef.setInput('items', [
+      { value: 'priorities', label: 'Stock priorities' },
+      { value: 'performance', label: 'Product performance' },
+    ]);
+    fixture.componentRef.setInput('value', 'performance');
+    fixture.componentRef.setInput('ariaLabel', 'Inventory analysis view');
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect((fixture.nativeElement.querySelector('select') as HTMLSelectElement).value).toBe(
+      'performance'
+    );
+  });
+
+  it('keeps the mobile selection in sync when items and the active view change', async () => {
+    fixture.componentRef.setInput('value', 'performance');
+    fixture.componentRef.setInput('items', [
+      { value: 'overview', label: 'Overview' },
+      { value: 'performance', label: 'Product performance' },
+      { value: 'sources', label: 'Supplier performance', disabled: true },
+    ]);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const select = fixture.nativeElement.querySelector('select') as HTMLSelectElement;
+    expect(select.value).toBe('performance');
+    expect(select.options[2].disabled).toBe(true);
+
+    const changed = vi.fn();
+    fixture.componentInstance.valueChange.subscribe(changed);
+    select.value = 'overview';
+    select.dispatchEvent(new Event('change'));
+    expect(changed).toHaveBeenCalledWith('overview');
+    fixture.componentRef.setInput('value', 'overview');
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(select.value).toBe('overview');
+    expect(fixture.nativeElement.querySelector('[aria-selected="true"]').textContent).toContain(
+      'Overview'
+    );
   });
 
   it('can use the quiet primary-section treatment without changing tab behavior', () => {

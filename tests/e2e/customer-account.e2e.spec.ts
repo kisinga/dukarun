@@ -427,14 +427,14 @@ test('customer list surfaces credit risk and exposes durable deep links', async 
   await expect(customerLinks.first()).toContainText('Amina Kamau');
 
   const filterButton = page.getByRole('button', { name: 'Filter list' });
-  if (await filterButton.isVisible()) await filterButton.click();
-  await page.getByLabel('Credit risk', { exact: true }).selectOption('healthy');
+  if ((await filterButton.getAttribute('aria-expanded')) !== 'true') await filterButton.click();
+  await page.getByRole('combobox', { name: 'Credit risk', exact: true }).selectOption('healthy');
   const applyFilters = page.getByRole('button', { name: 'View results' });
   if (await applyFilters.isVisible()) await applyFilters.click();
   await expect(page.getByRole('heading', { name: 'No customers found' })).toBeVisible();
 
-  if (await filterButton.isVisible()) await filterButton.click();
-  await page.getByLabel('Credit risk', { exact: true }).selectOption('review');
+  if ((await filterButton.getAttribute('aria-expanded')) !== 'true') await filterButton.click();
+  await page.getByRole('combobox', { name: 'Credit risk', exact: true }).selectOption('review');
   if (await applyFilters.isVisible()) await applyFilters.click();
   await expect(riskProfile).toBeVisible();
 
@@ -611,5 +611,101 @@ test('customer address editing uses one task and returns to refreshed detail', a
   expect(capture.customerProfileRequest()).toMatchObject({
     p_customer_id: customerId,
     p_profile: { delivery_address: 'Riverside Drive, Nairobi' },
+  });
+});
+
+test('two customer rows fit without internal scrolling or clipped credit content', async ({
+  page,
+}) => {
+  await authenticateAccountUser(page);
+  await page.route('**/rest/v1/customers?*', route =>
+    route.fulfill({
+      json: [
+        customer,
+        {
+          ...customer,
+          id: '93000000-0000-4000-8000-000000000020',
+          first_name: 'Jane',
+          last_name: 'Mwangi',
+          phone: '0712345678',
+          email: 'jane.mwangi@example.invalid',
+        },
+      ],
+    })
+  );
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto('http://127.0.0.1:4203/customers');
+  const viewport = page.locator('.data-table-viewport').first();
+  await expect(viewport.locator('tbody > tr')).toHaveCount(2);
+  await expect(page.locator('app-customers app-stat-bar .stat-bar-item:visible')).toHaveCount(6);
+  await expect(page.getByRole('button', { name: 'More summary' })).toHaveCount(0);
+  for (const width of [1280, 1024, 1440, 1920]) {
+    await page.setViewportSize({ width, height: 800 });
+    await expect
+      .poll(
+        async () =>
+          viewport.evaluate(element => ({
+            x: element.scrollWidth - element.clientWidth,
+            y: element.scrollHeight - element.clientHeight,
+          })),
+        { message: `Account table must fit at ${width}px` }
+      )
+      .toEqual({ x: 0, y: 0 });
+    await expect(viewport).toHaveJSProperty('scrollLeft', 0);
+    const credit = viewport.locator('tbody > tr').first().locator('td').nth(1);
+    const badge = credit.locator('app-score-badge');
+    const cellBox = (await credit.boundingBox())!;
+    const badgeBox = (await badge.boundingBox())!;
+    expect(badgeBox.x).toBeGreaterThanOrEqual(cellBox.x);
+    expect(badgeBox.x + badgeBox.width).toBeLessThanOrEqual(cellBox.x + cellBox.width);
+    const header = page.locator('.data-table-header-viewport').first();
+    expect(await header.evaluate(element => element.scrollWidth - element.clientWidth)).toBe(0);
+  }
+});
+
+test('mobile customer review preserves search, filters and sort when the drawer closes', async ({
+  page,
+}) => {
+  await authenticateAccountUser(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(
+    'http://127.0.0.1:4203/customers?search=Amina&risk=restricted&sort=balance&direction=desc&pageSize=25'
+  );
+  await expect(page.getByRole('searchbox')).toHaveValue('Amina');
+  const overdue = page.locator('.stat-bar-item').filter({ hasText: 'Customers overdue' });
+  await expect(overdue).toContainText('0');
+  await page.locator('app-mobile-list a').filter({ hasText: 'Amina Kamau' }).first().click();
+  const drawer = page.getByRole('dialog', { name: 'Amina Kamau' });
+  await expect(drawer).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(drawer).not.toBeVisible();
+  await expect(page.getByRole('searchbox')).toHaveValue('Amina');
+  expect(Object.fromEntries(new URL(page.url()).searchParams)).toEqual({
+    search: 'Amina',
+    risk: 'restricted',
+    sort: 'balance',
+    direction: 'desc',
+    pageSize: '25',
+  });
+});
+
+test('desktop customer name preserves list filters when the drawer closes', async ({ page }) => {
+  await authenticateAccountUser(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(
+    'http://127.0.0.1:4203/customers?search=Amina&risk=restricted&sort=balance&direction=desc&pageSize=25'
+  );
+  await page.locator('tbody a').filter({ hasText: 'Amina Kamau' }).first().click();
+  const drawer = page.getByRole('dialog', { name: 'Amina Kamau' });
+  await expect(drawer).toBeVisible();
+  await expect(page.getByRole('searchbox')).toHaveValue('Amina');
+  await page.keyboard.press('Escape');
+  await expect(drawer).not.toBeVisible();
+  expect(Object.fromEntries(new URL(page.url()).searchParams)).toEqual({
+    search: 'Amina',
+    risk: 'restricted',
+    sort: 'balance',
+    direction: 'desc',
+    pageSize: '25',
   });
 });

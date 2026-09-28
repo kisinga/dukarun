@@ -1,3 +1,4 @@
+import { bindListQuery, listQueryField } from '../../shared/list/list-query';
 import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
@@ -16,7 +17,6 @@ import {
   type ListSortOption,
 } from '../../shared/ui/list-search-bar.component';
 import { PaginationComponent } from '../../shared/ui/pagination.component';
-import { StatBarComponent } from '../../shared/ui/stat-bar.component';
 import { DrawerComponent } from '../../shared/ui/drawer.component';
 
 @Component({
@@ -30,7 +30,6 @@ import { DrawerComponent } from '../../shared/ui/drawer.component';
     IconComponent,
     ListSearchBarComponent,
     PaginationComponent,
-    StatBarComponent,
     DrawerComponent,
   ],
   template: `
@@ -181,6 +180,9 @@ import { DrawerComponent } from '../../shared/ui/drawer.component';
     }
 
     <app-list-search-bar
+      searchLabel="Search money transfers"
+      [activeFilters]="activeListFilters()"
+      (removeFilter)="removeListFilter($event)"
       placeholder="Search memo or reference…"
       [searchQuery]="historySearch()"
       (searchQueryChange)="onHistorySearch($event)"
@@ -190,10 +192,12 @@ import { DrawerComponent } from '../../shared/ui/drawer.component';
       [sortDirection]="historyDirection()"
       (sortDirectionChange)="historyDirection.set($event); reloadHistory()"
       [filtersEnabled]="true"
-      [activeFilterCount]="historyFilterCount()"
       (clearFilters)="clearHistoryFilters()"
     >
-      <app-stat-bar summary [stats]="historyStats()" />
+      <p summary class="type-caption">
+        <strong class="text-base-content tabular-nums">{{ historyTotal() }}</strong> matching
+        transfers
+      </p>
       <div filters class="grid gap-2 sm:grid-cols-2 lg:flex lg:flex-wrap lg:items-end">
         <app-form-field label="Account involved" class="lg:w-52">
           <select
@@ -207,20 +211,13 @@ import { DrawerComponent } from '../../shared/ui/drawer.component';
             }
           </select>
         </app-form-field>
-        <app-form-field label="From" class="lg:w-40"
-          ><input
-            type="date"
-            class="input input-bordered input-sm w-full"
-            [value]="historyFrom()"
-            (change)="setHistoryDate('from', $event)"
-        /></app-form-field>
-        <app-form-field label="To" class="lg:w-40"
-          ><input
-            type="date"
-            class="input input-bordered input-sm w-full"
-            [value]="historyTo()"
-            (change)="setHistoryDate('to', $event)"
-        /></app-form-field>
+      </div>
+      <div scope class="flex flex-wrap items-end gap-3">
+        @if (!monthActive()) {
+          <button type="button" class="btn btn-ghost btn-sm min-h-11" (click)="setMonth()">
+            Reset dates
+          </button>
+        }
         <div class="flex gap-2 sm:col-span-2">
           <button
             appButton
@@ -245,8 +242,20 @@ import { DrawerComponent } from '../../shared/ui/drawer.component';
             All time
           </button>
         </div>
-      </div>
-    </app-list-search-bar>
+        <app-form-field label="From" class="lg:w-40"
+          ><input
+            type="date"
+            class="input input-bordered input-sm w-full"
+            [value]="historyFrom()"
+            (change)="setHistoryDate('from', $event)" /></app-form-field
+        ><app-form-field label="To" class="lg:w-40"
+          ><input
+            type="date"
+            class="input input-bordered input-sm w-full"
+            [value]="historyTo()"
+            (change)="setHistoryDate('to', $event)"
+        /></app-form-field></div
+    ></app-list-search-bar>
     @if (historyError()) {
       <p class="mb-3 text-sm text-error" role="alert">
         {{ historyError() }}
@@ -254,6 +263,7 @@ import { DrawerComponent } from '../../shared/ui/drawer.component';
       </p>
     }
     <app-journal-list
+      context="transfer"
       [entries]="entries()"
       [loading]="historyLoading()"
       emptyText="No transfers posted yet."
@@ -272,6 +282,17 @@ import { DrawerComponent } from '../../shared/ui/drawer.component';
   `,
 })
 export class MoneyTransfersComponent implements OnInit, OnDestroy {
+  protected readonly activeListFilters = computed(() => [
+    ...(this.historyAccount() !== ''
+      ? [{ key: 'account', label: 'Account: ' + this.historyAccount().replaceAll('_', ' ') }]
+      : []),
+  ]);
+  protected removeListFilter(key: string): void {
+    if (key === 'account') this.historyAccount.set('');
+    this.historyPage.set(1);
+    void this.load();
+  }
+
   private readonly money = inject(MoneyService);
   protected readonly cashierSession = inject(CashierSessionService);
 
@@ -320,6 +341,22 @@ export class MoneyTransfersComponent implements OnInit, OnDestroy {
 
   /** Idempotency key for the in-progress transfer form (regenerated after success). */
   private transferId = crypto.randomUUID();
+
+  constructor() {
+    bindListQuery(
+      {
+        search: listQueryField(this.historySearch),
+        account: listQueryField(this.historyAccount),
+        from: listQueryField(this.historyFrom),
+        to: listQueryField(this.historyTo),
+        page: listQueryField(this.historyPage),
+        pageSize: listQueryField(this.historyPageSize, { max: 100 }),
+        sort: listQueryField(this.historySort),
+        direction: listQueryField(this.historyDirection),
+      },
+      () => void this.load()
+    );
+  }
 
   async ngOnInit(): Promise<void> {
     await this.load();
@@ -386,7 +423,7 @@ export class MoneyTransfersComponent implements OnInit, OnDestroy {
   protected onHistorySearch(value: string): void {
     this.historySearch.set(value);
     if (this.historySearchTimer) clearTimeout(this.historySearchTimer);
-    this.historySearchTimer = setTimeout(() => this.reloadHistory(), 250);
+    this.historySearchTimer = setTimeout(() => this.reloadHistory(), 0);
   }
   protected setHistoryAccount(event: Event): void {
     this.historyAccount.set((event.target as HTMLSelectElement).value);
@@ -413,12 +450,9 @@ export class MoneyTransfersComponent implements OnInit, OnDestroy {
   protected allTimeActive(): boolean {
     return !this.historyFrom() && !this.historyTo();
   }
-  protected historyFilterCount(): number {
-    return Number(Boolean(this.historyAccount())) + Number(!this.monthActive());
-  }
   protected clearHistoryFilters(): void {
     this.historyAccount.set('');
-    this.setMonth();
+    this.reloadHistory();
   }
   protected transferFormDirty(): boolean {
     return Boolean(this.principal.value.trim() || this.fee.value.trim() || this.memo.value.trim());

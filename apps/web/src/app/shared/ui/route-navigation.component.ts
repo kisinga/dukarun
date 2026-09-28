@@ -1,5 +1,6 @@
 import { Component, computed, inject, input } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
+import { FormsModule } from '@angular/forms';
 import { NavigationEnd, Router, RouterLink } from '@angular/router';
 import { filter } from 'rxjs';
 import { IconComponent } from './icon.component';
@@ -17,21 +18,22 @@ export interface RouteNavigationItem {
  */
 @Component({
   selector: 'app-route-navigation',
-  imports: [RouterLink, IconComponent],
-  host: { class: 'block' },
+  imports: [FormsModule, RouterLink, IconComponent],
+  host: { class: 'block min-w-0 max-w-full' },
   template: `
     @if (items().length > 1) {
-      <label class="form-control mb-3 md:hidden">
+      <label class="mb-3 flex min-w-0 flex-col md:hidden">
         <span
           class="label-text mb-1 text-xs font-semibold uppercase tracking-wide text-base-content/60"
         >
           {{ label() }} section
         </span>
         <select
-          class="select select-bordered min-h-11 w-full"
+          class="select select-bordered min-h-11 w-full min-w-0 max-w-full"
           [attr.aria-label]="label() + ' section'"
-          [value]="activeRoute()"
-          (change)="navigate($event)"
+          [ngModel]="activeRoute()"
+          [ngModelOptions]="{ standalone: true }"
+          (ngModelChange)="navigate($event)"
         >
           @for (item of items(); track item.route) {
             <option [value]="item.route">{{ item.label }}</option>
@@ -79,8 +81,7 @@ export class RouteNavigationComponent {
     );
   });
 
-  protected navigate(event: Event): void {
-    const route = (event.target as HTMLSelectElement).value;
+  protected navigate(route: string): void {
     if (route) void this.router.navigateByUrl(route);
   }
 }

@@ -1,3 +1,4 @@
+import { bindListQuery, listQueryField } from '../../shared/list/list-query';
 import {
   Component,
   OnDestroy,
@@ -27,7 +28,11 @@ import { PrintService } from '../../shared/print/print.service';
 import { ReceiptDataService } from '../../shared/print/receipt-data.service';
 import { OrderQueueCountsService } from '../order-queue-counts.service';
 import { QUEUE_LONG_COUNT, queueAge, waitLabel, type QueueAge } from '../queue-aging';
-import { DataTableShellComponent } from '../../shared/ui/data-table-shell.component';
+import {
+  DataTableShellComponent,
+  TableRowsDirective,
+  type TableColumn,
+} from '../../shared/ui/data-table-shell.component';
 import {
   ListSearchBarComponent,
   type ListSortDirection,
@@ -62,6 +67,7 @@ const QUEUE_SORT_OPTIONS: readonly ListSortOption[] = [
     MoneyComponent,
     IconComponent,
     DataTableShellComponent,
+    TableRowsDirective,
     ListSearchBarComponent,
     PaginationComponent,
     StatBarComponent,
@@ -162,6 +168,7 @@ const QUEUE_SORT_OPTIONS: readonly ListSortOption[] = [
       }
 
       <app-list-search-bar
+        searchLabel="Search waiting sales"
         placeholder="Search sale code or customer…"
         [searchQuery]="query()"
         (searchQueryChange)="onSearch($event)"
@@ -192,7 +199,11 @@ const QUEUE_SORT_OPTIONS: readonly ListSortOption[] = [
       } @else {
         <app-mobile-list>
           @for (order of parked(); track order.id) {
-            <div mobileListRow [class.bg-error/5]="ageOf(order) === 'stale'">
+            <div
+              [attr.data-list-record]="order.id"
+              mobileListRow
+              [class.bg-error/5]="ageOf(order) === 'stale'"
+            >
               <div class="p-3">
                 <div class="flex items-start justify-between gap-3">
                   <div class="min-w-0">
@@ -227,130 +238,120 @@ const QUEUE_SORT_OPTIONS: readonly ListSortOption[] = [
 
         <div class="hidden lg:block">
           <app-data-table-shell
+            [columns]="tableColumns1"
+            tableClass="table-sm"
             heading="Waiting for payment"
             [description]="
               totalItems() + ' ' + (totalItems() === 1 ? 'sale' : 'sales') + ' in queue'
             "
           >
-            <table class="table table-sm">
-              <thead>
-                <tr>
-                  <th>Waiting since</th>
-                  <th>Sale</th>
-                  <th>Customer</th>
-                  <th>Status</th>
-                  <th class="text-right">Amount due</th>
-                  <th class="text-right">Actions</th>
+            <ng-template tableRows>
+              @for (order of parked(); track order.id) {
+                <tr
+                  [attr.data-list-record]="order.id"
+                  tabindex="0"
+                  class="cursor-pointer"
+                  [class.bg-error/5]="ageOf(order) === 'stale'"
+                  [attr.aria-expanded]="expandedFor() === order.id"
+                  (click)="toggleItems(order.id)"
+                  (keydown.enter)="toggleItems(order.id)"
+                >
+                  <td>
+                    <p class="font-mono font-semibold">{{ order.code }}</p>
+                    <p class="table-primary" [class]="waitToneClass(order)">
+                      {{ waitLabel(pendingSince(order), now()) }}
+                    </p>
+                    <p class="table-secondary">{{ time(pendingSince(order)) }}</p>
+                  </td>
+                  <td>{{ customerName(order) }}</td>
+                  <td>
+                    <app-status-badge type="warning" label="Awaiting payment" size="xs" />
+                  </td>
+                  <td class="table-number"><app-money [amount]="order.total" /></td>
+                  <td class="table-actions" (click)="$event.stopPropagation()">
+                    <button
+                      appButton
+                      variant="ghost"
+                      [iconOnly]="true"
+                      [loading]="loadingLinesFor() === order.id"
+                      [attr.aria-expanded]="expandedFor() === order.id"
+                      [title]="expandedFor() === order.id ? 'Hide sale items' : 'View sale items'"
+                      [attr.aria-label]="
+                        expandedFor() === order.id ? 'Hide sale items' : 'View sale items'
+                      "
+                      (click)="toggleItems(order.id)"
+                    >
+                      <app-icon
+                        [name]="expandedFor() === order.id ? 'heroChevronUp' : 'heroChevronDown'"
+                      />
+                    </button>
+                    <button
+                      appButton
+                      size="sm"
+                      class="ml-2"
+                      type="button"
+                      [disabled]="!cashierSession.canTakePayment() || busy()"
+                      (click)="startSettlement(order)"
+                    >
+                      <app-icon name="heroBanknotes" />
+                      Collect payment
+                    </button>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                @for (order of parked(); track order.id) {
-                  <tr
-                    role="button"
-                    tabindex="0"
-                    class="cursor-pointer"
-                    [class.bg-error/5]="ageOf(order) === 'stale'"
-                    [attr.aria-expanded]="expandedFor() === order.id"
-                    (click)="toggleItems(order.id)"
-                    (keydown.enter)="toggleItems(order.id)"
-                  >
-                    <td>
-                      <p class="table-primary" [class]="waitToneClass(order)">
-                        {{ waitLabel(pendingSince(order), now()) }}
-                      </p>
-                      <p class="table-secondary">{{ time(pendingSince(order)) }}</p>
-                    </td>
-                    <td class="font-mono font-semibold">{{ order.code }}</td>
-                    <td>{{ customerName(order) }}</td>
-                    <td>
-                      <app-status-badge type="warning" label="Awaiting payment" size="xs" />
-                    </td>
-                    <td class="table-number"><app-money [amount]="order.total" /></td>
-                    <td class="table-actions" (click)="$event.stopPropagation()">
-                      <button
-                        appButton
-                        variant="ghost"
-                        [iconOnly]="true"
-                        [loading]="loadingLinesFor() === order.id"
-                        [attr.aria-expanded]="expandedFor() === order.id"
-                        [title]="expandedFor() === order.id ? 'Hide sale items' : 'View sale items'"
-                        [attr.aria-label]="
-                          expandedFor() === order.id ? 'Hide sale items' : 'View sale items'
-                        "
-                        (click)="toggleItems(order.id)"
-                      >
-                        <app-icon
-                          [name]="expandedFor() === order.id ? 'heroChevronUp' : 'heroChevronDown'"
-                        />
-                      </button>
-                      <button
-                        appButton
-                        size="sm"
-                        class="ml-2"
-                        type="button"
-                        [disabled]="!cashierSession.canTakePayment() || busy()"
-                        (click)="startSettlement(order)"
-                      >
-                        <app-icon name="heroBanknotes" />
-                        Collect payment
-                      </button>
+
+                @if (expandedFor() === order.id) {
+                  <tr class="row-detail">
+                    <td colspan="5">
+                      @if (loadingLinesFor() === order.id) {
+                        <div
+                          class="flex items-center justify-center gap-2 py-6 text-base-content/60"
+                        >
+                          <span class="loading loading-spinner loading-sm"></span>
+                          <span>Loading items…</span>
+                        </div>
+                      } @else if (lines().length === 0) {
+                        <p class="py-2 text-sm text-base-content/60">
+                          No items found for this sale.
+                        </p>
+                      } @else {
+                        <table class="table table-xs">
+                          <thead>
+                            <tr>
+                              <th>Item</th>
+                              <th class="text-right">Qty</th>
+                              <th class="text-right">Unit price</th>
+                              <th class="text-right">Total</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            @for (line of lines(); track line.id) {
+                              <tr [attr.data-list-record]="line.id">
+                                <td>
+                                  <p>{{ line.label }}</p>
+                                  <p class="type-caption">
+                                    {{ line.manufacturer_name || 'Manufacturer not set' }}
+                                    @if (line.sku) {
+                                      · {{ line.sku }}
+                                    }
+                                  </p>
+                                </td>
+                                <td class="text-right">{{ line.quantity }}</td>
+                                <td class="table-number">
+                                  <app-money [amount]="line.custom_price ?? line.unit_price" />
+                                </td>
+                                <td class="table-number">
+                                  <app-money [amount]="line.line_total" />
+                                </td>
+                              </tr>
+                            }
+                          </tbody>
+                        </table>
+                      }
                     </td>
                   </tr>
-
-                  @if (expandedFor() === order.id) {
-                    <tr class="row-detail">
-                      <td colspan="6">
-                        @if (loadingLinesFor() === order.id) {
-                          <div
-                            class="flex items-center justify-center gap-2 py-6 text-base-content/60"
-                          >
-                            <span class="loading loading-spinner loading-sm"></span>
-                            <span>Loading items…</span>
-                          </div>
-                        } @else if (lines().length === 0) {
-                          <p class="py-2 text-sm text-base-content/60">
-                            No items found for this sale.
-                          </p>
-                        } @else {
-                          <table class="table table-xs">
-                            <thead>
-                              <tr>
-                                <th>Item</th>
-                                <th class="text-right">Qty</th>
-                                <th class="text-right">Unit price</th>
-                                <th class="text-right">Total</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              @for (line of lines(); track line.id) {
-                                <tr>
-                                  <td>
-                                    <p>{{ line.label }}</p>
-                                    <p class="type-caption">
-                                      {{ line.manufacturer_name || 'Manufacturer not set' }}
-                                      @if (line.sku) {
-                                        · {{ line.sku }}
-                                      }
-                                    </p>
-                                  </td>
-                                  <td class="text-right">{{ line.quantity }}</td>
-                                  <td class="table-number">
-                                    <app-money [amount]="line.custom_price ?? line.unit_price" />
-                                  </td>
-                                  <td class="table-number">
-                                    <app-money [amount]="line.line_total" />
-                                  </td>
-                                </tr>
-                              }
-                            </tbody>
-                          </table>
-                        }
-                      </td>
-                    </tr>
-                  }
                 }
-              </tbody>
-            </table>
+              }
+            </ng-template>
           </app-data-table-shell>
         </div>
 
@@ -416,6 +417,13 @@ const QUEUE_SORT_OPTIONS: readonly ListSortOption[] = [
   `,
 })
 export class CashierQueueComponent implements OnInit, OnDestroy {
+  protected readonly tableColumns1: TableColumn[] = [
+    { key: 'sale', label: 'Sale / waiting time', pinned: true },
+    { key: 'column2', label: 'Customer' },
+    { key: 'column3', label: 'Status' },
+    { key: 'column4', label: 'Amount due', align: 'right' },
+    { key: 'column5', label: 'Actions', align: 'right' },
+  ];
   private readonly pos = inject(PosService);
   private readonly receiptData = inject(ReceiptDataService);
   private readonly print = inject(PrintService);
@@ -489,7 +497,7 @@ export class CashierQueueComponent implements OnInit, OnDestroy {
       {
         label: 'Value on page',
         value: formatKes(rows.reduce((total, order) => total + order.total, 0)),
-        mobilePriority: 'primary' as const,
+        mobilePriority: 'secondary' as const,
       },
       {
         label: 'Stale (1h+)',
@@ -501,7 +509,7 @@ export class CashierQueueComponent implements OnInit, OnDestroy {
         label: 'Oldest on page',
         value: oldest ? this.waitLabel(this.pendingSince(oldest), this.now()) : '—',
         tone: oldest ? this.ageTone(this.ageOf(oldest)) : undefined,
-        mobilePriority: 'secondary' as const,
+        mobilePriority: 'primary' as const,
       },
       {
         label: 'Walk-ins on page',
@@ -514,6 +522,17 @@ export class CashierQueueComponent implements OnInit, OnDestroy {
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
+    bindListQuery(
+      {
+        search: listQueryField(this.query),
+        sort: listQueryField(this.queueSort),
+        direction: listQueryField(this.queueSortDirection),
+        page: listQueryField(this.page),
+        pageSize: listQueryField(this.pageSize, { max: 100 }),
+      },
+      () => void this.load()
+    );
+
     effect(() => {
       this.recentSales.revision();
       const online = this.connectivity.online();
@@ -572,11 +591,13 @@ export class CashierQueueComponent implements OnInit, OnDestroy {
     this.query.set(query);
     this.page.set(1);
     if (this.searchTimer) clearTimeout(this.searchTimer);
-    this.searchTimer = setTimeout(() => void this.load(), 250);
+    this.searchTimer = setTimeout(() => void this.load(), 0);
   }
 
   /** Silent reloads (realtime events) update the list without flashing the header spinner. */
+  private listRequest = 0;
   protected async load(silent = false): Promise<void> {
+    const request = ++this.listRequest;
     if (!silent) this.loading.set(true);
     void this.orderQueueCounts.refresh();
     try {
@@ -589,6 +610,7 @@ export class CashierQueueComponent implements OnInit, OnDestroy {
         sortDirection: this.queueSortDirection(),
         cashierQueueOnly: true,
       });
+      if (request !== this.listRequest) return;
       this.parked.set(result.rows);
       this.totalItems.set(result.count);
       if (this.expandedFor() && !result.rows.some(order => order.id === this.expandedFor())) {
@@ -597,9 +619,10 @@ export class CashierQueueComponent implements OnInit, OnDestroy {
       }
       this.error.set(null);
     } catch (err) {
+      if (request !== this.listRequest) return;
       this.error.set(err instanceof Error ? err.message : 'Failed to load queue');
     } finally {
-      this.loading.set(false);
+      if (request === this.listRequest) this.loading.set(false);
     }
   }
 

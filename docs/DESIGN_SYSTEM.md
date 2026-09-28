@@ -95,8 +95,9 @@ The orange is a spice, not a sauce.
 ## Mobile ergonomics contract
 
 The authenticated app is usable without horizontal page scrolling at every width from 320px.
-The first useful list record should be visible in a 390×844 viewport unless a critical warning
-must precede it.
+Keep the first useful list record close to the controls in a 390×844 viewport. Preserve the
+complete summary and critical warnings even when they move records below the first screen;
+do not hide operational information to meet a fold-height target.
 
 ### Viewport containment
 
@@ -129,14 +130,27 @@ interactive content is a design-language violation.
   Editing and destructive actions belong in the record task sheet.
 - Tables are desktop-only from `lg` (1024px) and must be paired with a phone list through the
   responsive data pattern. `table-scroll` and page-level horizontal overflow are prohibited.
-- Primary desktop datasets use `<app-data-table-shell>`. Long tables receive one bounded,
-  keyboard-focusable scroll region with sticky column headers; short tables remain in natural
-  document flow. Consumers must not add their own height, overflow, or sticky-header rules.
+- Primary desktop datasets use `<app-data-table-shell>` in natural document flow. List routes
+  explicitly declare `data: { listPage: true }`; the shell then removes its overflow trap. The
+  document owns vertical scrolling over rows, headers, and whitespace. Column headers alone
+  pin below the 3.5rem navbar (56px at standard text size) and release at the table bottom. Never bound a primary table's height.
+- Declare stable `TableColumn` keys and labels, and project rows with `<ng-template tableRows>`.
+  Custom header controls use `<ng-template tableHeader="key">` and render exactly once. The native
+  semantic table keeps its noninteractive column headers; a separate Angular-rendered visual band
+  measures native column geometry and synchronizes horizontal scrolling. No DOM cloning, vertical
+  scroll handlers, or gesture interception. Expanded rows and nested tables stay native.
+- Pin the leading record identity (and adjacent selection column) on desktop only. Keep opaque
+  backgrounds, visible focus and keyboard-accessible horizontal scrolling. Print hides the visual
+  band and restores the semantic header. Opt out with `[stickyHeader]="false"` for embedded tables.
 - Phone list toolbars keep search visible. Sort uses the anchored menu; Filters opens the bottom
   sheet, applies changes immediately, exposes active filter chips/count, and ends with View results
-  and Clear all. Phone summaries expose exactly two primary metrics before More summary.
+  and Clear all. Summary metrics remain visible and wrap on phones; no More summary disclosure.
 - Phone pagination is range, previous, page/total, next. First/last and page-size controls are
   desktop concerns.
+- Numbered pagination requests record-area scrolling through the list return directive, after
+  Angular's router scroll event. This takes precedence over an older return anchor for the same
+  page. Include journal history alongside table/mobile-list surfaces; short pages clamp naturally
+  at the document bottom. Local-only pagination uses the next rendered frame.
 
 ### Connectivity is app state, not page decoration
 
@@ -322,8 +336,8 @@ Compose pages from these — never hand-roll what a primitive owns:
 - **`<app-section-tabs>`** — state-backed switching within a page. Pass `{ value, label }` items,
   the active value, and an accessible label. Use `presentation="primary"` when those values are the
   page's primary sections (Settings), and the default segmented presentation for secondary peer
-  views inside a selected section. Use `mobileSelect` when a long set should collapse to a selector
-  on phones.
+  views inside a selected section. Both presentations always use a labeled native dropdown below
+  768px; no per-page opt-in or horizontally scrolling phone tabs.
 - **`<app-mobile-list>` / `<app-responsive-data-view>`** — the shared phone list surface and
   desktop/mobile pairing boundary. Domain pages own row content; the primitives own visibility,
   border, radius, and dividers.
@@ -383,35 +397,123 @@ Every list page is the same four blocks, top to bottom — no improvisation:
    table footer or a floating row. Related navigation uses a domain icon; reserve `heroPlus`
    for create. Refresh includes a tooltip, accessible label, and loading state but no visible
    text label.
-2. **`<app-list-search-bar>`** — the common compact list top bar. Search, summary, and sort share
-   one desktop row; at medium widths the summary can move below search and sort. Search and sort
-   use matching control borders, field radii, and 44px heights. Metric values align at the top;
-   interactive and read-only metrics use identical straight dividers. Optional `[filters]` always
-   own a full-width divided row below, keeping their compact sizes and permanent labels. Never
-   squeeze filters between search and sort, add a full-width KPI strip, or enlarge every filter
-   to match the search height;
-   `[badges]` may wrap underneath. The primitive owns block layout, `p-4`, and `mb-4`, aligning
-   its contents with table-shell headers and cells while guaranteeing the same gap before every
-   data surface. Pages must not wrap it just to recreate that spacing. No detached stat-card
-   grids, custom search rows, or bare `input-bordered`.
-   The primitive owns its single clear button and applies `search-with-custom-clear` to suppress
-   the browser's native cancel control. Any other search that supplies a custom clear action must
-   use the same class; searches without a custom action keep native clearing. Two clear controls
-   are always a design-language defect. Give every consumer a domain-specific `searchLabel`
-   (for example, “Search customers”); the placeholder may describe searchable fields but is not
-   the accessible name. Filter controls use `app-form-field` so Customers, Suppliers, and other
-   directories share the same permanent-label alignment.
+2. **`<app-list-search-bar>`** — on wide list surfaces, search, summary and sorting share one row.
+   Keep search at a useful bounded width and show summary values above their labels between search
+   and sort. At narrower widths the complete summary wraps below search; phone summaries use two
+   columns. A divided second row contains visible quick filters, dataset scope and advanced Filters.
+   Sales keeps Status and Customer directly visible, followed by dates and period shortcuts.
+   Catalogue keeps Status, Stock status, Supplier, Manufacturer and Category directly visible in
+   one desktop filter row; labelled controls wrap into two columns on phones. Keep catalogue counts
+   and stock valuation in distinct summary groups, with readable values above concise labels.
+   Inside an existing panel, use the toolbar's `embedded` presentation to avoid a second card and
+   duplicated padding. With no summary, search and quick filters share a row when space permits.
+   Credit has two peer views: **Overview** and **Customer / supplier standings**, with the view in the URL.
+   Overview leads with a compact business-wide summary strip, then exposure by due status and
+   balance trends, followed by Collect now / Pay soon and customer credit risk. Keep all supplied
+   metrics visible, including net balances, overdue invoices, severe exposure, bills due soon,
+   over-limit accounts and concentration. Net balances and gross invoice exposure remain distinct.
+   Aging uses aligned bucket/amount/document-count/share rows. Risk modules take their natural
+   height; keep all five largest balances visible with names, amounts and shares.
+   Customer / supplier standings puts the customer/supplier switch, search, credit band and Overdue only directly
+   above records. Standings uses the existing risk-ordered cursor query, 25 records per page by default,
+   a visible page-size selector, and Previous/Next controls above and below records. Show a record
+   range; show an exact total only once the cursor is exhausted. Keep page/pageSize in the URL,
+   reset the page for filter changes, and reuse loaded records for Previous and detail returns.
+   View switches preserve filters, loaded pages and return position; Find an account
+   deliberately focuses search. Legacy filtered URLs open profiles. Both views remain mounted,
+   keeping the trend selection and profile state without duplicate requests. The existing in-memory
+   list snapshots support detail returns; no business rows are persisted to browser storage.
+   Desktop filter controls use a consistent 36px height; phones retain 44px touch targets. Search and
+   sorting retain their 44px controls. Custom history dates form a pair on phones.
+   Keep every existing summary metric visible on every
+   viewport; wrap the bar rather than hiding information. Label metrics as matching results, current page,
+   or entire business, and preserve financial visibility rules.
+   Keep search visible and debounce it by 250ms once. Discrete filters apply immediately. Custom
+   analytical date ranges apply after both dates are valid. History pages with optional endpoints
+   use `app-history-date-range`: Between, Since, Until and All time. Incomplete or reversed drafts
+   show guidance and preserve the applied results/URL. Histories have no analytical 12-month cap;
+   keep existing `from`/`to` names and endpoint semantics. Dataset changes reset pagination. Advanced filters
+   use the desktop inline **Filters** disclosure and the existing phone bottom sheet. Removable
+   active-filter chips and **Clear filters** remain outside the disclosure. The sheet traps focus,
+   closes with Escape, and returns focus to its trigger.
+   Give search a domain-specific `searchLabel`; placeholders describe searchable fields. The
+   primitive owns its single clear button and `search-with-custom-clear` suppression. Project
+   visible scope into `[scope]`, summary into `[summary]`, quick choices into `[quickFilters]`, and
+   advanced controls into `[filters]`. Render each filter once. Supplied active chips determine
+   badge counts and clear availability; the numeric count is only a legacy fallback. Search and
+   date/location scope do not count as filters. Clear filters/Clear all preserve search and scope;
+   offer separate Clear search, Reset dates and Current location actions where appropriate.
+   Use `StatItem.emphasis` (or legacy `mobilePriority`) for visual weight only, never visibility.
+   Keep grouping at page level; a single count can be inline text rather than a full metric strip.
 3. **Data surface** — desktop: `<app-data-table-shell>` containing a semantic table with
-   row-click navigation to the detail view (no "View" buttons); mobile: `<app-mobile-list>`
+   secondary Review navigation to the detail view (row activation may also open it); mobile: `<app-mobile-list>`
    with compact domain-owned rows. Use `<app-responsive-data-view>` when the two forms share
    one boundary. Separate shadowed record cards and horizontally scrolling tables are not
    mobile list patterns. Empty state = `<app-empty-state>`.
+   Customer and supplier tables fit their available desktop width: use column widths
+   on `TableColumn`, wrap explanations and row actions, and avoid fixed minimum table
+   widths. A short account list must have no internal horizontal or vertical overflow.
 4. **`<app-pagination>`** — the shared component, placed outside the data-table shell with
    `mt-3` so pagination has the same breathing room on table and mobile-card layouts. Primary
    datasets use database counts and `.range()` pagination. Page-size and first/last controls
    are desktop-only; phone pagination remains range, previous, page/total, next. Client-side
    slicing is reserved for already-loaded embedded detail lists. No hand-rolled `join`
-   pagination.
+   pagination. Preserve existing page sizes and sort choices. Numbered page changes return to the
+   record area; Load more appends without moving the viewport.
+
+Reproducible search, filters, sort, dates, page, and page size belong in the URL, preserving existing
+parameter names and deep links. Shared list helpers retain return anchors, neighboring record IDs,
+horizontal position, and loaded batches in memory only, scoped to company, user, location, and
+permissions. Restore after records render, using the nearest saved neighbor if the record vanished,
+then a clamped position. User interaction cancels pending restoration. Shared URLs refetch records;
+loaded batches are a same-session convenience. Clear snapshots on sign-out, scope/permission changes,
+and catalog/party revision changes; reject responses from older requests. Keep existing records visible
+while updating and distinguish request failures (with Retry), empty datasets, and no filter matches.
+
+Product identity includes manufacturer beneath the name in catalog, stock priorities, adjustments,
+transfers, and product performance. Manufacturer is default information, never hover-only detail.
+Append a variant only when it distinguishes the product; do not repeat a pack name already present
+in its display label. Long names and manufacturers wrap rather than losing their identifying text.
+
+Organize rich information before introducing disclosure. Group related summary metrics under one
+accurate scope label (for example product counts, stock valuation, and selected-period sales). Keep
+business totals, money direction, risk, overdue amounts, and actionable exceptions visible. Suppress
+empty placeholders where they add no decision value; retain actual contact notes and identifiers.
+Selective disclosure is appropriate for supporting evidence with a clear label: dashboard product
+leaders show their category's deciding measure, manufacturer, confidence, on-hand stock, planning
+cover, and stockout warnings. Trending also shows exact current/previous adjusted units.
+**Evidence & stock** holds the remaining comparison, order history and permitted financial
+figures. The product link and disclosure are separate targets. Confidence explanations use a native
+touch/keyboard disclosure, not hover alone. Staff rows surface nonzero refunds/voids and held
+exposure when either count or value is nonzero; **Gross, refunds & held sales** and Review
+preserve the supporting measures. Do not use a generic More control to conceal essential summaries.
+Dashboard chart values and unambiguous weekdays remain visible without hovering; **Daily details**
+provides the exact daily breakdown. When leader cards share a location, show its scope once in the
+section heading. Financial permissions still govern every primary and expanded value.
+
+Stock priorities lead with priority/reason/confidence, current planning cover, on-hand stock,
+suggested reorder units, and factual units/change in the selected sales period. The compact desktop
+heading is **Period sales**; its selected dates and presets remain visible above the results. Only
+custom date inputs need disclosure. A zero previous quantity reads **No previous sales**, or
+**No sales in either period** if both are zero. Group selected-period sales metrics separately from current
+inventory and planning estimates; keep those summary values visible. Show filtered result counts
+separately when a priority filter is active. Needs attention means
+exactly stockout, reorder, or low cover; count/filter before pagination. Deploy migration
+`20260927000005_0197_product_decision_counts.sql` before this frontend.
+
+Catalog rows show the first assigned category and a named **+N categories** control opening all
+categories in the drawer. Show Uncategorized only when category data is complete; otherwise show
+the loading/reconnect status. Keep manufacturer, selection and bulk actions available.
+
+Expense/transfer history rows keep date, memo, calculated amount and account context visible.
+Use **Paid from** for a simple standalone expense and **From → To** for a simple transfer. Compound,
+purchase-generated or incomplete entries use neutral **Accounts** wording with account names/codes.
+The account context and **Account lines** disclosure share one compact line; collapsed detail has
+no empty body padding or divider. Keep full debit/credit lines in the expansion and existing totals.
+
+Sell retains its existing product-selection, cart, and payment workspace. List-route scrolling does
+not apply to it. Task-focused count, transfer, cashier, reconciliation, and period-close controls also
+retain their workflows; their task controls and critical notices may precede the first mobile record.
 
 Pages without countable state may omit stats (rare); pages whose entities originate
 elsewhere (sales from the POS) omit the create action.
@@ -550,8 +652,10 @@ segmented presentation, which owns the global `.section-tabs` surface and `.sect
 group is content-width, horizontally scrollable when necessary, and uses the standard box and field
 radii. `.section-tab-active` is the only active signifier: a quiet primary tint with readable
 `--text-accent` text. Inactive labels use `--text-muted`. Do not use underline-only tabs, square
-outlines, full-width empty tab bars, or page-specific tab geometry. On phones, multi-view workspaces
-may replace either presentation with a labeled select.
+outlines, full-width empty tab bars, or page-specific tab geometry. Below 768px, both navigation
+levels use labeled native dropdowns, with the active value synchronized on first render, route
+changes, and permission-filtered options. Keep selectors within their container and leave compact
+toolbars unchanged. Use the shared components rather than duplicating mobile/desktop markup.
 
 Ranking, sorting, dates, locations, search, and filters are scope controls—not navigation. Put them
 in the page toolbar or filter row with permanent labels; never represent them as another tab level.

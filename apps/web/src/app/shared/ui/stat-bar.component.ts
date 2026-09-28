@@ -1,4 +1,4 @@
-import { Component, computed, input, output, signal } from '@angular/core';
+import { Component, input, output } from '@angular/core';
 
 /** One metric in a StatBar. `filter` makes it an independent toggle chip. */
 export interface StatItem {
@@ -8,7 +8,9 @@ export interface StatItem {
   /** If set, the item is a clickable filter toggle emitting this key. */
   filter?: string;
   active?: boolean;
-  /** Phones show two primary metrics first; secondary metrics expand on demand. */
+  /** Visual hierarchy only: supporting metrics always remain visible. */
+  emphasis?: 'primary' | 'supporting';
+  /** Legacy presentation hint; all supplied metrics remain visible at every width. */
   mobilePriority?: 'primary' | 'secondary';
 }
 
@@ -31,14 +33,15 @@ const VALUE_TONE: Record<string, string> = {
   host: { class: 'block min-w-0' },
   template: `
     <div class="stat-bar-grid">
-      @for (s of stats(); track s.label; let index = $index) {
+      @for (s of stats(); track s.label) {
         @if (s.filter) {
           <button
             type="button"
             (click)="select.emit(s.filter!)"
             [attr.aria-pressed]="!!s.active"
             class="stat-bar-item cursor-pointer text-left transition-colors"
-            [class]="itemClass(s, index, true)"
+            [class.stat-bar-primary]="(s.emphasis ?? s.mobilePriority) === 'primary'"
+            [class]="s.active ? 'bg-primary/10' : 'hover:bg-base-200/60'"
           >
             <span class="text-sm font-semibold leading-5 tabular-nums" [class]="toneClass(s)">{{
               s.value
@@ -46,7 +49,10 @@ const VALUE_TONE: Record<string, string> = {
             <span class="stat-bar-label text-xs leading-4 text-muted">{{ s.label }}</span>
           </button>
         } @else {
-          <span class="stat-bar-item" [class]="itemClass(s, index, false)">
+          <span
+            class="stat-bar-item"
+            [class.stat-bar-primary]="(s.emphasis ?? s.mobilePriority) === 'primary'"
+          >
             <span class="text-sm font-semibold leading-5 tabular-nums" [class]="toneClass(s)">{{
               s.value
             }}</span>
@@ -55,16 +61,6 @@ const VALUE_TONE: Record<string, string> = {
         }
       }
     </div>
-    @if (hasSecondary()) {
-      <button
-        type="button"
-        class="mt-1 min-h-11 text-xs font-semibold text-base-content/65 md:hidden"
-        [attr.aria-expanded]="expanded()"
-        (click)="expanded.set(!expanded())"
-      >
-        {{ expanded() ? 'Less summary' : 'More summary' }}
-      </button>
-    }
   `,
   styles: `
     .stat-bar-grid {
@@ -74,6 +70,7 @@ const VALUE_TONE: Record<string, string> = {
     }
 
     .stat-bar-item {
+      display: inline-flex;
       min-width: 0;
       min-height: 2.75rem;
       flex-direction: column;
@@ -91,6 +88,11 @@ const VALUE_TONE: Record<string, string> = {
       outline-offset: 2px;
     }
 
+    .stat-bar-primary > span:first-child {
+      font-size: 1.125rem;
+      line-height: 1.5rem;
+    }
+
     @media (min-width: 768px) {
       .stat-bar-grid {
         grid-template-columns: repeat(auto-fit, minmax(min(6rem, 100%), 1fr));
@@ -102,25 +104,6 @@ const VALUE_TONE: Record<string, string> = {
 export class StatBarComponent {
   readonly stats = input.required<StatItem[]>();
   readonly select = output<string>();
-  protected readonly expanded = signal(false);
-  protected readonly hasSecondary = computed(() =>
-    this.stats().some((stat, index) => this.isMobileSecondary(stat, index))
-  );
-
-  protected itemClass(s: StatItem, index: number, interactive: boolean): string {
-    const responsive =
-      this.isMobileSecondary(s, index) && !this.expanded()
-        ? 'hidden md:inline-flex'
-        : 'inline-flex';
-    if (!interactive) return responsive;
-    const state = s.active ? 'bg-primary/10' : 'hover:bg-base-200/60';
-    return `${responsive} ${state}`;
-  }
-
-  private isMobileSecondary(s: StatItem, index: number): boolean {
-    return s.mobilePriority === 'secondary' || (s.mobilePriority === undefined && index >= 2);
-  }
-
   protected toneClass(s: StatItem): string {
     // A zero count carries no urgency — never paint a 0 as an alert.
     const tone = Number(s.value) === 0 ? 'neutral' : (s.tone ?? 'neutral');

@@ -25,6 +25,7 @@ export interface SearchableFilterOption {
   host: { class: 'relative block' },
   template: `
     <button
+      #trigger
       type="button"
       class="input input-bordered flex w-full items-center gap-2 text-left font-normal"
       [class.input-sm]="controlSize() === 'sm'"
@@ -61,7 +62,6 @@ export interface SearchableFilterOption {
             [placeholder]="searchPlaceholder()"
             [value]="query()"
             (input)="query.set(searchInput.value)"
-            (keydown.escape)="close()"
           />
         </label>
 
@@ -113,6 +113,7 @@ export interface SearchableFilterOption {
 })
 export class SearchableFilterComponent {
   private readonly host = inject(ElementRef<HTMLElement>);
+  private readonly trigger = viewChild<ElementRef<HTMLButtonElement>>('trigger');
   private readonly searchInput = viewChild<ElementRef<HTMLInputElement>>('searchInput');
 
   readonly options = input<readonly SearchableFilterOption[]>([]);
@@ -152,13 +153,23 @@ export class SearchableFilterComponent {
     this.close();
   }
 
-  protected close(): void {
+  protected close(restoreFocus = true): void {
+    if (!this.open()) return;
     this.open.set(false);
     this.query.set('');
+    if (restoreFocus) this.trigger()?.nativeElement.focus({ preventScroll: true });
+  }
+
+  @HostListener('keydown.escape', ['$event'])
+  protected onEscape(event: Event): void {
+    if (!this.open()) return;
+    event.preventDefault();
+    event.stopPropagation();
+    this.close();
   }
 
   @HostListener('document:click', ['$event'])
   protected onDocumentClick(event: MouseEvent): void {
-    if (!this.host.nativeElement.contains(event.target as Node)) this.close();
+    if (!this.host.nativeElement.contains(event.target as Node)) this.close(false);
   }
 }

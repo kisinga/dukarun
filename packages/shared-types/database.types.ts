@@ -5315,96 +5315,6 @@ export type Database = {
           },
         ]
       }
-      legacy_customer_account_reconciliations: {
-        Row: {
-          amount: number
-          company_id: string
-          created_at: string
-          customer_id: string
-          id: string
-          ledger_balance: number
-          prior_document_balance: number
-          reason: string
-        }
-        Insert: {
-          amount: number
-          company_id: string
-          created_at?: string
-          customer_id: string
-          id?: string
-          ledger_balance: number
-          prior_document_balance: number
-          reason: string
-        }
-        Update: {
-          amount?: number
-          company_id?: string
-          created_at?: string
-          customer_id?: string
-          id?: string
-          ledger_balance?: number
-          prior_document_balance?: number
-          reason?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "legacy_customer_account_reconciliations_company_id_fkey"
-            columns: ["company_id"]
-            isOneToOne: false
-            referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "legacy_customer_account_reconciliations_company_id_fkey"
-            columns: ["company_id"]
-            isOneToOne: false
-            referencedRelation: "public_storefronts"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "legacy_customer_account_reconciliations_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: true
-            referencedRelation: "customer_account_balances"
-            referencedColumns: ["customer_id"]
-          },
-          {
-            foreignKeyName: "legacy_customer_account_reconciliations_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: true
-            referencedRelation: "customer_ar_balances"
-            referencedColumns: ["customer_id"]
-          },
-          {
-            foreignKeyName: "legacy_customer_account_reconciliations_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: true
-            referencedRelation: "customer_deposit_balances"
-            referencedColumns: ["customer_id"]
-          },
-          {
-            foreignKeyName: "legacy_customer_account_reconciliations_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: true
-            referencedRelation: "customers"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "legacy_customer_account_reconciliations_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: true
-            referencedRelation: "supplier_advance_balances"
-            referencedColumns: ["supplier_id"]
-          },
-          {
-            foreignKeyName: "legacy_customer_account_reconciliations_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: true
-            referencedRelation: "supplier_ap_balances"
-            referencedColumns: ["supplier_id"]
-          },
-        ]
-      }
       legal_document_versions: {
         Row: {
           content_markdown: string | null
@@ -14664,6 +14574,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      assert_order_receivable_evidence: {
+        Args: { p_order_id: string }
+        Returns: undefined
+      }
       assert_platform_admin: { Args: never; Returns: undefined }
       assert_product_image_object: {
         Args: { p_company_id: string; p_image_path: string }
@@ -15307,6 +15221,19 @@ export type Database = {
         Returns: Json
       }
       customer_receipt_result: { Args: { p_receipt_id: string }; Returns: Json }
+      customer_receivable_documents: {
+        Args: { p_customer_id: string }
+        Returns: {
+          code: string
+          created_at: string
+          id: string
+          is_credit_sale: boolean
+          outstanding: number
+          paid: number
+          status: string
+          total: number
+        }[]
+      }
       customer_statement: {
         Args: {
           p_before_date?: string
@@ -15842,6 +15769,10 @@ export type Database = {
         Args: { p_company_id: string; p_customer_id: string }
         Returns: undefined
       }
+      lock_receivable_order_customer: {
+        Args: { p_order_id: string }
+        Returns: undefined
+      }
       mark_fulfillment_ready: {
         Args: { p_expected_version: number; p_fulfillment_id: string }
         Returns: Json
@@ -16119,6 +16050,22 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      order_receivable_ledger_balance_core: {
+        Args: { p_order_id: string }
+        Returns: number
+      }
+      order_receivable_settlements_core: {
+        Args: { p_order_id: string }
+        Returns: number
+      }
+      order_receivable_statuses: {
+        Args: { p_order_ids: string[] }
+        Returns: {
+          order_id: string
+          outstanding: number
+          settled_amount: number
+        }[]
       }
       order_vat_reporting_date: {
         Args: { p_order_id: string; p_tax_point: string; p_timezone: string }
@@ -17070,21 +17017,38 @@ export type Database = {
         Args: { p_limit?: number }
         Returns: number
       }
-      product_intelligence: {
-        Args: {
-          p_decision?: string
-          p_limit?: number
-          p_location_id?: string
-          p_manufacturer_id?: string
-          p_offset?: number
-          p_search?: string
-          p_since?: string
-          p_supplier_id?: string
-          p_until?: string
-          p_window_days?: number
-        }
-        Returns: Json
-      }
+      product_intelligence:
+        | {
+            Args: {
+              p_decision?: string
+              p_limit?: number
+              p_location_id?: string
+              p_manufacturer_id?: string
+              p_offset?: number
+              p_search?: string
+              p_since?: string
+              p_supplier_id?: string
+              p_until?: string
+              p_variant_id: string
+              p_window_days?: number
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_decision?: string
+              p_limit?: number
+              p_location_id?: string
+              p_manufacturer_id?: string
+              p_offset?: number
+              p_search?: string
+              p_since?: string
+              p_supplier_id?: string
+              p_until?: string
+              p_window_days?: number
+            }
+            Returns: Json
+          }
       product_intelligence_with_identity: {
         Args: {
           p_limit?: number

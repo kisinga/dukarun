@@ -98,7 +98,6 @@ const SETTINGS_TABS: ReadonlyArray<{ key: SettingsTab; label: string; descriptio
             [value]="activeTab()"
             ariaLabel="Settings sections"
             mobileLabel="Settings section"
-            [mobileSelect]="true"
             presentation="primary"
             (valueChange)="selectTabFromValue($event)"
           />

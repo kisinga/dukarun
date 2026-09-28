@@ -98,7 +98,7 @@ select is(
   'supplier AP bucketed 60+'
 );
 
--- Customer-level corrections and overpayments settle positive orders FIFO.
+-- Corrections explicitly identify the affected invoices; aging reads that AR.
 insert into public.customers (id, company_id, first_name, is_credit_approved, credit_limit)
 select 'c0000000-0000-0000-0000-0000000000e3', company_id, 'FIFO Customer', true, 0
 from age_company;
@@ -130,16 +130,20 @@ select set_config('app.allow_ledger_mutation', 'off', true);
 
 select public.post_journal_entry(
   (select company_id from age_company), 'BalanceAdjustment', 'aging-customer-fifo-1',
-  'Unlinked customer correction',
-  '[{"account_code":"BALANCE_ADJUSTMENT","debit":15000,"meta":{"customerId":"c0000000-0000-0000-0000-0000000000e3"}},
-    {"account_code":"ACCOUNTS_RECEIVABLE","credit":15000,"meta":{"customerId":"c0000000-0000-0000-0000-0000000000e3"}}]'
+  'Order-scoped customer correction',
+  jsonb_build_array(
+    jsonb_build_object('account_code','BALANCE_ADJUSTMENT','debit',15000),
+    jsonb_build_object('account_code','ACCOUNTS_RECEIVABLE','credit',10000,'order_id',(select order_id from fifo_customer_old),
+      'meta',jsonb_build_object('customerId','c0000000-0000-0000-0000-0000000000e3')),
+    jsonb_build_object('account_code','ACCOUNTS_RECEIVABLE','credit',5000,'order_id',(select order_id from fifo_customer_new),
+      'meta',jsonb_build_object('customerId','c0000000-0000-0000-0000-0000000000e3')))
 );
 
 select is(
   (select balance from public.customer_credit_aging
    where customer_id = 'c0000000-0000-0000-0000-0000000000e3'),
   5000::bigint,
-  'unlinked customer correction reduces the aging balance'
+  'order-scoped customer correction reduces the aging balance'
 );
 
 select is(
@@ -152,15 +156,17 @@ select is(
 select public.post_journal_entry(
   (select company_id from age_company), 'BalanceAdjustment', 'aging-customer-fifo-2',
   'Clear remaining customer balance',
-  '[{"account_code":"BALANCE_ADJUSTMENT","debit":5000,"meta":{"customerId":"c0000000-0000-0000-0000-0000000000e3"}},
-    {"account_code":"ACCOUNTS_RECEIVABLE","credit":5000,"meta":{"customerId":"c0000000-0000-0000-0000-0000000000e3"}}]'
+  jsonb_build_array(
+    jsonb_build_object('account_code','BALANCE_ADJUSTMENT','debit',5000),
+    jsonb_build_object('account_code','ACCOUNTS_RECEIVABLE','credit',5000,'order_id',(select order_id from fifo_customer_new),
+      'meta',jsonb_build_object('customerId','c0000000-0000-0000-0000-0000000000e3')))
 );
 
 select is(
   (select count(*)::int from public.customer_credit_aging
    where customer_id = 'c0000000-0000-0000-0000-0000000000e3'),
   0,
-  'zero-balance customer has no aging row after an unlinked correction'
+  'zero-balance customer has no aging row after an order-scoped correction'
 );
 
 select is(

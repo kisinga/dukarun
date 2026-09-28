@@ -1,8 +1,13 @@
+import { bindListQuery, listQueryField, listFormQueryField } from '../shared/list/list-query';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { formatKes } from '../core/money';
 import { ButtonComponent } from '../shared/ui/button.component';
-import { DataTableShellComponent } from '../shared/ui/data-table-shell.component';
+import {
+  DataTableShellComponent,
+  TableRowsDirective,
+  type TableColumn,
+} from '../shared/ui/data-table-shell.component';
 import { DrawerComponent } from '../shared/ui/drawer.component';
 import { EmptyStateComponent } from '../shared/ui/empty-state.component';
 import { FormFieldComponent } from '../shared/ui/form-field.component';
@@ -24,6 +29,7 @@ import { WorkspaceNavigationComponent } from '../shared/ui/workspace-navigation.
     ReactiveFormsModule,
     ButtonComponent,
     DataTableShellComponent,
+    TableRowsDirective,
     DrawerComponent,
     EmptyStateComponent,
     FormFieldComponent,
@@ -63,53 +69,70 @@ import { WorkspaceNavigationComponent } from '../shared/ui/workspace-navigation.
       <app-workspace-navigation workspace="team" label="Team" />
 
       <app-list-search-bar
+        searchLabel="Search staff performance"
         placeholder="Search name, role, or status…"
         [searchQuery]="searchQuery()"
         (searchQueryChange)="searchQuery.set($event)"
-        [filtersEnabled]="true"
-        [activeFilterCount]="performanceFilterCount()"
-        (clearFilters)="clearPerformanceFilters()"
+        [filtersEnabled]="false"
         filterSheetTitle="Performance period"
       >
-        <app-stat-bar summary [stats]="performanceStats()" />
-        <div filters class="grid grid-cols-2 gap-3 md:flex md:items-end">
+        <div summary>
+          <p class="type-caption mb-1">All staff in the selected period</p>
+          <app-stat-bar [stats]="performanceStats()" />
+        </div>
+        <div filters class="grid grid-cols-2 gap-3 md:flex md:items-end"></div>
+        <div scope class="flex flex-wrap items-end gap-3">
+          @if (performanceFilterCount() > 0) {
+            <button
+              type="button"
+              class="btn btn-ghost btn-sm min-h-11"
+              (click)="clearPerformanceFilters()"
+            >
+              Reset dates
+            </button>
+          }
+
           <app-form-field label="From">
             <input
               type="date"
               class="input input-bordered input-sm w-full"
               [formControl]="from"
               (change)="load()"
-            />
-          </app-form-field>
-          <app-form-field label="To">
+            /> </app-form-field
+          ><app-form-field label="To">
             <input
               type="date"
               class="input input-bordered input-sm w-full"
               [formControl]="to"
               (change)="load()"
             />
-          </app-form-field>
-        </div>
-      </app-list-search-bar>
+          </app-form-field></div
+      ></app-list-search-bar>
 
       @if (error()) {
         <div role="alert" class="alert alert-error mb-4 text-sm">
           <app-icon name="heroExclamationTriangle" />
           <span>{{ error() }}</span>
+          <button appButton variant="ghost" size="sm" type="button" (click)="load()">Retry</button>
         </div>
       }
 
-      @if (!loading() && filteredRows().length === 0) {
+      @if (!loading() && !error() && filteredRows().length === 0) {
         <app-empty-state
           [compact]="true"
           icon="heroChartBar"
-          title="No staff sales in this range"
-          description="Try a wider date range or complete the first sale."
+          [title]="searchQuery() ? 'No matching staff' : 'No staff sales in this range'"
+          [description]="
+            searchQuery()
+              ? 'Try another name, role, or status, or clear the search.'
+              : 'Try a wider date range or complete the first sale.'
+          "
         />
       } @else {
         <app-mobile-list>
           @for (row of filteredRows(); track row.staff_user_id ?? row.display_name) {
             <button
+              [attr.data-list-record]="row.staff_user_id"
               mobileListRow
               type="button"
               class="flex min-h-20 w-full items-center gap-3 p-3 text-left"
@@ -118,100 +141,141 @@ import { WorkspaceNavigationComponent } from '../shared/ui/workspace-navigation.
             >
               <div class="min-w-0 flex-1">
                 <div class="flex items-center gap-2">
-                  <span class="truncate font-semibold">{{ row.display_name }}</span>
+                  <span class="whitespace-normal break-words font-semibold">{{
+                    row.display_name
+                  }}</span>
                   <app-status-badge
                     size="xs"
                     [type]="row.authorization_status === 'approved' ? 'neutral' : 'warning'"
                     [label]="row.authorization_status"
                   />
                 </div>
-                <p class="type-caption mt-1 truncate">
+                <p class="type-caption mt-1">
                   {{ row.role_name || 'No current role' }} · {{ row.transactions }} transactions
                 </p>
+                @if (row.refunds + row.voided_sales !== 0) {
+                  <p class="mt-1 text-xs text-warning">
+                    Refunds / voids: <app-money [amount]="row.refunds + row.voided_sales" />
+                  </p>
+                }
+                @if (row.held_count !== 0 || row.held_value !== 0) {
+                  <p class="mt-1 text-xs text-warning">
+                    {{ row.held_count }} held · <app-money [amount]="row.held_value" /> unpaid
+                  </p>
+                }
               </div>
               <div class="shrink-0 text-right">
                 <p class="font-semibold tabular-nums"><app-money [amount]="row.net_sales" /></p>
                 <p class="type-caption">collected <app-money [amount]="row.collected" /></p>
+                <p
+                  class="type-caption"
+                  [class.text-error]="row.margin < 0"
+                  [class.text-success]="row.margin > 0"
+                >
+                  margin <app-money [amount]="row.margin" />
+                </p>
+                <p class="type-caption">
+                  {{ comparisonLabel(row.net_sales, previousFor(row)?.net_sales ?? 0) }} vs previous
+                </p>
               </div>
             </button>
           }
         </app-mobile-list>
         <div class="hidden lg:block">
           <app-data-table-shell
+            [columns]="tableColumns1"
+            tableClass="table-sm"
             heading="Salesperson leaderboard"
             [description]="filteredRows().length + ' staff records · click a row for daily detail'"
           >
-            <table class="table table-sm">
-              <thead>
-                <tr>
-                  <th>Staff member</th>
-                  <th class="text-right">Transactions</th>
-                  <th class="text-right">Quantity</th>
-                  <th class="text-right">Gross sales</th>
-                  <th class="text-right">Refunds / voids</th>
-                  <th class="text-right">Net sales</th>
-                  <th class="text-right">Vs previous</th>
-                  <th class="text-right">Collected</th>
-                  <th class="text-right">Margin</th>
-                  <th class="text-right">Average</th>
-                  <th class="text-right">Held (unpaid)</th>
-                  <th class="text-right">Held value</th>
-                </tr>
-              </thead>
-              <tbody>
-                @for (row of filteredRows(); track row.staff_user_id ?? row.display_name) {
-                  <tr
-                    role="button"
-                    tabindex="0"
-                    class="cursor-pointer"
-                    [class.table-row-active]="selected()?.staff_user_id === row.staff_user_id"
-                    (click)="selectStaff(row)"
-                    (keydown.enter)="selectStaff(row)"
+            <ng-template tableRows>
+              @for (row of filteredRows(); track row.staff_user_id ?? row.display_name) {
+                <tr
+                  [attr.data-list-record]="row.staff_user_id"
+                  tabindex="0"
+                  class="cursor-pointer"
+                  [class.table-row-active]="selected()?.staff_user_id === row.staff_user_id"
+                  (click)="selectStaff(row)"
+                  (keydown.enter)="selectStaff(row)"
+                >
+                  <td>
+                    <span class="font-semibold">{{ row.display_name }}</span>
+                    <div class="mt-1 flex items-center gap-2">
+                      <span class="type-caption">{{ row.role_name || 'No current role' }}</span>
+                      <app-status-badge
+                        size="xs"
+                        [type]="row.authorization_status === 'approved' ? 'neutral' : 'warning'"
+                        [label]="row.authorization_status"
+                      />
+                    </div>
+                    @if (row.refunds + row.voided_sales !== 0) {
+                      <p class="mt-1 text-xs text-warning">
+                        Refunds / voids: <app-money [amount]="row.refunds + row.voided_sales" />
+                      </p>
+                    }
+                    @if (row.held_count !== 0 || row.held_value !== 0) {
+                      <p class="mt-1 text-xs text-warning">
+                        {{ row.held_count }} held · <app-money [amount]="row.held_value" /> unpaid
+                      </p>
+                    }
+                    <details
+                      class="mt-2"
+                      (click)="$event.stopPropagation()"
+                      (keydown.enter)="$event.stopPropagation()"
+                    >
+                      <summary class="cursor-pointer text-xs">
+                        Gross, refunds &amp; held sales
+                      </summary>
+                      <dl class="grid grid-cols-2 gap-2 mt-2 text-xs">
+                        <div>
+                          <dt>Quantity</dt>
+                          <dd>{{ quantity(row.quantity) }}</dd>
+                        </div>
+                        <div>
+                          <dt>Gross sales</dt>
+                          <dd><app-money [amount]="row.gross_sales" /></dd>
+                        </div>
+                        <div>
+                          <dt>Refunds / voids</dt>
+                          <dd><app-money [amount]="row.refunds + row.voided_sales" /></dd>
+                        </div>
+                        <div>
+                          <dt>Average</dt>
+                          <dd><app-money [amount]="row.average_sale" /></dd>
+                        </div>
+                        <div>
+                          <dt>Held sales</dt>
+                          <dd [class.text-warning]="row.held_count > 0">{{ row.held_count }}</dd>
+                        </div>
+                        <div>
+                          <dt>Held value</dt>
+                          <dd [class.text-warning]="row.held_value > 0">
+                            <app-money [amount]="row.held_value" />
+                          </dd>
+                        </div>
+                      </dl>
+                    </details>
+                  </td>
+                  <td class="text-right font-semibold"><app-money [amount]="row.net_sales" /></td>
+                  <td class="text-right"><app-money [amount]="row.collected" /></td>
+                  <td
+                    class="text-right"
+                    [class.text-success]="staffComparison(row) > 0"
+                    [class.text-error]="staffComparison(row) < 0"
                   >
-                    <td>
-                      <span class="font-semibold">{{ row.display_name }}</span>
-                      <div class="mt-1 flex items-center gap-2">
-                        <span class="type-caption">{{ row.role_name || 'No current role' }}</span>
-                        <app-status-badge
-                          size="xs"
-                          [type]="row.authorization_status === 'approved' ? 'neutral' : 'warning'"
-                          [label]="row.authorization_status"
-                        />
-                      </div>
-                    </td>
-                    <td class="text-right">{{ row.transactions }}</td>
-                    <td class="text-right">{{ quantity(row.quantity) }}</td>
-                    <td class="text-right"><app-money [amount]="row.gross_sales" /></td>
-                    <td class="text-right text-warning">
-                      <app-money [amount]="row.refunds + row.voided_sales" />
-                    </td>
-                    <td class="text-right font-semibold"><app-money [amount]="row.net_sales" /></td>
-                    <td
-                      class="text-right"
-                      [class.text-success]="staffComparison(row) >= 0"
-                      [class.text-error]="staffComparison(row) < 0"
-                    >
-                      {{ comparisonLabel(row.net_sales, previousFor(row)?.net_sales ?? 0) }}
-                    </td>
-                    <td class="text-right"><app-money [amount]="row.collected" /></td>
-                    <td
-                      class="text-right"
-                      [class.text-success]="row.margin > 0"
-                      [class.text-error]="row.margin < 0"
-                    >
-                      <app-money [amount]="row.margin" />
-                    </td>
-                    <td class="text-right"><app-money [amount]="row.average_sale" /></td>
-                    <td class="text-right" [class.text-warning]="row.held_count > 0">
-                      {{ row.held_count }}
-                    </td>
-                    <td class="text-right" [class.text-warning]="row.held_value > 0">
-                      <app-money [amount]="row.held_value" />
-                    </td>
-                  </tr>
-                }
-              </tbody>
-            </table>
+                    {{ comparisonLabel(row.net_sales, previousFor(row)?.net_sales ?? 0) }}
+                  </td>
+                  <td class="text-right">{{ row.transactions }}</td>
+                  <td
+                    class="text-right"
+                    [class.text-success]="row.margin > 0"
+                    [class.text-error]="row.margin < 0"
+                  >
+                    <app-money [amount]="row.margin" />
+                  </td>
+                </tr>
+              }
+            </ng-template>
           </app-data-table-shell>
         </div>
       }
@@ -240,6 +304,33 @@ import { WorkspaceNavigationComponent } from '../shared/ui/workspace-navigation.
               [sub]="staff.transactions + ' completed checkout(s)'"
             />
           </div>
+
+          <dl class="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+            <div>
+              <dt class="type-caption">Gross sales</dt>
+              <dd><app-money [amount]="staff.gross_sales" /></dd>
+            </div>
+            <div>
+              <dt class="type-caption">Margin</dt>
+              <dd><app-money [amount]="staff.margin" /></dd>
+            </div>
+            <div>
+              <dt class="type-caption">Refunds / voids</dt>
+              <dd><app-money [amount]="staff.refunds + staff.voided_sales" /></dd>
+            </div>
+            <div>
+              <dt class="type-caption">Average sale</dt>
+              <dd><app-money [amount]="staff.average_sale" /></dd>
+            </div>
+            <div>
+              <dt class="type-caption">Quantity</dt>
+              <dd>{{ quantity(staff.quantity) }}</dd>
+            </div>
+            <div>
+              <dt class="type-caption">Held sales</dt>
+              <dd>{{ staff.held_count }} · <app-money [amount]="staff.held_value" /> unpaid</dd>
+            </div>
+          </dl>
 
           <div class="mt-4">
             <h3 class="section-title mb-2">Daily movement</h3>
@@ -288,6 +379,14 @@ import { WorkspaceNavigationComponent } from '../shared/ui/workspace-navigation.
   `,
 })
 export class StaffPerformanceComponent implements OnInit {
+  protected readonly tableColumns1: TableColumn[] = [
+    { key: 'staff', label: 'Staff member', pinned: true },
+    { key: 'net', label: 'Net sales', align: 'right' },
+    { key: 'collected', label: 'Collected', align: 'right' },
+    { key: 'change', label: 'Vs previous', align: 'right' },
+    { key: 'transactions', label: 'Transactions', align: 'right' },
+    { key: 'margin', label: 'Margin', align: 'right' },
+  ];
   private readonly performance = inject(PerformanceService);
 
   protected readonly fmt = formatKes;
@@ -373,13 +472,21 @@ export class StaffPerformanceComponent implements OnInit {
     {
       label: 'Margin',
       value: this.fmt(this.totals().margin),
-      tone: this.totals().margin < 0 ? ('error' as const) : ('success' as const),
+      tone:
+        this.totals().margin < 0
+          ? ('error' as const)
+          : this.totals().margin > 0
+            ? ('success' as const)
+            : ('neutral' as const),
       mobilePriority: 'secondary' as const,
     },
     {
       label: 'Refunds + voids',
       value: this.fmt(this.totals().refunds + this.totals().voided),
-      tone: 'warning' as const,
+      tone:
+        this.totals().refunds + this.totals().voided > 0
+          ? ('warning' as const)
+          : ('neutral' as const),
       mobilePriority: 'secondary' as const,
     },
   ]);
@@ -394,15 +501,30 @@ export class StaffPerformanceComponent implements OnInit {
     void this.load();
   }
 
+  constructor() {
+    bindListQuery({
+      from: listFormQueryField(this.from),
+      to: listFormQueryField(this.to),
+
+      search: listQueryField(this.searchQuery),
+    });
+  }
+
   async ngOnInit(): Promise<void> {
     await this.load();
   }
 
+  private listRequest = 0;
   protected async load(): Promise<void> {
+    if (!this.from.value || !this.to.value) {
+      this.error.set('Choose both dates. Showing the last applied period.');
+      return;
+    }
     if (this.from.value > this.to.value) {
       this.error.set('The From date must be before the To date');
       return;
     }
+    const request = ++this.listRequest;
     this.loading.set(true);
     this.error.set(null);
     try {
@@ -411,12 +533,14 @@ export class StaffPerformanceComponent implements OnInit {
         this.performance.staff(this.from.value, this.to.value),
         this.performance.staff(previous.from, previous.to),
       ]);
+      if (request !== this.listRequest) return;
       this.rows.set(currentRows);
       this.previousRows.set(previousRows);
     } catch (err) {
+      if (request !== this.listRequest) return;
       this.error.set(err instanceof Error ? err.message : 'Failed to load staff performance');
     } finally {
-      this.loading.set(false);
+      if (request === this.listRequest) this.loading.set(false);
     }
   }
 

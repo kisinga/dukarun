@@ -88,20 +88,19 @@ describe('SupplierAccountsListComponent', () => {
     expect(fixture.componentInstance.opened).toBe('supplier-1');
   });
 
-  it('uses the shared six-column account table hierarchy', async () => {
+  it('uses the shared five-column account table hierarchy', async () => {
     const fixture = await render();
     const root = fixture.nativeElement as HTMLElement;
-    const table = root.querySelector('table') as HTMLTableElement;
+    const table = root.querySelector('.data-table-viewport table') as HTMLTableElement;
     const headings = [...table.querySelectorAll('th')].map(cell => cell.textContent?.trim());
 
-    expect(table.classList.contains('account-table')).toBe(true);
+    expect(table.classList.contains('list-account-table')).toBe(true);
     expect(headings).toEqual([
-      'Supplier',
-      'Contact',
+      'Supplier / contact',
       'Purchase activity',
       'Terms & aging',
       'We owe',
-      'Actions',
+      'Review',
     ]);
   });
 

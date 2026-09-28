@@ -1,6 +1,6 @@
 import { DatePipe } from '@angular/common';
 import { Component, OnInit, inject, signal } from '@angular/core';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { formatKes } from '../core/money';
 import { EmptyStateComponent } from '../shared/ui/empty-state.component';
 import { IconComponent } from '../shared/ui/icon.component';
@@ -31,7 +31,7 @@ import { ScoreBadgeComponent } from './score-badge.component';
       </div>
     } @else if (profile(); as item) {
       <section class="space-y-4">
-        <a routerLink="/insights/credit" class="btn btn-ghost btn-sm min-h-11"
+        <a [routerLink]="returnUrl" class="btn btn-ghost btn-sm min-h-11"
           ><app-icon name="heroChevronLeft" />Credit portfolio</a
         >
         <article class="card bg-base-100">
@@ -223,6 +223,13 @@ export class CreditProfileComponent implements OnInit {
   protected readonly fmt = formatKes;
   protected readonly documentStatus = creditDocumentStatus;
 
+  protected readonly returnUrl = (() => {
+    const router = inject(Router);
+    const value = this.route.snapshot.queryParamMap.get('returnTo');
+    return router.parseUrl(
+      value && /^\/insights\/credit(\?|$)/.test(value) ? value : '/insights/credit'
+    );
+  })();
   async ngOnInit(): Promise<void> {
     const partyId = this.route.snapshot.paramMap.get('partyId');
     const side = this.route.snapshot.paramMap.get('side');

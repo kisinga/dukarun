@@ -603,35 +603,28 @@ export class MoneyService {
   }
 
   async creditOrders(customerId: string) {
-    const { data, error } = await this.db
-      .from('orders')
-      .select('id, code, total, is_credit_sale, created_at, status')
-      .eq('customer_id', customerId)
-      .eq('is_credit_sale', true)
-      .order('created_at', { ascending: false })
-      .limit(20);
+    const { data, error } = await this.db.rpc('customer_receivable_documents', {
+      p_customer_id: customerId,
+    });
     if (error) throw error;
-    const orders = data ?? [];
-    if (orders.length === 0) return [];
-    const { data: payments, error: paymentError } = await this.db
-      .from('payments')
-      .select('order_id, amount')
-      .in(
-        'order_id',
-        orders.map(order => order.id)
-      )
-      .eq('status', 'settled');
-    if (paymentError) throw paymentError;
-    const paidByOrder = new Map<string, number>();
-    for (const payment of payments ?? []) {
-      paidByOrder.set(payment.order_id, (paidByOrder.get(payment.order_id) ?? 0) + payment.amount);
+    return data ?? [];
+  }
+
+  async orderReceivableStatuses(orderIds: string[]) {
+    if (orderIds.length === 0) return [];
+    const { data, error } = await this.db.rpc('order_receivable_statuses', {
+      p_order_ids: orderIds,
+    });
+    if (error) throw error;
+    const rows = data ?? [];
+    const requested = new Set(orderIds);
+    if (
+      new Set(rows.map(row => row.order_id)).size !== requested.size ||
+      rows.some(row => !requested.has(row.order_id))
+    ) {
+      throw new Error('Could not read every order balance');
     }
-    return orders
-      .map(order => {
-        const paid = paidByOrder.get(order.id) ?? 0;
-        return { ...order, paid, outstanding: Math.max(order.total - paid, 0) };
-      })
-      .filter(order => order.outstanding > 0);
+    return rows;
   }
 
   async customerStatement(

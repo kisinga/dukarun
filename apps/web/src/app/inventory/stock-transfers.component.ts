@@ -1,3 +1,4 @@
+import { bindListQuery, listQueryField } from '../shared/list/list-query';
 import { StockQuantityInputComponent } from '../shared/ui/stock-quantity-input.component';
 import { Component, OnInit, computed, effect, inject, signal, untracked } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
@@ -285,13 +286,18 @@ interface TransferLine {
               } @else {
                 <div class="mt-2 divide-y divide-base-200">
                   @for (transfer of history(); track transfer.id) {
-                    <div class="py-3">
+                    <div class="py-3" [attr.data-list-record]="transfer.id">
+                      <p class="font-semibold text-sm">
+                        {{ transfer.created_at | date: 'medium' }}
+                      </p>
                       <div class="flex items-center gap-2 text-sm font-medium">
                         <span>{{ transfer.from_location?.name ?? 'Unknown' }}</span>
                         <app-icon name="heroArrowRight" size="sm" />
                         <span>{{ transfer.to_location?.name ?? 'Unknown' }}</span>
                       </div>
-                      <p class="type-caption mt-1">{{ transfer.created_at | date: 'medium' }}</p>
+                      <p class="type-caption mt-1">
+                        Completed transfer · {{ transfer.id.slice(0, 8) }}
+                      </p>
                       <p class="type-caption mt-1">
                         {{ transfer.stock_transfer_lines.length }} item(s) ·
                         {{ transferQuantity(transfer) }} units
@@ -302,7 +308,27 @@ interface TransferLine {
                       ) {
                         <p class="mt-1 truncate text-xs">
                           {{ transferLineLabel(line) }} · {{ quantity(line.quantity) }}
+                          <span class="block text-base-content/65">{{
+                            line.product_variants?.products?.manufacturers?.name ||
+                              'Manufacturer not set'
+                          }}</span>
                         </p>
+                      }
+                      @if (transfer.stock_transfer_lines.length > 2) {
+                        <details class="mt-2">
+                          <summary class="min-h-11 cursor-pointer text-sm">
+                            Review all products
+                          </summary>
+                          @for (line of transfer.stock_transfer_lines; track line.variant_id) {
+                            <p class="py-1 text-sm">
+                              {{ transferLineLabel(line) }} · {{ quantity(line.quantity)
+                              }}<span class="block type-caption">{{
+                                line.product_variants?.products?.manufacturers?.name ||
+                                  'Manufacturer not set'
+                              }}</span>
+                            </p>
+                          }
+                        </details>
                       }
                     </div>
                   }
@@ -377,6 +403,17 @@ export class StockTransfersComponent implements OnInit {
   private historyLoadSequence = 0;
 
   constructor() {
+    bindListQuery(
+      {
+        fromLocation: listQueryField(this.historyFromLocation),
+        toLocation: listQueryField(this.historyToLocation),
+        from: listQueryField(this.historyFrom),
+        to: listQueryField(this.historyTo),
+        page: listQueryField(this.historyPage),
+      },
+      () => void this.loadHistory()
+    );
+
     effect(() => {
       const query = this.debouncedSearch();
       if (query === undefined) return;

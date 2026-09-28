@@ -14,6 +14,12 @@ export interface PurchaseHistoryInit {
   paymentStatus?: string | null;
   query?: string | null;
   page?: number | null;
+  pageSize?: number;
+  sort?: string | null;
+  direction?: string | null;
+  locationId?: string | null;
+  from?: string | null;
+  to?: string | null;
   allTime?: boolean;
   purchaseId?: string | null;
   purchaseRecorded?: boolean;
@@ -143,7 +149,29 @@ export class PurchaseHistoryStore implements OnDestroy {
     this.paymentFilterState.set(request.paymentStatus ?? 'all');
     this.queryState.set(request.query ?? '');
     this.pageState.set(Math.max(1, request.page ?? 1));
+    this.pageSizeState.set(
+      request.pageSize && Number.isInteger(request.pageSize) && request.pageSize > 0
+        ? Math.min(100, request.pageSize)
+        : 10
+    );
+    this.sortState.set(
+      request.sort && this.sortOptions().some(option => option.value === request.sort)
+        ? request.sort
+        : 'created'
+    );
+    this.sortDirectionState.set(request.direction === 'asc' ? 'asc' : 'desc');
+    this.fromState.set(this.monthStartIso());
+    this.toState.set(this.todayIso());
+    if (request.from || request.to) {
+      this.fromState.set(request.from ?? '');
+      this.toState.set(request.to ?? '');
+    }
     this.locationFilterState.set(this.locationsContext.requireActiveId());
+    if (
+      request.locationId &&
+      this.locationsContext.locations().some(location => location.id === request.locationId)
+    )
+      this.locationFilterState.set(request.locationId);
     if (request.allTime) {
       this.fromState.set('');
       this.toState.set('');
@@ -156,13 +184,16 @@ export class PurchaseHistoryStore implements OnDestroy {
     await this.load();
 
     if (request.purchaseId) await this.openById(request.purchaseId, false);
+    else this.selectedPurchaseState.set(null);
   }
 
   ngOnDestroy(): void {
+    this.listRequest++;
     if (this.searchTimer) clearTimeout(this.searchTimer);
   }
 
   async load(silent = false): Promise<boolean> {
+    if (this.from() && this.to() && this.from() > this.to()) return false;
     const request = ++this.listRequest;
     if (!silent) this.loadingState.set(true);
     this.errorState.set(null);
@@ -189,7 +220,7 @@ export class PurchaseHistoryStore implements OnDestroy {
   search(value: string): void {
     this.queryState.set(value);
     if (this.searchTimer) clearTimeout(this.searchTimer);
-    this.searchTimer = setTimeout(() => void this.resetAndLoad(), 250);
+    this.searchTimer = setTimeout(() => void this.resetAndLoad(), 0);
   }
 
   async setSupplier(value: string): Promise<void> {
@@ -205,6 +236,25 @@ export class PurchaseHistoryStore implements OnDestroy {
   async setLocation(value: string): Promise<void> {
     this.locationFilterState.set(value);
     await this.resetAndLoad();
+  }
+
+  async setDates(range: { from: string; to: string }): Promise<void> {
+    this.fromState.set(range.from);
+    this.toState.set(range.to);
+    await this.resetAndLoad();
+  }
+
+  defaultFrom(): string {
+    return this.monthStartIso();
+  }
+  defaultTo(): string {
+    return this.todayIso();
+  }
+  currentLocationActive(): boolean {
+    return this.locationFilter() === this.locationsContext.activeId();
+  }
+  async resetLocation(): Promise<void> {
+    await this.setLocation(this.locationsContext.requireActiveId());
   }
 
   async setDate(kind: 'from' | 'to', value: string): Promise<void> {
@@ -256,8 +306,7 @@ export class PurchaseHistoryStore implements OnDestroy {
   async clearFilters(): Promise<void> {
     this.supplierFilterState.set('all');
     this.paymentFilterState.set('all');
-    this.locationFilterState.set(this.locationsContext.requireActiveId());
-    await this.setMonth();
+    await this.resetAndLoad();
   }
 
   async cancelDraft(id: string): Promise<void> {
@@ -371,6 +420,12 @@ export class PurchaseHistoryStore implements OnDestroy {
       payment: this.paymentFilter() === 'all' ? null : this.paymentFilter(),
       q: this.query().trim() || null,
       page: this.page() > 1 ? this.page() : null,
+      pageSize: this.pageSize() === 10 ? null : this.pageSize(),
+      sort: this.sort() === 'created' ? null : this.sort(),
+      direction: this.sortDirection() === 'desc' ? null : this.sortDirection(),
+      location: this.locationFilter() || null,
+      from: this.from() || null,
+      to: this.to() || null,
       range: this.allTimeActive() ? 'all' : null,
     });
   }

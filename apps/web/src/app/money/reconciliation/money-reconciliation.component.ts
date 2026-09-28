@@ -1,4 +1,5 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { StatBarComponent } from '../../shared/ui/stat-bar.component';
+import { Component, computed, OnInit, inject, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { parseKes } from '../../core/money';
@@ -22,6 +23,7 @@ type ReconciliationWithAccounts = Reconciliation & { reconciliation_accounts: Re
 @Component({
   selector: 'app-money-reconciliation',
   imports: [
+    StatBarComponent,
     ReactiveFormsModule,
     RouterLink,
     ButtonComponent,
@@ -151,6 +153,13 @@ type ReconciliationWithAccounts = Reconciliation & { reconciliation_accounts: Re
       </div>
     }
 
+    <app-stat-bar
+      class="block mb-3"
+      [stats]="[
+        { label: 'Reconciliations shown', value: recons().length },
+        { label: 'Variances shown', value: historyVarianceCount() },
+      ]"
+    />
     <section class="mt-6">
       <div class="mb-3">
         <h2 class="section-title">Reconciliation history</h2>
@@ -169,7 +178,10 @@ type ReconciliationWithAccounts = Reconciliation & { reconciliation_accounts: Re
         <div class="flex flex-col gap-2">
           @for (recon of recons(); track recon.id) {
             @for (row of recon.reconciliation_accounts; track row.id) {
-              <article class="rounded-box border border-base-300/70 bg-base-100 p-3">
+              <article
+                class="rounded-box border border-base-300/70 bg-base-100 p-3"
+                [attr.data-list-record]="row.id"
+              >
                 <div class="flex flex-wrap items-start gap-3">
                   <div class="min-w-0 flex-1">
                     <div class="flex flex-wrap items-center gap-2">
@@ -382,6 +394,13 @@ type ReconciliationWithAccounts = Reconciliation & { reconciliation_accounts: Re
   `,
 })
 export class MoneyReconciliationComponent implements OnInit {
+  protected readonly historyVarianceCount = computed(() =>
+    this.recons().reduce(
+      (count, recon) =>
+        count + recon.reconciliation_accounts.filter(row => row.variance !== 0).length,
+      0
+    )
+  );
   private readonly money = inject(MoneyService);
   protected readonly perms = inject(PermissionsService);
 

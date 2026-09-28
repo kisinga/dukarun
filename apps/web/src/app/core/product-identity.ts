@@ -38,9 +38,17 @@ export function productIdentity(
   };
 }
 
-export function productIdentityLabel(identity: HydratedProductIdentity): string {
+export function productIdentityLabel(identity: {
+  product_name: string;
+  variant_name: string;
+  identity_resolution?: 'resolved' | 'unresolved';
+}): string {
   if (identity.identity_resolution === 'unresolved') return 'Details unavailable';
-  return !identity.variant_name || identity.variant_name === 'Default'
+  return !identity.variant_name ||
+    identity.variant_name === 'Default' ||
+    identity.product_name === identity.variant_name ||
+    identity.product_name.endsWith(' · ' + identity.variant_name) ||
+    identity.product_name.endsWith(' — ' + identity.variant_name)
     ? identity.product_name
     : `${identity.product_name} — ${identity.variant_name}`;
 }

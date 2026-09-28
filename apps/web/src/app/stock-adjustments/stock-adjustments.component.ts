@@ -1,3 +1,9 @@
+import { bindListQuery, listQueryField, listFormQueryField } from '../shared/list/list-query';
+import {
+  DataTableShellComponent,
+  TableRowsDirective,
+  type TableColumn,
+} from '../shared/ui/data-table-shell.component';
 import { StockQuantityInputComponent } from '../shared/ui/stock-quantity-input.component';
 import { Component, OnInit, computed, effect, inject, signal, untracked } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
@@ -42,6 +48,8 @@ type StockAdjustmentHistoryDisplay = StockAdjustmentHistoryRow & {
 @Component({
   selector: 'app-stock-adjustments',
   imports: [
+    DataTableShellComponent,
+    TableRowsDirective,
     StockQuantityInputComponent,
     ReactiveFormsModule,
     FormFieldComponent,
@@ -355,7 +363,10 @@ type StockAdjustmentHistoryDisplay = StockAdjustmentHistoryRow & {
             } @else {
               <div class="space-y-2 lg:hidden">
                 @for (row of historyRows(); track row.adjustment_id) {
-                  <article class="rounded-box border border-base-300 p-3">
+                  <article
+                    [attr.data-list-record]="row.adjustment_id"
+                    class="rounded-box border border-base-300 p-3"
+                  >
                     <div class="flex items-start justify-between gap-3">
                       <div class="min-w-0">
                         <p class="truncate text-sm font-semibold">{{ historyProduct(row) }}</p>
@@ -386,22 +397,11 @@ type StockAdjustmentHistoryDisplay = StockAdjustmentHistoryRow & {
                 }
               </div>
 
-              <div class="hidden overflow-x-auto lg:block">
-                <table class="table table-sm">
-                  <thead>
-                    <tr>
-                      <th>When</th>
-                      <th>Product</th>
-                      <th class="text-right">Change</th>
-                      <th class="text-right">Count</th>
-                      <th>Reason</th>
-                      <th>By</th>
-                      <th class="text-right">Stock value</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+              <div class="hidden lg:block">
+                <app-data-table-shell [columns]="tableColumns1" tableClass="table-sm"
+                  ><ng-template tableRows>
                     @for (row of historyRows(); track row.adjustment_id) {
-                      <tr>
+                      <tr [attr.data-list-record]="row.adjustment_id">
                         <td class="whitespace-nowrap text-xs">{{ time(row.adjusted_at) }}</td>
                         <td>
                           <p class="font-medium">{{ historyProduct(row) }}</p>
@@ -416,26 +416,26 @@ type StockAdjustmentHistoryDisplay = StockAdjustmentHistoryRow & {
                           [class.text-error]="row.quantity_change < 0"
                         >
                           {{ formatDifference(row.quantity_change) }}
-                        </td>
-                        <td class="whitespace-nowrap text-right tabular-nums">
-                          @if (row.quantity_before !== null && row.quantity_after !== null) {
-                            {{ formatQuantity(row.quantity_before) }} →
-                            {{ formatQuantity(row.quantity_after) }}
-                          } @else {
-                            —
-                          }
+                          <div class="type-caption whitespace-nowrap mt-1">
+                            @if (row.quantity_before !== null && row.quantity_after !== null) {
+                              {{ formatQuantity(row.quantity_before) }} →
+                              {{ formatQuantity(row.quantity_after) }}
+                            } @else {
+                              —
+                            }
+                          </div>
                         </td>
                         <td class="max-w-72">
-                          <span class="line-clamp-2">{{ row.reason }}</span>
+                          <span>{{ row.reason }}</span>
+                          <p class="type-caption mt-1">{{ row.actor_name }}</p>
                         </td>
-                        <td>{{ row.actor_name }}</td>
                         <td class="whitespace-nowrap text-right tabular-nums">
                           {{ signedValue(row) }}
                         </td>
                       </tr>
                     }
-                  </tbody>
-                </table>
+                  </ng-template></app-data-table-shell
+                >
               </div>
 
               <app-pagination
@@ -457,6 +457,13 @@ type StockAdjustmentHistoryDisplay = StockAdjustmentHistoryRow & {
   `,
 })
 export class StockAdjustmentsComponent implements OnInit {
+  protected readonly tableColumns1: TableColumn[] = [
+    { key: 'column0', label: 'When', pinned: true },
+    { key: 'column1', label: 'Product' },
+    { key: 'change', label: 'Change / counted quantity', align: 'right' },
+    { key: 'reason', label: 'Reason / operator' },
+    { key: 'column6', label: 'Stock value', align: 'right' },
+  ];
   private readonly money = inject(MoneyService);
   private readonly pos = inject(PosService);
   private readonly catalogSearch = inject(CatalogSearchService);
@@ -505,6 +512,17 @@ export class StockAdjustmentsComponent implements OnInit {
   );
 
   constructor() {
+    bindListQuery(
+      {
+        search: listFormQueryField(this.historySearch),
+
+        variant: listQueryField(this.historyVariantId),
+        page: listQueryField(this.historyPage),
+        pageSize: listQueryField(this.historyPageSize, { max: 100 }),
+      },
+      () => void this.loadHistory()
+    );
+
     effect(() => {
       const activeId = this.locations.activeId();
       // Track only the location; reloadForLocation reads/writes other signals
@@ -516,8 +534,11 @@ export class StockAdjustmentsComponent implements OnInit {
       if (query === undefined) return;
       untracked(() => void this.onSearch(query));
     });
+    let previousHistorySearch = this.historySearch.value;
     effect(() => {
-      if (this.debouncedHistorySearch() === undefined) return;
+      const query = this.debouncedHistorySearch();
+      if (query === undefined || query === previousHistorySearch) return;
+      previousHistorySearch = query;
       untracked(() => {
         this.historyPage.set(1);
         void this.loadHistory();
@@ -532,7 +553,7 @@ export class StockAdjustmentsComponent implements OnInit {
       try {
         const variant = await this.pos.variantById(variantId);
         if (variant?.track_inventory && variant.kind !== 'service') {
-          await this.pick(variant);
+          await this.pick(variant, { preserveHistoryPage: true });
           return;
         }
         this.error.set('This product does not have tracked stock to adjust.');
@@ -584,7 +605,10 @@ export class StockAdjustmentsComponent implements OnInit {
     }
   }
 
-  protected async pick(variant: Variant): Promise<void> {
+  protected async pick(
+    variant: Variant,
+    options: { preserveHistoryPage?: boolean } = {}
+  ): Promise<void> {
     const stock = Number(variant.stock ?? 0);
     this.selected.set(variant);
     this.currentQuantity.set(stock);
@@ -609,7 +633,7 @@ export class StockAdjustmentsComponent implements OnInit {
     } catch {
       // A cost can still be entered manually if stock is increased.
     }
-    this.historyPage.set(1);
+    if (!options.preserveHistoryPage) this.historyPage.set(1);
     void this.loadHistory();
   }
 

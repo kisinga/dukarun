@@ -12,21 +12,21 @@ describe('StatBarComponent', () => {
       { label: 'Active', value: 3 },
       { label: 'Owed', value: 'KES 0' },
       { label: 'Needs review', value: 1, filter: 'review' },
-      { label: 'Archived', value: 0 },
+      { label: 'Archived', value: 0, mobilePriority: 'secondary' },
     ]);
     fixture.detectChanges();
   });
 
-  it('exposes secondary metrics through the phone summary disclosure', () => {
+  it('keeps every supplied metric visible without a summary disclosure', () => {
     const root = fixture.nativeElement as HTMLElement;
-    const disclosure = [...root.querySelectorAll('button')].find(button =>
-      button.textContent?.includes('More summary')
-    )!;
-    expect(disclosure.getAttribute('aria-expanded')).toBe('false');
-    disclosure.click();
-    fixture.detectChanges();
-    expect(disclosure.getAttribute('aria-expanded')).toBe('true');
-    expect(disclosure.textContent).toContain('Less summary');
+    const metrics = [...root.querySelectorAll<HTMLElement>('.stat-bar-item')];
+    expect(metrics).toHaveLength(4);
+    for (const metric of metrics) {
+      expect(getComputedStyle(metric).display).not.toBe('none');
+      expect(metric.hidden).toBe(false);
+    }
+    expect(root.textContent).not.toContain('More summary');
+    expect(metrics[3].textContent).toContain('Archived');
   });
 
   it('emits the selected metric filter with an accessible toggle state', () => {

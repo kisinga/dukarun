@@ -1,3 +1,10 @@
+import { bindListQuery, listQueryField } from '../shared/list/list-query';
+import { StatBarComponent } from '../shared/ui/stat-bar.component';
+import {
+  DataTableShellComponent,
+  TableRowsDirective,
+  type TableColumn,
+} from '../shared/ui/data-table-shell.component';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { BusinessClockService } from '../core/business-clock.service';
@@ -25,6 +32,9 @@ type CustomerRow = {
 @Component({
   selector: 'app-reports',
   imports: [
+    StatBarComponent,
+    DataTableShellComponent,
+    TableRowsDirective,
     DateRangePresetControlComponent,
     EmptyStateComponent,
     PaginationComponent,
@@ -87,41 +97,27 @@ type CustomerRow = {
       }
 
       @if (summary().length > 0) {
-        <section aria-label="Sales summary" class="grid grid-cols-2 gap-2 lg:grid-cols-4">
-          <div class="card bg-base-100">
-            <div class="card-body gap-1 p-3 sm:p-4">
-              <span class="type-caption">Revenue</span>
-              <strong class="text-2xl tabular-nums">{{ fmt(totals().revenue) }}</strong>
-              <span class="text-xs text-base-content/60">selected period</span>
-            </div>
-          </div>
-          <div class="card bg-base-100">
-            <div class="card-body gap-1 p-3 sm:p-4">
-              <span class="type-caption">Margin</span>
-              <strong
-                class="text-2xl tabular-nums"
-                [class.text-success]="totals().margin > 0"
-                [class.text-error]="totals().margin < 0"
-                >{{ fmt(totals().margin) }}</strong
-              >
-              <span class="text-xs text-base-content/60">after cost of goods</span>
-            </div>
-          </div>
-          <div class="card bg-base-100">
-            <div class="card-body gap-1 p-3 sm:p-4">
-              <span class="type-caption">Sales</span>
-              <strong class="text-2xl tabular-nums">{{ totals().orders }}</strong>
-              <span class="text-xs text-base-content/60">completed transactions</span>
-            </div>
-          </div>
-          <div class="card bg-base-100">
-            <div class="card-body gap-1 p-3 sm:p-4">
-              <span class="type-caption">Average sale</span>
-              <strong class="text-2xl tabular-nums">{{ fmt(averageSale()) }}</strong>
-              <span class="text-xs text-base-content/60">revenue per sale</span>
-            </div>
-          </div>
-        </section>
+        <app-stat-bar
+          class="block surface-card p-3"
+          [stats]="[
+            {
+              label: 'Revenue · selected period',
+              value: fmt(totals().revenue),
+              emphasis: 'primary',
+            },
+            {
+              label: 'Margin · selected period',
+              value: fmt(totals().margin),
+              tone: totals().margin < 0 ? 'error' : 'neutral',
+              emphasis: 'primary',
+            },
+            { label: 'Completed sales · selected period', value: totals().orders },
+            { label: 'Average sale · selected period', value: fmt(averageSale()) },
+          ]"
+        />
+        <p class="type-caption mt-1">
+          Margin is after cost of goods. Average sale is revenue per sale.
+        </p>
       }
 
       <!-- Sales tab -->
@@ -136,7 +132,11 @@ type CustomerRow = {
         } @else {
           <app-mobile-list>
             @for (d of pagedSummary(); track d.day) {
-              <div mobileListRow class="flex min-h-20 items-center gap-3 p-3">
+              <div
+                [attr.data-list-record]="d.day"
+                mobileListRow
+                class="flex min-h-20 items-center gap-3 p-3"
+              >
                 <div class="min-w-0 flex-1">
                   <p class="font-semibold">{{ d.day }}</p>
                   <p class="type-caption mt-1">
@@ -158,19 +158,10 @@ type CustomerRow = {
           </app-mobile-list>
           <div class="card bg-base-100" data-learning-anchor="financial-revenue-margin">
             <div class="hidden lg:block">
-              <table class="table table-sm">
-                <thead>
-                  <tr>
-                    <th>Day</th>
-                    <th class="text-right">Sales</th>
-                    <th class="text-right">Revenue</th>
-                    <th class="text-right">COGS</th>
-                    <th class="text-right">Margin</th>
-                  </tr>
-                </thead>
-                <tbody>
+              <app-data-table-shell [columns]="tableColumns1" tableClass="table-sm"
+                ><ng-template tableRows>
                   @for (d of pagedSummary(); track d.day) {
-                    <tr>
+                    <tr [attr.data-list-record]="d.day">
                       <td class="text-sm">{{ d.day }}</td>
                       <td class="text-right">{{ d.orders }}</td>
                       <td class="text-right">{{ fmt(d.revenue ?? 0) }}</td>
@@ -197,8 +188,8 @@ type CustomerRow = {
                       {{ fmt(totals().margin) }}
                     </td>
                   </tr>
-                </tbody>
-              </table>
+                </ng-template></app-data-table-shell
+              >
             </div>
             <div class="p-3">
               <app-pagination
@@ -251,18 +242,10 @@ type CustomerRow = {
           </app-mobile-list>
           <div class="hidden bg-base-100 lg:block lg:rounded-box">
             <div class="hidden lg:block">
-              <table class="table table-sm">
-                <thead>
-                  <tr>
-                    <th>Customer</th>
-                    <th class="text-right">Sales</th>
-                    <th class="text-right">Revenue</th>
-                    <th class="text-right">AR Δ</th>
-                  </tr>
-                </thead>
-                <tbody>
+              <app-data-table-shell [columns]="tableColumns2" tableClass="table-sm"
+                ><ng-template tableRows>
                   @for (c of customers(); track c.customerId) {
-                    <tr>
+                    <tr [attr.data-list-record]="c.customerId">
                       <td class="text-sm font-medium">
                         <a
                           class="link"
@@ -282,8 +265,8 @@ type CustomerRow = {
                       </td>
                     </tr>
                   }
-                </tbody>
-              </table>
+                </ng-template></app-data-table-shell
+              >
             </div>
           </div>
         }
@@ -292,6 +275,19 @@ type CustomerRow = {
   `,
 })
 export class ReportsComponent implements OnInit {
+  protected readonly tableColumns1: TableColumn[] = [
+    { key: 'column0', label: 'Day', pinned: true },
+    { key: 'column1', label: 'Sales', align: 'right' },
+    { key: 'column2', label: 'Revenue', align: 'right' },
+    { key: 'column3', label: 'COGS', align: 'right' },
+    { key: 'column4', label: 'Margin', align: 'right' },
+  ];
+  protected readonly tableColumns2: TableColumn[] = [
+    { key: 'column0', label: 'Customer', pinned: true },
+    { key: 'column1', label: 'Sales', align: 'right' },
+    { key: 'column2', label: 'Revenue', align: 'right' },
+    { key: 'column3', label: 'AR Δ', align: 'right' },
+  ];
   private readonly reports = inject(ReportsService);
   private readonly businessClock = inject(BusinessClockService);
 
@@ -339,22 +335,37 @@ export class ReportsComponent implements OnInit {
     if (value === 'sales' || value === 'customers') this.tab.set(value);
   }
 
+  constructor() {
+    bindListQuery(
+      {
+        view: listQueryField(this.tab, { values: ['sales', 'customers'] }),
+        from: listQueryField(this.from),
+        to: listQueryField(this.to),
+        page: listQueryField(this.page),
+      },
+      () => void this.load()
+    );
+  }
+
   async ngOnInit(): Promise<void> {
     try {
       const today = await this.businessClock.today();
       this.businessToday.set(today);
       const range = presetDateRange(today, 30);
-      this.from.set(range.from);
-      this.to.set(range.to);
+      if (!this.from() || !this.to()) {
+        this.from.set(range.from);
+        this.to.set(range.to);
+      } else this.periodPreset.set(null);
       await this.load();
     } catch (error) {
       this.error.set(error instanceof Error ? error.message : 'Failed to load the business date');
     }
   }
 
+  private listRequest = 0;
   protected async load(): Promise<void> {
+    const request = ++this.listRequest;
     this.error.set(null);
-    this.page.set(1);
     if (!this.validRange(this.from(), this.to())) {
       return;
     }
@@ -366,16 +377,19 @@ export class ReportsComponent implements OnInit {
         this.reports.salesSummary(since, until),
         this.reports.customerStats(since, until),
       ]);
+      if (request !== this.listRequest) return;
       this.summary.set(summary);
-      await this.aggregateCustomers(customerStats);
+      await this.aggregateCustomers(customerStats, request);
     } catch (err) {
+      if (request !== this.listRequest) return;
       this.error.set(err instanceof Error ? err.message : 'Failed to load reports');
     } finally {
-      this.loading.set(false);
+      if (request === this.listRequest) this.loading.set(false);
     }
   }
 
   protected setPeriodPreset(value: DateRangePreset): void {
+    this.page.set(1);
     const today = this.businessToday();
     if (!today) return;
     const range = presetDateRange(today, value);
@@ -386,6 +400,7 @@ export class ReportsComponent implements OnInit {
   }
 
   protected setCustomRange(range: AppliedDateRange): void {
+    this.page.set(1);
     if (!this.validRange(range.from, range.to)) return;
     this.periodPreset.set(null);
     this.from.set(range.from);
@@ -413,7 +428,8 @@ export class ReportsComponent implements OnInit {
   }
 
   private async aggregateCustomers(
-    rows: import('./reports.service').DailyCustomerStats[]
+    rows: import('./reports.service').DailyCustomerStats[],
+    request: number
   ): Promise<void> {
     const byCustomer = new Map<string, { orders: number; revenue: number; arDelta: number }>();
     for (const r of rows) {
@@ -426,6 +442,7 @@ export class ReportsComponent implements OnInit {
     }
     const top = [...byCustomer.entries()].sort((a, b) => b[1].revenue - a[1].revenue).slice(0, 20);
     const names = await this.reports.customerNames(top.map(([id]) => id));
+    if (request !== this.listRequest) return;
     this.customers.set(
       top.map(([customerId, acc]) => ({
         customerId,

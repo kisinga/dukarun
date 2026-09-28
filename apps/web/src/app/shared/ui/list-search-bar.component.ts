@@ -1,5 +1,8 @@
 import {
   Component,
+  ElementRef,
+  inject,
+  viewChild,
   HostListener,
   OnDestroy,
   effect,
@@ -7,11 +10,17 @@ import {
   model,
   output,
   signal,
+  computed,
 } from '@angular/core';
 import { NgIcon } from '@ng-icons/core';
 
 export interface ListSortOption {
   value: string;
+  label: string;
+}
+
+export interface ActiveListFilter {
+  key: string;
   label: string;
 }
 
@@ -21,15 +30,14 @@ export type ListSortDirection = 'asc' | 'desc';
 @Component({
   selector: 'app-list-search-bar',
   imports: [NgIcon],
-  host: { class: 'mb-4 block' },
+  host: { class: 'block', '[class.mb-4]': '!embedded()' },
   template: `
-    <section class="card flex min-w-0 flex-col gap-3 bg-base-100 p-3 md:p-4">
-      <div
-        class="list-toolbar-grid grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 md:grid-cols-[minmax(0,1fr)_auto] xl:grid-cols-[minmax(14rem,18rem)_minmax(0,1fr)_auto] xl:gap-4"
-      >
-        <div
-          class="list-toolbar-search relative col-span-2 min-w-0 md:col-span-1 md:w-72 xl:w-full"
-        >
+    <section
+      class="card flex min-w-0 flex-col gap-3 bg-base-100 p-3 md:px-4"
+      [class.list-toolbar-embedded]="embedded()"
+    >
+      <div class="list-toolbar-grid">
+        <div class="list-toolbar-search relative min-w-0">
           <ng-icon
             name="heroMagnifyingGlass"
             size="1rem"
@@ -47,94 +55,66 @@ export type ListSortDirection = 'asc' | 'desc';
             <button
               type="button"
               class="btn absolute top-1/2 right-0.5 btn-circle btn-ghost btn-xs -translate-y-1/2"
-              (click)="searchQuery.set('')"
+              (click)="clearSearch()"
               aria-label="Clear search"
             >
               <ng-icon name="heroXMark" size="0.875rem" />
             </button>
           }
         </div>
-
-        <div
-          class="list-toolbar-summary min-w-0 md:col-span-2 md:row-start-2 xl:col-span-1 xl:col-start-2 xl:row-start-1"
-        >
-          <ng-content select="[summary]" />
-        </div>
-
-        <div class="flex shrink-0 items-center justify-end gap-1 md:hidden">
-          @if (sortOptions().length > 0) {
-            <div class="relative">
-              <button
-                type="button"
-                class="btn min-h-11 gap-1.5 btn-ghost btn-sm"
-                aria-label="Sort list"
-                [attr.aria-expanded]="sortOpen()"
-                (click)="$event.stopPropagation(); sortOpen.set(!sortOpen())"
-              >
-                <ng-icon
-                  [name]="sortDirection() === 'asc' ? 'heroBarsArrowUp' : 'heroBarsArrowDown'"
-                  size="1.25rem"
-                />
-                <span class="hidden min-[360px]:inline">Sort</span>
-              </button>
-              @if (sortOpen()) {
-                <div
-                  class="absolute top-[calc(100%+0.375rem)] right-0 z-50 w-56 rounded-box border border-base-300 bg-base-100 p-1.5 shadow-overlay"
-                >
-                  @for (option of sortOptions(); track option.value) {
-                    <button
-                      type="button"
-                      class="flex min-h-11 w-full items-center gap-2 rounded-field px-3 text-left text-sm hover:bg-base-200"
-                      [class.bg-base-200]="sortKey() === option.value"
-                      (click)="chooseSort(option.value)"
-                    >
-                      <ng-icon
-                        name="heroCheck"
-                        size="0.875rem"
-                        [class.invisible]="sortKey() !== option.value"
-                      />
-                      <span class="min-w-0 flex-1 truncate">{{ option.label }}</span>
-                    </button>
-                  }
-                  <button
-                    type="button"
-                    class="mt-1 flex min-h-11 w-full items-center gap-2 border-t border-base-300 px-3 pt-1 text-left text-sm"
-                    (click)="toggleSortDirection(); sortOpen.set(false)"
-                  >
-                    <ng-icon
-                      [name]="sortDirection() === 'asc' ? 'heroBarsArrowUp' : 'heroBarsArrowDown'"
-                      size="1.25rem"
-                    />
-                    {{ sortDirection() === 'asc' ? 'Ascending' : 'Descending' }}
-                  </button>
-                </div>
-              }
-            </div>
-          }
-          @if (filtersEnabled()) {
+        @if (sortOptions().length > 0) {
+          <div class="list-toolbar-mobile-sort relative md:hidden">
             <button
               type="button"
               class="btn min-h-11 gap-1.5 btn-ghost btn-sm"
-              aria-label="Filter list"
-              [attr.aria-expanded]="filtersOpen()"
-              (click)="filtersOpen.set(true)"
+              aria-label="Sort list"
+              [attr.aria-expanded]="sortOpen()"
+              (click)="$event.stopPropagation(); sortOpen.set(!sortOpen())"
             >
-              <span class="indicator">
-                <ng-icon name="heroFunnel" size="1.25rem" />
-                @if (activeFilterCount() > 0) {
-                  <span class="badge indicator-item badge-primary badge-xs">{{
-                    activeFilterCount()
-                  }}</span>
-                }
-              </span>
-              <span class="hidden min-[360px]:inline">Filters</span>
+              <ng-icon
+                [name]="sortDirection() === 'asc' ? 'heroBarsArrowUp' : 'heroBarsArrowDown'"
+                size="1.25rem"
+              />
+              <span class="sr-only">Sort</span>
             </button>
-          }
-        </div>
-
+            @if (sortOpen()) {
+              <div
+                class="absolute top-[calc(100%+0.375rem)] right-0 z-50 w-56 rounded-box border border-base-300 bg-base-100 p-1.5 shadow-overlay"
+              >
+                @for (option of sortOptions(); track option.value) {
+                  <button
+                    type="button"
+                    class="flex min-h-11 w-full items-center gap-2 rounded-field px-3 text-left text-sm hover:bg-base-200"
+                    [class.bg-base-200]="sortKey() === option.value"
+                    (click)="chooseSort(option.value)"
+                  >
+                    <ng-icon
+                      name="heroCheck"
+                      size="0.875rem"
+                      [class.invisible]="sortKey() !== option.value"
+                    />
+                    <span class="min-w-0 flex-1 truncate">{{ option.label }}</span>
+                  </button>
+                }
+                <button
+                  type="button"
+                  class="mt-1 flex min-h-11 w-full items-center gap-2 border-t border-base-300 px-3 pt-1 text-left text-sm"
+                  (click)="toggleSortDirection(); sortOpen.set(false)"
+                >
+                  <ng-icon
+                    [name]="sortDirection() === 'asc' ? 'heroBarsArrowUp' : 'heroBarsArrowDown'"
+                    size="1.25rem"
+                  />
+                  {{ sortDirection() === 'asc' ? 'Ascending' : 'Descending' }}
+                </button>
+              </div>
+            }
+          </div>
+        }
+        <div class="list-toolbar-summary min-w-0"><ng-content select="[summary]" /></div>
         @if (sortOptions().length > 0) {
           <div
-            class="list-toolbar-sort list-sort-control hidden w-56 min-w-0 items-stretch overflow-hidden rounded-field md:col-start-2 md:row-start-1 md:flex xl:col-start-3"
+            class="list-toolbar-sort list-sort-control hidden w-48 max-w-full min-w-0 items-stretch overflow-hidden rounded-field md:flex"
           >
             <select
               class="sort-select select min-h-11 min-w-0 flex-1 cursor-pointer rounded-none select-sm"
@@ -161,6 +141,36 @@ export type ListSortDirection = 'asc' | 'desc';
           </div>
         }
       </div>
+      <div class="list-toolbar-context flex min-w-0 flex-wrap items-end gap-3">
+        <div class="list-quick-filters flex min-w-0 max-w-full flex-wrap items-end gap-3">
+          <ng-content select="[quickFilters]" />
+        </div>
+        <div class="list-toolbar-scope flex min-w-0 max-w-full flex-wrap items-end gap-3">
+          <ng-content select="[scope]" />
+        </div>
+        <div class="list-toolbar-actions ml-auto flex shrink-0 items-center justify-end gap-1">
+          @if (filtersEnabled()) {
+            <button
+              type="button"
+              class="list-filter-trigger btn min-h-11 gap-1.5 btn-ghost btn-sm"
+              #filterTrigger
+              aria-label="Filter list"
+              [attr.aria-expanded]="filtersOpen()"
+              (click)="filtersOpen.set(!filtersOpen())"
+            >
+              <span class="indicator">
+                <ng-icon name="heroFunnel" size="1.25rem" />
+                @if (filterCount() > 0) {
+                  <span class="badge indicator-item badge-primary badge-xs">{{
+                    filterCount()
+                  }}</span>
+                }
+              </span>
+              <span class="hidden min-[360px]:inline">Filters</span>
+            </button>
+          }
+        </div>
+      </div>
 
       @if (filtersEnabled()) {
         @if (filtersOpen()) {
@@ -171,7 +181,15 @@ export type ListSortDirection = 'asc' | 'desc';
             (click)="filtersOpen.set(false)"
           ></button>
         }
-        <div class="list-filter-panel" [class.list-filter-panel-open]="filtersOpen()">
+        <div
+          #filterPanel
+          class="list-filter-panel"
+          [hidden]="!filtersOpen()"
+          [attr.role]="isMobileViewport() ? 'dialog' : null"
+          [attr.aria-modal]="isMobileViewport() && filtersOpen() ? true : null"
+          [attr.aria-label]="filterSheetTitle()"
+          [class.list-filter-panel-open]="filtersOpen()"
+        >
           <div
             class="flex items-center justify-between border-b border-base-300/70 px-4 py-3 md:hidden"
           >
@@ -191,7 +209,7 @@ export type ListSortDirection = 'asc' | 'desc';
           <div
             class="flex items-center gap-2 border-t border-base-300/70 bg-base-100 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:hidden"
           >
-            @if (activeFilterCount() > 0) {
+            @if (filterCount() > 0) {
               <button type="button" class="btn min-h-11 btn-ghost" (click)="clearFilters.emit()">
                 Clear all
               </button>
@@ -207,17 +225,23 @@ export type ListSortDirection = 'asc' | 'desc';
         </div>
       }
 
-      @if (activeFilterCount() > 0) {
-        <div class="flex flex-wrap md:hidden" aria-label="Active filters">
-          <button
-            type="button"
-            class="inline-flex min-h-11 items-center gap-1.5 rounded-selector bg-base-200 px-3 text-xs font-semibold"
-            aria-label="Clear all active filters"
-            (click)="clearFilters.emit()"
-          >
-            {{ activeFilterCount() }}
-            {{ activeFilterCount() === 1 ? 'filter' : 'filters' }} active
-            <ng-icon name="heroXMark" size="0.875rem" />
+      @if (filterCount() > 0) {
+        <div class="flex flex-wrap items-center gap-2" aria-label="Active filters">
+          @for (chip of filterChips(); track chip.key) {
+            <button
+              type="button"
+              class="btn min-h-11 btn-ghost btn-sm"
+              [attr.aria-label]="'Remove ' + chip.label"
+              (click)="removeFilter.emit(chip.key)"
+            >
+              {{ chip.label }} <ng-icon name="heroXMark" size="0.875rem" />
+            </button>
+          }
+          @if (!filterChips().length) {
+            <span class="text-xs text-muted">{{ filterCount() }} filters active</span>
+          }
+          <button type="button" class="btn min-h-11 btn-ghost btn-sm" (click)="clearFilters.emit()">
+            Clear filters
           </button>
         </div>
       }
@@ -226,8 +250,116 @@ export type ListSortDirection = 'asc' | 'desc';
     </section>
   `,
   styles: `
-    .list-toolbar-summary:empty {
+    .list-toolbar-summary:empty,
+    .list-toolbar-scope:empty,
+    .list-quick-filters:empty {
       display: none;
+    }
+
+    :host {
+      container-type: inline-size;
+    }
+
+    .list-toolbar-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .list-toolbar-context {
+      border-top: 1px solid var(--surface-border);
+      padding-top: 0.75rem;
+    }
+
+    .list-toolbar-embedded {
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      box-shadow: none;
+    }
+
+    .list-toolbar-embedded .list-toolbar-context {
+      --list-filter-height: 2.75rem;
+      padding-top: 0;
+      border-top: 0;
+    }
+
+    @container (min-width: 40rem) {
+      .list-toolbar-embedded:has(.list-toolbar-summary:empty) {
+        display: grid;
+        grid-template-columns: minmax(16rem, 28rem) minmax(0, 1fr);
+        align-items: end;
+      }
+
+      .list-toolbar-embedded:has(.list-toolbar-summary:empty)
+        > :not(.list-toolbar-grid, .list-toolbar-context) {
+        grid-column: 1 / -1;
+      }
+    }
+
+    .list-toolbar-actions:empty {
+      display: none;
+    }
+
+    .list-toolbar-context:has(> .list-toolbar-scope:empty) > .list-quick-filters {
+      flex: 1;
+    }
+
+    .list-toolbar-context:has(> .list-toolbar-scope:empty):has(> .list-quick-filters:empty):has(
+        > .list-toolbar-actions:empty
+      ) {
+      display: none;
+    }
+
+    .list-toolbar-summary {
+      grid-column: 1 / -1;
+      grid-row: 2;
+    }
+
+    .list-toolbar-sort,
+    .list-toolbar-mobile-sort {
+      grid-column: 2;
+      grid-row: 1;
+    }
+
+    @container (min-width: 64rem) {
+      .list-toolbar-grid {
+        grid-template-columns: minmax(14rem, 18rem) minmax(0, 1fr) auto;
+        gap: 1rem;
+      }
+
+      .list-toolbar-summary {
+        grid-column: 2;
+        grid-row: 1;
+      }
+
+      .list-toolbar-sort {
+        grid-column: 3;
+      }
+    }
+
+    .list-toolbar-grid:not(:has(.list-toolbar-sort)) {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    @container (min-width: 64rem) {
+      .list-toolbar-grid:not(:has(.list-toolbar-sort)) {
+        grid-template-columns: minmax(14rem, 18rem) minmax(0, 1fr);
+      }
+    }
+
+    .list-toolbar-grid:has(.list-toolbar-summary:empty) {
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .list-toolbar-grid:has(.list-toolbar-summary:empty) .list-toolbar-sort {
+      grid-column: 2;
+    }
+
+    .list-toolbar-grid:not(:has(.list-toolbar-sort)):has(.list-toolbar-summary:empty) {
+      grid-template-columns: minmax(0, 1fr);
     }
 
     .list-sort-control {
@@ -262,6 +394,10 @@ export type ListSortDirection = 'asc' | 'desc';
 
     .sort-direction:hover {
       background: var(--surface-action);
+    }
+
+    .list-filter-panel[hidden] {
+      display: none;
     }
 
     .list-filter-panel {
@@ -320,8 +456,13 @@ export type ListSortDirection = 'asc' | 'desc';
   `,
 })
 export class ListSearchBarComponent implements OnDestroy {
+  /** Reuse controls inside an existing panel without adding another card. */
+  readonly embedded = input(false);
   readonly searchQuery = model<string>('');
   readonly placeholder = input<string>('Search...');
+  readonly searchDebounceMs = input(250);
+  readonly activeFilters = input<readonly ActiveListFilter[] | undefined>();
+  readonly removeFilter = output<string>();
   readonly searchLabel = input('Search list');
   readonly sortOptions = input<readonly ListSortOption[]>([]);
   readonly sortKey = model<string>('');
@@ -332,18 +473,73 @@ export class ListSearchBarComponent implements OnDestroy {
   readonly filtersOpen = model(false);
   readonly clearFilters = output<void>();
 
+  protected readonly filterChips = computed(() => [
+    ...new Map((this.activeFilters() ?? []).map(chip => [chip.key, chip])).values(),
+  ]);
+  protected readonly filterCount = computed(() =>
+    this.activeFilters() === undefined ? this.activeFilterCount() : this.filterChips().length
+  );
+
   protected readonly sortOpen = signal(false);
+  private readonly element = inject(ElementRef<HTMLElement>);
+  private readonly filterTrigger = viewChild<ElementRef<HTMLButtonElement>>('filterTrigger');
+  private readonly panel = viewChild<ElementRef<HTMLElement>>('filterPanel');
+  private returnFocus: HTMLElement | null = null;
+  private searchTimer?: ReturnType<typeof setTimeout>;
   private savedBodyOverflow: string | null = null;
 
   constructor() {
     effect(() => {
-      if (this.filtersOpen() && this.isMobileViewport()) this.lockBody();
-      else this.unlockBody();
+      if (this.filtersOpen()) {
+        this.returnFocus =
+          this.filterTrigger()?.nativeElement ?? (document.activeElement as HTMLElement);
+        if (this.isMobileViewport()) {
+          this.lockBody();
+          queueMicrotask(() =>
+            this.panel()
+              ?.nativeElement.querySelector<HTMLElement>('button, input, select, [tabindex="0"]')
+              ?.focus()
+          );
+        }
+      } else {
+        this.unlockBody();
+        this.returnFocus?.focus();
+        this.returnFocus = null;
+      }
     });
   }
 
   protected onSearchInput(event: Event): void {
-    this.searchQuery.set((event.target as HTMLInputElement).value);
+    const value = (event.target as HTMLInputElement).value;
+    clearTimeout(this.searchTimer);
+    this.searchTimer = setTimeout(() => this.searchQuery.set(value), this.searchDebounceMs());
+  }
+
+  protected clearSearch(): void {
+    clearTimeout(this.searchTimer);
+    this.searchQuery.set('');
+    const input = this.element.nativeElement.querySelector('input');
+    if (input) input.value = '';
+  }
+
+  @HostListener('keydown', ['$event'])
+  protected containFilterFocus(event: KeyboardEvent): void {
+    if (event.key !== 'Tab' || !this.filtersOpen() || !this.isMobileViewport()) return;
+    const elements = Array.from(
+      this.panel()?.nativeElement.querySelectorAll<HTMLElement>(
+        'button, input, select, textarea, a[href], [tabindex="0"]'
+      ) ?? []
+    ).filter(element => !element.hasAttribute('disabled') && element.getClientRects().length > 0);
+    const first = elements[0],
+      last = elements[elements.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last?.focus();
+    }
+    if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first?.focus();
+    }
   }
 
   protected onSortKeyChange(event: Event): void {
@@ -383,6 +579,7 @@ export class ListSearchBarComponent implements OnDestroy {
   }
 
   ngOnDestroy(): void {
+    clearTimeout(this.searchTimer);
     this.unlockBody();
   }
 
@@ -398,7 +595,7 @@ export class ListSearchBarComponent implements OnDestroy {
     this.savedBodyOverflow = null;
   }
 
-  private isMobileViewport(): boolean {
+  protected isMobileViewport(): boolean {
     return typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches;
   }
 }

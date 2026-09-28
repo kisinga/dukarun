@@ -1,3 +1,4 @@
+import { bindListQuery, listQueryField } from '../shared/list/list-query';
 import {
   Component,
   DestroyRef,
@@ -30,7 +31,11 @@ import { ProfileService } from '../profile/profile.service';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ButtonComponent } from '../shared/ui/button.component';
 import { IconComponent } from '../shared/ui/icon.component';
-import { DataTableShellComponent } from '../shared/ui/data-table-shell.component';
+import {
+  DataTableShellComponent,
+  TableRowsDirective,
+  type TableColumn,
+} from '../shared/ui/data-table-shell.component';
 import { FormFieldComponent } from '../shared/ui/form-field.component';
 import {
   ListSearchBarComponent,
@@ -81,6 +86,7 @@ const MEMBER_SORT_OPTIONS: readonly ListSortOption[] = [
     ButtonComponent,
     IconComponent,
     DataTableShellComponent,
+    TableRowsDirective,
     FormFieldComponent,
     ListSearchBarComponent,
     StatBarComponent,
@@ -128,6 +134,7 @@ const MEMBER_SORT_OPTIONS: readonly ListSortOption[] = [
         <div role="alert" class="alert alert-error mb-3 text-sm">
           <app-icon name="heroExclamationTriangle" />
           <span>{{ error() }}</span>
+          <button appButton variant="ghost" size="sm" type="button" (click)="load()">Retry</button>
         </div>
       }
       @if (notice()) {
@@ -223,6 +230,7 @@ const MEMBER_SORT_OPTIONS: readonly ListSortOption[] = [
 
         <!-- Members -->
         <app-list-search-bar
+          searchLabel="Search team members"
           placeholder="Search member, role, or status…"
           [searchQuery]="memberQuery()"
           (searchQueryChange)="memberQuery.set($event); memberPage.set(1)"
@@ -232,7 +240,10 @@ const MEMBER_SORT_OPTIONS: readonly ListSortOption[] = [
           [sortDirection]="memberSortDirection()"
           (sortDirectionChange)="memberSortDirection.set($event); memberPage.set(1)"
         >
-          <app-stat-bar summary [stats]="teamStats()" />
+          <div summary>
+            <p class="type-caption mb-1">Entire business</p>
+            <app-stat-bar [stats]="teamStats()" />
+          </div>
         </app-list-search-bar>
 
         @if (invitations().length > 0) {
@@ -303,7 +314,7 @@ const MEMBER_SORT_OPTIONS: readonly ListSortOption[] = [
           </section>
         }
 
-        @if (!loading() && filteredMembers().length === 0) {
+        @if (!loading() && !error() && filteredMembers().length === 0) {
           <app-empty-state
             [compact]="true"
             icon="heroUsers"
@@ -313,102 +324,93 @@ const MEMBER_SORT_OPTIONS: readonly ListSortOption[] = [
         } @else {
           <div class="hidden lg:block">
             <app-data-table-shell
+              [columns]="tableColumns1"
+              tableClass="table-sm"
               heading="Members"
               [description]="filteredMembers().length + ' members'"
             >
-              <table class="table table-sm">
-                <thead>
-                  <tr>
-                    <th>Member</th>
-                    <th>Role</th>
-                    <th>Status</th>
-                    <th>Locations</th>
-                    <th>Joined</th>
-                    <th class="text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @for (m of pagedMembers(); track m.id) {
-                    <tr>
-                      <td>
-                        <div class="table-entity">
-                          <app-entity-avatar
-                            size="sm"
-                            [firstName]="m.staff_profile?.display_name ?? m.roles?.name ?? '?'"
-                            [imageUrl]="memberAvatarUrl(m)"
-                          />
-                          <div>
-                            <p class="table-primary" [title]="m.user_id">
-                              {{ memberNameFor(m) }}
-                              @if (isSelf(m)) {
-                                <span class="badge badge-xs badge-outline ml-1">You</span>
-                              }
-                              @if (isPrimaryContact(m)) {
-                                <span class="badge badge-xs badge-primary ml-1"
-                                  >Primary contact</span
-                                >
-                              }
-                            </p>
-                            <p class="table-secondary font-mono">User …{{ shortId(m.user_id) }}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td>
-                        <select
-                          class="select select-bordered select-xs w-40"
-                          [value]="m.role_id ?? ''"
-                          [disabled]="busy() || roles().length === 0 || isSelf(m)"
-                          [title]="
-                            isSelf(m) ? 'Ask another admin to change your role' : 'Change role'
-                          "
-                          aria-label="Change role"
-                          (change)="changeRole(m, $any($event.target))"
-                        >
-                          @if (!m.role_id) {
-                            <option value="" disabled>No role</option>
-                          }
-                          @for (r of roles(); track r.id) {
-                            <option [value]="r.id" [selected]="r.id === m.role_id">
-                              {{ r.name }}
-                            </option>
-                          }
-                        </select>
-                      </td>
-                      <td>
-                        <app-status-badge
-                          size="xs"
-                          [type]="memberStatusType(m.authorization_status)"
-                          [label]="m.authorization_status"
+              <ng-template tableRows>
+                @for (m of pagedMembers(); track m.id) {
+                  <tr [attr.data-list-record]="m.id">
+                    <td>
+                      <div class="table-entity">
+                        <app-entity-avatar
+                          size="sm"
+                          [firstName]="m.staff_profile?.display_name ?? m.roles?.name ?? '?'"
+                          [imageUrl]="memberAvatarUrl(m)"
                         />
-                      </td>
-                      <td>
-                        <p class="table-primary">{{ primaryLocationName(m) }}</p>
-                        @if (additionalLocationCount(m) > 0) {
-                          <p class="table-secondary">+{{ additionalLocationCount(m) }} more</p>
+                        <div>
+                          <p class="table-primary" [title]="m.user_id">
+                            {{ memberNameFor(m) }}
+                            @if (isSelf(m)) {
+                              <span class="badge badge-xs badge-outline ml-1">You</span>
+                            }
+                            @if (isPrimaryContact(m)) {
+                              <span class="badge badge-xs badge-primary ml-1">Primary contact</span>
+                            }
+                          </p>
+                          <p class="table-secondary font-mono">User …{{ shortId(m.user_id) }}</p>
+                        </div>
+                      </div>
+                      <details class="mt-1 text-xs">
+                        <summary>Membership detail</summary>
+                        <p>Joined {{ date(m.created_at) }}</p>
+                      </details>
+                    </td>
+                    <td>
+                      <select
+                        class="select select-bordered select-xs w-40"
+                        [value]="m.role_id ?? ''"
+                        [disabled]="busy() || roles().length === 0 || isSelf(m)"
+                        [title]="
+                          isSelf(m) ? 'Ask another admin to change your role' : 'Change role'
+                        "
+                        aria-label="Change role"
+                        (change)="changeRole(m, $any($event.target))"
+                      >
+                        @if (!m.role_id) {
+                          <option value="" disabled>No role</option>
                         }
-                      </td>
-                      <td>{{ date(m.created_at) }}</td>
-                      <td class="table-actions">
-                        <button
-                          appButton
-                          variant="ghost"
-                          [iconOnly]="true"
-                          type="button"
-                          aria-haspopup="menu"
-                          [attr.aria-label]="'Actions for ' + memberNameFor(m)"
-                          [attr.aria-expanded]="memberMenuId() === m.id"
-                          [attr.aria-controls]="
-                            memberMenuId() === m.id ? 'member-actions-menu' : null
-                          "
-                          (click)="toggleMemberMenu(m, $event)"
-                        >
-                          <app-icon name="heroEllipsisVertical" />
-                        </button>
-                      </td>
-                    </tr>
-                  }
-                </tbody>
-              </table>
+                        @for (r of roles(); track r.id) {
+                          <option [value]="r.id" [selected]="r.id === m.role_id">
+                            {{ r.name }}
+                          </option>
+                        }
+                      </select>
+                    </td>
+                    <td>
+                      <app-status-badge
+                        size="xs"
+                        [type]="memberStatusType(m.authorization_status)"
+                        [label]="m.authorization_status"
+                      />
+                    </td>
+                    <td>
+                      <p class="table-primary">{{ primaryLocationName(m) }}</p>
+                      @if (additionalLocationCount(m) > 0) {
+                        <p class="table-secondary">+{{ additionalLocationCount(m) }} more</p>
+                      }
+                    </td>
+                    <td class="table-actions">
+                      <button
+                        appButton
+                        variant="ghost"
+                        [iconOnly]="true"
+                        type="button"
+                        aria-haspopup="menu"
+                        [attr.aria-label]="'Actions for ' + memberNameFor(m)"
+                        [attr.aria-expanded]="memberMenuId() === m.id"
+                        [attr.aria-controls]="
+                          memberMenuId() === m.id ? 'member-actions-menu' : null
+                        "
+                        (click)="toggleMemberMenu(m, $event)"
+                      >
+                        <app-icon name="heroEllipsisVertical" />
+                      </button>
+                    </td>
+                  </tr>
+                }
+              </ng-template>
             </app-data-table-shell>
 
             @if (memberActionMenu(); as menu) {
@@ -484,6 +486,7 @@ const MEMBER_SORT_OPTIONS: readonly ListSortOption[] = [
           <app-mobile-list>
             @for (m of pagedMembers(); track m.id) {
               <div
+                [attr.data-list-record]="m.id"
                 mobileListRow
                 class="cursor-pointer"
                 role="button"
@@ -600,6 +603,7 @@ const MEMBER_SORT_OPTIONS: readonly ListSortOption[] = [
         <app-mobile-list>
           @for (r of roles(); track r.id) {
             <button
+              [attr.data-list-record]="r.id"
               mobileListRow
               type="button"
               class="flex min-h-20 w-full items-center gap-3 p-3 text-left"
@@ -836,6 +840,13 @@ const MEMBER_SORT_OPTIONS: readonly ListSortOption[] = [
   `,
 })
 export class TeamComponent implements OnInit {
+  protected readonly tableColumns1: TableColumn[] = [
+    { key: 'member', label: 'Member', pinned: true },
+    { key: 'role', label: 'Role' },
+    { key: 'status', label: 'Access status' },
+    { key: 'locations', label: 'Locations' },
+    { key: 'actions', label: 'Actions', align: 'right' },
+  ];
   private readonly team = inject(TeamService);
   private readonly supabase = inject(SupabaseService);
   private readonly profile = inject(ProfileService);
@@ -984,6 +995,14 @@ export class TeamComponent implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
 
   constructor() {
+    bindListQuery({
+      search: listQueryField(this.memberQuery),
+      sort: listQueryField(this.memberSort),
+      direction: listQueryField(this.memberSortDirection),
+      page: listQueryField(this.memberPage),
+      pageSize: listQueryField(this.memberPageSize, { max: 100 }),
+    });
+
     const timer = setInterval(() => this.resendClock.set(Date.now()), 30_000);
     this.destroyRef.onDestroy(() => clearInterval(timer));
     effect(() => {

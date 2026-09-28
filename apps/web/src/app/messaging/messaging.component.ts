@@ -1,3 +1,4 @@
+import { bindListQuery, listQueryField } from '../shared/list/list-query';
 import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { EmptyStateComponent } from '../shared/ui/empty-state.component';
@@ -9,7 +10,11 @@ import {
   OutboxMessageWithParty,
 } from '../notifications/notifications.service';
 import { ButtonComponent } from '../shared/ui/button.component';
-import { DataTableShellComponent } from '../shared/ui/data-table-shell.component';
+import {
+  DataTableShellComponent,
+  TableRowsDirective,
+  type TableColumn,
+} from '../shared/ui/data-table-shell.component';
 import { FormFieldComponent } from '../shared/ui/form-field.component';
 import { IconComponent } from '../shared/ui/icon.component';
 import {
@@ -54,6 +59,7 @@ const RELATED_PARTY_SEARCH_ID_LIMIT = 50;
     PaginationComponent,
     ButtonComponent,
     DataTableShellComponent,
+    TableRowsDirective,
     FormFieldComponent,
     IconComponent,
     ListSearchBarComponent,
@@ -92,6 +98,7 @@ const RELATED_PARTY_SEARCH_ID_LIMIT = 50;
         <div role="alert" class="alert alert-error mb-3 text-sm">
           <app-icon name="heroExclamationTriangle" />
           <span>{{ error() }}</span>
+          <button appButton variant="ghost" size="sm" type="button" (click)="load()">Retry</button>
         </div>
       }
 
@@ -122,6 +129,9 @@ const RELATED_PARTY_SEARCH_ID_LIMIT = 50;
       }
 
       <app-list-search-bar
+        searchLabel="Search messages"
+        [activeFilters]="activeListFilters()"
+        (removeFilter)="removeListFilter($event)"
         placeholder="Search customer, recipient, or message…"
         [searchQuery]="query()"
         (searchQueryChange)="onSearch($event)"
@@ -147,19 +157,7 @@ const RELATED_PARTY_SEARCH_ID_LIMIT = 50;
               <option value="whatsapp">WhatsApp</option>
             </select>
           </app-form-field>
-          <app-form-field label="Status" class="lg:w-44">
-            <select
-              class="select select-bordered select-sm w-full"
-              [value]="statusFilter()"
-              (change)="setFilter('status', $event)"
-            >
-              <option value="all">All statuses</option>
-              <option value="pending">Pending</option>
-              <option value="sent">Sent</option>
-              <option value="failed">Failed</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
-          </app-form-field>
+
           <app-form-field label="Related party" class="lg:w-52">
             <app-searchable-filter
               ariaLabel="Filter communications by customer or supplier"
@@ -184,22 +182,13 @@ const RELATED_PARTY_SEARCH_ID_LIMIT = 50;
               <option value="purchase_order">Purchase orders</option>
             </select>
           </app-form-field>
-          <app-form-field label="From" class="lg:w-40">
-            <input
-              type="date"
-              class="input input-bordered input-sm w-full"
-              [value]="from()"
-              (change)="setDate('from', $event)"
-            />
-          </app-form-field>
-          <app-form-field label="To" class="lg:w-40">
-            <input
-              type="date"
-              class="input input-bordered input-sm w-full"
-              [value]="to()"
-              (change)="setDate('to', $event)"
-            />
-          </app-form-field>
+        </div>
+        <div scope class="flex flex-wrap items-end gap-3">
+          @if (!last30Active()) {
+            <button type="button" class="btn btn-ghost btn-sm min-h-11" (click)="setLast30()">
+              Reset dates
+            </button>
+          }
           <div class="flex flex-wrap gap-2 sm:col-span-2">
             <button
               appButton
@@ -224,10 +213,40 @@ const RELATED_PARTY_SEARCH_ID_LIMIT = 50;
               All time
             </button>
           </div>
+          <app-form-field label="From" class="lg:w-40">
+            <input
+              type="date"
+              class="input input-bordered input-sm w-full"
+              [value]="from()"
+              (change)="setDate('from', $event)"
+            /> </app-form-field
+          ><app-form-field label="To" class="lg:w-40">
+            <input
+              type="date"
+              class="input input-bordered input-sm w-full"
+              [value]="to()"
+              (change)="setDate('to', $event)"
+            />
+          </app-form-field>
+        </div>
+        <div quickFilters class="flex flex-wrap items-end gap-3">
+          <app-form-field label="Status" class="lg:w-44">
+            <select
+              class="select select-bordered select-sm min-h-11 w-full"
+              [value]="statusFilter()"
+              (change)="setFilter('status', $event)"
+            >
+              <option value="all">All statuses</option>
+              <option value="pending">Pending</option>
+              <option value="sent">Sent</option>
+              <option value="failed">Failed</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </app-form-field>
         </div>
       </app-list-search-bar>
 
-      @if (!loading() && outbox().length === 0) {
+      @if (!loading() && !error() && outbox().length === 0) {
         <app-empty-state
           [compact]="hasOutboxFilters()"
           icon="heroBellSlash"
@@ -241,27 +260,18 @@ const RELATED_PARTY_SEARCH_ID_LIMIT = 50;
       } @else {
         <div class="hidden lg:block">
           <app-data-table-shell
+            [columns]="tableColumns1"
+            tableClass="table-sm"
             heading="Delivery history"
             [description]="outboxTotal() + ' matching deliveries'"
           >
-            <table class="table table-sm">
-              <thead>
-                <tr>
-                  <th>Queued</th>
-                  <th>Channel</th>
-                  <th>Customer</th>
-                  <th>Recipient</th>
-                  <th>Message</th>
-                  <th>Status</th>
-                  <th>Opens</th>
-                </tr>
-              </thead>
-              <tbody>
-                @for (message of outbox(); track message.id) {
-                  <tr>
-                    <td class="whitespace-nowrap">{{ time(message.created_at) }}</td>
-                    <td class="uppercase">{{ message.channel }}</td>
-                    <td>
+            <ng-template tableRows>
+              @for (message of outbox(); track message.id) {
+                <tr [attr.data-list-record]="message.id">
+                  <td class="whitespace-nowrap">{{ time(message.created_at) }}</td>
+                  <td>
+                    {{ message.recipient }}
+                    <div class="table-secondary mt-1">
                       @if (message.customers; as party) {
                         <a
                           class="link link-hover font-medium"
@@ -279,31 +289,22 @@ const RELATED_PARTY_SEARCH_ID_LIMIT = 50;
                       } @else {
                         <span class="text-base-content/40">Unlinked</span>
                       }
-                    </td>
-                    <td class="font-mono text-xs">{{ message.recipient }}</td>
-                    <td class="max-w-lg">
-                      <p class="line-clamp-2 text-sm">{{ message.body }}</p>
-                      @if (sourceDocumentLink(message); as documentLink) {
-                        <a
-                          class="mt-1 inline-flex text-xs font-medium link link-hover"
-                          [routerLink]="documentLink.route"
-                          [queryParams]="documentLink.queryParams"
-                        >
-                          Open source document
-                        </a>
-                      }
-                    </td>
-                    <td>
-                      <app-status-badge
-                        [type]="statusType(message.status)"
-                        [label]="message.status"
-                        size="xs"
-                      />
-                      @if (message.status === 'failed' && message.error) {
-                        <p class="table-secondary max-w-xs text-error">{{ message.error }}</p>
-                      }
-                    </td>
-                    <td class="whitespace-nowrap">
+                    </div>
+                  </td>
+                  <td class="uppercase">{{ message.channel }}</td>
+                  <td class="max-w-lg">
+                    <p class="line-clamp-2 text-sm">{{ message.body }}</p>
+                    @if (sourceDocumentLink(message); as documentLink) {
+                      <a
+                        class="mt-1 inline-flex text-xs font-medium link link-hover"
+                        [routerLink]="documentLink.route"
+                        [queryParams]="documentLink.queryParams"
+                      >
+                        Open source document
+                      </a>
+                    }
+                    <details class="mt-1 text-xs">
+                      <summary>Delivery detail</summary>
                       {{ openLabel(message) }}
                       @if (lastOpenedAt(message); as openedAt) {
                         <p
@@ -313,17 +314,27 @@ const RELATED_PARTY_SEARCH_ID_LIMIT = 50;
                           Last {{ time(openedAt) }}
                         </p>
                       }
-                    </td>
-                  </tr>
-                }
-              </tbody>
-            </table>
+                    </details>
+                  </td>
+                  <td>
+                    <app-status-badge
+                      [type]="statusType(message.status)"
+                      [label]="message.status"
+                      size="xs"
+                    />
+                    @if (message.status === 'failed' && message.error) {
+                      <p class="table-secondary max-w-xs text-error">{{ message.error }}</p>
+                    }
+                  </td>
+                </tr>
+              }
+            </ng-template>
           </app-data-table-shell>
         </div>
 
         <app-mobile-list>
           @for (message of outbox(); track message.id) {
-            <div mobileListRow>
+            <div [attr.data-list-record]="message.id" mobileListRow>
               <div class="grid min-h-20 gap-3 p-3">
                 <div class="flex items-start justify-between gap-3">
                   <div class="min-w-0">
@@ -393,6 +404,36 @@ const RELATED_PARTY_SEARCH_ID_LIMIT = 50;
   `,
 })
 export class CommunicationsComponent implements OnInit, OnDestroy {
+  protected readonly activeListFilters = computed(() => [
+    ...(this.channelFilter() !== 'all'
+      ? [{ key: 'channel', label: 'Channel: ' + this.channelFilter().replaceAll('_', ' ') }]
+      : []),
+    ...(this.statusFilter() !== 'all'
+      ? [{ key: 'status', label: 'Status: ' + this.statusFilter().replaceAll('_', ' ') }]
+      : []),
+    ...(this.partyFilter() !== 'all'
+      ? [{ key: 'party', label: 'Party: ' + this.partyFilter().replaceAll('_', ' ') }]
+      : []),
+    ...(this.documentFilter() !== 'all'
+      ? [{ key: 'document', label: 'Document: ' + this.documentFilter().replaceAll('_', ' ') }]
+      : []),
+  ]);
+  protected removeListFilter(key: string): void {
+    if (key === 'channel') this.channelFilter.set('all');
+    if (key === 'status') this.statusFilter.set('all');
+    if (key === 'party') this.partyFilter.set('all');
+    if (key === 'document') this.documentFilter.set('all');
+    this.outboxPage.set(1);
+    void this.load();
+  }
+
+  protected readonly tableColumns1: TableColumn[] = [
+    { key: 'queued', label: 'Queued', pinned: true },
+    { key: 'recipient', label: 'Recipient' },
+    { key: 'channel', label: 'Channel' },
+    { key: 'message', label: 'Message' },
+    { key: 'state', label: 'Delivery state' },
+  ];
   private readonly notifications = inject(NotificationsService);
   private readonly partyCache = inject(PartyCacheService);
 
@@ -482,6 +523,25 @@ export class CommunicationsComponent implements OnInit, OnDestroy {
   protected readonly outboxTotalPages = computed(() =>
     Math.max(1, Math.ceil(this.outboxTotal() / this.outboxPageSize()))
   );
+
+  constructor() {
+    bindListQuery(
+      {
+        search: listQueryField(this.query),
+        channel: listQueryField(this.channelFilter),
+        status: listQueryField(this.statusFilter),
+        party: listQueryField(this.partyFilter),
+        document: listQueryField(this.documentFilter),
+        from: listQueryField(this.from),
+        to: listQueryField(this.to),
+        sort: listQueryField(this.messageSort),
+        direction: listQueryField(this.messageSortDirection),
+        page: listQueryField(this.outboxPage),
+        pageSize: listQueryField(this.outboxPageSize, { max: 100 }),
+      },
+      () => void this.load()
+    );
+  }
 
   async ngOnInit(): Promise<void> {
     await this.partyCache.ensureLoaded();
@@ -621,7 +681,7 @@ export class CommunicationsComponent implements OnInit, OnDestroy {
   protected onSearch(value: string): void {
     this.query.set(value);
     if (this.searchTimer) clearTimeout(this.searchTimer);
-    this.searchTimer = setTimeout(() => this.reloadFromStart(), 250);
+    this.searchTimer = setTimeout(() => this.reloadFromStart(), 0);
   }
 
   protected setDate(kind: 'from' | 'to', event: Event): void {
@@ -648,8 +708,6 @@ export class CommunicationsComponent implements OnInit, OnDestroy {
     this.statusFilter.set('all');
     this.partyFilter.set('all');
     this.documentFilter.set('all');
-    this.from.set(this.daysAgoIso(29));
-    this.to.set(this.todayIso());
     this.reloadFromStart();
   }
 

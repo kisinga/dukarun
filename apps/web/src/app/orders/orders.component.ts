@@ -1,3 +1,4 @@
+import { bindListQuery, listQueryField, listFormQueryField } from '../shared/list/list-query';
 import {
   Component,
   OnDestroy,
@@ -26,7 +27,11 @@ import { PageLayoutComponent } from '../shared/ui/page-layout.component';
 import { PaginationComponent } from '../shared/ui/pagination.component';
 import { ORDER_STATUS_MAP, StatusBadgeComponent } from '../shared/ui/status-badge.component';
 import { MoneyService } from '../money/money.service';
-import { DataTableShellComponent } from '../shared/ui/data-table-shell.component';
+import {
+  DataTableShellComponent,
+  TableRowsDirective,
+  type TableColumn,
+} from '../shared/ui/data-table-shell.component';
 import { DrawerComponent } from '../shared/ui/drawer.component';
 import { StatCardComponent } from '../shared/ui/stat-card.component';
 import { ButtonComponent } from '../shared/ui/button.component';
@@ -75,6 +80,7 @@ const SALE_SORT_OPTIONS: readonly ListSortOption[] = [
     PaginationComponent,
     StatusBadgeComponent,
     DataTableShellComponent,
+    TableRowsDirective,
     DrawerComponent,
     StatCardComponent,
     ButtonComponent,
@@ -129,6 +135,7 @@ const SALE_SORT_OPTIONS: readonly ListSortOption[] = [
       }
 
       <app-list-search-bar
+        searchLabel="Search sales"
         placeholder="Search sale code or customer…"
         [searchQuery]="query()"
         (searchQueryChange)="onSearch($event)"
@@ -137,50 +144,35 @@ const SALE_SORT_OPTIONS: readonly ListSortOption[] = [
         (sortKeyChange)="changeSort($event, saleSortDirection())"
         [sortDirection]="saleSortDirection()"
         (sortDirectionChange)="changeSort(saleSort(), $event)"
-        [filtersEnabled]="true"
-        [activeFilterCount]="salesActiveFilterCount()"
+        [activeFilters]="filterChips()"
+        (removeFilter)="removeChip($event)"
         (clearFilters)="clearSalesFilters()"
       >
         <app-stat-bar summary [stats]="salesStats()" />
-        <div filters class="grid gap-2 sm:grid-cols-2 lg:flex lg:flex-wrap lg:items-end">
-          <app-form-field label="Status" class="sm:col-span-2 lg:w-44">
-            <select class="select select-bordered select-sm w-full" [formControl]="status">
-              <option value="all">All</option>
-              <option value="completed">Completed</option>
-              <option value="voided">Voided</option>
-              <option value="draft">Draft (proforma)</option>
-              <option value="expired">Expired proforma</option>
-              <option value="pending_payment">Cashier queue</option>
-            </select>
-          </app-form-field>
-          <app-form-field label="Customer" class="sm:col-span-2 lg:w-56">
-            <app-searchable-filter
-              ariaLabel="Filter sales by customer"
-              placeholder="All customers"
-              searchPlaceholder="Search customers…"
-              [options]="customerFilterOptions()"
-              [value]="customerId() ?? ''"
-              (valueChange)="setCustomerFilter($event)"
-            />
-          </app-form-field>
+        <div scope class="flex flex-wrap items-end gap-3">
+          @if (!todayActive()) {
+            <button type="button" class="btn btn-ghost btn-sm min-h-11" (click)="setToday()">
+              Reset dates
+            </button>
+          }
           <app-form-field label="From" class="lg:w-40">
             <input
               type="date"
               class="input input-bordered input-sm w-full"
               [formControl]="from"
+              (change)="applyDateRange()"
               [disabled]="allTime()"
-            />
-          </app-form-field>
-          <app-form-field label="To" class="lg:w-40">
+            /> </app-form-field
+          ><app-form-field label="To" class="lg:w-40">
             <input
               type="date"
               class="input input-bordered input-sm w-full"
               [formControl]="to"
+              (change)="applyDateRange()"
               [disabled]="allTime()"
             />
           </app-form-field>
           <div class="flex flex-wrap items-center gap-2 sm:col-span-2">
-            <button appButton type="button" (click)="apply()">Apply filters</button>
             <button
               appButton
               [variant]="todayActive() ? 'soft' : 'ghost'"
@@ -219,6 +211,32 @@ const SALE_SORT_OPTIONS: readonly ListSortOption[] = [
             </button>
           </div>
         </div>
+        <div quickFilters class="flex flex-wrap items-end gap-3">
+          <app-form-field label="Status" class="sm:col-span-2 lg:w-44">
+            <select
+              class="select select-bordered select-sm min-h-11 w-full"
+              [formControl]="status"
+              (change)="apply()"
+            >
+              <option value="all">All</option>
+              <option value="completed">Completed</option>
+              <option value="voided">Voided</option>
+              <option value="draft">Draft (proforma)</option>
+              <option value="expired">Expired proforma</option>
+              <option value="pending_payment">Cashier queue</option>
+            </select>
+          </app-form-field>
+          <app-form-field label="Customer" class="sm:col-span-2 lg:w-56">
+            <app-searchable-filter
+              ariaLabel="Filter sales by customer"
+              placeholder="All customers"
+              searchPlaceholder="Search customers…"
+              [options]="customerFilterOptions()"
+              [value]="customerId() ?? ''"
+              (valueChange)="setCustomerFilter($event)"
+            />
+          </app-form-field>
+        </div>
       </app-list-search-bar>
 
       @if (customerId() || allTime()) {
@@ -248,7 +266,7 @@ const SALE_SORT_OPTIONS: readonly ListSortOption[] = [
         </div>
       }
 
-      @if (!loading() && orders().length === 0) {
+      @if (!loading() && !error() && orders().length === 0) {
         <div class="mt-3">
           <app-empty-state
             [compact]="true"
@@ -265,6 +283,7 @@ const SALE_SORT_OPTIONS: readonly ListSortOption[] = [
         <app-mobile-list class="mt-3">
           @for (order of orders(); track order.id) {
             <div
+              [attr.data-list-record]="order.id"
               mobileListRow
               class="cursor-pointer"
               role="button"
@@ -331,136 +350,130 @@ const SALE_SORT_OPTIONS: readonly ListSortOption[] = [
 
         <div class="mt-3 hidden lg:block">
           <app-data-table-shell
+            [columns]="tableColumns1"
+            tableClass="table-sm"
             heading="Sales history"
             [description]="totalItems() + ' matching sales'"
           >
-            <table class="table table-sm">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Sale</th>
-                  <th>Customer</th>
-                  <th>Status</th>
-                  <th>Payment</th>
-                  <th class="text-right">Total</th>
-                  <th class="text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                @for (order of orders(); track order.id) {
-                  <tr
-                    role="button"
-                    tabindex="0"
-                    class="cursor-pointer"
-                    [class.table-row-active]="selectedOrderId() === order.id"
-                    (click)="openOrder(order.id)"
-                    (keydown.enter)="openOrder(order.id)"
-                  >
-                    <td>{{ time(order.created_at) }}</td>
-                    <td class="font-mono font-semibold">{{ order.code }}</td>
-                    <td>{{ customerName(order) }}</td>
-                    <td>
+            <ng-template tableRows>
+              @for (order of orders(); track order.id) {
+                <tr
+                  [attr.data-list-record]="order.id"
+                  tabindex="0"
+                  class="cursor-pointer"
+                  [class.table-row-active]="selectedOrderId() === order.id"
+                  (click)="openOrder(order.id)"
+                  (keydown.enter)="openOrder(order.id)"
+                >
+                  <td>
+                    {{ order.code }}
+                    <div class="table-secondary mt-1">{{ time(order.created_at) }}</div>
+                  </td>
+                  <td>{{ customerName(order) }}</td>
+                  <td>
+                    <app-status-badge
+                      [type]="statusType(order.status)"
+                      [label]="statusLabel(order.status, order.id)"
+                    />
+                    @if (order.is_credit_sale) {
                       <app-status-badge
-                        [type]="statusType(order.status)"
-                        [label]="statusLabel(order.status, order.id)"
+                        [type]="creditBadge(order).type"
+                        [label]="creditBadge(order).label"
                       />
-                      @if (order.is_credit_sale) {
-                        <app-status-badge
-                          [type]="creditBadge(order).type"
-                          [label]="creditBadge(order).label"
-                        />
+                    }
+                    @if (fulfillmentSummary(order.id); as fulfillment) {
+                      <app-status-badge
+                        [type]="fulfillmentStatusType(fulfillment.fulfillment_status)"
+                        [label]="fulfillmentLabel(fulfillment)"
+                      />
+                      @if (fulfillment.collection_kind === 'cod') {
+                        <app-status-badge type="warning" [label]="codLabel(fulfillment)" />
                       }
-                      @if (fulfillmentSummary(order.id); as fulfillment) {
-                        <app-status-badge
-                          [type]="fulfillmentStatusType(fulfillment.fulfillment_status)"
-                          [label]="fulfillmentLabel(fulfillment)"
-                        />
-                        @if (fulfillment.collection_kind === 'cod') {
-                          <app-status-badge type="warning" [label]="codLabel(fulfillment)" />
-                        }
-                      }
-                      @for (approval of approvalBadges(order.id); track approval.id) {
-                        <span
-                          class="badge badge-xs ml-1"
-                          [class.badge-warning]="approval.status === 'pending'"
-                          [class.badge-success]="approval.status === 'approved'"
-                          [class.badge-error]="
-                            approval.status === 'denied' || approval.status === 'expired'
-                          "
-                          [class.badge-ghost]="approval.status === 'cancelled'"
-                        >
-                          {{ approvalBadgeLabel(approval) }}
-                        </span>
-                      }
-                    </td>
-                    <td
-                      [class.font-medium]="order.status === 'pending_payment'"
-                      [class.text-warning]="order.status === 'pending_payment'"
-                    >
-                      {{ paymentLabel(order) }}
-                    </td>
-                    <td class="table-number"><app-money [amount]="order.total" /></td>
-                    <td class="table-actions" (click)="$event.stopPropagation()">
-                      @if (printerEnabled() && order.status === 'completed') {
-                        <button
-                          appButton
-                          variant="ghost"
-                          [iconOnly]="true"
-                          title="Print receipt"
-                          aria-label="Print receipt"
-                          (click)="printOrder(order.id)"
-                        >
-                          <app-icon name="heroPrinter" />
-                        </button>
-                      } @else if (
-                        order.status === 'pending_payment' &&
-                        order.cashier_pending_at &&
-                        permissions.has('SettleOrder') &&
-                        !pendingApprovalHold(order.id)
-                      ) {
-                        <a
-                          appButton
-                          variant="ghost"
-                          [iconOnly]="true"
-                          routerLink="/pos/cashier"
-                          title="Collect payment"
-                          aria-label="Collect payment"
-                        >
-                          <app-icon name="heroBanknotes" />
-                        </a>
-                      } @else if (order.status === 'draft') {
-                        <a
-                          appButton
-                          variant="ghost"
-                          [iconOnly]="true"
-                          routerLink="/pos/proformas"
-                          title="Open proforma"
-                          aria-label="Open proforma"
-                        >
-                          <app-icon name="heroDocumentText" />
-                        </a>
-                      }
-                      @if (
-                        order.status === 'completed' &&
-                        permissions.actionMode('sale.void') !== 'blocked' &&
-                        !isPending('order_reversal', order.id)
-                      ) {
-                        <button
-                          appButton
-                          variant="ghost"
-                          [iconOnly]="true"
-                          title="Void sale"
-                          aria-label="Void sale"
-                          (click)="openOrder(order.id); startVoid(order.id)"
-                        >
-                          <app-icon name="heroXMark" />
-                        </button>
-                      }
-                    </td>
-                  </tr>
-                }
-              </tbody>
-            </table>
+                    }
+                    @for (approval of approvalBadges(order.id); track approval.id) {
+                      <span
+                        class="badge badge-xs ml-1"
+                        [class.badge-warning]="approval.status === 'pending'"
+                        [class.badge-success]="approval.status === 'approved'"
+                        [class.badge-error]="
+                          approval.status === 'denied' || approval.status === 'expired'
+                        "
+                        [class.badge-ghost]="approval.status === 'cancelled'"
+                      >
+                        {{ approvalBadgeLabel(approval) }}
+                      </span>
+                    }
+                  </td>
+                  <td
+                    [class.font-medium]="order.status === 'pending_payment'"
+                    [class.text-warning]="order.status === 'pending_payment'"
+                  >
+                    {{ paymentLabel(order) }}
+                  </td>
+                  <td class="table-number"><app-money [amount]="order.total" /></td>
+                  <td class="table-actions" (click)="$event.stopPropagation()">
+                    <button appButton variant="ghost" type="button" (click)="openOrder(order.id)">
+                      Open
+                    </button>
+                    @if (printerEnabled() && order.status === 'completed') {
+                      <button
+                        appButton
+                        variant="ghost"
+                        [iconOnly]="true"
+                        title="Print receipt"
+                        aria-label="Print receipt"
+                        (click)="printOrder(order.id)"
+                      >
+                        <app-icon name="heroPrinter" />
+                      </button>
+                    } @else if (
+                      order.status === 'pending_payment' &&
+                      order.cashier_pending_at &&
+                      permissions.has('SettleOrder') &&
+                      !pendingApprovalHold(order.id)
+                    ) {
+                      <a
+                        appButton
+                        variant="ghost"
+                        [iconOnly]="true"
+                        routerLink="/pos/cashier"
+                        title="Collect payment"
+                        aria-label="Collect payment"
+                      >
+                        <app-icon name="heroBanknotes" />
+                      </a>
+                    } @else if (order.status === 'draft') {
+                      <a
+                        appButton
+                        variant="ghost"
+                        [iconOnly]="true"
+                        routerLink="/pos/proformas"
+                        title="Open proforma"
+                        aria-label="Open proforma"
+                      >
+                        <app-icon name="heroDocumentText" />
+                      </a>
+                    }
+                    @if (
+                      order.status === 'completed' &&
+                      permissions.actionMode('sale.void') !== 'blocked' &&
+                      !isPending('order_reversal', order.id)
+                    ) {
+                      <button
+                        appButton
+                        variant="ghost"
+                        [iconOnly]="true"
+                        title="Void sale"
+                        aria-label="Void sale"
+                        (click)="openOrder(order.id); startVoid(order.id)"
+                      >
+                        <app-icon name="heroXMark" />
+                      </button>
+                    }
+                  </td>
+                </tr>
+              }
+            </ng-template>
           </app-data-table-shell>
         </div>
 
@@ -520,8 +533,8 @@ const SALE_SORT_OPTIONS: readonly ListSortOption[] = [
               @if (order.is_credit_sale && order.status === 'completed') {
                 <app-stat-card
                   label="Paid so far"
-                  [value]="fmtKes(creditPaid().get(order.id) ?? 0)"
-                  [tone]="(creditPaid().get(order.id) ?? 0) >= order.total ? 'success' : 'warning'"
+                  [value]="creditPaid().has(order.id) ? fmtKes(creditPaid().get(order.id)!) : '—'"
+                  [tone]="creditBadge(order).type"
                   [sub]="paymentLabel(order)"
                 />
               } @else {
@@ -726,6 +739,7 @@ const SALE_SORT_OPTIONS: readonly ListSortOption[] = [
                     <div class="flex flex-col gap-2">
                       @for (approval of approvalHistory(); track approval.id) {
                         <article
+                          [attr.data-list-record]="approval.id"
                           class="rounded-field border border-base-300 p-3"
                           [class.ring-2]="highlightedApprovalId() === approval.id"
                           [class.ring-primary]="highlightedApprovalId() === approval.id"
@@ -957,6 +971,14 @@ const SALE_SORT_OPTIONS: readonly ListSortOption[] = [
   `,
 })
 export class OrdersComponent implements OnInit, OnDestroy {
+  protected readonly tableColumns1: TableColumn[] = [
+    { key: 'sale', label: 'Sale / date', pinned: true },
+    { key: 'customer', label: 'Customer' },
+    { key: 'status', label: 'Sale status' },
+    { key: 'payment', label: 'Payment status' },
+    { key: 'total', label: 'Total', align: 'right' },
+    { key: 'actions', label: 'Actions', align: 'right' },
+  ];
   private readonly pos = inject(PosService);
   private readonly receiptData = inject(ReceiptDataService);
   private readonly print = inject(PrintService);
@@ -979,6 +1001,8 @@ export class OrdersComponent implements OnInit, OnDestroy {
   protected readonly orders = signal<OrderWithCustomer[]>([]);
   /** Paid-so-far totals (shillings) for the credit sales currently listed. */
   protected readonly creditPaid = signal<Map<string, number>>(new Map());
+  protected readonly orderDues = signal<Map<string, number>>(new Map());
+  private detailSequence = 0;
   protected readonly fulfillmentByOrder = signal<Map<string, OrderFulfillmentSummary>>(new Map());
   protected readonly selectedOrderId = signal<string | null>(null);
   private readonly selectedOrderRecord = signal<OrderWithCustomer | null>(null);
@@ -1039,6 +1063,21 @@ export class OrdersComponent implements OnInit, OnDestroy {
   private loadSequence = 0;
   private authoritativeLoaded = false;
   constructor() {
+    bindListQuery(
+      {
+        from: listFormQueryField(this.from),
+        to: listFormQueryField(this.to),
+        status: listFormQueryField(this.status),
+
+        search: listQueryField(this.query),
+        sort: listQueryField(this.saleSort),
+        direction: listQueryField(this.saleSortDirection),
+        page: listQueryField(this.page),
+        pageSize: listQueryField(this.pageSize, { max: 100 }),
+      },
+      () => void this.load()
+    );
+
     effect(() => {
       const revision = this.approvals.revision();
       if (revision === 0) return;
@@ -1114,11 +1153,7 @@ export class OrdersComponent implements OnInit, OnDestroy {
   }
 
   protected canSendReceipt(order: OrderWithCustomer): boolean {
-    if (order.status !== 'completed') return false;
-    const paid = this.payments()
-      .filter(payment => payment.status === 'settled')
-      .reduce((sum, payment) => sum + payment.amount, 0);
-    return paid >= order.total;
+    return order.status === 'completed' && this.orderDues().get(order.id) === 0;
   }
 
   protected readonly salesStats = computed(() => {
@@ -1143,7 +1178,7 @@ export class OrdersComponent implements OnInit, OnDestroy {
         mobilePriority: 'secondary' as const,
       },
       {
-        label: 'Awaiting payment',
+        label: 'Awaiting payment on page',
         value: pending,
         tone: 'warning' as const,
         mobilePriority: 'secondary' as const,
@@ -1171,7 +1206,7 @@ export class OrdersComponent implements OnInit, OnDestroy {
     this.query.set(query);
     this.page.set(1);
     if (this.searchTimer) clearTimeout(this.searchTimer);
-    this.searchTimer = setTimeout(() => void this.load(), 250);
+    this.searchTimer = setTimeout(() => void this.load(), 0);
   }
 
   protected async apply(): Promise<void> {
@@ -1179,6 +1214,42 @@ export class OrdersComponent implements OnInit, OnDestroy {
     await this.load();
   }
 
+  protected filterChips() {
+    return [
+      ...(this.status.value !== 'all'
+        ? [{ key: 'status', label: 'Status: ' + this.status.value.replaceAll('_', ' ') }]
+        : []),
+      ...(this.customerId()
+        ? [
+            {
+              key: 'customer',
+              label:
+                'Customer: ' +
+                (this.customerFilterOptions().find(item => item.value === this.customerId())
+                  ?.label ?? 'Selected customer'),
+            },
+          ]
+        : []),
+    ];
+  }
+  protected async removeChip(key: string): Promise<void> {
+    if (key === 'status') this.status.setValue('all');
+    if (key === 'customer') {
+      await this.clearCustomerFilter();
+      return;
+    }
+    if (key === 'dates') {
+      await this.setToday();
+      return;
+    }
+    await this.apply();
+  }
+  protected async applyDateRange(): Promise<void> {
+    if (!this.from.value || !this.to.value || this.from.value > this.to.value) return;
+    this.allTime.set(false);
+    await this.syncHistoryFilters();
+    await this.apply();
+  }
   protected salesActiveFilterCount(): number {
     return (
       Number(this.status.value !== 'all') +
@@ -1190,7 +1261,8 @@ export class OrdersComponent implements OnInit, OnDestroy {
   protected async clearSalesFilters(): Promise<void> {
     this.status.setValue('all');
     this.customerId.set(null);
-    await this.setToday();
+    await this.syncHistoryFilters();
+    await this.apply();
   }
 
   protected async setToday(): Promise<void> {
@@ -1230,8 +1302,11 @@ export class OrdersComponent implements OnInit, OnDestroy {
   }
 
   protected async load(): Promise<void> {
+    if (!this.allTime() && (!this.from.value || !this.to.value || this.from.value > this.to.value))
+      return;
     const sequence = ++this.loadSequence;
     this.loading.set(true);
+    this.orderDues.set(new Map());
     try {
       await this.pos.expireProformas();
       const statuses = this.status.value === 'all' ? ALL_STATUSES : [this.status.value];
@@ -1252,9 +1327,8 @@ export class OrdersComponent implements OnInit, OnDestroy {
         sortBy: this.saleSort() as 'created_at' | 'code' | 'total' | 'status',
         sortDirection: this.saleSortDirection(),
       });
-      const creditIds = result.rows.filter(order => order.is_credit_sale).map(order => order.id);
-      const [paidTotals, fulfillmentRows] = await Promise.all([
-        this.pos.paidTotalsByOrder(creditIds),
+      const [receivables, fulfillmentRows] = await Promise.all([
+        this.money.orderReceivableStatuses(result.rows.map(order => order.id)),
         this.fulfillment.orderSummaries(result.rows.map(order => order.id)),
       ]);
       if (sequence !== this.loadSequence) return;
@@ -1262,7 +1336,8 @@ export class OrdersComponent implements OnInit, OnDestroy {
       // succeeds; journal revisions never patch only one part of this state.
       this.orders.set(result.rows);
       this.totalItems.set(result.count);
-      this.creditPaid.set(paidTotals);
+      this.creditPaid.set(new Map(receivables.map(row => [row.order_id, row.settled_amount])));
+      this.orderDues.set(new Map(receivables.map(row => [row.order_id, row.outstanding])));
       this.fulfillmentByOrder.set(new Map(fulfillmentRows.map(row => [row.order_id, row])));
       this.authoritativeLoaded = true;
       await this.loadPageApprovals();
@@ -1344,21 +1419,34 @@ export class OrdersComponent implements OnInit, OnDestroy {
 
   /** Refetch lines + payments for the open drawer; ignores stale results. */
   protected async refreshDetail(orderId: string): Promise<void> {
+    const sequence = ++this.detailSequence;
+    this.orderDues.update(values => {
+      const next = new Map(values);
+      next.delete(orderId);
+      return next;
+    });
     try {
-      const [lines, payments, history] = await Promise.all([
+      const [lines, payments, history, receivables] = await Promise.all([
         this.pos.orderLines(orderId),
         this.pos.orderPayments(orderId),
         this.approvals.forOrder(orderId),
+        this.money.orderReceivableStatuses([orderId]),
       ]);
-      if (this.selectedOrderId() !== orderId) return;
+      if (this.selectedOrderId() !== orderId || sequence !== this.detailSequence) return;
       this.lines.set(lines);
       this.payments.set(payments);
       this.setApprovalHistory(history);
+      this.orderDues.update(values => new Map(values).set(orderId, receivables[0].outstanding));
+      this.creditPaid.update(values => new Map(values).set(orderId, receivables[0].settled_amount));
       await this.recentSales.rememberDetail(orderId, { lines, payments, history });
     } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Failed to load order details');
+      if (this.selectedOrderId() === orderId && sequence === this.detailSequence) {
+        this.error.set(err instanceof Error ? err.message : 'Failed to load order details');
+      }
     } finally {
-      if (this.selectedOrderId() === orderId) this.detailLoading.set(false);
+      if (this.selectedOrderId() === orderId && sequence === this.detailSequence) {
+        this.detailLoading.set(false);
+      }
     }
   }
 
@@ -1396,6 +1484,7 @@ export class OrdersComponent implements OnInit, OnDestroy {
 
   /** Called by the drawer after its close transition finishes. */
   protected closeOrderDrawer(updateUrl = true): void {
+    this.detailSequence++;
     this.selectedOrderId.set(null);
     this.selectedOrderRecord.set(null);
     this.voidingFor.set(null);
@@ -1688,10 +1777,10 @@ export class OrdersComponent implements OnInit, OnDestroy {
     if (order.status === 'expired') return 'Expired';
     if (order.status === 'voided') return 'Voided';
     if (!order.is_credit_sale) return 'Paid';
-    const paid = this.creditPaid().get(order.id) ?? 0;
-    if (paid <= 0) return 'Credit · Unpaid';
-    if (paid >= order.total) return 'Credit · Settled';
-    return `Credit · Part-paid (${formatKes(paid)} of ${formatKes(order.total)})`;
+    const due = this.orderDues().get(order.id);
+    if (due === undefined) return 'Credit · Balance unavailable';
+    if (due === 0) return 'Credit · Settled';
+    return `Credit · ${formatKes(due)} outstanding`;
   }
 
   protected pendingApprovalHold(orderId: string): Approval | null {
@@ -1705,11 +1794,15 @@ export class OrdersComponent implements OnInit, OnDestroy {
   }
 
   /** Badge for a credit sale: warning while anything is outstanding, success once settled. */
-  protected creditBadge(order: OrderWithCustomer): { type: 'warning' | 'success'; label: string } {
-    const paid = this.creditPaid().get(order.id) ?? 0;
-    return paid >= order.total
+  protected creditBadge(order: OrderWithCustomer): {
+    type: 'neutral' | 'warning' | 'success';
+    label: string;
+  } {
+    const due = this.orderDues().get(order.id);
+    if (due === undefined) return { type: 'neutral', label: 'credit · balance unavailable' };
+    return due === 0
       ? { type: 'success', label: 'credit · settled' }
-      : { type: 'warning', label: paid > 0 ? 'credit · part-paid' : 'credit' };
+      : { type: 'warning', label: 'credit · outstanding' };
   }
 
   protected noPaymentsMessage(order: OrderWithCustomer): string {
@@ -1717,10 +1810,10 @@ export class OrdersComponent implements OnInit, OnDestroy {
     if (order.status === 'draft') return 'No payments on this proforma.';
     if (order.status === 'expired') return 'This proforma expired without being converted.';
     if (order.is_credit_sale) {
-      const paid = this.creditPaid().get(order.id) ?? 0;
-      if (paid >= order.total) return 'Credit sale — fully repaid.';
-      if (paid > 0) return `Credit sale — ${formatKes(order.total - paid)} still outstanding.`;
-      return 'Credit sale — no payment collected yet.';
+      const due = this.orderDues().get(order.id);
+      if (due === undefined) return 'Credit sale — balance unavailable.';
+      if (due === 0) return 'Credit sale — no outstanding balance.';
+      return `Credit sale — ${formatKes(due)} still outstanding.`;
     }
     return 'No payments recorded.';
   }
