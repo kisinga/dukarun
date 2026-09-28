@@ -17017,22 +17017,38 @@ export type Database = {
         Args: { p_limit?: number }
         Returns: number
       }
-      product_intelligence: {
-        Args: {
-          p_variant_id?: string
-          p_decision?: string
-          p_limit?: number
-          p_location_id?: string
-          p_manufacturer_id?: string
-          p_offset?: number
-          p_search?: string
-          p_since?: string
-          p_supplier_id?: string
-          p_until?: string
-          p_window_days?: number
-        }
-        Returns: Json
-      }
+      product_intelligence:
+        | {
+            Args: {
+              p_decision?: string
+              p_limit?: number
+              p_location_id?: string
+              p_manufacturer_id?: string
+              p_offset?: number
+              p_search?: string
+              p_since?: string
+              p_supplier_id?: string
+              p_until?: string
+              p_variant_id: string
+              p_window_days?: number
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_decision?: string
+              p_limit?: number
+              p_location_id?: string
+              p_manufacturer_id?: string
+              p_offset?: number
+              p_search?: string
+              p_since?: string
+              p_supplier_id?: string
+              p_until?: string
+              p_window_days?: number
+            }
+            Returns: Json
+          }
       product_intelligence_with_identity: {
         Args: {
           p_limit?: number
