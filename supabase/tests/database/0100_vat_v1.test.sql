@@ -267,12 +267,11 @@ select results_eq(
     where id=(select expense_id from vat_expense)$$,
   $$values (116::bigint,100::bigint,16::bigint)$$,
   'evidenced expense stores gross, net, and recoverable VAT snapshots');
-select throws_ok(format($$select public.schedule_company_tax_profile(%L,false,'',current_date,%L)$$,
+select lives_ok(format($$select public.schedule_company_tax_profile(%L,true,'P051234567A',current_date,%L)$$,
   (select j.id from public.tax_jurisdictions j where j.country_code='KE'),
   (select c.id from public.tax_categories c join public.tax_jurisdictions j
     on j.id=c.jurisdiction_id where j.country_code='KE' and c.code='STANDARD')),
-  'P0001','tax_profile_today_has_financial_activity',
-  'same-day activation is blocked after a financial transaction finalizes');
+  'same-day VAT changes apply immediately after a financial transaction finalizes');
 create temp table vat_dated_expense as select public.post_expense_with_tax(
   116,'CASH_ON_HAND','transport','Prior invoice',current_date,true,
   'P009999999Z','EXP-VAT-2',current_date-1,null) expense_id;
@@ -596,12 +595,12 @@ create temp table vat_offline_open as select public.post_offline_sale_at_locatio
   '[{"variant_id":"a1000000-0000-4000-8000-000000000020","quantity":1,"unit_price":116}]',
   '[{"method":"cash","amount":116}]','vat-offline-open-1',
   (current_date-1)::timestamp at time zone 'Africa/Nairobi','vat-open-device',1,null) result;
-select ok((select bool_and(e.entry_date=current_date-1)
+select ok((select bool_and(e.entry_date=current_date)
   from public.ledger_journal_entries e
   where e.source_type in ('Payment','InventorySaleCogs','VatSaleReclass')
     and exists(select 1 from public.ledger_journal_lines l where l.entry_id=e.id
       and l.order_id=(select (result->>'order_id')::uuid from vat_offline_open))),
-  'open-period offline sale posts every journal on its occurred date');
+  'open-period offline sale posts every journal on the server posting date');
 select set_config('app.sale_tax_point','',true);
 select set_config('app.sale_journal_date','',true);
 
@@ -716,8 +715,8 @@ select is((select status from public.late_sale_reviews where client_ref='vat-lat
   'dual-permission manager can approve a late offline sale');
 select is((select public.order_vat_reporting_date(o.id,o.tax_point_at,'Africa/Nairobi')
   from public.orders o join public.late_sale_reviews l on l.posted_order_id=o.id
-  where l.client_ref='vat-late-1'),current_date-1,
-  'approved late sale keeps VAT on its immutable transaction tax point');
+  where l.client_ref='vat-late-1'),current_date,
+  'approved late sale reports VAT on its server posting date');
 select is((select jsonb_array_length(public.vat_report(current_date,current_date)->'late_transactions')),1,
   'current VAT report includes a prior-period correction schedule');
 create temp table late_vat_purchase as select public.record_purchase_complete_with_tax(

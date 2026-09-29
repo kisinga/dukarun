@@ -41,6 +41,7 @@ describe('Document designer drafts', () => {
         {
           provide: TaxService,
           useValue: {
+            watchSettings: vi.fn(() => () => undefined),
             settings: vi.fn().mockResolvedValue({
               active_profile: null,
               categories: [],

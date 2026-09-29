@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, effect, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, computed, effect, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import {
@@ -381,6 +381,7 @@ export class DocumentDesignerComponent implements OnInit {
   readonly store = inject(CompanySettingsStore);
   private readonly print = inject(PrintService);
   private readonly tax = inject(TaxService);
+  private readonly destroy = inject(DestroyRef);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   readonly fromSetup = this.route.snapshot.queryParamMap.get('from') === 'setup';
@@ -489,6 +490,14 @@ export class DocumentDesignerComponent implements OnInit {
     try {
       await this.store.load();
       this.taxSettings.set(await this.tax.settings().catch(() => null));
+      if (!this.destroy.destroyed)
+        this.destroy.onDestroy(
+          this.tax.watchSettings(
+            'vat-document-designer',
+            settings => this.taxSettings.set(settings),
+            () => this.taxSettings.set(null)
+          )
+        );
     } catch (e) {
       this.error.set(e instanceof Error ? e.message : 'Document designs could not be loaded.');
     } finally {

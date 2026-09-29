@@ -2231,7 +2231,9 @@ export type Database = {
           created_by: string | null
           default_tax_category_id: string | null
           effective_from: string
+          effective_from_at: string
           effective_to: string | null
+          effective_to_at: string | null
           id: string
           jurisdiction_id: string
           tax_registration_number: string | null
@@ -2244,7 +2246,9 @@ export type Database = {
           created_by?: string | null
           default_tax_category_id?: string | null
           effective_from: string
+          effective_from_at: string
           effective_to?: string | null
+          effective_to_at?: string | null
           id?: string
           jurisdiction_id: string
           tax_registration_number?: string | null
@@ -2257,7 +2261,9 @@ export type Database = {
           created_by?: string | null
           default_tax_category_id?: string | null
           effective_from?: string
+          effective_from_at?: string
           effective_to?: string | null
+          effective_to_at?: string | null
           id?: string
           jurisdiction_id?: string
           tax_registration_number?: string | null
@@ -7096,6 +7102,7 @@ export type Database = {
         Row: {
           account_sale_request_fingerprint: string | null
           accounting_posting_date: string | null
+          captured_at: string | null
           cashier_pending_at: string | null
           cashier_session_id: string | null
           client_ref: string | null
@@ -7116,6 +7123,7 @@ export type Database = {
           location_id: string
           net_total: number
           pending_owner: string | null
+          posted_at: string | null
           posting_source: string | null
           quantity_total: number
           receivable_kind: string | null
@@ -7135,6 +7143,7 @@ export type Database = {
         Insert: {
           account_sale_request_fingerprint?: string | null
           accounting_posting_date?: string | null
+          captured_at?: string | null
           cashier_pending_at?: string | null
           cashier_session_id?: string | null
           client_ref?: string | null
@@ -7155,6 +7164,7 @@ export type Database = {
           location_id: string
           net_total?: number
           pending_owner?: string | null
+          posted_at?: string | null
           posting_source?: string | null
           quantity_total?: number
           receivable_kind?: string | null
@@ -7174,6 +7184,7 @@ export type Database = {
         Update: {
           account_sale_request_fingerprint?: string | null
           accounting_posting_date?: string | null
+          captured_at?: string | null
           cashier_pending_at?: string | null
           cashier_session_id?: string | null
           client_ref?: string | null
@@ -7194,6 +7205,7 @@ export type Database = {
           location_id?: string
           net_total?: number
           pending_owner?: string | null
+          posted_at?: string | null
           posting_source?: string | null
           quantity_total?: number
           receivable_kind?: string | null
@@ -18074,8 +18086,8 @@ export type Database = {
       scan_registration_volume_alerts: { Args: never; Returns: number }
       schedule_company_tax_profile: {
         Args: {
-          p_default_tax_category_id: string
-          p_effective_from: string
+          p_default_tax_category_id?: string
+          p_effective_from?: string
           p_jurisdiction_id: string
           p_tax_registration_number: string
           p_vat_registered: boolean

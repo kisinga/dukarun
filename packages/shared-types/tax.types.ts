@@ -12,6 +12,8 @@ export interface CompanyTaxActivation {
   business_date: string;
   has_financial_activity_today: boolean;
   earliest_effective_from: string;
+  immediate_available?: boolean;
+  server_time?: string;
 }
 
 /** Internal server boundary; clients must never be allowed to supply this directly. */
@@ -231,6 +233,8 @@ export interface CompanyTaxProfile {
   default_tax_category_id: string | null;
   effective_from: string;
   effective_to: string | null;
+  effective_from_at?: string;
+  effective_to_at?: string | null;
   business_timezone: string;
 }
 

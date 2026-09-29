@@ -1,4 +1,4 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable, Injector, effect, inject, untracked } from '@angular/core';
 import type { Json } from '@dukarun/shared-types';
 import type {
   CompanyTaxProfile,
@@ -9,6 +9,7 @@ import type {
 } from '@dukarun/tax-types';
 import { SupabaseService } from './supabase.service';
 import { rpcError } from '../pos/pos.service';
+import { CacheJournalService, type CacheStreamHandler } from './cache-journal.service';
 
 export interface TaxJurisdiction {
   id: string;
@@ -89,6 +90,8 @@ export interface PosDeviceStatus {
 @Injectable({ providedIn: 'root' })
 export class TaxService {
   private readonly supabase = inject(SupabaseService);
+  private readonly injector = inject(Injector);
+  private readonly journal = inject(CacheJournalService);
 
   private get db() {
     return this.supabase.client;
@@ -98,6 +101,101 @@ export class TaxService {
     const { data, error } = await this.db.rpc('company_tax_settings');
     if (error) throw rpcError(error);
     return data as unknown as CompanyTaxSettings;
+  }
+
+  /** Recover cross-device edits through the durable settings journal, and wake at midnight changes. */
+  watchSettings(
+    consumer: string,
+    next: (settings: CompanyTaxSettings) => void,
+    failed: () => void
+  ): () => void {
+    const watcher = effect(
+      onCleanup => {
+        const identity = this.supabase.offlineIdentity();
+        if (!identity) return;
+        untracked(() => {
+          const scope = `${identity.companyId}:${identity.userId}`;
+          let stopped = false;
+          let running: Promise<void> | undefined;
+          let again = false;
+          let timer: ReturnType<typeof setTimeout> | undefined;
+          const refresh = (): Promise<void> => {
+            if (running) {
+              again = true;
+              return running;
+            }
+            running = (async () => {
+              do {
+                again = false;
+                const settings = await this.settings();
+                if (stopped) return;
+                next(settings);
+                clearTimeout(timer);
+                const serverNow = Date.parse(settings.activation?.server_time ?? '') || Date.now();
+                const boundary = settings.scheduled_profiles
+                  .map(profile => Date.parse(profile.effective_from_at ?? ''))
+                  .filter(at => Number.isFinite(at) && at > serverNow)
+                  .sort((a, b) => a - b)[0];
+                if (boundary)
+                  timer = setTimeout(
+                    wake,
+                    Math.min(2_147_000_000, Math.max(100, boundary - serverNow + 50))
+                  );
+              } while (again && !stopped);
+            })()
+              .catch(error => {
+                if (!stopped) {
+                  failed();
+                  clearTimeout(timer);
+                  timer = setTimeout(wake, 30_000);
+                }
+                throw error;
+              })
+              .finally(() => {
+                running = undefined;
+              });
+            return running;
+          };
+          const wake = () => {
+            if (!stopped) void refresh().catch(() => undefined);
+          };
+          const visible = () => {
+            if (document.visibilityState === 'visible') wake();
+          };
+          const handler: CacheStreamHandler = {
+            apply: async changes => {
+              if (changes.some(change => change.entityType === 'company')) await refresh();
+            },
+            reset: async () => {
+              await refresh();
+              return !stopped;
+            },
+          };
+          const channel = this.journal.subscribe(
+            'settings',
+            scope,
+            identity.companyId,
+            handler,
+            consumer
+          );
+          window.addEventListener('online', wake);
+          window.addEventListener('focus', wake);
+          document.addEventListener('visibilitychange', visible);
+          wake();
+          onCleanup(() => {
+            stopped = true;
+            clearTimeout(timer);
+            this.journal.unsubscribe('settings', scope, handler, consumer);
+            void this.db.removeChannel(channel);
+            window.removeEventListener('online', wake);
+            window.removeEventListener('focus', wake);
+            document.removeEventListener('visibilitychange', visible);
+          });
+        });
+      },
+      { injector: this.injector, manualCleanup: true }
+    );
+    return () => watcher.destroy();
   }
 
   async categories(jurisdictionId: string): Promise<TaxCategory[]> {
@@ -116,14 +214,14 @@ export class TaxService {
     jurisdictionId: string;
     vatRegistered: boolean;
     taxRegistrationNumber: string | null;
-    effectiveFrom: string;
+    effectiveFrom?: string;
     defaultTaxCategoryId: string;
   }): Promise<string> {
     const { data, error } = await this.db.rpc('schedule_company_tax_profile', {
       p_jurisdiction_id: input.jurisdictionId,
       p_vat_registered: input.vatRegistered,
       p_tax_registration_number: input.taxRegistrationNumber ?? '',
-      p_effective_from: input.effectiveFrom,
+      ...(input.effectiveFrom ? { p_effective_from: input.effectiveFrom } : {}),
       p_default_tax_category_id: input.defaultTaxCategoryId,
     });
     if (error) throw rpcError(error);

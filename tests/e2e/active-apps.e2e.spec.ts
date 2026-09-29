@@ -1471,6 +1471,7 @@ test('shop setup reuses identity and keeps document drafts local while learning 
           tax_registration_number: null,
         },
         categories: [{ id: 'standard', classification: 'standard', rate_bps: 1600 }],
+        scheduled_profiles: [],
         show_vat_breakdown_on_prints: true,
       },
     })

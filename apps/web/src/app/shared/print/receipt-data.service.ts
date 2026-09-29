@@ -61,10 +61,11 @@ export class ReceiptDataService {
 
   private settings: CompanyPrintInfo | null = null;
   private settingsRevision = 0;
+  private settingsExpiresAt = 0;
 
-  /** Company branding + printer flag (cached per app run). */
+  /** Short cache, bounded by the next server VAT activation as well. */
   async companyPrintInfo(): Promise<CompanyPrintInfo> {
-    if (this.settings) return this.settings;
+    if (this.settings && Date.now() < this.settingsExpiresAt) return this.settings;
     const revision = this.settingsRevision;
     const [{ data, error }, { data: taxSettings, error: taxError }] = await Promise.all([
       this.db
@@ -79,6 +80,17 @@ export class ReceiptDataService {
     if (error) throw error;
     if (taxError) throw taxError;
     if (revision !== this.settingsRevision) return this.companyPrintInfo();
+    const timing = taxSettings as {
+      activation?: { server_time?: string };
+      scheduled_profiles?: { effective_from_at?: string }[];
+    } | null;
+    const serverNow = Date.parse(timing?.activation?.server_time ?? '') || Date.now();
+    const nextChange = timing?.scheduled_profiles
+      ?.map(p => Date.parse(p.effective_from_at ?? ''))
+      .filter(at => Number.isFinite(at) && at > serverNow)
+      .sort((a, b) => a - b)[0];
+    this.settingsExpiresAt =
+      Date.now() + Math.min(60_000, nextChange ? nextChange - serverNow : 60_000);
     const activeProfile = (
       taxSettings as {
         active_profile?: {
