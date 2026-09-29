@@ -190,16 +190,8 @@ export class SettingsService {
     return path;
   }
 
-  /** Remove all objects under the company logo prefix and clear logo_path. */
+  /** Issued documents retain their versioned branding; only clear the current logo. */
   async removeLogo(companyId: string): Promise<void> {
-    const bucket = this.db.storage.from('company-logos');
-    const { data: objects, error: listError } = await bucket.list(`${companyId}`);
-    if (listError) throw new Error(listError.message);
-    const paths = (objects ?? []).map(o => `${companyId}/${o.name}`);
-    if (paths.length > 0) {
-      const { error: removeError } = await bucket.remove(paths);
-      if (removeError) throw new Error(removeError.message);
-    }
     await this.updateSettings(companyId, { logo_path: null });
   }
 

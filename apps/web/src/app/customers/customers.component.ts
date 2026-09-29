@@ -1,4 +1,5 @@
 import { bindListQuery, listQueryField } from '../shared/list/list-query';
+import { SaleDocumentService, type ReceiptContact } from '../communications/sale-document.service';
 import {
   Component,
   OnInit,
@@ -581,6 +582,19 @@ type CustomerRiskFilter = 'all' | 'review' | 'restricted' | 'healthy' | 'unrated
               }
             </ng-container>
             @if (selectedCustomer(); as c) {
+              <div class="mb-3 flex flex-wrap items-center gap-2">
+                <span class="badge badge-outline">{{
+                  c.is_verified === false ? 'Unverified' : 'Verified'
+                }}</span>
+                @if (c.customer_origin === 'receipt') {
+                  <span class="badge badge-ghost">Receipt contact</span>
+                }
+                @if (c.is_verified === false && perms.has('ManageCustomers') && !c.deleted_at) {
+                  <button appButton variant="outline" size="sm" (click)="editFromDrawer(c)">
+                    Complete customer profile
+                  </button>
+                }
+              </div>
               @if (c.deleted_at) {
                 <div role="status" class="alert alert-warning mb-3 text-sm">
                   <app-icon name="heroArchiveBox" />
@@ -1390,7 +1404,13 @@ type CustomerRiskFilter = 'all' | 'review' | 'restricted' | 'healthy' | 'unrated
         <app-task-dialog
           #customerEditor
           [open]="creating() || drawerEditing()"
-          [title]="editing() ? 'Edit ' + name(editing()!) : 'New customer'"
+          [title]="
+            editing()
+              ? editing()!.is_verified === false
+                ? 'Complete customer profile'
+                : 'Edit ' + name(editing()!)
+              : 'New customer'
+          "
           subtitle="Customer profile"
           size="lg"
           [dirty]="editorDirty()"
@@ -1403,6 +1423,26 @@ type CustomerRiskFilter = 'all' | 'review' | 'restricted' | 'healthy' | 'unrated
             (input)="editorDirty.set(true)"
             (change)="editorDirty.set(true)"
           >
+            @if (existingReceiptContact(); as contact) {
+              <div
+                class="mb-4 rounded-box border border-info/30 bg-info/5 p-3 text-sm"
+                role="status"
+              >
+                <p>
+                  {{ contact.first_name }} {{ contact.last_name }} already uses this number as a
+                  receipt contact.
+                </p>
+                <button
+                  appButton
+                  variant="outline"
+                  size="sm"
+                  type="button"
+                  (click)="completeExistingReceiptContact(contact.id)"
+                >
+                  Complete customer profile
+                </button>
+              </div>
+            }
             <app-form-section title="Contact" description="The person or business buying from you.">
               <div class="grid gap-3 md:grid-cols-2">
                 <app-form-field label="First name" [required]="true">
@@ -1531,7 +1571,13 @@ type CustomerRiskFilter = 'all' | 'review' | 'restricted' | 'healthy' | 'unrated
               [loading]="busy()"
               [disabled]="firstName.value.trim().length === 0"
             >
-              {{ editing() ? 'Save changes' : 'Create customer' }}
+              {{
+                editing()
+                  ? editing()!.is_verified === false
+                    ? 'Complete customer profile'
+                    : 'Save changes'
+                  : 'Create customer'
+              }}
             </button>
           </div>
         </app-task-dialog>
@@ -1587,6 +1633,8 @@ export class CustomersComponent implements OnInit {
   protected readonly cashierSession = inject(CashierSessionService);
   private readonly businessClock = inject(BusinessClockService);
   private readonly money = inject(MoneyService);
+  private readonly saleDocuments = inject(SaleDocumentService);
+  protected readonly existingReceiptContact = signal<ReceiptContact | null>(null);
   protected readonly partyCache = inject(PartyCacheService);
   private readonly pos = inject(PosService);
   private readonly receiptData = inject(ReceiptDataService);
@@ -2092,6 +2140,7 @@ export class CustomersComponent implements OnInit {
   }
 
   protected startCreate(): void {
+    this.existingReceiptContact.set(null);
     if (!this.perms.has('ManageCustomers')) return;
     this.editing.set(null);
     this.firstName.setValue('');
@@ -2202,8 +2251,20 @@ export class CustomersComponent implements OnInit {
     this.notice.set(null);
     try {
       const editing = this.editing();
+      if (!editing && this.phone.value.trim()) {
+        const existing = await this.saleDocuments.lookup(this.phone.value);
+        if (existing) {
+          if (!existing.is_verified) this.existingReceiptContact.set(existing);
+          else
+            this.editorError.set(
+              'This number already belongs to a customer. Open their profile to make changes.'
+            );
+          return;
+        }
+      }
       const savedId = await this.money.saveCustomerProfile({
         customerId: editing?.id,
+        completeProfile: editing?.is_verified === false,
         firstName: this.firstName.value.trim(),
         lastName: this.lastName.value.trim(),
         phone: this.phone.value.trim(),
@@ -2229,6 +2290,24 @@ export class CustomersComponent implements OnInit {
       }
     } catch (err) {
       this.editorError.set(err instanceof Error ? err.message : 'Customer could not be saved');
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected async completeExistingReceiptContact(customerId: string): Promise<void> {
+    this.busy.set(true);
+    try {
+      await this.partyCache.refresh();
+      const customer = await this.pos.customerWithCredit(customerId);
+      if (!customer) throw new Error('Customer is unavailable. Please refresh.');
+      this.existingReceiptContact.set(null);
+      this.creating.set(false);
+      this.editFromDrawer(customer);
+    } catch (error) {
+      this.editorError.set(
+        error instanceof Error ? error.message : 'Could not open the customer profile.'
+      );
     } finally {
       this.busy.set(false);
     }

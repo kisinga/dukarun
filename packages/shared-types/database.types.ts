@@ -3700,6 +3700,7 @@ export type Database = {
           first_name: string
           id: string
           is_credit_approved: boolean
+          is_verified: boolean
           is_supplier: boolean
           last_name: string | null
           last_repayment_amount: number | null
@@ -3732,6 +3733,7 @@ export type Database = {
           first_name: string
           id?: string
           is_credit_approved?: boolean
+          is_verified?: boolean
           is_supplier?: boolean
           last_name?: string | null
           last_repayment_amount?: number | null
@@ -3764,6 +3766,7 @@ export type Database = {
           first_name?: string
           id?: string
           is_credit_approved?: boolean
+          is_verified?: boolean
           is_supplier?: boolean
           last_name?: string | null
           last_repayment_amount?: number | null
@@ -7311,6 +7314,12 @@ export type Database = {
       }
       outbox: {
         Row: {
+          document_request_key: string | null
+          document_requested_by: string | null
+          document_delivery_state: string | null
+          document_claim_token: string | null
+          document_lease_until: string | null
+          provider_message_id: string | null
           attempts: number
           body: string
           campaign_id: string | null
@@ -7348,6 +7357,12 @@ export type Database = {
           template_version: number | null
         }
         Insert: {
+          document_request_key?: string | null
+          document_requested_by?: string | null
+          document_delivery_state?: string | null
+          document_claim_token?: string | null
+          document_lease_until?: string | null
+          provider_message_id?: string | null
           attempts?: number
           body: string
           campaign_id?: string | null
@@ -7385,6 +7400,12 @@ export type Database = {
           template_version?: number | null
         }
         Update: {
+          document_request_key?: string | null
+          document_requested_by?: string | null
+          document_delivery_state?: string | null
+          document_claim_token?: string | null
+          document_lease_until?: string | null
+          provider_message_id?: string | null
           attempts?: number
           body?: string
           campaign_id?: string | null
@@ -14303,6 +14324,11 @@ export type Database = {
       }
     }
     Functions: {
+      lookup_receipt_contact: { Args: { p_phone: string }; Returns: Json }
+      sale_document_context: { Args: { p_order_id: string }; Returns: Json }
+      request_sale_document: { Args: { p_order_id: string; p_request_key: string; p_phone?: string; p_first_name?: string; p_last_name?: string }; Returns: Json }
+      correct_receipt_customer_phone: { Args: { p_customer_id: string; p_phone: string; p_expected_updated_at: string }; Returns: Json }
+      complete_receipt_customer_profile: { Args: { p_customer_id: string; p_profile: Json }; Returns: string }
       accept_cash_custody_remittance: {
         Args: { p_remittance_id: string }
         Returns: Json

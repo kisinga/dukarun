@@ -1,3 +1,4 @@
+import { SaleDocumentService } from '../../communications/sale-document.service';
 import { cartLineId } from '../cart.service';
 import { sellingUnits } from '@dukarun/pack-types';
 import { Injectable, OnDestroy, computed, effect, inject, signal, untracked } from '@angular/core';
@@ -62,6 +63,7 @@ export interface SellWorkflowInit {
  */
 @Injectable()
 export class SellWorkflowStore implements OnDestroy {
+  private readonly saleDocuments = inject(SaleDocumentService);
   readonly cart = inject(CartService);
   readonly connectivity = inject(ConnectivityService);
   readonly sync = inject(SyncService);
@@ -670,6 +672,7 @@ export class SellWorkflowStore implements OnDestroy {
     this.busyState.set(true);
     const customerId = this.cart.customerId();
     const lines = this.cart.toSaleLines();
+    const saleTotal = this.cart.total();
     const fulfillmentDraft = this.currentFulfillmentDraft();
     if (this.fulfillmentMode() !== 'counter' && !fulfillmentDraft) {
       this.busyState.set(false);
@@ -814,6 +817,7 @@ export class SellWorkflowStore implements OnDestroy {
           tone: 'success',
           orderId: result.orderId,
         });
+        this.saleDocuments.offerCompleted(result.orderId, result.status, saleTotal);
       }
     } catch (err) {
       if (!(err instanceof PosRpcError) && !settlement) {
@@ -933,6 +937,7 @@ export class SellWorkflowStore implements OnDestroy {
   }
 
   private finishMpesaSale(orderId: string, warning = false): void {
+    const saleTotal = this.cart.total();
     this.checkoutOpenState.set(false);
     this.cart.clear();
     this.saleAttempt = null;
@@ -944,6 +949,7 @@ export class SellWorkflowStore implements OnDestroy {
       tone: warning ? 'warning' : 'success',
       orderId,
     });
+    if (!warning) this.saleDocuments.offerCompleted(orderId, 'completed', saleTotal);
   }
 
   private async refreshCustomerDeposit(customerId: string): Promise<void> {
@@ -1032,6 +1038,7 @@ export class SellWorkflowStore implements OnDestroy {
           );
       const presentedDecision = this.creditDecision();
       const presentedCreditAmount = this.automaticCreditAmount();
+      this.saleDocuments.offerCompleted(result.orderId, result.status, this.cart.total());
       this.cart.clear();
       this.saleAttempt = null;
       this.selectedCustomerState.set(null);

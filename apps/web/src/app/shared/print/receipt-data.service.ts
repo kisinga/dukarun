@@ -4,6 +4,7 @@ import { Injectable, inject } from '@angular/core';
 import { CatalogIdentityLookupService } from '../../core/identity-lookup.services';
 import { SupabaseService } from '../../core/supabase.service';
 import { PosService, variantLabel } from '../../pos/pos.service';
+import type { SaleDocumentContext } from '../../communications/sale-document.service';
 import { ProfileService } from '../../profile/profile.service';
 import type { OrderData, PrintMeta, PurchaseData } from './print-data';
 
@@ -21,6 +22,7 @@ export interface CompanyPrintInfo {
   showVatBreakdown: boolean;
   vatRegistered: boolean;
   taxRegistrationNumber: string | null;
+  businessTimezone?: string;
 }
 
 const METHOD_LABELS: Record<string, string> = {
@@ -71,7 +73,7 @@ export class ReceiptDataService {
       this.db
         .from('companies')
         .select(
-          'name, code, address, email, public_whatsapp_number, website_url, document_designs, logo_path, enable_printer, show_vat_breakdown_on_prints'
+          'name, code, address, email, public_whatsapp_number, website_url, document_designs, logo_path, enable_printer, show_vat_breakdown_on_prints, business_timezone'
         )
         .limit(1)
         .single(),
@@ -102,6 +104,7 @@ export class ReceiptDataService {
     const logoPath = data.logo_path;
     this.settings = {
       name: data.name,
+      businessTimezone: data.business_timezone,
       code: data.code,
       logoUrl: logoPath
         ? logoPath.startsWith('http')
@@ -140,6 +143,16 @@ export class ReceiptDataService {
     return this.buildOrderDocumentData(orderId, 'receipt');
   }
 
+  async buildInvoiceData(orderId: string): Promise<{ order: OrderData; meta: PrintMeta }> {
+    return this.buildOrderDocumentData(orderId, 'invoice');
+  }
+
+  /** Select the saved design from authoritative settlement, including credit and reversals. */
+  async buildSaleDocumentData(orderId: string): Promise<{ order: OrderData; meta: PrintMeta }> {
+    const financials = await this.saleContext(orderId);
+    return this.buildOrderDocumentData(orderId, financials.document_type, financials);
+  }
+
   /** Proformas remain printable, but only as explicitly labeled draft documents. */
   async buildProformaData(orderId: string): Promise<{ order: OrderData; meta: PrintMeta }> {
     return this.buildOrderDocumentData(orderId, 'proforma');
@@ -148,7 +161,8 @@ export class ReceiptDataService {
   /** Order + lines (labeled via variant_catalog) + payments + customer → OrderData. */
   private async buildOrderDocumentData(
     orderId: string,
-    documentType: 'receipt' | 'proforma'
+    documentType: 'receipt' | 'invoice' | 'proforma',
+    context?: SaleDocumentContext
   ): Promise<{ order: OrderData; meta: PrintMeta }> {
     const [order, lines, payments, company, taxDocument, servedBy] = await Promise.all([
       this.pos.getOrder(orderId),
@@ -161,17 +175,24 @@ export class ReceiptDataService {
         .eq('source_order_id', orderId)
         .eq('document_kind', 'invoice')
         .maybeSingle(),
-      documentType === 'receipt' ? this.currentStaffFirstName() : Promise.resolve(undefined),
+      documentType !== 'proforma' ? this.currentStaffFirstName() : Promise.resolve(undefined),
     ]);
     if (taxDocument.error) throw taxDocument.error;
-    if (documentType === 'receipt' && order.status !== 'completed') {
+    if (documentType !== 'proforma' && order.status !== 'completed') {
       throw new Error('Receipt unavailable — complete payment before printing.');
     }
     if (documentType === 'proforma' && order.status !== 'draft') {
       throw new Error('This order is no longer a draft, so its proforma cannot be printed.');
     }
+    const financials =
+      documentType !== 'proforma' ? (context ?? (await this.saleContext(orderId))) : undefined;
+    if (documentType !== 'proforma' && !financials) throw new Error('Sale balance unavailable.');
+    if (documentType === 'receipt' && financials!.balance > 0)
+      throw new Error('This sale has an open balance. Print its invoice instead.');
+    if (documentType === 'invoice' && (!order.is_credit_sale || financials!.balance <= 0))
+      throw new Error('This sale is fully paid. Print its receipt instead.');
     const estimate =
-      order.tax_snapshot_status === 'pending'
+      order.status !== 'completed' && order.tax_snapshot_status === 'pending'
         ? await this.db.rpc('estimate_order_tax', { p_order_id: orderId })
         : null;
     if (estimate?.error) throw estimate.error;
@@ -232,6 +253,9 @@ export class ReceiptDataService {
       orderPlacedAt: order.created_at,
       total: order.total,
       totalWithTax: order.total,
+      paidAmount: financials?.paid,
+      openBalance: financials?.balance,
+      businessTimezone: company.businessTimezone,
       netTotal: estimatedTax?.net_total ?? order.net_total,
       taxTotal: estimatedTax?.tax_total ?? order.tax_total,
       taxDocumentNumber: taxDocument.data?.document_number ?? null,
@@ -289,9 +313,9 @@ export class ReceiptDataService {
       documentType,
       servedBy,
       showVatBreakdown: company.showVatBreakdown,
-      vatRegistered: documentType === 'receipt' ? !!taxDocument.data : company.vatRegistered,
+      vatRegistered: documentType !== 'proforma' ? !!taxDocument.data : company.vatRegistered,
       taxRegistrationNumber:
-        documentType === 'receipt'
+        documentType !== 'proforma'
           ? (taxDocument.data?.issuer_tax_registration_number ?? null)
           : company.taxRegistrationNumber,
       paymentMethodName:
@@ -304,6 +328,12 @@ export class ReceiptDataService {
             : 'N/A',
     };
     return { order: orderData, meta };
+  }
+
+  private async saleContext(orderId: string): Promise<SaleDocumentContext> {
+    const { data, error } = await this.db.rpc('sale_document_context', { p_order_id: orderId });
+    if (error) throw error;
+    return data as unknown as SaleDocumentContext;
   }
 
   private async currentStaffFirstName(): Promise<string | undefined> {

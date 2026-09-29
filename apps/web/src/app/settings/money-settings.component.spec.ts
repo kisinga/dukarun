@@ -157,6 +157,7 @@ describe('MoneySettingsComponent', () => {
       ),
     };
     const tax = {
+      watchSettings: vi.fn().mockReturnValue(() => {}),
       settings: vi.fn().mockResolvedValue({
         active_profile: null,
         scheduled_profiles: [],

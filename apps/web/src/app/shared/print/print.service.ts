@@ -51,7 +51,10 @@ export class PrintService {
     templateId?: PrintFormat
   ): Promise<void> {
     const documentType = printMeta?.documentType ?? 'receipt';
-    if (documentType === 'receipt' && order.state !== 'Fulfilled') {
+    if (
+      documentType === 'receipt' &&
+      (order.state !== 'Fulfilled' || (order.openBalance ?? 0) > 0)
+    ) {
       throw new Error('Receipt unavailable — complete payment before printing.');
     }
     const company = await this.receiptData.companyPrintInfo();

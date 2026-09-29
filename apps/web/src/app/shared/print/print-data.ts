@@ -9,6 +9,9 @@ export interface OrderData {
   orderPlacedAt?: string | null;
   total: number;
   totalWithTax: number;
+  paidAmount?: number;
+  openBalance?: number;
+  businessTimezone?: string;
   /** Immutable server snapshots for completed sales; estimates for proformas. */
   netTotal?: number;
   taxTotal?: number;

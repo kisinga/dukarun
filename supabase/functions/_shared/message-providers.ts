@@ -123,3 +123,55 @@ export async function sendWhatsappImage(
     'openwa'
   );
 }
+
+/** OpenWA retains attachments according to its own media retention policy. */
+export async function sendWhatsappDocument(
+  recipient: string,
+  bytes: Uint8Array,
+  filename: string,
+  caption: string
+): Promise<string> {
+  const baseUrl = Deno.env.get('OPENWA_BASE_URL');
+  const apiKey = Deno.env.get('OPENWA_API_KEY');
+  const session = Deno.env.get('OPENWA_SESSION') ?? 'default';
+  if (!baseUrl || !apiKey) throw new DeliveryError('provider_not_configured: openwa', true, false);
+  if (bytes.length > 5_000_000 || !filename.endsWith('.pdf') || caption.length > 1024)
+    throw new DeliveryError('invalid_document_payload', true, false);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += 8192)
+    binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
+  // A timeout or 5xx can happen after the gateway has handed the document to WhatsApp.
+  // Only definite rejection (e.g. rate limiting) is safe to retry automatically.
+  let response: Response;
+  try {
+    response = await fetch(
+      `${baseUrl}/api/sessions/${encodeURIComponent(session)}/messages/send-document`,
+      {
+        method: 'POST',
+        signal: AbortSignal.timeout(45_000),
+        headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
+        body: JSON.stringify({
+          chatId: `${kePhone(recipient)}@c.us`,
+          base64: btoa(binary),
+          mimetype: 'application/pdf',
+          filename,
+          caption,
+        }),
+      }
+    );
+  } catch (error) {
+    if (error instanceof DeliveryError) throw error;
+    throw new DeliveryError('provider_acceptance_unknown', false, true);
+  }
+  if (!response.ok)
+    throw new DeliveryError(
+      `openwa_document_http_${response.status}`,
+      response.status >= 400 && response.status < 500 && ![408, 429].includes(response.status),
+      response.status >= 500 || response.status === 408
+    );
+  const result = await response.json().catch(() => null);
+  const messageId = result?.messageId ?? result?.data?.messageId;
+  if (typeof messageId !== 'string' || !messageId)
+    throw new DeliveryError('provider_acceptance_unknown', false, true);
+  return messageId;
+}

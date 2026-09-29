@@ -3,11 +3,17 @@ import type { DocumentDesign, DocumentKind, PaperFormat } from './config';
 
 export const documentMoney = (amount: number, currency = 'KES'): string =>
   `${currency} ${new Intl.NumberFormat('en-KE', { maximumFractionDigits: 2 }).format(amount)}`;
-export function documentDate(value: string): string {
+export function documentDate(value: string, timeZone = 'Africa/Nairobi'): string {
   const date = new Date(value);
   return Number.isNaN(date.getTime())
     ? value
-    : date.toLocaleDateString('en-KE', { year: 'numeric', month: 'short', day: 'numeric' });
+    : date.toLocaleDateString('en-KE', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        // Calendar dates are already local dates; only instants require conversion.
+        timeZone: /^\d{4}-\d{2}-\d{2}$/.test(value) ? 'UTC' : timeZone,
+      });
 }
 export interface StatementRow {
   id: string;
@@ -82,6 +88,7 @@ export function statementContent(data: StatementInput): DocumentContent {
   };
 }
 export interface ExternalDocumentInput {
+  business_timezone?: string;
   document_design?: DocumentDesign | null;
   document_type: 'receipt' | 'invoice' | 'proforma' | 'purchase_order';
   document_number: string;
@@ -147,12 +154,12 @@ export function externalDocumentContent(
     title: vat && (kind === 'invoice' || kind === 'receipt') ? 'VAT Invoice' : undefined,
     reference: data.tax_document_number || data.document_number,
     metadata: [
-      { label: 'Date', value: documentDate(data.issue_date) },
+      { label: 'Date', value: documentDate(data.issue_date, data.business_timezone) },
       { label: kind === 'purchase-order' ? 'Supplier' : 'Customer', value: data.party_name },
       { label: 'Status', value: data.status },
       {
         label: kind === 'proforma' ? 'Valid until' : 'Due',
-        value: data.valid_until ? documentDate(data.valid_until) : '',
+        value: data.valid_until ? documentDate(data.valid_until, data.business_timezone) : '',
       },
     ],
     sections: [
@@ -183,7 +190,7 @@ export function externalDocumentContent(
               rows: data.payments.map(p => [
                 p.method,
                 p.reference ?? '',
-                documentDate(p.date),
+                documentDate(p.date, data.business_timezone),
                 documentMoney(p.amount),
               ]),
             },

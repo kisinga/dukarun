@@ -55,6 +55,9 @@ describe('shared shop profile form', () => {
     const file = new File(['<svg xmlns="http://www.w3.org/2000/svg"/>'], 'logo.svg', {
       type: 'image/svg+xml',
     });
+    Object.defineProperty(file, 'text', {
+      value: async () => '<svg xmlns="http://www.w3.org/2000/svg"/>',
+    });
     store.uploadLogo.mockRejectedValueOnce(new Error('Upload interrupted'));
     await component.selectLogo({
       target: { files: [file], value: 'logo.svg' },
@@ -65,5 +68,29 @@ describe('shared shop profile form', () => {
     expect(store.uploadLogo).toHaveBeenCalledTimes(2);
     expect(component.pendingLogo).toBeNull();
     expect(store.uploadLogo).toHaveBeenLastCalledWith(file, 'svg');
+  });
+  it('rejects external SVG images before saving a logo that cannot render on receipts', async () => {
+    const { component, store } = await render();
+    const svg =
+      '<svg xmlns="http://www.w3.org/2000/svg"><image href="https://example.test/logo.png"/></svg>';
+    const file = new File([svg], 'logo.svg', { type: 'image/svg+xml' });
+    Object.defineProperty(file, 'text', { value: async () => svg });
+    await component.selectLogo({
+      target: { files: [file], value: 'logo.svg' },
+    } as unknown as Event);
+    expect(store.uploadLogo).not.toHaveBeenCalled();
+    expect(component.logoError()).toContain('embedded PNG or JPEG');
+  });
+  it('accepts local SVG filters using the receipt rendering policy', async () => {
+    const { component, store } = await render();
+    const svg =
+      '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><defs><filter id="shadow"><feGaussianBlur stdDeviation="1"/></filter></defs><rect width="40" height="40" filter="url(#shadow)"/></svg>';
+    const file = new File([svg], 'logo.svg', { type: 'image/svg+xml' });
+    Object.defineProperty(file, 'text', { value: async () => svg });
+    await component.selectLogo({
+      target: { files: [file], value: 'logo.svg' },
+    } as unknown as Event);
+    expect(component.logoError()).toBeNull();
+    expect(store.uploadLogo).toHaveBeenCalledWith(file, 'svg');
   });
 });

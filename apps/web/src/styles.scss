@@ -214,7 +214,7 @@ input.search-with-custom-clear::-ms-clear {
   /* Short, reversible decisions belong in a content-height phone sheet, not a full task modal. */
   .modal-box.modal-box-compact {
     height: auto;
-    max-height: 92dvh;
+    max-height: min(92dvh, var(--modal-visual-height, 92dvh));
     width: 100%;
     max-width: 100%;
     border-radius: var(--radius-box) var(--radius-box) 0 0;

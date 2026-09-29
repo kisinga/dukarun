@@ -1,3 +1,5 @@
+import { SaleDocumentModalComponent } from '../../communications/sale-document-modal.component';
+import { SaleDocumentService } from '../../communications/sale-document.service';
 import { SellingUnitDialogComponent } from './selling-unit-dialog.component';
 import { Component, OnInit, computed, effect, inject, untracked, viewChild } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
@@ -57,6 +59,7 @@ import { CreditDecisionCardComponent } from '../../insights/credit-decision-card
   selector: 'app-sell',
   providers: [SellCatalogStore, SellWorkflowStore],
   imports: [
+    SaleDocumentModalComponent,
     SellingUnitDialogComponent,
     ReactiveFormsModule,
     CheckoutPanelComponent,
@@ -75,6 +78,7 @@ import { CreditDecisionCardComponent } from '../../insights/credit-decision-card
     CreditDecisionCardComponent,
   ],
   template: `
+    <app-sale-document-modal />
     @if (catalog.unitSelection(); as selection) {
       <app-selling-unit-dialog
         [variant]="selection.variant"
@@ -139,7 +143,7 @@ import { CreditDecisionCardComponent } from '../../insights/credit-decision-card
           [draftId]="cart.draftId()"
           [draftFlags]="draftFlags()"
           [draftFlagsDismissed]="draftFlagsDismissed()"
-          [printerEnabled]="printerEnabled()"
+          [printerEnabled]="true"
           [busy]="busy()"
           [printFormat]="print.format()"
           [printTemplates]="print.getAvailableTemplates()"
@@ -448,6 +452,7 @@ import { CreditDecisionCardComponent } from '../../insights/credit-decision-card
   `,
 })
 export class SellComponent implements OnInit {
+  protected readonly saleDocuments = inject(SaleDocumentService);
   protected readonly workflow = inject(SellWorkflowStore);
   private readonly route = inject(ActivatedRoute);
   protected readonly cart = this.workflow.cart;
@@ -616,7 +621,7 @@ export class SellComponent implements OnInit {
   }
 
   protected async printReceipt(orderId: string): Promise<void> {
-    await this.workflow.printReceipt(orderId);
+    this.saleDocuments.open(orderId);
   }
 
   protected newSale(): void {

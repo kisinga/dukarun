@@ -6,7 +6,7 @@ import {
   type PaperFormat,
 } from '@dukarun/documents';
 import type { OrderData, PrintMeta, PurchaseData } from './print-data';
-function documentTimestamp(value: string): string {
+function documentTimestamp(value: string, timeZone = 'Africa/Nairobi'): string {
   const date = new Date(value);
   return Number.isNaN(date.getTime())
     ? value
@@ -16,6 +16,7 @@ function documentTimestamp(value: string): string {
         day: 'numeric',
         hour: '2-digit',
         minute: '2-digit',
+        timeZone,
       });
 }
 function itemName(variant: OrderData['lines'][number]['productVariant']): string {
@@ -55,6 +56,12 @@ export function orderDocumentContent(
       totals.push({ label: 'VAT', value: money(order.taxTotal ?? 0) });
   }
   totals.push({ label: 'Total', value: money(order.totalWithTax), prominent: true });
+  if (['receipt', 'invoice'].includes(kind) && order.openBalance !== undefined) {
+    totals.push(
+      { label: 'Paid', value: money(order.paidAmount ?? 0) },
+      { label: 'Balance', value: money(order.openBalance) }
+    );
+  }
   const showPayment = kind !== 'proforma' && kind !== 'cashier-slip';
   const sheet = paper === 'a4';
   const status: Record<string, string> = {
@@ -72,7 +79,10 @@ export function orderDocumentContent(
     title: vat && ['receipt', 'invoice'].includes(kind) ? 'VAT Invoice' : undefined,
     reference: order.code,
     metadata: [
-      { label: 'Date', value: documentTimestamp(order.orderPlacedAt ?? order.createdAt) },
+      {
+        label: 'Date',
+        value: documentTimestamp(order.orderPlacedAt ?? order.createdAt, order.businessTimezone),
+      },
       {
         label: 'Customer',
         value: order.customer
@@ -101,7 +111,10 @@ export function orderDocumentContent(
       },
       {
         label: 'Valid until',
-        value: kind === 'proforma' && order.expiresAt ? documentTimestamp(order.expiresAt) : '',
+        value:
+          kind === 'proforma' && order.expiresAt
+            ? documentTimestamp(order.expiresAt, order.businessTimezone)
+            : '',
       },
       { label: 'Payment', value: showPayment ? (meta?.paymentMethodName ?? 'N/A') : '' },
       { label: 'Served by', value: showPayment ? (meta?.servedBy ?? '') : '' },
@@ -111,7 +124,13 @@ export function orderDocumentContent(
           kind === 'cashier-slip' && !order.code.startsWith('TILL-')
             ? 'PAY AT CASHIER'
             : sheet
-              ? (status[order.state] ?? order.state)
+              ? order.openBalance !== undefined
+                ? order.openBalance === 0
+                  ? 'Paid'
+                  : (order.paidAmount ?? 0) > 0
+                    ? 'Partially paid'
+                    : 'Unpaid'
+                : (status[order.state] ?? order.state)
               : '',
       },
     ],

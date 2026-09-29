@@ -4,6 +4,7 @@ import { CompanySettingsStore } from './company-settings.store';
 import { ButtonComponent } from '../shared/ui/button.component';
 import { FormFieldComponent } from '../shared/ui/form-field.component';
 import { imageExtension, resizeImage } from '../shared/ui/image.util';
+import { MAX_LOGO_BYTES, validateSvgLogo } from '@dukarun/documents';
 
 /** The same saved identity form is used in Business settings and first setup. */
 @Component({
@@ -213,7 +214,7 @@ export class ShopProfileComponent implements OnInit {
     input.value = '';
     if (!file) return;
     if (
-      file.size > 2 * 1024 * 1024 ||
+      file.size > MAX_LOGO_BYTES ||
       !['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml'].includes(file.type)
     ) {
       this.logoError.set('Choose a JPEG, PNG, WebP or SVG of 2 MB or smaller.');
@@ -229,6 +230,7 @@ export class ShopProfileComponent implements OnInit {
     this.logoError.set(null);
     try {
       const svg = file.type === 'image/svg+xml';
+      if (svg) validateSvgLogo(await file.text());
       await this.store.uploadLogo(
         svg ? file : await resizeImage(file, 400),
         svg ? 'svg' : imageExtension(file)
@@ -236,7 +238,11 @@ export class ShopProfileComponent implements OnInit {
       this.pendingLogo = null;
     } catch (e) {
       this.logoError.set(
-        e instanceof Error ? e.message : 'Upload failed. Retry to upload the same file.'
+        e instanceof Error && ['unsupported_svg_logo', 'logo_pixel_limit'].includes(e.message)
+          ? 'Use an SVG with local effects and embedded PNG or JPEG images, or upload a PNG, JPEG or WebP logo.'
+          : e instanceof Error
+            ? e.message
+            : 'Upload failed. Retry to upload the same file.'
       );
     } finally {
       this.logoBusy.set(false);
