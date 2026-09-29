@@ -2504,7 +2504,7 @@ export class CustomersComponent implements OnInit {
       const visitedCursors = new Set<string>();
       while (hasMore) {
         const cursor = rows[rows.length - 1];
-        if (!cursor) break;
+        if (!cursor) throw new Error('The complete statement could not be loaded.');
         const cursorKey = `${cursor.date}:${cursor.id}`;
         if (visitedCursors.has(cursorKey)) {
           throw new Error('Statement preparation stopped because pagination did not advance.');
@@ -2523,14 +2523,11 @@ export class CustomersComponent implements OnInit {
         rows.push(...page.rows);
         hasMore = page.hasMore;
       }
-      const company = this.companyInfo() ?? (await this.receiptData.companyPrintInfo());
+      const company = await this.receiptData.companyPrintInfo();
       if (this.selectedCustomerId() !== customerId || sequence !== this.statementSequence) return;
       const rendered = renderCustomerStatement({
-        company: {
-          name: company.name,
-          address: company.address,
-          logoUrl: company.logoUrl,
-        },
+        company,
+        design: company.documentDesigns?.statement,
         customerName: this.name(customer),
         currency: 'KES',
         generatedAt: new Date().toISOString(),

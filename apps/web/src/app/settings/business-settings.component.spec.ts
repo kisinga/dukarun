@@ -1,3 +1,5 @@
+import { By } from '@angular/platform-browser';
+import { ShopProfileComponent } from './shop-profile.component';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { describe, expect, it, vi } from 'vitest';
@@ -89,7 +91,8 @@ describe('BusinessSettingsComponent', () => {
   it('saves through the settings service contract and marks the form clean', async () => {
     const { fixture, settingsService } = await render();
     const root = fixture.nativeElement as HTMLElement;
-    const component = fixture.componentInstance as any;
+    const component = fixture.debugElement.query(By.directive(ShopProfileComponent))
+      .componentInstance as ShopProfileComponent;
 
     component.name.setValue('Dukarun Market');
     component.name.markAsDirty();
@@ -103,7 +106,7 @@ describe('BusinessSettingsComponent', () => {
     );
     fixture.detectChanges();
 
-    expect(root.textContent).toContain('Saved');
+    expect(root.textContent).toContain('Shop details saved.');
     expect(root.textContent).not.toContain('Unsaved changes');
   });
 });

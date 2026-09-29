@@ -1,3 +1,4 @@
+import type { DocumentDesign } from '@dukarun/documents';
 import {
   Injectable,
   PLATFORM_ID,
@@ -95,6 +96,10 @@ interface ApiProductResponse {
   };
 }
 export interface CustomerStatement {
+  company_address?: string | null;
+  company_email?: string | null;
+  company_website?: string | null;
+  document_design?: DocumentDesign | null;
   store_name: string;
   logo_path: string | null;
   whatsapp_number: string | null;
@@ -134,6 +139,9 @@ export interface ExternalDocumentPayment {
   date: string;
 }
 export interface ExternalDocument {
+  company_email?: string | null;
+  company_website?: string | null;
+  document_design?: DocumentDesign | null;
   document_type: 'receipt' | 'invoice' | 'proforma' | 'purchase_order';
   document_number: string;
   company_name: string;

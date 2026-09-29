@@ -78,6 +78,9 @@ try {
         throw error;
       }
     );
+  // The server can reject the post before the closer's COMMIT response arrives.
+  // Observe that rejection immediately; the assertion below still awaits it.
+  void blockedPost.catch(() => undefined);
 
   await delay(150);
   if (postSettled) throw new Error('Journal post did not wait for the period close lock');

@@ -697,6 +697,23 @@ input.search-with-custom-clear::-ms-clear {
     max-width: 80rem; // max-w-7xl
   }
 
+  // Designer uses the space below the shell navbar. The two panes scroll independently,
+  // leaving its header, sample and save actions in view without scroll synchronization.
+  @media (min-width: 1024px) {
+    app-document-designer .dashboard-main {
+      min-height: 0;
+    }
+    app-document-designer .page {
+      height: calc(100dvh - 3.5rem);
+      display: flex;
+      flex-direction: column;
+      padding-block: 1rem;
+    }
+    app-document-designer app-page-header {
+      flex-shrink: 0;
+    }
+  }
+
   /* Responsive page actions: secondary actions collapse into one phone menu. */
   .page-actions-overflow {
     position: absolute;

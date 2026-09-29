@@ -1699,6 +1699,7 @@ export type Database = {
           customer_payment_instructions: string | null
           default_reorder_lead_days: number
           default_reorder_safety_days: number
+          document_designs: Json
           email: string | null
           enable_printer: boolean
           id: string
@@ -1720,6 +1721,7 @@ export type Database = {
           public_storefront_enabled: boolean
           public_whatsapp_number: string | null
           require_opening_count: boolean
+          shop_setup: Json
           show_vat_breakdown_on_prints: boolean
           sms_period_end: string | null
           sms_reserved_this_period: number
@@ -1737,6 +1739,7 @@ export type Database = {
           subscription_tier_id: string | null
           updated_at: string
           variance_notification_threshold: number
+          website_url: string | null
           whatsapp_reserved_this_period: number
           whatsapp_used_this_period: number
         }
@@ -1759,6 +1762,7 @@ export type Database = {
           customer_payment_instructions?: string | null
           default_reorder_lead_days?: number
           default_reorder_safety_days?: number
+          document_designs?: Json
           email?: string | null
           enable_printer?: boolean
           id?: string
@@ -1780,6 +1784,7 @@ export type Database = {
           public_storefront_enabled?: boolean
           public_whatsapp_number?: string | null
           require_opening_count?: boolean
+          shop_setup?: Json
           show_vat_breakdown_on_prints?: boolean
           sms_period_end?: string | null
           sms_reserved_this_period?: number
@@ -1797,6 +1802,7 @@ export type Database = {
           subscription_tier_id?: string | null
           updated_at?: string
           variance_notification_threshold?: number
+          website_url?: string | null
           whatsapp_reserved_this_period?: number
           whatsapp_used_this_period?: number
         }
@@ -1819,6 +1825,7 @@ export type Database = {
           customer_payment_instructions?: string | null
           default_reorder_lead_days?: number
           default_reorder_safety_days?: number
+          document_designs?: Json
           email?: string | null
           enable_printer?: boolean
           id?: string
@@ -1840,6 +1847,7 @@ export type Database = {
           public_storefront_enabled?: boolean
           public_whatsapp_number?: string | null
           require_opening_count?: boolean
+          shop_setup?: Json
           show_vat_breakdown_on_prints?: boolean
           sms_period_end?: string | null
           sms_reserved_this_period?: number
@@ -1857,6 +1865,7 @@ export type Database = {
           subscription_tier_id?: string | null
           updated_at?: string
           variance_notification_threshold?: number
+          website_url?: string | null
           whatsapp_reserved_this_period?: number
           whatsapp_used_this_period?: number
         }
@@ -17939,6 +17948,10 @@ export type Database = {
         Args: { p_customer_id?: string; p_profile: Json }
         Returns: string
       }
+      save_document_design: {
+        Args: { p_design: Json; p_document_type: string }
+        Returns: Json
+      }
       save_draft: {
         Args: { p_customer_id: string; p_draft_id?: string; p_lines: Json }
         Returns: string
@@ -18053,6 +18066,7 @@ export type Database = {
         }
         Returns: string
       }
+      save_shop_setup: { Args: { p_patch: Json }; Returns: Json }
       save_variant_packs: {
         Args: { p_packs: Json; p_stock_unit: string; p_variant_id: string }
         Returns: undefined
@@ -18196,6 +18210,7 @@ export type Database = {
         }
         Returns: string
       }
+      shop_address_availability: { Args: { p_slug: string }; Returns: Json }
       sign_off_business_day: {
         Args: { p_business_date: string }
         Returns: string

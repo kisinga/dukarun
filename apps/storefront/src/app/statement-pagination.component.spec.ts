@@ -1,3 +1,4 @@
+import { DocumentViewComponent } from './document-view.component';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute } from '@angular/router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -122,7 +123,7 @@ describe('StatementComponent pagination', () => {
       companyLogoUrl: vi.fn().mockReturnValue(null),
       legalUrl: vi.fn((path: string) => `https://dukarun.test/${path}`),
     };
-    const print = vi.spyOn(window, 'print').mockImplementation(() => undefined);
+    const print = vi.spyOn(DocumentViewComponent.prototype, 'print').mockResolvedValue(undefined);
     await TestBed.configureTestingModule({
       imports: [StatementComponent],
       providers: [
@@ -151,13 +152,10 @@ describe('StatementComponent pagination', () => {
     const screenActivity = fixture.nativeElement.querySelector(
       '.statement-activity-screen'
     ) as HTMLElement;
-    const printActivity = fixture.nativeElement.querySelector(
-      '.statement-activity-print'
-    ) as HTMLElement;
+    const rendered = (fixture.componentInstance as any).documentPreview();
     expect(screenActivity.textContent).not.toContain('Opening credit sale');
-    expect(printActivity.textContent).toContain('Opening credit sale');
-    expect(printActivity.textContent.indexOf('SALE-1')).toBeLessThan(
-      printActivity.textContent.indexOf('SALE-2')
-    );
+    expect(rendered.html).toContain('Opening credit sale');
+    expect(rendered.html.indexOf('SALE-1')).toBeLessThan(rendered.html.indexOf('SALE-2'));
+    expect(rendered.html).toContain('On delivery');
   });
 });

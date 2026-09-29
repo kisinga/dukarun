@@ -1,10 +1,11 @@
+import type { DocumentDesigns } from '@dukarun/documents';
 import { transactionUnitLabel } from '@dukarun/pack-types';
 import { Injectable, inject } from '@angular/core';
 import { CatalogIdentityLookupService } from '../../core/identity-lookup.services';
 import { SupabaseService } from '../../core/supabase.service';
 import { PosService, variantLabel } from '../../pos/pos.service';
 import { ProfileService } from '../../profile/profile.service';
-import type { OrderData, PrintMeta, PurchaseData } from './print-templates';
+import type { OrderData, PrintMeta, PurchaseData } from './print-data';
 
 export interface CompanyPrintInfo {
   name: string;
@@ -12,6 +13,10 @@ export interface CompanyPrintInfo {
   /** Full public URL: kept as-is when logo_path is absolute, resolved from the company-logos bucket otherwise. */
   logoUrl: string | null;
   address: string | null;
+  email?: string | null;
+  phone?: string | null;
+  website?: string | null;
+  documentDesigns?: DocumentDesigns;
   printerEnabled: boolean;
   showVatBreakdown: boolean;
   vatRegistered: boolean;
@@ -55,20 +60,25 @@ export class ReceiptDataService {
   }
 
   private settings: CompanyPrintInfo | null = null;
+  private settingsRevision = 0;
 
   /** Company branding + printer flag (cached per app run). */
   async companyPrintInfo(): Promise<CompanyPrintInfo> {
     if (this.settings) return this.settings;
+    const revision = this.settingsRevision;
     const [{ data, error }, { data: taxSettings, error: taxError }] = await Promise.all([
       this.db
         .from('companies')
-        .select('name, code, address, logo_path, enable_printer, show_vat_breakdown_on_prints')
+        .select(
+          'name, code, address, email, public_whatsapp_number, website_url, document_designs, logo_path, enable_printer, show_vat_breakdown_on_prints'
+        )
         .limit(1)
         .single(),
       this.db.rpc('company_tax_settings'),
     ]);
     if (error) throw error;
     if (taxError) throw taxError;
+    if (revision !== this.settingsRevision) return this.companyPrintInfo();
     const activeProfile = (
       taxSettings as {
         active_profile?: {
@@ -87,6 +97,10 @@ export class ReceiptDataService {
           : this.db.storage.from('company-logos').getPublicUrl(logoPath).data.publicUrl
         : null,
       address: data.address,
+      email: data.email,
+      phone: data.public_whatsapp_number,
+      website: data.website_url,
+      documentDesigns: data.document_designs as unknown as DocumentDesigns,
       printerEnabled: data.enable_printer,
       showVatBreakdown: data.show_vat_breakdown_on_prints,
       vatRegistered: activeProfile?.vat_registered ?? false,
@@ -97,6 +111,7 @@ export class ReceiptDataService {
 
   /** Drop the cached settings so the next print reflects new branding (logo/name/address). */
   invalidateCompanyInfo(): void {
+    this.settingsRevision++;
     this.settings = null;
   }
 
@@ -130,7 +145,7 @@ export class ReceiptDataService {
       this.companyPrintInfo(),
       this.db
         .from('tax_documents')
-        .select('document_number')
+        .select('document_number, issuer_tax_registration_number')
         .eq('source_order_id', orderId)
         .eq('document_kind', 'invoice')
         .maybeSingle(),
@@ -262,8 +277,11 @@ export class ReceiptDataService {
       documentType,
       servedBy,
       showVatBreakdown: company.showVatBreakdown,
-      vatRegistered: company.vatRegistered,
-      taxRegistrationNumber: company.taxRegistrationNumber,
+      vatRegistered: documentType === 'receipt' ? !!taxDocument.data : company.vatRegistered,
+      taxRegistrationNumber:
+        documentType === 'receipt'
+          ? (taxDocument.data?.issuer_tax_registration_number ?? null)
+          : company.taxRegistrationNumber,
       paymentMethodName:
         payments.length > 0
           ? [...new Set(payments.map(p => METHOD_LABELS[p.method_code] ?? p.method_code))].join(
