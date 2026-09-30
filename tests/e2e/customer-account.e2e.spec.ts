@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '../fixtures/mocked-browser';
+import { mockCashierSession } from '../fixtures/cashier-session';
 
 const companyId = '93000000-0000-4000-8000-000000000001';
 const userId = '93000000-0000-4000-8000-000000000002';
@@ -33,6 +34,12 @@ const customer = {
 };
 
 const variant = {
+  catalogue_version: {
+    product: '2026-09-29T00:00:00Z',
+    variant: '2026-09-29T00:00:00Z',
+    pack: null,
+  },
+  packs: [],
   variant_id: variantId,
   variant_name: 'Default',
   product_id: productId,
@@ -366,6 +373,7 @@ async function authenticateAccountUser(page: Page): Promise<{
     if (path.includes('/rest/v1/rpc/')) return json([]);
     return json([]);
   });
+  await mockCashierSession(page, { companyId, userId, locationId });
   return {
     creditRequest: () => postedCreditRequest,
     directSaleRequest: () => postedDirectSaleRequest,
@@ -387,7 +395,7 @@ test('direct checkout posts the cart and clears it only after completion', async
   await checkout.getByRole('button', { name: 'Exact' }).click();
   await checkout.getByRole('button', { name: 'Complete sale' }).click();
 
-  await expect(page.getByText('Sale completed')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Sale completed', exact: true })).toBeVisible();
   await expect(page.locator('#current-sale app-sell-cart-line')).toHaveCount(0);
   expect(capture.directSaleRequest()).toMatchObject({
     p_customer_id: null,
@@ -575,7 +583,7 @@ test('delivery credit checkout keeps a one-off address and suppresses milestone 
     .getByRole('button', { name: 'Confirm sale' })
     .click();
 
-  await expect(page.getByText(/Sale completed/)).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Sale completed', exact: true })).toBeVisible();
   const body = capture.fulfillmentCreditRequest() as {
     p_customer: Record<string, unknown>;
     p_fulfillment: Record<string, unknown>;
@@ -659,7 +667,13 @@ test('two customer rows fit without internal scrolling or clipped credit content
     expect(badgeBox.x).toBeGreaterThanOrEqual(cellBox.x);
     expect(badgeBox.x + badgeBox.width).toBeLessThanOrEqual(cellBox.x + cellBox.width);
     const header = page.locator('.data-table-header-viewport').first();
-    expect(await header.evaluate(element => element.scrollWidth - element.clientWidth)).toBe(0);
+    // Header widths follow ResizeObserver + requestAnimationFrame. Body CSS can
+    // already fit while the separate sticky header still has the previous width.
+    await expect
+      .poll(() => header.evaluate(element => element.scrollWidth - element.clientWidth), {
+        message: `Account header must finish resizing at ${width}px`,
+      })
+      .toBe(0);
   }
 });
 

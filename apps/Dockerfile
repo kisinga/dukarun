@@ -45,8 +45,8 @@ RUN case "$APP" in site|web|storefront|super-admin) ;; *) echo "APP must be site
 COPY scripts/generate-environment.mjs scripts/generate-environment.mjs
 COPY scripts/generate-site-seo-files.mjs scripts/generate-site-seo-files.mjs
 COPY scripts/generate-storefront-sitemap.mjs scripts/generate-storefront-sitemap.mjs
-COPY packages/shared-types packages/shared-types
-COPY packages/legal-markdown.ts packages/legal-markdown.ts
+# Keep the complete shared source tree: app tsconfig aliases also resolve here.
+COPY packages packages
 COPY apps/$APP apps/$APP
 
 ARG SUPABASE_URL

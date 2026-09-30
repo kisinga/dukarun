@@ -6,9 +6,16 @@ export default defineConfig({
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 2 : undefined,
-  reporter: process.env.CI ? [['line'], ['html', { open: 'never' }]] : 'line',
+  reporter: process.env.CI
+    ? [['line'], ['html', { open: 'never' }], ['json', { outputFile: 'test-results/results.json' }]]
+    : 'line',
   use: {
-    trace: { mode: 'retain-on-failure', screenshots: false },
+    // A missing/disabled control should fail on the same budget as an assertion,
+    // not consume the entire test timeout on every retry.
+    actionTimeout: 5000,
+    navigationTimeout: 30_000,
+    // Successful CI journeys need no DOM trace. A retry still captures diagnostics.
+    trace: { mode: process.env.CI ? 'on-first-retry' : 'retain-on-failure', screenshots: false },
     screenshot: 'off',
     video: 'off',
   },
