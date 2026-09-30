@@ -167,7 +167,7 @@ interface NavSection {
             </a>
 
             <!-- Global one-click till action -->
-            @if (perms.has('SettleOrder') && cashierSession.cashControlEnabled()) {
+            @if (perms.has('SettleOrder')) {
               <button
                 type="button"
                 appButton
@@ -202,7 +202,7 @@ interface NavSection {
                   @if (cashierSession.loading()) {
                     Checking till
                   } @else {
-                    {{ cashierSession.isOpen() ? 'Close till' : 'Open till' }}
+                    {{ cashierSession.isOpen() ? 'Close session' : 'Open session' }}
                   }
                 </span>
               </button>
@@ -280,7 +280,7 @@ interface NavSection {
         <!-- Page content -->
         <main
           [appListReturn]="listPage()"
-          [class.overflow-auto]="!listPage()"
+          [class.overflow-auto]="!listPage() && !documentScroll()"
           [class.list-scroll-page]="listPage()"
           class="flex-1 bg-base-200/40 pb-[calc(4rem+env(safe-area-inset-bottom,0px))] lg:pb-0"
         >
@@ -571,6 +571,12 @@ export class ShellComponent implements OnInit {
     let route = this.router.routerState.snapshot.root;
     while (route.firstChild) route = route.firstChild;
     return route.data['listPage'] === true;
+  });
+  protected readonly documentScroll = computed(() => {
+    this.navigation();
+    let route = this.router.routerState.snapshot.root;
+    while (route.firstChild) route = route.firstChild;
+    return route.data['documentScroll'] === true;
   });
   protected readonly theme = inject(ThemeService);
   protected readonly perms = inject(PermissionsService);

@@ -93,6 +93,8 @@ try {
        billing_cycle='yearly' where id=$1`,
     [companyId]
   );
+  // Financial posting requires a session even when cash control is disabled.
+  await asUser(clients[0], 'select testkit.ensure_open_session() result');
   await pool.query(
     `insert into public.customers(id,company_id,first_name,is_credit_approved,credit_limit)
      values($1,$4,'Receipt race',true,1000),($2,$4,'Sale race',true,1000),

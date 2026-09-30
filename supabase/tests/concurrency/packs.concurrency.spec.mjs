@@ -127,6 +127,14 @@ try {
   const saleDraftId = (
     await clients[0].query('select public.save_draft(null,$1::jsonb) id', [saleLines])
   ).rows[0].id;
+  // Capture before the competing transactions, as a client does before replay.
+  const offlineRequest = (
+    await clients[0].query(
+      "select testkit.offline_request($1,null,$2::jsonb,$3::jsonb,$4,clock_timestamp(),'pack-lock-test') request",
+      [locationId, saleLines, salePayments, crypto.randomUUID()]
+    )
+  ).rows[0].request;
+  offlineRequest.draft_id = saleDraftId;
   await clients[0].query('commit');
   const saleScenarios = [
     {
@@ -149,15 +157,9 @@ try {
     },
     {
       name: 'offline held checkout',
-      sql: 'select public.post_offline_sale_at_location($1,null,$2::jsonb,$3::jsonb,$4,now(),$5,p_draft_id=>$6) id',
-      args: [
-        locationId,
-        saleLines,
-        salePayments,
-        crypto.randomUUID(),
-        'pack-lock-test',
-        saleDraftId,
-      ],
+      offline: true,
+      sql: 'select public.submit_offline_sale($1::jsonb) id',
+      args: [JSON.stringify(offlineRequest)],
     },
     {
       name: 'edit held sale',
@@ -202,7 +204,47 @@ try {
     const result = await pending;
     assert.equal(result.error, null, scenario.name);
     assert.ok(result.result.rows[0].id, scenario.name);
+    if (scenario.offline) {
+      assert.equal(result.result.rows[0].id.status, 'completed', scenario.name);
+      assert.ok(result.result.rows[0].id.order_id, scenario.name);
+      assert.notEqual(result.result.rows[0].id.order_id, saleDraftId, scenario.name);
+    }
   }
+
+  // Online and offline callers share logical-sale -> catalog ordering. A sale
+  // waiting for its reference must not hold a catalog lock needed by the winner.
+  for (const client of clients) await beginSaleTest(client);
+  const orderedRef = crypto.randomUUID();
+  await clients[1].query(
+    "select pg_advisory_xact_lock(hashtextextended('sale:'||$1||':'||$2,73))",
+    [companyId, orderedRef]
+  );
+  await clients[0].query('set local role authenticated');
+  const orderedSale = clients[0]
+    .query('select public.post_sale(null,$1::jsonb,$2::jsonb,p_client_ref=>$3) id', [
+      saleLines,
+      salePayments,
+      orderedRef,
+    ])
+    .then(
+      result => ({ result }),
+      error => ({ error })
+    );
+  let orderedResult;
+  try {
+    await waitForAdvisory(clients[0].processID, 'logical sale before catalog');
+    const lock = await clients[1].query(
+      "select pg_try_advisory_xact_lock(hashtextextended('catalog-units:'||$1,0)) acquired",
+      [companyId]
+    );
+    assert.equal(lock.rows[0].acquired, true, 'waiting sale leaves catalog unlocked');
+  } finally {
+    await clients[1].query('rollback');
+    orderedResult = await orderedSale;
+    await clients[0].query('rollback');
+  }
+  assert.equal(orderedResult.error, undefined, 'sale completes after logical lock release');
+  assert.ok(orderedResult.result.rows[0].id);
 
   // Reverse the overlap: pause a sale after unit resolution and draft creation.
   // Catalog writers must wait before taking either the journal or variant locks.
@@ -398,6 +440,13 @@ try {
   await clients[0].query('reset role').catch(() => undefined);
   if (companyId) {
     await clients[0].query('begin');
+    // The capture context is committed; each replay is rolled back. Remove only
+    // this fixture's immutable context using the owner-only test cleanup path.
+    await clients[0].query("set local session_replication_role='replica'");
+    await clients[0].query('delete from public.offline_sale_contexts where company_id=$1', [
+      companyId,
+    ]);
+    await clients[0].query("set local session_replication_role='origin'");
     await clients[0].query("select set_config('app.allow_ledger_mutation','on',true)");
     await clients[0].query('delete from public.companies where id=$1', [companyId]);
     await clients[0].query('commit');

@@ -1403,3 +1403,177 @@ test('staff invalid dates during refresh retain the valid results and release lo
   await expect(page.locator('[data-list-record]:visible').first()).toContainText('Amina');
   await expect(page.getByRole('alert')).toContainText('From date must be before');
 });
+
+test('shop setup reuses identity and keeps document drafts local while learning is unavailable', async ({
+  page,
+  isMobile,
+}) => {
+  await authenticateFinancialUser(page, ['ManageCompanySettings']);
+  if (isMobile) await page.setViewportSize({ width: 320, height: 720 });
+  const company: Record<string, any> = {
+    id: '00000000-0000-4000-8000-000000000001',
+    name: 'Registered shop',
+    address: 'Market Road',
+    email: 'hello@example.test',
+    logo_path: null,
+    public_slug: null,
+    public_whatsapp_number: null,
+    public_storefront_enabled: false,
+    website_url: null,
+    shop_setup: {},
+    document_designs: {},
+  };
+  await page.route('**/rest/v1/companies*', async route => {
+    if (route.request().method() === 'PATCH') {
+      Object.assign(company, route.request().postDataJSON());
+      return route.fulfill({ status: 204, body: '' });
+    }
+    if (
+      new URL(route.request().url()).searchParams
+        .get('select')
+        ?.includes('public_storefront_enabled')
+    )
+      return route.fulfill({ json: company });
+    return route.fallback();
+  });
+  await page.route('**/rest/v1/rpc/save_shop_setup', async route => {
+    Object.assign(company['shop_setup'], route.request().postDataJSON().p_patch);
+    await route.fulfill({ json: company['shop_setup'] });
+  });
+  await page.route('**/rest/v1/rpc/shop_address_availability', async route => {
+    const slug = route.request().postDataJSON().p_slug;
+    await route.fulfill({
+      json: { available: slug !== 'taken', suggestion: slug === 'taken' ? 'taken-2' : slug },
+    });
+  });
+  await page.route('**/rest/v1/rpc/save_document_design', async route => {
+    const { p_document_type, p_design } = route.request().postDataJSON();
+    company['document_designs'][p_document_type] = p_design;
+    await route.fulfill({ json: p_design });
+  });
+  await page.goto('http://127.0.0.1:4203/shop-setup');
+  await expect(page.getByLabel('Business name')).toHaveValue('Registered shop');
+  await page.getByLabel('Website (optional)').fill('https://example.test');
+  await page.getByRole('button', { name: 'Save and continue', exact: true }).click();
+  await expect(page.getByLabel('Shop web address')).toHaveValue('registered-shop');
+  await page.getByLabel('Shop web address').fill('taken');
+  await page.getByRole('button', { name: 'Save and continue', exact: true }).click();
+  await page.getByRole('button', { name: 'Use taken-2', exact: true }).click();
+  await page.getByRole('button', { name: 'Save and continue', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Your documents are ready' })).toBeVisible();
+  expect(company['public_storefront_enabled']).toBe(false);
+  await page.route('**/rest/v1/rpc/company_tax_settings', route =>
+    route.fulfill({
+      json: {
+        active_profile: {
+          vat_registered: false,
+          default_tax_category_id: 'standard',
+          tax_registration_number: null,
+        },
+        categories: [{ id: 'standard', classification: 'standard', rate_bps: 1600 }],
+        scheduled_profiles: [],
+        show_vat_breakdown_on_prints: true,
+      },
+    })
+  );
+  await page.getByRole('link', { name: 'Customize documents', exact: true }).click();
+  await expect(page).toHaveURL(/settings\/documents\?from=setup/);
+  const editor = page.locator('app-document-designer');
+  const preview = editor.frameLocator('iframe');
+  const edit = async () => {
+    if (isMobile) await editor.getByRole('tab', { name: 'Edit', exact: true }).click();
+  };
+  const showPreview = async () => {
+    if (isMobile) await editor.getByRole('tab', { name: 'Preview', exact: true }).click();
+  };
+  await editor.getByRole('radio', { name: 'Modern' }).check();
+  await editor.getByLabel('Receipt message').fill('Local draft message');
+  await editor.getByLabel('Text or link').fill('https://example.test');
+  await editor.getByRole('button', { name: 'Add a caption', exact: true }).click();
+  await editor.getByLabel('Caption (optional)').fill('Website');
+  await expect(preview.locator('.custom-field strong')).toHaveText('Website');
+  await expect(preview.locator('.custom-field p:not(.qr-pending)')).toHaveText(
+    'https://example.test'
+  );
+  await expect(preview.getByRole('img', { name: 'QR code' })).toHaveCount(0);
+  await editor.getByRole('radio', { name: 'Text and QR', exact: true }).check();
+  await showPreview();
+  await expect(preview.getByText('Local draft message')).toBeVisible();
+  await expect(preview.getByRole('img', { name: 'QR code' })).toBeVisible();
+  await expect(preview.locator('.totals')).toContainText('VAT 16%');
+  await expect(preview.locator('.document-note')).toContainText('VAT layout example only');
+  const originalQr = await preview.locator('.document-qr path').getAttribute('d');
+  await preview.locator('html').evaluate(el => el.setAttribute('data-persistent-preview', 'yes'));
+  await edit();
+  await editor.getByLabel('Text or link').fill('https://example.test/shop');
+  await expect(preview.locator('.custom-field p:not(.qr-pending)')).toHaveText(
+    'https://example.test/shop'
+  );
+  await expect(preview.locator('.document-qr path')).toHaveCount(1);
+  await expect(preview.locator('.document-qr path')).not.toHaveAttribute('d', originalQr!);
+  await expect(preview.locator('html')).toHaveAttribute('data-persistent-preview', 'yes');
+  await expect(preview.locator('.custom-field')).toHaveAttribute('data-preview-active', '');
+  await editor.getByRole('radio', { name: 'QR code', exact: true }).check();
+  await expect(preview.locator('.custom-field p:not(.qr-pending)')).toHaveCount(0);
+  await editor.getByRole('radio', { name: 'Text and QR', exact: true }).check();
+  await editor.getByLabel('Show VAT breakdown').uncheck();
+  await expect(preview.locator('.totals')).not.toContainText('VAT');
+  expect(company['document_designs']['receipt']).toBeUndefined();
+  await editor.getByRole('combobox', { name: 'Document', exact: true }).selectOption('invoice');
+  await expect(editor.getByLabel('Show VAT breakdown')).toBeChecked();
+  await editor.getByRole('combobox', { name: 'Document', exact: true }).selectOption('receipt');
+  await expect(editor.getByLabel('Receipt message')).toHaveValue('Local draft message');
+  await expect(editor.getByLabel('Show VAT breakdown')).not.toBeChecked();
+  await showPreview();
+  await preview.locator('.custom-field').scrollIntoViewIfNeeded();
+  await expect(preview.getByRole('img', { name: 'QR code' })).toBeInViewport();
+  await editor.getByRole('button', { name: 'Save receipt', exact: true }).click();
+  await expect(editor.getByText('Receipt design saved.')).toBeVisible();
+  await expect(editor.getByRole('button', { name: 'Test print', exact: true })).toBeEnabled();
+  await expect(preview.locator('html')).toHaveAttribute('data-persistent-preview', 'yes');
+  if (!isMobile) {
+    await expect(editor.locator('#design-preview')).toBeInViewport();
+    // The sample remains visible while either the page or its document is scrolled.
+    await editor.getByRole('combobox', { name: 'Paper', exact: true }).selectOption('a4');
+    const previewPanel = editor.locator('#design-preview');
+    for (const height of [720, 600]) {
+      await page.setViewportSize({ width: 1280, height });
+      for (const fraction of [0, 0.5, 1]) {
+        await editor.locator('#design-controls').evaluate((el, f) => {
+          el.scrollTop = el.scrollHeight * f;
+        }, fraction);
+        await expect
+          .poll(async () => {
+            const bounds = await previewPanel.boundingBox();
+            return bounds !== null && bounds.y >= 56 && bounds.y + bounds.height <= height;
+          })
+          .toBe(true);
+      }
+    }
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await editor.locator('#design-controls').evaluate(el => {
+      el.scrollTop = 0;
+    });
+  }
+  expect(company['document_designs']['receipt'].layout).toBe('modern');
+  expect(company['document_designs']['receipt'].showVatBreakdown).toBe(false);
+  if (process.env.DESIGN_REVIEW_DIR)
+    await page.screenshot({
+      path: `${process.env.DESIGN_REVIEW_DIR}/document-designer-${isMobile ? 'phone' : 'desktop'}.png`,
+    });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true
+  );
+  await editor.getByRole('link', { name: 'Back to setup', exact: true }).click();
+  await expect(page).toHaveURL(/shop-setup\?step=documents/);
+  await page.getByRole('button', { name: 'Use these defaults and continue' }).click();
+  await expect(page.getByRole('heading', { name: 'Your shop basics are ready' })).toBeVisible();
+  await expect(
+    page.getByRole('link', { name: 'Continue your first business cycle' })
+  ).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Your shop basics are ready' })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true
+  );
+});

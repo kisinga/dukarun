@@ -37,8 +37,8 @@ select throws_ok($$select public.post_offline_sale_at_location(
  null,'[{"variant_id":"aa200000-0000-4000-8000-000000000003","quantity":1,"unit_price":15}]',
  '[{"method":"cash","amount":15}]','legacy-pack-checkout',now(),'pack-test-device',
  p_draft_id=>(select id from packed_draft))$$,
- 'P0001','pack_client_update_required: reopen the app before editing this sale',
- 'offline checkout applies the same held-pack compatibility guard');
+ 'P0001','offline_client_update_required: old queued sales are no longer accepted; update the app',
+ 'old offline checkout requires the protocol-v2 client');
 select is((select stock_quantity from public.order_lines where order_id=(select id from packed_draft)),
  100::numeric,'rejected legacy checkouts preserve the original held pack');
 create temp table pack_sale as select public.post_sale(null,

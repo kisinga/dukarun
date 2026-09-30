@@ -1,0 +1,101 @@
+begin;
+select no_plan();
+select testkit.create_user('93600000-0000-4000-8000-000000000001','receipt-admin@test.local');
+select testkit.create_user('93600000-0000-4000-8000-000000000002','receipt-cashier@test.local');
+create temp table receipt_fixture as select testkit.provision('93600000-0000-4000-8000-000000000001','Receipt Store') company_id;
+grant select on receipt_fixture to authenticated;
+select testkit.add_member(company_id,'93600000-0000-4000-8000-000000000002','Receipt Cashier',array['SettleOrder']) from receipt_fixture;
+select set_config('request.jwt.claims',testkit.claims(company_id,'93600000-0000-4000-8000-000000000001','Admin'),true) from receipt_fixture;
+select vault.create_secret('https://receipt.test','STOREFRONT_PUBLIC_URL');
+insert into public.orders(id,company_id,location_id,code,status,total,is_credit_sale,completed_at)
+select '93600000-0000-4000-8000-000000000010',f.company_id,l.id,'PDF-PAID','completed',1000,false,now()
+from receipt_fixture f join public.stock_locations l on l.company_id=f.company_id and l.code='MAIN';
+insert into public.payments(company_id,order_id,method_code,amount,status)
+select company_id,'93600000-0000-4000-8000-000000000010','cash',1000,'settled' from receipt_fixture;
+create temp table receipt_before as select count(*) journals from public.ledger_journal_entries where company_id=(select company_id from receipt_fixture);
+create temp table receipt_results(key text primary key,value jsonb);
+grant all on receipt_results to authenticated;
+select testkit.as_user(company_id,'93600000-0000-4000-8000-000000000001','Admin') from receipt_fixture;
+select is(public.sale_document_context('93600000-0000-4000-8000-000000000010')->>'document_type','receipt','fully paid sale is a receipt');
+select lives_ok($$insert into receipt_results values('first',public.request_sale_document('93600000-0000-4000-8000-000000000010','93600000-0000-4000-8000-000000000100','0712345601','Amina','Buyer'))$$,'anonymous sale captures contact and queues atomically');
+select is(public.lookup_receipt_contact('+254712345601')->>'is_verified','false','receipt capture is unverified');
+select is(public.lookup_receipt_contact('0712345601')->>'customer_origin','receipt','receipt origin is permanent');
+select is(public.request_sale_document('93600000-0000-4000-8000-000000000010','93600000-0000-4000-8000-000000000100'),(select value from receipt_results where key='first'),'idempotent acceptance survives closing app/retry');
+select throws_ok($$select public.request_sale_document('93600000-0000-4000-8000-000000000010','93600000-0000-4000-8000-000000000101')$$,'P0001','document_send_pending','different key cannot queue twice while pending');
+reset role;
+select is((select count(*) from public.ledger_journal_entries where company_id=(select company_id from receipt_fixture)),(select journals from receipt_before),'contact association preserves ledger');
+select is((select count(*) from public.customers where company_id=(select company_id from receipt_fixture) and phone_normalized='+254712345601'),1::bigint,'one normalized phone identity');
+select is((select snapshot->>'paper_format' from public.external_document_links where id=(select external_document_link_id from public.outbox where id=(select (value->>'outbox_id')::uuid from receipt_results where key='first'))),'a4','sent snapshot always A4');
+select throws_ok($$insert into public.customers(company_id,first_name,phone) select company_id,'Duplicate','+254712345601' from receipt_fixture$$,'23505',null,'database rejects another customer with equivalent phone');
+select lives_ok($$insert into public.customers(company_id,first_name,phone,is_supplier) select company_id,'Supplier','0712345601',true from receipt_fixture$$,'supplier phone is outside customer uniqueness');
+insert into receipt_results values('claim',public.claim_sale_document_delivery((select (value->>'outbox_id')::uuid from receipt_results where key='first')));
+select is((select value->>'recipient' from receipt_results where key='claim'),'+254712345601','worker resolves saved recipient');
+select is(public.claim_sale_document_delivery((select (value->>'outbox_id')::uuid from receipt_results where key='first')),null::jsonb,'concurrent worker cannot claim active preparation');
+select testkit.as_user(company_id,'93600000-0000-4000-8000-000000000001','Admin') from receipt_fixture;
+insert into receipt_results values('contact',public.lookup_receipt_contact('0712345601'));
+select lives_ok($$select public.correct_receipt_customer_phone((select (value->>'id')::uuid from receipt_results where key='contact'),'0712345602',(select (value->>'updated_at')::timestamptz from receipt_results where key='contact'))$$,'explicit correction updates customer');
+select throws_ok($$select public.correct_receipt_customer_phone((select (value->>'id')::uuid from receipt_results where key='contact'),'0712345603',(select (value->>'updated_at')::timestamptz from receipt_results where key='contact'))$$,'P0001','customer_changed_reload','stale correction fails');
+select is(public.sale_document_context('93600000-0000-4000-8000-000000000010')#>>'{delivery,state}','cancelled','correction cancels unsent request');
+reset role;
+select is(public.begin_sale_document_dispatch((select (value->>'id')::uuid from receipt_results where key='claim'),(select (value->>'claim_token')::uuid from receipt_results where key='claim')),false,'cancelled prepared PDF cannot dispatch');
+select testkit.as_user(company_id,'93600000-0000-4000-8000-000000000001','Admin') from receipt_fixture;
+select lives_ok($$select public.complete_receipt_customer_profile((select (value->>'id')::uuid from receipt_results where key='contact'),'{"first_name":"Amina","last_name":"Buyer","phone":"0712345602"}' )$$,'profile completion accepts existing identity');
+select is(public.lookup_receipt_contact('0712345602')->>'is_verified','true','staff completion verifies same account');
+select is(public.lookup_receipt_contact('0712345602')->>'customer_origin','receipt','completion retains receipt origin');
+select throws_ok($$select public.request_sale_document('93600000-0000-4000-8000-000000000010','93600000-0000-4000-8000-000000000102','0712345609')$$,'P0001','saved_recipient_required','cannot override saved recipient');
+insert into receipt_results values('second',public.request_sale_document('93600000-0000-4000-8000-000000000010','93600000-0000-4000-8000-000000000102'));
+reset role;
+insert into receipt_results values('claim2',public.claim_sale_document_delivery((select (value->>'outbox_id')::uuid from receipt_results where key='second')));
+select is(public.begin_sale_document_dispatch((select (value->>'id')::uuid from receipt_results where key='claim2'),(select (value->>'claim_token')::uuid from receipt_results where key='claim2')),true,'claim can start dispatch once');
+select is(public.begin_sale_document_dispatch((select (value->>'id')::uuid from receipt_results where key='claim2'),(select (value->>'claim_token')::uuid from receipt_results where key='claim2')),false,'same claim cannot dispatch twice');
+update public.outbox set document_lease_until=now()-interval '1 second' where id=(select (value->>'id')::uuid from receipt_results where key='claim2');
+select is(public.claim_sale_document_delivery((select (value->>'id')::uuid from receipt_results where key='claim2')),null::jsonb,'expired dispatch never retries automatically');
+select is((select document_delivery_state from public.outbox where id=(select (value->>'id')::uuid from receipt_results where key='claim2')),'unknown','crash during send records unknown outcome');
+select is((select quota_state from public.outbox where id=(select (value->>'id')::uuid from receipt_results where key='claim2')),'used','uncertain provider acceptance accounts for reserved quota');
+select testkit.as_user(company_id,'93600000-0000-4000-8000-000000000002','Receipt Cashier') from receipt_fixture;
+select throws_ok($$select public.correct_receipt_customer_phone((select (value->>'id')::uuid from receipt_results where key='contact'),'0712345609',now())$$,'P0001','permission_denied','settlement permission does not allow number corrections');
+select throws_ok($$select public.complete_receipt_customer_profile((select (value->>'id')::uuid from receipt_results where key='contact'),'{}')$$,'P0001',null,'settlement permission does not allow profile completion');
+select lives_ok($$select public.request_sale_document('93600000-0000-4000-8000-000000000010','93600000-0000-4000-8000-000000000103')$$,'cashier can explicitly resend despite standing notification opt-out');
+reset role;
+update public.external_document_links set revoked_at=now() where id=(select external_document_link_id from public.outbox where document_request_key='93600000-0000-4000-8000-000000000103');
+select is(public.claim_sale_document_delivery((select id from public.outbox where document_request_key='93600000-0000-4000-8000-000000000103')),null::jsonb,'revoked links cannot dispatch attachments');
+select is((select snapshot#>>'{document_design,layout}' from public.external_document_links where id=(select external_document_link_id from public.outbox where document_request_key='93600000-0000-4000-8000-000000000103')),'classic','default layout is frozen explicitly');
+-- Real credit postings, partial settlement and final settlement use the authoritative ledger.
+select set_config('request.jwt.claims',testkit.claims(company_id,'93600000-0000-4000-8000-000000000001','Admin'),true) from receipt_fixture;
+select testkit.ensure_open_session();
+insert into public.products(id,company_id,name)
+select '93600000-0000-4000-8000-000000000020',company_id,'PDF Service' from receipt_fixture;
+insert into public.product_variants(id,company_id,product_id,name,sku,kind,price,wholesale_price,track_inventory)
+select '93600000-0000-4000-8000-000000000021',company_id,'93600000-0000-4000-8000-000000000020','Default','PDF-SERVICE','service',1000,1000,false from receipt_fixture;
+insert into public.customers(id,company_id,first_name,phone,is_credit_approved,credit_limit)
+select '93600000-0000-4000-8000-000000000022',company_id,'Credit Buyer','0712345622',true,100000 from receipt_fixture;
+insert into receipt_results values('credit',public.post_sale_at_location(null,'93600000-0000-4000-8000-000000000022',
+  '[{"variant_id":"93600000-0000-4000-8000-000000000021","quantity":1,"unit_price":1000}]','[]',false,'pdf-credit'));
+select is(public.sale_document_context((select (value->>'order_id')::uuid from receipt_results where key='credit'))->>'document_type','invoice','unpaid completed credit sale is an invoice');
+select is(public.sale_document_context((select (value->>'order_id')::uuid from receipt_results where key='credit'))->>'paid','0','unpaid invoice does not inherit completed=Paid');
+select public.post_customer_receipt(null,'93600000-0000-4000-8000-000000000022',400,'cash',null,'pdf-partial');
+select is(public.sale_document_context((select (value->>'order_id')::uuid from receipt_results where key='credit'))->>'balance','600','partial invoice balance follows ledger');
+select is(public.sale_document_context((select (value->>'order_id')::uuid from receipt_results where key='credit'))->>'paid','400','partial invoice paid amount follows ledger');
+select public.save_document_design('invoice','{"version":1,"layout":"modern","message":"Issued design","custom":{"label":"","value":"","display":"text"}}');
+insert into receipt_results values('invoice-send',public.request_sale_document((select (value->>'order_id')::uuid from receipt_results where key='credit'),'93600000-0000-4000-8000-000000000110'));
+create temp table issued_pdf as select snapshot from public.external_document_links where id=(select external_document_link_id from public.outbox where id=(select (value->>'outbox_id')::uuid from receipt_results where key='invoice-send'));
+select is((select snapshot->>'status' from issued_pdf),'Partially paid','issued invoice states actual partial payment');
+select is((select snapshot#>>'{document_design,layout}' from issued_pdf),'modern','invoice captures its saved invoice design');
+select public.save_document_design('invoice','{"version":1,"layout":"compact","message":"Changed later","custom":{"label":"","value":"","display":"text"}}');
+update public.companies set show_vat_breakdown_on_prints=not show_vat_breakdown_on_prints where id=(select company_id from receipt_fixture);
+insert into receipt_results values('invoice-claim',public.claim_sale_document_delivery((select (value->>'outbox_id')::uuid from receipt_results where key='invoice-send')));
+select is((select value->'snapshot' from receipt_results where key='invoice-claim'),(select snapshot from issued_pdf),'worker uses original design and VAT snapshot after settings change');
+select public.finish_sale_document_delivery((select (value->>'id')::uuid from receipt_results where key='invoice-claim'),(select (value->>'claim_token')::uuid from receipt_results where key='invoice-claim'),'retry',null,'temporary');
+update public.outbox set scheduled_after=now() where id=(select (value->>'id')::uuid from receipt_results where key='invoice-claim');
+select is(public.claim_sale_document_delivery((select (value->>'id')::uuid from receipt_results where key='invoice-claim'))->'snapshot',(select snapshot from issued_pdf),'retry regenerates the same issued snapshot');
+select public.post_customer_receipt(null,'93600000-0000-4000-8000-000000000022',600,'cash',null,'pdf-final');
+select is(public.sale_document_context((select (value->>'order_id')::uuid from receipt_results where key='credit'))->>'document_type','receipt','fully settled credit sale now produces a receipt');
+select is((select snapshot->>'balance' from issued_pdf),'600','later payments do not rewrite issued invoice');
+insert into public.customers(id,company_id,first_name,phone,deleted_at)
+select '93600000-0000-4000-8000-000000000023',company_id,'Archived duplicate','0712345622',now() from receipt_fixture;
+select throws_ok($$update public.customers set deleted_at=null where id='93600000-0000-4000-8000-000000000023'$$,'23505',null,'restoration cannot take an active customer phone');
+set local role anon;
+select throws_like($$select public.sale_document_context('93600000-0000-4000-8000-000000000010')$$,'%permission denied%','anonymous users cannot access sale context');
+reset role;
+select * from finish();
+rollback;

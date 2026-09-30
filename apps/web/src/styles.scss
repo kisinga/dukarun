@@ -214,7 +214,7 @@ input.search-with-custom-clear::-ms-clear {
   /* Short, reversible decisions belong in a content-height phone sheet, not a full task modal. */
   .modal-box.modal-box-compact {
     height: auto;
-    max-height: 92dvh;
+    max-height: min(92dvh, var(--modal-visual-height, 92dvh));
     width: 100%;
     max-width: 100%;
     border-radius: var(--radius-box) var(--radius-box) 0 0;
@@ -695,6 +695,23 @@ input.search-with-custom-clear::-ms-clear {
   .page-wide,
   .page-workspace {
     max-width: 80rem; // max-w-7xl
+  }
+
+  // Designer uses the space below the shell navbar. The two panes scroll independently,
+  // leaving its header, sample and save actions in view without scroll synchronization.
+  @media (min-width: 1024px) {
+    app-document-designer .dashboard-main {
+      min-height: 0;
+    }
+    app-document-designer .page {
+      height: calc(100dvh - 3.5rem);
+      display: flex;
+      flex-direction: column;
+      padding-block: 1rem;
+    }
+    app-document-designer app-page-header {
+      flex-shrink: 0;
+    }
   }
 
   /* Responsive page actions: secondary actions collapse into one phone menu. */

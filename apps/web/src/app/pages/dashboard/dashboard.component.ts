@@ -1,3 +1,4 @@
+import { ShopSetupEntryComponent } from '../../settings/shop-setup-entry.component';
 import { DemandConfidenceIndicatorComponent } from '../../shared/ui/demand-confidence-indicator.component';
 import {
   Component,
@@ -91,6 +92,7 @@ type DashboardSection = 'sales' | 'attention';
   selector: 'app-dashboard',
   imports: [
     DemandConfidenceIndicatorComponent,
+    ShopSetupEntryComponent,
     ButtonComponent,
     EmptyStateComponent,
     IconComponent,
@@ -133,6 +135,7 @@ type DashboardSection = 'sales' | 'attention';
       </app-page-actions>
 
       <div class="space-y-6">
+        <app-shop-setup-entry />
         @if (loadError()) {
           <div role="alert" class="alert alert-error text-sm">
             <app-icon name="heroExclamationTriangle" />

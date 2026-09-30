@@ -1,3 +1,5 @@
+import { SaleDocumentModalComponent } from '../communications/sale-document-modal.component';
+import { SaleDocumentService } from '../communications/sale-document.service';
 import { bindListQuery, listQueryField, listFormQueryField } from '../shared/list/list-query';
 import {
   Component,
@@ -44,7 +46,6 @@ import { PageActionsComponent } from '../shared/ui/page-actions.component';
 import { PermissionsService } from '../core/permissions.service';
 import { Approval, ApprovalsService } from '../approvals/approvals.service';
 import { RecentSalesCacheService } from '../core/recent-sales-cache.service';
-import { DocumentSendComponent } from '../communications/document-send.component';
 import { PartyCacheService } from '../core/party-cache.service';
 import {
   SearchableFilterComponent,
@@ -72,6 +73,7 @@ const SALE_SORT_OPTIONS: readonly ListSortOption[] = [
 @Component({
   selector: 'app-orders',
   imports: [
+    SaleDocumentModalComponent,
     ReactiveFormsModule,
     RouterLink,
     PageLayoutComponent,
@@ -88,12 +90,12 @@ const SALE_SORT_OPTIONS: readonly ListSortOption[] = [
     IconComponent,
     StatBarComponent,
     MoneyComponent,
-    DocumentSendComponent,
     SearchableFilterComponent,
     MobileListComponent,
     PageActionsComponent,
   ],
   template: `
+    <app-sale-document-modal />
     <app-page
       title="Sales"
       subtitle="Review completed sales, cashier handoffs, proformas, refunds, and voids."
@@ -415,13 +417,13 @@ const SALE_SORT_OPTIONS: readonly ListSortOption[] = [
                     <button appButton variant="ghost" type="button" (click)="openOrder(order.id)">
                       Open
                     </button>
-                    @if (printerEnabled() && order.status === 'completed') {
+                    @if (order.status === 'completed') {
                       <button
                         appButton
                         variant="ghost"
                         [iconOnly]="true"
-                        title="Print receipt"
-                        aria-label="Print receipt"
+                        title="Receipt or invoice"
+                        aria-label="Receipt or invoice"
                         (click)="printOrder(order.id)"
                       >
                         <app-icon name="heroPrinter" />
@@ -485,15 +487,15 @@ const SALE_SORT_OPTIONS: readonly ListSortOption[] = [
             [title]="order.code"
             [subtitle]="time(order.created_at) + ' · ' + customerName(order)"
           >
-            @if (printerEnabled() && order.status === 'completed') {
+            @if (order.status === 'completed') {
               <button
                 drawerActions
                 appButton
                 variant="ghost"
                 [iconOnly]="true"
                 type="button"
-                title="Print receipt"
-                aria-label="Print receipt"
+                title="Receipt or invoice"
+                aria-label="Receipt or invoice"
                 (click)="printOrder(order.id)"
               >
                 <app-icon name="heroPrinter" />
@@ -557,32 +559,16 @@ const SALE_SORT_OPTIONS: readonly ListSortOption[] = [
 
             @if (
               order.status === 'completed' &&
-              order.customer_id &&
-              permissions.has('ManageCommunications')
+              (permissions.has('SettleOrder') || permissions.has('ManageCommunications'))
             ) {
-              <div class="mt-3 space-y-2">
-                @if (canSendReceipt(order)) {
-                  <app-document-send
-                    documentType="receipt"
-                    [subjectId]="order.id"
-                    title="Send receipt"
-                    description="Customer and totals come from this completed sale."
-                    (sent)="notice.set($event)"
-                    (failed)="error.set($event)"
-                  />
-                }
-                @if (order.is_credit_sale) {
-                  <app-document-send
-                    documentType="invoice"
-                    [subjectId]="order.id"
-                    title="Send invoice"
-                    description="Customer, total, and balance come from this credit sale."
-                    [allowCompanyCopy]="true"
-                    (sent)="notice.set($event)"
-                    (failed)="error.set($event)"
-                  />
-                }
-              </div>
+              <button
+                appButton
+                variant="outline"
+                class="mt-3 w-full"
+                (click)="saleDocuments.open(order.id, false, order.total, order.code)"
+              >
+                Receipt / invoice · WhatsApp PDF
+              </button>
             }
 
             @if (detailLoading()) {
@@ -971,6 +957,7 @@ const SALE_SORT_OPTIONS: readonly ListSortOption[] = [
   `,
 })
 export class OrdersComponent implements OnInit, OnDestroy {
+  protected readonly saleDocuments = inject(SaleDocumentService);
   protected readonly tableColumns1: TableColumn[] = [
     { key: 'sale', label: 'Sale / date', pinned: true },
     { key: 'customer', label: 'Customer' },
@@ -1661,15 +1648,7 @@ export class OrdersComponent implements OnInit, OnDestroy {
   }
 
   protected async printOrder(orderId: string): Promise<void> {
-    try {
-      const [{ order, meta }, company] = await Promise.all([
-        this.receiptData.buildReceiptData(orderId),
-        this.receiptData.companyPrintInfo(),
-      ]);
-      await this.print.printOrder(order, company.name, company.logoUrl, meta, company.address);
-    } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Print failed');
-    }
+    this.saleDocuments.open(orderId);
   }
 
   protected statusType(status: string) {

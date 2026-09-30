@@ -1,3 +1,5 @@
+import type { OfflineCapture } from '../offline/offline-contract';
+import { SaleDocumentService } from '../../communications/sale-document.service';
 import { cartLineId } from '../cart.service';
 import { sellingUnits } from '@dukarun/pack-types';
 import { Injectable, OnDestroy, computed, effect, inject, signal, untracked } from '@angular/core';
@@ -62,6 +64,7 @@ export interface SellWorkflowInit {
  */
 @Injectable()
 export class SellWorkflowStore implements OnDestroy {
+  private readonly saleDocuments = inject(SaleDocumentService);
   readonly cart = inject(CartService);
   readonly connectivity = inject(ConnectivityService);
   readonly sync = inject(SyncService);
@@ -254,6 +257,7 @@ export class SellWorkflowStore implements OnDestroy {
   }));
   private approvalSentTimer: ReturnType<typeof setTimeout> | null = null;
   private saleAttempt: SaleAttemptState | null = null;
+  private offlineCapture: { clientRef: string; capture: OfflineCapture } | null = null;
   private customerSearchSeq = 0;
   private matchedCustomerRequest = 0;
   private customerDepositRequest = 0;
@@ -670,6 +674,7 @@ export class SellWorkflowStore implements OnDestroy {
     this.busyState.set(true);
     const customerId = this.cart.customerId();
     const lines = this.cart.toSaleLines();
+    const saleTotal = this.cart.total();
     const fulfillmentDraft = this.currentFulfillmentDraft();
     if (this.fulfillmentMode() !== 'counter' && !fulfillmentDraft) {
       this.busyState.set(false);
@@ -687,6 +692,17 @@ export class SellWorkflowStore implements OnDestroy {
     });
     this.saleAttempt = resolveSaleAttempt(this.saleAttempt, fingerprint, () => crypto.randomUUID());
     const clientRef = this.saleAttempt.clientRef;
+    if (this.offlineCapture?.clientRef !== clientRef) {
+      try {
+        this.offlineCapture = { clientRef, capture: this.cashierSession.captureOfflineSale() };
+      } catch (error) {
+        this.errorState.set(
+          error instanceof Error ? error.message : 'Session confirmation required'
+        );
+        this.busyState.set(false);
+        return;
+      }
+    }
     if (!this.connectivity.online()) {
       if (
         payments.some(payment => payment.method === 'mpesa') &&
@@ -814,9 +830,10 @@ export class SellWorkflowStore implements OnDestroy {
           tone: 'success',
           orderId: result.orderId,
         });
+        this.saleDocuments.offerCompleted(result.orderId, result.status, saleTotal);
       }
     } catch (err) {
-      if (!(err instanceof PosRpcError) && !settlement) {
+      if ((!(err instanceof PosRpcError) || err.code === '') && !settlement) {
         try {
           await this.queueSale(customerId, lines, payments, clientRef, fulfillmentDraft);
           this.saleAttempt = null;
@@ -933,6 +950,7 @@ export class SellWorkflowStore implements OnDestroy {
   }
 
   private finishMpesaSale(orderId: string, warning = false): void {
+    const saleTotal = this.cart.total();
     this.checkoutOpenState.set(false);
     this.cart.clear();
     this.saleAttempt = null;
@@ -944,6 +962,7 @@ export class SellWorkflowStore implements OnDestroy {
       tone: warning ? 'warning' : 'success',
       orderId,
     });
+    if (!warning) this.saleDocuments.offerCompleted(orderId, 'completed', saleTotal);
   }
 
   private async refreshCustomerDeposit(customerId: string): Promise<void> {
@@ -1032,6 +1051,7 @@ export class SellWorkflowStore implements OnDestroy {
           );
       const presentedDecision = this.creditDecision();
       const presentedCreditAmount = this.automaticCreditAmount();
+      this.saleDocuments.offerCompleted(result.orderId, result.status, this.cart.total());
       this.cart.clear();
       this.saleAttempt = null;
       this.selectedCustomerState.set(null);
@@ -1115,8 +1135,11 @@ export class SellWorkflowStore implements OnDestroy {
     if (fulfillmentDraft && !fulfillmentDraft.fulfillment.phone?.trim()) {
       throw new Error('Offline pickup requires a recipient phone so the tracking PIN is not lost.');
     }
+    if (this.offlineCapture?.clientRef !== clientRef)
+      throw new Error('Original sale capture is missing. Keep this cart and reconnect.');
     await this.sync.enqueue(
       {
+        ...this.offlineCapture.capture,
         customer_id: customerId,
         lines,
         payments,

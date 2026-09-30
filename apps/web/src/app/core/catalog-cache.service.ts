@@ -109,8 +109,10 @@ export class CatalogCacheService {
           this.companyId = identity?.companyId ?? null;
           this.reset();
           this.subscribeChannel();
-          if (scope) void this.ensureLoaded();
         }
+        // Reconnect must also hydrate retained pre-cutover evidence, even when
+        // the catalogue journal has no product changes to deliver.
+        if (scope) void this.ensureLoaded();
         if (online && scope && this.handler) {
           void this.journal.reconcile('catalog', scope, this.handler, 'catalog-cache');
         }
@@ -138,9 +140,11 @@ export class CatalogCacheService {
       this.connectivity.online() &&
       (!snapshot ||
         snapshot.category_memberships_complete !== true ||
-        snapshot.products.some(row => row.packs === undefined))
+        snapshot.products.some(row => row.packs === undefined || !row.catalogue_version))
     ) {
-      void this.refresh();
+      // The hard cutover discards old queues, but retained catalogue rows still
+      // need capture evidence before they can be used for new offline sales.
+      await this.refresh();
     }
     return !!snapshot?.families && !!snapshot.location_stock;
   }

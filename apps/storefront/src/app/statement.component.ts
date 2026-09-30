@@ -1,4 +1,12 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import {
+  documentDate,
+  documentMoney,
+  renderDocument,
+  statementContent,
+  type DocumentContent,
+} from '@dukarun/documents';
+import { DocumentViewComponent } from './document-view.component';
+import { Component, OnInit, computed, inject, signal, viewChild } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { CustomerStatement, StorefrontService } from './storefront.service';
 import { StorefrontSeoService } from './storefront-seo.service';
@@ -6,7 +14,7 @@ import { PoweredByDukarunComponent } from './powered-by-dukarun.component';
 
 @Component({
   selector: 'app-statement',
-  imports: [PoweredByDukarunComponent],
+  imports: [PoweredByDukarunComponent, DocumentViewComponent],
   template: `
     <main class="min-h-screen bg-base-200 p-4 py-10 print:bg-white print:p-0">
       <div class="mx-auto max-w-xl print:max-w-none">
@@ -128,42 +136,11 @@ import { PoweredByDukarunComponent } from './powered-by-dukarun.component';
                   }
                 </section>
               }
-              @if (printRows(s).length > 0) {
-                <section class="statement-activity-print mt-5 hidden print:block">
-                  <h2 class="mb-2 font-semibold">Account activity</h2>
-                  <table class="table table-sm">
-                    <thead>
-                      <tr>
-                        <th>Date</th>
-                        <th>Reference</th>
-                        <th>Description</th>
-                        <th class="text-right">Debit</th>
-                        <th class="text-right">Credit</th>
-                        <th class="text-right">Balance</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      @for (activity of printRows(s); track activity.id) {
-                        <tr>
-                          <td>{{ date(activity.date) }}</td>
-                          <td>{{ activity.reference }}</td>
-                          <td>{{ activity.description || activityLabel(activity.kind) }}</td>
-                          <td class="text-right">
-                            {{ activityDebit(activity) > 0 ? money(activityDebit(activity)) : '—' }}
-                          </td>
-                          <td class="text-right">
-                            {{
-                              activityCredit(activity) > 0 ? money(activityCredit(activity)) : '—'
-                            }}
-                          </td>
-                          <td class="text-right font-semibold">
-                            {{ money(activity.balance ?? 0) }}
-                          </td>
-                        </tr>
-                      }
-                    </tbody>
-                  </table>
-                </section>
+              @if (documentPreview(); as preview) {
+                <details class="mt-5">
+                  <summary class="cursor-pointer py-3 font-semibold">Document preview</summary>
+                  <app-document-view [document]="preview" />
+                </details>
               }
               @if (s.payment_instructions) {
                 <div class="mt-5 rounded-box border border-base-300 p-4">
@@ -234,6 +211,59 @@ export class StatementComponent implements OnInit {
   protected readonly printError = signal<string | null>(null);
   protected readonly printActivities = signal<CustomerStatement['activities']>([]);
   private token: string | null = null;
+  private readonly documentView = viewChild(DocumentViewComponent);
+  protected readonly documentPreview = computed(() => {
+    const s = this.statement();
+    if (!s) return null;
+    const identity = {
+      name: s.store_name,
+      logoUrl: this.storefront.companyLogoUrl(s.logo_path),
+      address: s.company_address,
+      email: s.company_email,
+      phone: s.whatsapp_number,
+      website: s.company_website,
+    };
+    const rows = this.printRows(s).map(r => ({
+      id: r.id,
+      date: r.date,
+      reference: r.reference,
+      description: r.description || this.activityLabel(r.kind),
+      debit: this.activityDebit(r),
+      credit: this.activityCredit(r),
+      balance: r.balance ?? 0,
+    }));
+    const content: DocumentContent = rows.length
+      ? statementContent({
+          company: identity,
+          customerName: s.customer_first_name,
+          currency: 'KES',
+          generatedAt: s.generated_at,
+          rows,
+        })
+      : {
+          kind: 'statement',
+          identity,
+          reference: s.customer_first_name,
+          metadata: [{ label: 'Generated', value: documentDate(s.generated_at) }],
+          sections: [],
+          totals: [{ label: 'Account balance', value: documentMoney(s.account_balance) }],
+        };
+    if (s.orders.length)
+      content.sections = [
+        ...content.sections,
+        {
+          title: 'Open invoices',
+          columns: [{ label: 'Sale' }, { label: 'Due' }, { label: 'Balance', numeric: true }],
+          rows: s.orders.map(o => [
+            o.code,
+            o.due_date ? documentDate(o.due_date) : 'On delivery',
+            documentMoney(o.balance),
+          ]),
+        },
+      ];
+    content.notes = s.payment_instructions;
+    return renderDocument(content, s.document_design);
+  });
 
   async ngOnInit(): Promise<void> {
     this.seo.set('Private customer statement', 'Secure customer statement.', '/statement', true);
@@ -280,7 +310,7 @@ export class StatementComponent implements OnInit {
       const visitedCursors = new Set<string>();
       while (hasMore) {
         const cursor = activities[activities.length - 1];
-        if (!cursor) break;
+        if (!cursor) throw new Error('The complete statement could not be loaded.');
         const cursorKey = `${cursor.date}:${cursor.id}`;
         if (visitedCursors.has(cursorKey)) {
           throw new Error('Statement preparation stopped because pagination did not advance.');
@@ -301,7 +331,7 @@ export class StatementComponent implements OnInit {
       }
       this.printActivities.set(activities);
       await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
-      window.print();
+      await this.documentView()?.print();
     } catch (error) {
       this.printError.set(
         error instanceof Error ? error.message : 'Statement could not be printed'

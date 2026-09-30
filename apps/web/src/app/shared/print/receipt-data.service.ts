@@ -1,10 +1,14 @@
+import { ServerClockService } from '../../core/server-clock.service';
+import { TaxSettingsSourceService } from '../../core/tax-settings-source.service';
+import type { DocumentDesigns } from '@dukarun/documents';
 import { transactionUnitLabel } from '@dukarun/pack-types';
 import { Injectable, inject } from '@angular/core';
 import { CatalogIdentityLookupService } from '../../core/identity-lookup.services';
 import { SupabaseService } from '../../core/supabase.service';
 import { PosService, variantLabel } from '../../pos/pos.service';
+import type { SaleDocumentContext } from '../../communications/sale-document.service';
 import { ProfileService } from '../../profile/profile.service';
-import type { OrderData, PrintMeta, PurchaseData } from './print-templates';
+import type { OrderData, PrintMeta, PurchaseData } from './print-data';
 
 export interface CompanyPrintInfo {
   name: string;
@@ -12,10 +16,15 @@ export interface CompanyPrintInfo {
   /** Full public URL: kept as-is when logo_path is absolute, resolved from the company-logos bucket otherwise. */
   logoUrl: string | null;
   address: string | null;
+  email?: string | null;
+  phone?: string | null;
+  website?: string | null;
+  documentDesigns?: DocumentDesigns;
   printerEnabled: boolean;
   showVatBreakdown: boolean;
   vatRegistered: boolean;
   taxRegistrationNumber: string | null;
+  businessTimezone?: string;
 }
 
 const METHOD_LABELS: Record<string, string> = {
@@ -48,6 +57,8 @@ export class ReceiptDataService {
   private readonly supabase = inject(SupabaseService);
   private readonly pos = inject(PosService);
   private readonly catalogIdentities = inject(CatalogIdentityLookupService);
+  private readonly clock = inject(ServerClockService);
+  private readonly taxSettingsSource = inject(TaxSettingsSourceService);
   private readonly profile = inject(ProfileService);
 
   private get db() {
@@ -55,20 +66,40 @@ export class ReceiptDataService {
   }
 
   private settings: CompanyPrintInfo | null = null;
+  private settingsRevision = 0;
+  private settingsExpiresAt = 0;
 
-  /** Company branding + printer flag (cached per app run). */
+  /** Short cache, bounded by the next server VAT activation as well. */
   async companyPrintInfo(): Promise<CompanyPrintInfo> {
-    if (this.settings) return this.settings;
-    const [{ data, error }, { data: taxSettings, error: taxError }] = await Promise.all([
+    const currentTime = this.clock.now();
+    if (this.settings && currentTime !== null && currentTime < this.settingsExpiresAt)
+      return this.settings;
+    const revision = this.settingsRevision;
+    const [{ data, error }, taxSettings] = await Promise.all([
       this.db
         .from('companies')
-        .select('name, code, address, logo_path, enable_printer, show_vat_breakdown_on_prints')
+        .select(
+          'name, code, address, email, public_whatsapp_number, website_url, document_designs, logo_path, enable_printer, show_vat_breakdown_on_prints, business_timezone'
+        )
         .limit(1)
         .single(),
-      this.db.rpc('company_tax_settings'),
+      this.taxSettingsSource.read(),
     ]);
     if (error) throw error;
-    if (taxError) throw taxError;
+    if (revision !== this.settingsRevision) return this.companyPrintInfo();
+    const timing = taxSettings as {
+      activation?: { server_time?: string };
+      scheduled_profiles?: { effective_from_at?: string }[];
+    } | null;
+    const serverNow = this.clock.now();
+    const nextChange = timing?.scheduled_profiles
+      ?.map(p => Date.parse(p.effective_from_at ?? ''))
+      .filter(at => Number.isFinite(at) && serverNow !== null && at > serverNow)
+      .sort((a, b) => a - b)[0];
+    this.settingsExpiresAt =
+      serverNow === null
+        ? 0
+        : serverNow + Math.min(60_000, nextChange ? nextChange - serverNow : 60_000);
     const activeProfile = (
       taxSettings as {
         active_profile?: {
@@ -80,6 +111,7 @@ export class ReceiptDataService {
     const logoPath = data.logo_path;
     this.settings = {
       name: data.name,
+      businessTimezone: data.business_timezone,
       code: data.code,
       logoUrl: logoPath
         ? logoPath.startsWith('http')
@@ -87,6 +119,10 @@ export class ReceiptDataService {
           : this.db.storage.from('company-logos').getPublicUrl(logoPath).data.publicUrl
         : null,
       address: data.address,
+      email: data.email,
+      phone: data.public_whatsapp_number,
+      website: data.website_url,
+      documentDesigns: data.document_designs as unknown as DocumentDesigns,
       printerEnabled: data.enable_printer,
       showVatBreakdown: data.show_vat_breakdown_on_prints,
       vatRegistered: activeProfile?.vat_registered ?? false,
@@ -97,6 +133,7 @@ export class ReceiptDataService {
 
   /** Drop the cached settings so the next print reflects new branding (logo/name/address). */
   invalidateCompanyInfo(): void {
+    this.settingsRevision++;
     this.settings = null;
   }
 
@@ -113,6 +150,16 @@ export class ReceiptDataService {
     return this.buildOrderDocumentData(orderId, 'receipt');
   }
 
+  async buildInvoiceData(orderId: string): Promise<{ order: OrderData; meta: PrintMeta }> {
+    return this.buildOrderDocumentData(orderId, 'invoice');
+  }
+
+  /** Select the saved design from authoritative settlement, including credit and reversals. */
+  async buildSaleDocumentData(orderId: string): Promise<{ order: OrderData; meta: PrintMeta }> {
+    const financials = await this.saleContext(orderId);
+    return this.buildOrderDocumentData(orderId, financials.document_type, financials);
+  }
+
   /** Proformas remain printable, but only as explicitly labeled draft documents. */
   async buildProformaData(orderId: string): Promise<{ order: OrderData; meta: PrintMeta }> {
     return this.buildOrderDocumentData(orderId, 'proforma');
@@ -121,7 +168,8 @@ export class ReceiptDataService {
   /** Order + lines (labeled via variant_catalog) + payments + customer → OrderData. */
   private async buildOrderDocumentData(
     orderId: string,
-    documentType: 'receipt' | 'proforma'
+    documentType: 'receipt' | 'invoice' | 'proforma',
+    context?: SaleDocumentContext
   ): Promise<{ order: OrderData; meta: PrintMeta }> {
     const [order, lines, payments, company, taxDocument, servedBy] = await Promise.all([
       this.pos.getOrder(orderId),
@@ -130,21 +178,28 @@ export class ReceiptDataService {
       this.companyPrintInfo(),
       this.db
         .from('tax_documents')
-        .select('document_number')
+        .select('document_number, issuer_tax_registration_number')
         .eq('source_order_id', orderId)
         .eq('document_kind', 'invoice')
         .maybeSingle(),
-      documentType === 'receipt' ? this.currentStaffFirstName() : Promise.resolve(undefined),
+      documentType !== 'proforma' ? this.currentStaffFirstName() : Promise.resolve(undefined),
     ]);
     if (taxDocument.error) throw taxDocument.error;
-    if (documentType === 'receipt' && order.status !== 'completed') {
+    if (documentType !== 'proforma' && order.status !== 'completed') {
       throw new Error('Receipt unavailable — complete payment before printing.');
     }
     if (documentType === 'proforma' && order.status !== 'draft') {
       throw new Error('This order is no longer a draft, so its proforma cannot be printed.');
     }
+    const financials =
+      documentType !== 'proforma' ? (context ?? (await this.saleContext(orderId))) : undefined;
+    if (documentType !== 'proforma' && !financials) throw new Error('Sale balance unavailable.');
+    if (documentType === 'receipt' && financials!.balance > 0)
+      throw new Error('This sale has an open balance. Print its invoice instead.');
+    if (documentType === 'invoice' && (!order.is_credit_sale || financials!.balance <= 0))
+      throw new Error('This sale is fully paid. Print its receipt instead.');
     const estimate =
-      order.tax_snapshot_status === 'pending'
+      order.status !== 'completed' && order.tax_snapshot_status === 'pending'
         ? await this.db.rpc('estimate_order_tax', { p_order_id: orderId })
         : null;
     if (estimate?.error) throw estimate.error;
@@ -205,6 +260,9 @@ export class ReceiptDataService {
       orderPlacedAt: order.created_at,
       total: order.total,
       totalWithTax: order.total,
+      paidAmount: financials?.paid,
+      openBalance: financials?.balance,
+      businessTimezone: company.businessTimezone,
       netTotal: estimatedTax?.net_total ?? order.net_total,
       taxTotal: estimatedTax?.tax_total ?? order.tax_total,
       taxDocumentNumber: taxDocument.data?.document_number ?? null,
@@ -262,8 +320,11 @@ export class ReceiptDataService {
       documentType,
       servedBy,
       showVatBreakdown: company.showVatBreakdown,
-      vatRegistered: company.vatRegistered,
-      taxRegistrationNumber: company.taxRegistrationNumber,
+      vatRegistered: documentType !== 'proforma' ? !!taxDocument.data : company.vatRegistered,
+      taxRegistrationNumber:
+        documentType !== 'proforma'
+          ? (taxDocument.data?.issuer_tax_registration_number ?? null)
+          : company.taxRegistrationNumber,
       paymentMethodName:
         payments.length > 0
           ? [...new Set(payments.map(p => METHOD_LABELS[p.method_code] ?? p.method_code))].join(
@@ -274,6 +335,12 @@ export class ReceiptDataService {
             : 'N/A',
     };
     return { order: orderData, meta };
+  }
+
+  private async saleContext(orderId: string): Promise<SaleDocumentContext> {
+    const { data, error } = await this.db.rpc('sale_document_context', { p_order_id: orderId });
+    if (error) throw error;
+    return data as unknown as SaleDocumentContext;
   }
 
   private async currentStaffFirstName(): Promise<string | undefined> {

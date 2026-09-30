@@ -17,6 +17,7 @@ import { SyncService } from '../offline/sync.service';
 import { type CustomerWithCredit, PosRpcError, PosService } from '../pos.service';
 import { SellCatalogStore } from './sell-catalog.store';
 import { SellWorkflowStore } from './sell-workflow.store';
+import { SaleDocumentService } from '../../communications/sale-document.service';
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -103,6 +104,9 @@ describe('SellWorkflowStore', () => {
       lineTotal: vi.fn().mockReturnValue(100),
     };
     pos = {
+      getOrder: vi
+        .fn()
+        .mockResolvedValue({ id: 'order-1', status: 'completed', total: 100, code: 'SALE-1' }),
       postSale: vi.fn().mockResolvedValue({ status: 'completed', orderId: 'order-1' }),
       postSaleWithPrepayment: vi
         .fn()
@@ -178,6 +182,13 @@ describe('SellWorkflowStore', () => {
           provide: CashierSessionService,
           useValue: {
             assertOpen: vi.fn().mockResolvedValue(undefined),
+            captureOfflineSale: vi.fn(() => ({
+              offline_context_id: 'context-1',
+              originating_session_id: 'session-1',
+              occurred_at: '2026-09-29T09:00:00Z',
+              device_key: 'device-1',
+              location_id: 'location-1',
+            })),
             canTakePayment: vi.fn().mockReturnValue(true),
             cashierFlowEnabled: vi.fn().mockReturnValue(true),
           },
@@ -243,6 +254,33 @@ describe('SellWorkflowStore', () => {
       expect.any(String)
     );
     expect(cart['clear']).toHaveBeenCalledOnce();
+    expect(TestBed.inject(SaleDocumentService).modal()).toBeNull();
+  });
+
+  it('opens the receipt celebration after a completed cash sale', async () => {
+    const store = TestBed.inject(SellWorkflowStore);
+    pos['getOrder'].mockRejectedValue(new Error('Network interrupted after checkout'));
+    await store.completeSale([{ method: 'cash', amount: 100 }]);
+    expect(TestBed.inject(SaleDocumentService).modal()).toEqual({
+      orderId: 'order-1',
+      celebrate: true,
+      total: 100,
+      code: undefined,
+    });
+    expect(pos['getOrder']).not.toHaveBeenCalled();
+  });
+
+  it('does not open a receipt for a payment still pending on the server', async () => {
+    pos['postSale'].mockResolvedValue({ orderId: 'order-1', status: 'parked' });
+    await TestBed.inject(SellWorkflowStore).completeSale([{ method: 'cash', amount: 100 }]);
+    expect(TestBed.inject(SaleDocumentService).modal()).toBeNull();
+  });
+
+  it('does not open a receipt when approval is required', async () => {
+    pos['postSale'].mockResolvedValue({ status: 'approval_required', orderId: 'order-1' });
+    await TestBed.inject(SellWorkflowStore).completeSale([{ method: 'cash', amount: 100 }]);
+    expect(pos['getOrder']).not.toHaveBeenCalled();
+    expect(TestBed.inject(SaleDocumentService).modal()).toBeNull();
   });
 
   it('keeps deposit and tender allocation together in mixed settlement', async () => {
@@ -283,6 +321,7 @@ describe('SellWorkflowStore', () => {
   });
 
   it('passes the committed fulfillment snapshot to a COD checkout', async () => {
+    fulfillment['checkout'].mockResolvedValueOnce({ status: 'pending', order_id: 'order-1' });
     const store = TestBed.inject(SellWorkflowStore);
     await store.fulfillmentModeChanged('pickup');
     const codDraft = {
@@ -296,9 +335,12 @@ describe('SellWorkflowStore', () => {
       expect.objectContaining({ customer: codDraft.customer, fulfillment: codDraft.fulfillment })
     );
     expect(cart['clear']).toHaveBeenCalledOnce();
+    expect(TestBed.inject(SaleDocumentService).modal()).toBeNull();
   });
 
   it('uses the selected customer and fulfillment snapshot for credit checkout', async () => {
+    const advisory = deferred<void>();
+    insights['recordCreditAdvisory'].mockReturnValueOnce(advisory.promise);
     const store = TestBed.inject(SellWorkflowStore);
     store.selectCustomer(customer as CustomerWithCredit);
     await store.fulfillmentModeChanged('pickup');
@@ -307,6 +349,11 @@ describe('SellWorkflowStore', () => {
     store.confirmCreditSale();
 
     await vi.waitFor(() => expect(fulfillment['creditCheckout']).toHaveBeenCalledOnce());
+    expect(TestBed.inject(SaleDocumentService).modal()).toMatchObject({
+      orderId: 'order-1',
+      celebrate: true,
+    });
+    advisory.resolve();
     expect(fulfillment['creditCheckout']).toHaveBeenCalledWith(
       expect.objectContaining({
         customerId: customer.id,
@@ -316,7 +363,9 @@ describe('SellWorkflowStore', () => {
       })
     );
     expect(cart['clear']).toHaveBeenCalledOnce();
-    expect(learning.track).toHaveBeenCalledWith('dukarun_credit_sale_completed');
+    await vi.waitFor(() =>
+      expect(learning.track).toHaveBeenCalledWith('dukarun_credit_sale_completed')
+    );
   });
 
   it('requires and records a reason before adding credit to an overdue account', async () => {
@@ -369,6 +418,10 @@ describe('SellWorkflowStore', () => {
       expect.objectContaining({ clientRef: expect.any(String), lines: saleLines })
     );
     expect(cart['clear']).toHaveBeenCalledOnce();
+    expect(TestBed.inject(SaleDocumentService).modal()).toMatchObject({
+      orderId: 'order-1',
+      celebrate: true,
+    });
   });
 
   it('retains a split M-PESA sale until the cash side is confirmed', async () => {

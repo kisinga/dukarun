@@ -2,6 +2,12 @@ import { Injectable, inject } from '@angular/core';
 import type { Database, Json } from '@dukarun/shared-types';
 import { SupabaseService } from '../core/supabase.service';
 import { rpcError } from '../pos/pos.service';
+import type {
+  DocumentDesign,
+  DocumentDesigns,
+  DocumentKind,
+  ShopSetupState,
+} from '@dukarun/documents';
 
 export type PaymentMethodRow = Database['public']['Tables']['payment_methods']['Row'];
 export type StockLocationRow = Database['public']['Tables']['stock_locations']['Row'];
@@ -62,6 +68,9 @@ export interface CompanySettings {
   address: string | null;
   email: string | null;
   logo_path: string | null;
+  website_url?: string | null;
+  shop_setup?: ShopSetupState;
+  document_designs?: DocumentDesigns;
   public_storefront_enabled: boolean;
   public_slug: string | null;
   public_whatsapp_number: string | null;
@@ -92,6 +101,9 @@ const SELECT_COLUMNS = [
   'address',
   'email',
   'logo_path',
+  'website_url',
+  'shop_setup',
+  'document_designs',
   'public_storefront_enabled',
   'public_slug',
   'public_whatsapp_number',
@@ -135,17 +147,41 @@ export class SettingsService {
   }
 
   /** Patch ONLY the granted columns (see UPDATABLE_COLUMNS contract). */
-  async updateSettings(id: string, patch: Partial<Omit<CompanySettings, 'id'>>): Promise<void> {
+  async updateSettings(
+    id: string,
+    patch: Partial<Omit<CompanySettings, 'id' | 'shop_setup' | 'document_designs'>>
+  ): Promise<void> {
     const { error } = await this.db.from('companies').update(patch).eq('id', id);
     if (error) throw new Error(error.message);
   }
 
+  async saveDocumentDesign(kind: DocumentKind, design: DocumentDesign): Promise<DocumentDesign> {
+    const { data, error } = await this.db.rpc('save_document_design', {
+      p_document_type: kind,
+      p_design: design as unknown as Json,
+    });
+    if (error) throw rpcError(error);
+    return data as unknown as DocumentDesign;
+  }
+
+  async saveShopSetup(patch: Partial<ShopSetupState>): Promise<ShopSetupState> {
+    const { data, error } = await this.db.rpc('save_shop_setup', { p_patch: patch as Json });
+    if (error) throw rpcError(error);
+    return data as unknown as ShopSetupState;
+  }
+
+  async shopAddressAvailability(slug: string): Promise<{ available: boolean; suggestion: string }> {
+    const { data, error } = await this.db.rpc('shop_address_availability', { p_slug: slug });
+    if (error) throw rpcError(error);
+    return data as unknown as { available: boolean; suggestion: string };
+  }
+
   /**
-   * Upload the company logo to a fixed path (overwrites any previous one),
-   * then point logo_path at it. Returns the storage path.
+   * Give each uploaded logo a stable URL so previews do not reuse a cached previous logo.
+   * The existing company record and company-logos bucket remain authoritative.
    */
   async uploadLogo(companyId: string, file: Blob, ext: string): Promise<string> {
-    const path = `${companyId}/logo.${ext}`;
+    const path = `${companyId}/logo-${crypto.randomUUID()}.${ext}`;
     const { error } = await this.db.storage
       .from('company-logos')
       .upload(path, file, { upsert: true });
@@ -154,21 +190,14 @@ export class SettingsService {
     return path;
   }
 
-  /** Remove all objects under the company logo prefix and clear logo_path. */
+  /** Issued documents retain their versioned branding; only clear the current logo. */
   async removeLogo(companyId: string): Promise<void> {
-    const bucket = this.db.storage.from('company-logos');
-    const { data: objects, error: listError } = await bucket.list(`${companyId}`);
-    if (listError) throw new Error(listError.message);
-    const paths = (objects ?? []).map(o => `${companyId}/${o.name}`);
-    if (paths.length > 0) {
-      const { error: removeError } = await bucket.remove(paths);
-      if (removeError) throw new Error(removeError.message);
-    }
     await this.updateSettings(companyId, { logo_path: null });
   }
 
-  /** Public URL for a stored logo path (bucket is public). */
+  /** Preserve absolute logo URLs; resolve stored paths against the public bucket. */
   logoPublicUrl(logoPath: string): string {
+    if (/^https?:\/\//i.test(logoPath)) return logoPath;
     return this.db.storage.from('company-logos').getPublicUrl(logoPath).data.publicUrl;
   }
 

@@ -1,5 +1,5 @@
 begin;
-select plan(20);
+select plan(21);
 
 select has_column('public','orders','pending_owner',
   'pending orders declare which workflow owns the next action');
@@ -47,6 +47,12 @@ select testkit.as_user(
   'Admin'
 );
 
+select throws_ok($$select public.post_sale(null,
+ '[{"variant_id":"aa000000-0000-0000-0000-000000000054","quantity":1,"unit_price":10000}]',
+ '[{"method":"cash","amount":10000}]')$$,'P0001',
+ 'cashier_session_required: open a session before recording this transaction',
+ 'cash counting off never removes the open-session requirement');
+create temp table direct_session as select testkit.ensure_open_session() id;
 create temp table direct_sale as
 select public.post_sale(
   null,
@@ -54,7 +60,7 @@ select public.post_sale(
   '[{"method":"cash","amount":10000}]'
 ) as order_id;
 
-select ok((select order_id from direct_sale) is not null, 'direct checkout works without a till');
+select ok((select order_id from direct_sale) is not null, 'direct checkout works with cash counting disabled');
 select is(
   (select status from public.orders where id = (select order_id from direct_sale)),
   'completed',
@@ -62,8 +68,8 @@ select is(
 );
 select is(
   (select cashier_session_id from public.orders where id = (select order_id from direct_sale)),
-  null::uuid,
-  'direct checkout does not attach a cashier session'
+  (select id from direct_session),
+  'direct checkout retains its cashier session'
 );
 
 select throws_ok(
@@ -78,7 +84,7 @@ select throws_ok(
 );
 
 create temp table offline_sale as
-select public.post_offline_sale_at_location(
+select testkit.post_offline_sale(
   (select id from public.stock_locations
    where company_id=(select company_id from flow_company) and is_default),
   null,
@@ -139,6 +145,7 @@ select is(
 update public.companies
 set cash_control_enabled = true
 where id = (select company_id from flow_company);
+select testkit.close_open_session();
 
 select throws_ok(
   $$select public.post_sale(
@@ -153,8 +160,8 @@ select throws_ok(
 
 select is(
   (select count(*) from public.cashier_sessions where company_id = (select company_id from flow_company)),
-  0::bigint,
-  'mode checks do not create hidden cashier sessions'
+  1::bigint,
+  'mode checks do not create additional hidden cashier sessions'
 );
 
 reset role;

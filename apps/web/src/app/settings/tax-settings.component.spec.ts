@@ -31,6 +31,7 @@ const activeProfile = {
 describe('TaxSettingsComponent', () => {
   async function render(active = true) {
     const tax = {
+      watchSettings: vi.fn(() => () => undefined),
       settings: vi.fn().mockResolvedValue({
         show_vat_breakdown_on_prints: true,
         business_timezone: 'Africa/Nairobi',
@@ -121,7 +122,6 @@ describe('TaxSettingsComponent', () => {
       jurisdictionId: jurisdiction.id,
       vatRegistered: true,
       taxRegistrationNumber: '',
-      effectiveFrom: '2026-08-21',
       defaultTaxCategoryId: 'category-standard',
     });
   });
@@ -135,5 +135,41 @@ describe('TaxSettingsComponent', () => {
 
     expect(tax.updateRegistrationNumber).toHaveBeenCalledWith(activeProfile.id, 'P000000001A');
     expect(tax.scheduleProfile).not.toHaveBeenCalled();
+  });
+  it('offers immediate activation even after trading, with an optional future date', async () => {
+    const { fixture, tax } = await render(false);
+    const component = fixture.componentInstance as any;
+    component.settings.update((s: any) => ({
+      ...s,
+      activation: {
+        ...s.activation,
+        has_financial_activity_today: true,
+        earliest_effective_from: '2026-08-22',
+      },
+    }));
+    component.openEditor(true);
+    fixture.detectChanges();
+    expect(component.activationMode.value).toBe('now');
+    expect(fixture.nativeElement.textContent).toContain('Turn on VAT now');
+    expect(fixture.nativeElement.querySelector('input[type="date"]')).toBeNull();
+    fixture.nativeElement.querySelector('input[value="scheduled"]').click();
+    component.effectiveFrom.setValue('2026-08-25');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Starts at midnight in Africa/Nairobi');
+    await component.saveProfile();
+    expect(tax.scheduleProfile).toHaveBeenCalledWith(
+      expect.objectContaining({ effectiveFrom: '2026-08-25' })
+    );
+  });
+  it('keeps the editor available when a save fails', async () => {
+    const { fixture, tax } = await render(false);
+    const component = fixture.componentInstance as any;
+    component.openEditor(true);
+    tax.scheduleProfile.mockRejectedValueOnce(new Error('Connection lost'));
+    await component.saveProfile();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Connection lost');
+    expect(fixture.nativeElement.textContent).toContain('Turn on VAT now');
+    expect(component.profileEditorOpen()).toBe(true);
   });
 });

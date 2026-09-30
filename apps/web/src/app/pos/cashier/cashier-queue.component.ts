@@ -1,3 +1,5 @@
+import { SaleDocumentModalComponent } from '../../communications/sale-document-modal.component';
+import { SaleDocumentService } from '../../communications/sale-document.service';
 import { bindListQuery, listQueryField } from '../../shared/list/list-query';
 import {
   Component,
@@ -58,6 +60,7 @@ const QUEUE_SORT_OPTIONS: readonly ListSortOption[] = [
 @Component({
   selector: 'app-cashier-queue',
   imports: [
+    SaleDocumentModalComponent,
     RouterLink,
     CheckoutPanelComponent,
     PageLayoutComponent,
@@ -76,6 +79,7 @@ const QUEUE_SORT_OPTIONS: readonly ListSortOption[] = [
     PageActionsComponent,
   ],
   template: `
+    <app-sale-document-modal />
     <app-page
       title="Cashier Queue"
       subtitle="Collect payment for sales handed off from the Sell screen."
@@ -114,16 +118,16 @@ const QUEUE_SORT_OPTIONS: readonly ListSortOption[] = [
               {{ printerEnabled() ? 'The receipt is ready.' : 'The sale is finalized.' }}
             </p>
           </div>
-          @if (printerEnabled()) {
+          @if (completed.id) {
             <button
               appButton
               variant="outline"
               size="sm"
               [loading]="printing()"
-              (click)="printReceipt(completed.id)"
+              (click)="saleDocuments.open(completed.id, false, undefined, completed.code)"
             >
               <app-icon name="heroPrinter" />
-              Print receipt
+              Receipt options
             </button>
           }
           <button
@@ -417,6 +421,7 @@ const QUEUE_SORT_OPTIONS: readonly ListSortOption[] = [
   `,
 })
 export class CashierQueueComponent implements OnInit, OnDestroy {
+  protected readonly saleDocuments = inject(SaleDocumentService);
   protected readonly tableColumns1: TableColumn[] = [
     { key: 'sale', label: 'Sale / waiting time', pinned: true },
     { key: 'column2', label: 'Customer' },
@@ -768,6 +773,7 @@ export class CashierQueueComponent implements OnInit, OnDestroy {
     this.settleClientRef = null;
     this.settleMpesaRetryAllowed = false;
     this.completedSale.set({ id: orderId, code });
+    this.saleDocuments.open(orderId, true, undefined, code);
   }
 
   protected async startSettlement(order: OrderWithCustomer): Promise<void> {

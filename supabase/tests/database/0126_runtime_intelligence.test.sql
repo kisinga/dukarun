@@ -1,6 +1,8 @@
 -- Incremental credit and product intelligence: evidence, scoring, sparse
 -- positions, bounded reads, role-shaped responses and legacy compatibility.
 begin;
+-- Historical fixture dates only; rollback restores the production guard.
+alter table public.orders disable trigger orders_preserve_capture_times;
 select no_plan();
 
 select has_table('public','credit_document_performance','credit documents are cached');
@@ -101,6 +103,7 @@ create temp table late_order as select
     '[]',false,'insight-late-sale')->>'order_id')::uuid id;
 grant select on pg_temp.late_order to authenticated;
 reset role;
+-- Historical fixture setup only; production finalized timestamps stay immutable.
 update public.orders set completed_at=now()-interval '100 days',credit_due_at=current_date-70
 where id=(select id from late_order);
 select testkit.as_user(

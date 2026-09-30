@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import type { TaxCategory } from '@dukarun/tax-types';
 import { PermissionsService } from '../core/permissions.service';
@@ -40,12 +40,14 @@ import { ReceiptDataService } from '../shared/print/receipt-data.service';
 
         @if (loading()) {
           <p class="type-caption mt-4">Loading VAT settings…</p>
-        } @else if (error()) {
+        }
+        @if (error()) {
           <div role="alert" class="alert alert-error mt-4 text-sm">
             <app-icon name="heroExclamationTriangle" />
             <span>{{ error() }}</span>
           </div>
-        } @else if (settings(); as current) {
+        }
+        @if (settings(); as current) {
           <div class="mt-4 rounded-box border border-base-300 p-3">
             <div class="flex flex-wrap items-center justify-between gap-3">
               <div>
@@ -67,7 +69,7 @@ import { ReceiptDataService } from '../shared/print/receipt-data.service';
                   </p>
                 }
               </div>
-              @if (canManage() && !profileEditorOpen() && current.scheduled_profiles.length === 0) {
+              @if (canManage() && !profileEditorOpen()) {
                 <button
                   appButton
                   type="button"
@@ -268,24 +270,41 @@ import { ReceiptDataService } from '../shared/print/receipt-data.service';
                   </app-form-field>
                 }
 
-                <app-form-field
-                  [label]="
-                    registered.value ? 'First VAT business date' : 'First non-VAT business date'
-                  "
-                  [hint]="
-                    current.activation.has_financial_activity_today
-                      ? 'Today has finalized activity. The earliest safe date is tomorrow.'
-                      : 'Today is available because no financial activity has finalized yet.'
-                  "
-                  [required]="true"
-                >
-                  <input
-                    type="date"
-                    class="input input-bordered w-full"
-                    [min]="current.activation.earliest_effective_from"
-                    [formControl]="effectiveFrom"
-                  />
-                </app-form-field>
+                <fieldset class="space-y-2">
+                  <legend class="form-field-label">When should this change apply?</legend>
+                  <label class="flex items-center gap-2">
+                    <input
+                      class="radio radio-sm"
+                      type="radio"
+                      value="now"
+                      [formControl]="activationMode"
+                    />
+                    Immediately
+                  </label>
+                  <label class="flex items-center gap-2">
+                    <input
+                      class="radio radio-sm"
+                      type="radio"
+                      value="scheduled"
+                      [formControl]="activationMode"
+                    />
+                    Schedule for a future date
+                  </label>
+                </fieldset>
+                @if (activationMode.value === 'scheduled') {
+                  <app-form-field
+                    label="Start date"
+                    [hint]="'Starts at midnight in ' + current.business_timezone"
+                    [required]="true"
+                  >
+                    <input
+                      type="date"
+                      class="input input-bordered w-full"
+                      [min]="minimumScheduledDate()"
+                      [formControl]="effectiveFrom"
+                    />
+                  </app-form-field>
+                }
 
                 @if (registered.value) {
                   <app-form-field
@@ -316,8 +335,8 @@ import { ReceiptDataService } from '../shared/print/receipt-data.service';
               >
                 {{
                   registered.value
-                    ? 'Prices stay unchanged. Dukarun extracts VAT from them from the selected date. The business remains responsible for its tax obligations.'
-                    : 'New sales from the selected date will not record output VAT. Historical transactions remain unchanged.'
+                    ? 'Prices stay unchanged. VAT is calculated when each sale posts, including sales captured offline before activation.'
+                    : 'Sales posted after this change will not record output VAT. Completed sales and their tax documents stay unchanged.'
                 }}
               </div>
 
@@ -325,10 +344,10 @@ import { ReceiptDataService } from '../shared/print/receipt-data.service';
                 <button appButton type="submit" [loading]="saving()">
                   {{
                     registered.value
-                      ? effectiveFrom.value === current.activation.business_date
+                      ? activationMode.value === 'now'
                         ? 'Turn on VAT now'
                         : 'Schedule VAT on'
-                      : effectiveFrom.value === current.activation.business_date
+                      : activationMode.value === 'now'
                         ? 'Turn off VAT now'
                         : 'Schedule VAT off'
                   }}
@@ -349,6 +368,7 @@ export class TaxSettingsComponent implements OnInit {
   private readonly tax = inject(TaxService);
   private readonly receiptData = inject(ReceiptDataService);
   private readonly permissions = inject(PermissionsService);
+  private readonly destroy = inject(DestroyRef);
 
   protected readonly settings = signal<CompanyTaxSettings | null>(null);
   protected readonly categories = signal<TaxCategory[]>([]);
@@ -391,6 +411,16 @@ export class TaxSettingsComponent implements OnInit {
     nonNullable: true,
     validators: Validators.required,
   });
+  protected readonly activationMode = new FormControl<'now' | 'scheduled'>('now', {
+    nonNullable: true,
+  });
+  protected readonly minimumScheduledDate = computed(() => {
+    const date = this.settings()?.activation.business_date;
+    if (!date) return '';
+    const next = new Date(date + 'T12:00:00Z');
+    next.setUTCDate(next.getUTCDate() + 1);
+    return next.toISOString().slice(0, 10);
+  });
   protected readonly effectiveFrom = new FormControl('', {
     nonNullable: true,
     validators: Validators.required,
@@ -405,6 +435,20 @@ export class TaxSettingsComponent implements OnInit {
 
   async ngOnInit(): Promise<void> {
     await this.load();
+    if (this.destroy.destroyed) return;
+    this.destroy.onDestroy(
+      this.tax.watchSettings(
+        'vat-settings',
+        settings => {
+          this.settings.set(settings);
+          this.receiptData.invalidateCompanyInfo();
+          // An update from another device must not erase a form the user is editing.
+          if (this.documentPin.pristine)
+            this.documentPin.setValue(this.registrationProfile()?.tax_registration_number ?? '');
+        },
+        () => this.error.set('Could not refresh VAT status. Reconnect to see the current setting.')
+      )
+    );
   }
 
   protected async jurisdictionChanged(): Promise<void> {
@@ -440,7 +484,12 @@ export class TaxSettingsComponent implements OnInit {
   }
 
   protected async saveProfile(): Promise<void> {
-    if (this.jurisdiction.invalid || this.effectiveFrom.invalid || this.defaultCategory.invalid)
+    if (
+      this.jurisdiction.invalid ||
+      this.defaultCategory.invalid ||
+      (this.activationMode.value === 'scheduled' &&
+        (this.effectiveFrom.invalid || this.effectiveFrom.value < this.minimumScheduledDate()))
+    )
       return;
     this.saving.set(true);
     this.error.set(null);
@@ -450,14 +499,16 @@ export class TaxSettingsComponent implements OnInit {
         jurisdictionId: this.jurisdiction.value,
         vatRegistered: this.registered.value,
         taxRegistrationNumber: this.registered.value ? this.pin.value.trim() : null,
-        effectiveFrom: this.effectiveFrom.value,
+        ...(this.activationMode.value === 'scheduled'
+          ? { effectiveFrom: this.effectiveFrom.value }
+          : {}),
         defaultTaxCategoryId: this.defaultCategory.value,
       });
       this.receiptData.invalidateCompanyInfo();
       this.notice.set(
-        this.registered.value
-          ? `VAT accounting will turn on from ${this.effectiveFrom.value}.`
-          : `VAT accounting will turn off from ${this.effectiveFrom.value}.`
+        this.activationMode.value === 'now'
+          ? `VAT calculation is now ${this.registered.value ? 'on' : 'off'}. Applies to sales posted from now, including pending syncs.`
+          : `VAT will turn ${this.registered.value ? 'on' : 'off'} at midnight on ${this.effectiveFrom.value} (${this.settings()?.business_timezone}).`
       );
       this.profileEditorOpen.set(false);
       await this.load();
@@ -515,6 +566,8 @@ export class TaxSettingsComponent implements OnInit {
 
   protected openEditor(enabled: boolean): void {
     this.notice.set(null);
+    this.error.set(null);
+    this.activationMode.setValue('now');
     this.registered.setValue(enabled);
     this.profileEditorOpen.set(true);
   }
@@ -554,7 +607,7 @@ export class TaxSettingsComponent implements OnInit {
           locations.map(location => [location.id, location.tax_integration_branch_code ?? ''])
         )
       );
-      this.effectiveFrom.setValue(settings.activation.earliest_effective_from);
+      this.effectiveFrom.setValue(this.minimumScheduledDate());
       const profile = settings.active_profile;
       const jurisdictionId = profile?.jurisdiction_id ?? settings.jurisdictions[0]?.id ?? '';
       this.jurisdiction.setValue(jurisdictionId);

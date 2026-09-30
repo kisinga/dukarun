@@ -12,6 +12,7 @@
 //      APP_PUBLIC_URL (used for runtime links in durable message templates)
 
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import { processSaleDocument } from '../_shared/sale-document-delivery.ts';
 import {
   DeliveryError,
   requestProvider,
@@ -146,12 +147,18 @@ Deno.serve(async req => {
     return Response.json({ error: 'not_authorized' }, { status: 401 });
   }
 
+  // Separate durable PDF state machine: these rows must never enter the text sender.
+  EdgeRuntime.waitUntil(
+    processSaleDocument(db).catch(() => console.error('sale_document_recovery_failed'))
+  );
+
   const { data: candidates, error } = await db
     .from('outbox')
     .select(
       'id, company_id, channel, recipient, subject, body, attempts, max_attempts, campaign_id, campaign_recipient_id, customer_id, source, template_key, template_version, quota_units, quota_state, fallback_channel, fallback_body'
     )
     .eq('status', 'pending')
+    .is('document_delivery_state', null)
     .lte('scheduled_after', new Date().toISOString())
     .order('scheduled_after', { ascending: true })
     .limit(BATCH);

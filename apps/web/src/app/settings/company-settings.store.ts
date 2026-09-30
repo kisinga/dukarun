@@ -1,4 +1,6 @@
-import { Injectable, inject, signal } from '@angular/core';
+import { Injectable, effect, inject, signal } from '@angular/core';
+import { SupabaseService } from '../core/supabase.service';
+import type { DocumentDesign, DocumentKind, ShopSetupState } from '@dukarun/documents';
 import { ReceiptDataService } from '../shared/print/receipt-data.service';
 import { CompanySettings, SettingsService } from './settings.service';
 
@@ -14,6 +16,8 @@ import { CompanySettings, SettingsService } from './settings.service';
 export class CompanySettingsStore {
   private readonly settingsService = inject(SettingsService);
   private readonly receiptData = inject(ReceiptDataService);
+  private readonly supabase = inject(SupabaseService);
+  private scope = this.currentScope();
   private loadPromise: Promise<CompanySettings> | null = null;
   private loadRequest = 0;
 
@@ -23,6 +27,25 @@ export class CompanySettingsStore {
   readonly loading = this.loadingState.asReadonly();
   private readonly errorState = signal<string | null>(null);
   readonly error = this.errorState.asReadonly();
+
+  constructor() {
+    effect(() => {
+      const scope = this.currentScope();
+      if (scope === this.scope) return;
+      this.scope = scope;
+      this.loadRequest++;
+      this.loadPromise = null;
+      this.settingsState.set(null);
+      this.loadingState.set(false);
+      this.errorState.set(null);
+      this.receiptData.invalidateCompanyInfo();
+    });
+  }
+
+  private currentScope(): string | null {
+    const identity = this.supabase.offlineIdentity();
+    return identity ? `${identity.companyId}:${identity.userId}` : null;
+  }
 
   async load(force = false): Promise<CompanySettings> {
     const current = this.settings();
@@ -50,23 +73,40 @@ export class CompanySettingsStore {
     return load;
   }
 
-  async update(patch: Partial<Omit<CompanySettings, 'id'>>): Promise<CompanySettings> {
+  async update(
+    patch: Partial<Omit<CompanySettings, 'id' | 'shop_setup' | 'document_designs'>>
+  ): Promise<CompanySettings> {
     const current = this.settings() ?? (await this.load());
     await this.settingsService.updateSettings(current.id, patch);
-    const next = { ...current, ...patch };
-    this.settingsState.set(next);
+    const next = { ...(this.settings() ?? current), ...patch };
+    if (this.settings()?.id === current.id) this.settingsState.set(next);
+    this.receiptData.invalidateCompanyInfo();
     return next;
   }
 
   patchLocal(patch: Partial<Omit<CompanySettings, 'id'>>): void {
     const current = this.settings();
     if (current) this.settingsState.set({ ...current, ...patch });
+    this.receiptData.invalidateCompanyInfo();
+  }
+
+  async saveDesign(kind: DocumentKind, design: DocumentDesign): Promise<void> {
+    const company = this.settings() ?? (await this.load());
+    const saved = await this.settingsService.saveDocumentDesign(kind, design);
+    if (this.settings()?.id !== company.id) return;
+    this.patchLocal({ document_designs: { ...this.settings()?.document_designs, [kind]: saved } });
+  }
+
+  async saveSetup(patch: Partial<ShopSetupState>): Promise<void> {
+    const company = this.settings() ?? (await this.load());
+    const saved = await this.settingsService.saveShopSetup(patch);
+    if (this.settings()?.id === company.id) this.patchLocal({ shop_setup: saved });
   }
 
   async uploadLogo(file: Blob, ext: string): Promise<string> {
     const current = this.settings() ?? (await this.load());
     const logoPath = await this.settingsService.uploadLogo(current.id, file, ext);
-    this.settingsState.set({ ...current, logo_path: logoPath });
+    if (this.settings()?.id === current.id) this.patchLocal({ logo_path: logoPath });
     this.receiptData.invalidateCompanyInfo();
     return logoPath;
   }
@@ -75,7 +115,7 @@ export class CompanySettingsStore {
     const current = this.settings() ?? (await this.load());
     if (!current.logo_path) return;
     await this.settingsService.removeLogo(current.id);
-    this.settingsState.set({ ...current, logo_path: null });
+    if (this.settings()?.id === current.id) this.patchLocal({ logo_path: null });
     this.receiptData.invalidateCompanyInfo();
   }
 

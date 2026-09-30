@@ -1106,6 +1106,7 @@ export class MoneyService {
 
   async saveCustomerProfile(input: {
     customerId?: string;
+    completeProfile?: boolean;
     firstName: string;
     lastName: string;
     phone: string;
@@ -1117,21 +1118,24 @@ export class MoneyService {
     smsNotificationsEnabled: boolean;
     whatsappNotificationsEnabled: boolean;
   }): Promise<string> {
-    const { data, error } = await this.db.rpc('save_customer_profile', {
-      ...(input.customerId ? { p_customer_id: input.customerId } : {}),
-      p_profile: {
-        first_name: input.firstName,
-        last_name: input.lastName,
-        phone: input.phone,
-        email: input.email,
-        delivery_address: input.deliveryAddress,
-        tax_registration_number: input.taxRegistrationNumber,
-        notes: input.notes,
-        notifications_enabled: input.notificationsEnabled,
-        sms_notifications_enabled: input.smsNotificationsEnabled,
-        whatsapp_notifications_enabled: input.whatsappNotificationsEnabled,
-      },
-    });
+    const { data, error } = await this.db.rpc(
+      input.completeProfile ? 'complete_receipt_customer_profile' : 'save_customer_profile',
+      {
+        ...(input.customerId ? { p_customer_id: input.customerId } : {}),
+        p_profile: {
+          first_name: input.firstName,
+          last_name: input.lastName,
+          phone: input.phone,
+          email: input.email,
+          delivery_address: input.deliveryAddress,
+          tax_registration_number: input.taxRegistrationNumber,
+          notes: input.notes,
+          notifications_enabled: input.notificationsEnabled,
+          sms_notifications_enabled: input.smsNotificationsEnabled,
+          whatsapp_notifications_enabled: input.whatsappNotificationsEnabled,
+        },
+      }
+    );
     if (error) throw rpcError(error);
     this.parties.invalidate();
     return data;

@@ -600,6 +600,7 @@ select public.start_fulfillment_preparation(
   (select (result->>'fulfillment_id')::uuid from reversed_checkout),1);
 select public.mark_fulfillment_ready(
   (select (result->>'fulfillment_id')::uuid from reversed_checkout),2);
+select testkit.ensure_open_session();
 select public.dispatch_fulfillment(
   (select (result->>'fulfillment_id')::uuid from reversed_checkout),3);
 select is((public.cancel_fulfillment(
@@ -666,6 +667,11 @@ select is((public.retry_fulfillment(
 select is((public.dispatch_fulfillment(
   (select (result->>'fulfillment_id')::uuid from cod_checkout),7)->>'state_version')::int,
   8,'redispatch does not repeat commercial completion');
+select testkit.as_user((select company_id from fulfillment_fixture),
+  'f1160000-0000-4000-8000-000000000001','Admin');
+select testkit.close_open_session();
+select testkit.as_user((select company_id from fulfillment_fixture),
+  'f1160000-0000-4000-8000-000000000003','Fulfillment completer');
 select is((select count(*)::int from public.cashier_sessions where company_id=
   (select company_id from fulfillment_fixture) and status='open'),0,
   'a completer does not need an open cashier session to collect custody cash');

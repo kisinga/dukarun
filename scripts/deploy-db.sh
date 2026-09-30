@@ -78,6 +78,11 @@ if [ "$SYNC_FUNCTIONS" = "1" ] && [ "$VAULT_ONLY" = "1" ]; then
   exit 2
 fi
 
+# Fail locally before changing the database if the server artifact cannot build.
+if [ "$SYNC_FUNCTIONS" = "1" ]; then
+  node scripts/build-document-edge.mjs
+fi
+
 # Shared SSH options. Keep the tunnel as a real background process so cleanup
 # can reliably close it on every exit path.
 SSH_OPTS=(
@@ -212,7 +217,7 @@ sync_openwa_vault
 
 if [ "$SYNC_FUNCTIONS" = "1" ]; then
   echo "→ syncing edge functions to ${SSH_HOST}:${FUNCTIONS_VOLUME}"
-  for fn in _shared paystack-charge paystack-webhook mpesa-initiate mpesa-callback mpesa-process mpesa-credentials notification-flush platform-message-test platform-sales-invitation-send public-content-renderer storefront-api site-deploy usertour-identity; do
+  for fn in _shared sale-document-send paystack-charge paystack-webhook mpesa-initiate mpesa-callback mpesa-process mpesa-credentials notification-flush platform-message-test platform-sales-invitation-send public-content-renderer storefront-api site-deploy usertour-identity; do
     rsync -az --delete -e "ssh ${SSH_OPTS[*]}" \
       "supabase/functions/${fn}/" "${SSH_HOST}:${FUNCTIONS_VOLUME}/${fn}/"
   done

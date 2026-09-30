@@ -49,6 +49,7 @@ limit 1;
 grant select on pg_temp.ep_location to authenticated;
 
 select testkit.as_user((select company_id from ep_company), '11111111-1111-1111-1111-111111111111', 'Admin');
+select testkit.ensure_open_session();
 
 -- ---------------------------------------------------------------------------
 -- 1-2. update_payment_method: p_is_cashier_controlled (null keeps current).

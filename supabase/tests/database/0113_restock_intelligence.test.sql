@@ -1,4 +1,6 @@
 begin;
+-- Historical fixture dates only; rollback restores the production guard.
+alter table public.orders disable trigger orders_preserve_capture_times;
 select plan(15);
 
 select ok(
@@ -206,6 +208,7 @@ grant select on pg_temp.current_tea, pg_temp.current_sugar,
   pg_temp.previous_tea, pg_temp.previous_sugar to authenticated;
 
 reset role;
+-- Historical fixture setup only; production finalized timestamps stay immutable.
 update public.orders
 set created_at = ((now() at time zone 'Africa/Nairobi')::date - 7) + time '12:00',
     completed_at = (((now() at time zone 'Africa/Nairobi')::date - 7) + time '12:00')
@@ -286,6 +289,7 @@ select is(
 );
 
 reset role;
+-- Historical fixture setup only; production finalized timestamps stay immutable.
 update public.orders
 set created_at = ((now() at time zone 'Africa/Nairobi')::date - 7) + time '12:00',
     completed_at = (((now() at time zone 'Africa/Nairobi')::date - 7) + time '12:00')

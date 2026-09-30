@@ -483,6 +483,22 @@ export const routes: Routes = [
         redirectTo: preserveQueryRedirect('/activity/audit'),
       },
       {
+        path: 'shop-setup',
+        canActivate: [permissionGuard],
+        canDeactivate: [confirmUnsavedChanges],
+        data: { permission: 'ManageCompanySettings' },
+        loadComponent: () =>
+          import('./settings/shop-setup.component').then(m => m.ShopSetupComponent),
+      },
+      {
+        path: 'settings/documents',
+        canActivate: [permissionGuard],
+        canDeactivate: [confirmUnsavedChanges],
+        data: { permission: 'ManageCompanySettings', documentScroll: true },
+        loadComponent: () =>
+          import('./settings/document-designer.component').then(m => m.DocumentDesignerComponent),
+      },
+      {
         path: 'settings',
         canActivate: [permissionGuard],
         data: { permission: 'ManageCompanySettings' },

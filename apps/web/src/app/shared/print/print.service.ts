@@ -1,43 +1,35 @@
-import { Injectable, signal } from '@angular/core';
 import {
-  A4PurchaseTemplate,
-  A4Template,
-  OrderData,
-  PrintMeta,
-  PrintTemplate,
-  PurchaseData,
-  Receipt52mmTemplate,
-  Receipt80mmTemplate,
-} from './print-templates';
+  escapeText,
+  renderDocument,
+  type DocumentIdentity,
+  type PaperFormat,
+} from '@dukarun/documents';
+import { ReceiptDataService } from './receipt-data.service';
+import { orderDocumentContent, purchaseDocumentContent } from './document-adapters';
+import { Injectable, inject, signal } from '@angular/core';
+import type { OrderData, PrintMeta, PurchaseData } from './print-data';
 
-export type PrintFormat = 'receipt-52mm' | 'receipt-80mm' | 'a4';
+export type PrintFormat = PaperFormat;
 
 const FORMAT_KEY = 'dukarun-print-format';
 
 /**
- * Print Service — renders via the ported templates and prints through a
- * hidden iframe (no new tab). Receipt format (52mm/80mm/A4) persists to
- * localStorage for the pilot; a company-level setting could come later.
+ * Renders saved document designs and prints through the existing hidden iframe.
+ * The device's paper preference remains separate from company document designs.
  */
 @Injectable({ providedIn: 'root' })
 export class PrintService {
-  private readonly templates = new Map<PrintFormat, PrintTemplate>([
-    ['receipt-52mm', new Receipt52mmTemplate()],
-    ['receipt-80mm', new Receipt80mmTemplate()],
-    ['a4', new A4Template()],
-  ]);
-
-  private readonly a4PurchaseTemplate = new A4PurchaseTemplate();
+  private readonly receiptData = inject(ReceiptDataService);
   private preparingDocument = false;
 
   readonly format = signal<PrintFormat>(this.loadFormat());
 
   getAvailableTemplates(): Array<{ id: PrintFormat; name: string; width: string }> {
-    return Array.from(this.templates.entries()).map(([id, template]) => ({
-      id,
-      name: template.name,
-      width: template.width,
-    }));
+    return [
+      { id: 'receipt-52mm', name: '52mm Receipt', width: '52mm' },
+      { id: 'receipt-80mm', name: '80mm Receipt', width: '80mm' },
+      { id: 'a4', name: 'A4 Invoice', width: '210mm' },
+    ];
   }
 
   setFormat(format: PrintFormat): void {
@@ -59,13 +51,36 @@ export class PrintService {
     templateId?: PrintFormat
   ): Promise<void> {
     const documentType = printMeta?.documentType ?? 'receipt';
-    if (documentType === 'receipt' && order.state !== 'Fulfilled') {
+    if (
+      documentType === 'receipt' &&
+      (order.state !== 'Fulfilled' || (order.openBalance ?? 0) > 0)
+    ) {
       throw new Error('Receipt unavailable — complete payment before printing.');
     }
-    const template = this.templates.get(templateId ?? this.format());
-    if (!template) return;
-    const html = template.render(order, companyLogo, companyName, printMeta, companyAddress);
-    await this.printDocument(`Print Order ${order.code}`, html, template.getStyles());
+    const company = await this.receiptData.companyPrintInfo();
+    const identity: DocumentIdentity = {
+      ...company,
+      name: companyName || company.name,
+      logoUrl: companyLogo,
+      address: companyAddress ?? company.address,
+    };
+    const rendered = renderDocument(
+      orderDocumentContent(
+        order,
+        identity,
+        {
+          ...printMeta,
+          showVatBreakdown:
+            company.documentDesigns?.[documentType]?.showVatBreakdown ??
+            printMeta?.showVatBreakdown ??
+            company.showVatBreakdown,
+        },
+        templateId ?? this.format()
+      ),
+      company.documentDesigns?.[documentType],
+      templateId ?? this.format()
+    );
+    await this.printDocument(rendered.title, rendered.html, rendered.styles);
   }
 
   /** Print a purchase order (A4-only by design). */
@@ -76,33 +91,21 @@ export class PrintService {
     printMeta?: PrintMeta,
     companyAddress?: string | null
   ): Promise<void> {
-    const html = this.a4PurchaseTemplate.render(
-      purchase,
-      companyLogo,
-      companyName,
-      {
-        ...printMeta,
-        documentType: 'purchase-order',
-      },
-      companyAddress
+    const company = await this.receiptData.companyPrintInfo();
+    const rendered = renderDocument(
+      purchaseDocumentContent(
+        purchase,
+        {
+          ...company,
+          name: companyName || company.name,
+          logoUrl: companyLogo,
+          address: companyAddress ?? company.address,
+        },
+        printMeta
+      ),
+      company.documentDesigns?.['purchase-order']
     );
-    const ref = purchase.referenceNumber ?? purchase.id;
-    await this.printDocument(`Purchase Order ${ref}`, html, this.a4PurchaseTemplate.getStyles());
-  }
-
-  /**
-   * Render without printing (used by tests and previews).
-   */
-  renderOrder(
-    order: OrderData,
-    companyName: string | null,
-    companyLogo: string | null,
-    printMeta?: PrintMeta,
-    templateId?: PrintFormat,
-    companyAddress?: string | null
-  ): string {
-    const template = this.templates.get(templateId ?? this.format())!;
-    return template.render(order, companyLogo, companyName, printMeta, companyAddress);
+    await this.printDocument(rendered.title, rendered.html, rendered.styles);
   }
 
   /** Shared hidden-iframe print orchestration for receipts, documents, and labels. */
@@ -146,7 +149,7 @@ export class PrintService {
                 <!DOCTYPE html>
                 <html>
                 <head>
-                    <title>${this.escapeText(title)}</title>
+                    <title>${escapeText(title)}</title>
                     <meta charset="utf-8">
                     <style>
                         * {
@@ -254,15 +257,6 @@ export class PrintService {
         }
       );
     });
-  }
-
-  private escapeText(value: string): string {
-    return value
-      .replaceAll('&', '&amp;')
-      .replaceAll('<', '&lt;')
-      .replaceAll('>', '&gt;')
-      .replaceAll('"', '&quot;')
-      .replaceAll("'", '&#039;');
   }
 
   private loadFormat(): PrintFormat {
