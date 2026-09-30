@@ -1,3 +1,5 @@
+import { ServerClockService } from '../../core/server-clock.service';
+import { TaxSettingsSourceService } from '../../core/tax-settings-source.service';
 import type { DocumentDesigns } from '@dukarun/documents';
 import { transactionUnitLabel } from '@dukarun/pack-types';
 import { Injectable, inject } from '@angular/core';
@@ -55,6 +57,8 @@ export class ReceiptDataService {
   private readonly supabase = inject(SupabaseService);
   private readonly pos = inject(PosService);
   private readonly catalogIdentities = inject(CatalogIdentityLookupService);
+  private readonly clock = inject(ServerClockService);
+  private readonly taxSettingsSource = inject(TaxSettingsSourceService);
   private readonly profile = inject(ProfileService);
 
   private get db() {
@@ -67,9 +71,11 @@ export class ReceiptDataService {
 
   /** Short cache, bounded by the next server VAT activation as well. */
   async companyPrintInfo(): Promise<CompanyPrintInfo> {
-    if (this.settings && Date.now() < this.settingsExpiresAt) return this.settings;
+    const currentTime = this.clock.now();
+    if (this.settings && currentTime !== null && currentTime < this.settingsExpiresAt)
+      return this.settings;
     const revision = this.settingsRevision;
-    const [{ data, error }, { data: taxSettings, error: taxError }] = await Promise.all([
+    const [{ data, error }, taxSettings] = await Promise.all([
       this.db
         .from('companies')
         .select(
@@ -77,22 +83,23 @@ export class ReceiptDataService {
         )
         .limit(1)
         .single(),
-      this.db.rpc('company_tax_settings'),
+      this.taxSettingsSource.read(),
     ]);
     if (error) throw error;
-    if (taxError) throw taxError;
     if (revision !== this.settingsRevision) return this.companyPrintInfo();
     const timing = taxSettings as {
       activation?: { server_time?: string };
       scheduled_profiles?: { effective_from_at?: string }[];
     } | null;
-    const serverNow = Date.parse(timing?.activation?.server_time ?? '') || Date.now();
+    const serverNow = this.clock.now();
     const nextChange = timing?.scheduled_profiles
       ?.map(p => Date.parse(p.effective_from_at ?? ''))
-      .filter(at => Number.isFinite(at) && at > serverNow)
+      .filter(at => Number.isFinite(at) && serverNow !== null && at > serverNow)
       .sort((a, b) => a - b)[0];
     this.settingsExpiresAt =
-      Date.now() + Math.min(60_000, nextChange ? nextChange - serverNow : 60_000);
+      serverNow === null
+        ? 0
+        : serverNow + Math.min(60_000, nextChange ? nextChange - serverNow : 60_000);
     const activeProfile = (
       taxSettings as {
         active_profile?: {

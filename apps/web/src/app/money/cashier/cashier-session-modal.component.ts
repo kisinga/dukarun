@@ -39,11 +39,13 @@ import { CashierCountGuidance, cashierCountGuidance } from './cashier-count-guid
               </h2>
               <p class="type-caption mt-1">
                 {{
-                  reviewing()
-                    ? 'Review the count before confirming.'
-                    : !openSession() && !preferences.requireOpeningCount()
-                      ? 'No opening count is required.'
-                      : 'Count each controlled account.'
+                  !preferences.cashControlEnabled()
+                    ? 'Cash counting is off. This session still records who posts each sale.'
+                    : reviewing()
+                      ? 'Review the count before confirming.'
+                      : !openSession() && !preferences.requireOpeningCount()
+                        ? 'No opening count is required.'
+                        : 'Count each controlled account.'
                 }}
               </p>
             </div>
@@ -74,7 +76,16 @@ import { CashierCountGuidance, cashierCountGuidance } from './cashier-count-guid
                 </div>
               }
 
-              @if (accounts().length === 0) {
+              @if (!preferences.cashControlEnabled()) {
+                <p class="text-sm">
+                  {{
+                    openSession()
+                      ? 'Close this session after resolving its pending sales.'
+                      : 'Open a session to start posting sales at this location.'
+                  }}
+                  No cash count is required.
+                </p>
+              } @else if (accounts().length === 0) {
                 <div role="alert" class="alert alert-warning text-sm">
                   <app-icon name="heroExclamationTriangle" />
                   <span>No enabled cashier-controlled payment accounts are configured.</span>
@@ -247,6 +258,15 @@ import { CashierCountGuidance, cashierCountGuidance } from './cashier-count-guid
           <footer class="flex flex-wrap justify-end gap-2 border-t border-base-300 p-4">
             @if (loading()) {
               <button appButton variant="ghost" type="button" (click)="close()">Cancel</button>
+            } @else if (!preferences.cashControlEnabled()) {
+              <button
+                appButton
+                type="button"
+                [loading]="busy()"
+                (click)="confirm(openSession() ? 'close' : 'open')"
+              >
+                {{ openSession() ? 'Close session' : 'Open session' }}
+              </button>
             } @else if (!openSession() && !preferences.requireOpeningCount()) {
               <button appButton variant="ghost" type="button" (click)="close()">Cancel</button>
               <button appButton type="button" [loading]="busy()" (click)="confirm('open')">
@@ -471,7 +491,10 @@ export class CashierSessionModalComponent {
 
   protected async confirm(action: 'open' | 'close'): Promise<void> {
     const declarations =
-      action === 'open' && !this.preferences.requireOpeningCount() ? [] : this.declarations();
+      !this.preferences.cashControlEnabled() ||
+      (action === 'open' && !this.preferences.requireOpeningCount())
+        ? []
+        : this.declarations();
     if (!declarations) return;
 
     const session = this.openSession();

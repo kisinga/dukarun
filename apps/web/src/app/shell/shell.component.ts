@@ -167,7 +167,7 @@ interface NavSection {
             </a>
 
             <!-- Global one-click till action -->
-            @if (perms.has('SettleOrder') && cashierSession.cashControlEnabled()) {
+            @if (perms.has('SettleOrder')) {
               <button
                 type="button"
                 appButton
@@ -202,7 +202,7 @@ interface NavSection {
                   @if (cashierSession.loading()) {
                     Checking till
                   } @else {
-                    {{ cashierSession.isOpen() ? 'Close till' : 'Open till' }}
+                    {{ cashierSession.isOpen() ? 'Close session' : 'Open session' }}
                   }
                 </span>
               </button>

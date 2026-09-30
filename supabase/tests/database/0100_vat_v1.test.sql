@@ -220,7 +220,7 @@ select ok(public.upsert_tax_integration_item_mapping(
 
 select public.schedule_company_tax_profile(
   (select j.id from public.tax_jurisdictions j where j.country_code='KE'),false,'',
-  (select end_date+1 from public.accounting_periods
+  (select greatest(end_date+1,current_date+3) from public.accounting_periods
     where company_id=(select company_id from vat_fixture) and status='open'),
   (select c.id from public.tax_categories c join public.tax_jurisdictions j
     on j.id=c.jurisdiction_id where j.country_code='KE' and c.code='STANDARD'));
@@ -589,12 +589,12 @@ reset role;
 select testkit.as_user((select company_id from vat_fixture),
   'a1000000-0000-4000-8000-000000000001','Admin');
 
-create temp table vat_offline_open as select public.post_offline_sale_at_location(
+create temp table vat_offline_open as select testkit.post_offline_sale(
   (select id from public.stock_locations where company_id=(select company_id from vat_fixture)
     and is_default limit 1),null,
   '[{"variant_id":"a1000000-0000-4000-8000-000000000020","quantity":1,"unit_price":116}]',
   '[{"method":"cash","amount":116}]','vat-offline-open-1',
-  (current_date-1)::timestamp at time zone 'Africa/Nairobi','vat-open-device',1,null) result;
+  clock_timestamp()-interval '2 hours','vat-open-device',1,null) result;
 select ok((select bool_and(e.entry_date=current_date)
   from public.ledger_journal_entries e
   where e.source_type in ('Payment','InventorySaleCogs','VatSaleReclass')
@@ -695,30 +695,33 @@ select company_id,current_date,current_date,'open','a1000000-0000-4000-8000-0000
 select testkit.as_user((select company_id from vat_fixture),
   'a1000000-0000-4000-8000-000000000001','Admin');
 
-create temp table late_result as select public.post_offline_sale_at_location(
+create temp table late_result as select testkit.post_offline_sale(
   (select id from public.stock_locations where company_id=(select company_id from vat_fixture) and is_default limit 1),
   null,'[{"variant_id":"a1000000-0000-4000-8000-000000000020","quantity":1,"unit_price":116}]',
   '[{"method":"cash","amount":116}]','vat-late-1',now()-interval '1 day','vat-test-device',1,null) result;
 grant select on pg_temp.late_result to authenticated;
-select is((select result->>'status' from late_result),'late_review_required',
+select is((select result->>'status' from late_result),'review',
   'offline sale in a locked period is parked for review instead of back-posted');
-select throws_ok($$select public.post_offline_sale_at_location(
+select throws_ok($$select testkit.post_offline_sale(
   (select id from public.stock_locations where company_id=(select company_id from vat_fixture) and is_default limit 1),
   null,'[{"variant_id":"a1000000-0000-4000-8000-000000000020","quantity":1,"unit_price":115}]',
   '[{"method":"cash","amount":115}]','vat-late-1',now()-interval '1 day','vat-test-device',1,null)$$,
-  'P0001','idempotency_conflict: client_ref reused with different late-sale payload',
+  'P0001','idempotency_conflict: original offline request is immutable',
   'late-sale idempotency rejects a reused client reference with different economics');
-create temp table late_review_result as select public.review_late_sale(
-  (select (result->>'review_id')::uuid from late_result),true,'Verified device timestamp') result;
+create temp table late_assessment as select public.get_offline_sale_review(
+ (select (result->>'review_id')::uuid from late_result)) result;
+create temp table late_review_result as select public.confirm_offline_sale_review(
+ (select (result->>'review_id')::uuid from late_result),gen_random_uuid(),
+ (select result->>'review_fingerprint' from late_assessment),
+ (select (result#>>'{destination_session,id}')::uuid from late_assessment),'Verified device timestamp') result;
 grant select on pg_temp.late_review_result to authenticated;
-select is((select status from public.late_sale_reviews where client_ref='vat-late-1'),'approved',
-  'dual-permission manager can approve a late offline sale');
+select is((select result->>'status' from late_review_result),'completed',
+ 'manager can explicitly review and post a delayed offline sale');
 select is((select public.order_vat_reporting_date(o.id,o.tax_point_at,'Africa/Nairobi')
-  from public.orders o join public.late_sale_reviews l on l.posted_order_id=o.id
-  where l.client_ref='vat-late-1'),current_date,
-  'approved late sale reports VAT on its server posting date');
-select is((select jsonb_array_length(public.vat_report(current_date,current_date)->'late_transactions')),1,
-  'current VAT report includes a prior-period correction schedule');
+ from public.orders o where o.id=(select (result->>'order_id')::uuid from late_review_result)),current_date,
+ 'approved late sale reports VAT on its server posting date');
+select is((select jsonb_array_length(public.vat_report(current_date,current_date)->'late_transactions')),0,
+ 'current-rule offline posting is not a backdated VAT correction');
 create temp table late_vat_purchase as select public.record_purchase_complete_with_tax(
   'a1000000-0000-4000-8000-000000000030',
   '[{"variant_id":"a1000000-0000-4000-8000-000000000020","quantity":1,"unit_cost":116,"line_total":116,"value_source":"unit"}]',
@@ -730,7 +733,7 @@ select results_eq(
       p.accounting_posting_date,p.is_late_tax_adjustment,
       jsonb_array_length(public.vat_report(current_date,current_date)->'late_transactions')
     from public.purchases p where p.id=(select purchase_id from late_vat_purchase)$$,
-  $$values (current_date-1,current_date,true,2)$$,
+  $$values (current_date-1,current_date,true,1)$$,
   'closed-period supplier invoice keeps its tax point, posts now, and joins the correction schedule');
 select public.pos_device_heartbeat('vat-test-device',
   (select id from public.stock_locations where company_id=(select company_id from vat_fixture) and is_default limit 1),0,true);
@@ -758,7 +761,7 @@ select testkit.as_user((select company_id from vat_fixture),
 
 select is((public.period_close_readiness(current_date)->'blockers')::text,'{}',
   'monthly readiness has no blockers after sessions, queues, reviews, and sign-offs are clear');
-select is((public.period_close_readiness(current_date)->'warnings'->>'stale_devices')::integer,2,
+select is((public.period_close_readiness(current_date)->'warnings'->>'stale_devices')::integer,1,
   'stale devices warn without blocking a known-clear queue');
 create temp table closed_vat_period as select public.close_accounting_period(current_date) period_id;
 grant select on pg_temp.closed_vat_period to authenticated;

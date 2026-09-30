@@ -42,6 +42,7 @@ from cr_company;
 
 select testkit.as_user((select company_id from cr_company),
   '22222222-2222-2222-2222-222222222172','Cashier');
+select testkit.ensure_open_session();
 select is(public.current_access_snapshot()->'actions'->>'sale.credit_over_limit','request',
   'SettleOrder can request an over-limit credit sale');
 select testkit.as_user((select company_id from cr_company),

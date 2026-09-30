@@ -8,6 +8,12 @@ import { LocationContextService } from '../core/location-context.service';
 import { PartyCacheService, type PartyQueryResult } from '../core/party-cache.service';
 import { ActionExecutorService, type ActionOutcome } from '../core/action-executor.service';
 import type { CachedCustomer } from './offline/offline-db';
+import type { ItemEvidence } from './offline/offline-contract';
+
+type OfflineCatalogueEvidence = {
+  catalogue_version?: ItemEvidence['catalogue_version'];
+  pack_versions?: Record<string, string>;
+};
 
 export type Product = Database['public']['Tables']['products']['Row'];
 export type Manufacturer = Database['public']['Tables']['manufacturers']['Row'];
@@ -18,7 +24,8 @@ export type ProductCategoryLink = Pick<
   'product_id' | 'category_id'
 >;
 export type Variant = Database['public']['Views']['variant_catalog']['Row'] &
-  PackCatalogue & { selected_pack_id?: string | null };
+  PackCatalogue &
+  OfflineCatalogueEvidence & { selected_pack_id?: string | null };
 export type ProductVariant = Database['public']['Tables']['product_variants']['Row'] &
   PackCatalogue;
 export type Customer = Database['public']['Tables']['customers']['Row'];
@@ -61,6 +68,7 @@ export function variantLabel(v: Pick<Variant, 'product_name' | 'variant_name'>):
 
 /** p_lines item for post_sale / save_draft (amounts in shillings). */
 export interface SaleLineInput {
+  capture?: ItemEvidence;
   pack_id?: string | null;
   units_per_unit?: number;
   expected_unit_price?: number;
@@ -185,12 +193,12 @@ export class PosService {
 
   async withPackDefinitions<T extends { variant_id?: string | null; id?: string }>(
     rows: T[]
-  ): Promise<Array<T & PackCatalogue>> {
+  ): Promise<Array<T & PackCatalogue & OfflineCatalogueEvidence>> {
     if (!rows.length) return [];
-    const definitions = new Map<string, PackCatalogue>();
+    const definitions = new Map<string, PackCatalogue & OfflineCatalogueEvidence>();
     const ids = rows.map(row => row.variant_id ?? row.id!).filter(Boolean);
     for (let start = 0; start < ids.length; start += 500) {
-      const { data, error } = await this.client.rpc('catalog_pack_definitions', {
+      const { data, error } = await this.client.rpc('offline_catalog_definitions', {
         p_variant_ids: ids.slice(start, start + 500),
       });
       if (error) throw rpcError(error);
@@ -198,6 +206,8 @@ export class PosService {
         definitions.set(row.variant_id, {
           stock_unit: row.stock_unit,
           packs: row.packs as unknown as ProductPack[],
+          catalogue_version: row.catalogue_version as unknown as ItemEvidence['catalogue_version'],
+          pack_versions: row.pack_versions as Record<string, string>,
         });
     }
     return rows.map(row => ({ ...row, ...definitions.get(row.variant_id ?? row.id!) }));
@@ -882,6 +892,12 @@ export class PosService {
     });
     if (error) throw rpcError(error);
     const result = data as { status: string; order_id: string; approval_id?: string };
+    if (
+      !result?.order_id ||
+      !['completed', 'parked', 'approval_required'].includes(result.status)
+    ) {
+      throw new PosRpcError('Sale completion was not confirmed. Keep this request for retry.', '');
+    }
     if (result.status === 'approval_required') {
       return {
         status: 'approval_required',

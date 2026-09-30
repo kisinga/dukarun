@@ -3700,8 +3700,8 @@ export type Database = {
           first_name: string
           id: string
           is_credit_approved: boolean
-          is_verified: boolean
           is_supplier: boolean
+          is_verified: boolean
           last_name: string | null
           last_repayment_amount: number | null
           last_repayment_date: string | null
@@ -3733,8 +3733,8 @@ export type Database = {
           first_name: string
           id?: string
           is_credit_approved?: boolean
-          is_verified?: boolean
           is_supplier?: boolean
+          is_verified?: boolean
           last_name?: string | null
           last_repayment_amount?: number | null
           last_repayment_date?: string | null
@@ -3766,8 +3766,8 @@ export type Database = {
           first_name?: string
           id?: string
           is_credit_approved?: boolean
-          is_verified?: boolean
           is_supplier?: boolean
+          is_verified?: boolean
           last_name?: string | null
           last_repayment_amount?: number | null
           last_repayment_date?: string | null
@@ -6746,6 +6746,403 @@ export type Database = {
           },
         ]
       }
+      offline_cash_corrections: {
+        Row: {
+          closing_count_id: string | null
+          company_id: string
+          created_at: string
+          created_by: string
+          included_amount: number
+          order_id: string
+          reason: string
+          request_id: string
+          revision_id: string
+        }
+        Insert: {
+          closing_count_id?: string | null
+          company_id: string
+          created_at?: string
+          created_by: string
+          included_amount: number
+          order_id: string
+          reason: string
+          request_id: string
+          revision_id: string
+        }
+        Update: {
+          closing_count_id?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string
+          included_amount?: number
+          order_id?: string
+          reason?: string
+          request_id?: string
+          revision_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "offline_cash_corrections_closing_count_id_fkey"
+            columns: ["closing_count_id"]
+            isOneToOne: false
+            referencedRelation: "cash_drawer_counts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "offline_cash_corrections_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "offline_cash_corrections_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "offline_cash_corrections_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "offline_cash_corrections_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: true
+            referencedRelation: "offline_sale_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "offline_cash_corrections_revision_id_fkey"
+            columns: ["revision_id"]
+            isOneToOne: false
+            referencedRelation: "offline_sale_revisions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      offline_sale_contexts: {
+        Row: {
+          company_id: string
+          device_key: string
+          expires_at: string
+          id: string
+          issued_at: string
+          location_id: string
+          session_id: string
+          user_id: string
+        }
+        Insert: {
+          company_id: string
+          device_key: string
+          expires_at: string
+          id?: string
+          issued_at: string
+          location_id: string
+          session_id: string
+          user_id: string
+        }
+        Update: {
+          company_id?: string
+          device_key?: string
+          expires_at?: string
+          id?: string
+          issued_at?: string
+          location_id?: string
+          session_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "offline_sale_contexts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "offline_sale_contexts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "offline_sale_contexts_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "low_stock_variants_by_location"
+            referencedColumns: ["location_id"]
+          },
+          {
+            foreignKeyName: "offline_sale_contexts_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "stock_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "offline_sale_contexts_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "cashier_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      offline_sale_events: {
+        Row: {
+          action: string
+          actor_id: string | null
+          company_id: string
+          created_at: string
+          details: Json
+          id: number
+          reason: string | null
+          request_id: string
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          company_id: string
+          created_at?: string
+          details?: Json
+          id?: never
+          reason?: string | null
+          request_id: string
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          company_id?: string
+          created_at?: string
+          details?: Json
+          id?: never
+          reason?: string | null
+          request_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "offline_sale_events_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "offline_sale_events_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "offline_sale_events_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "offline_sale_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      offline_sale_requests: {
+        Row: {
+          active_revision_id: string | null
+          blockers: Json
+          captured_at: string | null
+          captured_by: string
+          client_ref: string
+          company_id: string
+          context_id: string | null
+          device_key: string | null
+          id: string
+          location_id: string
+          original_request: Json
+          originating_session_id: string | null
+          posted_order_id: string | null
+          received_at: string
+          request_fingerprint: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          active_revision_id?: string | null
+          blockers?: Json
+          captured_at?: string | null
+          captured_by: string
+          client_ref: string
+          company_id: string
+          context_id?: string | null
+          device_key?: string | null
+          id?: string
+          location_id: string
+          original_request: Json
+          originating_session_id?: string | null
+          posted_order_id?: string | null
+          received_at?: string
+          request_fingerprint: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          active_revision_id?: string | null
+          blockers?: Json
+          captured_at?: string | null
+          captured_by?: string
+          client_ref?: string
+          company_id?: string
+          context_id?: string | null
+          device_key?: string | null
+          id?: string
+          location_id?: string
+          original_request?: Json
+          originating_session_id?: string | null
+          posted_order_id?: string | null
+          received_at?: string
+          request_fingerprint?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "offline_sale_requests_active_revision_id_fkey"
+            columns: ["active_revision_id"]
+            isOneToOne: false
+            referencedRelation: "offline_sale_revisions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "offline_sale_requests_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "offline_sale_requests_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "offline_sale_requests_context_id_fkey"
+            columns: ["context_id"]
+            isOneToOne: false
+            referencedRelation: "offline_sale_contexts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "offline_sale_requests_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "low_stock_variants_by_location"
+            referencedColumns: ["location_id"]
+          },
+          {
+            foreignKeyName: "offline_sale_requests_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "stock_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "offline_sale_requests_originating_session_id_fkey"
+            columns: ["originating_session_id"]
+            isOneToOne: false
+            referencedRelation: "cashier_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "offline_sale_requests_posted_order_id_fkey"
+            columns: ["posted_order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      offline_sale_revisions: {
+        Row: {
+          cash_resolution: Json | null
+          company_id: string
+          confirmation_key: string
+          created_at: string
+          created_by: string
+          destination_session_id: string
+          execution_key: string
+          id: string
+          payload: Json
+          payload_fingerprint: string
+          reason: string
+          request_id: string
+          review_fingerprint: string
+        }
+        Insert: {
+          cash_resolution?: Json | null
+          company_id: string
+          confirmation_key: string
+          created_at?: string
+          created_by: string
+          destination_session_id: string
+          execution_key?: string
+          id?: string
+          payload: Json
+          payload_fingerprint: string
+          reason: string
+          request_id: string
+          review_fingerprint: string
+        }
+        Update: {
+          cash_resolution?: Json | null
+          company_id?: string
+          confirmation_key?: string
+          created_at?: string
+          created_by?: string
+          destination_session_id?: string
+          execution_key?: string
+          id?: string
+          payload?: Json
+          payload_fingerprint?: string
+          reason?: string
+          request_id?: string
+          review_fingerprint?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "offline_sale_revisions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "offline_sale_revisions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "public_storefronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "offline_sale_revisions_destination_session_id_fkey"
+            columns: ["destination_session_id"]
+            isOneToOne: false
+            referencedRelation: "cashier_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "offline_sale_revisions_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "offline_sale_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_fulfillments: {
         Row: {
           address_line: string | null
@@ -7125,8 +7522,11 @@ export type Database = {
           late_posting_reason: string | null
           location_id: string
           net_total: number
+          offline_request_id: string | null
+          offline_revision_id: string | null
           pending_owner: string | null
           posted_at: string | null
+          posting_request_fingerprint: string | null
           posting_source: string | null
           quantity_total: number
           receivable_kind: string | null
@@ -7166,8 +7566,11 @@ export type Database = {
           late_posting_reason?: string | null
           location_id: string
           net_total?: number
+          offline_request_id?: string | null
+          offline_revision_id?: string | null
           pending_owner?: string | null
           posted_at?: string | null
+          posting_request_fingerprint?: string | null
           posting_source?: string | null
           quantity_total?: number
           receivable_kind?: string | null
@@ -7207,8 +7610,11 @@ export type Database = {
           late_posting_reason?: string | null
           location_id?: string
           net_total?: number
+          offline_request_id?: string | null
+          offline_revision_id?: string | null
           pending_owner?: string | null
           posted_at?: string | null
+          posting_request_fingerprint?: string | null
           posting_source?: string | null
           quantity_total?: number
           receivable_kind?: string | null
@@ -7297,6 +7703,20 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "orders_offline_request_id_fkey"
+            columns: ["offline_request_id"]
+            isOneToOne: false
+            referencedRelation: "offline_sale_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_offline_revision_id_fkey"
+            columns: ["offline_revision_id"]
+            isOneToOne: false
+            referencedRelation: "offline_sale_revisions"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "orders_tax_document_id_fkey"
             columns: ["tax_document_id"]
             isOneToOne: false
@@ -7314,12 +7734,6 @@ export type Database = {
       }
       outbox: {
         Row: {
-          document_request_key: string | null
-          document_requested_by: string | null
-          document_delivery_state: string | null
-          document_claim_token: string | null
-          document_lease_until: string | null
-          provider_message_id: string | null
           attempts: number
           body: string
           campaign_id: string | null
@@ -7332,7 +7746,12 @@ export type Database = {
           customer_id: string | null
           customer_statement_link_id: string | null
           dedupe_key: string | null
+          document_claim_token: string | null
           document_copy_role: string | null
+          document_delivery_state: string | null
+          document_lease_until: string | null
+          document_request_key: string | null
+          document_requested_by: string | null
           document_subject_id: string | null
           document_type: string | null
           error: string | null
@@ -7344,6 +7763,7 @@ export type Database = {
           fulfillment_id: string | null
           id: string
           max_attempts: number
+          provider_message_id: string | null
           quota_state: string
           quota_units: number
           recipient: string
@@ -7357,12 +7777,6 @@ export type Database = {
           template_version: number | null
         }
         Insert: {
-          document_request_key?: string | null
-          document_requested_by?: string | null
-          document_delivery_state?: string | null
-          document_claim_token?: string | null
-          document_lease_until?: string | null
-          provider_message_id?: string | null
           attempts?: number
           body: string
           campaign_id?: string | null
@@ -7375,7 +7789,12 @@ export type Database = {
           customer_id?: string | null
           customer_statement_link_id?: string | null
           dedupe_key?: string | null
+          document_claim_token?: string | null
           document_copy_role?: string | null
+          document_delivery_state?: string | null
+          document_lease_until?: string | null
+          document_request_key?: string | null
+          document_requested_by?: string | null
           document_subject_id?: string | null
           document_type?: string | null
           error?: string | null
@@ -7387,6 +7806,7 @@ export type Database = {
           fulfillment_id?: string | null
           id?: string
           max_attempts?: number
+          provider_message_id?: string | null
           quota_state?: string
           quota_units?: number
           recipient: string
@@ -7400,12 +7820,6 @@ export type Database = {
           template_version?: number | null
         }
         Update: {
-          document_request_key?: string | null
-          document_requested_by?: string | null
-          document_delivery_state?: string | null
-          document_claim_token?: string | null
-          document_lease_until?: string | null
-          provider_message_id?: string | null
           attempts?: number
           body?: string
           campaign_id?: string | null
@@ -7418,7 +7832,12 @@ export type Database = {
           customer_id?: string | null
           customer_statement_link_id?: string | null
           dedupe_key?: string | null
+          document_claim_token?: string | null
           document_copy_role?: string | null
+          document_delivery_state?: string | null
+          document_lease_until?: string | null
+          document_request_key?: string | null
+          document_requested_by?: string | null
           document_subject_id?: string | null
           document_type?: string | null
           error?: string | null
@@ -7430,6 +7849,7 @@ export type Database = {
           fulfillment_id?: string | null
           id?: string
           max_attempts?: number
+          provider_message_id?: string | null
           quota_state?: string
           quota_units?: number
           recipient?: string
@@ -14324,11 +14744,6 @@ export type Database = {
       }
     }
     Functions: {
-      lookup_receipt_contact: { Args: { p_phone: string }; Returns: Json }
-      sale_document_context: { Args: { p_order_id: string }; Returns: Json }
-      request_sale_document: { Args: { p_order_id: string; p_request_key: string; p_phone?: string; p_first_name?: string; p_last_name?: string }; Returns: Json }
-      correct_receipt_customer_phone: { Args: { p_customer_id: string; p_phone: string; p_expected_updated_at: string }; Returns: Json }
-      complete_receipt_customer_profile: { Args: { p_customer_id: string; p_profile: Json }; Returns: string }
       accept_cash_custody_remittance: {
         Args: { p_remittance_id: string }
         Returns: Json
@@ -14710,6 +15125,10 @@ export type Database = {
         }
         Returns: Json
       }
+      begin_sale_document_dispatch: {
+        Args: { p_claim_token: string; p_outbox_id: string }
+        Returns: boolean
+      }
       build_period_closing_pack: {
         Args: { p_end_date: string; p_period_id: string; p_start_date: string }
         Returns: Json
@@ -14746,6 +15165,14 @@ export type Database = {
           p_expected_version: number
           p_fulfillment_id: string
           p_reason: string
+        }
+        Returns: Json
+      }
+      cancel_offline_sale: {
+        Args: {
+          p_payment_resolution: Json
+          p_reason: string
+          p_request_id: string
         }
         Returns: Json
       }
@@ -14938,6 +15365,10 @@ export type Database = {
         Returns: boolean
       }
       claim_public_site_deployment: { Args: never; Returns: Json }
+      claim_sale_document_delivery: {
+        Args: { p_outbox_id?: string }
+        Returns: Json
+      }
       claim_team_invitations: { Args: never; Returns: Json }
       classify_mpesa_collection: {
         Args: {
@@ -15040,6 +15471,27 @@ export type Database = {
         }
         Returns: string
       }
+      complete_receipt_customer_profile: {
+        Args: { p_customer_id: string; p_profile: Json }
+        Returns: string
+      }
+      confirm_offline_sale_context: {
+        Args: { p_device_key: string; p_location_id: string }
+        Returns: Json
+      }
+      confirm_offline_sale_review: {
+        Args: {
+          p_cash_resolution?: Json
+          p_confirm_crossover?: boolean
+          p_confirmation_key: string
+          p_destination_session_id: string
+          p_proposed?: Json
+          p_reason: string
+          p_request_id: string
+          p_review_fingerprint: string
+        }
+        Returns: Json
+      }
       confirm_purchase_draft: {
         Args: {
           p_account_code?: string
@@ -15080,6 +15532,14 @@ export type Database = {
       convert_draft: {
         Args: { p_order_id: string; p_payments: Json }
         Returns: string
+      }
+      correct_receipt_customer_phone: {
+        Args: {
+          p_customer_id: string
+          p_expected_updated_at: string
+          p_phone: string
+        }
+        Returns: Json
       }
       create_approval: {
         Args: {
@@ -15436,6 +15896,10 @@ export type Database = {
         }
         Returns: string
       }
+      execute_offline_sale: {
+        Args: { p_request_id: string; p_revision_id: string }
+        Returns: Json
+      }
       execute_payment_reversal: {
         Args: { p_payment_id: string; p_reason: string }
         Returns: string
@@ -15508,6 +15972,16 @@ export type Database = {
         }
         Returns: string
       }
+      finish_sale_document_delivery: {
+        Args: {
+          p_claim_token: string
+          p_error?: string
+          p_outbox_id: string
+          p_outcome: string
+          p_provider_message_id?: string
+        }
+        Returns: undefined
+      }
       flush_outbox_trigger: { Args: never; Returns: undefined }
       freeze_tax_export_artifact: {
         Args: {
@@ -15574,6 +16048,14 @@ export type Database = {
         Returns: string
       }
       generate_fulfillment_pin: { Args: never; Returns: string }
+      get_offline_sale_review: {
+        Args: {
+          p_destination_session_id?: string
+          p_proposed?: Json
+          p_request_id: string
+        }
+        Returns: Json
+      }
       hold_sale_order_core: {
         Args: { p_order_id: string; p_owner: string }
         Returns: string
@@ -15727,6 +16209,7 @@ export type Database = {
           result_code: string
         }[]
       }
+      list_offline_sale_reviews: { Args: never; Returns: Json }
       list_party_credit_profiles: {
         Args: {
           p_band?: string
@@ -15820,6 +16303,7 @@ export type Database = {
         Args: { p_order_id: string }
         Returns: undefined
       }
+      lookup_receipt_contact: { Args: { p_phone: string }; Returns: Json }
       mark_fulfillment_ready: {
         Args: { p_expected_version: number; p_fulfillment_id: string }
         Returns: Json
@@ -16070,6 +16554,38 @@ export type Database = {
           p_user_id: string
         }
         Returns: string
+      }
+      offline_catalog_definitions: {
+        Args: { p_variant_ids: string[] }
+        Returns: {
+          catalogue_version: Json
+          pack_versions: Json
+          packs: Json
+          stock_unit: string
+          variant_id: string
+        }[]
+      }
+      offline_line_current_state: {
+        Args: { p_company_id: string; p_line: Json }
+        Returns: Json
+      }
+      offline_request_fingerprint: {
+        Args: { p_payload: Json }
+        Returns: string
+      }
+      offline_sale_assessment: {
+        Args: {
+          p_destination_session_id?: string
+          p_payload: Json
+          p_posting_at?: string
+          p_request_id: string
+        }
+        Returns: Json
+      }
+      offline_sale_result: { Args: { p_request_id: string }; Returns: Json }
+      offline_tax_settings_at: {
+        Args: { p_at: string; p_company_id: string }
+        Returns: Json
       }
       open_cashier_session: { Args: { p_declarations: Json }; Returns: string }
       open_cashier_session_at_location: {
@@ -17317,6 +17833,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      receipt_contact_json: {
+        Args: { p_customer: Database["public"]["Tables"]["customers"]["Row"] }
+        Returns: Json
+      }
       reconcile_all_company_usage: { Args: never; Returns: number }
       reconcile_company_usage: {
         Args: { p_company_id?: string }
@@ -17648,6 +18168,16 @@ export type Database = {
         }
         Returns: string
       }
+      request_sale_document: {
+        Args: {
+          p_first_name?: string
+          p_last_name?: string
+          p_order_id: string
+          p_phone?: string
+          p_request_key: string
+        }
+        Returns: Json
+      }
       request_trial_access: {
         Args: { p_reason: string; p_requested_days: number }
         Returns: string
@@ -17967,6 +18497,7 @@ export type Database = {
         Args: { p_action: string; p_event_id: string; p_notes: string }
         Returns: Json
       }
+      sale_document_context: { Args: { p_order_id: string }; Returns: Json }
       sales_collection_events: {
         Args: { p_company_id: string; p_from: string; p_to: string }
         Returns: {
@@ -18406,6 +18937,7 @@ export type Database = {
         Args: { p_location_id: string; p_payment_ids: string[] }
         Returns: Json
       }
+      submit_offline_sale: { Args: { p_request: Json }; Returns: Json }
       subscription_expiry_scan: { Args: never; Returns: number }
       supplier_account_status: {
         Args: { p_supplier_id: string }
@@ -18791,6 +19323,10 @@ export type Database = {
             }
             Returns: undefined
           }
+      validate_offline_order_posting: {
+        Args: { p_order_id: string; p_session_id: string }
+        Returns: undefined
+      }
       validate_platform_campaign: {
         Args: {
           p_audience: string

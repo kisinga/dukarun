@@ -182,6 +182,13 @@ describe('SellWorkflowStore', () => {
           provide: CashierSessionService,
           useValue: {
             assertOpen: vi.fn().mockResolvedValue(undefined),
+            captureOfflineSale: vi.fn(() => ({
+              offline_context_id: 'context-1',
+              originating_session_id: 'session-1',
+              occurred_at: '2026-09-29T09:00:00Z',
+              device_key: 'device-1',
+              location_id: 'location-1',
+            })),
             canTakePayment: vi.fn().mockReturnValue(true),
             cashierFlowEnabled: vi.fn().mockReturnValue(true),
           },

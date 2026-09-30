@@ -332,7 +332,30 @@ export class CartService {
       price_source: l.priceSource ?? 'retail',
       quantity: l.quantity,
       unit_price: l.unitPrice,
-      ...(l.customPrice !== null && l.customPrice !== l.unitPrice
+      capture: {
+        product_id: l.variant.product_id,
+        variant_id: l.variant.variant_id!,
+        pack_id: l.packId ?? null,
+        product_name: l.variant.product_name,
+        variant_name: l.variant.variant_name,
+        unit_name: l.unitName ?? l.stockUnit ?? 'item',
+        stock_unit: l.stockUnit ?? l.variant.stock_unit ?? 'item',
+        units_per_unit: l.unitsPerUnit ?? 1,
+        kind: l.variant.kind,
+        allow_fractional: l.variant.allow_fractional,
+        track_inventory: l.variant.track_inventory,
+        expected_unit_price: l.unitPrice,
+        price_floor: l.packId
+          ? (l.variant.packs?.find(p => p.id === l.packId)?.sale_price ?? null)
+          : l.variant.wholesale_price,
+        catalogue_version: l.variant.catalogue_version
+          ? {
+              ...l.variant.catalogue_version,
+              pack: l.packId ? (l.variant.pack_versions?.[l.packId] ?? null) : null,
+            }
+          : null,
+      },
+      ...(l.customPrice !== null
         ? { custom_price: l.customPrice, override_reason: l.overrideReason }
         : {}),
     }));

@@ -2,6 +2,7 @@ import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import type { Database } from '@dukarun/shared-types';
 import type { AppIdentity } from '../../core/supabase.service';
 import type { CartLine } from '../cart.service';
+import type { OfflineConfirmation, OfflineRequest, OfflineResult } from './offline-contract';
 import type {
   CategoryWithCount,
   Manufacturer,
@@ -57,6 +58,8 @@ interface ScopedRecord {
  * same client_ref returns the original order id instead of double-posting.
  */
 export interface OutboxEntry extends ScopedRecord {
+  /** Immutable posting request; delivery state below never changes this payload. */
+  request: OfflineRequest;
   client_ref: string;
   customer_id: string | null;
   lines: SaleLineInput[];
@@ -71,7 +74,8 @@ export interface OutboxEntry extends ScopedRecord {
   /** Stable browser-installation identifier used by period-close readiness. */
   device_key: string;
   queued_at: string; // ISO
-  status: 'queued' | 'failed';
+  status: 'queued' | 'failed' | 'review' | 'waiting' | 'approval';
+  outcome?: OfflineResult;
   /** Server rejection message (P0001) when status is 'failed'. */
   error?: string;
 }
@@ -143,6 +147,7 @@ export interface CashierSessionSnapshot extends ScopedRecord {
   key: string;
   session: CashierSession;
   confirmed_at: string;
+  confirmation: OfflineConfirmation;
 }
 
 export interface CachedPaymentMethod {
@@ -263,11 +268,10 @@ interface PosOfflineDb extends DBSchema {
 let dbPromise: Promise<IDBPDatabase<PosOfflineDb>> | null = null;
 
 export function offlineDb(): Promise<IDBPDatabase<PosOfflineDb>> {
-  // v3 scopes all new records by company + user. Existing records are never
-  // deleted here: unscoped outbox entries are quarantined by SyncService so an
-  // upgrade cannot lose or accidentally replay a sale under another account.
-  dbPromise ??= openDB<PosOfflineDb>('dukarun-pos-offline', 6, {
-    upgrade(db, _oldVersion, _newVersion, transaction) {
+  // v7 is a hard cutover to server-confirmed offline capture. Old sales cannot
+  // supply that evidence and must not be replayed or migrated into review.
+  dbPromise ??= openDB<PosOfflineDb>('dukarun-pos-offline', 7, {
+    upgrade(db, oldVersion, _newVersion, transaction) {
       const outbox = db.objectStoreNames.contains('outbox')
         ? transaction.objectStore('outbox')
         : db.createObjectStore('outbox', { keyPath: 'client_ref' });
@@ -309,6 +313,18 @@ export function offlineDb(): Promise<IDBPDatabase<PosOfflineDb>> {
       if (!db.objectStoreNames.contains('snapshots')) {
         db.createObjectStore('snapshots', { keyPath: 'key' });
       }
+      if (oldVersion < 7) {
+        void outbox.clear();
+        void transaction.objectStore('cashier').clear();
+      }
+    },
+    blocking() {
+      // Release this connection when another tab installs a later schema.
+      void dbPromise?.then(db => db.close());
+      dbPromise = null;
+    },
+    terminated() {
+      dbPromise = null;
     },
   });
   return dbPromise;

@@ -15,7 +15,13 @@ import {
   type PosSettingsSnapshot,
 } from './offline-db';
 import { CacheJournalService, type CacheStreamHandler } from '../../core/cache-journal.service';
-import { FulfillmentService } from '../../fulfillment/fulfillment.service';
+import { OfflinePostingService } from './offline-posting.service';
+import {
+  offlineDeviceKey,
+  offlineBlockerLabel,
+  type OfflineRequest,
+  type OfflineReviewSummary,
+} from './offline-contract';
 
 export type BarcodeResolution =
   | { status: 'found'; variant: Variant; source: 'server' | 'cache' }
@@ -32,11 +38,11 @@ const SYNC_INTERVAL_MS = 30_000;
  *  - Queued sales are NOT server truth: they never appear in Today's Sales,
  *    only in the "Pending sync" list, and the user is told "queued", never
  *    "completed".
- *  - Replay is FIFO via post_sale(p_client_ref) — exactly-once by design, so
+ *  - Replay is FIFO via immutable submit_offline_sale requests, so
  *    a sale whose response was lost is safe to replay.
  *  - Network failure mid-sync: stop, keep everything queued, retry later.
  *  - Server rejection (P0001): mark the entry failed with the server message
- *    and leave it for explicit user action (retry / discard). Never silently
+ *    and leave it for explicit review and audited resolution. Never silently
  *    drop, never infinite-retry.
  *
  * Triggers: browser `online` (via ConnectivityService), app start, manual
@@ -51,14 +57,14 @@ export class SyncService {
   private readonly catalogCache = inject(CatalogCacheService);
   private readonly catalogSearch = inject(CatalogSearchService);
   private readonly journal = inject(CacheJournalService);
-  private readonly fulfillment = inject(FulfillmentService);
+  private readonly posting = inject(OfflinePostingService);
 
   /** All outbox entries (queued + failed), FIFO by queued_at. */
   readonly entries = signal<OutboxEntry[]>([]);
   readonly queuedCount = computed(() => this.entries().filter(e => e.status === 'queued').length);
   readonly failedCount = computed(() => this.entries().filter(e => e.status === 'failed').length);
-  /** Pre-v3 entries are preserved, but never replayed without a tenant identity. */
-  readonly legacyEntryCount = signal(0);
+  readonly reviews = signal<OfflineReviewSummary[]>([]);
+  readonly lastPostedCount = signal(0);
   readonly syncing = signal(false);
   /** Bumped after a sync pass that posted at least one sale — screens can refresh. */
   readonly lastPostedAt = signal<string | null>(null);
@@ -69,7 +75,7 @@ export class SyncService {
   private settingsScope: string | null = null;
   private settingsChannel: RealtimeChannel | null = null;
   private settingsHandler: CacheStreamHandler | null = null;
-  private readonly deviceKey = this.loadDeviceKey();
+  private readonly deviceKey = offlineDeviceKey();
 
   constructor() {
     // App start, account change, reconnect, and resume-from-suspension triggers.
@@ -119,6 +125,7 @@ export class SyncService {
         }
         if (!identity) {
           this.entries.set([]);
+          this.reviews.set([]);
           return;
         }
         void this.refresh();
@@ -138,121 +145,115 @@ export class SyncService {
     }
   }
 
-  /** Persist a locally-completed sale and surface it in the queue. */
+  /** Persist the original capture once; status updates never rewrite its request. */
   async enqueue(
-    entry: Omit<
-      OutboxEntry,
-      | 'client_ref'
-      | 'occurred_at'
-      | 'device_key'
-      | 'queued_at'
-      | 'status'
-      | 'company_id'
-      | 'user_id'
-    >,
+    entry: Omit<OfflineRequest, 'protocol_version' | 'client_ref'>,
     clientRef: string = crypto.randomUUID()
   ): Promise<string> {
     const identity = this.requireIdentity();
+    if (
+      !entry.offline_context_id ||
+      !entry.originating_session_id ||
+      !entry.occurred_at ||
+      !entry.location_id
+    ) {
+      throw new Error('An open session confirmation is required before taking an offline sale.');
+    }
+    const request: OfflineRequest = JSON.parse(
+      JSON.stringify({ ...entry, protocol_version: 2, client_ref: clientRef })
+    );
     const full: OutboxEntry = {
-      ...entry,
+      ...request,
+      request,
       company_id: identity.companyId,
       user_id: identity.userId,
-      location_id: this.locations.requireActiveId(),
-      client_ref: clientRef,
-      occurred_at: new Date().toISOString(),
-      device_key: this.deviceKey,
       queued_at: new Date().toISOString(),
       status: 'queued',
     };
     const db = await offlineDb();
-    await db.put('outbox', full);
+    const transaction = db.transaction('outbox', 'readwrite');
+    const existing = await transaction.store.get(clientRef);
+    if (existing) {
+      if (
+        !belongsToIdentity(existing, identity) ||
+        JSON.stringify(existing.request) !== JSON.stringify(request)
+      ) {
+        transaction.abort();
+        throw new Error(
+          'This sale reference already has a different queued request. Review it before making corrections.'
+        );
+      }
+    } else await transaction.store.add(full);
+    await transaction.done;
     await this.refresh();
-    return full.client_ref;
+    return clientRef;
   }
 
-  /** Manual "Sync now" + all automatic triggers funnel here. */
+  /** All retries send the exact captured request. Holds require explicit review. */
   async sync(): Promise<void> {
     const identity = this.supabase.offlineIdentity();
     if (!identity || this.syncing() || !this.connectivity.online()) return;
     const identityKey = offlineScopeKey(identity);
     this.syncing.set(true);
+    this.lastPostedCount.set(0);
     let posted = 0;
     try {
       const db = await offlineDb();
-      const queued = (await db.getAllFromIndex('outbox', 'by-queued-at')).filter(
-        e => belongsToIdentity(e, identity) && e.status === 'queued'
+      const entries = (await db.getAllFromIndex('outbox', 'by-queued-at')).filter(
+        e =>
+          belongsToIdentity(e, identity) && (e.status === 'queued' || !!e.outcome?.durable_custody)
       );
-      for (const [index, entry] of queued.entries()) {
+      for (const entry of entries) {
         const currentIdentity = this.supabase.offlineIdentity();
         if (!currentIdentity || offlineScopeKey(currentIdentity) !== identityKey) break;
         try {
-          const replay = {
-            locationId: entry.location_id ?? this.locations.requireActiveId(),
-            lines: entry.lines,
-            payments: entry.payments,
-            clientRef: entry.client_ref,
-            occurredAt: entry.occurred_at ?? entry.queued_at,
-            deviceKey: entry.device_key ?? this.deviceKey,
-            pendingCount: queued.length - index,
-            draftId: entry.draft_id ?? undefined,
-          };
-          if (entry.fulfillment && entry.checkout_customer) {
-            await this.fulfillment.offlineCheckout({
-              ...replay,
-              customer: entry.checkout_customer,
-              fulfillment: entry.fulfillment,
+          // Held custody stays in review; an approved attempt may resume normal validation.
+          const result = await this.posting.submit(entry.request);
+          if (result.status === 'completed' || result.status === 'cancelled') {
+            await db.delete('outbox', entry.client_ref);
+            if (result.status === 'completed') posted++;
+          } else {
+            await db.put('outbox', {
+              ...entry,
+              status: result.status,
+              outcome: result,
+              error: result.blockers.map(offlineBlockerLabel).join('. '),
             });
-          } else {
-            await this.pos.postOfflineSale({ ...replay, customerId: entry.customer_id });
           }
-          await db.delete('outbox', entry.client_ref);
-          posted++;
-        } catch (err) {
-          if (err instanceof PosRpcError && err.code === 'P0001') {
-            // Business rejection (insufficient_stock, payment_mismatch, …):
-            // park it as failed; user action required. Keep replaying the rest.
-            await db.put('outbox', { ...entry, status: 'failed', error: err.message });
-          } else {
-            // Network/unknown failure: stop and retry later — the entry stays
-            // queued and replay is exactly-once thanks to client_ref.
-            break;
-          }
+        } catch (error) {
+          if (error instanceof PosRpcError && error.code === 'P0001') {
+            await db.put('outbox', { ...entry, status: 'failed', error: error.message });
+          } else break; // Ambiguous results retain the full request for safe retry.
         }
       }
-      const remaining = (await db.getAllFromIndex('outbox', 'by-queued-at')).filter(
-        entry => belongsToIdentity(entry, identity) && entry.status === 'queued'
-      ).length;
-      await this.pos.heartbeatPosDevice(
-        this.deviceKey,
-        this.locations.requireActiveId(),
-        remaining,
-        remaining === 0
+      const remaining = (await db.getAllFromIndex('outbox', 'by-queued-at')).filter(entry =>
+        belongsToIdentity(entry, identity)
       );
+      for (const locationId of new Set([
+        this.locations.requireActiveId(),
+        ...remaining.map(e => e.location_id!),
+      ])) {
+        const count = remaining.filter(e => e.location_id === locationId).length;
+        await this.pos.heartbeatPosDevice(this.deviceKey, locationId, count, count === 0);
+      }
       if (posted > 0) this.lastPostedAt.set(new Date().toISOString());
+      this.lastPostedCount.set(posted);
     } finally {
       this.syncing.set(false);
       await this.refresh();
     }
   }
 
-  /** User chose to retry a failed sale (re-queues it for the next sync pass). */
   async retry(clientRef: string): Promise<void> {
     const identity = this.requireIdentity();
     const db = await offlineDb();
     const entry = await db.get('outbox', clientRef);
     if (!entry || !belongsToIdentity(entry, identity)) return;
+    if (entry.outcome?.durable_custody)
+      throw new Error('Open this sale for review. Its original request cannot be changed.');
     await db.put('outbox', { ...entry, status: 'queued', error: undefined });
     await this.refresh();
-    void this.sync();
-  }
-
-  /** User explicitly discarded a failed sale (UI confirms first). */
-  async discard(clientRef: string): Promise<void> {
-    const identity = this.requireIdentity();
-    const db = await offlineDb();
-    const entry = await db.get('outbox', clientRef);
-    if (entry && belongsToIdentity(entry, identity)) await db.delete('outbox', clientRef);
-    await this.refresh();
+    await this.sync();
   }
 
   async refresh(): Promise<void> {
@@ -260,19 +261,17 @@ export class SyncService {
     const db = await offlineDb();
     const all = await db.getAllFromIndex('outbox', 'by-queued-at');
     this.entries.set(identity ? all.filter(entry => belongsToIdentity(entry, identity)) : []);
-    this.legacyEntryCount.set(all.filter(entry => !entry.company_id || !entry.user_id).length);
-  }
-
-  private loadDeviceKey(): string {
-    const storageKey = 'dukarun-pos-device-key';
-    try {
-      const existing = localStorage.getItem(storageKey);
-      if (existing) return existing;
-      const created = crypto.randomUUID();
-      localStorage.setItem(storageKey, created);
-      return created;
-    } catch {
-      return crypto.randomUUID();
+    if (identity && this.connectivity.online()) {
+      try {
+        const reviews = await this.posting.list();
+        if (
+          this.supabase.offlineIdentity()?.companyId === identity.companyId &&
+          this.supabase.offlineIdentity()?.userId === identity.userId
+        )
+          this.reviews.set(reviews);
+      } catch {
+        /* Retain visible custody when the network is unavailable. */
+      }
     }
   }
 

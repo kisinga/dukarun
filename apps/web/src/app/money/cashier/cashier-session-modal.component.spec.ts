@@ -60,6 +60,7 @@ describe('CashierSessionModalComponent guidance', () => {
         {
           provide: CompanyPreferencesService,
           useValue: {
+            cashControlEnabled: signal(true),
             requireOpeningCount: signal(true),
             varianceNotificationThreshold: signal(100),
           },

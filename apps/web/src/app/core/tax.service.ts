@@ -1,3 +1,5 @@
+import { ServerClockService } from './server-clock.service';
+import { TaxSettingsSourceService } from './tax-settings-source.service';
 import { Injectable, Injector, effect, inject, untracked } from '@angular/core';
 import type { Json } from '@dukarun/shared-types';
 import type {
@@ -90,6 +92,8 @@ export interface PosDeviceStatus {
 @Injectable({ providedIn: 'root' })
 export class TaxService {
   private readonly supabase = inject(SupabaseService);
+  private readonly clock = inject(ServerClockService);
+  private readonly settingsSource = inject(TaxSettingsSourceService);
   private readonly injector = inject(Injector);
   private readonly journal = inject(CacheJournalService);
 
@@ -97,10 +101,8 @@ export class TaxService {
     return this.supabase.client;
   }
 
-  async settings(): Promise<CompanyTaxSettings> {
-    const { data, error } = await this.db.rpc('company_tax_settings');
-    if (error) throw rpcError(error);
-    return data as unknown as CompanyTaxSettings;
+  settings(): Promise<CompanyTaxSettings> {
+    return this.settingsSource.read();
   }
 
   /** Recover cross-device edits through the durable settings journal, and wake at midnight changes. */
@@ -131,7 +133,11 @@ export class TaxService {
                 if (stopped) return;
                 next(settings);
                 clearTimeout(timer);
-                const serverNow = Date.parse(settings.activation?.server_time ?? '') || Date.now();
+                const serverNow = this.clock.now();
+                if (serverNow === null) {
+                  timer = setTimeout(wake, 30_000);
+                  continue;
+                }
                 const boundary = settings.scheduled_profiles
                   .map(profile => Date.parse(profile.effective_from_at ?? ''))
                   .filter(at => Number.isFinite(at) && at > serverNow)

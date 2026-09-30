@@ -63,7 +63,7 @@ select is(public.post_full_refund((select id from fractional_pack_sale),'cash','
 select results_eq($$select sum(remaining),sum(remaining_cost) from public.inventory_batches where variant_id=(select id from fractional_pack_variant)$$,
   $$values (180.5::numeric,1807::numeric)$$,'refund restores exact fractional stock and value');
 
-create temp table fractional_pack_offline_sale as select public.post_offline_sale_at_location(
+create temp table fractional_pack_offline_sale as select testkit.post_offline_sale(
   (select id from public.stock_locations where company_id=(select id from fractional_pack_company) and code='MAIN'),
   null,(select data from fractional_pack_lines),'[{"method":"cash","amount":1510}]',
   'fractional-pack-offline',now(),'fractional-pack-test-device') result;

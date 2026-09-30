@@ -21,8 +21,8 @@ const dbVersion = Number(db.match(/openDB<PosOfflineDb>\('dukarun-pos-offline', 
 
 const checks = [
   {
-    ok: Number.isInteger(dbVersion) && dbVersion >= 3,
-    message: 'IndexedDB schema must remain on the tenant-scoped v3+ migration path.',
+    ok: Number.isInteger(dbVersion) && dbVersion >= 7,
+    message: 'IndexedDB schema must include the v7 hard cutover.',
   },
   {
     ok: !db.includes('deleteObjectStore('),
@@ -33,7 +33,7 @@ const checks = [
     message: 'Outbox records must carry company and user scope.',
   },
   {
-    ok: /belongsToIdentity\(e, identity\) && e\.status === 'queued'/.test(sync),
+    ok: /belongsToIdentity\(e, identity\) && \(e\.status === 'queued'/.test(sync),
     message: 'Sync must filter queued entries to the active company and user.',
   },
   {
@@ -57,8 +57,9 @@ const checks = [
   {
     ok:
       /snapshot\.session\.company_id === identity\.companyId/.test(cashier) &&
-      /this\.nairobiDay\(snapshot\.confirmed_at\) ===/.test(cashier),
-    message: 'Cached cashier state must be tenant-scoped and expire at the Nairobi day boundary.',
+      /confirmedOfflineTime\(snapshot\.confirmation, this\.clock\.now\(\)\) !== null/.test(cashier),
+    message:
+      'Cached cashier state must be tenant-scoped and use the server-issued 24-hour confirmation.',
   },
   {
     ok:

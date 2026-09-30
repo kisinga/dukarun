@@ -1,214 +1,166 @@
-import { Component, inject, signal, viewChild } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { PageLayoutComponent } from '../../shared/ui/page-layout.component';
 import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
-import { DeleteConfirmationModalComponent } from '../../shared/ui/delete-confirmation-modal.component';
 import { formatKes } from '../../core/money';
 import { ConnectivityService } from '../offline/connectivity.service';
-import type { OutboxEntry } from '../offline/offline-db';
 import { SyncService } from '../offline/sync.service';
 import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
 import { MobileListComponent } from '../../shared/ui/mobile-list.component';
 import { PageActionsComponent } from '../../shared/ui/page-actions.component';
+import { OfflineSaleReviewComponent } from './offline-sale-review.component';
+import { offlineBlockerLabel } from '../offline/offline-contract';
 
-/**
- * Pending sync — the offline outbox. Queued sales are local-only until the
- * sync engine replays them (exactly-once via client_ref); they never appear
- * in Today's Sales before that. Failed entries (server P0001 rejections)
- * keep the server message and need explicit user action.
- */
 @Component({
   selector: 'app-pending-sync',
   imports: [
     PageLayoutComponent,
     EmptyStateComponent,
     StatusBadgeComponent,
-    DeleteConfirmationModalComponent,
     MobileListComponent,
     PageActionsComponent,
+    OfflineSaleReviewComponent,
   ],
   template: `
     <app-page
-      title="Pending Sync"
-      [badge]="sync.entries().length"
-      subtitle="Posted when you're back online. Until then they're only on this device — not in Today's Sales, not in the books."
+      title="Pending sales"
+      [badge]="rows().length"
+      subtitle="Queued and held sales are not posted until the server confirms completion."
     >
       <app-page-actions actions>
         <button
           primaryAction
           class="btn btn-primary btn-sm"
-          [disabled]="!connectivity.online() || sync.syncing() || sync.queuedCount() === 0"
+          [disabled]="!connectivity.online() || sync.syncing()"
           (click)="syncNow()"
         >
-          {{ sync.syncing() ? 'Syncing…' : 'Sync now' }}
+          {{ sync.syncing() ? 'Checking…' : 'Sync and refresh' }}
         </button>
       </app-page-actions>
-
-      <p class="mb-3 rounded-field bg-info/10 px-3 py-2 text-xs text-base-content/75 md:hidden">
-        Queued sales remain only on this device until they sync; they are not yet in Sales or the
-        books.
-      </p>
-
       @if (notice()) {
-        <p class="mb-2 text-sm text-success">{{ notice() }}</p>
+        <p role="status" class="mb-3 text-sm text-success">{{ notice() }}</p>
       }
       @if (error()) {
-        <p class="mb-2 text-sm text-error">{{ error() }}</p>
+        <p role="alert" class="mb-3 text-sm text-error">{{ error() }}</p>
       }
-
-      @if (sync.legacyEntryCount() > 0) {
-        <div role="alert" class="alert alert-warning mb-3 text-sm">
-          <span>
-            {{ sync.legacyEntryCount() }} sale(s) from an older app version remain safely on this
-            device. They are quarantined because their company could not be verified and will not
-            sync automatically.
-          </span>
-        </div>
-      }
-
-      @if (sync.entries().length === 0) {
+      @if (reviewId(); as id) {
+        <app-offline-sale-review
+          [reviewId]="id"
+          (closed)="reviewId.set(null)"
+          (resolved)="reviewResolved()"
+        />
+      } @else if (!rows().length) {
         <app-empty-state
           icon="heroCheckCircle"
-          [title]="
-            sync.legacyEntryCount() > 0 ? 'Nothing waiting for this account' : 'Nothing waiting'
-          "
-          [description]="
-            sync.legacyEntryCount() > 0
-              ? 'Older quarantined sales need manual recovery before they can be posted.'
-              : 'All sales are synced.'
-          "
+          title="Nothing waiting"
+          description="No queued or held sales for this account."
         />
       } @else {
         <app-mobile-list [desktopVisible]="true">
-          @for (entry of sync.entries(); track entry.client_ref) {
-            <div
-              mobileListRow
-              class="bg-base-100"
-              [class.border]="entry.status === 'failed'"
-              [class.border-error]="entry.status === 'failed'"
-            >
-              <div class="p-3">
-                <div class="flex flex-wrap items-center gap-3">
-                  <span class="font-mono text-sm">{{ shortRef(entry.client_ref) }}</span>
-                  <span class="text-sm text-base-content/60">
-                    queued {{ time(entry.queued_at) }}
-                  </span>
-                  <span class="text-sm">{{ entry.lines.length }} item(s)</span>
-                  <app-status-badge
-                    [type]="entry.status === 'failed' ? 'error' : 'warning'"
-                    [label]="entry.status === 'failed' ? 'failed' : 'awaiting sync'"
-                  />
-                  <span class="ml-auto font-bold tabular-nums">{{ fmt(total(entry)) }}</span>
-                  @if (entry.status === 'failed') {
-                    <button
-                      class="btn btn-outline btn-sm"
-                      [disabled]="retrying() === entry.client_ref"
-                      (click)="retry(entry.client_ref)"
-                    >
-                      {{ retrying() === entry.client_ref ? 'Retrying…' : 'Retry' }}
-                    </button>
-                    <button class="btn btn-error btn-outline btn-sm" (click)="startDiscard(entry)">
-                      Discard
-                    </button>
-                  }
-                </div>
-                @if (entry.status === 'failed' && entry.error) {
-                  <p class="mt-2 text-sm text-error">{{ entry.error }}</p>
-                  <p class="text-xs text-base-content/60">
-                    The server rejected this sale — it was never posted. Retry after fixing the
-                    cause (e.g. stock), or discard it.
-                  </p>
+          @for (row of rows(); track row.clientRef) {
+            <div mobileListRow class="bg-base-100 p-4">
+              <div class="flex flex-wrap items-center gap-3">
+                <strong class="font-mono text-sm">{{ row.clientRef.slice(0, 8) }}</strong>
+                <span class="text-sm text-base-content/60"
+                  >Captured {{ time(row.capturedAt) }}</span
+                >
+                <app-status-badge
+                  [type]="row.status === 'failed' ? 'error' : 'warning'"
+                  [label]="row.status === 'queued' ? 'Awaiting sync' : row.status"
+                />
+                <strong class="ml-auto tabular-nums">{{ fmt(row.paid) }} collected</strong>
+                @if (row.reviewId) {
+                  <button
+                    class="btn btn-outline btn-sm"
+                    [disabled]="!connectivity.online()"
+                    (click)="reviewId.set(row.reviewId)"
+                  >
+                    Review sale
+                  </button>
+                } @else if (row.status === 'failed') {
+                  <button
+                    class="btn btn-outline btn-sm"
+                    [disabled]="!connectivity.online() || sync.syncing()"
+                    (click)="retry(row.clientRef)"
+                  >
+                    Retry original request
+                  </button>
                 }
               </div>
+              <p class="mt-2 text-xs text-base-content/60">
+                {{
+                  row.reviewId
+                    ? 'Saved by the server · remains unresolved'
+                    : 'Saved on this device · keep the app data until sync confirms receipt'
+                }}
+              </p>
+              @if (row.error) {
+                <p class="mt-2 text-sm text-warning">{{ row.error }}</p>
+              }
             </div>
           }
         </app-mobile-list>
       }
-      <app-delete-confirmation-modal
-        [data]="discardData()"
-        title="Discard queued sale?"
-        entityType="sale"
-        verb="discard"
-        confirmButtonText="Discard"
-        (confirm)="confirmDiscard()"
-      />
     </app-page>
   `,
 })
 export class PendingSyncComponent {
   protected readonly sync = inject(SyncService);
   protected readonly connectivity = inject(ConnectivityService);
-
   protected readonly fmt = formatKes;
-  protected readonly discarding = signal<OutboxEntry | null>(null);
-  private readonly deleteModal = viewChild(DeleteConfirmationModalComponent);
-  protected readonly notice = signal<string | null>(null);
-  protected readonly error = signal<string | null>(null);
-  protected readonly retrying = signal<string | null>(null);
-
-  protected total(entry: OutboxEntry): number {
-    return entry.lines.reduce(
-      (sum, l) => sum + Math.round(l.quantity * (l.custom_price ?? l.unit_price)),
-      0
-    );
+  protected readonly notice = signal('');
+  protected readonly error = signal('');
+  protected readonly reviewId = signal<string | null>(null);
+  protected readonly rows = computed(() => {
+    const local = this.sync.entries().map(entry => ({
+      clientRef: entry.client_ref,
+      capturedAt: entry.occurred_at,
+      status: entry.status,
+      paid: entry.payments.filter(p => p.method !== 'credit').reduce((sum, p) => sum + p.amount, 0),
+      reviewId: entry.outcome?.review_id ?? null,
+      error: entry.error ?? '',
+    }));
+    const refs = new Set(local.map(row => row.clientRef));
+    return [
+      ...local,
+      ...this.sync
+        .reviews()
+        .filter(r => !refs.has(r.client_ref))
+        .map(r => ({
+          clientRef: r.client_ref,
+          capturedAt: r.captured_at,
+          status: r.status,
+          paid: r.payments.filter(p => p.method !== 'credit').reduce((sum, p) => sum + p.amount, 0),
+          reviewId: r.id,
+          error: r.blockers.map(offlineBlockerLabel).join('. '),
+        })),
+    ].sort((a, b) => a.capturedAt.localeCompare(b.capturedAt));
+  });
+  protected time(iso: string) {
+    return new Date(iso).toLocaleString('en-KE');
   }
-
-  protected shortRef(ref: string): string {
-    return ref.slice(0, 8);
-  }
-
-  protected time(iso: string): string {
-    return new Date(iso).toLocaleString('en-KE', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  }
-
-  protected async syncNow(): Promise<void> {
-    this.notice.set(null);
-    const before = this.sync.queuedCount();
-    const failedBefore = this.sync.failedCount();
-    await this.sync.sync();
-    // Rejected entries flip queued→failed without leaving the outbox; don't
-    // report them as synced.
-    const posted = before - this.sync.queuedCount() - (this.sync.failedCount() - failedBefore);
-    if (posted > 0) this.notice.set(`Synced ${posted} sale(s)`);
-  }
-
-  protected async retry(clientRef: string): Promise<void> {
-    this.discarding.set(null);
-    this.error.set(null);
-    this.retrying.set(clientRef);
+  protected async syncNow() {
+    this.notice.set('');
+    this.error.set('');
     try {
-      await this.sync.retry(clientRef);
-    } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Retry failed');
-    } finally {
-      this.retrying.set(null);
+      await this.sync.sync();
+      const count = this.sync.lastPostedCount();
+      this.notice.set(
+        count ? `Posted ${count} sale(s).` : 'Status refreshed. Held sales still need review.'
+      );
+    } catch (e) {
+      this.error.set(e instanceof Error ? e.message : 'Could not sync. Requests are kept.');
     }
   }
-
-  protected startDiscard(entry: OutboxEntry): void {
-    this.discarding.set(entry);
-    this.deleteModal()?.show();
+  protected async retry(ref: string) {
+    this.error.set('');
+    try {
+      await this.sync.retry(ref);
+    } catch (e) {
+      this.error.set(e instanceof Error ? e.message : 'Could not retry');
+    }
   }
-
-  protected discardData() {
-    const entry = this.discarding();
-    return {
-      entityName: entry
-        ? `${this.shortRef(entry.client_ref)} · ${this.fmt(this.total(entry))}`
-        : '',
-      warningDetails: ['This sale was never posted to the server.'],
-    };
-  }
-
-  protected async confirmDiscard(): Promise<void> {
-    const entry = this.discarding();
-    if (!entry) return;
-    this.discarding.set(null);
-    this.deleteModal()?.hide();
-    await this.sync.discard(entry.client_ref);
+  protected async reviewResolved() {
+    this.reviewId.set(null);
+    await this.syncNow();
   }
 }

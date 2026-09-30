@@ -1,3 +1,4 @@
+import type { OfflineCapture } from '../offline/offline-contract';
 import { SaleDocumentService } from '../../communications/sale-document.service';
 import { cartLineId } from '../cart.service';
 import { sellingUnits } from '@dukarun/pack-types';
@@ -256,6 +257,7 @@ export class SellWorkflowStore implements OnDestroy {
   }));
   private approvalSentTimer: ReturnType<typeof setTimeout> | null = null;
   private saleAttempt: SaleAttemptState | null = null;
+  private offlineCapture: { clientRef: string; capture: OfflineCapture } | null = null;
   private customerSearchSeq = 0;
   private matchedCustomerRequest = 0;
   private customerDepositRequest = 0;
@@ -690,6 +692,17 @@ export class SellWorkflowStore implements OnDestroy {
     });
     this.saleAttempt = resolveSaleAttempt(this.saleAttempt, fingerprint, () => crypto.randomUUID());
     const clientRef = this.saleAttempt.clientRef;
+    if (this.offlineCapture?.clientRef !== clientRef) {
+      try {
+        this.offlineCapture = { clientRef, capture: this.cashierSession.captureOfflineSale() };
+      } catch (error) {
+        this.errorState.set(
+          error instanceof Error ? error.message : 'Session confirmation required'
+        );
+        this.busyState.set(false);
+        return;
+      }
+    }
     if (!this.connectivity.online()) {
       if (
         payments.some(payment => payment.method === 'mpesa') &&
@@ -820,7 +833,7 @@ export class SellWorkflowStore implements OnDestroy {
         this.saleDocuments.offerCompleted(result.orderId, result.status, saleTotal);
       }
     } catch (err) {
-      if (!(err instanceof PosRpcError) && !settlement) {
+      if ((!(err instanceof PosRpcError) || err.code === '') && !settlement) {
         try {
           await this.queueSale(customerId, lines, payments, clientRef, fulfillmentDraft);
           this.saleAttempt = null;
@@ -1122,8 +1135,11 @@ export class SellWorkflowStore implements OnDestroy {
     if (fulfillmentDraft && !fulfillmentDraft.fulfillment.phone?.trim()) {
       throw new Error('Offline pickup requires a recipient phone so the tracking PIN is not lost.');
     }
+    if (this.offlineCapture?.clientRef !== clientRef)
+      throw new Error('Original sale capture is missing. Keep this cart and reconnect.');
     await this.sync.enqueue(
       {
+        ...this.offlineCapture.capture,
         customer_id: customerId,
         lines,
         payments,

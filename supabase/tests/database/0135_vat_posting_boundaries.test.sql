@@ -38,7 +38,7 @@ select is((select effective_to_at from public.company_tax_profiles
   (select effective_from_at from public.company_tax_profiles where id=(select id from vat_enabled)),
   'activation creates an exact exclusive boundary');
 create temp table vat_captured as select clock_timestamp()-interval '2 hours' captured;
-create temp table vat_delayed as select public.post_offline_sale_at_location(
+create temp table vat_delayed as select testkit.post_offline_sale(
   (select id from public.stock_locations where company_id=(select company_id from vat_boundary_fixture) and is_default limit 1),null,
   '[{"variant_id":"a1350000-0000-4000-8000-000000000020","quantity":1,"unit_price":116}]',
   '[{"method":"cash","amount":116}]','vat-delayed-boundary',
@@ -55,7 +55,7 @@ select ok((select posted_at>captured_at and tax_point_at=posted_at and completed
 select pg_temp.change_vat(false);
 select is((public.company_tax_settings()->'active_profile'->>'vat_registered')::boolean,false,
   'VAT can turn off again on the same business day');
-select is(public.post_offline_sale_at_location(
+select is(testkit.post_offline_sale(
   (select id from public.stock_locations where company_id=(select company_id from vat_boundary_fixture) and is_default limit 1),null,
   '[{"variant_id":"a1350000-0000-4000-8000-000000000020","quantity":1,"unit_price":116}]',
   '[{"method":"cash","amount":116}]','vat-delayed-boundary',
