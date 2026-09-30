@@ -24,6 +24,12 @@ declare
   sizes text[] := array['Small pack','Family pack','Catering pack',
     'Refill pouch','Premium selection','Value pack'];
 begin
+  -- Keep staging inside the block so batch parsing cannot resolve it early.
+  -- Only sales created by this run may receive historical fixture dates.
+  create temp table list_ux_sale_dates (
+    order_id uuid primary key,
+    completed_at timestamptz not null
+  ) on commit drop;
   select id into strict c from public.companies where name='Mama Mboga Stores';
   if not exists(select 1 from public.company_memberships
     where company_id=c and user_id=admin) then
@@ -133,9 +139,10 @@ begin
       sale := (result->>'order_id')::uuid;
       if sale is null then raise exception 'Demo sale did not complete: %',result; end if;
       at_time := date_trunc('day',now())-(j-1)*interval '2 days'+interval '7 hours'+i*interval '3 minutes';
-      update public.orders set created_at=at_time,completed_at=at_time,
+      update public.orders set created_at=at_time,
         credit_due_at=case when is_credit_sale then at_time::date+7 else null end
         where id=sale;
+      insert into pg_temp.list_ux_sale_dates values(sale,at_time);
       update public.payments set created_at=at_time where order_id=sale;
     end loop;
   end loop;
@@ -300,6 +307,17 @@ begin
       case when i%3=0 then 'Demo delivery failure: fictional recipient' end,
       'direct',0,'released',now()-i*interval '1 hour') on conflict(id) do nothing;
   end loop;
+
+  -- Local historical fixtures deliberately predate their real posting evidence.
+  -- Flush deferred financial checks before ALTER TABLE, then suspend only the
+  -- timestamp guard for these newly seeded rows. The table lock excludes other
+  -- writers until commit; an error rolls back both the data and trigger state.
+  -- No production command gets an immutability bypass, and all other guards run.
+  set constraints all immediate;
+  alter table public.orders disable trigger orders_preserve_capture_times;
+  update public.orders o set completed_at=d.completed_at
+  from pg_temp.list_ux_sale_dates d where o.id=d.order_id;
+  alter table public.orders enable trigger orders_preserve_capture_times;
 
   -- Commission plans and two distinct statement periods use real collected-sale
   -- events and the existing seeded staff; no additional login accounts needed.

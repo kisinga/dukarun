@@ -1,5 +1,5 @@
 begin;
-select plan(15);
+select plan(18);
 create temp table ux_company as select id from public.companies where name='Mama Mboga Stores';
 
 select is((select count(*) from public.product_variants v join ux_company c on c.id=v.company_id
@@ -39,5 +39,15 @@ select ok(not exists(select e.id from public.ledger_journal_entries e join ux_co
   'hydrated ledger remains balanced entry by entry');
 select lives_ok($$select public.assert_order_receivable_evidence(id) from public.orders
   where client_ref like 'list-ux-v1-%'$$,'seeded receivables have matching payment evidence');
+select is((select count(distinct (o.completed_at at time zone c.business_timezone)::date)
+  from public.orders o join public.companies c on c.id=o.company_id
+  where o.client_ref like 'list-ux-v1-sale-%'),10::bigint,
+  'historical sale fixtures retain ten selling days');
+select is((select tgenabled::text from pg_trigger
+  where tgrelid='public.orders'::regclass and tgname='orders_preserve_capture_times'),'O',
+  'seed restores the posting evidence guard');
+select throws_ok($$update public.orders set completed_at=completed_at+interval '1 second'
+  where client_ref='list-ux-v1-sale-1-1'$$,'P0001','sale_posting_evidence_immutable',
+  'posted fixture evidence is immutable after hydration');
 select * from finish();
 rollback;
