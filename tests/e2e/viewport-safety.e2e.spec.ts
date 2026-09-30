@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from '../fixtures/mocked-browser';
 import { renderedTextContrast } from '../fixtures/contrast';
+import { mockCashierSession } from '../fixtures/cashier-session';
 
 const companyId = '96000000-0000-4000-8000-000000000001';
 const userId = '96000000-0000-4000-8000-000000000002';
@@ -154,6 +155,12 @@ async function mockOperationsApp(
     updated_at: '2026-08-19T00:00:00Z',
   };
   const variant = {
+    catalogue_version: {
+      product: '2026-09-29T00:00:00Z',
+      variant: '2026-09-29T00:00:00Z',
+      pack: null,
+    },
+    packs: [],
     variant_id: variantId,
     variant_name: 'Default',
     product_id: productId,
@@ -256,19 +263,6 @@ async function mockOperationsApp(
           : [{ id: companyId, name: 'Viewport shop', code: 'VIEWPORT' }]
       );
     }
-    if (path.endsWith('/rest/v1/cashier_sessions')) {
-      return json(
-        options.openTill?.()
-          ? {
-              id: '96000000-0000-4000-8000-000000000007',
-              company_id: companyId,
-              location_id: locationId,
-              status: 'open',
-              opened_at: new Date().toISOString(),
-            }
-          : null
-      );
-    }
     if (path.endsWith('/rest/v1/products')) {
       return request.headers()['accept']?.includes('application/vnd.pgrst.object')
         ? json(product)
@@ -329,6 +323,13 @@ async function mockOperationsApp(
     }
     if (path.includes('/rest/v1/rpc/')) return json([]);
     return json([]);
+  });
+  await mockCashierSession(page, {
+    companyId,
+    userId,
+    locationId,
+    open: options.openTill ?? (() => false),
+    canSettle: options.cashControl ?? false,
   });
   return {
     createdProduct: () => createdProduct,
@@ -918,6 +919,11 @@ test('stock decisions preserve manufacturer, server filters, and loaded records 
   if (!isMobile) await page.setViewportSize({ width: 1024, height: 720 });
   await mockOperationsApp(page, { insights: true });
   const variants = Array.from({ length: 60 }, (_, index) => ({
+    catalogue_version: {
+      product: '2026-09-29T00:00:00Z',
+      variant: '2026-09-29T00:00:00Z',
+      pack: null,
+    },
     variant_id: `97000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`,
     product_id: productId,
     product_name: `Tea ${String(index + 1).padStart(2, '0')}`,

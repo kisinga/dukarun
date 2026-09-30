@@ -1,4 +1,5 @@
 import { TestBed } from '@angular/core/testing';
+import { signal } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CashierSessionService } from '../core/cashier-session.service';
 import { BusinessClockService } from '../core/business-clock.service';
@@ -8,6 +9,7 @@ import { MoneyService } from '../money/money.service';
 import { PrintService } from '../shared/print/print.service';
 import { ReceiptDataService } from '../shared/print/receipt-data.service';
 import { PurchaseDetailStore } from './purchase-detail.store';
+import { PurchaseDetailDrawerComponent } from './purchase-detail-drawer.component';
 import type { PurchaseRow } from './purchase-history.store';
 
 function deferred<T>() {
@@ -97,6 +99,37 @@ describe('PurchaseDetailStore', () => {
   });
 
   afterEach(() => TestBed.resetTestingModule());
+
+  it('keeps the drawer payment draft when receipt settings observe a clock tick', async () => {
+    TestBed.overrideComponent(PurchaseDetailDrawerComponent, {
+      set: { template: '', imports: [] },
+    });
+    const clockTick = signal(0);
+    vi.mocked(TestBed.inject(ReceiptDataService).printerEnabled).mockImplementation(async () => {
+      clockTick();
+      return false;
+    });
+    const fixture = TestBed.createComponent(PurchaseDetailDrawerComponent);
+    fixture.componentRef.setInput('purchase', purchaseA);
+    fixture.componentRef.setInput('supplierName', 'Supplier A');
+    await fixture.whenStable();
+    const store = fixture.debugElement.injector.get(PurchaseDetailStore);
+    await store.startPayment();
+    store.paymentAmount.setValue('250');
+
+    clockTick.update(value => value + 1);
+    await fixture.whenStable();
+    expect(store.paymentOpen()).toBe(true);
+    expect(store.paymentAmount.value).toBe('250');
+    expect(store.paymentAccount.value).toBe('1000');
+    expect(money['purchaseLines']).toHaveBeenCalledOnce();
+
+    fixture.componentRef.setInput('purchase', purchaseB);
+    await fixture.whenStable();
+    expect(store.purchase()?.id).toBe(purchaseB.id);
+    expect(store.paymentOpen()).toBe(false);
+    expect(money['purchaseLines']).toHaveBeenCalledTimes(2);
+  });
 
   it('does not restore an older purchase after its post-commit refresh', async () => {
     const store = TestBed.inject(PurchaseDetailStore);

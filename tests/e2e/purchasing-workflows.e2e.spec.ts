@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '../fixtures/mocked-browser';
+import { mockCashierSession } from '../fixtures/cashier-session';
 import { renderedTextContrast } from '../fixtures/contrast';
 
 const companyId = '97000000-0000-4000-8000-000000000001';
@@ -93,6 +94,11 @@ async function mockPurchasing(
     updated_at: '2026-08-01T08:00:00Z',
   };
   const variant = {
+    catalogue_version: {
+      product: '2026-09-29T00:00:00Z',
+      variant: '2026-09-29T00:00:00Z',
+      pack: null,
+    },
     variant_id: variantId,
     variant_name: 'Default',
     product_id: productId,
@@ -375,6 +381,7 @@ async function mockPurchasing(
     if (path.includes('/rest/v1/rpc/')) return json([]);
     return json([]);
   });
+  await mockCashierSession(page, { companyId, userId, locationId });
 
   return {
     changePack: (price, active = true) => {
@@ -436,6 +443,7 @@ test('purchase deep link composes its scoped drawer and records payment', async 
   await expect(drawer).toBeVisible();
   await expect(drawer.getByText('Breakfast tea')).toBeVisible();
   await drawer.getByRole('button', { name: 'Record payment' }).click();
+  await expect(drawer.getByLabel('Pay from')).toHaveValue('CASH_ON_HAND');
   await drawer.getByLabel('Amount (KES)').fill('400');
   await drawer.getByRole('button', { name: 'Save payment' }).click();
 

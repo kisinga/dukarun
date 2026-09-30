@@ -1,5 +1,5 @@
 import { transactionUnitLabel } from '@dukarun/pack-types';
-import { Component, effect, inject, input, output } from '@angular/core';
+import { Component, effect, inject, input, output, untracked } from '@angular/core';
 import { ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { DocumentSendComponent } from '../communications/document-send.component';
@@ -361,7 +361,12 @@ export class PurchaseDetailDrawerComponent {
   protected readonly fmtCost = formatUnitCost;
 
   constructor() {
-    effect(() => void this.store.open(this.purchase()));
+    effect(() => {
+      const purchase = this.purchase();
+      // Only a new purchase reinitializes the draft. Receipt settings read the
+      // server clock, whose ticks must not reopen the drawer or reset payment.
+      untracked(() => void this.store.open(purchase));
+    });
   }
 
   protected requestClose(): void {

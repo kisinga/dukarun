@@ -97,3 +97,13 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e:mocked
+      - name: Upload browser results and retry traces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mocked-browser-results
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7

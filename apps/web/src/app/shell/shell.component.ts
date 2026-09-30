@@ -70,7 +70,7 @@ interface NavSection {
       <div class="drawer-content flex min-h-screen flex-col">
         <!-- Top navbar -->
         <div
-          class="navbar sticky top-0 z-40 h-14 min-h-14 border-b border-base-300 bg-base-100 px-3 md:px-4"
+          class="navbar sticky top-0 z-40 min-h-14 flex-wrap gap-y-2 border-b border-base-300 bg-base-100 px-3 md:px-4"
         >
           <div class="flex-none lg:hidden">
             <label for="app-drawer" class="btn btn-square btn-ghost btn-sm" aria-label="Open menu">
@@ -82,10 +82,10 @@ interface NavSection {
           <div class="flex-1"></div>
 
           @if (locations.isMultiLocation()) {
-            <label class="mr-2 hidden items-center gap-2 lg:flex">
+            <label class="mr-2 hidden min-w-0 max-w-full items-center gap-2 lg:flex">
               <span class="type-caption font-medium">Working location</span>
               <select
-                class="select select-bordered select-sm max-w-52"
+                class="select select-bordered select-sm min-w-0 max-w-52"
                 [value]="locations.activeId()"
                 aria-label="Working location"
                 (change)="changeLocation($event)"
@@ -97,7 +97,7 @@ interface NavSection {
             </label>
           }
 
-          <div class="flex flex-none items-center gap-1.5">
+          <div class="flex min-w-0 flex-wrap items-center justify-end gap-1.5">
             @if (connectivity.offline()) {
               <span
                 class="badge badge-warning h-8 gap-1.5 whitespace-nowrap px-2.5"

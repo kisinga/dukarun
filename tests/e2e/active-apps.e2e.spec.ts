@@ -391,6 +391,11 @@ for (const financials of [true, false]) {
       price: 100,
       track_inventory: true,
       packs: [],
+      catalogue_version: {
+        product: '2026-09-29T00:00:00Z',
+        variant: '2026-09-29T00:00:00Z',
+        pack: null,
+      },
       product_active: true,
       variant_active: true,
     }));
@@ -1051,6 +1056,14 @@ for (const path of operationalListRoutes) {
                   : -1;
               }),
               overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+              overflowingElements: Array.from(document.querySelectorAll<HTMLElement>('*'))
+                .filter(el => el.getBoundingClientRect().right > innerWidth + 1)
+                .slice(0, 12)
+                .map(el => ({
+                  tag: el.tagName,
+                  classes: el.className,
+                  width: el.getBoundingClientRect().width,
+                })),
               searchBottom: search.bottom,
               scopeTop: element.querySelector('.list-toolbar-context')!.getBoundingClientRect().top,
               searchWidth: search.width,
@@ -1068,7 +1081,10 @@ for (const path of operationalListRoutes) {
           );
           expect(geometry.labelGaps.length).toBeGreaterThanOrEqual(3);
           for (const gap of geometry.labelGaps) expect(gap).toBeCloseTo(6 * textScale, 0);
-          expect(geometry.overflow).toBeLessThanOrEqual(1);
+          expect(
+            geometry.overflow,
+            `${path}, ${width}px, text scale ${textScale}: ${JSON.stringify(geometry)}`
+          ).toBeLessThanOrEqual(1);
           expect(geometry.searchBottom).toBeLessThanOrEqual(geometry.scopeTop + 1);
           if (width === 1600 && textScale === 1) {
             expect(geometry.searchWidth).toBeLessThanOrEqual(320);
@@ -1078,7 +1094,7 @@ for (const path of operationalListRoutes) {
             ).toBeLessThanOrEqual(1);
             expect(geometry.toolbarHeight).toBeLessThanOrEqual(170);
           }
-        }).toPass();
+        }).toPass({ timeout: 5000 });
         await expect(toolbar.locator('.stat-bar-item:visible')).toHaveCount(4);
         if (path === '/sales') await expect(toolbar.locator('app-searchable-filter')).toBeVisible();
       }
