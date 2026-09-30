@@ -113,6 +113,8 @@ try {
     [companyId]
   );
   locationId = setup.rows[0].location_id;
+  // Prepaid sales and COD collection share the required open location session.
+  await asUser(clients[0], 'select testkit.ensure_open_session() result');
   await pool.query(
     `insert into public.products(id,company_id,name) values($1,$2,'Delivery item')`,
     [productId, companyId]
