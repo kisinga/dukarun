@@ -18818,6 +18818,14 @@ export type Database = {
         Args: { p_product_id: string; p_tax_category_id?: string }
         Returns: string
       }
+      set_products_active: {
+        Args: { p_active: boolean; p_product_ids: string[] }
+        Returns: Json
+      }
+      set_products_storefront_published: {
+        Args: { p_product_ids: string[]; p_published: boolean }
+        Returns: Json
+      }
       set_supplier_active: {
         Args: { p_active: boolean; p_supplier_id: string }
         Returns: string

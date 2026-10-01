@@ -232,6 +232,24 @@ describe('Product storefront publication', () => {
     }
   );
 
+  it('preserves only confirmed visibility across connectivity changes while other data stays reactive', async () => {
+    const page = await setup();
+    page.cache.refresh.mockResolvedValue(false);
+    page.change(false);
+    page.save.resolve(false);
+    await page.settle();
+    for (const online of [false, true, false]) {
+      page.online.set(online);
+      page.cache.families.set([{ ...page.family, name: 'Fresh name' }]);
+      page.cache.catalog.set([{ ...page.variant, variant_name: 'Fresh variant' }]);
+      await page.settle();
+      expect(page.checkbox()!.checked).toBe(false);
+      expect(page.share()).toBeNull();
+      expect(page.fixture.nativeElement.textContent).toContain('Fresh name');
+      expect(page.fixture.nativeElement.textContent).toContain('Fresh variant');
+    }
+  });
+
   it('requires ManageCatalog and blocks offline changes', async () => {
     const page = await setup({ permitted: false });
     expect(page.checkbox()).toBeNull();

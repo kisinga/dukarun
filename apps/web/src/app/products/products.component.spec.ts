@@ -20,7 +20,13 @@ async function setup(url: string) {
     providers: [
       provideRouter([{ path: 'products', component: ProductsComponent }]),
       { provide: PosService, useValue: {} },
-      { provide: SupabaseService, useValue: { client: { rpc } } },
+      {
+        provide: SupabaseService,
+        useValue: {
+          client: { rpc },
+          offlineIdentity: signal({ userId: 'user', companyId: 'company' }),
+        },
+      },
       {
         provide: PartyCacheService,
         useValue: { suppliers: signal([]), ensureLoaded: async () => true },

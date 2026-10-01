@@ -236,6 +236,68 @@ export class PosService {
     return data;
   }
 
+  async setProductsStorefrontPublished(
+    productIds: string[],
+    published: boolean
+  ): Promise<{ product_count: number; changed_count: number }> {
+    const { data, error } = await this.client.rpc('set_products_storefront_published', {
+      p_product_ids: productIds,
+      p_published: published,
+    });
+    if (error) throw rpcError(error);
+    return data as { product_count: number; changed_count: number };
+  }
+
+  async setProductsActive(
+    productIds: string[],
+    active: boolean
+  ): Promise<{ product_count: number; changed_count: number }> {
+    const { data, error } = await this.client.rpc('set_products_active', {
+      p_product_ids: productIds,
+      p_active: active,
+    });
+    if (error) throw rpcError(error);
+    return data as { product_count: number; changed_count: number };
+  }
+
+  /** Complete selected families, including inactive variants, independent of the cache limit. */
+  async variantsForSelectedProducts(productIds: string[], signal: AbortSignal): Promise<Variant[]> {
+    const companyId = this.supabase.offlineIdentity()?.companyId;
+    if (!companyId) throw new Error('not_authenticated');
+    if (
+      !productIds.length ||
+      productIds.length > 100 ||
+      new Set(productIds).size !== productIds.length
+    )
+      throw new Error('invalid_product_ids');
+    const rows: Variant[] = [];
+    let after: string | null = null;
+    // Keyset pagination also works when the server caps pages below the requested limit.
+    for (;;) {
+      signal.throwIfAborted();
+      let query = this.client
+        .from('variant_catalog')
+        .select('*')
+        .eq('company_id', companyId)
+        .in('product_id', productIds)
+        .order('variant_id')
+        .limit(500)
+        .abortSignal(signal);
+      if (after) query = query.gt('variant_id', after);
+      const { data, error } = await query;
+      if (error) throw rpcError(error);
+      if (!data?.length) break;
+      rows.push(...data);
+      after = data[data.length - 1].variant_id!;
+    }
+    signal.throwIfAborted();
+    const enriched = await this.withPackDefinitions(rows);
+    signal.throwIfAborted();
+    if (enriched.some(row => !Array.isArray(row.packs)))
+      throw new Error('Could not load complete pack definitions. Please retry.');
+    return enriched;
+  }
+
   /** POS search: active variants of active products from variant_catalog. */
   async searchVariants(query: string, limit = 20): Promise<Variant[]> {
     const { data, error } = await this.client.rpc('search_catalog_variants', {

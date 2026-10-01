@@ -588,6 +588,9 @@ export class ProductDetailDrawerComponent implements OnDestroy {
   protected readonly publicationError = signal<string | null>(null);
   protected readonly intelligence = signal<ProductProfile | null>(null);
   protected readonly intelligenceLoading = signal(false);
+  private readonly confirmedPublication = signal<{ productId: string; published: boolean } | null>(
+    null
+  );
   private readonly loadedGroup = signal<ProductGroup | null>(null);
   private productRequest = 0;
   private purchaseHistoryRequest = 0;
@@ -598,8 +601,17 @@ export class ProductDetailDrawerComponent implements OnDestroy {
     const productId = this.productId();
     if (!productId) return null;
     const loaded = this.loadedGroup();
-    if (loaded?.family.id === productId) return loaded;
-    return this.cachedGroup(productId);
+    const cached = this.cachedGroup(productId);
+    const group =
+      cached && typeof cached.family.storefront_published === 'boolean'
+        ? cached
+        : loaded?.family.id === productId
+          ? loaded
+          : cached;
+    const confirmed = this.confirmedPublication();
+    return group && confirmed?.productId === productId
+      ? { ...group, family: { ...group.family, storefront_published: confirmed.published } }
+      : group;
   });
   protected readonly subtitle = computed(() => {
     const group = this.group();
@@ -616,16 +628,12 @@ export class ProductDetailDrawerComponent implements OnDestroy {
     });
 
     effect(() => {
-      const loaded = this.loadedGroup();
-      if (!loaded) return;
-      const cached = this.cachedGroup(loaded.family.id);
-      // Keep the confirmed visibility until the cache catches up, then resume
-      // following catalogue updates instead of retaining the local snapshot.
+      const confirmed = this.confirmedPublication();
       if (
-        typeof cached?.family.storefront_published === 'boolean' &&
-        cached.family.storefront_published === loaded.family.storefront_published
+        confirmed &&
+        this.cachedGroup(confirmed.productId)?.family.storefront_published === confirmed.published
       ) {
-        this.loadedGroup.set(null);
+        this.confirmedPublication.set(null);
       }
     });
 
@@ -686,6 +694,7 @@ export class ProductDetailDrawerComponent implements OnDestroy {
     const request = ++this.productRequest;
     if (this.activeProductId !== productId) {
       this.activeProductId = productId;
+      this.confirmedPublication.set(null);
       this.publicationError.set(null);
       this.resetDetailPanels();
     }
@@ -818,10 +827,7 @@ export class ProductDetailDrawerComponent implements OnDestroy {
     try {
       const saved = await this.pos.setProductStorefrontPublished(productId, published);
       if (this.productId() === productId) {
-        this.loadedGroup.set({
-          ...group,
-          family: { ...group.family, storefront_published: saved },
-        });
+        this.confirmedPublication.set({ productId, published: saved });
       }
       try {
         if (!(await this.catalogCache.refresh())) throw new Error('catalog_refresh_failed');

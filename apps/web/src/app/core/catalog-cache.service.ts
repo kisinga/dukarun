@@ -197,6 +197,13 @@ export class CatalogCacheService {
     return refresh;
   }
 
+  /** Read after a committed write, even when an older refresh is still running. */
+  refreshAfterMutation(): Promise<boolean> {
+    const expectedScope = this.scope;
+    if (!expectedScope) return Promise.resolve(false);
+    return this.enqueueMutation(() => this.fetchSnapshot(expectedScope));
+  }
+
   private async fetchSnapshot(expectedScope: string): Promise<boolean> {
     const identity = this.supabase.offlineIdentity();
     const locationId = this.locations.activeId();
