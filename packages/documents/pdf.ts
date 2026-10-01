@@ -156,14 +156,16 @@ export async function renderDocumentPdf(
   }
   const identityWidth = WIDTH * 0.59 - (identityX - MARGIN) - 12;
   let identityHeight =
-    block(
-      content.identity.name,
-      identityX,
-      y,
-      identityWidth,
-      design.layout === 'classic' ? serif : bold,
-      compact ? 16 : 21
-    ) + 7;
+    design.showCompanyName !== false
+      ? block(
+          content.identity.name,
+          identityX,
+          y,
+          identityWidth,
+          design.layout === 'classic' ? serif : bold,
+          compact ? 16 : 21
+        ) + 7
+      : 0;
   for (const s of [
     content.identity.address,
     content.identity.email,

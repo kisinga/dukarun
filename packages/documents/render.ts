@@ -96,7 +96,7 @@ export function renderDocument(
     ${data.sample ? '<p class="sample">SAMPLE — NOT A TRANSACTION</p>' : ''}
     <header class="document-header" data-preview-section="identity">
       ${logo ? `<img class="document-logo" src="${e(logo)}" alt=""/>` : ''}
-      <div class="identity"><h1>${e(data.identity.name)}</h1>${[
+      <div class="identity">${design.showCompanyName !== false ? `<h1>${e(data.identity.name)}</h1>` : ''}${[
         data.identity.address,
         data.identity.email,
         data.identity.phone,

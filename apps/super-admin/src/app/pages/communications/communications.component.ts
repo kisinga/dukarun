@@ -347,6 +347,11 @@ import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
               </p>
               <strong class="mt-2 block">{{ renderedTitle() }}</strong>
               <p class="mt-2 whitespace-pre-wrap text-sm">{{ renderedBody() }}</p>
+              @if (p.sms_segments != null) {
+                <p class="type-caption mt-2">
+                  {{ p.sms_segments }} SMS segment(s), including account identity
+                </p>
+              }
               @if (ctaLabel.value && ctaLink.value) {
                 <span class="btn btn-primary btn-sm mt-3">{{ ctaLabel.value }}</span>
               }
@@ -549,12 +554,8 @@ export class CommunicationsComponent implements OnInit {
   }
   protected messageHint(): string {
     return this.channel.value === 'sms'
-      ? `${this.body.value.length} characters · ${this.smsSegments()} segment(s)`
+      ? `${this.body.value.length} draft characters · review shows SMS segments including account identity`
       : `${this.body.value.length}/2000 characters`;
-  }
-  private smsSegments(): number {
-    const n = this.body.value.length;
-    return n <= 160 ? 1 : Math.ceil(n / 153);
   }
 
   protected async saveDraft(showNotice = true): Promise<string | null> {
@@ -632,10 +633,10 @@ export class CommunicationsComponent implements OnInit {
   }
 
   protected renderedTitle(): string {
-    return this.render(this.title.value);
+    return this.preview()?.rendered_title ?? this.render(this.title.value);
   }
   protected renderedBody(): string {
-    return this.render(this.body.value);
+    return this.preview()?.rendered_body ?? this.render(this.body.value);
   }
   private render(value: string): string {
     const sample = this.preview()?.sample;

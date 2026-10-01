@@ -126,7 +126,7 @@ Deno.serve(async request => {
   if (!claimed) return response({ error: 'invitation_send_too_soon' }, 429);
 
   try {
-    await sendWhatsappImage(recipient, qrCodeBase64, caption);
+    await sendWhatsappImage(recipient, qrCodeBase64, caption, { scope: 'platform' });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'provider_failed';
     const deliveryError =

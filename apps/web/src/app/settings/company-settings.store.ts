@@ -74,7 +74,12 @@ export class CompanySettingsStore {
   }
 
   async update(
-    patch: Partial<Omit<CompanySettings, 'id' | 'shop_setup' | 'document_designs'>>
+    patch: Partial<
+      Omit<
+        CompanySettings,
+        'id' | 'shop_setup' | 'document_designs' | 'show_company_name_on_documents'
+      >
+    >
   ): Promise<CompanySettings> {
     const current = this.settings() ?? (await this.load());
     await this.settingsService.updateSettings(current.id, patch);
@@ -95,6 +100,12 @@ export class CompanySettingsStore {
     const saved = await this.settingsService.saveDocumentDesign(kind, design);
     if (this.settings()?.id !== company.id) return;
     this.patchLocal({ document_designs: { ...this.settings()?.document_designs, [kind]: saved } });
+  }
+
+  async saveDocumentCompanyName(show: boolean): Promise<void> {
+    const company = this.settings() ?? (await this.load());
+    const saved = await this.settingsService.saveDocumentCompanyName(show);
+    if (this.settings()?.id === company.id) this.patchLocal(saved);
   }
 
   async saveSetup(patch: Partial<ShopSetupState>): Promise<void> {

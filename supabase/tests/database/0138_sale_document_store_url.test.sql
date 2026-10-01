@@ -29,9 +29,9 @@ reset role;
 create temp table issued_store_url as select o.id,o.body,l.snapshot from public.outbox o
   join public.external_document_links l on l.id=o.external_document_link_id
   where o.document_request_key='a1380000-0000-4000-8000-000000000011';
-select ok((select body like E'%\nShop online: https://storefront.test/receipt-url-store' from issued_store_url),
+select ok((select body like E'%\nShop online:\nhttps://storefront.test/receipt-url-store' from issued_store_url),
   'WhatsApp caption includes the canonical available shop URL without duplicate slashes');
-select ok((select body like E'%\nView online: https://storefront.test/document/%' from issued_store_url),
+select ok((select body like E'%\nView your receipt online:\nhttps://storefront.test/document/%' from issued_store_url),
   'the secure receipt link remains separate from the public shop link');
 select is((select snapshot->>'store_url' from issued_store_url),'https://storefront.test/receipt-url-store',
   'the PDF and secure webpage snapshot retain the same public shop URL');

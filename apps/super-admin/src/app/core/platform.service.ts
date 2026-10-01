@@ -118,6 +118,9 @@ export interface PlatformCampaignPreview {
   skipped: number;
   missing_primary: number;
   missing_phone: number;
+  rendered_title?: string;
+  rendered_body?: string;
+  sms_segments?: number | null;
   sample: {
     merchant_name: string;
     tier: string;

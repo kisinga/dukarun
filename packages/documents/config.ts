@@ -18,6 +18,8 @@ export interface DocumentDesign {
   version: 1;
   layout: DocumentLayout;
   message: string;
+  /** Resolved from the shared company preference; frozen with issued documents. */
+  showCompanyName?: boolean;
   /** Omitted designs inherit the existing company print preference. */
   showVatBreakdown?: boolean;
   custom: { label: string; value: string; display: 'text' | 'qr' | 'both'; qr?: PreparedQr };
@@ -51,6 +53,7 @@ export function validateDesign(value: DocumentDesign): boolean {
     ['classic', 'compact', 'modern'].includes(value.layout) &&
     typeof value.message === 'string' &&
     value.message.length <= 1000 &&
+    (value.showCompanyName === undefined || typeof value.showCompanyName === 'boolean') &&
     (value.showVatBreakdown === undefined || typeof value.showVatBreakdown === 'boolean') &&
     !!value.custom &&
     typeof value.custom.label === 'string' &&

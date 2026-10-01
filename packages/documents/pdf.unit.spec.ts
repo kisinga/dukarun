@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
-import { describe, expect, it } from 'vitest';
-import { PDFDocument } from 'pdf-lib';
+import { describe, expect, it, vi } from 'vitest';
+import { PDFDocument, PDFPage } from 'pdf-lib';
 import { renderDocumentPdf } from './pdf';
 import { defaultDesign, type DocumentLayout } from './config';
 import { documentDate, externalDocumentContent } from './adapters';
@@ -39,6 +39,50 @@ const snapshot = {
   tax_total: 160,
 };
 describe('A4 server PDF', () => {
+  it.each(['classic', 'compact', 'modern'] as DocumentLayout[])(
+    'honors company name visibility in %s PDFs without removing contact details or the logo',
+    async layout => {
+      const drawText = vi.spyOn(PDFPage.prototype, 'drawText');
+      const drawImage = vi.spyOn(PDFPage.prototype, 'drawImage');
+      try {
+        const content = externalDocumentContent(snapshot, {
+          name: 'Amina Shop',
+          address: 'Nairobi',
+          email: 'hello@example.test',
+        });
+        const brandedAssets = {
+          ...assets,
+          logo: {
+            type: 'png' as const,
+            bytes: new Uint8Array(
+              Buffer.from(
+                'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLttAAAAABJRU5ErkJggg==',
+                'base64'
+              )
+            ),
+          },
+        };
+        for (const showCompanyName of [undefined, true, false]) {
+          drawText.mockClear();
+          drawImage.mockClear();
+          const design = { ...defaultDesign('invoice'), layout, showCompanyName };
+          const pdf = await PDFDocument.load(
+            await renderDocumentPdf(content, design, brandedAssets)
+          );
+          const text = drawText.mock.calls.map(([value]) => value);
+          expect(text.includes('Amina Shop')).toBe(showCompanyName !== false);
+          expect(text).toContain('Nairobi');
+          expect(text).toContain('hello@example.test');
+          expect(drawImage).toHaveBeenCalledOnce();
+          expect(pdf.getAuthor()).toBe('Amina Shop');
+          expect(pdf.getPageCount()).toBe(1);
+        }
+      } finally {
+        drawText.mockRestore();
+        drawImage.mockRestore();
+      }
+    }
+  );
   it.each(['classic', 'compact', 'modern'] as DocumentLayout[])(
     'renders saved %s layout on A4',
     async layout => {

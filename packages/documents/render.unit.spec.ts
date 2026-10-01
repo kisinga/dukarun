@@ -7,6 +7,8 @@ import {
   sampleDocument,
   statementContent,
   externalDocumentContent,
+  type DocumentLayout,
+  type PaperFormat,
 } from './index';
 
 describe('document layouts', () => {
@@ -42,6 +44,41 @@ describe('document layouts', () => {
     expect(output.html).not.toContain('<img');
     expect(output.html).not.toContain('undefined');
     expect(output.html).not.toContain('null');
+  });
+  it.each(DOCUMENT_TYPES)('can hide the company name on every %s layout and paper size', kind => {
+    const content = sampleDocument(kind, {
+      name: 'Amina Shop',
+      logoUrl: 'https://example.test/logo.png',
+      address: 'Nairobi',
+      email: 'hello@example.test',
+      taxNumber: 'SHOP-PIN',
+    });
+    for (const layout of ['classic', 'compact', 'modern'] as DocumentLayout[]) {
+      for (const paper of ['a4', 'receipt-52mm', 'receipt-80mm'] as PaperFormat[]) {
+        const design = { ...defaultDesign(kind), layout };
+        const visible = renderDocument(content, design, paper);
+        expect(visible.html).toContain('<h1>Amina Shop</h1>');
+        expect(renderDocument(content, { ...design, showCompanyName: true }, paper).html).toBe(
+          visible.html
+        );
+        const hidden = renderDocument(content, { ...design, showCompanyName: false }, paper);
+        expect(hidden.html).toBe(visible.html.replace('<h1>Amina Shop</h1>', ''));
+        expect(hidden.html).toContain('https://example.test/logo.png');
+        expect(hidden.html).toContain('hello@example.test');
+        expect(hidden.title).toBe(visible.title);
+        expect(
+          renderDocument(content, { ...design, showCompanyName: false }, paper, {
+            preview: true,
+          }).html
+        ).not.toContain('<h1>');
+      }
+    }
+    expect(
+      renderDocument(
+        { ...content, identity: { name: 'Amina Shop' } },
+        { ...defaultDesign(kind), showCompanyName: false }
+      ).html
+    ).not.toContain('Amina Shop');
   });
   it('escapes every shop-controlled field and rejects unsafe logo URLs', () => {
     const content = sampleDocument('receipt', {
@@ -155,6 +192,25 @@ describe('document layouts', () => {
 });
 
 describe('designer preview and VAT presentation', () => {
+  it('reads company name visibility without losing other saved design settings', () => {
+    const design = {
+      ...defaultDesign('invoice'),
+      layout: 'modern' as const,
+      message: 'Keep me',
+      showVatBreakdown: false,
+      showCompanyName: false,
+    };
+    expect(readDesign('invoice', design)).toEqual(design);
+    expect(readDesign('invoice', { ...design, showCompanyName: true })).toEqual({
+      ...design,
+      showCompanyName: true,
+    });
+    for (const invalid of ['false', null, 0]) {
+      expect(readDesign('invoice', { ...design, showCompanyName: invalid })).toEqual(
+        defaultDesign('invoice')
+      );
+    }
+  });
   it('accepts optional VAT overrides without resetting saved layouts', () => {
     const design = { ...defaultDesign('invoice'), showVatBreakdown: false, message: 'Keep me' };
     expect(readDesign('invoice', design)).toEqual(design);

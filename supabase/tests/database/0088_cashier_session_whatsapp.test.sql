@@ -52,7 +52,7 @@ select is(
   'cashier_session','alert has cashier-session source'
 );
 select ok(
-  (select body like '%Day opened%' and body like '%Main%' and body like '%Opening balances%'
+  (select body like '%Cashier session opened%' and body like '%Main%' and body like '%Opening balances%'
    from public.outbox where cashier_session_id=(select session_id from alert_session)
      and cashier_session_event='opened'),
   'opening message contains report details'
@@ -120,7 +120,7 @@ select is(
   1,'closing queues one alert'
 );
 select ok(
-  (select body like '%Day closed%' and body like '%Sales:%KES 2,500%'
+  (select body like '%Cashier session closed%' and body like '%Sales:%KES 2,500%'
      and body like '%Cash: KES 2,500%' and body like '%Variance:%None%'
    from public.outbox where cashier_session_id=(select session_id from alert_session)
      and cashier_session_event='closed'),

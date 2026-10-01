@@ -12,18 +12,18 @@ export function platformSalesInvitationCaption(
   invitationUrl: string
 ): string {
   return [
+    'Dukarun',
+    '',
     `Hi ${person.name} 👋`,
     '',
     'Your Dukarun referral kit is ready.',
     '',
-    'Share or forward this message to a new customer. When they sign up using your link or code, the registration will be tracked to you.',
+    'Share the signup link or QR code below with a new customer. When they sign up using your link or code, their registration will be attributed to you.',
     '',
     `Your sales code: *${person.invitation_code}*`,
     'Customer signup link:',
     invitationUrl,
     '',
-    "The attached QR opens the same signup link. You don't need to register or log in—this is for customers you refer.",
-    '',
-    'Go bring the next biashara online 🚀',
+    "The attached QR code opens the same signup link. You don't need to register or log in to use this referral kit.",
   ].join('\n');
 }

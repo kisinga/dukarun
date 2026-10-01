@@ -357,7 +357,7 @@ reset role;
 create temp table runtime_sms_quota as
 select public.queue_message(
   (select company_id from team_notice_company),'sms','+254713000001',
-  repeat('A',140) || '{{app_url}}','Runtime quota check'
+  repeat('A',120) || '{{app_url}}','Runtime quota check'
 ) outbox_id;
 select is(
   (select quota_units from public.outbox
@@ -367,7 +367,7 @@ select is(
 select is(
   public.reconcile_runtime_sms_quota(
     (select outbox_id from runtime_sms_quota),
-    repeat('A',140) || 'https://app.dukarun.com'
+    'Notification Store: ' || repeat('A',120) || 'https://app.dukarun.com'
   ),
   2,'runtime URL expansion reconciles SMS quota to the final segment count'
 );
