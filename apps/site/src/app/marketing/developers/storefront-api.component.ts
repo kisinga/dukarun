@@ -58,7 +58,8 @@ import { RouterLink } from '@angular/router';
                   >GET /storefronts/{{ '{' }}slug{{ '}' }}</code
                 >
                 <p class="mb-0 mt-2 text-sm text-base-content/70 sm:mt-0">
-                  Store identity, categories, and paged product summaries. Filter with
+                  Store identity, eligible categories, and paged published product summaries. Filter
+                  with
                   <code>search</code> or <code>category</code>.
                 </p>
               </div>
@@ -67,7 +68,7 @@ import { RouterLink } from '@angular/router';
                   >GET /storefronts/{{ '{' }}slug{{ '}' }}/products/…</code
                 >
                 <p class="mb-0 mt-2 text-sm text-base-content/70 sm:mt-0">
-                  One product with its active variants, SKUs, prices, and availability.
+                  One published product with its active variants, SKUs, prices, and availability.
                 </p>
               </div>
             </div>
@@ -102,6 +103,17 @@ import { RouterLink } from '@angular/router';
                 <strong class="block text-base-content">Pagination</strong>
                 <code>limit</code> defaults to 12 and can be at most 48. Continue while
                 <code>has_more</code> is true.
+              </li>
+              <li class="mkt-card p-5">
+                <strong class="block text-base-content">Publication</strong>
+                Products hidden from the storefront are also excluded here. Their detail URLs return
+                <code>404</code>. Categories need at least one eligible product.
+              </li>
+              <li class="mkt-card p-5">
+                <strong class="block text-base-content">Fresh reads</strong>
+                Catalogue responses send <code>Cache-Control: no-store</code> and
+                <code>CDN-Cache-Control: no-store</code>. Requests after an unpublish save commits
+                exclude that product. Respect these headers in your integration.
               </li>
               <li class="mkt-card p-5">
                 <strong class="block text-base-content">Errors</strong>
@@ -161,7 +173,8 @@ export class StorefrontApiComponent {
   'https://store.dukarun.com/api/v1/storefronts/your-shop?limit=12'`;
 
   protected readonly javascriptExample = `const response = await fetch(
-  'https://store.dukarun.com/api/v1/storefronts/your-shop?limit=12'
+  'https://store.dukarun.com/api/v1/storefronts/your-shop?limit=12',
+  { cache: 'no-store' }
 );
 
 if (!response.ok) throw new Error(\`API failed: \${response.status}\`);

@@ -438,7 +438,10 @@ export class StorefrontService {
             requestUrl.searchParams.set('offset', String(requestedOffset));
             if (search) requestUrl.searchParams.set('search', search);
             if (categoryId) requestUrl.searchParams.set('category', categoryId);
-            const request = await fetch(requestUrl, { headers: { Accept: 'application/json' } });
+            const request = await fetch(requestUrl, {
+              headers: { Accept: 'application/json' },
+              cache: 'no-store',
+            });
             let response: CatalogPage;
             if (!environment.production && request.status === 404) {
               // Angular's development server may not have the Nginx /api/v1
@@ -510,7 +513,10 @@ export class StorefrontService {
         `/api/v1/storefronts/${encodeURIComponent(slug)}/products/${encodeURIComponent(productId)}`,
         environment.storefrontPublicUrl
       );
-      const request = await fetch(requestUrl, { headers: { Accept: 'application/json' } });
+      const request = await fetch(requestUrl, {
+        headers: { Accept: 'application/json' },
+        cache: 'no-store',
+      });
       if (!environment.production && request.status === 404) {
         const { data, error } = await this.client.rpc('storefront_product_units', {
           p_slug: slug,
@@ -519,6 +525,7 @@ export class StorefrontService {
         if (error) throw error;
         return data as unknown as CatalogRow[];
       }
+      if (request.status === 404) return [];
       if (!request.ok) throw new Error(`storefront_product_failed:${request.status}`);
       const product = ((await request.json()) as ApiProductResponse).data.product;
       return product.variants.map(variant => ({

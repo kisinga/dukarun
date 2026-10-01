@@ -109,6 +109,42 @@ type ShareFeedback = { kind: 'success' | 'error'; message: string };
             />
           </div>
 
+          @if (perms.has('ManageCatalog')) {
+            <section class="surface-card mb-3 p-4">
+              <label class="flex min-h-11 items-center justify-between gap-4">
+                <span>
+                  <span class="type-heading block">Show on storefront</span>
+                  <span class="type-caption block"
+                    >Also controls access through the public API.</span
+                  >
+                </span>
+                <input
+                  type="checkbox"
+                  class="toggle toggle-primary"
+                  [checked]="group.family.storefront_published === true"
+                  [disabled]="
+                    !connectivity.online() ||
+                    publicationBusy() ||
+                    group.family.storefront_published === undefined
+                  "
+                  (change)="setStorefrontPublished(group, $event)"
+                />
+              </label>
+              @if (publicationError()) {
+                <p role="alert" class="mt-2 text-sm text-error">{{ publicationError() }}</p>
+              } @else if (group.family.storefront_published === undefined) {
+                <p class="type-caption mt-2" [attr.role]="loadError() ? 'alert' : 'status'">
+                  {{
+                    loadError() ||
+                      (connectivity.online()
+                        ? 'Loading visibility…'
+                        : 'Reconnect to load visibility.')
+                  }}
+                </p>
+              }
+            </section>
+          }
+
           <dl class="surface-card grid grid-cols-2 gap-4 p-4">
             <div class="min-w-0">
               <dt class="type-caption">Stock on hand</dt>
@@ -516,7 +552,7 @@ type ShareFeedback = { kind: 'success' | 'error'; message: string };
 })
 export class ProductDetailDrawerComponent implements OnDestroy {
   private readonly catalogCache = inject(CatalogCacheService);
-  private readonly connectivity = inject(ConnectivityService);
+  protected readonly connectivity = inject(ConnectivityService);
   private readonly money = inject(MoneyService);
   private readonly parties = inject(PartyCacheService);
   private readonly pos = inject(PosService);
@@ -548,6 +584,8 @@ export class ProductDetailDrawerComponent implements OnDestroy {
   protected readonly loadError = signal<string | null>(null);
   protected readonly shareBusy = signal(false);
   protected readonly shareFeedback = signal<ShareFeedback | null>(null);
+  protected readonly publicationBusy = signal(false);
+  protected readonly publicationError = signal<string | null>(null);
   protected readonly intelligence = signal<ProductProfile | null>(null);
   protected readonly intelligenceLoading = signal(false);
   private readonly loadedGroup = signal<ProductGroup | null>(null);
@@ -573,7 +611,22 @@ export class ProductDetailDrawerComponent implements OnDestroy {
     effect(() => {
       const productId = this.productId();
       const variantId = this.selectedVariantId();
+      this.connectivity.online();
       untracked(() => void this.loadProduct(productId, variantId));
+    });
+
+    effect(() => {
+      const loaded = this.loadedGroup();
+      if (!loaded) return;
+      const cached = this.cachedGroup(loaded.family.id);
+      // Keep the confirmed visibility until the cache catches up, then resume
+      // following catalogue updates instead of retaining the local snapshot.
+      if (
+        typeof cached?.family.storefront_published === 'boolean' &&
+        cached.family.storefront_published === loaded.family.storefront_published
+      ) {
+        this.loadedGroup.set(null);
+      }
     });
 
     effect(() => {
@@ -633,13 +686,19 @@ export class ProductDetailDrawerComponent implements OnDestroy {
     const request = ++this.productRequest;
     if (this.activeProductId !== productId) {
       this.activeProductId = productId;
+      this.publicationError.set(null);
       this.resetDetailPanels();
     }
     this.loadedGroup.set(null);
     this.loadError.set(null);
     if (!productId) return;
     void this.publicProductLinks.load().catch(() => undefined);
-    if (this.cachedGroup(productId)) return;
+    const cached = this.cachedGroup(productId);
+    if (
+      cached &&
+      (typeof cached.family.storefront_published === 'boolean' || !this.connectivity.online())
+    )
+      return;
     try {
       const group = await this.pos.productGroupById(productId, variantId);
       if (request !== this.productRequest) return;
@@ -734,7 +793,52 @@ export class ProductDetailDrawerComponent implements OnDestroy {
   }
 
   protected canShareProduct(group: ProductGroup): boolean {
-    return group.family.active && group.variants.some(variant => variant.variant_active);
+    return (
+      group.family.storefront_published === true &&
+      group.family.active &&
+      group.variants.some(variant => variant.variant_active)
+    );
+  }
+
+  protected async setStorefrontPublished(group: ProductGroup, event: Event): Promise<void> {
+    const checkbox = event.target as HTMLInputElement;
+    const published = checkbox.checked;
+    // Keep the displayed state confirmed by the server, including on failed writes.
+    checkbox.checked = group.family.storefront_published === true;
+    if (
+      !this.perms.has('ManageCatalog') ||
+      !this.connectivity.online() ||
+      this.publicationBusy() ||
+      typeof group.family.storefront_published !== 'boolean'
+    )
+      return;
+    this.publicationBusy.set(true);
+    this.publicationError.set(null);
+    const productId = group.family.id;
+    try {
+      const saved = await this.pos.setProductStorefrontPublished(productId, published);
+      if (this.productId() === productId) {
+        this.loadedGroup.set({
+          ...group,
+          family: { ...group.family, storefront_published: saved },
+        });
+      }
+      try {
+        if (!(await this.catalogCache.refresh())) throw new Error('catalog_refresh_failed');
+      } catch {
+        if (this.productId() === productId) {
+          this.publicationError.set('Visibility saved. Could not refresh the product list.');
+        }
+      }
+    } catch (error) {
+      if (this.productId() === productId) {
+        this.publicationError.set(
+          error instanceof Error ? error.message : 'Could not save storefront visibility.'
+        );
+      }
+    } finally {
+      this.publicationBusy.set(false);
+    }
   }
 
   protected async shareProduct(group: ProductGroup): Promise<void> {

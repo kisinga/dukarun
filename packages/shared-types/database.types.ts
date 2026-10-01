@@ -9790,6 +9790,7 @@ export type Database = {
           image_path: string | null
           manufacturer_id: string | null
           name: string
+          storefront_published: boolean
           tax_category_id: string | null
           updated_at: string
         }
@@ -9802,6 +9803,7 @@ export type Database = {
           image_path?: string | null
           manufacturer_id?: string | null
           name: string
+          storefront_published?: boolean
           tax_category_id?: string | null
           updated_at?: string
         }
@@ -9814,6 +9816,7 @@ export type Database = {
           image_path?: string | null
           manufacturer_id?: string | null
           name?: string
+          storefront_published?: boolean
           tax_category_id?: string | null
           updated_at?: string
         }
@@ -15272,6 +15275,7 @@ export type Database = {
           image_path: string | null
           manufacturer_id: string | null
           name: string
+          storefront_published: boolean
           tax_category_id: string | null
           updated_at: string
         }[]
@@ -18805,6 +18809,10 @@ export type Database = {
           p_product_id: string
         }
         Returns: string
+      }
+      set_product_storefront_published: {
+        Args: { p_product_id: string; p_published: boolean }
+        Returns: boolean
       }
       set_product_tax_category: {
         Args: { p_product_id: string; p_tax_category_id?: string }

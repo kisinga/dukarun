@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
+import vm from 'node:vm';
+import { build } from 'esbuild';
 import {
   isUuid,
   parseStorefrontApiRoute,
@@ -18,6 +20,102 @@ const productId = '7e520000-0000-4000-8000-000000000003';
 const manufacturerId = '7e520000-0000-4000-8000-000000000004';
 const variantId = '7e520000-0000-4000-8000-000000000005';
 const storageOrigin = 'https://supa.dukarun.com';
+
+async function edgeHandler(entry, db) {
+  const bundle = await build({
+    entryPoints: [entry],
+    bundle: true,
+    write: false,
+    format: 'iife',
+    platform: 'node',
+    plugins: [
+      {
+        name: 'storefront-db-fixture',
+        setup(builder) {
+          builder.onResolve({ filter: /^npm:/ }, args => ({
+            path: args.path,
+            namespace: 'fixture',
+          }));
+          builder.onLoad({ filter: /.*/, namespace: 'fixture' }, () => ({
+            contents: 'export const createClient = () => globalThis.catalogueDb;',
+          }));
+        },
+      },
+    ],
+  });
+  let handler;
+  vm.runInNewContext(bundle.outputFiles[0].text, {
+    catalogueDb: db,
+    URL,
+    Request,
+    Response,
+    Headers,
+    crypto,
+    console: { error() {} },
+    Deno: {
+      env: { get: key => ({ SUPABASE_URL: storageOrigin, SUPABASE_ANON_KEY: 'fixture' })[key] },
+      serve: callback => {
+        handler = callback;
+      },
+    },
+  });
+  return handler;
+}
+
+test('current and legacy handlers never cache lists, searches, HEAD, or failures', async () => {
+  const page = {
+    storefront: { id: storefrontId, name: 'Shop', slug: 'shop', catalogue_visible: true },
+    categories: [],
+    rows: [],
+    offset: 0,
+    hasMore: false,
+  };
+  for (const [entry, path] of [
+    ['supabase/functions/storefront-api/index.ts', '/api/v1/storefronts/shop'],
+    ['supabase/functions/public-content-renderer/index.ts', '/api/storefront/shop'],
+  ]) {
+    let fail = false;
+    const handler = await edgeHandler(entry, {
+      rpc: async () => ({ data: page, error: fail ? new Error('offline') : null }),
+    });
+    for (const [query, method, serviceFailure, expected] of [
+      ['', 'GET', false, 200],
+      ['?search=tea', 'GET', false, 200],
+      ['', 'HEAD', false, 200],
+      ['?limit=49', 'GET', false, 400],
+      ['', 'GET', true, 503],
+    ]) {
+      fail = serviceFailure;
+      const response = await handler(
+        new Request(`https://store.dukarun.com${path}${query}`, {
+          method,
+          headers: { 'X-Public-App': 'storefront', 'X-Original-URI': path + query },
+        })
+      );
+      assert.equal(response.status, expected, `${entry}: ${method} ${query}`);
+      assert.equal(response.headers.get('cache-control'), 'no-store');
+      assert.equal(response.headers.get('cdn-cache-control'), 'no-store');
+      if (method === 'HEAD') assert.equal(await response.text(), '');
+    }
+  }
+});
+
+test('an empty public product read returns the existing uncached not-found response', async () => {
+  const handler = await edgeHandler('supabase/functions/storefront-api/index.ts', {
+    rpc: async (name, args) => {
+      assert.equal(name, 'storefront_product_units');
+      assert.equal(args.p_product_id, productId);
+      return { data: [], error: null };
+    },
+  });
+  const response = await handler(
+    new Request(`https://store.dukarun.com/api/v1/storefronts/shop/products/${productId}`)
+  );
+  assert.equal(response.status, 404);
+  assert.equal(response.headers.get('cache-control'), 'no-store');
+  assert.equal(response.headers.get('cdn-cache-control'), 'no-store');
+  assert.equal((await response.json()).error.code, 'product_not_found');
+});
 
 test('v1 routes only the catalogue and product resources', () => {
   assert.deepEqual(parseStorefrontApiRoute('/api/v1/storefronts/example-shop?limit=12'), {
@@ -65,10 +163,13 @@ test('responses provide CORS, cache policy, request IDs, and consistent errors',
   const response = storefrontApiResponse(request, requestId, { data: 'ok' });
   assert.equal(response.headers.get('access-control-allow-origin'), '*');
   assert.equal(response.headers.get('access-control-allow-credentials'), null);
-  assert.equal(response.headers.get('cache-control'), 'public, max-age=30');
+  assert.equal(response.headers.get('cache-control'), 'no-store');
+  assert.equal(response.headers.get('cdn-cache-control'), 'no-store');
   assert.equal(response.headers.get('x-request-id'), requestId);
 
-  const search = storefrontApiResponse(request, requestId, { data: 'ok' }, 200, false);
+  const search = storefrontApiResponse(new Request(`${request.url}?search=tea`), requestId, {
+    data: 'ok',
+  });
   assert.equal(search.headers.get('cache-control'), 'no-store');
 
   const error = storefrontApiError(request, requestId, 400, 'invalid_request', 'Invalid.');
@@ -82,6 +183,8 @@ test('responses provide CORS, cache policy, request IDs, and consistent errors',
   });
   assert.equal(await head.text(), '');
   assert.equal(head.headers.get('x-request-id'), requestId);
+  assert.equal(head.headers.get('cache-control'), 'no-store');
+  assert.equal(head.headers.get('cdn-cache-control'), 'no-store');
 
   const options = storefrontApiOptionsResponse(requestId);
   assert.equal(options.status, 204);
@@ -266,6 +369,11 @@ test('proxy and deployment configuration publish v1 without removing the legacy 
   assert.match(nginx, /limit_req zone=storefront_api burst=20 nodelay/);
   assert.match(nginx, /limit_req zone=storefront_search burst=5 nodelay/);
   assert.match(nginx, /"code":"rate_limited"/);
+  const rateLimitResponse = nginx.match(
+    /location @storefront_api_rate_limited \{([^}]+return 429)/s
+  )?.[1];
+  assert.match(rateLimitResponse, /add_header Cache-Control "no-store" always/);
+  assert.match(rateLimitResponse, /add_header CDN-Cache-Control "no-store" always/);
   assert.match(nginx, /location \^~ \/api\/storefront\//);
   assert.match(nginx, /proxy_set_header X-Original-URI \$request_uri/);
   assert.match(deploy, /public-content-renderer storefront-api site-deploy/);

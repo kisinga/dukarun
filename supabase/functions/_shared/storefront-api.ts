@@ -10,11 +10,6 @@ export const STOREFRONT_API_CORS_HEADERS = {
   'Access-Control-Max-Age': '86400',
 } as const;
 
-const CACHE_HEADERS = {
-  'Cache-Control': 'public, max-age=30',
-  'CDN-Cache-Control': 'public, max-age=120, stale-while-revalidate=600, stale-if-error=600',
-} as const;
-
 const NO_STORE_HEADERS = {
   'Cache-Control': 'no-store',
   'CDN-Cache-Control': 'no-store',
@@ -96,14 +91,13 @@ export function storefrontApiResponse(
   request: Request,
   requestId: string,
   body: unknown,
-  status = 200,
-  cacheable = true
+  status = 200
 ): Response {
   return new Response(request.method === 'HEAD' ? null : JSON.stringify(body), {
     status,
     headers: {
       ...STOREFRONT_API_CORS_HEADERS,
-      ...(status === 200 && cacheable ? CACHE_HEADERS : NO_STORE_HEADERS),
+      ...NO_STORE_HEADERS,
       'Content-Type': 'application/json; charset=utf-8',
       'X-Content-Type-Options': 'nosniff',
       'X-Request-Id': requestId,

@@ -227,6 +227,15 @@ export class PosService {
     return data;
   }
 
+  async setProductStorefrontPublished(productId: string, published: boolean): Promise<boolean> {
+    const { data, error } = await this.client.rpc('set_product_storefront_published', {
+      p_product_id: productId,
+      p_published: published,
+    });
+    if (error) throw rpcError(error);
+    return data;
+  }
+
   /** POS search: active variants of active products from variant_catalog. */
   async searchVariants(query: string, limit = 20): Promise<Variant[]> {
     const { data, error } = await this.client.rpc('search_catalog_variants', {

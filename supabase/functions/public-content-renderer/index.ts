@@ -35,8 +35,8 @@ const HTML_HEADERS = {
 };
 const STOREFRONT_API_HEADERS = {
   'Content-Type': 'application/json; charset=utf-8',
-  'Cache-Control': 'public, max-age=30',
-  'CDN-Cache-Control': 'public, max-age=120, stale-while-revalidate=600, stale-if-error=600',
+  'Cache-Control': 'no-store',
+  'CDN-Cache-Control': 'no-store',
   'X-Content-Type-Options': 'nosniff',
 };
 
@@ -54,22 +54,10 @@ function html(body: string, status = 200): Response {
   return response(body, 'text/html; charset=utf-8', status);
 }
 
-function storefrontApiResponse(
-  request: Request,
-  body: unknown,
-  status = 200,
-  cacheable = true
-): Response {
+function storefrontApiResponse(request: Request, body: unknown, status = 200): Response {
   return new Response(request.method === 'HEAD' ? null : JSON.stringify(body), {
     status,
-    headers:
-      status === 200 && cacheable
-        ? STOREFRONT_API_HEADERS
-        : {
-            ...STOREFRONT_API_HEADERS,
-            'Cache-Control': 'no-store',
-            'CDN-Cache-Control': 'no-store',
-          },
+    headers: STOREFRONT_API_HEADERS,
   });
 }
 
@@ -163,9 +151,7 @@ Deno.serve(async request => {
         ...(categoryId ? { p_category_id: categoryId } : {}),
       });
       if (error) throw error;
-      // Free-form searches create an unbounded cache key space. Category and
-      // browse pages are finite and safe for the shared edge cache.
-      return storefrontApiResponse(request, data, 200, !search);
+      return storefrontApiResponse(request, data);
     } catch (error) {
       console.error('storefront API failed', storefrontApiMatch[1], error);
       return storefrontApiResponse(request, { error: 'temporarily_unavailable' }, 503);
