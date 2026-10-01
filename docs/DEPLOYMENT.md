@@ -49,6 +49,40 @@ Run `npm run deploy:vault` to repair or rotate only that projection without
 applying migrations. The command fails closed if the required OpenWA runtime
 configuration is absent and never prints the secret values.
 
+## Outbound company identity cutover (0207)
+
+Release migration `20261001000002_0207_outbound_company_identity.sql` with
+`notification-flush`, `sale-document-send`, `platform-message-test`,
+`platform-sales-invitation-send`, their shared modules, and the super-admin campaign review.
+Do not resume dispatch between the database and Edge deployments.
+
+1. Pause notification flushing and scheduled campaign dispatch. Temporarily stop incoming
+   SMS/WhatsApp send requests, including OTP login, manual documents, operator tests and
+   referral kits. The external-messaging setting alone does not stop every direct sender.
+2. Let in-flight provider requests finish. Preserve delivery-attempt records and uncertain
+   acceptance outcomes; do not reset attempts or requeue messages during maintenance.
+3. Apply the migration and deploy the affected functions together (`npm run deploy:functions`),
+   then deploy the super-admin build. The migration cancels legacy pending SMS/WhatsApp rows,
+   releases unattempted reservations, and conservatively accounts for attempted deliveries.
+   An interrupted PDF dispatch retains an `unknown` outcome. History is preserved.
+4. Verify the pending outbox constraint and the new function deployment before reopening
+   entry points and resuming the paused dispatch jobs.
+5. With designated test recipients, verify company SMS, WhatsApp, an ordinary delivery-failure
+   SMS fallback, a PDF caption, an account campaign and an OTP. Check the company opening,
+   full-message SMS units, and server-rendered campaign preview. Contract errors are permanent
+   and must not create an SMS fallback.
+
+Monitor existing outbox errors for `message_contract:` and quota failures. Keep dispatch paused
+if database and function versions differ. Fix forward without reconstructing old bodies,
+regenerating old links, replaying historical events, or resending cancelled deliveries.
+
+The local cutover regression runs the migration's cancellation block in a transaction that
+rolls back, using a disposable database with the normal testkit installed:
+
+```sh
+TEST_DB_CONTAINER=<disposable-postgres-container> node supabase/tests/migrations/outbound-identity-cutover.spec.mjs
+```
+
 ## Remaining
 
 ### 1. Paystack webhook
@@ -149,6 +183,32 @@ Production setup:
 The `site-deploy` function and generic queue remain available for changes that genuinely alter
 build artifacts, but dynamic blog/storefront content must not enqueue them. Its database dispatcher
 returns without an Edge Function call when the queue is empty.
+
+## Storefront publication rollout
+
+Deploy in this order so an unpublish save cannot be followed by a stale public response:
+
+1. Deploy `storefront-api` and `public-content-renderer` with both `Cache-Control: no-store`
+   and `CDN-Cache-Control: no-store` on current and legacy catalogue responses. Deploy the
+   storefront client with uncached fetches and normal handling of product `404` responses.
+2. Clear existing shared catalogue caches, including Cloudflare entries for
+   `/api/v1/storefronts/*` and legacy `/api/storefront/*`, plus any cached product crawler HTML
+   and storefront sitemap. Check CDN rules respect `no-store`; remove overrides on these routes.
+   Old browser cache entries cannot be remotely purged; the new client bypasses them.
+3. Apply additive migration `20261001000003_0208_storefront_product_publication.sql` before
+   deploying the web admin UI. Existing and new products remain published by default. The
+   migration also emits the existing catalogue cache reset so retained internal family records
+   acquire the new field.
+4. Deploy the web admin UI. On a test product, unpublish and make fresh list, search, detail,
+   category, and sitemap requests. Verify the product is absent and its detail endpoint returns
+   the existing `product_not_found` response. Check both cache headers on GET, HEAD, and errors
+   through the public hostname. Republish and verify the product returns.
+
+Publication uses `ManageCatalog`; ordinary edits and imports preserve the saved choice. Internal
+catalogue, POS, inventory, and reporting remain independent. “Immediate” means requests after the
+save commits; already-open pages, saved baskets, and previously obtained image URLs are unchanged.
+Keep the column and filtered readers in place if rolling back the admin UI; retaining `no-store`
+is safe. Do not roll back the public filter while products are explicitly unpublished.
 
 ## Cloudflare front door
 

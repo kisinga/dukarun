@@ -1722,6 +1722,7 @@ export type Database = {
           public_whatsapp_number: string | null
           require_opening_count: boolean
           shop_setup: Json
+          show_company_name_on_documents: boolean
           show_vat_breakdown_on_prints: boolean
           sms_period_end: string | null
           sms_reserved_this_period: number
@@ -1785,6 +1786,7 @@ export type Database = {
           public_whatsapp_number?: string | null
           require_opening_count?: boolean
           shop_setup?: Json
+          show_company_name_on_documents?: boolean
           show_vat_breakdown_on_prints?: boolean
           sms_period_end?: string | null
           sms_reserved_this_period?: number
@@ -1848,6 +1850,7 @@ export type Database = {
           public_whatsapp_number?: string | null
           require_opening_count?: boolean
           shop_setup?: Json
+          show_company_name_on_documents?: boolean
           show_vat_breakdown_on_prints?: boolean
           sms_period_end?: string | null
           sms_reserved_this_period?: number
@@ -7742,6 +7745,7 @@ export type Database = {
           cashier_session_id: string | null
           channel: string
           company_id: string
+          company_name_snapshot: string | null
           created_at: string
           customer_id: string | null
           customer_statement_link_id: string | null
@@ -7785,6 +7789,7 @@ export type Database = {
           cashier_session_id?: string | null
           channel: string
           company_id: string
+          company_name_snapshot?: string | null
           created_at?: string
           customer_id?: string | null
           customer_statement_link_id?: string | null
@@ -7828,6 +7833,7 @@ export type Database = {
           cashier_session_id?: string | null
           channel?: string
           company_id?: string
+          company_name_snapshot?: string | null
           created_at?: string
           customer_id?: string | null
           customer_statement_link_id?: string | null
@@ -9784,6 +9790,7 @@ export type Database = {
           image_path: string | null
           manufacturer_id: string | null
           name: string
+          storefront_published: boolean
           tax_category_id: string | null
           updated_at: string
         }
@@ -9796,6 +9803,7 @@ export type Database = {
           image_path?: string | null
           manufacturer_id?: string | null
           name: string
+          storefront_published?: boolean
           tax_category_id?: string | null
           updated_at?: string
         }
@@ -9808,6 +9816,7 @@ export type Database = {
           image_path?: string | null
           manufacturer_id?: string | null
           name?: string
+          storefront_published?: boolean
           tax_category_id?: string | null
           updated_at?: string
         }
@@ -15266,6 +15275,7 @@ export type Database = {
           image_path: string | null
           manufacturer_id: string | null
           name: string
+          storefront_published: boolean
           tax_category_id: string | null
           updated_at: string
         }[]
@@ -15983,6 +15993,15 @@ export type Database = {
         Returns: undefined
       }
       flush_outbox_trigger: { Args: never; Returns: undefined }
+      format_outbound_message: {
+        Args: {
+          p_body: string
+          p_channel: string
+          p_company_name: string
+          p_scope?: string
+        }
+        Returns: string
+      }
       freeze_tax_export_artifact: {
         Args: {
           p_provider_code: string
@@ -16633,6 +16652,23 @@ export type Database = {
       order_vat_reporting_date: {
         Args: { p_order_id: string; p_tax_point: string; p_timezone: string }
         Returns: string
+      }
+      outbound_company_name_valid: {
+        Args: { p_company_name: string }
+        Returns: boolean
+      }
+      outbound_message_prefix: {
+        Args: { p_channel: string; p_company_name: string; p_scope?: string }
+        Returns: string
+      }
+      outbound_message_valid: {
+        Args: {
+          p_body: string
+          p_channel: string
+          p_company_name: string
+          p_scope?: string
+        }
+        Returns: boolean
       }
       party_credit_profile: {
         Args: {
@@ -17770,12 +17806,25 @@ export type Database = {
         }
         Returns: string
       }
+      queue_identified_message: {
+        Args: {
+          p_body: string
+          p_channel: string
+          p_company_id: string
+          p_company_name: string
+          p_recipient: string
+          p_source?: string
+          p_subject: string
+        }
+        Returns: string
+      }
       queue_manual_document_message: {
         Args: {
           p_body: string
           p_bypass_quiet_hours?: boolean
           p_channel: string
           p_company_id: string
+          p_company_name_snapshot?: string
           p_recipient: string
           p_subject?: string
         }
@@ -18517,6 +18566,10 @@ export type Database = {
         Args: { p_customer_id?: string; p_profile: Json }
         Returns: string
       }
+      save_document_company_name: {
+        Args: { p_show_company_name: boolean }
+        Returns: Json
+      }
       save_document_design: {
         Args: { p_design: Json; p_document_type: string }
         Returns: Json
@@ -18757,9 +18810,21 @@ export type Database = {
         }
         Returns: string
       }
+      set_product_storefront_published: {
+        Args: { p_product_id: string; p_published: boolean }
+        Returns: boolean
+      }
       set_product_tax_category: {
         Args: { p_product_id: string; p_tax_category_id?: string }
         Returns: string
+      }
+      set_products_active: {
+        Args: { p_active: boolean; p_product_ids: string[] }
+        Returns: Json
+      }
+      set_products_storefront_published: {
+        Args: { p_product_ids: string[]; p_published: boolean }
+        Returns: Json
       }
       set_supplier_active: {
         Args: { p_active: boolean; p_supplier_id: string }
@@ -19524,4 +19589,3 @@ export const Constants = {
     Enums: {},
   },
 } as const
-

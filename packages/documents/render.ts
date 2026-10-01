@@ -36,6 +36,8 @@ export interface DocumentContent {
   sections: readonly DocumentSection[];
   totals: readonly { label: string; value: string; prominent?: boolean }[];
   notes?: string | null;
+  /** Optional public shop link saved with an issued document. */
+  storeUrl?: string | null;
   sample?: boolean;
 }
 export interface RenderedDocument {
@@ -89,11 +91,12 @@ export function renderDocument(
       'Prepare the QR code before printing. Open the document designer and save it again.'
     );
   const title = data.title ?? DOCUMENT_LABELS[data.kind];
+  const storeUrl = safeImageUrl(data.storeUrl);
   const html = `<main class="print-template document ${design.layout} ${paper === 'a4' ? 'sheet' : 'thermal'}">
     ${data.sample ? '<p class="sample">SAMPLE — NOT A TRANSACTION</p>' : ''}
     <header class="document-header" data-preview-section="identity">
       ${logo ? `<img class="document-logo" src="${e(logo)}" alt=""/>` : ''}
-      <div class="identity"><h1>${e(data.identity.name)}</h1>${[
+      <div class="identity">${design.showCompanyName !== false ? `<h1>${e(data.identity.name)}</h1>` : ''}${[
         data.identity.address,
         data.identity.email,
         data.identity.phone,
@@ -114,6 +117,7 @@ export function renderDocument(
     ${data.notes ? `<section class="document-note"><h3>Notes</h3><p>${e(data.notes)}</p></section>` : ''}</div>
     <footer>${design.message.trim() || preview ? `<p class="document-message" data-preview-section="message">${e(design.message)}</p>` : ''}
     ${custom.value.trim() || preview ? `<div class="custom-field" data-preview-section="custom">${custom.value.trim() && custom.label.trim() ? `<strong>${e(custom.label)}</strong>` : ''}${hasQr ? (custom.qr && !(preview && options.qrPending) ? qrBlock(custom.qr) : `<p class="qr-pending" role="status">${preview && options.qrError ? 'QR code unavailable' : 'Preparing QR code…'}</p>`) : ''}${custom.display !== 'qr' ? `<p>${e(custom.value)}</p>` : ''}</div>` : ''}
+    ${storeUrl ? `<p class="document-store">Shop online<br/><a href="${e(storeUrl)}" target="_blank" rel="noopener noreferrer">${e(storeUrl)}</a></p>` : ''}
     <p class="powered">Powered by Dukarun</p></footer>
   </main>`;
   const width = paper === 'receipt-52mm' ? '52mm' : paper === 'receipt-80mm' ? '80mm' : '182mm';
@@ -136,6 +140,7 @@ export function renderDocument(
     .totals dd { margin:0; text-align:right; font-variant-numeric:tabular-nums; } .grand-total { font-weight:bold; font-size:12pt; border-top:0.4mm solid #111; }
     .document-note, .document-message { white-space:pre-wrap; } footer { margin-top:6mm; border-top:0.2mm solid #aaa; padding-top:3mm; }
     .custom-field { margin-top:3mm; text-align:center; } .document-qr { display:block; margin:2mm auto; max-width:100%; } .powered { font-size:8pt; margin-top:4mm!important; text-align:center; }
+    .document-store { grid-column:1 / -1; font-size:8pt; overflow-wrap:anywhere; break-inside:avoid; } .document-store a { color:inherit; text-decoration:underline; }
     .sample { border:0.4mm dashed #111; text-align:center; font-weight:bold; padding:2mm; margin-bottom:4mm!important; }
     .compact { font-size:9pt; line-height:1.25; } .compact .document-header { padding-bottom:2mm; } .compact .metadata { padding:2mm 0; gap:1mm 5mm; }
     .compact th,.compact td { padding:1mm; } .compact h1 { font-size:14pt; } .compact footer { margin-top:3mm; } .compact .document-logo { max-width:16mm; max-height:12mm; }

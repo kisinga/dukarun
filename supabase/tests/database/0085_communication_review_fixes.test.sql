@@ -14,8 +14,8 @@ select '85858585-8585-4585-8585-858585858584',company_id,'Benta','+254700000854'
 
 -- Platform totals include other tenants and demo seeds. Keep background work
 -- present and assert the exact increase from this test's deliveries and link.
-insert into public.outbox(company_id,channel,recipient,body,status,source)
-select company_id,'sms','+254700000852','Existing background delivery','pending','direct'
+insert into public.outbox(company_id,channel,recipient,body,status,source,company_name_snapshot)
+select company_id,'sms','+254700000852','Follow-up B: Existing background delivery','pending','direct','Follow-up B'
 from followup_b cross join generate_series(1,3);
 set local role authenticated;
 set local request.jwt.claims='{"sub":"85858585-8585-4585-8585-858585858589","role":"authenticated","is_platform_admin":true}';
@@ -38,8 +38,8 @@ insert into public.outbox(company_id,channel,recipient,body,status,source,extern
 select company_id,'whatsapp','+254700000851','Company copy','sent','manual_document_copy','85858585-8585-4585-8585-858585858585' from followup_a;
 insert into public.outbox(company_id,channel,recipient,body,status,source)
 select company_id,'sms','+254700000851','Campaign','failed','campaign' from followup_a;
-insert into public.outbox(company_id,channel,recipient,body,status,source)
-select company_id,'sms','+254700000851','Direct','pending','direct' from followup_a;
+insert into public.outbox(company_id,channel,recipient,body,status,source,company_name_snapshot)
+select company_id,'sms','+254700000851','Follow-up A: Direct','pending','direct','Follow-up A' from followup_a;
 
 set local role authenticated;
 set local request.jwt.claims='{"sub":"85858585-8585-4585-8585-858585858589","role":"authenticated","is_platform_admin":true}';
@@ -77,9 +77,9 @@ select is((select status||':'||sent_count||':'||failed_count from public.message
 
 insert into public.customer_statement_links(company_id,customer_id,token_hash,expires_at)
 select company_id,'85858585-8585-4585-8585-858585858584',encode(extensions.digest('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','sha256'),'hex'),now()+interval '1 day' from followup_b;
-insert into public.outbox(company_id,channel,recipient,body,status,source)
-select company_id,'sms','+254700000851','/statement/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','pending','reminder' from followup_a;
-select is((select customer_statement_link_id from public.outbox where body like '/statement/aaaa%'),null,'statement attribution cannot cross tenants');
+insert into public.outbox(company_id,channel,recipient,body,status,source,company_name_snapshot)
+select company_id,'sms','+254700000851','Follow-up A: /statement/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','pending','reminder','Follow-up A' from followup_a;
+select is((select customer_statement_link_id from public.outbox where body like '%/statement/aaaa%'),null,'statement attribution cannot cross tenants');
 
 select * from finish();
 rollback;

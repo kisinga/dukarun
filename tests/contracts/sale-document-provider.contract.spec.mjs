@@ -24,6 +24,7 @@ async function withProvider(fetcher, run) {
     Object.assign(globalThis, saved);
   }
 }
+const identity = { scope: 'company', companyName: 'Fixture Shop' };
 const pdf = new TextEncoder().encode('%PDF-1.7');
 test('sends PDF bytes with a readable filename and personalized secure-link caption', async () => {
   await withProvider(
@@ -34,7 +35,7 @@ test('sends PDF bytes with a readable filename and personalized secure-link capt
         base64: Buffer.from(pdf).toString('base64'),
         mimetype: 'application/pdf',
         filename: 'receipt-SALE-001.pdf',
-        caption: 'Hi Amina. View online: https://shop.test/document/secure',
+        caption: 'Fixture Shop\n\nHi Amina. View online: https://shop.test/document/secure',
       });
       assert.ok(init.signal);
       return Response.json({ messageId: 'accepted-123' });
@@ -45,7 +46,8 @@ test('sends PDF bytes with a readable filename and personalized secure-link capt
           '0712345678',
           pdf,
           'receipt-SALE-001.pdf',
-          'Hi Amina. View online: https://shop.test/document/secure'
+          'Fixture Shop\n\nHi Amina. View online: https://shop.test/document/secure',
+          identity
         ),
         'accepted-123'
       )
@@ -57,7 +59,7 @@ for (const status of [408, 500, 502])
       async () => new Response('', { status }),
       async () => {
         await assert.rejects(
-          sendWhatsappDocument('0712345678', pdf, 'receipt.pdf', 'Hi'),
+          sendWhatsappDocument('0712345678', pdf, 'receipt.pdf', 'Fixture Shop\n\nHi', identity),
           e => e instanceof DeliveryError && e.accepted
         );
       }
@@ -68,7 +70,7 @@ test('429 is a definite transient rejection', async () => {
     async () => new Response('', { status: 429 }),
     async () => {
       await assert.rejects(
-        sendWhatsappDocument('0712345678', pdf, 'receipt.pdf', 'Hi'),
+        sendWhatsappDocument('0712345678', pdf, 'receipt.pdf', 'Fixture Shop\n\nHi', identity),
         e => e instanceof DeliveryError && !e.accepted && !e.permanent
       );
     }
@@ -83,7 +85,7 @@ test('timeout and malformed success are unknown outcomes', async () => {
   ]) {
     await withProvider(fetcher, async () => {
       await assert.rejects(
-        sendWhatsappDocument('0712345678', pdf, 'receipt.pdf', 'Hi'),
+        sendWhatsappDocument('0712345678', pdf, 'receipt.pdf', 'Fixture Shop\n\nHi', identity),
         e => e instanceof DeliveryError && e.accepted
       );
     });

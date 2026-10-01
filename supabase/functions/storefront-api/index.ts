@@ -105,7 +105,7 @@ Deno.serve(async request => {
           'Storefront not found.'
         );
       }
-      return storefrontApiResponse(request, requestId, response, 200, !options.search);
+      return storefrontApiResponse(request, requestId, response);
     }
 
     if (!isUuid(route.productId)) {

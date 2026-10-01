@@ -5,11 +5,63 @@ import { CompanySettingsStore } from './company-settings.store';
 import { SettingsService, type CompanySettings } from './settings.service';
 import { SupabaseService } from '../core/supabase.service';
 import { ReceiptDataService } from '../shared/print/receipt-data.service';
+import { DOCUMENT_TYPES, defaultDesign } from '@dukarun/documents';
 @Component({ template: '' })
 class Host {
   readonly store = inject(CompanySettingsStore);
 }
 describe('Shared company settings scope', () => {
+  it('refreshes every design and the print cache when shared name visibility changes', async () => {
+    const identity = signal({ companyId: 'one', userId: 'user' });
+    const saved = {
+      show_company_name_on_documents: false,
+      document_designs: Object.fromEntries(
+        DOCUMENT_TYPES.map(kind => [
+          kind,
+          {
+            ...defaultDesign(kind),
+            showCompanyName: false,
+          },
+        ])
+      ),
+    };
+    let resolve!: (value: typeof saved) => void;
+    const service = {
+      getSettings: vi.fn().mockResolvedValue({ id: 'one', name: 'Shop' }),
+      saveDocumentCompanyName: vi
+        .fn()
+        .mockResolvedValueOnce(saved)
+        .mockImplementationOnce(
+          () =>
+            new Promise<typeof saved>(r => {
+              resolve = r;
+            })
+        ),
+    };
+    const receipt = { invalidateCompanyInfo: vi.fn() };
+    await TestBed.configureTestingModule({
+      imports: [Host],
+      providers: [
+        { provide: SettingsService, useValue: service },
+        { provide: SupabaseService, useValue: { offlineIdentity: identity } },
+        { provide: ReceiptDataService, useValue: receipt },
+      ],
+    }).compileComponents();
+    const fixture = TestBed.createComponent(Host);
+    fixture.detectChanges();
+    const store = fixture.componentInstance.store;
+    await store.load();
+    await store.saveDocumentCompanyName(false);
+    expect(service.saveDocumentCompanyName).toHaveBeenCalledWith(false);
+    expect(store.settings()).toMatchObject(saved);
+    expect(receipt.invalidateCompanyInfo).toHaveBeenCalledOnce();
+    const request = store.saveDocumentCompanyName(true);
+    identity.set({ companyId: 'two', userId: 'user' });
+    fixture.detectChanges();
+    resolve({ ...saved, show_company_name_on_documents: true });
+    await request;
+    expect(store.settings()).toBeNull();
+  });
   it('deduplicates reads, invalidates prints after save, and drops state on company switch', async () => {
     const identity = signal({ companyId: 'one', userId: 'user' });
     const settings = { id: 'one', name: 'Shop', logo_path: null } as CompanySettings;

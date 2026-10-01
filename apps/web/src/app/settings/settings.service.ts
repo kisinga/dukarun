@@ -71,6 +71,7 @@ export interface CompanySettings {
   website_url?: string | null;
   shop_setup?: ShopSetupState;
   document_designs?: DocumentDesigns;
+  show_company_name_on_documents?: boolean;
   public_storefront_enabled: boolean;
   public_slug: string | null;
   public_whatsapp_number: string | null;
@@ -104,6 +105,7 @@ const SELECT_COLUMNS = [
   'website_url',
   'shop_setup',
   'document_designs',
+  'show_company_name_on_documents',
   'public_storefront_enabled',
   'public_slug',
   'public_whatsapp_number',
@@ -149,7 +151,12 @@ export class SettingsService {
   /** Patch ONLY the granted columns (see UPDATABLE_COLUMNS contract). */
   async updateSettings(
     id: string,
-    patch: Partial<Omit<CompanySettings, 'id' | 'shop_setup' | 'document_designs'>>
+    patch: Partial<
+      Omit<
+        CompanySettings,
+        'id' | 'shop_setup' | 'document_designs' | 'show_company_name_on_documents'
+      >
+    >
   ): Promise<void> {
     const { error } = await this.db.from('companies').update(patch).eq('id', id);
     if (error) throw new Error(error.message);
@@ -162,6 +169,19 @@ export class SettingsService {
     });
     if (error) throw rpcError(error);
     return data as unknown as DocumentDesign;
+  }
+
+  async saveDocumentCompanyName(
+    show: boolean
+  ): Promise<Pick<CompanySettings, 'show_company_name_on_documents' | 'document_designs'>> {
+    const { data, error } = await this.db.rpc('save_document_company_name', {
+      p_show_company_name: show,
+    });
+    if (error) throw rpcError(error);
+    return data as unknown as Pick<
+      CompanySettings,
+      'show_company_name_on_documents' | 'document_designs'
+    >;
   }
 
   async saveShopSetup(patch: Partial<ShopSetupState>): Promise<ShopSetupState> {

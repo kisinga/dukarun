@@ -15,6 +15,8 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
 import { processSaleDocument } from '../_shared/sale-document-delivery.ts';
 import {
   DeliveryError,
+  assertOutboundMessage,
+  isMessageContractError,
   requestProvider,
   sendSms,
   sendWhatsapp,
@@ -155,7 +157,7 @@ Deno.serve(async req => {
   const { data: candidates, error } = await db
     .from('outbox')
     .select(
-      'id, company_id, channel, recipient, subject, body, attempts, max_attempts, campaign_id, campaign_recipient_id, customer_id, source, template_key, template_version, quota_units, quota_state, fallback_channel, fallback_body'
+      'id, company_id, company_name_snapshot, channel, recipient, subject, body, attempts, max_attempts, campaign_id, campaign_recipient_id, customer_id, source, template_key, template_version, quota_units, quota_state, fallback_channel, fallback_body'
     )
     .eq('status', 'pending')
     .is('document_delivery_state', null)
@@ -244,6 +246,13 @@ Deno.serve(async req => {
     }
     try {
       const body = resolveRuntimePlaceholders(row.body);
+      const identity = {
+        scope: row.source === 'platform' ? ('platform_account' as const) : ('company' as const),
+        companyName: row.company_name_snapshot,
+      };
+      if (row.channel === 'sms' || row.channel === 'whatsapp') {
+        assertOutboundMessage(row.channel, body, identity);
+      }
       if (row.channel === 'sms') {
         const { error: quotaError } = await db.rpc('reconcile_runtime_sms_quota', {
           p_outbox_id: row.id,
@@ -251,15 +260,20 @@ Deno.serve(async req => {
         });
         if (quotaError) {
           const quotaExhausted = quotaError.message.includes('sms_limit_reached');
+          const contractError = quotaError.message.includes('message_contract:');
           throw new DeliveryError(
-            quotaExhausted ? 'quota_exhausted' : 'sms_quota_reconciliation_failed',
-            quotaExhausted,
+            contractError
+              ? quotaError.message.slice(quotaError.message.indexOf('message_contract:'))
+              : quotaExhausted
+                ? 'quota_exhausted'
+                : 'sms_quota_reconciliation_failed',
+            contractError || quotaExhausted,
             false
           );
         }
       }
-      if (row.channel === 'sms') await sendSms(row.recipient, body);
-      else if (row.channel === 'whatsapp') await sendWhatsapp(row.recipient, body);
+      if (row.channel === 'sms') await sendSms(row.recipient, body, identity);
+      else if (row.channel === 'whatsapp') await sendWhatsapp(row.recipient, body, identity);
       else await sendEmail(row.recipient, row.subject, body);
 
       await db.rpc('finalize_message_quota', { p_outbox_id: row.id, p_accepted: true });
@@ -316,7 +330,7 @@ Deno.serve(async req => {
       if (updated?.length) failed++;
       if (terminal && updated?.length) {
         await tryFinalizeCampaignRecipient(row, 'failed');
-        await queueFallback(row);
+        if (!isMessageContractError(deliveryError)) await queueFallback(row);
       }
     }
   }

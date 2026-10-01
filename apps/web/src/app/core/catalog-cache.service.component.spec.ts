@@ -106,3 +106,110 @@ describe('Retained catalogue after the hard cutover', () => {
     expect(refresh).not.toHaveBeenCalled();
   });
 });
+
+describe('Catalogue refresh after a mutation', () => {
+  async function readyCache() {
+    const { service, refresh } = setup(true, true);
+    TestBed.tick();
+    await service.ensureLoaded();
+    refresh.mockRestore();
+    return service;
+  }
+
+  function deferred<T>() {
+    let resolve!: (value: T) => void;
+    const promise = new Promise<T>(yes => {
+      resolve = yes;
+    });
+    return { promise, resolve };
+  }
+
+  it('keeps ordinary refreshes deduplicated', async () => {
+    const service = await readyCache();
+    const response = deferred<boolean>();
+    const fetch = vi
+      .spyOn(
+        service as unknown as { fetchSnapshot(scope: string): Promise<boolean> },
+        'fetchSnapshot'
+      )
+      .mockReturnValue(response.promise);
+    const first = service.refresh();
+    expect(service.refresh()).toBe(first);
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledOnce());
+    response.resolve(true);
+    expect(await first).toBe(true);
+  });
+
+  it('queues a new read after an older refresh and returns the committed state', async () => {
+    const service = await readyCache();
+    const oldResponse = deferred<void>();
+    let serverActive = true;
+    let cachedActive = true;
+    const fetch = vi
+      .spyOn(
+        service as unknown as { fetchSnapshot(scope: string): Promise<boolean> },
+        'fetchSnapshot'
+      )
+      .mockImplementationOnce(async () => {
+        const beforeSave = serverActive;
+        await oldResponse.promise;
+        cachedActive = beforeSave;
+        return true;
+      })
+      .mockImplementationOnce(async () => {
+        cachedActive = serverActive;
+        return true;
+      });
+    const older = service.refresh();
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledOnce());
+    serverActive = false;
+    const reconciliation = service.refreshAfterMutation();
+    expect(fetch).toHaveBeenCalledOnce();
+    oldResponse.resolve();
+    expect(await older).toBe(true);
+    expect(await reconciliation).toBe(true);
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(cachedActive).toBe(false);
+  });
+
+  it('reports failure of the new read even when the older refresh succeeds', async () => {
+    const service = await readyCache();
+    const oldResponse = deferred<boolean>();
+    const fetch = vi
+      .spyOn(
+        service as unknown as { fetchSnapshot(scope: string): Promise<boolean> },
+        'fetchSnapshot'
+      )
+      .mockReturnValueOnce(oldResponse.promise)
+      .mockResolvedValueOnce(false);
+    const older = service.refresh();
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledOnce());
+    const reconciliation = service.refreshAfterMutation();
+    oldResponse.resolve(true);
+    expect(await older).toBe(true);
+    expect(await reconciliation).toBe(false);
+  });
+
+  it('does not read the new workspace when a queued refresh outlives its scope', async () => {
+    const service = await readyCache();
+    const oldResponse = deferred<boolean>();
+    const fetch = vi
+      .spyOn(
+        service as unknown as { fetchSnapshot(scope: string): Promise<boolean> },
+        'fetchSnapshot'
+      )
+      .mockReturnValueOnce(oldResponse.promise);
+    const older = service.refresh();
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledOnce());
+    const oldScope = fetch.mock.calls[0][0];
+    const reconciliation = service.refreshAfterMutation();
+    (TestBed.inject(LocationContextService).activeId as ReturnType<typeof signal<string>>).set(
+      'other-location'
+    );
+    TestBed.tick();
+    oldResponse.resolve(true);
+    await older;
+    expect(await reconciliation).toBe(false);
+    expect(fetch).toHaveBeenNthCalledWith(2, oldScope);
+  });
+});

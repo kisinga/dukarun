@@ -27,6 +27,8 @@
 #                  synchronized into Database Vault for the auth OTP hook
 #   FUNCTIONS_VOLUME edge-runtime functions dir on the host
 #                   (default: $COOLIFY_SERVICE_DIR/volumes/functions)
+#   EDGE_RUNTIME_CONTAINER defaults to supabase-edge-functions-<service dir name>;
+#                   restarted when the main router or PDF CPU policy changes
 
 set -euo pipefail
 
@@ -44,6 +46,7 @@ STOREFRONT_PUBLIC_URL="${STOREFRONT_PUBLIC_URL:-https://store.dukarun.com}"
 SITE_DEPLOY_URL="${SITE_DEPLOY_URL:-}"
 MPESA_PROCESS_URL="${MPESA_PROCESS_URL:-}"
 FUNCTIONS_VOLUME="${FUNCTIONS_VOLUME:-$COOLIFY_SERVICE_DIR/volumes/functions}"
+EDGE_RUNTIME_CONTAINER="${EDGE_RUNTIME_CONTAINER:-supabase-edge-functions-$(basename "$COOLIFY_SERVICE_DIR")}"
 SYNC_FUNCTIONS=0
 VAULT_ONLY=0
 
@@ -89,8 +92,12 @@ SSH_OPTS=(
   -o BatchMode=no -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new
 )
 TUNNEL_PID=""
+RUNTIME_WORKDIR=""
 
 cleanup() {
+  if [ -n "$RUNTIME_WORKDIR" ]; then
+    rm -rf -- "$RUNTIME_WORKDIR"
+  fi
   if [ -n "$TUNNEL_PID" ]; then
     kill "$TUNNEL_PID" 2>/dev/null || true
     wait "$TUNNEL_PID" 2>/dev/null || true
@@ -98,6 +105,18 @@ cleanup() {
   fi
 }
 trap cleanup EXIT
+
+# Validate the host's router before migrations. Preserve its authentication logic;
+# only wrap user-worker options with the policy for the two PDF delivery routes.
+if [ "$SYNC_FUNCTIONS" = "1" ]; then
+  RUNTIME_WORKDIR=$(mktemp -d "${TMPDIR:-/tmp}/dukarun-document-runtime.XXXXXX")
+  printf -v REMOTE_RUNTIME_MAIN '%q' "$FUNCTIONS_VOLUME/main/index.ts"
+  printf -v REMOTE_RUNTIME_POLICY '%q' "$FUNCTIONS_VOLUME/_shared/sale-document-runtime.ts"
+  ssh "${SSH_OPTS[@]}" "$SSH_HOST" "cat -- $REMOTE_RUNTIME_MAIN" > "$RUNTIME_WORKDIR/original.ts"
+  node scripts/configure-document-runtime.mjs "$RUNTIME_WORKDIR/original.ts" "$RUNTIME_WORKDIR/updated.ts"
+  ssh "${SSH_OPTS[@]}" "$SSH_HOST" \
+    "if [ -f $REMOTE_RUNTIME_POLICY ]; then cat -- $REMOTE_RUNTIME_POLICY; fi" > "$RUNTIME_WORKDIR/previous-policy.ts"
+fi
 
 remote_service_env() {
   local key="$1"
@@ -216,11 +235,37 @@ fi
 sync_openwa_vault
 
 if [ "$SYNC_FUNCTIONS" = "1" ]; then
+  # Refuse to overwrite router changes made while this deployment was running.
+  ssh "${SSH_OPTS[@]}" "$SSH_HOST" "cat -- $REMOTE_RUNTIME_MAIN" > "$RUNTIME_WORKDIR/current.ts"
+  if ! cmp -s "$RUNTIME_WORKDIR/original.ts" "$RUNTIME_WORKDIR/current.ts"; then
+    echo "✗ edge main router changed during deployment; rerun to preserve those changes" >&2
+    exit 1
+  fi
+  RESTART_RUNTIME=0
+  if ! cmp -s "$RUNTIME_WORKDIR/previous-policy.ts" supabase/functions/_shared/sale-document-runtime.ts; then
+    RESTART_RUNTIME=1
+  fi
   echo "→ syncing edge functions to ${SSH_HOST}:${FUNCTIONS_VOLUME}"
   for fn in _shared sale-document-send paystack-charge paystack-webhook mpesa-initiate mpesa-callback mpesa-process mpesa-credentials notification-flush platform-message-test platform-sales-invitation-send public-content-renderer storefront-api site-deploy usertour-identity; do
     rsync -az --delete -e "ssh ${SSH_OPTS[*]}" \
       "supabase/functions/${fn}/" "${SSH_HOST}:${FUNCTIONS_VOLUME}/${fn}/"
   done
+  if ! cmp -s "$RUNTIME_WORKDIR/original.ts" "$RUNTIME_WORKDIR/updated.ts"; then
+    RUNTIME_SUFFIX="${RUNTIME_WORKDIR##*/}"
+    RUNTIME_NEXT="$FUNCTIONS_VOLUME/main/index.ts.$RUNTIME_SUFFIX"
+    printf -v REMOTE_RUNTIME_NEXT '%q' "$RUNTIME_NEXT"
+    printf -v REMOTE_RUNTIME_BACKUP '%q' "$FUNCTIONS_VOLUME/main/index.ts.before-$RUNTIME_SUFFIX"
+    rsync -az -e "ssh ${SSH_OPTS[*]}" "$RUNTIME_WORKDIR/updated.ts" "${SSH_HOST}:${RUNTIME_NEXT}"
+    ssh "${SSH_OPTS[@]}" "$SSH_HOST" "set -e
+cp -p -- $REMOTE_RUNTIME_MAIN $REMOTE_RUNTIME_BACKUP
+mv -- $REMOTE_RUNTIME_NEXT $REMOTE_RUNTIME_MAIN"
+    RESTART_RUNTIME=1
+  fi
+  if [ "$RESTART_RUNTIME" = "1" ]; then
+    printf -v REMOTE_RUNTIME_CONTAINER '%q' "$EDGE_RUNTIME_CONTAINER"
+    echo "→ restarting edge runtime to load the scoped PDF CPU policy (65-second stop grace)"
+    ssh "${SSH_OPTS[@]}" "$SSH_HOST" "docker restart --time 65 $REMOTE_RUNTIME_CONTAINER"
+  fi
   echo "✓ functions synced (edge-runtime hot-reloads; restart it if your template doesn't watch the volume)"
 fi
 

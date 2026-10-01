@@ -9,6 +9,63 @@ export class DeliveryError extends Error {
   }
 }
 
+/** Identity is supplied by the business record, never by message text or the recipient. */
+export type MessageIdentity =
+  { scope: 'company' | 'platform_account'; companyName: string } | { scope: 'platform' };
+
+function identityPrefix(channel: 'sms' | 'whatsapp', identity: MessageIdentity): string {
+  if (!identity || !['company', 'platform_account', 'platform'].includes(identity.scope)) {
+    throw new DeliveryError('message_contract: missing_identity', true, false);
+  }
+  if (identity.scope === 'platform') return channel === 'sms' ? 'Dukarun: ' : 'Dukarun\n\n';
+  const name = identity.companyName;
+  if (
+    typeof name !== 'string' ||
+    !name.trim() ||
+    name !== name.trim() ||
+    /[\x00-\x1f\x7f]|\{\{|\}\}/.test(name)
+  ) {
+    throw new DeliveryError('message_contract: invalid_company_name', true, false);
+  }
+  if (identity.scope === 'platform_account') {
+    return channel === 'sms' ? `Dukarun - ${name}: ` : `Dukarun\nAccount: ${name}\n\n`;
+  }
+  return channel === 'sms' ? `${name}: ` : `${name}\n\n`;
+}
+
+export function assertOutboundMessage(
+  channel: 'sms' | 'whatsapp',
+  body: string,
+  identity: MessageIdentity
+): void {
+  const prefix = identityPrefix(channel, identity);
+  if (
+    typeof body !== 'string' ||
+    !body.startsWith(prefix) ||
+    !body.slice(prefix.length).trim() ||
+    /\{\{|\}\}|\\n|[\x00-\x08\x0b-\x1f\x7f]/.test(body)
+  ) {
+    throw new DeliveryError('message_contract: invalid_body', true, false);
+  }
+}
+
+/** Mirrors public.format_outbound_message; SQL owns queued bodies and previews. */
+export function formatOutboundMessage(
+  channel: 'sms' | 'whatsapp',
+  body: string,
+  identity: MessageIdentity
+): string {
+  const prefix = identityPrefix(channel, identity);
+  const content = body.replace(/\r\n?/g, '\n').trim();
+  const result = content.startsWith(prefix) ? content : prefix + content;
+  assertOutboundMessage(channel, result, identity);
+  return result;
+}
+
+export function isMessageContractError(error: unknown): boolean {
+  return error instanceof DeliveryError && error.message.startsWith('message_contract:');
+}
+
 export function normalizeWhatsappPhone(raw: string): string | null {
   const compact = raw.trim().replace(/[\s().-]/g, '');
   if (!/^\+?\d+$/.test(compact)) return null;
@@ -49,7 +106,12 @@ export async function requestProvider(
   }
 }
 
-export async function sendSms(recipient: string, body: string): Promise<void> {
+export async function sendSms(
+  recipient: string,
+  body: string,
+  identity: MessageIdentity
+): Promise<void> {
+  assertOutboundMessage('sms', body, identity);
   const apiKey = Deno.env.get('TEXTSMS_API_KEY');
   const partnerID = Deno.env.get('TEXTSMS_PARTNER_ID');
   const shortcode = Deno.env.get('TEXTSMS_SHORTCODE');
@@ -82,7 +144,12 @@ export async function sendSms(recipient: string, body: string): Promise<void> {
   }
 }
 
-export async function sendWhatsapp(recipient: string, body: string): Promise<void> {
+export async function sendWhatsapp(
+  recipient: string,
+  body: string,
+  identity: MessageIdentity
+): Promise<void> {
+  assertOutboundMessage('whatsapp', body, identity);
   const baseUrl = Deno.env.get('OPENWA_BASE_URL');
   const apiKey = Deno.env.get('OPENWA_API_KEY');
   const session = Deno.env.get('OPENWA_SESSION') ?? 'default';
@@ -101,8 +168,12 @@ export async function sendWhatsapp(recipient: string, body: string): Promise<voi
 export async function sendWhatsappImage(
   recipient: string,
   base64: string,
-  caption: string
+  caption: string,
+  identity: MessageIdentity
 ): Promise<void> {
+  assertOutboundMessage('whatsapp', caption, identity);
+  if (caption.length > 1024)
+    throw new DeliveryError('message_contract: caption_too_long', true, false);
   const baseUrl = Deno.env.get('OPENWA_BASE_URL');
   const apiKey = Deno.env.get('OPENWA_API_KEY');
   const session = Deno.env.get('OPENWA_SESSION') ?? 'default';
@@ -129,8 +200,12 @@ export async function sendWhatsappDocument(
   recipient: string,
   bytes: Uint8Array,
   filename: string,
-  caption: string
+  caption: string,
+  identity: MessageIdentity
 ): Promise<string> {
+  assertOutboundMessage('whatsapp', caption, identity);
+  if (caption.length > 1024)
+    throw new DeliveryError('message_contract: caption_too_long', true, false);
   const baseUrl = Deno.env.get('OPENWA_BASE_URL');
   const apiKey = Deno.env.get('OPENWA_API_KEY');
   const session = Deno.env.get('OPENWA_SESSION') ?? 'default';

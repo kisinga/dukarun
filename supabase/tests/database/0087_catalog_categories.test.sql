@@ -172,7 +172,7 @@ select is(
 );
 select is(
   (select count(*)::integer from public.storefront_categories('category-company')),
-  2, 'storefront categories expose active categories only'
+  1, 'storefront categories expose active categories with eligible products only'
 );
 
 reset role;

@@ -24,7 +24,7 @@
       "get": {
         "operationId": "getStorefrontCatalogue",
         "summary": "Get a storefront catalogue",
-        "description": "Returns storefront details, active categories, and one page of product summaries. A known storefront whose catalogue is hidden returns 200 with empty category and product arrays. Search responses are not cached.",
+        "description": "Returns storefront details, active categories containing published eligible products, and one page of published product summaries. A known storefront whose catalogue is hidden returns 200 with empty category and product arrays. All responses use no-store; publication changes apply to subsequent reads.",
         "tags": ["Storefronts"],
         "parameters": [
           {
@@ -173,7 +173,7 @@
       "get": {
         "operationId": "getStorefrontProduct",
         "summary": "Get one product",
-        "description": "Returns the public product and all active variants. A hidden catalogue, inactive product, unknown product, or unknown storefront returns 404.",
+        "description": "Returns the public product and all active variants. A hidden catalogue, unpublished or inactive product, unknown product, or unknown storefront returns 404.",
         "tags": ["Storefronts"],
         "parameters": [
           {
@@ -356,7 +356,7 @@
         }
       },
       "CacheControl": {
-        "description": "Browser cache policy. Search and error responses are no-store.",
+        "description": "Browser cache policy. All responses are no-store.",
         "schema": {
           "type": "string"
         }

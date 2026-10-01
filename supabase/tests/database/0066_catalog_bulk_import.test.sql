@@ -1,5 +1,5 @@
 begin;
-select plan(15);
+select plan(18);
 
 create function pg_temp.run_catalog_import(
   p_products jsonb,
@@ -60,8 +60,12 @@ select is(
   'same idempotency key returns original result'
 );
 
+select is((select storefront_published from public.products where name='Flour'), true,
+  'new imports are published by default');
+
 create temp table bread as
 select public.create_catalog_product('Bread', '[{"name":"400g","sku":"BREAD-400","price":60}]') id;
+select public.set_product_storefront_published((select id from public.products where name='Flour'), false);
 create temp table export_marker as
 select public.start_catalog_export() marker;
 
@@ -102,6 +106,11 @@ select is((select active from public.products where id = (select id from bread))
 select is((select active from public.product_variants where sku = 'BREAD-400'), false,
   'omitted variant deactivated');
 select is((select count(*)::int from public.catalog_imports), 2, 'jobs recorded once per key');
+
+select is((select storefront_published from public.products where name='Flour'), false,
+  'replacement imports preserve explicit unpublishing');
+select is((select storefront_published from public.products where id=(select id from bread)), true,
+  'ordinary product creation is published by default');
 
 select testkit.as_user((select company_id from catalog_company),
   '66666666-6666-4666-8666-666666666662', 'Import Cashier');

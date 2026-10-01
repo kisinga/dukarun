@@ -47,7 +47,7 @@ end $$;
 select is(public.preview_customer_statement('92000000-0000-4000-8000-000000000010','sms')->>'recipient',
   '+254700000010','preview resolves the customer record');
 select matches(public.preview_customer_statement('92000000-0000-4000-8000-000000000010','sms')->>'body',
-  'expires in 7 days','preview discloses the fixed link lifetime');
+  'expires on [0-9]{2} [A-Za-z]{3} [0-9]{4} [0-9]{2}:[0-9]{2} EAT','preview discloses absolute link expiry');
 select is((public.preview_customer_statement('92000000-0000-4000-8000-000000000010','sms')
   ->>'account_balance')::bigint,126::bigint,'preview uses the whole customer account balance');
 reset role;

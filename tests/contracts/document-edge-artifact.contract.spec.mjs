@@ -30,6 +30,53 @@ test('deployed artifact embeds its dependencies and fonts and always emits A4', 
     /unsupported_renderer_version/
   );
 });
+for (const layout of ['classic', 'compact', 'modern']) {
+  test(`renders ${layout} PDFs when Edge runtime math constants are truncated`, async () => {
+    // Isolate the production v1.71.2 Math values from the test runner. Import the
+    // actual bundle afterward so dependency initialization sees the same values.
+    const bytes = execFileSync(
+      process.execPath,
+      [
+        '--input-type=module',
+        '--eval',
+        `
+          import { readFileSync } from 'node:fs';
+          process.on('uncaughtException', error => {
+            console.error(error.stack);
+            process.exit(1);
+          });
+          globalThis.Math = Object.create(Math, Object.fromEntries(
+            Object.entries({ E: 2, LN2: 0, LN10: 2, LOG2E: 1, LOG10E: 0 })
+              .map(([key, value]) => [key, { value }])
+          ));
+          const { renderSnapshotPdf } = await import(process.argv[1]);
+          const snapshot = JSON.parse(readFileSync(0, 'utf8'));
+          const bytes = await renderSnapshotPdf(snapshot, { name: 'Test electricals' });
+          process.stdout.write(bytes);
+        `,
+        new URL('../../supabase/functions/_shared/generated/documents.mjs', import.meta.url).href,
+      ],
+      {
+        input: JSON.stringify({
+          ...snapshot,
+          document_design: {
+            version: 1,
+            layout,
+            message: 'Thank you for your business!',
+            custom: { label: '', value: '', display: 'text' },
+          },
+        }),
+        timeout: 10_000,
+        stdio: ['pipe', 'pipe', 'pipe'],
+      }
+    );
+    const pdf = await PDFDocument.load(bytes);
+    assert.equal(pdf.getPageCount(), 1);
+    assert.deepEqual(pdf.getPage(0).getSize(), { width: 595.28, height: 841.89 });
+    assert.equal(pdf.getTitle(), 'Receipt ARTIFACT-1');
+    assert.ok(bytes.length < 100_000, 'font subsets must remain compact');
+  });
+}
 test('SVG and WebP branding decode to real PNG pixels without remote assets', async () => {
   const svg = await preparePdfLogo(
     new TextEncoder().encode(

@@ -25,7 +25,13 @@ const LABEL_LAYOUT_KEY = 'dukarun-barcode-label-layout';
         <header class="flex items-start gap-3 border-b border-base-300 p-4">
           <div>
             <h2 class="type-title">
-              {{ mode() === 'single' ? 'Print barcode label' : 'Print catalogue labels' }}
+              {{
+                mode() === 'single'
+                  ? 'Print barcode label'
+                  : mode() === 'selection'
+                    ? 'Print selected labels'
+                    : 'Print catalogue labels'
+              }}
             </h2>
             <p class="type-caption mt-1">
               Labels contain the item name, variant, SKU, and barcode. Prices are not printed.
@@ -107,7 +113,11 @@ const LABEL_LAYOUT_KEY = 'dukarun-barcode-label-layout';
               <p class="type-caption mt-1">
                 Missing codes and shared duplicate codes are excluded from ready labels.
               </p>
-              @if (!perms.has('ManageStockAdjustments')) {
+              @if (mode() === 'selection') {
+                <p class="type-caption mt-2">
+                  Edit barcodes individually before printing these entries.
+                </p>
+              } @else if (!perms.has('ManageStockAdjustments')) {
                 <p class="mt-2 text-sm text-warning">
                   You can print ready labels, but barcode generation requires catalog edit access.
                 </p>
@@ -159,6 +169,45 @@ const LABEL_LAYOUT_KEY = 'dukarun-barcode-label-layout';
             </div>
           }
 
+          @if (mode() === 'selection') {
+            <div class="mt-4 space-y-2">
+              <p class="font-medium">Choose labels ({{ selectedReadyCount() }} selected)</p>
+              <p class="type-caption">
+                Active base variants and priced packs are selected by default.
+              </p>
+              @for (item of visibleClassified(); track unitKey(item.variant)) {
+                <label
+                  class="flex min-h-11 items-center gap-3 rounded-field border border-base-300 p-2"
+                >
+                  <input
+                    type="checkbox"
+                    class="checkbox checkbox-sm"
+                    [checked]="item.state === 'ready' && !deselected().has(unitKey(item.variant))"
+                    [disabled]="item.state !== 'ready' || printing()"
+                    (change)="toggleLabel(item.variant)"
+                  />
+                  <span class="min-w-0 flex-1"
+                    >{{ label(item.variant)
+                    }}<span class="type-caption block font-mono">{{
+                      item.variant.barcode || 'No barcode'
+                    }}</span></span
+                  >
+                  @if (item.state !== 'ready') {
+                    <span class="text-sm text-warning">{{ item.state }} — excluded</span>
+                  }
+                </label>
+              }
+              @for (item of excluded(); track unitKey(item.variant)) {
+                <p class="rounded-field border border-base-300 p-2 text-sm">
+                  {{ label(item.variant) }} — {{ item.reason }} (excluded)
+                </p>
+              }
+              @if (!visibleClassified().length && !excluded().length) {
+                <p class="type-caption">No variants were found for the selected products.</p>
+              }
+            </div>
+          }
+
           <div class="mt-5 grid gap-4 sm:grid-cols-2">
             <label>
               <span class="type-heading block">Print layout</span>
@@ -175,9 +224,11 @@ const LABEL_LAYOUT_KEY = 'dukarun-barcode-label-layout';
                 Choose the same paper size in the system print dialog.
               </p>
             </label>
-            @if (mode() === 'single') {
+            @if (mode() !== 'catalogue') {
               <label>
-                <span class="type-heading block">Copies</span>
+                <span class="type-heading block">{{
+                  mode() === 'selection' ? 'Copies per label' : 'Copies'
+                }}</span>
                 <input
                   type="number"
                   inputmode="numeric"
@@ -227,6 +278,8 @@ const LABEL_LAYOUT_KEY = 'dukarun-barcode-label-layout';
             <app-icon name="heroPrinter" />
             @if (mode() === 'catalogue') {
               Print ready labels only
+            } @else if (mode() === 'selection') {
+              Print selected labels
             } @else {
               Print label
             }
@@ -249,7 +302,7 @@ export class BarcodeLabelDialogComponent {
   protected readonly perms = inject(PermissionsService);
   protected readonly hardwareGuideUrl = siteUrl('/docs/hardware');
 
-  readonly mode = input.required<'catalogue' | 'single'>();
+  readonly mode = input.required<'catalogue' | 'single' | 'selection'>();
   readonly variants = input.required<Variant[]>();
   readonly variantId = input<string | null>(null);
   readonly closed = output<void>();
@@ -265,6 +318,34 @@ export class BarcodeLabelDialogComponent {
   protected readonly renderFailures = signal<string[]>([]);
   protected readonly batchIndex = signal(0);
 
+  protected readonly deselected = signal<Set<string>>(new Set());
+  protected readonly excluded = computed(() =>
+    this.variants().flatMap(variant => {
+      const inactive = !variant.product_active || !variant.variant_active;
+      const entries: Array<{ variant: Variant; reason: string }> = inactive
+        ? [{ variant, reason: !variant.product_active ? 'Inactive product' : 'Inactive variant' }]
+        : [];
+      for (const pack of variant.packs ?? []) {
+        if (inactive || !pack.active || pack.sale_price === null)
+          entries.push({
+            variant: {
+              ...variant,
+              selected_pack_id: pack.id,
+              variant_name: [variant.variant_name, pack.name].filter(Boolean).join(' · '),
+            },
+            reason: inactive
+              ? 'Inactive product or variant'
+              : !pack.active
+                ? 'Inactive pack'
+                : 'Pack has no sale price',
+          });
+      }
+      return entries;
+    })
+  );
+  protected readonly selectedReadyCount = computed(
+    () => this.ready().filter(item => !this.deselected().has(this.unitKey(item.variant))).length
+  );
   protected readonly selectedPackId = signal('');
   protected readonly classified = computed(() =>
     classifyBarcodeLabels(
@@ -299,7 +380,7 @@ export class BarcodeLabelDialogComponent {
     this.classified().filter(item => item.variant.variant_id === this.variantId())
   );
   protected readonly visibleClassified = computed(() => {
-    if (this.mode() === 'catalogue') return this.classified();
+    if (this.mode() !== 'single') return this.classified();
     return this.classified().filter(item => item.variant.variant_id === this.variantId());
   });
   protected readonly ready = computed(() =>
@@ -332,16 +413,43 @@ export class BarcodeLabelDialogComponent {
         ? batchLabels(Array.from({ length: this.copies() }, () => selected.variant))
         : [];
     }
+    if (this.mode() === 'selection')
+      return batchLabels(
+        this.ready()
+          .filter(item => !this.deselected().has(this.unitKey(item.variant)))
+          .flatMap(item => Array.from({ length: this.copies() }, () => item.variant))
+      );
     return batchLabels(this.ready().map(item => item.variant));
   });
 
   constructor() {
     effect(() => {
       this.mode();
+      this.variants();
+      this.deselected.set(new Set());
+    });
+    effect(() => {
+      this.mode();
       this.variantId();
       this.variants();
       this.copies();
+      this.deselected();
       this.batchIndex.set(0);
+    });
+  }
+
+  protected unitKey(variant: Variant): string {
+    return `${variant.variant_id}:${variant.selected_pack_id || ''}`;
+  }
+
+  protected toggleLabel(variant: Variant): void {
+    if (this.printing()) return;
+    const key = this.unitKey(variant);
+    this.deselected.update(current => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
     });
   }
 
@@ -377,6 +485,7 @@ export class BarcodeLabelDialogComponent {
   }
 
   protected async generateMissing(): Promise<void> {
+    if (this.mode() === 'selection') return;
     const targets = this.needsCodes();
     if (targets.length === 0 || this.busy()) return;
     this.busy.set(true);

@@ -1,5 +1,14 @@
 import { bindListQuery, listQueryField } from '../shared/list/list-query';
-import { Component, OnInit, computed, effect, inject, signal, untracked } from '@angular/core';
+import {
+  Component,
+  DestroyRef,
+  OnInit,
+  computed,
+  effect,
+  inject,
+  signal,
+  untracked,
+} from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { EmptyStateComponent } from '../shared/ui/empty-state.component';
 import { PageLayoutComponent } from '../shared/ui/page-layout.component';
@@ -22,6 +31,7 @@ import {
   type TableColumn,
 } from '../shared/ui/data-table-shell.component';
 import { ButtonComponent } from '../shared/ui/button.component';
+import { TaskDialogComponent } from '../shared/ui/task-dialog.component';
 import { IconComponent } from '../shared/ui/icon.component';
 import { MoneyComponent } from '../shared/ui/money.component';
 import { StatBarComponent } from '../shared/ui/stat-bar.component';
@@ -56,6 +66,7 @@ type StockInfo = { stock: number; stock_value: number };
 type ProductStatusFilter = 'all' | 'active' | 'inactive';
 type StockStatusFilter = 'all' | 'needs_restock' | 'in_stock' | 'out_of_stock' | 'not_tracked';
 type ManagementVariant = Variant & { stock_value?: number | null };
+type ProductBulkAction = 'publish' | 'unpublish' | 'activate' | 'deactivate';
 type ProductGroup = { family: Product; variants: ManagementVariant[] };
 const DEFAULT_PRODUCT_STATUS_FILTER: ProductStatusFilter = 'active';
 
@@ -72,6 +83,7 @@ const PRODUCT_SORT_OPTIONS: readonly ListSortOption[] = [
 @Component({
   selector: 'app-products',
   imports: [
+    TaskDialogComponent,
     EmptyStateComponent,
     PageLayoutComponent,
     StatusBadgeComponent,
@@ -329,24 +341,166 @@ const PRODUCT_SORT_OPTIONS: readonly ListSortOption[] = [
         }
       }
 
-      @if (selectedProductIds().size > 0 && categoryMembershipsComplete()) {
-        <div class="card mb-3 flex-row items-center gap-3 bg-base-100 p-3">
+      <div class="mb-3 flex flex-wrap items-center gap-3">
+        <label class="flex min-h-11 items-center gap-2 lg:hidden">
+          <input
+            type="checkbox"
+            class="checkbox checkbox-sm"
+            aria-label="Select page"
+            [checked]="allPageProductsSelected()"
+            [indeterminate]="somePageProductsSelected()"
+            [disabled]="selectionLocked()"
+            (change)="togglePageSelection()"
+          />
+          Select page
+        </label>
+        @if (selectedProductIds().size > 0) {
           <p class="min-w-0 flex-1 text-sm font-semibold">
             {{ selectedProductIds().size }} products selected
           </p>
-          <button appButton variant="ghost" size="sm" type="button" (click)="clearSelection()">
-            Clear
-          </button>
           <button
             appButton
-            variant="soft"
+            variant="ghost"
             size="sm"
             type="button"
-            (click)="batchCategoriesOpen.set(true)"
+            [disabled]="selectionLocked()"
+            (click)="clearSelection()"
           >
-            <app-icon name="heroQueueList" /> Categorize
+            Clear
           </button>
+          <details #actions class="dropdown dropdown-end">
+            <summary class="btn btn-soft btn-sm min-h-11">Actions</summary>
+            <ul
+              class="menu dropdown-content z-30 w-60 rounded-box border border-base-300 bg-base-100 p-2 shadow-overlay"
+            >
+              @if (perms.has('ManageCatalog')) {
+                <li>
+                  <button
+                    type="button"
+                    [disabled]="writeDisabled() || !categoryMembershipsComplete()"
+                    (click)="actions.open = false; batchCategoriesOpen.set(true)"
+                  >
+                    Categorize
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    [disabled]="writeDisabled()"
+                    (click)="actions.open = false; confirmBulkAction('publish')"
+                  >
+                    Publish on storefront
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    [disabled]="writeDisabled()"
+                    (click)="actions.open = false; confirmBulkAction('unpublish')"
+                  >
+                    Unpublish from storefront
+                  </button>
+                </li>
+              }
+              @if (perms.has('ManageStockAdjustments')) {
+                <li>
+                  <button
+                    type="button"
+                    [disabled]="writeDisabled()"
+                    (click)="actions.open = false; confirmBulkAction('activate')"
+                  >
+                    Activate
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    [disabled]="writeDisabled()"
+                    (click)="actions.open = false; confirmBulkAction('deactivate')"
+                  >
+                    Deactivate
+                  </button>
+                </li>
+              }
+              <li>
+                <button
+                  type="button"
+                  [disabled]="writeDisabled()"
+                  (click)="actions.open = false; prepareSelectedLabels()"
+                >
+                  Print selected labels
+                </button>
+              </li>
+            </ul>
+          </details>
+        }
+      </div>
+      @if (labelsPreparing()) {
+        <p role="status" class="mb-3 text-sm">Preparing selected labels…</p>
+      }
+      @if (bulkError()) {
+        <div role="alert" class="alert alert-error mb-3">
+          <span>{{ bulkError() }}</span>
+          @if (bulkRefreshPending()) {
+            <button
+              appButton
+              type="button"
+              variant="outline"
+              [disabled]="bulkBusy() || !connectivity.online()"
+              (click)="retryBulkRefresh()"
+            >
+              Retry refresh
+            </button>
+          }
         </div>
+      }
+      @if (bulkConfirmation(); as confirmation) {
+        <app-task-dialog
+          [open]="true"
+          [title]="bulkActionLabel(confirmation.action)"
+          (closed)="closeBulkConfirmation()"
+        >
+          <p>
+            {{ bulkActionLabel(confirmation.action) }} {{ confirmation.ids.length }} selected
+            products?
+          </p>
+          @if (confirmation.action === 'deactivate') {
+            <p class="mt-3 text-sm">
+              Deactivation prevents internal selling and removes products from the storefront.
+              Variant and publication settings are preserved.
+            </p>
+          } @else if (confirmation.action === 'activate') {
+            <p class="mt-3 text-sm">
+              Reactivation enables internal selling for active variants and can restore public
+              visibility for published products.
+            </p>
+          } @else {
+            <p class="mt-3 text-sm">
+              This changes storefront and public API visibility. Internal selling is unaffected.
+            </p>
+          }
+          <div taskFooter class="flex justify-end gap-2">
+            <button
+              appButton
+              type="button"
+              variant="ghost"
+              [disabled]="bulkBusy()"
+              (click)="closeBulkConfirmation()"
+            >
+              Cancel
+            </button>
+            <button
+              appButton
+              type="button"
+              variant="primary"
+              [disabled]="writeDisabled()"
+              [loading]="bulkBusy()"
+              (click)="saveBulkAction()"
+            >
+              {{ bulkActionLabel(confirmation.action) }}
+            </button>
+          </div>
+        </app-task-dialog>
       }
 
       <!-- Grouped list -->
@@ -375,16 +529,15 @@ const PRODUCT_SORT_OPTIONS: readonly ListSortOption[] = [
             >
               <div class="p-3">
                 <div class="flex items-start gap-3">
-                  @if (perms.has('ManageCatalog') && categoryMembershipsComplete()) {
-                    <input
-                      type="checkbox"
-                      class="checkbox checkbox-sm mt-1 shrink-0"
-                      [checked]="selectedProductIds().has(group.family.id)"
-                      [attr.aria-label]="'Select ' + group.family.name"
-                      (click)="$event.stopPropagation()"
-                      (change)="toggleProductSelection(group.family.id)"
-                    />
-                  }
+                  <input
+                    type="checkbox"
+                    class="checkbox checkbox-sm mt-1 shrink-0"
+                    [checked]="selectedProductIds().has(group.family.id)"
+                    [disabled]="selectionLocked()"
+                    [attr.aria-label]="'Select ' + group.family.name"
+                    (click)="$event.stopPropagation()"
+                    (change)="toggleProductSelection(group.family.id)"
+                  />
                   @if (imageUrl(group.family.image_path); as thumb) {
                     @if (!brokenImages().has(group.family.image_path!)) {
                       <img
@@ -480,6 +633,7 @@ const PRODUCT_SORT_OPTIONS: readonly ListSortOption[] = [
                 class="checkbox checkbox-sm"
                 aria-label="Select products on this page"
                 [checked]="allPageProductsSelected()"
+                [disabled]="selectionLocked()"
                 [indeterminate]="somePageProductsSelected()"
                 (change)="togglePageSelection()" /></ng-template
             ><ng-template tableRows>
@@ -492,17 +646,16 @@ const PRODUCT_SORT_OPTIONS: readonly ListSortOption[] = [
                   (click)="openProduct(group.family.id)"
                   (keydown.enter)="openProduct(group.family.id)"
                 >
-                  @if (perms.has('ManageCatalog') && categoryMembershipsComplete()) {
-                    <td (click)="$event.stopPropagation()">
-                      <input
-                        type="checkbox"
-                        class="checkbox checkbox-sm"
-                        [checked]="selectedProductIds().has(group.family.id)"
-                        [attr.aria-label]="'Select ' + group.family.name"
-                        (change)="toggleProductSelection(group.family.id)"
-                      />
-                    </td>
-                  }
+                  <td (click)="$event.stopPropagation()">
+                    <input
+                      type="checkbox"
+                      class="checkbox checkbox-sm"
+                      [checked]="selectedProductIds().has(group.family.id)"
+                      [disabled]="selectionLocked()"
+                      [attr.aria-label]="'Select ' + group.family.name"
+                      (change)="toggleProductSelection(group.family.id)"
+                    />
+                  </td>
                   <td>
                     <div class="flex min-w-0 items-center gap-3">
                       <div
@@ -667,7 +820,7 @@ const PRODUCT_SORT_OPTIONS: readonly ListSortOption[] = [
         @if (labelDialogMode(); as labelMode) {
           <app-barcode-label-dialog
             [mode]="labelMode"
-            [variants]="catalog()"
+            [variants]="labelMode === 'selection' ? selectedLabelVariants() : catalog()"
             [variantId]="labelVariantId()"
             (closed)="closeLabelDialog()"
           />
@@ -756,15 +909,31 @@ export class ProductsComponent implements OnInit {
   }
 
   protected readonly tableColumns1 = computed<TableColumn[]>(() => [
-    ...(this.perms.has('ManageCatalog') && this.categoryMembershipsComplete()
-      ? [{ key: 'selection', label: 'Select', width: '3rem', pinned: true }]
-      : []),
+    { key: 'selection', label: 'Select', width: '3rem', pinned: true },
     { key: 'product', label: 'Product', pinned: true, minWidth: '16rem' },
     { key: 'variants', label: 'Variants', align: 'right' },
     { key: 'stock', label: 'Available stock', align: 'right' },
     { key: 'status', label: 'Status' },
     { key: 'actions', label: 'Actions', align: 'right' },
   ]);
+  private readonly destroyRef = inject(DestroyRef);
+  private workspaceVersion = 0;
+  private destroyed = false;
+  private labelPreparation: AbortController | null = null;
+  protected readonly bulkBusy = signal(false);
+  protected readonly bulkRefreshPending = signal(false);
+  protected readonly bulkError = signal<string | null>(null);
+  protected readonly bulkConfirmation = signal<{ action: ProductBulkAction; ids: string[] } | null>(
+    null
+  );
+  protected readonly labelsPreparing = signal(false);
+  protected readonly selectedLabelVariants = signal<Variant[]>([]);
+  protected readonly selectionLocked = computed(
+    () => this.bulkBusy() || this.bulkRefreshPending() || this.labelsPreparing()
+  );
+  protected readonly writeDisabled = computed(
+    () => this.selectionLocked() || !this.connectivity.online()
+  );
   private readonly pos = inject(PosService);
   private readonly supabase = inject(SupabaseService);
   private readonly route = inject(ActivatedRoute);
@@ -807,7 +976,7 @@ export class ProductsComponent implements OnInit {
   protected readonly taxCategories = signal<TaxCategory[]>([]);
 
   protected readonly editorRequest = signal<ProductEditorRequest | null>(null);
-  protected readonly labelDialogMode = signal<'catalogue' | 'single' | null>(null);
+  protected readonly labelDialogMode = signal<'catalogue' | 'single' | 'selection' | null>(null);
   protected readonly labelVariantId = signal<string | null>(null);
 
   protected readonly loading = signal(false);
@@ -1109,6 +1278,39 @@ export class ProductsComponent implements OnInit {
   protected readonly supplierStockValue = computed(() => this.supplierStockSummary().value);
 
   constructor() {
+    this.destroyRef.onDestroy(() => {
+      this.destroyed = true;
+      this.labelPreparation?.abort();
+      ++this.serverRequest;
+      if (this.serverSearchTimer) clearTimeout(this.serverSearchTimer);
+    });
+    let previousWorkspace: string | undefined;
+    effect(() => {
+      const workspace = this.workspaceKey();
+      if (workspace === previousWorkspace) return;
+      previousWorkspace = workspace;
+      untracked(() => {
+        ++this.workspaceVersion;
+        ++this.serverRequest;
+        this.labelPreparation?.abort();
+        this.labelsPreparing.set(false);
+        this.bulkBusy.set(false);
+        this.bulkRefreshPending.set(false);
+        this.bulkError.set(null);
+        this.clearSelection();
+        this.closeLabelDialog();
+        this.serverGroups.set([]);
+        this.serverStock.set(new Map());
+        this.serverTotal.set(0);
+        this.serverLoaded.set(false);
+        if (this.serverMode()) this.scheduleManagementLoad();
+      });
+    });
+    effect(() => {
+      this.page();
+      this.pageSize();
+      untracked(() => this.clearSelection());
+    });
     bindListQuery({
       search: listQueryField(this.query),
       status: listQueryField(this.productStatusFilter),
@@ -1169,7 +1371,7 @@ export class ProductsComponent implements OnInit {
       const selectedCategory = this.categoryFilter();
       if (!complete) {
         this.categoryFilter.set('all');
-        this.clearSelection();
+        this.batchCategoriesOpen.set(false);
         return;
       }
       if (
@@ -1240,18 +1442,21 @@ export class ProductsComponent implements OnInit {
   }
 
   protected toggleProductSelection(productId: string): void {
-    if (!this.categoryMembershipsComplete()) return;
+    if (this.selectionLocked() || !this.pagedGroups().some(group => group.family.id === productId))
+      return;
     this.selectedProductIds.update(selected => {
       const next = new Set(selected);
       if (next.has(productId)) next.delete(productId);
-      else next.add(productId);
+      else if (next.size < 100) next.add(productId);
       return next;
     });
   }
 
   protected togglePageSelection(): void {
-    if (!this.categoryMembershipsComplete()) return;
-    const pageIds = this.pagedGroups().map(group => group.family.id);
+    if (this.selectionLocked()) return;
+    const pageIds = this.pagedGroups()
+      .slice(0, 100)
+      .map(group => group.family.id);
     this.selectedProductIds.update(selected => {
       const next = new Set(selected);
       const remove = pageIds.length > 0 && pageIds.every(id => next.has(id));
@@ -1263,6 +1468,7 @@ export class ProductsComponent implements OnInit {
   protected clearSelection(): void {
     this.selectedProductIds.set(new Set());
     this.batchCategoriesOpen.set(false);
+    this.bulkConfirmation.set(null);
   }
 
   protected productCategoryNames(productId: string): string[] {
@@ -1362,8 +1568,9 @@ export class ProductsComponent implements OnInit {
     this.serverSearchTimer = setTimeout(() => void this.loadManagementPage(), 0);
   }
 
-  private async loadManagementPage(): Promise<void> {
-    if (!this.serverMode()) return;
+  private async loadManagementPage(): Promise<boolean> {
+    if (!this.serverMode()) return true;
+    const workspace = this.workspaceKey();
     const request = ++this.serverRequest;
     this.loading.set(true);
     try {
@@ -1380,7 +1587,8 @@ export class ProductsComponent implements OnInit {
         p_location_id: this.locationContext.activeId() ?? undefined,
       });
       if (error) throw error;
-      if (request !== this.serverRequest) return;
+      if (request !== this.serverRequest || workspace !== this.workspaceKey() || this.destroyed)
+        return false;
       const result = data as unknown as { total: number; groups: ProductGroup[] };
       this.serverGroups.set(result.groups);
       this.serverStock.set(
@@ -1405,10 +1613,16 @@ export class ProductsComponent implements OnInit {
       this.serverTotal.set(result.total);
       this.serverLoaded.set(true);
       this.error.set(null);
+      if (this.page() > this.totalPages()) {
+        this.page.set(this.totalPages());
+        return this.loadManagementPage();
+      }
+      return true;
     } catch (error) {
-      if (request === this.serverRequest) {
+      if (request === this.serverRequest && workspace === this.workspaceKey() && !this.destroyed) {
         this.error.set(error instanceof Error ? error.message : 'Could not load product history');
       }
+      return false;
     } finally {
       if (request === this.serverRequest) this.loading.set(false);
     }
@@ -1612,6 +1826,127 @@ export class ProductsComponent implements OnInit {
   protected productEditorClosed(): void {
     this.editorRequest.set(null);
   }
+  private workspaceKey(): string {
+    const identity = this.supabase.offlineIdentity();
+    return JSON.stringify([identity?.userId, identity?.companyId, this.locationContext.activeId()]);
+  }
+
+  private currentWorkspace(key: string, version: number): boolean {
+    return !this.destroyed && key === this.workspaceKey() && version === this.workspaceVersion;
+  }
+
+  protected bulkActionLabel(action: ProductBulkAction): string {
+    return {
+      publish: 'Publish on storefront',
+      unpublish: 'Unpublish from storefront',
+      activate: 'Activate',
+      deactivate: 'Deactivate',
+    }[action];
+  }
+
+  private canBulkAction(action: ProductBulkAction): boolean {
+    return this.perms.has(
+      action === 'publish' || action === 'unpublish' ? 'ManageCatalog' : 'ManageStockAdjustments'
+    );
+  }
+
+  protected confirmBulkAction(action: ProductBulkAction): void {
+    if (this.writeDisabled() || !this.canBulkAction(action) || !this.selectedProductIds().size)
+      return;
+    this.bulkError.set(null);
+    this.bulkConfirmation.set({ action, ids: [...this.selectedProductIds()] });
+  }
+
+  protected closeBulkConfirmation(): void {
+    if (!this.bulkBusy()) this.bulkConfirmation.set(null);
+  }
+
+  protected async saveBulkAction(): Promise<void> {
+    const confirmation = this.bulkConfirmation();
+    if (!confirmation || this.writeDisabled() || !this.canBulkAction(confirmation.action)) return;
+    const key = this.workspaceKey(),
+      version = this.workspaceVersion;
+    this.bulkBusy.set(true);
+    this.bulkError.set(null);
+    try {
+      const { action, ids } = confirmation;
+      if (action === 'publish' || action === 'unpublish') {
+        await this.pos.setProductsStorefrontPublished(ids, action === 'publish');
+      } else {
+        await this.pos.setProductsActive(ids, action === 'activate');
+      }
+      if (!this.currentWorkspace(key, version)) return;
+      this.bulkConfirmation.set(null);
+      this.bulkRefreshPending.set(true);
+      await this.reconcileBulkSave(key, version);
+    } catch (error) {
+      if (this.currentWorkspace(key, version)) {
+        this.bulkConfirmation.set(null);
+        this.bulkError.set(
+          error instanceof Error ? error.message : 'Could not save selected products.'
+        );
+      }
+    } finally {
+      if (this.currentWorkspace(key, version)) this.bulkBusy.set(false);
+    }
+  }
+
+  private async reconcileBulkSave(key: string, version: number): Promise<void> {
+    try {
+      if (!(await this.catalogCache.refreshAfterMutation())) throw new Error('refresh_failed');
+      if (!this.currentWorkspace(key, version)) return;
+      if (this.serverMode() && !(await this.loadManagementPage()))
+        throw new Error('refresh_failed');
+      if (!this.currentWorkspace(key, version)) return;
+      this.bulkRefreshPending.set(false);
+      this.bulkError.set(null);
+      this.notice.set('Selected products saved.');
+      this.clearSelection();
+    } catch {
+      if (this.currentWorkspace(key, version)) this.bulkError.set('Saved; refresh failed');
+    }
+  }
+
+  protected async retryBulkRefresh(): Promise<void> {
+    if (!this.bulkRefreshPending() || this.bulkBusy() || !this.connectivity.online()) return;
+    const key = this.workspaceKey(),
+      version = this.workspaceVersion;
+    this.bulkBusy.set(true);
+    try {
+      await this.reconcileBulkSave(key, version);
+    } finally {
+      if (this.currentWorkspace(key, version)) this.bulkBusy.set(false);
+    }
+  }
+
+  protected async prepareSelectedLabels(): Promise<void> {
+    if (this.writeDisabled() || !this.selectedProductIds().size) return;
+    const key = this.workspaceKey(),
+      version = this.workspaceVersion;
+    const controller = new AbortController();
+    this.labelPreparation?.abort();
+    this.labelPreparation = controller;
+    this.labelsPreparing.set(true);
+    this.bulkError.set(null);
+    try {
+      const variants = await this.pos.variantsForSelectedProducts(
+        [...this.selectedProductIds()],
+        controller.signal
+      );
+      if (!this.currentWorkspace(key, version) || controller.signal.aborted) return;
+      this.selectedLabelVariants.set(variants);
+      this.labelVariantId.set(null);
+      this.labelDialogMode.set('selection');
+    } catch (error) {
+      if (this.currentWorkspace(key, version) && !controller.signal.aborted)
+        this.bulkError.set(
+          error instanceof Error ? error.message : 'Could not prepare selected labels.'
+        );
+    } finally {
+      if (this.currentWorkspace(key, version)) this.labelsPreparing.set(false);
+    }
+  }
+
   protected openCatalogueLabels(): void {
     this.labelVariantId.set(null);
     this.labelDialogMode.set('catalogue');
@@ -1625,6 +1960,7 @@ export class ProductsComponent implements OnInit {
   protected closeLabelDialog(): void {
     this.labelDialogMode.set(null);
     this.labelVariantId.set(null);
+    this.selectedLabelVariants.set([]);
   }
 
   protected startVariantEdit(productId: string): void {

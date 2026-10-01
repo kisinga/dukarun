@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { signal } from '@angular/core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { defaultDesign } from '@dukarun/documents';
+import { DOCUMENT_TYPES, defaultDesign, readDesign } from '@dukarun/documents';
 import { DocumentDesignerComponent } from './document-designer.component';
 import { CompanySettingsStore } from './company-settings.store';
 import { PrintService } from '../shared/print/print.service';
@@ -18,11 +18,27 @@ describe('Document designer drafts', () => {
       address: 'Nairobi',
       logo_path: null,
       document_designs: {},
+      show_company_name_on_documents: true,
     } as CompanySettings);
     const store = {
       settings,
       load: vi.fn(async () => settings()),
       logoPublicUrl: vi.fn(),
+      saveDocumentCompanyName: vi.fn(async (show: boolean) => {
+        settings.update(s => ({
+          ...s,
+          show_company_name_on_documents: show,
+          document_designs: Object.fromEntries(
+            DOCUMENT_TYPES.map(kind => [
+              kind,
+              {
+                ...readDesign(kind, s.document_designs?.[kind]),
+                showCompanyName: show,
+              },
+            ])
+          ),
+        }));
+      }),
       saveDesign: vi.fn(async (kind, design) => {
         settings.update(s => ({
           ...s,
@@ -92,6 +108,62 @@ describe('Document designer drafts', () => {
     expect(component.preview()?.html).not.toContain('<svg');
     await vi.waitFor(() => expect(component.preview()?.html).toContain('<svg'));
   });
+  it('saves company name visibility once for all documents and keeps design drafts intact', async () => {
+    const { fixture, component, store, print } = await render();
+    const toggle = Array.from(
+      fixture.nativeElement.querySelectorAll('label') as NodeListOf<HTMLLabelElement>
+    )
+      .find(label => label.textContent?.includes('Show company name'))!
+      .querySelector('input')!;
+    expect(toggle.checked).toBe(true);
+    expect(component.preview()?.html).toContain('<h1>Test shop</h1>');
+    component.patch({ message: 'Unsaved receipt' });
+    component.kind.set('invoice');
+    component.patch({ message: 'Unsaved invoice' });
+    toggle.click();
+    fixture.detectChanges();
+    await vi.waitFor(() => expect(component.busy()).toBe(false));
+    expect(store.saveDocumentCompanyName).toHaveBeenCalledWith(false);
+    expect(store.saveDesign).not.toHaveBeenCalled();
+    for (const kind of DOCUMENT_TYPES) {
+      component.kind.set(kind);
+      expect(component.preview()?.html).not.toContain('<h1>');
+      expect(component.preview()?.html).toContain('Nairobi');
+    }
+    component.kind.set('receipt');
+    expect(component.draft().message).toBe('Unsaved receipt');
+    await component.testPrint();
+    expect(print.printDocument.mock.calls[0][1]).not.toContain('<h1>');
+    await component.save();
+    expect(store.saveDesign).toHaveBeenCalledWith(
+      'receipt',
+      expect.objectContaining({ showCompanyName: false, message: 'Unsaved receipt' })
+    );
+    component.restore();
+    expect(component.preview()?.html).not.toContain('<h1>');
+    component.discard();
+    component.kind.set('invoice');
+    expect(component.draft().message).toBe('Unsaved invoice');
+    component.discard();
+    expect(component.dirty()).toBe(false);
+    await component.saveCompanyName(true);
+    for (const kind of DOCUMENT_TYPES) {
+      component.kind.set(kind);
+      expect(component.preview()?.html).toContain('<h1>Test shop</h1>');
+    }
+    expect(component.dirty()).toBe(false);
+  });
+  it('restores the shared toggle and previews if saving fails', async () => {
+    const { fixture, component, store } = await render();
+    store.saveDocumentCompanyName.mockRejectedValueOnce(new Error('Offline'));
+    await component.saveCompanyName(false);
+    fixture.detectChanges();
+    expect(component.showCompanyName()).toBe(true);
+    expect(component.preview()?.html).toContain('<h1>Test shop</h1>');
+    expect(component.error()).toBe('Offline');
+    expect(component.dirty()).toBe(false);
+    expect(store.settings().show_company_name_on_documents).toBe(true);
+  });
   it('keeps VAT presentation per document and restores inheritance', async () => {
     const { component } = await render();
     component.patch({ showVatBreakdown: false });
@@ -148,7 +220,7 @@ describe('Document designer drafts', () => {
     const { component, store } = await render();
     component.setLayout('compact');
     component.restore();
-    expect(component.draft()).toEqual(defaultDesign('receipt'));
+    expect(component.draft()).toEqual({ ...defaultDesign('receipt'), showCompanyName: true });
     component.patch({ message: 'Keep this' });
     store.saveDesign.mockRejectedValueOnce(new Error('Offline'));
     await component.save();

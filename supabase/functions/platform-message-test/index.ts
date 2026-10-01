@@ -1,5 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
-import { sendSms, sendWhatsapp } from '../_shared/message-providers.ts';
+import { formatOutboundMessage, sendSms, sendWhatsapp } from '../_shared/message-providers.ts';
 
 const url = Deno.env.get('SUPABASE_URL') ?? '';
 const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
@@ -65,8 +65,14 @@ Deno.serve(async request => {
     return response({ error: error instanceof Error ? error.message : 'audit_failed' }, 500);
   }
   try {
-    if (channel === 'sms') await sendSms(recipient, body);
-    else await sendWhatsapp(recipient, body);
+    const identity = { scope: 'platform' as const };
+    const message = formatOutboundMessage(
+      channel as 'sms' | 'whatsapp',
+      channel === 'sms' ? `Test message: ${body}` : `Test message\n\n${body}`,
+      identity
+    );
+    if (channel === 'sms') await sendSms(recipient, message, identity);
+    else await sendWhatsapp(recipient, message, identity);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'provider_failed';
     await audit('UPDATE', auth.user.id, testId, {

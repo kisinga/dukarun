@@ -162,6 +162,22 @@ import { CompanySettingsStore } from './company-settings.store';
                   >Edit shop details</a
                 >
               </div>
+              <div class="space-y-2" (focusin)="activeSection.set('identity')">
+                <label class="flex items-center gap-3"
+                  ><input
+                    type="checkbox"
+                    class="toggle"
+                    [checked]="showCompanyName()"
+                    [disabled]="busy()"
+                    aria-describedby="company-name-hint"
+                    (change)="saveCompanyName($any($event.target).checked)"
+                  />Show company name</label
+                >
+                <p id="company-name-hint" class="type-caption">
+                  Applies to all documents and saves automatically. Turn off if your logo already
+                  includes your company name.
+                </p>
+              </div>
             </div>
             <div class="card bg-base-100 p-4 space-y-4">
               <app-form-field
@@ -407,11 +423,15 @@ export class DocumentDesignerComponent implements OnInit {
   readonly captionOpen = signal(false);
   readonly loading = signal(false);
   private readonly drafts = signal<DocumentDesigns>({});
-  readonly draft = computed(
-    () =>
-      this.drafts()[this.kind()] ??
-      readDesign(this.kind(), this.store.settings()?.document_designs?.[this.kind()])
+  private readonly pendingCompanyName = signal<boolean | null>(null);
+  readonly showCompanyName = computed(
+    () => this.pendingCompanyName() ?? this.store.settings()?.show_company_name_on_documents ?? true
   );
+  readonly draft = computed(() => ({
+    ...(this.drafts()[this.kind()] ??
+      readDesign(this.kind(), this.store.settings()?.document_designs?.[this.kind()])),
+    showCompanyName: this.showCompanyName(),
+  }));
   readonly dirty = computed(() => this.types.some(type => this.changed(type)));
   readonly busy = signal(false);
   readonly error = signal<string | null>(null);
@@ -567,6 +587,22 @@ export class DocumentDesignerComponent implements OnInit {
   patch(patch: Partial<DocumentDesign>): void {
     this.drafts.update(d => ({ ...d, [this.kind()]: { ...this.draft(), ...patch } }));
     this.notice.set(null);
+  }
+  async saveCompanyName(show: boolean): Promise<void> {
+    if (this.busy()) return;
+    this.pendingCompanyName.set(show);
+    this.busy.set(true);
+    this.error.set(null);
+    this.notice.set(null);
+    try {
+      await this.store.saveDocumentCompanyName(show);
+      this.notice.set('Company name setting saved for all documents.');
+    } catch (e) {
+      this.error.set(e instanceof Error ? e.message : 'Company name setting could not be saved.');
+    } finally {
+      this.pendingCompanyName.set(null);
+      this.busy.set(false);
+    }
   }
   setLayout(layout: DocumentLayout): void {
     this.patch({ layout });

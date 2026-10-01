@@ -48,7 +48,9 @@ test('WhatsApp image delivery uses the OpenWA media endpoint with a caption', as
   };
 
   try {
-    await sendWhatsappImage('0712 345 678', 'cG5nLWJ5dGVz', 'Invitation caption');
+    await sendWhatsappImage('0712 345 678', 'cG5nLWJ5dGVz', 'Dukarun\n\nInvitation caption', {
+      scope: 'platform',
+    });
   } finally {
     globalThis.Deno = originalDeno;
     globalThis.fetch = originalFetch;
@@ -63,7 +65,7 @@ test('WhatsApp image delivery uses the OpenWA media endpoint with a caption', as
     base64: 'cG5nLWJ5dGVz',
     mimetype: 'image/png',
     filename: 'dukarun-invitation.png',
-    caption: 'Invitation caption',
+    caption: 'Dukarun\n\nInvitation caption',
   });
 });
 
@@ -94,7 +96,9 @@ test('OpenWA transport failures retain the acceptance-unknown signal', async () 
 
   try {
     await assert.rejects(
-      sendWhatsappImage('+254712345678', 'cG5nLWJ5dGVz', 'Invitation caption'),
+      sendWhatsappImage('+254712345678', 'cG5nLWJ5dGVz', 'Dukarun\n\nInvitation caption', {
+        scope: 'platform',
+      }),
       error => error instanceof DeliveryError && error.accepted && !error.permanent
     );
   } finally {
