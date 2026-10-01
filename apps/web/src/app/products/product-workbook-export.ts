@@ -352,6 +352,9 @@ export async function exportProductWorkbook(
     HEADERS,
     Array.from({ length: capacity }, () => Array<CellValue>(HEADERS.length).fill(null))
   );
+  // Prepared rows have identical styles per column. ExcelJS caches serialization
+  // by style identity; separate objects make it rebuild the same XML 270,000 times.
+  const blankRowStyles: Cell['style'][] = [];
   for (let i = 0; i < capacity; i++) {
     const n = START_ROW + i,
       entry = ordered[i],
@@ -421,6 +424,12 @@ export async function exportProductWorkbook(
       if ([5, 7, 9, 11, 24, 25, 26].includes(c) || cell.value === BLOCKED) readonly(cell);
       if ((c >= 5 && c <= 12) || c >= 24) cell.numFmt = '#,##0.###;[Red](#,##0.###);0;@';
       if (c === 9 || c === 10) cell.numFmt = '#,##0.##;[Red](#,##0.##);0;@';
+      if (!variant) {
+        // Finalized blank-row styles stay shared; populated rows retain their
+        // own styles because their unit-specific formats are assigned below.
+        blankRowStyles[c] ??= cell.style;
+        cell.style = blankRowStyles[c];
+      }
       if (variant && ![5, 7, 9, 11, 24, 25, 26].includes(c))
         cell.note = `At export: ${cell.text || '(blank)'}. Optional details are edited here; blank clears an optional detail.`;
     }

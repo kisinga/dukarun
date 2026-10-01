@@ -2,6 +2,11 @@ import { expect, test, type Page } from '../fixtures/mocked-browser';
 import { Workbook } from 'exceljs';
 import type { WorkbookChanges } from '../../apps/web/src/app/products/product-workbook';
 
+// These journeys serialize and parse a real 10,000-row workbook several times.
+// Budget the file work separately from the five-second UI-control timeout.
+test.setTimeout(90_000);
+const workbookOperationTimeout = 30_000;
+
 const companyId = '85000000-0000-4000-8000-000000000001';
 const userId = '85000000-0000-4000-8000-000000000002';
 const locationId = '85000000-0000-4000-8000-000000000003';
@@ -376,22 +381,35 @@ async function mockPriceWorkbookFlow(page: Page) {
 }
 
 async function downloadWorkbook(page: Page): Promise<Workbook> {
-  const downloading = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Download editable workbook' }).click();
-  const download = await downloading;
+  const [download] = await Promise.all([
+    page.waitForEvent('download', { timeout: workbookOperationTimeout }),
+    page.getByRole('button', { name: 'Download editable workbook' }).click(),
+  ]);
   expect(download.suggestedFilename()).toMatch(/^Products-MAIN-.*\.xlsx$/);
   const chunks: Buffer[] = [];
   for await (const chunk of (await download.createReadStream())!) chunks.push(Buffer.from(chunk));
   const workbook = new Workbook();
   await workbook.xlsx.load(Buffer.concat(chunks));
+  expect(workbook.getWorksheet('Products')!.rowCount).toBe(10_005);
   return workbook;
 }
 async function uploadWorkbook(page: Page, workbook: Workbook): Promise<void> {
-  await page.locator('#product-import-file').setInputFiles({
-    name: 'Products-edited.xlsx',
-    mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    buffer: Buffer.from(await workbook.xlsx.writeBuffer()),
-  });
+  const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
+  const input = page.locator('#product-import-file');
+  // A fresh snapshot is requested after parsing the file. Wait for that work
+  // before checking preview controls, including on the second upload.
+  await Promise.all([
+    page.waitForResponse(
+      response => response.url().endsWith('/rest/v1/rpc/product_workbook_snapshot'),
+      { timeout: workbookOperationTimeout }
+    ),
+    input.setInputFiles({
+      name: 'Products-edited.xlsx',
+      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      buffer,
+    }),
+  ]);
+  await expect(input).toBeEnabled({ timeout: workbookOperationTimeout });
 }
 
 test('Settings exports, previews, and applies the three-sheet Products workbook', async ({
@@ -451,8 +469,8 @@ test('Workbook creates products, sizes/types and packs, and blocks pack stock en
   workbook.getWorksheet('Pack sizes')!.getCell('A7').value = 'Tray';
   workbook.getWorksheet('Pack sizes')!.getCell('B7').value = 30;
   for (const [i, name, count] of [
-    [8, 'Large', 120],
-    [10, 'Small', 60],
+    [10_002, 'Large', 120],
+    [10_004, 'Small', 60],
   ] as const) {
     sheet.getCell(i, 1).value = 'Workbook Eggs';
     sheet.getCell(i, 3).value = name;

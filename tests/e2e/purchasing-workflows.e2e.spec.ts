@@ -486,9 +486,14 @@ test('pack purchase keeps quantity, cost, total and Remove aligned and computes 
   await expect(cost).toHaveValue('333.33');
   await expect(row.getByRole('button', { name: 'Remove item' })).toBeVisible();
   if ((page.viewportSize()?.width ?? 0) >= 1280) {
-    const qtyBox = await quantity.boundingBox();
-    const removeBox = await row.getByRole('button', { name: 'Remove item' }).boundingBox();
-    expect(Math.abs((qtyBox?.y ?? 0) - (removeBox?.y ?? 0))).toBeLessThan(30);
+    // Measure in one browser turn: scrolling between separate boundingBox calls
+    // changes their coordinate origin even when the controls remain aligned.
+    const verticalOffset = await row.evaluate(element => {
+      const quantity = element.querySelector('[data-quantity]')!.getBoundingClientRect();
+      const remove = element.querySelector('button[title="Remove item"]')!.getBoundingClientRect();
+      return Math.abs(quantity.y - remove.y);
+    });
+    expect(verticalOffset).toBeLessThan(30);
   }
   expect(
     await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)
