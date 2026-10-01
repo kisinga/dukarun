@@ -88,6 +88,8 @@ export function statementContent(data: StatementInput): DocumentContent {
   };
 }
 export interface ExternalDocumentInput {
+  /** Public shop URL frozen when this document was issued; absent on older snapshots. */
+  store_url?: string | null;
   business_timezone?: string;
   document_design?: DocumentDesign | null;
   document_type: 'receipt' | 'invoice' | 'proforma' | 'purchase_order';
@@ -199,6 +201,7 @@ export function externalDocumentContent(
     ],
     totals,
     notes: data.notes,
+    storeUrl: data.store_url,
   };
 }
 

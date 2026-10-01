@@ -1,8 +1,8 @@
 /** Server-only entry point. Do not export this from the browser document entry point. */
-import { PDFDocument, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
+import { PDFDocument, PDFString, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
 import { DOCUMENT_LABELS, readDesign, validQr, type DocumentDesign } from './config';
-import type { DocumentContent } from './render';
+import { safeImageUrl, type DocumentContent } from './render';
 import { MAX_LOGO_BYTES } from './svg-logo';
 
 export const PDF_RENDERER_VERSION = 1;
@@ -332,6 +332,8 @@ export async function renderDocumentPdf(
     text(s, MARGIN, y);
     y += line;
   }
+  const messageEndPage = page;
+  const messageEnd = y;
   if (page === footerPage) y = footerY;
   if (custom.value.trim()) {
     const x = MARGIN + WIDTH * 0.66;
@@ -360,6 +362,33 @@ export async function renderDocumentPdf(
       ensure(line);
       text(s, x, y);
       y += line;
+    }
+  }
+  const storeUrl = safeImageUrl(content.storeUrl);
+  if (storeUrl) {
+    if (page === messageEndPage) y = Math.max(y, messageEnd);
+    y += 14;
+    const urlLines = wrap(storeUrl, WIDTH, regular, 8.5);
+    ensure(16 + urlLines.length * 13);
+    text('Shop online', MARGIN, y, bold, 8);
+    y += 16;
+    for (const s of urlLines) {
+      ensure(13);
+      text(s, MARGIN, y, regular, 8.5);
+      const width = regular.widthOfTextAtSize(s, 8.5);
+      rule(y + 10, MARGIN, width, MUTED, 0.4);
+      page.node.addAnnot(
+        doc.context.register(
+          doc.context.obj({
+            Type: 'Annot',
+            Subtype: 'Link',
+            Rect: [MARGIN, A4[1] - y - 13, MARGIN + width, A4[1] - y + 2],
+            Border: [0, 0, 0],
+            A: { Type: 'Action', S: 'URI', URI: PDFString.of(storeUrl) },
+          })
+        )
+      );
+      y += 13;
     }
   }
   const pages = doc.getPages();

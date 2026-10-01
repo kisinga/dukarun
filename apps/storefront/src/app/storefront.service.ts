@@ -139,6 +139,7 @@ export interface ExternalDocumentPayment {
   date: string;
 }
 export interface ExternalDocument {
+  store_url?: string | null;
   company_email?: string | null;
   company_website?: string | null;
   document_design?: DocumentDesign | null;
