@@ -100,7 +100,7 @@ export const routes: Routes = [
       {
         path: 'pos/sell',
         canActivate: [permissionGuard],
-        data: { preload: true, permission: 'SettleOrder' },
+        data: { preload: true, permission: 'SettleOrder', documentScroll: true },
         loadComponent: () => import('./pos/sell/sell.component').then(m => m.SellComponent),
       },
       { path: 'pos/sales', redirectTo: 'sales' },

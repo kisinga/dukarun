@@ -25,6 +25,7 @@ import { SellCatalogStore } from './sell-catalog.store';
  */
 @Component({
   selector: 'app-sell-catalog-panel',
+  host: { class: 'block min-w-0' },
   imports: [
     ReactiveFormsModule,
     BarcodeScannerComponent,
@@ -33,10 +34,10 @@ import { SellCatalogStore } from './sell-catalog.store';
     MoneyComponent,
   ],
   template: `
-    <section class="card order-1 min-w-0 bg-base-100 xl:col-start-1 xl:row-start-1 xl:h-full">
+    <section class="card min-w-0 bg-base-100">
       <div class="card-body p-4">
         <div class="flex items-start justify-between gap-3">
-          <div>
+          <div class="min-w-0">
             <h2 class="type-heading">Add products</h2>
             <p class="mt-0.5 text-sm text-base-content/60">
               Search by product, manufacturer, or SKU, or scan a barcode.
@@ -193,7 +194,7 @@ import { SellCatalogStore } from './sell-catalog.store';
               @for (category of catalog.categoryDirectory(); track category.id) {
                 <button
                   type="button"
-                  class="min-h-24 rounded-box border border-base-300/70 bg-base-100 p-3 text-left transition-colors hover:border-primary/50 hover:bg-primary/5"
+                  class="min-h-24 min-w-0 rounded-box border border-base-300/70 bg-base-100 p-3 text-left transition-colors hover:border-primary/50 hover:bg-primary/5"
                   (click)="catalog.openCategory(category.id)"
                 >
                   <span class="line-clamp-2 text-sm font-semibold">{{ category.name }}</span>
@@ -250,9 +251,19 @@ import { SellCatalogStore } from './sell-catalog.store';
                     /></span>
                   }
                   <span class="min-w-0 flex-1">
-                    <span class="type-caption block truncate">{{
-                      v.manufacturer_name || 'Manufacturer not set'
-                    }}</span>
+                    <span class="type-caption block truncate">
+                      @if (v.manufacturer_name) {
+                        {{ v.manufacturer_name }}
+                      } @else {
+                        <span
+                          role="img"
+                          aria-label="Manufacturer not set"
+                          title="Manufacturer not set"
+                        >
+                          <app-icon name="heroInformationCircle" size="sm" />
+                        </span>
+                      }
+                    </span>
                     <span class="line-clamp-2 text-sm font-semibold">{{ catalog.label(v) }}</span>
                   </span>
                   <span class="shrink-0 text-right">
@@ -272,18 +283,11 @@ import { SellCatalogStore } from './sell-catalog.store';
               }
             </div>
           } @else {
-            <div
-              class="mt-2 snap-x gap-2 overflow-x-auto pb-2 sm:grid sm:grid-cols-3 sm:overflow-visible sm:pb-0 xl:grid-cols-4"
-              [class.flex]="catalog.quickAddMode()"
-              [class.grid]="!catalog.quickAddMode()"
-              [class.grid-cols-2]="!catalog.quickAddMode()"
-            >
+            <div class="mt-2 grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
               @for (v of catalog.visibleCatalogItems(); track v.variant_id) {
                 <button
                   type="button"
-                  class="group relative flex h-32 min-h-32 shrink-0 snap-start flex-col items-start gap-1 overflow-hidden rounded-box border border-base-300/70 bg-base-100 p-3 text-left transition-colors hover:border-primary/50 hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-45 sm:w-auto"
-                  [class.w-36]="catalog.quickAddMode()"
-                  [class.w-full]="!catalog.quickAddMode()"
+                  class="group relative flex min-h-32 min-w-0 flex-col items-start gap-1 rounded-box border border-base-300/70 bg-base-100 p-3 text-left transition-colors hover:border-primary/50 hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-45"
                   [disabled]="catalog.unavailable(v)"
                   (click)="catalog.addVariant(v)"
                 >
@@ -308,9 +312,19 @@ import { SellCatalogStore } from './sell-catalog.store';
                         ><app-icon name="heroCube" size="lg"
                       /></span>
                     }
-                    <span class="type-caption min-w-0 flex-1 truncate pt-0.5">{{
-                      v.manufacturer_name || 'Manufacturer not set'
-                    }}</span>
+                    <span class="type-caption min-w-0 flex-1 truncate pt-0.5">
+                      @if (v.manufacturer_name) {
+                        {{ v.manufacturer_name }}
+                      } @else {
+                        <span
+                          role="img"
+                          aria-label="Manufacturer not set"
+                          title="Manufacturer not set"
+                        >
+                          <app-icon name="heroInformationCircle" size="sm" />
+                        </span>
+                      }
+                    </span>
                     @if (catalog.quantityInCart(v.variant_id) > 0) {
                       <span class="badge badge-primary badge-sm shrink-0">{{
                         catalog.quantityInCart(v.variant_id)
@@ -319,15 +333,18 @@ import { SellCatalogStore } from './sell-catalog.store';
                       <span class="badge badge-error badge-sm shrink-0">Out</span>
                     }
                   </div>
-                  <span class="line-clamp-2 text-sm leading-tight font-semibold">{{
-                    catalog.label(v)
-                  }}</span>
-                  <span class="mt-auto flex w-full items-end justify-between gap-1">
-                    <span class="text-sm font-bold whitespace-nowrap"
+                  <span
+                    class="line-clamp-2 w-full break-words text-sm leading-tight font-semibold"
+                    >{{ catalog.label(v) }}</span
+                  >
+                  <span
+                    class="mt-auto flex w-full min-w-0 flex-wrap items-end justify-between gap-x-2 gap-y-1 pt-1"
+                  >
+                    <span class="min-w-0 break-words text-sm font-bold"
                       ><app-money [amount]="v.price ?? 0"
                     /></span>
                     <span
-                      class="text-right text-xs whitespace-nowrap"
+                      class="min-w-0 break-words text-right text-xs"
                       [class.text-error]="catalog.unavailable(v)"
                       [class.text-muted]="!catalog.unavailable(v)"
                       >{{ catalog.stockLabel(v) }}</span

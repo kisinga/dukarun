@@ -18,36 +18,45 @@ import { MoneyComponent } from '../../shared/ui/money.component';
       <div class="sale-line-summary">
         <button
           type="button"
-          class="sale-line-name"
-          title="View item details"
+          class="sale-line-name group"
           [attr.aria-label]="'Details for ' + label()"
           [attr.aria-expanded]="detailsOpen()"
           [attr.aria-controls]="detailsId()"
           (click)="detailsOpen.set(!detailsOpen())"
         >
-          <span class="min-w-0">
-            <span class="line-clamp-2">{{ label() }}</span>
-            <span
-              class="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs font-normal"
-            >
-              @if (line().variant.manufacturer_name) {
-                <span
-                  class="max-w-full truncate rounded bg-base-200 px-1.5 py-0.5 text-base-content"
-                >
-                  {{ line().variant.manufacturer_name }}
-                </span>
-              } @else if (line().variant.kind === 'service') {
-                <span class="text-base-content/60">Service</span>
-              }
-              @if ((line().unitsPerUnit ?? 1) > 1) {
-                <span class="text-base-content/60"
-                  >{{ line().unitsPerUnit }} {{ line().stockUnit || 'items' }} /
-                  {{ unitName() }}</span
-                >
-              }
-            </span>
+          <span class="sale-details-caret" aria-hidden="true">
+            <app-icon
+              name="heroChevronRight"
+              size="md"
+              class="transition-transform duration-150 motion-reduce:transition-none"
+              [class.rotate-90]="detailsOpen()"
+            />
+          </span>
+          <span class="sale-product-title min-w-0">
+            <span class="min-w-0 line-clamp-2">{{ label() }}</span>
           </span>
         </button>
+        @if (
+          line().variant.manufacturer_name ||
+          line().variant.kind === 'service' ||
+          (line().unitsPerUnit ?? 1) > 1
+        ) {
+          <div class="sale-product-meta">
+            @if (line().variant.manufacturer_name) {
+              <span class="max-w-full truncate">
+                {{ line().variant.manufacturer_name }}
+              </span>
+            } @else if (line().variant.kind === 'service') {
+              <span class="text-base-content/60">Service</span>
+            }
+            @if ((line().unitsPerUnit ?? 1) > 1) {
+              <span class="text-base-content/60"
+                >{{ line().unitsPerUnit }} {{ line().stockUnit || 'items' }} /
+                {{ unitName() }}</span
+              >
+            }
+          </div>
+        }
         <p class="sale-line-total" [attr.aria-label]="'Line total for ' + label()">
           <span class="sale-total-label">Total</span>
           <app-money [amount]="lineTotal()" />
@@ -70,7 +79,7 @@ import { MoneyComponent } from '../../shared/ui/money.component';
       <div class="sale-line-controls">
         <div class="sale-price-field">
           <div class="sale-field-label">
-            <span>Price /</span>
+            <span class="shrink-0">Price /</span>
             @if ((line().variant.packs?.length ?? 0) > 0) {
               <button
                 type="button"
@@ -87,8 +96,30 @@ import { MoneyComponent } from '../../shared/ui/money.component';
             } @else {
               <span class="truncate" [title]="unitName()">{{ unitName() }}</span>
             }
+            @if (overridden()) {
+              <span class="sale-price-reset">
+                <span class="sr-only">Price adjusted · Was KES {{ line().unitPrice }}</span>
+                @if (canOverridePrice()) {
+                  <button
+                    appButton
+                    variant="ghost"
+                    type="button"
+                    aria-label="Reset price"
+                    [title]="'Reset to KES ' + line().unitPrice"
+                    (click)="priceReset.emit()"
+                  >
+                    Reset
+                  </button>
+                }
+              </span>
+            }
           </div>
-          <div class="sale-price-control" role="group" [attr.aria-label]="'Price for ' + label()">
+          <div
+            class="sale-price-control"
+            [class.sale-price-control--adjusted]="overridden()"
+            role="group"
+            [attr.aria-label]="'Price for ' + label()"
+          >
             @if (canOverridePrice()) {
               <button
                 appButton
@@ -132,25 +163,6 @@ import { MoneyComponent } from '../../shared/ui/money.component';
               /></span>
             }
           </div>
-          @if (overridden()) {
-            <div class="sale-price-reset type-caption flex flex-wrap items-center gap-x-2">
-              <span
-                ><span class="sr-only">Price adjusted · </span>Was
-                <app-money [amount]="line().unitPrice"
-              /></span>
-              @if (canOverridePrice()) {
-                <button
-                  appButton
-                  variant="ghost"
-                  type="button"
-                  aria-label="Reset price"
-                  (click)="priceReset.emit()"
-                >
-                  Reset
-                </button>
-              }
-            </div>
-          }
         </div>
         <div class="sale-quantity-field">
           <span class="sale-field-label">Quantity</span>
@@ -237,66 +249,112 @@ import { MoneyComponent } from '../../shared/ui/money.component';
     }
 
     .sale-line {
-      padding: 0.25rem 0.75rem 0.5rem;
+      padding: 0.875rem 1rem 1rem;
     }
     .sale-line-summary {
       display: grid;
       grid-template-columns: minmax(0, 1fr) auto 2.75rem;
       align-items: center;
-      column-gap: 0.5rem;
+      column-gap: 0.75rem;
     }
     .sale-line-name {
+      grid-column: 1;
+      grid-row: 1;
       display: flex;
       align-items: center;
-      gap: 0.375rem;
+      gap: 0.5rem;
       min-width: 0;
       min-height: 2.75rem;
       text-align: left;
-      font-size: 0.9375rem;
-      font-weight: 600;
-      line-height: 1.25rem;
       cursor: pointer;
     }
+    .sale-details-caret {
+      display: inline-flex;
+      flex: 0 0 1.5rem;
+      height: 1.5rem;
+      align-items: center;
+      justify-content: center;
+      border-radius: var(--radius-selector);
+      color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+    }
+    .sale-line-name:hover .sale-details-caret,
+    .sale-line-name:focus-visible .sale-details-caret {
+      background: var(--surface-inset);
+      color: var(--color-base-content);
+    }
+    .sale-product-title {
+      font-size: 1rem;
+      font-weight: 600;
+      line-height: 1.375rem;
+      letter-spacing: -0.015em;
+    }
+    .sale-product-meta {
+      grid-column: 1;
+      grid-row: 2;
+      display: flex;
+      min-width: 0;
+      flex-wrap: wrap;
+      gap: 0.25rem 0.5rem;
+      margin-top: 0.25rem;
+      padding-left: 2rem;
+      color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+      font-size: 0.75rem;
+      font-weight: 400;
+      line-height: 1rem;
+    }
     .sale-line-total {
+      grid-column: 2;
+      grid-row: 1;
       display: flex;
       min-height: 2.75rem;
       flex-direction: column;
       justify-content: center;
-      font-size: 1.125rem;
-      line-height: 1.375rem;
+      font-size: 1.375rem;
+      line-height: 1.625rem;
       font-weight: 700;
       font-variant-numeric: tabular-nums;
       text-align: right;
+      letter-spacing: -0.025em;
     }
     .sale-total-label {
       display: block;
       font-size: 0.6875rem;
       line-height: 1rem;
       font-weight: 500;
+      letter-spacing: 0;
       color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
     }
     .sale-price-reset {
-      font-size: 0.6875rem;
+      margin-left: auto;
+      flex-shrink: 0;
     }
     .sale-price-reset button {
       color: var(--color-primary);
-      font-size: 0.6875rem;
+      font-size: 0.75rem;
       padding-inline: 0.25rem;
       min-width: 2.75rem;
+      min-height: 2.75rem;
     }
     .sale-line-remove {
-      border: 1px solid color-mix(in oklab, var(--surface-border) 70%, transparent);
+      grid-column: 3;
+      grid-row: 1;
+      border: 0;
       border-radius: var(--radius-field);
-      color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+      color: color-mix(in oklab, var(--color-base-content) 45%, transparent);
     }
     .sale-line-remove:hover {
       color: var(--color-error);
+      background: color-mix(in oklab, var(--color-error) 8%, transparent);
     }
     .sale-line-controls {
       display: grid;
-      grid-template-columns: minmax(9rem, 1fr) 8.375rem;
+      grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
       align-items: start;
       gap: 0.75rem;
+      max-width: 28rem;
+      margin-top: 0.5rem;
+      padding-top: 0.25rem;
+      border-top: 1px solid color-mix(in oklab, var(--surface-border) 55%, transparent);
     }
     .sale-price-field {
       min-width: 0;
@@ -316,11 +374,15 @@ import { MoneyComponent } from '../../shared/ui/money.component';
       align-items: center;
       border: 1px solid var(--surface-border);
       border-radius: var(--radius-field);
-      background: color-mix(in oklab, var(--color-primary) 7%, var(--surface-content));
-      border-color: color-mix(in oklab, var(--color-primary) 12%, var(--surface-border));
+      background: color-mix(in oklab, var(--surface-inset) 55%, var(--surface-content));
     }
     .sale-price-control > button.counter-btn {
-      color: var(--color-primary);
+      color: color-mix(in oklab, var(--color-base-content) 65%, transparent);
+      padding: 0;
+    }
+    .sale-price-control--adjusted {
+      border-color: color-mix(in oklab, var(--color-primary) 35%, var(--surface-border));
+      background: color-mix(in oklab, var(--color-primary) 5%, var(--surface-content));
     }
     .sale-line-price,
     .sale-line-unit {
@@ -339,6 +401,7 @@ import { MoneyComponent } from '../../shared/ui/money.component';
     }
     .sale-line-unit {
       max-width: 100%;
+      justify-content: start;
     }
     .sale-price-readonly {
       grid-column: 1 / -1;
@@ -394,28 +457,56 @@ import { MoneyComponent } from '../../shared/ui/money.component';
     @container (min-width: 46rem) {
       .sale-line {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) minmax(19rem, 21rem) 3.5rem 2.75rem;
+        grid-template-columns:
+          minmax(0, 1fr) minmax(10rem, 12rem) 8.375rem minmax(5rem, max-content)
+          2.75rem;
+        grid-template-rows: 2.75rem auto;
         align-items: center;
-        gap: 0.5rem 0.75rem;
+        gap: 0 0.75rem;
       }
-      .sale-line-summary {
+      .sale-line-summary,
+      .sale-line-controls,
+      .sale-price-field,
+      .sale-quantity-field,
+      .sale-line-total {
         display: contents;
       }
       .sale-line-name {
         grid-column: 1;
+        grid-row: 2;
+      }
+      .sale-product-meta {
+        grid-column: 1;
+        grid-row: 3;
+      }
+      .sale-price-field > .sale-field-label {
+        grid-column: 2;
         grid-row: 1;
       }
-      .sale-line-total {
+      .sale-price-control {
+        grid-column: 2;
+        grid-row: 2;
+      }
+      .sale-quantity-field > .sale-field-label {
         grid-column: 3;
         grid-row: 1;
       }
-      .sale-line-remove {
+      .sale-quantity {
+        grid-column: 3;
+        grid-row: 2;
+      }
+      .sale-total-label {
         grid-column: 4;
         grid-row: 1;
+        font-size: 0.75rem;
       }
-      .sale-line-controls {
-        grid-column: 2;
-        grid-row: 1;
+      .sale-line-total > app-money {
+        grid-column: 4;
+        grid-row: 2;
+      }
+      .sale-line-remove {
+        grid-column: 5;
+        grid-row: 2;
       }
       .sale-line > p {
         grid-column: 1 / -1;
@@ -426,7 +517,7 @@ import { MoneyComponent } from '../../shared/ui/money.component';
     }
     @container (max-width: 24rem) {
       .sale-line {
-        padding-inline: 0.25rem;
+        padding-inline: 0.75rem;
       }
       .sale-line-controls {
         grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -445,12 +536,8 @@ import { MoneyComponent } from '../../shared/ui/money.component';
         gap: 0.125rem;
         overflow-wrap: anywhere;
       }
-      .sale-line-summary,
-      .sale-price-reset {
-        padding-inline: 0.25rem;
-      }
     }
-    @container (max-width: 17.5rem) {
+    @container (max-width: 20rem) {
       .sale-line-controls {
         grid-template-columns: minmax(0, 1fr);
       }
@@ -458,6 +545,9 @@ import { MoneyComponent } from '../../shared/ui/money.component';
         display: flex;
         justify-content: space-between;
         gap: 0.5rem;
+      }
+      .sale-quantity {
+        min-width: 8.375rem;
       }
     }
   `,

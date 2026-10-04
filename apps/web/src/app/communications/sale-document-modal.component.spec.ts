@@ -88,6 +88,36 @@ describe('Sale document modal', () => {
     expect(fixture.nativeElement.querySelector('dialog').open).toBe(true);
     expect(button('Done').disabled).toBe(false);
   });
+  it('renders receipt actions immediately during celebration while customer details are loading', async () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: false }));
+    const { fixture, service, button } = await render();
+    let resolve!: (context: SaleDocumentContext) => void;
+    service.context.mockImplementationOnce(
+      () =>
+        new Promise<SaleDocumentContext>(done => {
+          resolve = done;
+        })
+    );
+    service.modal.set({ orderId: 'sale-loading', celebrate: true });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Sale completed');
+    expect(fixture.nativeElement.textContent).toContain('Loading customer details');
+    expect(button('Send PDF via WhatsApp').disabled).toBe(true);
+    expect(button('Print').disabled).toBe(false);
+    expect(button('Done').disabled).toBe(false);
+    resolve(base);
+    await fixture.whenStable();
+  });
+  it('keeps invoice balance visible and does not celebrate historical documents', async () => {
+    const { fixture, service } = await render({ ...base, document_type: 'invoice', balance: 40 });
+    service.modal.set({ orderId: 'sale-history', celebrate: false });
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('h2').textContent).toContain('Send invoice');
+    expect(fixture.nativeElement.textContent).toContain('Balance KES 40');
+    expect(fixture.nativeElement.textContent).not.toContain('Sale completed');
+  });
   it('shows saved customer details without an editable recipient override', async () => {
     const customer = {
       id: 'customer',

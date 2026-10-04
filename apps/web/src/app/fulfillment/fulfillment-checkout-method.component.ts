@@ -34,14 +34,17 @@ import type { FulfillmentSettings } from './fulfillment.service';
                   {{ mode() === 'delivery' ? 'Delivery details' : 'Pickup details' }}
                 </p>
                 @if (detailsCommitted()) {
-                  <p class="mt-1 truncate text-sm">{{ recipientName() }}</p>
-                  <p class="type-caption mt-0.5 truncate">
-                    @if (mode() === 'delivery') {
+                  <p class="mt-1 break-words text-sm">{{ recipientName() }}</p>
+                  @if (phone()) {
+                    <p class="type-caption mt-0.5">{{ phone() }}</p>
+                  }
+                  @if (mode() === 'delivery') {
+                    <p class="type-caption mt-1 whitespace-pre-line break-words">
                       {{ address() }}
-                    } @else {
-                      {{ phone() || 'No phone provided' }}
-                    }
-                  </p>
+                    </p>
+                  } @else if (!phone()) {
+                    <p class="type-caption mt-1">No phone provided</p>
+                  }
                 } @else {
                   <p class="type-caption mt-1">Recipient details still need attention.</p>
                 }
@@ -51,15 +54,20 @@ import type { FulfillmentSettings } from './fulfillment.service';
                 type="button"
                 variant="ghost"
                 size="sm"
-                [iconOnly]="true"
                 [attr.aria-label]="detailsCommitted() ? 'Edit order details' : 'Add order details'"
                 [title]="detailsCommitted() ? 'Edit details' : 'Add details'"
                 (click)="detailsRequested.emit()"
               >
                 <app-icon [name]="detailsCommitted() ? 'heroPencilSquare' : 'heroPlus'" />
+                {{ detailsCommitted() ? 'Edit details' : 'Add details' }}
               </button>
             </div>
             @if (detailsCommitted()) {
+              @if (mode() === 'delivery') {
+                <p class="mt-3 text-sm font-medium">
+                  {{ collectionKind() === 'cod' ? 'Collect on delivery' : 'Pay before delivery' }}
+                </p>
+              }
               <div class="mt-3 flex flex-wrap gap-2">
                 <span class="badge badge-ghost badge-sm">
                   {{ updatesRequested() ? 'Updates on' : 'Updates off' }}

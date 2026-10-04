@@ -1,4 +1,13 @@
-import { Component, computed, input, output, viewChild } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  afterRenderEffect,
+  computed,
+  input,
+  output,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { FormControl } from '@angular/forms';
 import {
   FulfillmentCheckoutFieldsComponent,
@@ -45,6 +54,7 @@ export type SellCheckoutWorkspaceIntent =
  */
 @Component({
   selector: 'app-sell-checkout-workspace',
+  host: { '[class.checkout-fits]': 'fitsViewport()' },
   imports: [
     FulfillmentCheckoutFieldsComponent,
     FulfillmentCheckoutMethodComponent,
@@ -55,22 +65,23 @@ export type SellCheckoutWorkspaceIntent =
     :host {
       display: block;
       min-width: 0;
-      order: 2;
     }
 
     @media (min-width: 80rem) {
       :host {
-        position: sticky;
-        top: 1rem;
         grid-column: 2;
         grid-row: 1 / span 2;
-        height: 100%;
+        align-self: start;
+      }
+      :host.checkout-fits {
+        position: sticky;
+        top: 4.5rem;
       }
     }
   `,
   template: `
-    <aside class="min-w-0 xl:h-full">
-      <div class="card h-full overflow-hidden bg-base-100" aria-label="Sale summary">
+    <aside class="min-w-0">
+      <div #summaryCard class="card bg-base-100" aria-label="Sale summary">
         <app-sell-customer-context
           [viewModel]="viewModel().customer"
           [searchControl]="customerSearch()"
@@ -91,7 +102,7 @@ export type SellCheckoutWorkspaceIntent =
           (detailsRequested)="fulfillmentFields()?.openDetails()"
         />
 
-        <section class="mt-auto border-t border-base-300/60 p-4">
+        <section class="border-t border-base-300/60 p-4">
           <app-sell-payment-actions
             mode="sidebar"
             [total]="viewModel().total"
@@ -129,6 +140,7 @@ export type SellCheckoutWorkspaceIntent =
       (sellOnCredit)="intent.emit({ type: 'credit' })"
       (sendToCashier)="intent.emit({ type: 'send-to-cashier' })"
       (saveProforma)="intent.emit({ type: 'save-proforma' })"
+      (dockClearanceChanged)="dockClearanceChanged.emit($event)"
     />
 
     <app-fulfillment-checkout-fields
@@ -143,6 +155,31 @@ export class SellCheckoutWorkspaceComponent {
   readonly viewModel = input.required<SellCheckoutWorkspaceViewModel>();
   readonly customerSearch = input.required<FormControl<string>>();
   readonly intent = output<SellCheckoutWorkspaceIntent>();
+  readonly dockClearanceChanged = output<number>();
+
+  protected readonly fitsViewport = signal(false);
+  private readonly summaryCard = viewChild<ElementRef<HTMLElement>>('summaryCard');
+
+  constructor() {
+    afterRenderEffect(onCleanup => {
+      const card = this.summaryCard()?.nativeElement;
+      if (!card) return;
+      const measure = () => {
+        const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
+        this.fitsViewport.set(
+          card.getBoundingClientRect().height <= window.innerHeight - 5.5 * rem
+        );
+      };
+      const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+      observer?.observe(card);
+      window.addEventListener('resize', measure);
+      measure();
+      onCleanup(() => {
+        observer?.disconnect();
+        window.removeEventListener('resize', measure);
+      });
+    });
+  }
 
   protected readonly fulfillmentFields = viewChild(FulfillmentCheckoutFieldsComponent);
   readonly isCodCheckout = computed(
