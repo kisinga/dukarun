@@ -130,7 +130,7 @@ import { MoneyComponent } from '../../shared/ui/money.component';
                 [attr.aria-label]="'Reduce price of ' + label()"
                 (click)="priceStep.emit(-1)"
               >
-                <app-icon name="heroChevronDown" size="sm" />
+                <app-icon name="heroMinus" size="md" />
               </button>
               <button
                 type="button"
@@ -155,7 +155,7 @@ import { MoneyComponent } from '../../shared/ui/money.component';
                 [attr.aria-label]="'Increase price of ' + label()"
                 (click)="priceStep.emit(1)"
               >
-                <app-icon name="heroChevronUp" size="sm" />
+                <app-icon name="heroPlus" size="md" />
               </button>
             } @else {
               <span class="sale-line-price sale-price-readonly"
@@ -178,7 +178,7 @@ import { MoneyComponent } from '../../shared/ui/money.component';
               [attr.aria-label]="'Reduce quantity of ' + label()"
               (click)="quantityStep.emit(-1)"
             >
-              <app-icon name="heroMinus" size="sm" />
+              <app-icon name="heroMinus" size="md" />
             </button>
             <input
               type="number"
@@ -200,7 +200,7 @@ import { MoneyComponent } from '../../shared/ui/money.component';
               [attr.aria-label]="'Increase quantity of ' + label()"
               (click)="quantityStep.emit(1)"
             >
-              <app-icon name="heroPlus" size="sm" />
+              <app-icon name="heroPlus" size="md" />
             </button>
           </div>
         </div>
@@ -376,9 +376,21 @@ import { MoneyComponent } from '../../shared/ui/money.component';
       border-radius: var(--radius-field);
       background: color-mix(in oklab, var(--surface-inset) 55%, var(--surface-content));
     }
-    .sale-price-control > button.counter-btn {
-      color: color-mix(in oklab, var(--color-base-content) 65%, transparent);
+    .sale-price-control > button.counter-btn,
+    .sale-quantity-step.counter-btn {
+      color: var(--color-primary);
+      background: color-mix(in oklab, var(--color-primary) 4%, transparent);
       padding: 0;
+    }
+    .sale-price-control > button.counter-btn:hover,
+    .sale-price-control > button.counter-btn:focus-visible,
+    .sale-quantity-step.counter-btn:hover,
+    .sale-quantity-step.counter-btn:focus-visible {
+      background: color-mix(in oklab, var(--color-primary) 12%, transparent);
+    }
+    .sale-price-control > button.counter-btn:active,
+    .sale-quantity-step.counter-btn:active {
+      background: color-mix(in oklab, var(--color-primary) 18%, transparent);
     }
     .sale-price-control--adjusted {
       border-color: color-mix(in oklab, var(--color-primary) 35%, var(--surface-border));
