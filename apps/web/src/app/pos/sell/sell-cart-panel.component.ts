@@ -39,6 +39,7 @@ export type SellCartIntent =
 /** Cart rendering is isolated from checkout orchestration; changes return as typed cart intents. */
 @Component({
   selector: 'app-sell-cart-panel',
+  host: { class: 'block min-w-0' },
   imports: [
     ReactiveFormsModule,
     ButtonComponent,
@@ -48,7 +49,7 @@ export type SellCartIntent =
     SellCartLineComponent,
   ],
   template: `
-    <section id="current-sale" class="order-3 min-w-0 scroll-mt-4 xl:col-start-1 xl:row-start-2">
+    <section id="current-sale" tabindex="-1" class="min-w-0 scroll-mt-20">
       <div
         class="mb-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-base-300 px-1 pb-3"
       >
@@ -147,11 +148,15 @@ export type SellCartIntent =
               />
 
               @if (viewModel().overrideFor === lineId(item.line)) {
-                <div class="surface-inset mx-3 mb-3 p-3 sm:mx-4">
-                  <div class="flex items-start justify-between gap-3">
-                    <div>
+                <div
+                  class="surface-inset mx-3 mb-3 p-3 sm:mx-4"
+                  role="group"
+                  aria-label="Set exact unit price"
+                >
+                  <div class="flex items-center justify-between gap-3">
+                    <div class="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
                       <p class="text-sm font-semibold">Set exact unit price</p>
-                      <p class="mt-0.5 text-xs text-base-content/60">
+                      <p class="text-xs text-base-content/60">
                         Per {{ item.line.unitName || item.line.variant.stock_unit || 'item' }} ·
                         whole KES.
                       </p>
@@ -159,7 +164,7 @@ export type SellCartIntent =
                     <button
                       appButton
                       variant="ghost"
-                      size="sm"
+                      size="md"
                       [iconOnly]="true"
                       aria-label="Close price editor"
                       (click)="intent.emit({ type: 'close-price-editor' })"
@@ -167,16 +172,16 @@ export type SellCartIntent =
                       <app-icon name="heroXMark" />
                     </button>
                   </div>
-                  <div class="mt-3 grid gap-3 sm:grid-cols-2">
+                  <div class="mt-2 grid gap-3 sm:grid-cols-[minmax(0,12rem)_minmax(0,1fr)]">
                     <app-form-field label="Unit price (KES)" [required]="true">
                       <input
                         type="text"
                         inputmode="numeric"
-                        class="input input-bordered min-h-11 w-full"
+                        class="input input-bordered min-h-11 w-full font-semibold tabular-nums"
                         [formControl]="overridePrice()"
                       />
                     </app-form-field>
-                    <app-form-field label="Reason" hint="Optional; saved on the sale line.">
+                    <app-form-field label="Reason" hint="Optional">
                       <input
                         type="text"
                         class="input input-bordered min-h-11 w-full"
@@ -185,12 +190,13 @@ export type SellCartIntent =
                       />
                     </app-form-field>
                   </div>
-                  <div class="mt-3 flex flex-wrap justify-end gap-2">
+                  <div class="mt-3 flex flex-wrap justify-end gap-2 border-t border-base-300 pt-3">
                     @if (item.line.customPrice !== null) {
                       <button
                         appButton
                         variant="ghost"
                         size="md"
+                        class="mr-auto"
                         (click)="intent.emit({ type: 'price-reset', line: item.line })"
                       >
                         Use base price
@@ -198,7 +204,7 @@ export type SellCartIntent =
                     }
                     <button
                       appButton
-                      variant="outline"
+                      variant="ghost"
                       size="md"
                       (click)="intent.emit({ type: 'close-price-editor' })"
                     >

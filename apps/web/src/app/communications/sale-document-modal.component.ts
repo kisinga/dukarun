@@ -39,150 +39,153 @@ import { IconComponent } from '../shared/ui/icon.component';
           class="modal-box modal-box-task modal-box-compact receipt-panel bg-base-100 text-base-content"
         >
           <header class="px-5 pt-5 pb-3">
-            <div class="flex items-center gap-3">
-              <span class="text-success" [class.receipt-success]="service.modal()?.celebrate">
-                <app-icon name="heroCheckCircle" size="xl" />
-              </span>
-              <div>
-                <h2 id="receipt-heading" tabindex="-1" autofocus #heading class="type-heading">
-                  {{ service.modal()?.celebrate ? 'Sale completed' : 'Sale document' }}
-                </h2>
-                <p class="text-sm text-base-content/65">
-                  {{ context()?.document_number || service.modal()?.code || 'Preparing document…' }}
+            @if (service.modal()?.celebrate) {
+              <p class="mb-2 flex items-center gap-2 text-sm font-medium text-success">
+                <app-icon name="heroCheckCircle" /> Sale completed
+              </p>
+            }
+            <h2 id="receipt-heading" tabindex="-1" autofocus #heading class="type-heading">
+              {{ taskTitle() }}
+            </h2>
+          </header>
+          <div class="modal-body receipt-body space-y-4 px-5 pb-4">
+            @if (context() || service.modal()?.total !== undefined) {
+              <div
+                class="flex min-w-0 flex-wrap items-end justify-between gap-3 border-y border-base-300/60 py-3"
+              >
+                <div class="min-w-0">
+                  <p class="type-caption">
+                    {{ context()?.document_type === 'invoice' ? 'Invoice' : 'Receipt' }} · PDF
+                  </p>
+                  <p class="break-words text-sm font-semibold">
+                    {{
+                      context()?.document_number || service.modal()?.code || 'Preparing document…'
+                    }}
+                  </p>
+                </div>
+                <p class="type-hero">
+                  {{ money(context()?.total ?? service.modal()?.total ?? 0) }}
                 </p>
               </div>
-            </div>
-            @if (context() || service.modal()?.total !== undefined) {
-              <p class="mt-3 text-2xl font-semibold">
-                {{ money(context()?.total ?? service.modal()?.total ?? 0) }}
-              </p>
             }
             @if (context()?.document_type === 'invoice') {
               <p class="text-sm">Invoice · Balance {{ money(context()!.balance) }}</p>
             }
-          </header>
-          <div class="modal-body receipt-body space-y-4 px-5 pb-4">
-            @if (ready()) {
-              @if (!canSend()) {
-                <p class="text-sm text-base-content/65">
-                  Print your sale document here. WhatsApp sending requires settlement or
-                  communications access.
+            @if (!canSend()) {
+              <p class="text-sm text-base-content/65">
+                Print your sale document here. WhatsApp sending requires settlement or
+                communications access.
+              </p>
+            } @else if (context(); as ctx) {
+              @if (!ctx.eligible) {
+                <p class="text-sm">This sale is not ready for a receipt or invoice yet.</p>
+              } @else if (ctx.has_customer && !ctx.customer) {
+                <p class="text-sm">
+                  The linked customer is unavailable. Ask a manager to review their account.
                 </p>
-              } @else if (context(); as ctx) {
-                @if (!ctx.eligible) {
-                  <p class="text-sm">This sale is not ready for a receipt or invoice yet.</p>
-                } @else if (ctx.has_customer && !ctx.customer) {
-                  <p class="text-sm">
-                    The linked customer is unavailable. Ask a manager to review their account.
+              } @else if (ctx.customer; as customer) {
+                <div class="space-y-1">
+                  <p class="type-caption">Send to</p>
+                  <p class="font-medium">{{ customer.first_name }} {{ customer.last_name }}</p>
+                  <p class="text-sm text-base-content/65">
+                    {{ customer.phone || 'No saved phone number' }}
                   </p>
-                } @else if (ctx.customer; as customer) {
-                  <div class="rounded-box border border-base-300 p-3">
-                    <p class="font-medium">{{ customer.first_name }} {{ customer.last_name }}</p>
-                    <p class="text-sm text-base-content/65">
-                      {{ customer.phone || 'No saved phone number' }}
-                    </p>
-                    @if (ctx.can_correct_number && !correcting()) {
-                      <button
-                        appButton
-                        variant="ghost"
-                        size="sm"
-                        (click)="startCorrection(customer)"
-                      >
-                        Correct number
-                      </button>
-                    }
-                  </div>
-                  @if (correcting()) {
-                    <app-form-field
-                      label="Correct phone number"
-                      hint="This updates the customer account and cancels unsent documents to the old number."
-                    >
-                      <input
-                        class="input w-full"
-                        type="tel"
-                        inputmode="tel"
-                        maxlength="30"
-                        [(ngModel)]="correctedPhone"
-                      />
-                    </app-form-field>
-                    <div class="flex gap-2">
-                      <button
-                        appButton
-                        variant="outline"
-                        [loading]="savingNumber()"
-                        (click)="saveCorrection()"
-                      >
-                        Update customer number
-                      </button>
-                      <button appButton variant="ghost" (click)="correcting.set(false)">
-                        Cancel
-                      </button>
-                    </div>
+                  @if (ctx.can_correct_number && !correcting()) {
+                    <button appButton variant="ghost" size="sm" (click)="startCorrection(customer)">
+                      Correct number
+                    </button>
                   }
-                } @else {
+                </div>
+                @if (correcting()) {
                   <app-form-field
-                    label="WhatsApp number"
-                    [required]="true"
-                    hint="Use a Kenyan mobile number."
+                    label="Correct phone number"
+                    hint="This updates the customer account and cancels unsent documents to the old number."
                   >
                     <input
                       class="input w-full"
                       type="tel"
                       inputmode="tel"
-                      autocomplete="tel"
                       maxlength="30"
-                      [ngModel]="phone()"
-                      (ngModelChange)="changePhone($event)"
+                      [(ngModel)]="correctedPhone"
                     />
                   </app-form-field>
-                  @if (lookingUp()) {
-                    <p class="text-sm" role="status">Checking number…</p>
-                  }
-                  @if (matched(); as contact) {
-                    <p class="rounded-box bg-base-200 p-3 text-sm">
-                      Use {{ contact.first_name }} {{ contact.last_name }} ·
-                      {{ contact.is_verified ? 'Verified' : 'Unverified' }}
-                    </p>
-                  } @else {
-                    <div class="grid grid-cols-2 gap-3">
-                      <app-form-field label="First name" [required]="true">
-                        <input
-                          class="input w-full"
-                          autocomplete="given-name"
-                          maxlength="100"
-                          [ngModel]="firstName()"
-                          (ngModelChange)="firstName.set($event)"
-                        />
-                      </app-form-field>
-                      <app-form-field label="Second name" hint="Optional">
-                        <input
-                          class="input w-full"
-                          autocomplete="family-name"
-                          maxlength="100"
-                          [(ngModel)]="lastName"
-                        />
-                      </app-form-field>
-                    </div>
-                  }
+                  <div class="flex gap-2">
+                    <button
+                      appButton
+                      variant="outline"
+                      [loading]="savingNumber()"
+                      (click)="saveCorrection()"
+                    >
+                      Update customer number
+                    </button>
+                    <button appButton variant="ghost" (click)="correcting.set(false)">
+                      Cancel
+                    </button>
+                  </div>
                 }
-                @if (ctx.delivery; as delivery) {
-                  <p role="status" class="rounded-box bg-base-200 p-3 text-sm">
-                    {{ stateLabel(delivery.state) }}
-                    @if (delivery.state === 'sent') {
-                      · {{ delivery.recipient }}
-                    }
-                    @if (delivery.state === 'unknown') {
-                      The gateway may have accepted this PDF. Check with the customer before sending
-                      again.
-                    }
-                    @if (delivery.state === 'failed') {
-                      Please check the customer details and try again.
-                    }
+              } @else {
+                <app-form-field
+                  label="WhatsApp number"
+                  [required]="true"
+                  hint="Use a Kenyan mobile number."
+                >
+                  <input
+                    class="input w-full"
+                    type="tel"
+                    inputmode="tel"
+                    autocomplete="tel"
+                    maxlength="30"
+                    [ngModel]="phone()"
+                    (ngModelChange)="changePhone($event)"
+                  />
+                </app-form-field>
+                @if (lookingUp()) {
+                  <p class="text-sm" role="status">Checking number…</p>
+                }
+                @if (matched(); as contact) {
+                  <p class="rounded-box bg-base-200 p-3 text-sm">
+                    Use {{ contact.first_name }} {{ contact.last_name }} ·
+                    {{ contact.is_verified ? 'Verified' : 'Unverified' }}
                   </p>
+                } @else {
+                  <div class="grid grid-cols-2 gap-3">
+                    <app-form-field label="First name" [required]="true">
+                      <input
+                        class="input w-full"
+                        autocomplete="given-name"
+                        maxlength="100"
+                        [ngModel]="firstName()"
+                        (ngModelChange)="firstName.set($event)"
+                      />
+                    </app-form-field>
+                    <app-form-field label="Second name" hint="Optional">
+                      <input
+                        class="input w-full"
+                        autocomplete="family-name"
+                        maxlength="100"
+                        [(ngModel)]="lastName"
+                      />
+                    </app-form-field>
+                  </div>
                 }
-              } @else if (loading()) {
-                <p role="status" class="text-sm">Loading customer details…</p>
               }
+              @if (ctx.delivery; as delivery) {
+                <p role="status" class="rounded-box bg-base-200 p-3 text-sm">
+                  {{ stateLabel(delivery.state) }}
+                  @if (delivery.state === 'sent') {
+                    · {{ delivery.recipient }}
+                  }
+                  @if (delivery.state === 'unknown') {
+                    The gateway may have accepted this PDF. Check with the customer before sending
+                    again.
+                  }
+                  @if (delivery.state === 'failed') {
+                    Please check the customer details and try again.
+                  }
+                </p>
+              }
+            } @else if (loading()) {
+              <p role="status" class="text-sm">Loading customer details…</p>
             }
             @if (error()) {
               <p role="alert" class="text-sm text-error">{{ error() }}</p>
@@ -202,7 +205,7 @@ import { IconComponent } from '../shared/ui/icon.component';
             }
           </div>
           <footer class="space-y-2 border-t border-base-300 px-5 py-4">
-            @if (ready() && canSend()) {
+            @if (canSend()) {
               @if (confirmResend()) {
                 <p class="text-sm">Send another copy to {{ context()?.customer?.phone }}?</p>
                 <div class="flex gap-2">
@@ -282,20 +285,17 @@ import { IconComponent } from '../shared/ui/icon.component';
       flex-shrink: 0;
       padding-bottom: max(1rem, env(safe-area-inset-bottom));
     }
-    .receipt-success {
-      animation: receipt-check 500ms ease-out both;
+    .receipt-dialog[open] .receipt-panel {
+      animation: receipt-enter 180ms ease-out both;
     }
-    @keyframes receipt-check {
+    @keyframes receipt-enter {
       0% {
         opacity: 0;
-        transform: scale(0.55);
-      }
-      70% {
-        transform: scale(1.12);
+        transform: translateY(8px);
       }
       100% {
         opacity: 1;
-        transform: scale(1);
+        transform: translateY(0);
       }
     }
     @media (min-width: 768px) {
@@ -304,7 +304,7 @@ import { IconComponent } from '../shared/ui/icon.component';
       }
     }
     @media (prefers-reduced-motion: reduce) {
-      .receipt-success {
+      .receipt-dialog[open] .receipt-panel {
         animation: none;
       }
     }
@@ -317,7 +317,6 @@ export class SaleDocumentModalComponent implements OnDestroy {
   private readonly permissions = inject(PermissionsService);
   protected readonly money = formatKes;
   protected readonly context = signal<SaleDocumentContext | null>(null);
-  protected readonly ready = signal(false);
   protected readonly loading = signal(false);
   protected readonly sending = signal(false);
   protected readonly printing = signal(false);
@@ -335,7 +334,6 @@ export class SaleDocumentModalComponent implements OnDestroy {
   private readonly dialog = viewChild<ElementRef<HTMLDialogElement>>('dialog');
   private readonly heading = viewChild<ElementRef<HTMLElement>>('heading');
   private previousFocus: HTMLElement | null = null;
-  private timer?: ReturnType<typeof setTimeout>;
   private lookupTimer?: ReturnType<typeof setTimeout>;
   private pollTimer?: ReturnType<typeof setTimeout>;
   private requestKey = crypto.randomUUID();
@@ -355,6 +353,11 @@ export class SaleDocumentModalComponent implements OnDestroy {
   protected readonly canSend = computed(
     () => this.permissions.has('SettleOrder') || this.permissions.has('ManageCommunications')
   );
+  protected readonly taskTitle = computed(() => {
+    const context = this.context();
+    if (!context?.eligible || !this.canSend()) return 'Sale document';
+    return context.document_type === 'invoice' ? 'Send invoice' : 'Send receipt';
+  });
   protected readonly sendEnabled = computed(() => {
     const ctx = this.context();
     return (
@@ -373,7 +376,6 @@ export class SaleDocumentModalComponent implements OnDestroy {
       const modal = this.service.modal();
       ++this.generation;
       ++this.lookupVersion;
-      clearTimeout(this.timer);
       clearTimeout(this.pollTimer);
       clearTimeout(this.lookupTimer);
       if (!modal) return;
@@ -389,10 +391,6 @@ export class SaleDocumentModalComponent implements OnDestroy {
       this.lookingUp.set(false);
       this.requestKey = crypto.randomUUID();
       this.requestAccepted = false;
-      const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      const ready = !modal.celebrate || reduced;
-      this.ready.set(ready);
-      if (!ready) this.timer = setTimeout(() => this.ready.set(true), 500);
       void this.refresh(this.generation);
     });
     afterRenderEffect(() => {
@@ -426,7 +424,6 @@ export class SaleDocumentModalComponent implements OnDestroy {
   }
   ngOnDestroy(): void {
     ++this.generation;
-    clearTimeout(this.timer);
     clearTimeout(this.pollTimer);
     clearTimeout(this.lookupTimer);
     if (this.dialog()?.nativeElement.open) this.restoreFocus();

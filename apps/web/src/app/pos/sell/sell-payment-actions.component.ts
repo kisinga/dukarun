@@ -1,4 +1,12 @@
-import { Component, computed, input, output } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  afterRenderEffect,
+  computed,
+  input,
+  output,
+  viewChild,
+} from '@angular/core';
 import { ButtonComponent } from '../../shared/ui/button.component';
 import { IconComponent } from '../../shared/ui/icon.component';
 import { MoneyComponent } from '../../shared/ui/money.component';
@@ -19,12 +27,21 @@ type PaymentActionsMode = 'sidebar' | 'dock';
   template: `
     @if (mode() === 'dock') {
       <div
+        #dock
         data-testid="sell-payment-dock"
         class="shadow-overlay fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom,0px))] z-30 border-t border-base-300/60 bg-base-100 p-3 lg:bottom-0 lg:left-64 xl:hidden"
       >
         <div class="flex w-full flex-wrap items-center gap-3">
-          <a href="#current-sale" class="min-w-0 flex-1 rounded-field focus:outline-primary">
-            <p class="type-caption">{{ itemCount() }} {{ itemLabel() }}</p>
+          <a
+            [href]="saleAnchor"
+            (click)="viewCurrentSale($event)"
+            class="min-w-0 flex-1 rounded-field focus:outline-primary"
+          >
+            <p class="type-caption font-semibold">View current sale</p>
+            <p class="type-caption">
+              {{ codCheckout() ? 'To collect on delivery · ' : '' }}{{ itemCount() }}
+              {{ itemLabel() }}
+            </p>
             <p class="type-hero truncate"><app-money [amount]="total()" /></p>
           </a>
           @if (creditAllowed()) {
@@ -56,7 +73,7 @@ type PaymentActionsMode = 'sidebar' | 'dock';
     } @else {
       <div class="hidden items-end justify-between gap-3 xl:flex">
         <div>
-          <p class="type-caption">Amount due</p>
+          <p class="type-caption">{{ codCheckout() ? 'To collect on delivery' : 'Amount due' }}</p>
           <p class="mt-1 type-hero"><app-money [amount]="total()" /></p>
         </div>
         <span class="badge badge-ghost whitespace-nowrap">{{ itemCount() }} {{ itemLabel() }}</span>
@@ -133,6 +150,46 @@ export class SellPaymentActionsComponent {
   readonly sellOnCredit = output<void>();
   readonly sendToCashier = output<void>();
   readonly saveProforma = output<void>();
+  readonly dockClearanceChanged = output<number>();
+
+  private readonly dock = viewChild<ElementRef<HTMLElement>>('dock');
+
+  protected get saleAnchor(): string {
+    return `${window.location.pathname}${window.location.search}#current-sale`;
+  }
+
+  protected viewCurrentSale(event: MouseEvent): void {
+    if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+    const sale = document.getElementById('current-sale');
+    if (!sale) return;
+    event.preventDefault();
+    sale.focus({ preventScroll: true });
+    sale.scrollIntoView({ block: 'start' });
+  }
+
+  constructor() {
+    afterRenderEffect(onCleanup => {
+      const dock = this.dock()?.nativeElement;
+      if (!dock) return;
+      let lastClearance = -1;
+      const measure = () => {
+        const height = dock.getBoundingClientRect().height;
+        const clearance =
+          height > 0 ? Math.ceil(height + parseFloat(getComputedStyle(dock).bottom) + 16) : 0;
+        if (clearance === lastClearance) return;
+        lastClearance = clearance;
+        this.dockClearanceChanged.emit(clearance);
+      };
+      const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+      observer?.observe(dock);
+      window.addEventListener('resize', measure);
+      measure();
+      onCleanup(() => {
+        observer?.disconnect();
+        window.removeEventListener('resize', measure);
+      });
+    });
+  }
 
   protected readonly primaryDisabled = computed(
     () =>

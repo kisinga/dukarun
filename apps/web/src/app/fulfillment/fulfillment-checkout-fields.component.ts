@@ -114,19 +114,6 @@ type ValidationErrors = Partial<Record<ValidationKey, string>>;
             </app-form-field>
           </div>
 
-          <app-preference-row
-            class="mt-3 block"
-            label="Status updates"
-            description="Ready, dispatched, failed and delivered messages. The link and PIN are still sent once."
-          >
-            <input
-              type="checkbox"
-              class="toggle toggle-primary toggle-sm"
-              [ngModel]="updatesRequested()"
-              (ngModelChange)="updatesRequested.set($event)"
-            />
-          </app-preference-row>
-
           @if (!customer() && customerMatches().length > 0) {
             <div class="mt-3 border-y border-base-300/60 py-2">
               <p class="type-caption">Existing customer with this phone</p>
@@ -147,7 +134,11 @@ type ValidationErrors = Partial<Record<ValidationKey, string>>;
             <app-preference-row
               class="mt-3 block"
               label="Save as customer"
-              description="Keep these details for future orders; campaigns stay off."
+              [description]="
+                collectionKind() === 'cod'
+                  ? 'Required for collection on delivery; campaigns stay off.'
+                  : 'Keep these details for future orders; campaigns stay off.'
+              "
             >
               <input
                 type="checkbox"
@@ -182,20 +173,25 @@ type ValidationErrors = Partial<Record<ValidationKey, string>>;
               <app-preference-row
                 class="mt-3 block"
                 label="Use this address next time"
-                [description]="'Update the saved delivery address for ' + customer()!.name + '.'"
+                [description]="
+                  collectionKind() === 'cod'
+                    ? 'Required for collection on delivery.'
+                    : 'Update the saved delivery address for ' + customer()!.name + '.'
+                "
               >
                 <input
                   type="checkbox"
                   class="toggle toggle-primary toggle-sm"
                   [ngModel]="saveDeliveryAddress()"
                   (ngModelChange)="saveDeliveryAddress.set($event)"
+                  [disabled]="collectionKind() === 'cod'"
                 />
               </app-preference-row>
             }
           </app-form-section>
         }
 
-        <app-form-section title="Timing and collection">
+        <app-form-section title="Timing and payment">
           <div
             class="grid gap-3"
             [class.md:grid-cols-2]="mode() === 'delivery' && settings()?.cod_enabled"
@@ -224,7 +220,21 @@ type ValidationErrors = Partial<Record<ValidationKey, string>>;
           </div>
         </app-form-section>
 
-        <app-form-section title="Notes" description="Add only what this order needs.">
+        <app-form-section title="Updates">
+          <app-preference-row
+            label="Status updates"
+            description="Ready, dispatched, failed and delivered messages. The link and PIN are still sent once."
+          >
+            <input
+              type="checkbox"
+              class="toggle toggle-primary toggle-sm"
+              [ngModel]="updatesRequested()"
+              (ngModelChange)="updatesRequested.set($event)"
+            />
+          </app-preference-row>
+        </app-form-section>
+
+        <app-form-section title="Optional details">
           <button
             appButton
             type="button"
@@ -285,7 +295,7 @@ type ValidationErrors = Partial<Record<ValidationKey, string>>;
           <button appButton variant="ghost" type="button" (click)="detailsDialog.requestClose()">
             Cancel
           </button>
-          <button appButton type="button" (click)="completeDetails()">Done</button>
+          <button appButton type="button" (click)="completeDetails()">Save details</button>
         </div>
       </app-task-dialog>
     }

@@ -1,7 +1,16 @@
 import { SaleDocumentModalComponent } from '../../communications/sale-document-modal.component';
 import { SaleDocumentService } from '../../communications/sale-document.service';
 import { SellingUnitDialogComponent } from './selling-unit-dialog.component';
-import { Component, OnInit, computed, effect, inject, untracked, viewChild } from '@angular/core';
+import {
+  Component,
+  OnInit,
+  computed,
+  effect,
+  inject,
+  signal,
+  untracked,
+  viewChild,
+} from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { debounceTime, distinctUntilChanged } from 'rxjs';
@@ -135,7 +144,7 @@ import { CreditDecisionCardComponent } from '../../insights/credit-decision-card
         <app-session-required-notice action="taking payment or completing a sale" />
       }
 
-      <div class="pb-24 lg:pb-24 xl:pb-0">
+      <div [style.padding-bottom.px]="dockClearance()">
         <app-sell-status-messages
           [success]="success()"
           [error]="displayError()"
@@ -156,7 +165,7 @@ import { CreditDecisionCardComponent } from '../../insights/credit-decision-card
         />
 
         <div
-          class="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(20rem,22rem)] xl:items-stretch"
+          class="grid min-w-0 grid-cols-[minmax(0,1fr)] items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(20rem,22rem)]"
         >
           <app-sell-catalog-panel
             [itemCount]="cartItemCount()"
@@ -179,6 +188,7 @@ import { CreditDecisionCardComponent } from '../../insights/credit-decision-card
             [viewModel]="workflow.checkoutWorkspaceViewModel()"
             [customerSearch]="workflow.customerSearch"
             (intent)="handleCheckoutWorkspaceIntent($event)"
+            (dockClearanceChanged)="dockClearance.set($event)"
           />
         </div>
       </div>
@@ -452,6 +462,7 @@ import { CreditDecisionCardComponent } from '../../insights/credit-decision-card
   `,
 })
 export class SellComponent implements OnInit {
+  protected readonly dockClearance = signal(0);
   protected readonly saleDocuments = inject(SaleDocumentService);
   protected readonly workflow = inject(SellWorkflowStore);
   private readonly route = inject(ActivatedRoute);
