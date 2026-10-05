@@ -14,14 +14,14 @@
   },
   "private": true,
   "dependencies": {
-    "@angular/common": "^21.0.8",
-    "@angular/compiler": "^21.0.8",
-    "@angular/core": "^21.0.8",
-    "@angular/forms": "^21.0.8",
-    "@angular/platform-browser": "^21.0.8",
-    "@angular/pwa": "^21.0.5",
-    "@angular/router": "^21.0.8",
-    "@angular/service-worker": "^21.0.8",
+    "@angular/common": "^21.2.24",
+    "@angular/compiler": "^21.2.24",
+    "@angular/core": "^21.2.24",
+    "@angular/forms": "^21.2.24",
+    "@angular/platform-browser": "^21.2.24",
+    "@angular/pwa": "^21.2.24",
+    "@angular/router": "^21.2.24",
+    "@angular/service-worker": "^21.2.24",
     "@gitbook/embed": "^0.5.1",
     "@ng-icons/core": "^33.3.0",
     "@ng-icons/heroicons": "^33.3.0",
@@ -35,13 +35,13 @@
     "usertour.js": "^0.0.24"
   },
   "devDependencies": {
-    "@angular/build": "^21.0.5",
-    "@angular/cli": "^21.0.5",
-    "@angular/compiler-cli": "^21.0.8",
-    "@tailwindcss/postcss": "^4.1.18",
+    "@angular/build": "^21.2.24",
+    "@angular/cli": "^21.2.24",
+    "@angular/compiler-cli": "^21.2.24",
+    "@tailwindcss/postcss": "^4.3.3",
     "daisyui": "^5.5.14",
-    "postcss": "^8.5.6",
-    "tailwindcss": "^4.1.18",
+    "postcss": "^8.5.23",
+    "tailwindcss": "^4.3.3",
     "typescript": "~5.9.3"
   },
   "optionalDependencies": {
@@ -51,7 +51,6 @@
     "@tailwindcss/oxide-linux-x64-musl": "^4.3.1",
     "lightningcss-linux-x64-gnu": "^1.32.0",
     "lightningcss-linux-x64-musl": "^1.32.0",
-    "napi": "*",
-    "version": "^0.1.2"
+    "napi": "*"
   }
 }
