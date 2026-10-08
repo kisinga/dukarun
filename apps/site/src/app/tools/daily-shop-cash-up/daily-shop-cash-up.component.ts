@@ -9,7 +9,7 @@ import {
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { environment } from '../../../environments/environment';
-import { dukarunWhatsAppUrl } from '../../core/public-contact';
+import { AcquisitionService } from '../../core/acquisition.service';
 import { appUrl } from '../../core/public-url';
 import { IconComponent } from '../../shared/ui/icon.component';
 import {
@@ -451,6 +451,17 @@ interface StepLabel {
                 This tool compares only the figures you enter. It can show a difference, but it
                 cannot identify its cause.
               </p>
+              <div class="screen-only mt-6 border-t border-neutral-content/20 pt-5">
+                <p class="mb-3 text-sm leading-relaxed text-neutral-content/80">
+                  Want this connected to the sales your team records?
+                </p>
+                <a [href]="acquisition.enquiryUrl()" class="btn btn-primary min-h-11 w-full"
+                  >Request a demo for your shop</a
+                >
+                <p class="mt-2 mb-0 text-xs text-neutral-content/65">
+                  Your figures stay here and are not included in the enquiry.
+                </p>
+              </div>
             </div>
           </aside>
         </div>
@@ -462,8 +473,9 @@ interface StepLabel {
             <p class="mkt-eyebrow">Worked example</p>
             <h2 class="mkt-h2 mt-2">A KES 100 difference is worth checking today.</h2>
             <p class="mkt-lead mt-4">
-              It may be a missed expense, incorrect change, a payment under the wrong method or a
-              counting mistake. The tool points you to the channel to review first.
+              At fictional Mwangaza Electricals, it may be a missed expense, incorrect change, a
+              payment under the wrong method or a counting mistake. The tool points you to the
+              channel to review first.
             </p>
           </div>
           <div class="mkt-card overflow-hidden bg-base-100">
@@ -521,12 +533,7 @@ interface StepLabel {
               Start my shop
               <app-icon name="heroArrowRight" size="sm" />
             </a>
-            <a
-              [href]="setupWhatsAppUrl"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="btn whatsapp-action min-h-12"
-            >
+            <a [href]="acquisition.enquiryUrl('setup')" class="btn whatsapp-action min-h-12">
               <app-icon name="whatsapp" size="md" />
               I need setup and training
             </a>
@@ -643,6 +650,7 @@ interface StepLabel {
   `,
 })
 export class DailyShopCashUpComponent {
+  protected readonly acquisition = inject(AcquisitionService);
   private readonly platformId = inject(PLATFORM_ID);
   protected readonly appUrl = appUrl;
   protected readonly currentStep = signal<CashUpStep>(1);
@@ -664,9 +672,6 @@ export class DailyShopCashUpComponent {
     () => this.resultRevealed() && this.summary() !== null && this.checkedChannelCount() > 0
   );
   protected readonly shareNotice = signal<string | null>(null);
-  protected readonly setupWhatsAppUrl = dukarunWhatsAppUrl(
-    'Hello Dukarun, I used the daily cash-up tool and would like to discuss setup and staff training. My business type is:'
-  );
 
   protected readonly steps: StepLabel[] = [
     { number: 1, short: 'Recorded sales' },
@@ -737,10 +742,12 @@ export class DailyShopCashUpComponent {
     { label: 'Cash sales', value: 'KES 8,400' },
     { label: 'M-Pesa sales', value: 'KES 6,300' },
     { label: 'Credit sales', value: 'KES 1,500' },
-    { label: 'Older debt received', value: 'KES 1,000' },
+    { label: 'Old debt repaid in cash', value: 'KES 600' },
+    { label: 'Old debt repaid by M-Pesa', value: 'KES 400' },
     { label: 'Cash expenses', value: 'KES 500' },
     { label: 'Cash removed', value: 'KES 4,000' },
     { label: 'Counted cash', value: 'KES 6,400' },
+    { label: 'Confirmed M-Pesa receipts', value: 'KES 6,700' },
   ];
 
   protected setValue(field: CashUpField, value: string): void {

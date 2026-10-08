@@ -62,7 +62,8 @@ export const routes: Routes = [
         path: 'contact',
         title: 'Contact | Dukarun',
         data: {
-          description: 'Contact the Dukarun team for product, support, or partnership questions.',
+          description:
+            'Request a focused Dukarun demo or a separately quoted setup and staff training. Tell us how your shop works today.',
         },
         loadComponent: () =>
           import('./marketing/contact/contact.component').then(m => m.ContactComponent),

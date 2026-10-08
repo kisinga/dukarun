@@ -1,9 +1,10 @@
-import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { IconComponent } from '../shared/ui/icon.component';
 import { appUrl } from '../core/public-url';
 import { DUKARUN_WHATSAPP_DISPLAY, dukarunWhatsAppUrl } from '../core/public-contact';
 import { DUKARUN_GUIDES_URL, dukarunGuideUrl } from '../core/public-learning';
+import { AcquisitionService } from '../core/acquisition.service';
 
 interface NavLink {
   readonly label: string;
@@ -60,8 +61,12 @@ interface NavLink {
             >
               Log in
             </a>
-            <a [href]="appUrl('/register')" class="btn btn-primary btn-sm min-h-11">
-              Start my shop
+            <a
+              [href]="acquisition.enquiryUrl()"
+              class="btn btn-primary btn-sm min-h-11"
+              (click)="menuOpen.set(false)"
+            >
+              Request a demo
               <app-icon name="heroArrowRight" size="sm" />
             </a>
             <button
@@ -228,6 +233,7 @@ interface NavLink {
   `,
 })
 export class MarketingLayoutComponent {
+  protected readonly acquisition = inject(AcquisitionService);
   protected readonly appUrl = appUrl;
   protected readonly whatsappUrl = dukarunWhatsAppUrl();
   protected readonly whatsappDisplay = DUKARUN_WHATSAPP_DISPLAY;

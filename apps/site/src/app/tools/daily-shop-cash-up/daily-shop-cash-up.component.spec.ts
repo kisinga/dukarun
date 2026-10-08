@@ -65,8 +65,8 @@ describe('DailyShopCashUpComponent', () => {
       anchors.find(anchor => anchor.textContent.includes(label)) as HTMLAnchorElement;
 
     expect(findLink('Start my shop').href).toContain('/register');
-    expect(findLink('I need setup and training').href).toContain('wa.me/254788922222');
-    expect(findLink('I need setup and training').href).toContain('staff%20training');
+    expect(findLink('I need setup and training').href).toContain('/contact?intent=setup');
+    expect(findLink('Request a demo').href).toContain('/contact?intent=demo');
     expect(findLink('Read the closing guide').href).toContain('/docs#cashier-sessions');
   });
 

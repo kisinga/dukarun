@@ -11,6 +11,7 @@
     "importHelpers": true,
     "target": "ES2022",
     "module": "preserve",
+    "resolveJsonModule": true,
     "baseUrl": "./",
     "paths": {
       "@dukarun/shared-types": ["../../packages/shared-types/database.types.ts"],

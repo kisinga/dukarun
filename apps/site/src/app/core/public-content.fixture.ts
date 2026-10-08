@@ -4,6 +4,7 @@ import type {
   PublicSubscriptionPlan,
 } from '../marketing/public-pricing.service';
 import type { PublishedBlogPost } from '../blog/blog.service';
+import { MARKETING_CONTENT_PREVIEW } from './marketing-content.fixture';
 
 const document = (type: LegalDocumentType, title: string): PublishedLegalDocument => ({
   id: `fixture-${type}`,
@@ -55,6 +56,7 @@ export const FIXTURE_BILLING_CONFIG: PublicBillingConfig = {
 };
 
 export const FIXTURE_BLOG_POSTS: PublishedBlogPost[] = [
+  ...MARKETING_CONTENT_PREVIEW,
   {
     post_id: '00000000-0000-4000-8000-000000000075',
     revision_id: '00000000-0000-4000-8000-000000000076',
