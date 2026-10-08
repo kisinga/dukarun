@@ -3,6 +3,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  HostListener,
   OnInit,
   PLATFORM_ID,
   inject,
@@ -16,12 +17,12 @@ import { appUrl } from '../core/public-url';
 import { SiteSeoService } from '../core/site-seo.service';
 import { IconComponent } from '../shared/ui/icon.component';
 import { BlogService, PublishedBlogPost } from './blog.service';
-
-const ACQUISITION_CTA_LABELS = new Set([
-  'Check today’s closing',
-  'See how Dukarun tracks stock',
-  'Talk through your shop setup',
-]);
+import {
+  acquisitionParams,
+  acquisitionSource,
+  classifyAcquisitionLink,
+  enquiryPath,
+} from '../../../../../packages/public-acquisition';
 
 @Component({
   selector: 'app-blog-article',
@@ -108,7 +109,12 @@ const ACQUISITION_CTA_LABELS = new Set([
           </aside>
 
           <div class="min-w-0">
-            <div class="blog-prose" [innerHTML]="html()" (click)="trackContentLink($event)"></div>
+            <div
+              class="blog-prose"
+              [innerHTML]="html()"
+              (click)="trackContentLink($event)"
+              (auxclick)="trackContentLink($event)"
+            ></div>
 
             <aside
               class="article-cta relative mt-14 overflow-hidden rounded-[1.25rem] bg-neutral p-7 text-neutral-content sm:p-10"
@@ -118,20 +124,28 @@ const ACQUISITION_CTA_LABELS = new Set([
                   From insight to action
                 </p>
                 <h2 class="mt-3 text-2xl font-bold leading-tight tracking-tight sm:text-3xl">
-                  Run the business with the same clarity.
+                  See how this works in your shop.
                 </h2>
                 <p class="mt-4 max-w-lg leading-relaxed text-neutral-content/65">
-                  Sell, manage stock, follow cash, and keep balanced books from one practical
-                  workspace.
+                  Tell us how you sell today. We can demonstrate the relevant workflow and explain
+                  the subscription and any separately quoted setup.
                 </p>
                 <a
-                  [href]="registrationUrl()"
+                  [href]="demoUrl()"
                   class="btn btn-primary mt-7 min-h-12 px-6"
-                  (click)="trackCta($event)"
+                  (click)="trackDemo($event)"
+                  (auxclick)="trackDemo($event)"
                 >
-                  Get started with Dukarun
+                  Request a demo
                   <app-icon name="heroArrowRight" size="sm" />
                 </a>
+                <a
+                  [href]="registrationUrl()"
+                  (click)="trackCta($event)"
+                  (auxclick)="trackCta($event)"
+                  class="mt-4 flex min-h-11 items-center text-sm font-semibold text-neutral-content underline underline-offset-4"
+                  >Ready to start myself</a
+                >
               </div>
             </aside>
 
@@ -308,6 +322,7 @@ export class BlogArticleComponent implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
   private readonly slug = this.route.snapshot.paramMap.get('slug') ?? '';
   private readonly ctaEventId = this.blog.newEventId();
+  private readonly demoEventId = this.blog.newEventId();
   private engagementTimer: ReturnType<typeof setTimeout> | null = null;
   private scrollFrame: number | null = null;
   private sent50 = false;
@@ -346,49 +361,116 @@ export class BlogArticleComponent implements OnInit {
   }
 
   protected registrationUrl(): string {
-    return appUrl('/register', { blog_ref: this.ctaEventId });
+    return appUrl('/register', { blog_ref: this.ctaEventId, ...this.campaignParams() });
+  }
+
+  protected demoUrl(): string {
+    return enquiryPath('demo', { ...this.sourceContext(), blogRef: this.demoEventId });
   }
 
   protected async trackCta(event: MouseEvent): Promise<void> {
-    const article = this.post();
-    if (!article) return;
-    event.preventDefault();
-    // Give the durable attribution event a short opportunity to finish before
-    // crossing origins. Registration still proceeds if analytics is unavailable.
-    await Promise.race([
-      this.blog.recordEvent(
-        article.post_id,
-        'cta_click',
-        this.sourceMetadata(),
-        this.ctaEventId,
-        true
-      ),
-      new Promise(resolve => setTimeout(resolve, 1_200)),
-    ]).catch(() => undefined);
-    window.location.assign(this.registrationUrl());
+    await this.followAcquisitionLink(event, 'article_footer', this.ctaEventId);
+  }
+
+  protected async trackDemo(event: MouseEvent): Promise<void> {
+    await this.followAcquisitionLink(event, 'article_footer', this.demoEventId);
   }
 
   protected trackContentLink(event: MouseEvent): void {
+    void this.followAcquisitionLink(event, 'article_body');
+  }
+
+  @HostListener('document:click', ['$event'])
+  @HostListener('document:auxclick', ['$event'])
+  protected trackLayoutLink(event: MouseEvent): void {
+    if (!isPlatformBrowser(this.platformId) || !(event.target instanceof Element)) return;
+    const layout = event.target.closest(
+      'app-marketing-layout > div > header, app-marketing-layout > div > footer'
+    );
+    if (!layout) return;
+    void this.followAcquisitionLink(
+      event,
+      layout.tagName === 'HEADER' ? 'site_navigation' : 'site_footer'
+    );
+  }
+
+  private async followAcquisitionLink(
+    event: MouseEvent,
+    placement: string,
+    eventId = this.blog.newEventId()
+  ): Promise<void> {
+    if (!isPlatformBrowser(this.platformId) || event.button > 1) return;
     if (!(event.target instanceof Element)) return;
     const anchor = event.target.closest('a');
     const article = this.post();
-    const label = anchor?.textContent?.trim() ?? '';
-    if (!anchor || !article || !ACQUISITION_CTA_LABELS.has(label)) return;
-    const url = new URL(anchor.href, environment.sitePublicUrl);
-    void this.blog
+    if (!anchor || !article) return;
+    // Resolve relative links against the actual preview origin as well as production.
+    let url: URL;
+    try {
+      url = new URL(anchor.getAttribute('href') ?? '', window.location.origin);
+    } catch {
+      return;
+    }
+    const action = classifyAcquisitionLink(
+      url.href,
+      window.location.origin,
+      environment.appPublicUrl
+    );
+    if (!action) return;
+    if (action === 'demo' || action === 'setup') {
+      url.search = new URL(
+        enquiryPath(action, { ...this.sourceContext(), blogRef: eventId }),
+        window.location.origin
+      ).search;
+    } else {
+      for (const [key, value] of acquisitionParams({ ...this.sourceContext(), blogRef: eventId }))
+        url.searchParams.set(key, value);
+    }
+    anchor.href = url.toString();
+    const plainClick =
+      event.button === 0 &&
+      !event.ctrlKey &&
+      !event.metaKey &&
+      !event.shiftKey &&
+      !event.altKey &&
+      (!anchor.target || anchor.target === '_self');
+    if (plainClick) event.preventDefault();
+    const recording = this.blog
       .recordEvent(
         article.post_id,
         'cta_click',
         {
           ...this.sourceMetadata(),
-          source: 'article_body',
-          label,
-          destination: `${url.origin}${url.pathname}${url.hash}`,
+          action,
+          placement,
+          destination: `${url.origin}${url.pathname}`,
         },
-        this.blog.newEventId(),
+        eventId,
         true
       )
       .catch(() => undefined);
+    // Modified clicks and new-tab links keep their native behavior.
+    if (!plainClick) return;
+    await Promise.race([recording, new Promise(resolve => setTimeout(resolve, 1_200))]);
+    window.location.assign(url.toString());
+  }
+
+  private sourceContext() {
+    const search = new URLSearchParams();
+    for (const key of this.route.snapshot.queryParamMap.keys)
+      search.set(key, this.route.snapshot.queryParamMap.get(key) ?? '');
+    return { ...acquisitionSource(search), from: `/blog/${this.slug}` };
+  }
+
+  private campaignParams(): Record<string, string> {
+    const source = this.sourceContext();
+    return Object.fromEntries(
+      [
+        ['utm_source', source.utmSource],
+        ['utm_medium', source.utmMedium],
+        ['utm_campaign', source.utmCampaign],
+      ].filter((entry): entry is [string, string] => Boolean(entry[1]))
+    );
   }
 
   protected async shareArticle(): Promise<void> {
@@ -448,14 +530,6 @@ export class BlogArticleComponent implements OnInit {
 
   private sourceMetadata(): Record<string, string> {
     const referrer = document.referrer ? new URL(document.referrer).hostname : '';
-    const params = new URLSearchParams(location.search);
-    return Object.fromEntries(
-      [
-        ['referrer', referrer],
-        ['utm_source', params.get('utm_source') ?? ''],
-        ['utm_medium', params.get('utm_medium') ?? ''],
-        ['utm_campaign', params.get('utm_campaign') ?? ''],
-      ].filter(([, value]) => value)
-    );
+    return { ...(referrer ? { referrer } : {}), ...this.campaignParams() };
   }
 }

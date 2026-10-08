@@ -10,7 +10,7 @@ const dockerfile = readFileSync(resolve(root, 'apps/Dockerfile'), 'utf8');
 const builder = dockerfile.split('FROM nginx:')[0];
 
 for (const app of ['site', 'web', 'storefront', 'super-admin']) {
-  test(`${app} source aliases resolve inside the Docker builder, not just the checkout`, () => {
+  test(`${app} source inputs resolve inside the Docker builder, not just the checkout`, () => {
     const copies = [...builder.matchAll(/^COPY (?!.*--from=)(.+)$/gm)].flatMap(match => {
       const paths = match[1].replaceAll('$APP', app).trim().split(/\s+/);
       const destination = paths.pop();

@@ -3,6 +3,7 @@ import {
   Component,
   OnInit,
   PLATFORM_ID,
+  afterNextRender,
   computed,
   inject,
   signal,
@@ -21,13 +22,14 @@ import { appUrl } from '../../core/public-url';
 import { dukarunWhatsAppUrl } from '../../core/public-contact';
 import { DUKARUN_GUIDES_URL } from '../../core/public-learning';
 import { PUBLIC_FAQS } from '../../core/public-faq';
-
-interface DemoProduct {
-  readonly id: string;
-  readonly name: string;
-  readonly price: number;
-  readonly initials: string;
-}
+import { AcquisitionService } from '../../core/acquisition.service';
+import { WorkflowEvidenceComponent } from '../workflow-evidence.component';
+import {
+  DEMO_BASKET,
+  DEMO_PRODUCTS,
+  DEMO_SHOP,
+  type DemoProduct,
+} from '../../../../../../packages/marketing-demo';
 
 interface CartLine {
   readonly product: DemoProduct;
@@ -47,7 +49,7 @@ interface Testimonial {
  */
 @Component({
   selector: 'app-marketing-home',
-  imports: [RouterLink, IconComponent, MarketingVideoComponent],
+  imports: [RouterLink, IconComponent, MarketingVideoComponent, WorkflowEvidenceComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <!-- Hero -->
@@ -67,11 +69,11 @@ interface Testimonial {
           remains, even when the internet drops.
         </p>
         <div class="mt-8 flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
-          <a routerLink="/tools/daily-shop-cash-up" class="btn btn-primary btn-lg min-h-11">
-            Check today’s closing free
+          <a [href]="acquisition.enquiryUrl()" class="btn btn-primary btn-lg min-h-11">
+            Request a demo
             <app-icon name="heroArrowRight" size="md" />
           </a>
-          <a href="#how-it-works" class="btn btn-outline btn-lg min-h-11">See how Dukarun works</a>
+          <a href="#how-it-works" class="btn btn-outline btn-lg min-h-11">Try the counter</a>
         </div>
         <ul class="mt-7 flex flex-wrap justify-center gap-x-5 gap-y-2 text-sm text-base-content/60">
           @for (point of trustPoints; track point) {
@@ -178,38 +180,41 @@ interface Testimonial {
           <span class="mkt-eyebrow">Live demo</span>
           <h2 id="demo-heading" class="mkt-h2 mt-2">Try the counter yourself</h2>
           <p class="mkt-lead mx-auto mt-3 max-w-xl">
-            This is Jiko Kiosk, a fictional shop with fictional prices. Tap a few products, charge,
-            and watch the receipt print.
+            {{ demoShop.name }} is a fictional, established shop with one location and two counter
+            staff. Try a sale of four bulbs and two sockets, then check the remaining stock.
           </p>
         </div>
 
         <div class="card mx-auto mt-10 max-w-4xl p-4 sm:p-6">
           <div class="flex flex-wrap items-center gap-2 pb-4">
-            <span class="badge badge-primary font-semibold">Jiko Kiosk</span>
-            <span class="text-sm text-base-content/60">Morning shift · Cashier: Wanjiru</span>
-            <span class="ml-auto flex items-center gap-1 text-xs text-base-content/60">
-              <app-icon name="heroSignalSlash" size="sm" />
-              works offline
-            </span>
+            <span class="badge badge-primary font-semibold">{{ demoShop.name }}</span>
+            <span class="text-sm text-base-content/70">Counter staff: {{ demoShop.cashier }}</span>
           </div>
 
           <div class="grid gap-4 sm:grid-cols-[1.2fr_1fr]">
             <!-- Products -->
-            <div class="grid grid-cols-3 content-start gap-2">
+            <div class="grid grid-cols-2 content-start gap-2 lg:grid-cols-3">
               @for (product of products; track product.id) {
                 <button
                   type="button"
                   (click)="addToCart(product)"
+                  [disabled]="!demoReady() || !!paid() || qtyOf(product.id) >= stockOf(product.id)"
                   [attr.aria-label]="'Add ' + product.name + ' for KES ' + product.price"
-                  class="relative flex min-h-11 flex-col items-start gap-1.5 rounded-field border border-base-300/60 bg-base-200/50 p-3 text-left transition-colors hover:border-primary/40 hover:bg-base-200 active:scale-95"
+                  [attr.aria-describedby]="'demo-stock-' + product.id"
+                  class="relative flex min-h-11 flex-col items-start gap-1.5 rounded-field border border-base-300/60 bg-base-200/50 p-3 text-left transition-colors enabled:hover:border-primary/40 enabled:hover:bg-base-200 disabled:cursor-default"
                 >
                   <span
                     class="flex h-8 w-8 items-center justify-center rounded-selector bg-primary/10 text-xs font-bold text-primary"
                   >
                     {{ product.initials }}
                   </span>
-                  <span class="text-xs font-medium leading-tight">{{ product.name }}</span>
-                  <span class="text-sm font-bold tabular-nums">{{ kes(product.price) }}</span>
+                  <span class="text-sm font-medium leading-tight">{{ product.name }}</span>
+                  <span class="text-sm font-bold tabular-nums"
+                    >{{ kes(product.price) }} / {{ product.unit }}</span
+                  >
+                  <span [id]="'demo-stock-' + product.id" class="text-xs text-base-content/70"
+                    >{{ stockOf(product.id) }} in stock</span
+                  >
                   @if (qtyOf(product.id) > 0) {
                     <span
                       class="absolute -top-1.5 -right-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-xs font-bold text-primary-content"
@@ -227,6 +232,7 @@ interface Testimonial {
             >
               @if (!paid()) {
                 <div class="flex-1">
+                  <h3 class="mb-3 text-sm font-semibold">Counter sale</h3>
                   @if (cart().size === 0) {
                     <div
                       class="flex h-full min-h-32 flex-col items-center justify-center gap-2 text-base-content/40"
@@ -237,14 +243,25 @@ interface Testimonial {
                   } @else {
                     <ul class="flex flex-col divide-y divide-base-300/60">
                       @for (line of cartLines(); track line.product.id) {
-                        <li class="flex items-baseline justify-between gap-2 py-1.5 text-sm">
-                          <span class="min-w-0 truncate">
+                        <li class="flex items-center justify-between gap-2 py-1.5 text-sm">
+                          <span class="min-w-0">
                             {{ line.product.name }}
                             <span class="text-base-content/50">× {{ line.qty }}</span>
                           </span>
-                          <span class="shrink-0 font-semibold tabular-nums">
-                            {{ (line.product.price * line.qty).toLocaleString('en-KE') }}
-                          </span>
+                          <div class="flex shrink-0 items-center gap-2">
+                            <span class="font-semibold tabular-nums">
+                              {{ (line.product.price * line.qty).toLocaleString('en-KE') }}
+                            </span>
+                            <button
+                              type="button"
+                              (click)="removeFromCart(line.product.id)"
+                              [disabled]="!demoReady()"
+                              [attr.aria-label]="'Remove one ' + line.product.name"
+                              class="btn btn-ghost btn-square min-h-11 min-w-11"
+                            >
+                              −
+                            </button>
+                          </div>
                         </li>
                       }
                     </ul>
@@ -258,16 +275,17 @@ interface Testimonial {
                   <button
                     type="button"
                     (click)="charge()"
-                    [disabled]="cart().size === 0"
+                    [disabled]="!demoReady() || cart().size === 0"
                     class="btn btn-primary mt-3 w-full min-h-11"
                   >
-                    Record M-Pesa payment
+                    Record sample M-Pesa sale
                   </button>
                   @if (cart().size > 0) {
                     <button
                       type="button"
                       (click)="clearCart()"
-                      class="mt-1.5 w-full text-center text-xs text-base-content/50 hover:text-base-content/80"
+                      [disabled]="!demoReady()"
+                      class="btn btn-ghost mt-1.5 min-h-11 w-full text-sm"
                     >
                       Clear sale
                     </button>
@@ -279,10 +297,10 @@ interface Testimonial {
                   <div class="receipt-edge receipt-edge-up shrink-0" aria-hidden="true"></div>
                   <div class="receipt flex-1 px-4 py-3 font-mono text-sm">
                     <p class="mb-0 text-center text-xs font-bold tracking-widest">
-                      JIKO KIOSK · DEMO SALE
+                      {{ demoShop.name }} · SAMPLE SALE
                     </p>
                     <p class="mb-0 mt-0.5 text-center text-xs opacity-60">
-                      Cashier: Wanjiru · Session 014
+                      Counter staff: {{ demoShop.cashier }}
                     </p>
                     <div class="my-2 border-t border-dashed border-current opacity-40"></div>
                     <ul>
@@ -302,34 +320,45 @@ interface Testimonial {
                     </p>
                     <p class="mb-0 mt-2 flex items-center gap-1 text-xs font-bold text-success">
                       <app-icon name="heroCheckCircle" size="sm" />
-                      M-PESA RECORDED · POSTED TO LEDGER
+                      SAMPLE M-PESA SALE RECORDED
                     </p>
-                    <div class="receipt-barcode mt-3 opacity-70" aria-hidden="true"></div>
-                    <p class="mb-0 mt-1.5 text-center text-xs opacity-60">Asante · dukarun</p>
+                    <p class="mb-0 mt-3 text-xs leading-relaxed" role="status">
+                      Stock updated above. This sale stays in the demo.
+                    </p>
                   </div>
                   <div class="receipt-edge shrink-0" aria-hidden="true"></div>
                   <div class="mt-3 flex flex-col gap-1.5">
-                    <a [href]="appUrl('/register')" class="btn btn-primary btn-sm w-full min-h-11">
-                      Make it yours. Start my shop
+                    <a
+                      [href]="acquisition.enquiryUrl()"
+                      class="btn btn-primary btn-sm w-full min-h-11"
+                    >
+                      Request a demo for my shop
                     </a>
                     <button
                       type="button"
                       (click)="resetDemo()"
-                      class="w-full text-center text-xs text-base-content/50 hover:text-base-content/80"
+                      class="btn btn-ghost min-h-11 w-full text-sm"
                     >
-                      Sell again
+                      Reset sample sale
                     </button>
                   </div>
                 </div>
               }
             </div>
           </div>
-          <p class="mt-4 text-center text-xs text-base-content/50">
-            Nothing to type. The sale is already in the books.
+          <p class="mt-4 text-center text-sm text-base-content/70">
+            @if (paid()) {
+              Reset the sample to try a different basket.
+            } @else {
+              Tap a product to add one; use − to reduce a quantity.
+            }
+            Products, prices and records are illustrative. No payment is taken.
           </p>
         </div>
       </div>
     </section>
+
+    <app-workflow-evidence />
 
     <!-- A day at the duka -->
     <section class="bg-base-100 py-14 sm:py-20" aria-labelledby="day-heading">
@@ -463,12 +492,7 @@ interface Testimonial {
                 Quoted from your scope; typical engagements exceed KES 40,000
               </li>
             </ul>
-            <a
-              [href]="assistedSetupWhatsAppUrl"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="btn whatsapp-action mt-7 self-start"
-            >
+            <a [href]="acquisition.enquiryUrl('setup')" class="btn whatsapp-action mt-7 self-start">
               <app-icon name="whatsapp" size="md" />
               Discuss my setup
             </a>
@@ -477,11 +501,7 @@ interface Testimonial {
 
         <p class="mt-6 text-center text-sm text-base-content/65">
           Not sure which route fits?
-          <a
-            [href]="routeHelpWhatsAppUrl"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="link whatsapp-link font-semibold"
+          <a [href]="acquisition.enquiryUrl()" class="link whatsapp-link font-semibold"
             >Tell us how your business works</a
           >
           and we will recommend one.
@@ -652,12 +672,7 @@ interface Testimonial {
             Start my shop
             <app-icon name="heroArrowRight" size="md" />
           </a>
-          <a
-            [href]="assistedSetupWhatsAppUrl"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="btn whatsapp-action"
-          >
+          <a [href]="acquisition.enquiryUrl('setup')" class="btn whatsapp-action">
             <app-icon name="whatsapp" size="md" />
             Ask about setup
           </a>
@@ -670,16 +685,11 @@ interface Testimonial {
   `,
 })
 export class HomeComponent implements OnInit {
+  protected readonly acquisition = inject(AcquisitionService);
   protected readonly appUrl = appUrl;
   protected readonly guidesUrl = DUKARUN_GUIDES_URL;
   protected readonly whatsappUrl = dukarunWhatsAppUrl(
     'Hello Dukarun, I would like to know whether Dukarun is right for my business.'
-  );
-  protected readonly assistedSetupWhatsAppUrl = dukarunWhatsAppUrl(
-    'Hello Dukarun, I would like to discuss business setup and staff training. My business type is:'
-  );
-  protected readonly routeHelpWhatsAppUrl = dukarunWhatsAppUrl(
-    'Hello Dukarun, I am not sure whether to start myself or get assisted setup. My business has this many staff and locations:'
   );
   protected readonly pricingWhatsAppUrl = dukarunWhatsAppUrl(
     'Hello Dukarun, I would like to ask about current Dukarun pricing.'
@@ -710,17 +720,16 @@ export class HomeComponent implements OnInit {
 
   protected readonly trustPoints = ['No hardware needed', 'Works offline', 'Cancel anytime'];
 
-  protected readonly products: DemoProduct[] = [
-    { id: 'unga', name: 'Unga wa Dola 2kg', price: 185, initials: 'UD' },
-    { id: 'mafuta', name: 'Mafuta 1L', price: 340, initials: 'MF' },
-    { id: 'sugar', name: 'Sugar 1kg', price: 165, initials: 'SG' },
-    { id: 'airtime', name: 'Airtime 100', price: 100, initials: 'AT' },
-    { id: 'milk', name: 'Milk 500ml', price: 60, initials: 'MK' },
-    { id: 'bread', name: 'Bread 400g', price: 65, initials: 'BR' },
-  ];
-
-  protected readonly cart = signal(new Map<string, number>());
+  protected readonly demoShop = DEMO_SHOP;
+  protected readonly products = DEMO_PRODUCTS;
+  protected readonly demoReady = signal(false);
+  protected readonly stock = signal(new Map(this.products.map(p => [p.id, p.stock])));
+  protected readonly cart = signal(new Map(DEMO_BASKET));
   protected readonly paid = signal<{ lines: CartLine[]; total: number } | null>(null);
+
+  constructor() {
+    afterNextRender(() => this.demoReady.set(true));
+  }
 
   protected readonly cartLines = computed<CartLine[]>(() =>
     this.products
@@ -734,6 +743,10 @@ export class HomeComponent implements OnInit {
 
   protected qtyOf(id: string): number {
     return this.cart().get(id) ?? 0;
+  }
+
+  protected stockOf(id: string): number {
+    return this.stock().get(id) ?? 0;
   }
 
   protected kes(amount: number): string {
@@ -781,9 +794,18 @@ export class HomeComponent implements OnInit {
   }
 
   protected addToCart(product: DemoProduct): void {
-    this.paid.set(null);
+    if (!this.demoReady() || this.paid() || this.qtyOf(product.id) >= this.stockOf(product.id))
+      return;
     const next = new Map(this.cart());
     next.set(product.id, (next.get(product.id) ?? 0) + 1);
+    this.cart.set(next);
+  }
+
+  protected removeFromCart(id: string): void {
+    const next = new Map(this.cart());
+    const quantity = this.qtyOf(id) - 1;
+    if (quantity > 0) next.set(id, quantity);
+    else next.delete(id);
     this.cart.set(next);
   }
 
@@ -792,13 +814,22 @@ export class HomeComponent implements OnInit {
   }
 
   protected charge(): void {
-    if (this.cart().size === 0) return;
-    this.paid.set({ lines: this.cartLines(), total: this.cartTotal() });
+    if (!this.demoReady() || this.paid() || this.cart().size === 0) return;
+    const lines = this.cartLines();
+    this.stock.update(stock => {
+      const next = new Map(stock);
+      for (const line of lines)
+        next.set(line.product.id, (stock.get(line.product.id) ?? 0) - line.qty);
+      return next;
+    });
+    this.paid.set({ lines, total: this.cartTotal() });
     this.cart.set(new Map());
   }
 
   protected resetDemo(): void {
     this.paid.set(null);
+    this.stock.set(new Map(this.products.map(p => [p.id, p.stock])));
+    this.cart.set(new Map(DEMO_BASKET));
   }
 
   protected readonly closingQuestions = [
@@ -846,19 +877,19 @@ export class HomeComponent implements OnInit {
       time: '07:30',
       icon: 'heroLockOpen',
       title: 'Open the shop',
-      copy: 'The cashier starts a session and counts the float. Yesterday closed balanced, so today starts clean.',
+      copy: 'Wanjiru starts a cashier session and confirms the opening float before serving the first customer.',
     },
     {
       time: '13:00',
-      icon: 'heroSignalSlash',
-      title: 'Lunch rush, no network',
-      copy: 'The internet drops and nobody at the counter notices. Sales keep going through and wait safely on the phone until the signal comes back.',
+      icon: 'heroShoppingCart',
+      title: 'Serve the next customer',
+      copy: 'An electrician collects bulbs and sockets. Record the correct items and payment method; if the connection drops, offline sales wait to sync.',
     },
     {
       time: '19:45',
       icon: 'heroLockClosed',
-      title: 'Close in minutes',
-      copy: 'Count the drawer and match it against the session. The numbers already agree, so posting the day takes minutes.',
+      title: 'Review the closing',
+      copy: 'Count the drawer, compare the expected balance and review any difference. The owner can follow the session, stock and customer balances.',
     },
   ];
 

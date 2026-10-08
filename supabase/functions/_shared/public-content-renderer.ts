@@ -322,6 +322,11 @@ export function renderBlogIndex(posts: PublicBlogPost[], origin: string): string
 
 export function renderBlogArticle(post: PublicBlogPost, origin: string, image: string): string {
   const canonical = absoluteUrl(origin, `/blog/${encodeURIComponent(post.slug)}`);
+  const demo = absoluteUrl(
+    origin,
+    `/contact?${new URLSearchParams({ intent: 'demo', from: `/blog/${post.slug}` })}`
+  );
+  const acquisition = `<aside><h2>See how this works in your shop.</h2><p>Tell us how you sell today. We can demonstrate the relevant workflow and explain the subscription and any separately quoted setup.</p><p><a href="${escapeHtml(demo)}">Request a demo</a></p><p><a href="https://app.dukarun.com/register">Ready to start myself</a></p></aside>`;
   const titleBase = post.seo_title || post.title;
   const title = /\|\s*dukarun$/i.test(titleBase) ? titleBase : `${titleBase} | Dukarun`;
   const description = post.seo_description || post.excerpt;
@@ -334,7 +339,7 @@ export function renderBlogArticle(post: PublicBlogPost, origin: string, image: s
     canonical,
     image,
     type: 'article',
-    body: `<main><p><a href="${escapeHtml(absoluteUrl(origin, '/blog'))}">Dukarun business guides</a></p><article><header><h1>${escapeHtml(post.title)}</h1><p>${escapeHtml(post.excerpt)}</p><p class="meta">${escapeHtml(post.author_name)} · <time datetime="${escapeHtml(post.published_at)}">${escapeHtml(post.published_at.slice(0, 10))}</time> · ${post.reading_minutes} min read</p>${cover}</header>${renderSafeMarkdown(post.content_markdown ?? '')}</article></main>`,
+    body: `<main><p><a href="${escapeHtml(absoluteUrl(origin, '/blog'))}">Dukarun business guides</a></p><article><header><h1>${escapeHtml(post.title)}</h1><p>${escapeHtml(post.excerpt)}</p><p class="meta">${escapeHtml(post.author_name)} · <time datetime="${escapeHtml(post.published_at)}">${escapeHtml(post.published_at.slice(0, 10))}</time> · ${post.reading_minutes} min read</p>${cover}</header>${renderSafeMarkdown(post.content_markdown ?? '')}${acquisition}</article></main>`,
     structuredData: {
       '@context': 'https://schema.org',
       '@type': 'BlogPosting',

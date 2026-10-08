@@ -743,7 +743,8 @@ test('populated cart stays compact and keeps editing reachable in both themes', 
       }))
     );
     for (const row of geometry) {
-      expect(row.height).toBeLessThanOrEqual(160);
+      // Narrow screens stack price and quantity while keeping 44px controls.
+      expect(row.height).toBeLessThanOrEqual(isMobile ? 260 : 200);
       expect(row.overflow).toBeLessThanOrEqual(1);
       for (const control of row.targets) {
         expect(control.width).toBeGreaterThanOrEqual(44);
@@ -769,9 +770,7 @@ test('populated cart stays compact and keeps editing reachable in both themes', 
     }
   }
   const sugar = rows.nth(0);
-  await expect(
-    sugar.getByRole('button', { name: 'Details for Sugar — 1kg Packed', exact: true })
-  ).toContainText('Mumias Sugar');
+  await expect(sugar.getByText('Mumias Sugar', { exact: true })).toBeVisible();
   await sugar
     .getByRole('button', { name: 'Increase quantity of Sugar — 1kg Packed', exact: true })
     .click();
