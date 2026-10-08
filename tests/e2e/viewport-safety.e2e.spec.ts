@@ -704,6 +704,9 @@ test('primary desktop tables use page scrolling and a native sticky header band'
   await expect(
     page.getByRole('checkbox', { name: 'Select products on this page', exact: true })
   ).toHaveCount(1);
+  await expect(
+    viewport.getByRole('checkbox', { name: 'Select Breakfast tea', exact: true })
+  ).toBeVisible();
   await viewport.locator('tbody').evaluate(body => {
     const row = body.querySelector('tr');
     if (row) for (let index = 0; index < 24; index++) body.append(row.cloneNode(true));

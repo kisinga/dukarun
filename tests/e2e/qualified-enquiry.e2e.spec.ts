@@ -179,6 +179,7 @@ test('article to cash-up to WhatsApp preserves attribution without sending finan
 test('qualification controls have a usable keyboard order and visible focus', async ({ page }) => {
   await page.goto(`${origin}/contact?intent=setup`);
   const business = page.getByLabel('Business type', { exact: true });
+  await expect(business).toBeEnabled();
   await business.focus();
   await page.keyboard.press('Tab');
   const locations = page.getByLabel('Locations', { exact: true });
@@ -221,20 +222,20 @@ test('article demo and modified registration links preserve campaign and blog at
   expect(url.searchParams.get('utm_source')).toBe('group');
   expect(url.searchParams.get('blog_ref')).toMatch(/^[0-9a-f-]{36}$/);
   await page.goto(`${origin}${articlePath}?utm_source=group`);
-  await context.route('**/register*', route => route.fulfill({ body: 'Registration preview' }));
-  const [newTab] = await Promise.all([
+  await context.route('**/register*', route => route.abort());
+  const [registrationRequest] = await Promise.all([
+    context.waitForEvent(
+      'request',
+      request => request.isNavigationRequest() && new URL(request.url()).pathname === '/register'
+    ),
     context.waitForEvent('page'),
     page
       .getByRole('link', { name: 'Ready to start myself' })
       .click({ modifiers: ['ControlOrMeta'] }),
   ]);
-  await newTab.waitForLoadState();
-  expect(new URL(newTab.url()).searchParams.get('blog_ref')).toMatch(/^[0-9a-f-]{36}$/);
-  // The existing app redirect carries blog_ref into /login?register=1.
-  // Campaign attribution is present on the site's outbound registration URL.
-  expect(
-    await page.getByRole('link', { name: 'Ready to start myself' }).getAttribute('href')
-  ).toContain('utm_source=group');
+  const registrationUrl = new URL(registrationRequest.url());
+  expect(registrationUrl.searchParams.get('blog_ref')).toMatch(/^[0-9a-f-]{36}$/);
+  expect(registrationUrl.searchParams.get('utm_source')).toBe('group');
   expect(page.url()).toContain('/blog/');
 });
 
