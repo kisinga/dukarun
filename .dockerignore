@@ -18,11 +18,7 @@ coverage/
 *.log
 .DS_Store
 Thumbs.db
-# Include only the editorial package needed by site fixture previews.
-docs/*
-!docs/marketing/
-docs/marketing/*
-!docs/marketing/blog-content.json
+docs/
 *.md
 !README.md
 

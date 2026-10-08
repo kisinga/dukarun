@@ -395,7 +395,7 @@ test('direct checkout posts the cart and clears it only after completion', async
   await checkout.getByRole('button', { name: 'Exact' }).click();
   await checkout.getByRole('button', { name: 'Complete sale' }).click();
 
-  await expect(page.getByRole('heading', { name: 'Sale completed', exact: true })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Sale document' })).toContainText('Sale completed');
   await expect(page.locator('#current-sale app-sell-cart-line')).toHaveCount(0);
   expect(capture.directSaleRequest()).toMatchObject({
     p_customer_id: null,
@@ -575,7 +575,7 @@ test('delivery credit checkout keeps a one-off address and suppresses milestone 
   await details.getByLabel('Delivery address').fill('Westlands, Nairobi');
   await details.getByRole('checkbox', { name: /Status updates/ }).uncheck();
   await details.getByRole('checkbox', { name: /Use this address next time/ }).uncheck();
-  await details.getByRole('button', { name: 'Done', exact: true }).click();
+  await details.getByRole('button', { name: 'Save details', exact: true }).click();
 
   await page.getByRole('button', { name: 'Sell on credit' }).first().click();
   await page
@@ -583,7 +583,7 @@ test('delivery credit checkout keeps a one-off address and suppresses milestone 
     .getByRole('button', { name: 'Confirm sale' })
     .click();
 
-  await expect(page.getByRole('heading', { name: 'Sale completed', exact: true })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Sale document' })).toContainText('Sale completed');
   const body = capture.fulfillmentCreditRequest() as {
     p_customer: Record<string, unknown>;
     p_fulfillment: Record<string, unknown>;

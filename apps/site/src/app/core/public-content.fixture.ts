@@ -4,7 +4,6 @@ import type {
   PublicSubscriptionPlan,
 } from '../marketing/public-pricing.service';
 import type { PublishedBlogPost } from '../blog/blog.service';
-import { MARKETING_CONTENT_PREVIEW } from './marketing-content.fixture';
 
 const document = (type: LegalDocumentType, title: string): PublishedLegalDocument => ({
   id: `fixture-${type}`,
@@ -56,15 +55,28 @@ export const FIXTURE_BILLING_CONFIG: PublicBillingConfig = {
 };
 
 export const FIXTURE_BLOG_POSTS: PublishedBlogPost[] = [
-  ...MARKETING_CONTENT_PREVIEW,
   {
     post_id: '00000000-0000-4000-8000-000000000075',
     revision_id: '00000000-0000-4000-8000-000000000076',
     slug: 'keep-stock-and-cash-in-step',
     title: 'Keep stock and cash in step',
     excerpt: 'A practical guide to connecting what leaves the shelf with what lands in the till.',
-    content_markdown:
-      '# Keep stock and cash in step\n\n## Count what matters\n\nA reliable stock count makes every purchasing and cash decision easier.\n\n## Close the loop\n\nRecord each sale when it happens, review exceptions, and close the day against the money received.',
+    // Test content only. Live articles are published through the admin portal.
+    content_markdown: `## Count what matters
+
+A reliable stock count makes every purchasing and cash decision easier. At fictional Mwangaza Electricals, four bulbs and two sockets make a KES 1,900 sample sale.
+
+![Fictional electricals shop with bulbs and sockets selected on the Dukarun sale screen](/assets/workflows/record-sale.webp)
+
+[See the sale-to-stock workflow](/contact?intent=demo), or [ask about setup and training](/contact?intent=setup).
+
+## Close the loop
+
+Record each sale when it happens, review exceptions, and close the day against the money received.
+
+[Open the free cash-up tool](/tools/daily-shop-cash-up).
+
+[Create your account](https://app.dukarun.com/register).`,
     author_name: 'Dukarun team',
     cover_image_path: null,
     cover_image_alt: null,

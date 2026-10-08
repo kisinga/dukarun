@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '../fixtures/mocked-browser';
 
 const origin = 'http://127.0.0.1:4202';
+const articlePath = '/blog/keep-stock-and-cash-in-step';
 async function complete(page: Page) {
   await page.getByLabel('Business type', { exact: true }).fill('Electricals shop');
   await page.getByLabel('Locations', { exact: true }).selectOption('1');
@@ -125,7 +126,7 @@ test('article to cash-up to WhatsApp preserves attribution without sending finan
 }) => {
   const requests: string[] = [];
   page.on('request', r => requests.push(r.url() + (r.postData() ?? '')));
-  const from = '/blog/how-to-reconcile-cash-mpesa-shop';
+  const from = articlePath;
   await page.goto(
     `${origin}${from}?utm_source=whatsapp&utm_medium=owner-group&utm_campaign=cash-up`
   );
@@ -211,17 +212,15 @@ test('article demo and modified registration links preserve campaign and blog at
   page,
   context,
 }) => {
-  await page.goto(
-    `${origin}/blog/how-to-track-stock-small-shop-kenya?utm_source=group&utm_campaign=stock`
-  );
+  await page.goto(`${origin}${articlePath}?utm_source=group&utm_campaign=stock`);
   const demo = page.getByRole('link', { name: 'See the sale-to-stock workflow', exact: true });
   await demo.click();
   await expect(page).toHaveURL(/contact\?intent=demo/);
   const url = new URL(page.url());
-  expect(url.searchParams.get('from')).toBe('/blog/how-to-track-stock-small-shop-kenya');
+  expect(url.searchParams.get('from')).toBe(articlePath);
   expect(url.searchParams.get('utm_source')).toBe('group');
   expect(url.searchParams.get('blog_ref')).toMatch(/^[0-9a-f-]{36}$/);
-  await page.goto(`${origin}/blog/how-to-track-stock-small-shop-kenya?utm_source=group`);
+  await page.goto(`${origin}${articlePath}?utm_source=group`);
   await context.route('**/register*', route => route.fulfill({ body: 'Registration preview' }));
   const [newTab] = await Promise.all([
     context.waitForEvent('page'),
@@ -240,7 +239,7 @@ test('article demo and modified registration links preserve campaign and blog at
 });
 
 test('blog navigation demo actions carry a blog reference and placement', async ({ page }) => {
-  await page.goto(`${origin}/blog/how-to-track-stock-small-shop-kenya`);
+  await page.goto(`${origin}${articlePath}`);
   await expect(page.locator('app-blog-article h1')).toBeVisible();
   const events = await captureBlogEvents(page);
   await page
@@ -257,7 +256,7 @@ test('blog navigation demo actions carry a blog reference and placement', async 
 test('analytics rejection cannot block a blog enquiry or change the acquisition classification', async ({
   page,
 }) => {
-  await page.goto(`${origin}/blog/how-to-track-stock-small-shop-kenya?utm_source=group`);
+  await page.goto(`${origin}${articlePath}?utm_source=group`);
   await expect(page.getByRole('link', { name: 'See the sale-to-stock workflow' })).toBeVisible();
   const events = await captureBlogEvents(page, true);
   await page.getByRole('link', { name: 'See the sale-to-stock workflow' }).click();

@@ -47,8 +47,6 @@ COPY scripts/generate-site-seo-files.mjs scripts/generate-site-seo-files.mjs
 COPY scripts/generate-storefront-sitemap.mjs scripts/generate-storefront-sitemap.mjs
 # Keep the complete shared source tree: app tsconfig aliases also resolve here.
 COPY packages packages
-# Fixture-mode article previews read the same package used by the editorial workflow.
-COPY docs/marketing/blog-content.json docs/marketing/blog-content.json
 COPY apps/$APP apps/$APP
 
 ARG SUPABASE_URL
