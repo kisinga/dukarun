@@ -1,0 +1,150 @@
+<div class="dukarun-story" id="story-top">
+  <a class="story-skip-link" href="#voices">Skip to the stories</a>
+  <header class="story-hero story-width">
+    <a routerLink="/about" class="story-breadcrumb"
+      ><app-icon name="heroArrowRight" size="sm" />About Dukarun</a
+    >
+    <div class="hero-grid">
+      <div>
+        <p class="eyebrow">Our story, still growing</p>
+        <h1>The answer came from <span>listening.</span></h1>
+      </div>
+      <div class="hero-copy">
+        <p>I thought I already had the solution.</p>
+        <p>
+          Then a customer’s experience changed the direction. Different people, different moments,
+          and an answer that keeps taking shape.
+        </p>
+        <a href="#voices" class="story-link"
+          >Explore a connection<app-icon name="heroArrowRight" size="sm"
+        /></a>
+      </div>
+    </div>
+  </header>
+
+  <div class="story-experience story-width">
+    <aside class="story-visual" aria-label="Customer experiences shaping Dukarun">
+      <div class="visual-heading">
+        <span>Many experiences. Shared directions.</span
+        ><span class="visual-hint">Choose a leaf</span>
+      </div>
+      <div class="tree-stage" id="tree-stage" data-phase="contributions">
+        <canvas id="seed-canvas" aria-hidden="true"></canvas>
+        <div id="tree-drawing" class="tree-drawing"></div>
+        <div class="root-labels" aria-label="Lessons sustaining the seed">
+          @for (lesson of config.lessons; track lesson.chapter; let index = $index) {
+            <a
+              class="root-label"
+              [attr.data-root]="index"
+              [href]="'#' + lesson.chapter"
+              [title]="lesson.detail"
+              (click)="selectChapter(lesson.chapter, $event)"
+              >{{ lesson.text }}</a
+            >
+          }
+        </div>
+        <span class="potential-label" aria-hidden="true">What this can become</span>
+      </div>
+      <p class="scene-caption" aria-live="polite">
+        <span id="scene-title">People shape the answer.</span
+        ><span id="scene-detail">Each leaf is a perspective.</span>
+      </p>
+    </aside>
+
+    <div class="story-context">
+      <section id="voices" class="voices" aria-labelledby="voices-heading">
+        <div class="explore-heading">
+          <p class="eyebrow" id="voices-heading">Follow a connection</p>
+          <label class="voice-picker"
+            ><span class="sr-only">Choose a person's contribution</span
+            ><select [value]="selectedId()" (change)="changeSelection($event)" id="voice-select">
+              @for (branch of config.branches; track branch.id) {
+                <optgroup [label]="branch.label">
+                  @for (leaf of leaves; track leaf.id) {
+                    @if (leaf.direction === branch.label) {
+                      <option [value]="leaf.id">{{ leaf.persona }} · {{ leaf.label }}</option>
+                    }
+                  }
+                </optgroup>
+              }</select
+            ><app-icon name="heroArrowRight" size="sm"
+          /></label>
+        </div>
+        @let leaf = selected();
+        <article
+          class="leaf-account"
+          [id]="leaf.chapter?.id ?? leaf.id"
+          [style.--strand]="leaf.color"
+        >
+          <div class="account-meta">
+            <span class="account-direction">{{ leaf.direction }}</span
+            ><span class="account-persona">{{ leaf.persona }}</span>
+          </div>
+          <h2 aria-live="polite">{{ leaf.label }}</h2>
+          @if (leaf.chapter; as chapter) {
+            <p class="account-intro">{{ chapter.intro }}</p>
+            @if (chapter.quote) {
+              <figure>
+                <blockquote>{{ chapter.quote }}</blockquote>
+                <figcaption>Customer experience, retold by the founder</figcaption>
+              </figure>
+            }
+            <p class="account-body">{{ chapter.body }}</p>
+            <div class="account-lesson">
+              <span class="eyebrow">The direction it shaped</span>
+              <p>{{ chapter.direction }}</p>
+            </div>
+            @if (related().length) {
+              <nav class="related-voices" aria-label="Connected contributions">
+                <span>Other moments in this direction</span>
+                @for (connected of related(); track connected.id) {
+                  <button type="button" (click)="selectLeaf(connected.leaf)">
+                    {{ connected.title }}<app-icon name="heroArrowRight" size="sm" />
+                  </button>
+                }
+              </nav>
+            }
+            <details class="account-evidence">
+              <summary>Sources and context<app-icon name="heroArrowRight" size="sm" /></summary>
+              <p>{{ chapter.basis }}</p>
+              <ul>
+                @for (source of chapter.sources; track source.url) {
+                  <li>
+                    <a [href]="source.url" target="_blank" rel="noopener noreferrer">{{
+                      source.label
+                    }}</a>
+                  </li>
+                }
+              </ul>
+            </details>
+          } @else {
+            <p class="account-intro">Room for another experience.</p>
+            <p class="account-body">
+              This leaf holds a place for a person, an encounter, and an idea that can change the
+              direction. Its story is still to be added.
+            </p>
+          }
+        </article>
+      </section>
+      <section id="taking-root" class="story-beat" aria-labelledby="root-heading">
+        <p class="eyebrow">The answer changes</p>
+        <h2 id="root-heading">What we learn becomes what we build.</h2>
+        <p>
+          Customer ideas reshape a first answer into something alive. The experiences become
+          lessons, and those lessons become its roots.
+        </p>
+      </section>
+      <section id="potential" class="story-beat potential-copy" aria-labelledby="potential-heading">
+        <p class="eyebrow">Grounded in what exists</p>
+        <h2 id="potential-heading">Still a seed. <span>Room to grow.</span></h2>
+        <p>
+          The seed and its roots are here today. Behind them, a projection of the potential they
+          hold.
+        </p>
+        <a routerLink="/contact" class="story-cta"
+          >Help shape what comes next<app-icon name="heroArrowRight" size="sm"
+        /></a>
+      </section>
+    </div>
+  </div>
+</div>

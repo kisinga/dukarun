@@ -59,6 +59,16 @@ export const routes: Routes = [
           import('./marketing/about/about.component').then(m => m.AboutComponent),
       },
       {
+        path: 'story',
+        title: 'Our story | Dukarun',
+        data: {
+          description:
+            'Follow the customer experiences and lessons shaping Dukarun, from interrupted sales to a growing solution for Kenyan shops.',
+        },
+        loadComponent: () =>
+          import('./marketing/story/story.component').then(m => m.StoryComponent),
+      },
+      {
         path: 'contact',
         title: 'Contact | Dukarun',
         data: {

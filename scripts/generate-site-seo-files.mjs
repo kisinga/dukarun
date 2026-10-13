@@ -7,6 +7,7 @@ const baseUrl = new URL(process.env.SITE_PUBLIC_URL || 'http://localhost:4202');
 const routes = [
   '',
   'about',
+  'story',
   'contact',
   'docs',
   'docs/hardware',

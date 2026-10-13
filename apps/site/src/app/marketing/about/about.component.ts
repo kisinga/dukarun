@@ -21,6 +21,13 @@ import { dukarunWhatsAppUrl } from '../../core/public-contact';
           Running a shop means long hours and thin margins, and too often a notebook that never
           quite balances. We build dukarun so the paperwork isn't the hardest part of your day.
         </p>
+        <a
+          routerLink="/story"
+          class="mt-6 inline-flex min-h-11 items-center gap-2 font-semibold text-primary"
+        >
+          Follow the people shaping Dukarun
+          <app-icon name="heroArrowRight" size="sm" />
+        </a>
       </div>
     </section>
 
