@@ -18,9 +18,10 @@ import {
   type UnitChoice,
 } from './product-workbook';
 
-const GREY = 'EEF2F3',
-  YELLOW = 'FFF0BD',
-  TEAL = '137C78';
+// SpreadsheetML colors include alpha; six-digit CSS RGB values fail Excel validation.
+const GREY = 'FFEEF2F3',
+  YELLOW = 'FFFFF0BD',
+  TEAL = 'FF137C78';
 export const quote = (text: string): string => `"${text.replaceAll('"', '""')}"`;
 export const column = (n: number): string => {
   let result = '';
@@ -98,7 +99,7 @@ function table(
   sheet.getRow(5).height = 38;
   sheet.getRow(5).eachCell(cell => {
     cell.fill = fill(TEAL);
-    cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFFFFF' } };
+    cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
     cell.alignment = { wrapText: true, vertical: 'middle' };
   });
 }
@@ -132,8 +133,8 @@ function sheet(
     ws.getCell(row, 1).alignment = { wrapText: true, vertical: 'middle' };
   }
   ws.getRow(1).height = 40;
-  ws.getCell('A1').font = { name: 'Calibri', size: 23, bold: true, color: { argb: 'FFFFFF' } };
-  ws.getCell('A1').fill = fill('183A43');
+  ws.getCell('A1').font = { name: 'Calibri', size: 23, bold: true, color: { argb: 'FFFFFFFF' } };
+  ws.getCell('A1').fill = fill('FF183A43');
   ws.getRow(2).height = 28;
   ws.getRow(3).height = 65;
   return ws;
@@ -416,11 +417,13 @@ export async function exportProductWorkbook(
     values.forEach((value, j) => {
       main.getCell(n, j + 1).value = value;
     });
+    // Original values live in _Original. Avoid cell notes: ExcelJS 4.4 writes
+    // their legacyDrawing after tableParts, violating the worksheet XML schema.
     for (let c = 1; c <= 27; c++) {
       const cell = main.getCell(n, c);
-      cell.font = { name: 'Calibri', size: 11, color: { argb: '243D45' } };
+      cell.font = { name: 'Calibri', size: 11, color: { argb: 'FF243D45' } };
       cell.alignment = { wrapText: true, vertical: 'middle' };
-      cell.fill = fill([6, 8, 10, 12, 27].includes(c) || !variant ? YELLOW : 'FFFFFF');
+      cell.fill = fill([6, 8, 10, 12, 27].includes(c) || !variant ? YELLOW : 'FFFFFFFF');
       if ([5, 7, 9, 11, 24, 25, 26].includes(c) || cell.value === BLOCKED) readonly(cell);
       if ((c >= 5 && c <= 12) || c >= 24) cell.numFmt = '#,##0.###;[Red](#,##0.###);0;@';
       if (c === 9 || c === 10) cell.numFmt = '#,##0.##;[Red](#,##0.##);0;@';
@@ -430,8 +433,6 @@ export async function exportProductWorkbook(
         blankRowStyles[c] ??= cell.style;
         cell.style = blankRowStyles[c];
       }
-      if (variant && ![5, 7, 9, 11, 24, 25, 26].includes(c))
-        cell.note = `At export: ${cell.text || '(blank)'}. Optional details are edited here; blank clears an optional detail.`;
     }
     dropdown(main.getCell(n, 2), 'ManufacturerChoices');
     if (product?.manufacturer_id)
@@ -559,13 +560,15 @@ export async function exportProductWorkbook(
     }
   }
   // Conditional formats cover ranges, so pack restrictions also follow newly selected choices.
+  // Priorities are unique across the worksheet, including rules on different ranges.
+  let priority = 1;
   for (const c of [8, 10, 12, 27])
     main.addConditionalFormatting({
       ref: `${column(c)}6:${column(c)}${last}`,
       rules: [
         {
           type: 'expression',
-          priority: c,
+          priority: priority++,
           formulae: [c === 8 ? '$AH6>1' : 'OR($AH6>1,$P6="Service",$Q6="No")'],
           style: { fill: fill(GREY) },
         },
@@ -582,7 +585,7 @@ export async function exportProductWorkbook(
         rules: [
           {
             type: 'expression',
-            priority: 100 + choices.indexOf(choice),
+            priority: priority++,
             formulae: [`$AI6=${quote(choice.key)}`],
             style: { numFmt: format },
           },
