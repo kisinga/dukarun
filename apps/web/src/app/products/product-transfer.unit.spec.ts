@@ -134,6 +134,101 @@ describe('Products workbook', () => {
     ).toMatchObject({ opening_quantity: 100, opening_unit_cost: 2.5 });
   });
 
+  it.each([
+    { name: '250g', archivedFirst: false },
+    { name: 'Default', archivedFirst: false },
+    { name: 'Default', archivedFirst: true },
+  ])(
+    'round trips variants sharing $name without merging their IDs (archived first: $archivedFirst)',
+    async ({ name, archivedFirst }) => {
+      const snapshot = workbookFixture();
+      const original = snapshot.variants[0];
+      original.name = name;
+      const archived = {
+        ...original,
+        id: '85000000-0000-4000-8000-000000000091',
+        sku: 'ARCHIVED-SOAP',
+        active: false,
+      };
+      if (archivedFirst) snapshot.variants.unshift(archived);
+      else snapshot.variants.push(archived);
+      const exported = await exportProductWorkbook(snapshot);
+      const book = await createExcelWorkbook();
+      await book.xlsx.load(await exported.xlsx.writeBuffer());
+      const unchanged = readProductWorkbook(book, 'Products.xlsx', snapshot);
+      expect(unchanged.errors).toEqual([]);
+      expect(unchanged.lines).toEqual([]);
+      bySku(book, 'SOAP250').getCell(6).value = 55;
+      bySku(book, 'ARCHIVED-SOAP').getCell(6).value = 45;
+      const edited = readProductWorkbook(book, 'Products.xlsx', snapshot);
+      expect(edited.errors).toEqual([]);
+      expect(edited.changes.products[0].variants).toHaveLength(2);
+      expect(edited.changes.products[0].variants.map(v => [v.id, v.values.price])).toEqual(
+        expect.arrayContaining([
+          [original.id, 55],
+          [archived.id, 45],
+        ])
+      );
+      expect(edited.changes.stock).toEqual([]);
+      // A new pack still cannot choose between these parents by their shared name.
+      add(book, 2, 'Soap', 'Soap Works', name, 'Box of 12 bars', 540);
+      expect(readProductWorkbook(book, 'Products.xlsx', snapshot).errors.join()).toContain(
+        'exactly one matching'
+      );
+    }
+  );
+
+  it('keeps stock and saved packs attached to the correct same-name variant', async () => {
+    const snapshot = workbookFixture();
+    const original = snapshot.variants[0];
+    const archived = {
+      ...original,
+      id: '85000000-0000-4000-8000-000000000091',
+      sku: 'ARCHIVED-SOAP',
+      active: false,
+    };
+    snapshot.variants.unshift(archived);
+    snapshot.stock.push({ variant_id: archived.id, quantity: 8, value: 0, batch: null });
+    const book = await exportProductWorkbook(snapshot);
+    bySku(book, 'SOAP250').getCell(12).value = 47;
+    bySku(book, 'ARCHIVED-SOAP').getCell(12).value = 7;
+    packRow(book).getCell(6).value = 530;
+    const preview = readProductWorkbook(book, 'Products.xlsx', snapshot);
+    expect(preview.errors).toEqual([]);
+    expect(preview.changes.stock).toHaveLength(2);
+    expect(preview.changes.stock).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          variant_id: original.id,
+          expected_stock_quantity: 48,
+          new_stock_quantity: 47,
+        }),
+        expect.objectContaining({
+          variant_id: archived.id,
+          expected_stock_quantity: 8,
+          new_stock_quantity: 7,
+        }),
+      ])
+    );
+    const variants = preview.changes.products[0].variants;
+    expect(variants.find(v => v.id === original.id)!.packs[0]).toMatchObject({
+      id: snapshot.packs[0].id,
+      sale_price: 530,
+    });
+    expect(variants.find(v => v.id === archived.id)!.packs).toEqual([]);
+  });
+
+  it.each([
+    { sku: 'SOAP500', name: '250g' },
+    { sku: 'SOAP250', name: '500g' },
+  ])('rejects renaming $sku to the existing variant name $name', async ({ sku, name }) => {
+    const { snapshot, book } = await setup();
+    bySku(book, sku).getCell(3).value = name;
+    expect(readProductWorkbook(book, 'Products.xlsx', snapshot).errors.join()).toContain(
+      'Duplicate Single / Per'
+    );
+  });
+
   it('does not inherit a variant barcode on a pack with no barcode', async () => {
     const snapshot = workbookFixture();
     snapshot.packs[0].barcode = null;

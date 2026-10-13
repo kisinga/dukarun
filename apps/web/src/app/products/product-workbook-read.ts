@@ -626,7 +626,16 @@ export function readProductWorkbook(
       }
       const owner = entry.owner;
       const identity = familyKey(parent.key, '', owner.values.name);
-      if (owners.has(identity))
+      const previous = owners.get(identity);
+      // Historical variants may share a name (including archived Default rows).
+      // Their exported IDs still identify independent stock records. Only new
+      // or deliberately renamed collisions need a distinct size/type name.
+      const savedNamesUnchanged =
+        entry.variant &&
+        previous?.variant &&
+        normalized(entry.variant.name) === normalized(owner.values.name) &&
+        normalized(previous.variant.name) === normalized(previous.owner!.values.name);
+      if (previous && !savedNamesUnchanged)
         throw new Error('Duplicate Single / Per row for this size / type. Keep one stock row.');
       owners.set(identity, entry);
       const applyField = <K extends keyof VariantEdit['values']>(

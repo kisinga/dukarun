@@ -84,6 +84,7 @@
     "esbuild": "0.28.1",
     "husky": "^9.1.7",
     "jsdom": "^28.1.0",
+    "jszip": "3.10.1",
     "lint-staged": "^17.0.8",
     "pdf-lib": "1.17.1",
     "prettier": "^3.9.6",
