@@ -66,7 +66,9 @@
     "etl:teardown": "node scripts/etl/teardown.mjs",
     "etl:backfill-manufacturers": "node scripts/etl/backfill-manufacturers.mjs",
     "etl:diff": "node scripts/etl/ledger-diff.mjs",
-    "etl:export-map": "node scripts/etl/export-map.mjs"
+    "etl:export-map": "node scripts/etl/export-map.mjs",
+    "predev:tailscale": "node scripts/prepare-tailscale.mjs",
+    "dev:tailscale": "concurrently -k -n SITE,WEB,STORE,ADMIN -c yellow,green,blue,magenta \"npm run ng -w @dukarun/site -- serve --configuration tailscale\" \"npm run ng -w @dukarun/web -- serve --configuration tailscale\" \"npm run ng -w @dukarun/storefront -- serve --configuration tailscale\" \"npm run ng -w @dukarun/super-admin -- serve --configuration tailscale\""
   },
   "dependencies": {
     "pg": "8.22.0"

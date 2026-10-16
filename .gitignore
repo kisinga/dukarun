@@ -36,6 +36,7 @@ yarn-error.log
 .gitnexus
 # Generated production frontend configuration (created by each app's prebuild).
 apps/*/src/environments/environment.generated.ts
+apps/*/src/environments/environment.tailscale.generated.ts
 apps/storefront/public/sitemap.xml
 
 # Locally generated blog cover drafts. Published covers live in Supabase Storage.

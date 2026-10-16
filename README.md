@@ -32,6 +32,35 @@ npm run sb:lint              # lint public database objects
 npm run sb:types             # reset local DB, then refresh checked-in database types
 ```
 
+## Test on other devices with trusted HTTPS
+
+Connect the development machine and test devices to the same Tailscale network.
+Enable MagicDNS and HTTPS certificates in the Tailscale admin DNS settings once.
+With Docker running, start all four apps with:
+
+```bash
+npm run dev:tailscale
+```
+
+The command starts local Supabase, generates ignored development environment files,
+configures private Tailscale Serve endpoints, and starts Angular with live reload.
+It prints your machine's actual URLs. The dashboard, site, storefront, admin, and Supabase use HTTPS ports 8443–8447
+respectively. These ports avoid conflicts with existing services on port 443. Certificates are publicly
+trusted; no custom CA or router changes are required. The script discovers the machine's `*.ts.net` hostname automatically.
+
+Local Angular ports 4302–4305 are separate from normal development and test servers.
+Existing `dev`, `dev:all`, tests, CI, Node requirements, and production builds are unchanged.
+The preparation script refuses to overwrite Tailscale ports serving other targets.
+Ctrl+C stops Angular; Supabase and the Tailscale Serve mappings remain available for reuse.
+To remove a mapping, run `tailscale serve --https=<port> off` for its port; avoid
+`tailscale serve reset` if you have other services configured.
+
+Camera and other secure-context APIs work through trusted HTTPS. Angular development
+builds disable the service worker, so PWA offline-reload testing still requires a
+production build. External webhooks need a publicly reachable test backend; Serve
+is private to the tailnet. Email/OAuth redirect tests also need the printed app URL
+in the backend/provider redirect allowlists.
+
 ## Deploy (manual, first-party)
 
 Target host config lives in `.env.deploy` (gitignored — `cp .env.deploy.example .env.deploy`
