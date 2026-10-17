@@ -88,6 +88,7 @@ export function statementContent(data: StatementInput): DocumentContent {
   };
 }
 export interface ExternalDocumentInput {
+  paper_format?: PaperFormat;
   /** Public shop URL frozen when this document was issued; absent on older snapshots. */
   store_url?: string | null;
   business_timezone?: string;

@@ -133,7 +133,12 @@ describe('Sale document modal', () => {
     expect(button('Send PDF via WhatsApp').disabled).toBe(false);
     button('Send PDF via WhatsApp').click();
     await fixture.whenStable();
-    expect(service.send).toHaveBeenCalledWith('sale-1', expect.any(String), undefined);
+    expect(service.send).toHaveBeenCalledWith(
+      'sale-1',
+      expect.any(String),
+      undefined,
+      'receipt-52mm'
+    );
     expect(fixture.nativeElement.querySelector('dialog').open).toBe(true);
   });
   it('requires deliberate confirmation before resending an unknown outcome', async () => {
@@ -176,7 +181,11 @@ describe('Sale document modal', () => {
       customer_origin: 'manual',
       updated_at: '2026-09-01',
     };
-    const { fixture, button, service } = await render({ ...base, has_customer: true, customer });
+    const { fixture, button, service, print } = await render({
+      ...base,
+      has_customer: true,
+      customer,
+    });
     service.send.mockRejectedValue(new Error('Network interrupted'));
     button('Send PDF via WhatsApp').click();
     await fixture.whenStable();
@@ -184,6 +193,16 @@ describe('Sale document modal', () => {
     button('Send PDF via WhatsApp').click();
     await fixture.whenStable();
     expect(service.send.mock.calls[0][1]).toBe(service.send.mock.calls[1][1]);
+    print.format.set('a4');
+    fixture.detectChanges();
+    button('Send PDF via WhatsApp').click();
+    await fixture.whenStable();
+    expect(service.send.mock.calls[2][1]).not.toBe(service.send.mock.calls[1][1]);
+    expect(service.send.mock.calls.map(call => call[3])).toEqual([
+      'receipt-52mm',
+      'receipt-52mm',
+      'a4',
+    ]);
   });
 
   it('retains acceptance through a failed status fetch, polls again, and confirms any resend', async () => {

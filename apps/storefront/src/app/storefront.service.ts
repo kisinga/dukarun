@@ -139,6 +139,7 @@ export interface ExternalDocumentPayment {
   date: string;
 }
 export interface ExternalDocument {
+  paper_format?: import('@dukarun/documents').PaperFormat;
   store_url?: string | null;
   company_email?: string | null;
   company_website?: string | null;

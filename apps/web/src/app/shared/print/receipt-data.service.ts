@@ -2,7 +2,7 @@ import { ServerClockService } from '../../core/server-clock.service';
 import { TaxSettingsSourceService } from '../../core/tax-settings-source.service';
 import type { DocumentDesigns } from '@dukarun/documents';
 import { transactionUnitLabel } from '@dukarun/pack-types';
-import { Injectable, inject } from '@angular/core';
+import { Injectable, inject, signal, computed } from '@angular/core';
 import { CatalogIdentityLookupService } from '../../core/identity-lookup.services';
 import { SupabaseService } from '../../core/supabase.service';
 import { PosService, variantLabel } from '../../pos/pos.service';
@@ -65,12 +65,24 @@ export class ReceiptDataService {
     return this.supabase.client;
   }
 
+  readonly printScope = computed(() => {
+    const identity = this.supabase.offlineIdentity?.();
+    return identity ? `${identity.companyId}:${identity.userId}` : null;
+  });
+  private settingsScope: string | null = null;
   private settings: CompanyPrintInfo | null = null;
   private settingsRevision = 0;
+  readonly printRevision = signal(0);
   private settingsExpiresAt = 0;
 
   /** Short cache, bounded by the next server VAT activation as well. */
   async companyPrintInfo(): Promise<CompanyPrintInfo> {
+    const scope = this.printScope();
+    if (scope !== this.settingsScope) {
+      this.settingsScope = scope;
+      this.settings = null;
+      this.settingsRevision++;
+    }
     const currentTime = this.clock.now();
     if (this.settings && currentTime !== null && currentTime < this.settingsExpiresAt)
       return this.settings;
@@ -86,7 +98,8 @@ export class ReceiptDataService {
       this.taxSettingsSource.read(),
     ]);
     if (error) throw error;
-    if (revision !== this.settingsRevision) return this.companyPrintInfo();
+    if (revision !== this.settingsRevision || scope !== this.printScope())
+      return this.companyPrintInfo();
     const timing = taxSettings as {
       activation?: { server_time?: string };
       scheduled_profiles?: { effective_from_at?: string }[];
@@ -134,6 +147,7 @@ export class ReceiptDataService {
   /** Drop the cached settings so the next print reflects new branding (logo/name/address). */
   invalidateCompanyInfo(): void {
     this.settingsRevision++;
+    this.printRevision.update(value => value + 1);
     this.settings = null;
   }
 

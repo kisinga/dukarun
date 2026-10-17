@@ -10,15 +10,17 @@ import {
 } from '@angular/router';
 import { SwUpdate } from '@angular/service-worker';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
+import { OpenEscDialogComponent } from './shared/print/open-esc-dialog.component';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet],
+  imports: [RouterOutlet, OpenEscDialogComponent],
   template: `
     @if (showNavigationProgress()) {
       <div class="navigation-progress" role="progressbar" aria-label="Loading page"></div>
     }
     <router-outlet />
+    <app-open-esc-dialog />
     @if (updateNotice()) {
       <div
         class="fixed inset-x-3 bottom-3 z-50 mx-auto flex max-w-lg items-center gap-3 rounded-box border border-base-300 bg-base-100 p-3 shadow-overlay"

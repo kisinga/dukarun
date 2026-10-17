@@ -20,26 +20,34 @@ const snapshot = {
   notes: null,
   lines: [{ description: 'Tea', quantity: 1, unit_price: 1000, line_total: 1000 }],
 };
-test('deployed artifact embeds its dependencies and fonts and always emits A4', async () => {
-  const bytes = await renderSnapshotPdf(snapshot, { name: 'Shop' });
-  const pdf = await PDFDocument.load(bytes);
-  assert.equal(pdf.getPageCount(), 1);
-  assert.deepEqual(pdf.getPage(0).getSize(), { width: 595.28, height: 841.89 });
-  await assert.rejects(
-    renderSnapshotPdf({ ...snapshot, pdf_renderer_version: 99 }, { name: 'Shop' }),
-    /unsupported_renderer_version/
-  );
+test('deployed artifact uses the current renderer for old inputs and defaults missing sizes to A4', async () => {
+  for (const pdf_renderer_version of [undefined, 1, 2, 99]) {
+    const bytes = await renderSnapshotPdf({ ...snapshot, pdf_renderer_version }, { name: 'Shop' });
+    const pdf = await PDFDocument.load(bytes);
+    assert.equal(pdf.getPageCount(), 1);
+    assert.deepEqual(pdf.getPage(0).getSize(), { width: 595.28, height: 841.89 });
+  }
 });
+for (const paper_format of ['receipt-52mm', 'receipt-80mm']) {
+  test(`deployed artifact maps ${paper_format} to an adaptive 80 mm mobile PDF`, async () => {
+    const bytes = await renderSnapshotPdf({ ...snapshot, paper_format }, { name: 'Shop' });
+    const pdf = await PDFDocument.load(bytes);
+    assert.equal(pdf.getPageCount(), 1);
+    assert.ok(Math.abs(pdf.getPage(0).getWidth() - (80 * 72) / 25.4) < 0.01);
+    assert.ok(pdf.getPage(0).getHeight() < 841.89, 'short receipts use less than A4 height');
+  });
+}
 for (const layout of ['classic', 'compact', 'modern']) {
-  test(`renders ${layout} PDFs when Edge runtime math constants are truncated`, async () => {
-    // Isolate the production v1.71.2 Math values from the test runner. Import the
-    // actual bundle afterward so dependency initialization sees the same values.
-    const bytes = execFileSync(
-      process.execPath,
-      [
-        '--input-type=module',
-        '--eval',
-        `
+  for (const paper_format of ['a4', 'receipt-80mm']) {
+    test(`renders ${layout} ${paper_format} PDFs when Edge runtime math constants are truncated`, async () => {
+      // Isolate the production v1.71.2 Math values from the test runner. Import the
+      // actual bundle afterward so dependency initialization sees the same values.
+      const bytes = execFileSync(
+        process.execPath,
+        [
+          '--input-type=module',
+          '--eval',
+          `
           import { readFileSync } from 'node:fs';
           process.on('uncaughtException', error => {
             console.error(error.stack);
@@ -54,28 +62,35 @@ for (const layout of ['classic', 'compact', 'modern']) {
           const bytes = await renderSnapshotPdf(snapshot, { name: 'Test electricals' });
           process.stdout.write(bytes);
         `,
-        new URL('../../supabase/functions/_shared/generated/documents.mjs', import.meta.url).href,
-      ],
-      {
-        input: JSON.stringify({
-          ...snapshot,
-          document_design: {
-            version: 1,
-            layout,
-            message: 'Thank you for your business!',
-            custom: { label: '', value: '', display: 'text' },
-          },
-        }),
-        timeout: 10_000,
-        stdio: ['pipe', 'pipe', 'pipe'],
+          new URL('../../supabase/functions/_shared/generated/documents.mjs', import.meta.url).href,
+        ],
+        {
+          input: JSON.stringify({
+            ...snapshot,
+            paper_format,
+            document_design: {
+              version: 1,
+              layout,
+              message: 'Thank you for your business!',
+              custom: { label: '', value: '', display: 'text' },
+            },
+          }),
+          timeout: 10_000,
+          stdio: ['pipe', 'pipe', 'pipe'],
+        }
+      );
+      const pdf = await PDFDocument.load(bytes);
+      assert.equal(pdf.getPageCount(), 1);
+      if (paper_format === 'a4') {
+        assert.deepEqual(pdf.getPage(0).getSize(), { width: 595.28, height: 841.89 });
+      } else {
+        assert.ok(Math.abs(pdf.getPage(0).getWidth() - (80 * 72) / 25.4) < 0.01);
+        assert.ok(pdf.getPage(0).getHeight() <= 841.89);
       }
-    );
-    const pdf = await PDFDocument.load(bytes);
-    assert.equal(pdf.getPageCount(), 1);
-    assert.deepEqual(pdf.getPage(0).getSize(), { width: 595.28, height: 841.89 });
-    assert.equal(pdf.getTitle(), 'Receipt ARTIFACT-1');
-    assert.ok(bytes.length < 100_000, 'font subsets must remain compact');
-  });
+      assert.equal(pdf.getTitle(), 'Receipt ARTIFACT-1');
+      assert.ok(bytes.length < 100_000, 'font subsets must remain compact');
+    });
+  }
 }
 test('SVG and WebP branding decode to real PNG pixels without remote assets', async () => {
   const svg = await preparePdfLogo(

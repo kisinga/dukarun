@@ -148,3 +148,99 @@ describe('A4 server PDF', () => {
     );
   });
 });
+
+describe('mobile PDF documents', () => {
+  it.each(['receipt-52mm', 'receipt-80mm'] as const)(
+    'uses a single readable mobile layout for %s',
+    async paper => {
+      const content = externalDocumentContent(snapshot, { name: 'Amina Shop', address: 'Nairobi' });
+      const calls = vi.spyOn(PDFPage.prototype, 'drawText');
+      try {
+        const pdf = await PDFDocument.load(
+          await renderDocumentPdf(content, defaultDesign('invoice'), assets, paper)
+        );
+        expect(pdf.getPage(0).getWidth()).toBeCloseTo((80 * 72) / 25.4);
+        expect(pdf.getPage(0).getHeight()).toBeLessThan(841.89);
+        expect(pdf.getPageCount()).toBe(1);
+        const values = calls.mock.calls.map(([value]) => value);
+        expect(values).toContain('Qty: 2');
+        expect(values).toContain('Unit: KES 580');
+        expect(values).toContain('Total: KES 1,160');
+        expect(values).toContain('Original issue');
+        expect(values).toContain('KES 1,000');
+      } finally {
+        calls.mockRestore();
+      }
+    }
+  );
+  it.each(['classic', 'compact', 'modern'] as DocumentLayout[])(
+    'wraps large values, contact details and names within the %s mobile page',
+    async layout => {
+      const content = externalDocumentContent(
+        {
+          ...snapshot,
+          party_name: 'A very long customer name '.repeat(6),
+          lines: [
+            {
+              ...snapshot.lines[0]!,
+              description: 'A long name without truncating product details '.repeat(6),
+            },
+          ],
+          total: 1234567890.12,
+          balance: 1234567890.12,
+          store_url: 'https://example.test/shop/mobile',
+        },
+        {
+          name: 'A very long company name '.repeat(4),
+          website: 'https://example.test/' + 'long'.repeat(20),
+        }
+      );
+      const calls = vi.spyOn(PDFPage.prototype, 'drawText');
+      try {
+        const pdf = await PDFDocument.load(
+          await renderDocumentPdf(
+            content,
+            { ...defaultDesign('invoice'), layout },
+            assets,
+            'receipt-80mm'
+          )
+        );
+        expect(pdf.getPageCount()).toBeGreaterThan(0);
+        for (const [value, options] of calls.mock.calls) {
+          expect(options!.x!).toBeGreaterThanOrEqual(11.9);
+          expect(
+            options!.x! + options!.font!.widthOfTextAtSize(value, options!.size!)
+          ).toBeLessThanOrEqual((80 * 72) / 25.4 - 11.9);
+          expect(options!.y!).toBeGreaterThanOrEqual(0);
+        }
+        expect(pdf.getPages().every(page => page.getHeight() <= 841.89)).toBe(true);
+      } finally {
+        calls.mockRestore();
+      }
+    }
+  );
+  it('paginates long mobile receipts with all items and a complete final summary', async () => {
+    const content = externalDocumentContent(
+      {
+        ...snapshot,
+        lines: Array.from({ length: 120 }, (_, i) => ({
+          ...snapshot.lines[0]!,
+          description: `Item ${i} with full details`,
+        })),
+      },
+      { name: 'Shop' }
+    );
+    const calls = vi.spyOn(PDFPage.prototype, 'drawText');
+    try {
+      const pdf = await PDFDocument.load(
+        await renderDocumentPdf(content, defaultDesign('invoice'), assets, 'receipt-80mm')
+      );
+      expect(pdf.getPageCount()).toBeGreaterThan(5);
+      expect(pdf.getPageCount()).toBeLessThan(40);
+      expect(calls.mock.calls.map(([value]) => value)).toContain('Item 119 with full details');
+      expect(calls.mock.calls.map(([value]) => value)).toContain('Balance');
+    } finally {
+      calls.mockRestore();
+    }
+  });
+});

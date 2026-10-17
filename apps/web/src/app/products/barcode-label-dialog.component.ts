@@ -1,3 +1,6 @@
+import { PreparedPrintDirective } from '../shared/print/prepared-print.directive';
+import { PrinterSettingsComponent } from '../shared/print/printer-settings.component';
+import type { PrintJob } from '@dukarun/documents';
 import { Component, computed, effect, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CatalogCacheService } from '../core/catalog-cache.service';
@@ -10,15 +13,23 @@ import {
   BarcodeLabelPrintService,
   BarcodeLabelRenderError,
   type BarcodeLabelLayout,
+  type BarcodeDirection,
 } from './barcode-label-print.service';
 import { BARCODE_LABEL_PRESETS } from './barcode-label-presets';
 import { batchLabels, classifyBarcodeLabels, generateDukarunBarcode } from './barcode-labels';
 
 const LABEL_LAYOUT_KEY = 'dukarun-barcode-label-layout';
+const LABEL_ROTATION_KEY = 'dukarun-barcode-label-rotation';
 
 @Component({
   selector: 'app-barcode-label-dialog',
-  imports: [FormsModule, ButtonComponent, IconComponent],
+  imports: [
+    PreparedPrintDirective,
+    PrinterSettingsComponent,
+    FormsModule,
+    ButtonComponent,
+    IconComponent,
+  ],
   template: `
     <dialog class="modal modal-open" (cancel)="$event.preventDefault(); closed.emit()">
       <section class="modal-box modal-box-task p-0 md:w-full md:max-w-2xl">
@@ -221,7 +232,7 @@ const LABEL_LAYOUT_KEY = 'dukarun-barcode-label-layout';
                 }
               </select>
               <p class="type-caption mt-1">
-                Choose the same paper size in the system print dialog.
+                Saved on this device. Match the label dimensions in your printer settings.
               </p>
             </label>
             @if (mode() !== 'catalogue') {
@@ -242,6 +253,29 @@ const LABEL_LAYOUT_KEY = 'dukarun-barcode-label-layout';
             }
           </div>
 
+          <label class="mt-4 block">
+            <span class="form-field-label">Label direction</span>
+            <select
+              class="select select-bordered w-full"
+              [ngModel]="layout() === 'a4-grid' ? 0 : rotation()"
+              (ngModelChange)="setRotation($event)"
+            >
+              <option value="auto" [disabled]="layout() === 'a4-grid'">Automatic</option>
+              <option [ngValue]="0">Standard</option>
+              <option [ngValue]="90" [disabled]="layout() === 'a4-grid'">Rotate 90°</option>
+            </select>
+            <p class="type-caption mt-1">
+              Automatic rotates wide labels, including text, to fit a continuous roll. Your choice
+              is saved. A4 grids use Standard.
+            </p>
+          </label>
+          <app-printer-settings [showPaper]="false" />
+          @if (handedOffCount()) {
+            <p role="status" class="type-caption mt-3">
+              {{ handedOffCount() }} labels handed to the printer. Check the output before
+              requesting another copy.
+            </p>
+          }
           @if (error()) {
             <div class="alert alert-error mt-4 text-sm">{{ error() }}</div>
           }
@@ -261,6 +295,9 @@ const LABEL_LAYOUT_KEY = 'dukarun-barcode-label-layout';
             variant="outline"
             [loading]="testPrinting()"
             [disabled]="printing() || testPrinting()"
+            [appPreparePrint]="prepareTestLabel"
+            [appPrintSheet]="layout() === 'a4-grid'"
+            [appPrintRevision]="testPrintRevision()"
             (click)="printTestLabel()"
           >
             Print test label
@@ -272,7 +309,15 @@ const LABEL_LAYOUT_KEY = 'dukarun-barcode-label-layout';
             variant="primary"
             data-learning-anchor="barcode-print"
             [loading]="printing()"
-            [disabled]="printBatches().length === 0 || printing()"
+            [disabled]="
+              printBatches().length === 0 ||
+              printing() ||
+              batchOffset() >= (printBatches()[batchIndex()]?.length ?? 0)
+            "
+            [appPreparePrint]="prepareCurrentBatch"
+            [appPrintSheet]="layout() === 'a4-grid'"
+            [appPrintRevision]="printRevision()"
+            (printHandedOff)="advanceBatch($event)"
             (click)="printCurrentBatch()"
           >
             <app-icon name="heroPrinter" />
@@ -309,6 +354,11 @@ export class BarcodeLabelDialogComponent {
 
   protected readonly layout = signal<BarcodeLabelLayout>(this.loadLayout());
   protected readonly labelPresets = BARCODE_LABEL_PRESETS;
+  protected readonly rotation = signal<BarcodeDirection>(this.loadRotation());
+  protected readonly printDirection = computed<BarcodeDirection>(() =>
+    this.layout() === 'a4-grid' ? 0 : this.rotation()
+  );
+  protected readonly testPrintRevision = computed(() => [this.layout(), this.rotation()]);
   protected readonly copies = signal(1);
   protected readonly busy = signal(false);
   protected readonly printing = signal(false);
@@ -317,6 +367,40 @@ export class BarcodeLabelDialogComponent {
   protected readonly error = signal<string | null>(null);
   protected readonly renderFailures = signal<string[]>([]);
   protected readonly batchIndex = signal(0);
+  protected readonly batchOffset = signal(0);
+  protected readonly handedOffCount = signal(0);
+  protected readonly printRevision = computed(() => [
+    this.layout(),
+    this.rotation(),
+    this.printBatches(),
+    this.batchIndex(),
+    this.batchOffset(),
+  ]);
+  readonly prepareTestLabel = () =>
+    this.labels.renderTestLabel(this.layout(), this.printDirection(), true);
+  readonly prepareCurrentBatch = () => {
+    const batches = this.printBatches();
+    const index = this.batchIndex();
+    return this.labels.renderLabels(
+      (batches[index] ?? []).slice(this.batchOffset()),
+      this.layout(),
+      index + 1,
+      batches.length,
+      true,
+      this.printDirection()
+    );
+  };
+  protected advanceBatch(job: PrintJob): void {
+    const batch = this.printBatches()[this.batchIndex()];
+    if (!batch) return;
+    this.handedOffCount.update(count => count + (job.itemCount ?? 0));
+    const offset = this.batchOffset() + (job.itemCount ?? 0);
+    if (offset < batch.length) this.batchOffset.set(offset);
+    else if (this.batchIndex() + 1 < this.printBatches().length) {
+      this.batchOffset.set(0);
+      this.batchIndex.update(index => index + 1);
+    } else this.batchOffset.set(batch.length);
+  }
 
   protected readonly deselected = signal<Set<string>>(new Set());
   protected readonly excluded = computed(() =>
@@ -431,10 +515,17 @@ export class BarcodeLabelDialogComponent {
     effect(() => {
       this.mode();
       this.variantId();
+      this.selectedPackId();
       this.variants();
       this.copies();
+      this.rotation();
+      this.layout();
       this.deselected();
+      this.error.set(null);
+      this.renderFailures.set([]);
       this.batchIndex.set(0);
+      this.batchOffset.set(0);
+      this.handedOffCount.set(0);
     });
   }
 
@@ -462,6 +553,23 @@ export class BarcodeLabelDialogComponent {
     this.copies.set(Number.isFinite(parsed) ? Math.min(Math.max(parsed, 1), 500) : 1);
   }
 
+  protected setRotation(value: BarcodeDirection): void {
+    if (value !== 'auto' && value !== 0 && value !== 90) return;
+    this.rotation.set(value);
+    try {
+      localStorage.setItem(LABEL_ROTATION_KEY, String(value));
+    } catch {
+      /* Session choice. */
+    }
+  }
+  private loadRotation(): BarcodeDirection {
+    try {
+      const saved = localStorage.getItem(LABEL_ROTATION_KEY);
+      return saved === '90' ? 90 : saved === '0' ? 0 : 'auto';
+    } catch {
+      return 'auto';
+    }
+  }
   protected setLayout(layout: BarcodeLabelLayout): void {
     this.layout.set(layout);
     try {
@@ -476,7 +584,7 @@ export class BarcodeLabelDialogComponent {
     this.testPrinting.set(true);
     this.error.set(null);
     try {
-      await this.labels.printTestLabel(this.layout());
+      await this.labels.printTestLabel(this.layout(), this.printDirection());
     } catch (error) {
       this.error.set(this.friendlyError(error));
     } finally {
@@ -516,14 +624,20 @@ export class BarcodeLabelDialogComponent {
   protected async printCurrentBatch(): Promise<void> {
     const batches = this.printBatches();
     const index = Math.min(this.batchIndex(), Math.max(batches.length - 1, 0));
-    const batch = batches[index];
-    if (!batch || this.printing()) return;
+    const batch = batches[index]?.slice(this.batchOffset());
+    if (!batch?.length || this.printing()) return;
     this.printing.set(true);
     this.error.set(null);
     this.renderFailures.set([]);
     try {
-      await this.labels.printLabels(batch, this.layout(), index + 1, batches.length);
-      if (index + 1 < batches.length) this.batchIndex.set(index + 1);
+      await this.labels.printLabels(
+        batch,
+        this.layout(),
+        index + 1,
+        batches.length,
+        this.printDirection()
+      );
+      this.advanceBatch({ title: 'Labels', html: '', styles: '', itemCount: batch.length });
     } catch (error) {
       if (error instanceof BarcodeLabelRenderError) {
         this.renderFailures.set(

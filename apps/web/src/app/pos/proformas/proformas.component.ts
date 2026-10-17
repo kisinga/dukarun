@@ -1,3 +1,4 @@
+import { PreparedPrintDirective } from '../../shared/print/prepared-print.directive';
 import {
   HistoryDateRangeComponent,
   type HistoryDateRange,
@@ -70,6 +71,7 @@ const PROFORMA_SORT_OPTIONS: readonly ListSortOption[] = [
 @Component({
   selector: 'app-proformas',
   imports: [
+    PreparedPrintDirective,
     HistoryDateRangeComponent,
     RouterLink,
     ReactiveFormsModule,
@@ -145,6 +147,9 @@ const PROFORMA_SORT_OPTIONS: readonly ListSortOption[] = [
                 variant="outline"
                 size="sm"
                 [loading]="printing()"
+                [appPrintOrder]="completed.id"
+                [appPrintRevision]="completed"
+                appPrintKind="receipt"
                 (click)="printReceipt(completed.id)"
               >
                 <app-icon name="heroPrinter" />
@@ -347,6 +352,9 @@ const PROFORMA_SORT_OPTIONS: readonly ListSortOption[] = [
                           title="Print proforma"
                           aria-label="Print proforma"
                           [disabled]="printing()"
+                          [appPrintOrder]="draft.id"
+                          [appPrintRevision]="draft"
+                          appPrintKind="proforma"
                           (click)="printProforma(draft.id)"
                         >
                           <app-icon name="heroPrinter" />
@@ -437,6 +445,9 @@ const PROFORMA_SORT_OPTIONS: readonly ListSortOption[] = [
               title="Print proforma"
               aria-label="Print proforma"
               [disabled]="printing()"
+              [appPrintOrder]="draft.id"
+              [appPrintRevision]="draft"
+              appPrintKind="proforma"
               (click)="printProforma(draft.id)"
             >
               <app-icon name="heroPrinter" />

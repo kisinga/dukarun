@@ -31,6 +31,11 @@ describe('Shop setup document integration', () => {
       data: { publicUrl: `https://storage.example.test/company-logos/${path}` },
     }));
     const print = {
+      getAvailableTemplates: () => [
+        { id: 'receipt-52mm', width: '52mm' },
+        { id: 'receipt-80mm', width: '80mm' },
+        { id: 'a4', width: 'A4' },
+      ],
       format: signal('receipt-52mm'),
       printDocument: vi.fn().mockResolvedValue(undefined),
     };

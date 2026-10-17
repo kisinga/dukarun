@@ -44,6 +44,23 @@ export interface RenderedDocument {
   title: string;
   html: string;
   styles: string;
+  /** Explicit output geometry; absent metadata keeps legacy callers on system printing. */
+  print?: PrintMedia;
+}
+export type PrintMedia =
+  | { kind: 'thermal-document'; widthMm: number; rasterWidthDots?: number }
+  | {
+      kind: 'roll-label';
+      widthMm: number;
+      heightMm: number;
+      rasterWidthDots?: number;
+      dpi?: number;
+    }
+  | { kind: 'sheet'; widthMm: number; heightMm: number };
+export interface PrintJob extends RenderedDocument {
+  /** Roll labels are separate pages in one handoff, in copy order. */
+  pages?: readonly RenderedDocument[];
+  itemCount?: number;
 }
 export function escapeText(value: string): string {
   return value
@@ -112,7 +129,7 @@ export function renderDocument(
       .filter(m => m.value)
       .map(m => `<div><dt>${e(m.label)}</dt><dd>${e(m.value)}</dd></div>`)
       .join('')}</dl>
-    ${data.sections.map(section => `<section>${section.title ? `<h3>${e(section.title)}</h3>` : ''}<table data-columns="${section.columns.length}" data-numeric-columns="${section.columns.filter(c => c.numeric).length}"><thead><tr>${section.columns.map(c => `<th${c.numeric ? ' class="number"' : ''}>${e(c.label)}</th>`).join('')}</tr></thead><tbody>${section.rows.map(row => `<tr>${section.columns.map((col, i) => `<td${col.numeric ? ' class="number"' : ''}>${e(row[i] ?? '')}</td>`).join('')}</tr>`).join('')}</tbody></table></section>`).join('')}
+    ${data.sections.map(section => `<section>${section.title ? `<h3>${e(section.title)}</h3>` : ''}<table data-columns="${section.columns.length}" data-numeric-columns="${section.columns.filter(c => c.numeric).length}"><thead><tr>${section.columns.map(c => `<th${c.numeric ? ' class="number"' : ''}>${e(c.label)}</th>`).join('')}</tr></thead><tbody>${section.rows.map(row => `<tr>${section.columns.map((col, i) => `<td data-label="${e(col.label)}"${col.numeric ? ' class="number"' : ''}>${e(row[i] ?? '')}</td>`).join('')}</tr>`).join('')}</tbody></table></section>`).join('')}
     <div class="document-summary"><dl class="totals" data-preview-section="totals">${data.totals.map(t => `<div${t.prominent ? ' class="grand-total"' : ''}><dt>${e(t.label)}</dt><dd>${e(t.value)}</dd></div>`).join('')}</dl>
     ${data.notes ? `<section class="document-note"><h3>Notes</h3><p>${e(data.notes)}</p></section>` : ''}</div>
     <footer>${design.message.trim() || preview ? `<p class="document-message" data-preview-section="message">${e(design.message)}</p>` : ''}
@@ -219,7 +236,15 @@ export function renderDocument(
     @media screen { .document { zoom:var(--document-preview-scale,1); } }
     @media print { .document { max-width:none; print-color-adjust:exact; -webkit-print-color-adjust:exact; } }
   `;
-  return { title: `${data.identity.name} — ${title} — ${data.reference}`, html, styles };
+  return {
+    title: `${data.identity.name} — ${title} — ${data.reference}`,
+    html,
+    styles,
+    print:
+      paper === 'a4'
+        ? { kind: 'sheet', widthMm: 210, heightMm: 297 }
+        : { kind: 'thermal-document', widthMm: paper === 'receipt-80mm' ? 80 : 52 },
+  };
 }
 export function documentHtml(document: RenderedDocument): string {
   return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeText(document.title)}</title><style>${document.styles}</style></head><body>${document.html}</body></html>`;

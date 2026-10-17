@@ -1,3 +1,4 @@
+import type { PaperFormat } from '@dukarun/documents';
 import { Injectable, inject, signal } from '@angular/core';
 import { SupabaseService } from '../core/supabase.service';
 import { rpcError } from '../pos/pos.service';
@@ -29,6 +30,7 @@ export interface SaleDocumentContext {
     id: string;
     state: DocumentDeliveryState;
     recipient: string;
+    paper_format?: PaperFormat;
     sent_at: string | null;
     error: string | null;
   } | null;
@@ -76,10 +78,11 @@ export class SaleDocumentService {
   async send(
     orderId: string,
     requestKey: string,
-    contact?: { phone: string; first_name: string; last_name: string }
+    contact?: { phone: string; first_name: string; last_name: string },
+    paperFormat: PaperFormat = 'a4'
   ) {
     const { data, error } = await this.db.functions.invoke('sale-document-send', {
-      body: { order_id: orderId, request_key: requestKey, ...contact },
+      body: { order_id: orderId, request_key: requestKey, paper_format: paperFormat, ...contact },
     });
     if (error) {
       const result = await error.context?.json?.().catch(() => null);
@@ -87,6 +90,6 @@ export class SaleDocumentService {
         result?.error ?? 'Could not confirm acceptance. Retry to check the same request.'
       );
     }
-    return data as { outbox_id: string; state: DocumentDeliveryState };
+    return data as { outbox_id: string; state: DocumentDeliveryState; paper_format?: PaperFormat };
   }
 }

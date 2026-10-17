@@ -1,11 +1,13 @@
 /** Server-only entry point. Do not export this from the browser document entry point. */
 import { PDFDocument, PDFString, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
+import { renderMobilePdf } from './pdf-mobile';
+import type { PaperFormat } from './config';
 import { DOCUMENT_LABELS, readDesign, validQr, type DocumentDesign } from './config';
 import { safeImageUrl, type DocumentContent } from './render';
 import { MAX_LOGO_BYTES } from './svg-logo';
 
-export const PDF_RENDERER_VERSION = 1;
+export const PDF_RENDERER_VERSION = 2;
 export interface PdfAssets {
   regular: Uint8Array;
   bold: Uint8Array;
@@ -23,7 +25,8 @@ const RULE = rgb(0.86, 0.88, 0.9);
 export async function renderDocumentPdf(
   content: DocumentContent,
   value: DocumentDesign | null | undefined,
-  assets: PdfAssets
+  assets: PdfAssets,
+  paper: PaperFormat = 'a4'
 ): Promise<Uint8Array> {
   if (content.sample) throw new Error('sample_document_rejected');
   const suppliedCustom = value?.custom;
@@ -39,6 +42,7 @@ export async function renderDocumentPdf(
   )
     throw new Error('document_too_large');
   const design = readDesign(content.kind, value);
+  if (paper !== 'a4') return renderMobilePdf(content, design, assets);
   const custom = design.custom;
   const hasQr = !!custom.value.trim() && custom.display !== 'text';
   if (hasQr && (!custom.qr || !validQr(custom.qr))) throw new Error('document_qr_not_prepared');

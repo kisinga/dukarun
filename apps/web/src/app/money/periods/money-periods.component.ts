@@ -1,3 +1,4 @@
+import { printCurrentPage } from '../../../../../../packages/documents/browser-print';
 import { StatBarComponent } from '../../shared/ui/stat-bar.component';
 import {
   DataTableShellComponent,
@@ -581,7 +582,11 @@ export class MoneyPeriodsComponent implements OnInit {
   }
 
   protected printPack(): void {
-    window.print();
+    try {
+      printCurrentPage();
+    } catch (error) {
+      this.error.set(error instanceof Error ? error.message : 'Printing failed. Try again.');
+    }
   }
 
   private yesterday(): string {
