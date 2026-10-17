@@ -1,3 +1,4 @@
+import { PreparedPrintDirective } from '../../shared/print/prepared-print.directive';
 import { Component, effect, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CashierSessionDialogService } from '../../core/cashier-session-dialog.service';
@@ -22,7 +23,14 @@ import { CashierCountGuidance, cashierCountGuidance } from './cashier-count-guid
 
 @Component({
   selector: 'app-cashier-session-modal',
-  imports: [FormsModule, ButtonComponent, FormFieldComponent, IconComponent, MoneyComponent],
+  imports: [
+    PreparedPrintDirective,
+    FormsModule,
+    ButtonComponent,
+    FormFieldComponent,
+    IconComponent,
+    MoneyComponent,
+  ],
   template: `
     @if (dialog.visible()) {
       <dialog
@@ -321,6 +329,8 @@ import { CashierCountGuidance, cashierCountGuidance } from './cashier-count-guid
               appButton
               variant="outline"
               type="button"
+              [appPrintOrder]="result.closedSessionId"
+              appPrintKind="cashier-slip"
               (click)="printSlip(result.closedSessionId)"
             >
               <app-icon name="heroPrinter" /> Print slip

@@ -1,6 +1,11 @@
 import { Component, OnInit, inject, signal, viewChild } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
-import { externalDocumentContent, renderDocument, type RenderedDocument } from '@dukarun/documents';
+import {
+  externalDocumentContent,
+  renderDocument,
+  renderMobileDocument,
+  type RenderedDocument,
+} from '@dukarun/documents';
 import { ExternalDocument, StorefrontService } from './storefront.service';
 import { StorefrontSeoService } from './storefront-seo.service';
 import { PoweredByDukarunComponent } from './powered-by-dukarun.component';
@@ -20,7 +25,7 @@ import { DocumentViewComponent } from './document-view.component';
             <button
               class="btn btn-outline"
               type="button"
-              [disabled]="!rendered()"
+              [disabled]="!rendered() || !!view()?.preparing()"
               (click)="print()"
             >
               Print
@@ -54,7 +59,7 @@ export class DocumentComponent implements OnInit {
   protected readonly rendered = signal<RenderedDocument | null>(null);
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
-  private readonly view = viewChild(DocumentViewComponent);
+  protected readonly view = viewChild(DocumentViewComponent);
   async ngOnInit(): Promise<void> {
     this.seo.set('Private business document', 'Secure business document.', '/document', true);
     try {
@@ -63,7 +68,9 @@ export class DocumentComponent implements OnInit {
       this.document.set(d);
       if (d)
         this.rendered.set(
-          renderDocument(
+          (d.paper_format === 'receipt-52mm' || d.paper_format === 'receipt-80mm'
+            ? renderMobileDocument
+            : renderDocument)(
             externalDocumentContent(d, {
               name: d.company_name,
               address: d.company_address,

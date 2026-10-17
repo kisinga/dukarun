@@ -21,6 +21,8 @@ Deno.serve(async request => {
     !input ||
     !uuid.test(input.order_id ?? '') ||
     !uuid.test(input.request_key ?? '') ||
+    (input.paper_format !== undefined &&
+      !['a4', 'receipt-52mm', 'receipt-80mm'].includes(input.paper_format)) ||
     [input.phone, input.first_name, input.last_name].some(
       v => v != null && (typeof v !== 'string' || v.length > 100)
     )
@@ -32,6 +34,7 @@ Deno.serve(async request => {
     p_phone: input.phone ?? null,
     p_first_name: input.first_name ?? null,
     p_last_name: input.last_name ?? null,
+    p_paper_format: input.paper_format ?? 'a4',
   });
   if (error) return respond({ error: error.message }, 400);
   // Acceptance is durable before responding. Scheduled notification-flush recovers any missed wake-up.

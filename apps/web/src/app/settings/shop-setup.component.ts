@@ -1,3 +1,4 @@
+import { PreparedPrintDirective } from '../shared/print/prepared-print.directive';
 import { Component, OnInit, computed, inject, signal, viewChild } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { renderDocument, sampleDocument } from '@dukarun/documents';
@@ -13,6 +14,7 @@ import { ShopSetupCoordinator } from './shop-setup-coordinator.service';
 @Component({
   selector: 'app-shop-setup',
   imports: [
+    PreparedPrintDirective,
     RouterLink,
     ButtonComponent,
     PageLayoutComponent,
@@ -72,7 +74,13 @@ import { ShopSetupCoordinator } from './shop-setup-coordinator.service';
                     <app-document-preview [document]="document" />
                   }
                   <div class="flex flex-wrap justify-end gap-2">
-                    <button appButton variant="outline" (click)="testPrint()">Print sample</button
+                    <button
+                      appButton
+                      variant="outline"
+                      [appPrintDocument]="preview()"
+                      (click)="testPrint()"
+                    >
+                      Print sample</button
                     ><a
                       appButton
                       variant="outline"

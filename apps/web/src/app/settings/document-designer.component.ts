@@ -1,3 +1,4 @@
+import { PreparedPrintDirective } from '../shared/print/prepared-print.directive';
 import { Component, DestroyRef, OnInit, computed, effect, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -28,10 +29,12 @@ import { PrintService } from '../shared/print/print.service';
 import { prepareDocumentQr } from '../shared/print/document-qr';
 import { TaxService, type CompanyTaxSettings } from '../core/tax.service';
 import { CompanySettingsStore } from './company-settings.store';
+import { PrinterSettingsComponent } from '../shared/print/printer-settings.component';
 
 @Component({
   selector: 'app-document-designer',
   imports: [
+    PreparedPrintDirective,
     FormsModule,
     RouterLink,
     PageLayoutComponent,
@@ -39,6 +42,7 @@ import { CompanySettingsStore } from './company-settings.store';
     ButtonComponent,
     FormFieldComponent,
     DocumentPreviewComponent,
+    PrinterSettingsComponent,
   ],
   host: { '(window:beforeunload)': 'beforeUnload($event)' },
   template: `
@@ -117,7 +121,7 @@ import { CompanySettingsStore } from './company-settings.store';
                   ><select
                     class="select select-bordered w-full"
                     [ngModel]="effectivePaper()"
-                    (ngModelChange)="paper.set($event)"
+                    (ngModelChange)="setPaper($event)"
                   >
                     @if (kind() !== 'statement' && kind() !== 'purchase-order') {
                       <option value="receipt-52mm">52 mm receipt</option>
@@ -317,6 +321,7 @@ import { CompanySettingsStore } from './company-settings.store';
               }}
               · Preview fits your screen
             </p>
+            <div class="mt-3"><app-printer-settings [showPaper]="false" /></div>
           </section>
         </div>
         <footer
@@ -341,6 +346,8 @@ import { CompanySettingsStore } from './company-settings.store';
               appButton
               variant="outline"
               [disabled]="busy() || !preview()"
+              [appPreparePrint]="prepareTestPrint"
+              [appPrintDocument]="preview()"
               (click)="testPrint()"
             >
               Test print
@@ -418,6 +425,10 @@ export class DocumentDesignerComponent implements OnInit {
   readonly effectivePaper = computed(() =>
     ['statement', 'purchase-order'].includes(this.kind()) ? 'a4' : this.paper()
   );
+  setPaper(paper: PaperFormat): void {
+    this.paper.set(paper);
+    this.print.setFormat(paper);
+  }
   readonly mobileView = signal<'edit' | 'preview'>('edit');
   readonly activeSection = signal<PreviewSection>(null);
   readonly captionOpen = signal(false);
@@ -482,6 +493,7 @@ export class DocumentDesignerComponent implements OnInit {
   });
 
   constructor() {
+    effect(() => this.paper.set(this.print.format()));
     effect(onCleanup => {
       const value = this.qrValue();
       this.previewError.set(null);
@@ -669,6 +681,8 @@ export class DocumentDesignerComponent implements OnInit {
       this.busy.set(false);
     }
   }
+  readonly prepareTestPrint = async () =>
+    this.render(await this.prepare(structuredClone(this.draft())));
   async testPrint(): Promise<void> {
     if (this.busy() || !this.store.settings()) return;
     this.busy.set(true);

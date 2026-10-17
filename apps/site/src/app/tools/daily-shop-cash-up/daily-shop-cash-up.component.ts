@@ -1,3 +1,4 @@
+import { printCurrentPage } from '../../../../../../packages/documents/browser-print';
 import { NgTemplateOutlet, isPlatformBrowser } from '@angular/common';
 import {
   ChangeDetectionStrategy,
@@ -418,6 +419,9 @@ interface StepLabel {
                 </div>
               }
 
+              @if (printError()) {
+                <p role="alert">{{ printError() }}</p>
+              }
               <div
                 class="no-print mt-6 flex flex-wrap gap-2 border-t border-neutral-content/15 pt-5"
               >
@@ -671,6 +675,7 @@ export class DailyShopCashUpComponent {
   protected readonly canUseSummary = computed(
     () => this.resultRevealed() && this.summary() !== null && this.checkedChannelCount() > 0
   );
+  protected readonly printError = signal<string | null>(null);
   protected readonly shareNotice = signal<string | null>(null);
 
   protected readonly steps: StepLabel[] = [
@@ -864,7 +869,11 @@ export class DailyShopCashUpComponent {
 
   protected printSummary(): void {
     if (!this.canUseSummary() || !isPlatformBrowser(this.platformId)) return;
-    window.print();
+    try {
+      printCurrentPage();
+    } catch {
+      this.printError.set('Printing failed. Try again.');
+    }
   }
 
   protected async shareTool(): Promise<void> {

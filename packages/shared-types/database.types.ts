@@ -18217,16 +18217,28 @@ export type Database = {
         }
         Returns: string
       }
-      request_sale_document: {
-        Args: {
-          p_first_name?: string
-          p_last_name?: string
-          p_order_id: string
-          p_phone?: string
-          p_request_key: string
-        }
-        Returns: Json
-      }
+      request_sale_document:
+        | {
+            Args: {
+              p_first_name?: string
+              p_last_name?: string
+              p_order_id: string
+              p_phone?: string
+              p_request_key: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_first_name: string
+              p_last_name: string
+              p_order_id: string
+              p_paper_format: string
+              p_phone: string
+              p_request_key: string
+            }
+            Returns: Json
+          }
       request_trial_access: {
         Args: { p_reason: string; p_requested_days: number }
         Returns: string

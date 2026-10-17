@@ -144,7 +144,7 @@ export class SettingsService {
       .select(SELECT_COLUMNS)
       .limit(1)
       .single();
-    if (error) throw error;
+    if (error) throw rpcError(error);
     return data as unknown as CompanySettings;
   }
 

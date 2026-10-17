@@ -1,3 +1,4 @@
+import { PreparedPrintDirective } from '../shared/print/prepared-print.directive';
 import {
   Component,
   ElementRef,
@@ -23,10 +24,18 @@ import { formatKes } from '../core/money';
 import { ButtonComponent } from '../shared/ui/button.component';
 import { FormFieldComponent } from '../shared/ui/form-field.component';
 import { IconComponent } from '../shared/ui/icon.component';
+import { PrinterSettingsComponent } from '../shared/print/printer-settings.component';
 
 @Component({
   selector: 'app-sale-document-modal',
-  imports: [FormsModule, ButtonComponent, FormFieldComponent, IconComponent],
+  imports: [
+    PreparedPrintDirective,
+    FormsModule,
+    ButtonComponent,
+    FormFieldComponent,
+    IconComponent,
+    PrinterSettingsComponent,
+  ],
   template: `
     <dialog
       #dialog
@@ -190,22 +199,11 @@ import { IconComponent } from '../shared/ui/icon.component';
             @if (error()) {
               <p role="alert" class="text-sm text-error">{{ error() }}</p>
             }
-            @if (showSizes()) {
-              <app-form-field label="Print paper size">
-                <select
-                  class="select w-full"
-                  [ngModel]="print.format()"
-                  (ngModelChange)="setFormat($event)"
-                >
-                  @for (format of print.getAvailableTemplates(); track format.id) {
-                    <option [value]="format.id">{{ format.width }}</option>
-                  }
-                </select>
-              </app-form-field>
-            }
+            <app-printer-settings />
           </div>
           <footer class="space-y-2 border-t border-base-300 px-5 py-4">
             @if (canSend()) {
+              <p class="type-caption">WhatsApp PDF · {{ whatsAppSize() }}</p>
               @if (confirmResend()) {
                 <p class="text-sm">Send another copy to {{ context()?.customer?.phone }}?</p>
                 <div class="flex gap-2">
@@ -236,24 +234,14 @@ import { IconComponent } from '../shared/ui/icon.component';
                 variant="outline"
                 class="flex-1"
                 [loading]="printing()"
+                [appPrintOrder]="service.modal()?.orderId ?? null"
+                [appPrintRevision]="printRevision()"
                 (click)="printDocument()"
               >
                 <app-icon name="heroPrinter" /> Print
               </button>
               <button appButton variant="ghost" (click)="close()">Done</button>
             </div>
-            <button
-              appButton
-              variant="ghost"
-              size="sm"
-              class="w-full"
-              (click)="showSizes.set(!showSizes())"
-            >
-              Change size ·
-              {{
-                print.format() === 'a4' ? 'A4' : print.format() === 'receipt-80mm' ? '80mm' : '52mm'
-              }}
-            </button>
           </footer>
         </section>
       }
@@ -317,6 +305,12 @@ export class SaleDocumentModalComponent implements OnDestroy {
   private readonly permissions = inject(PermissionsService);
   protected readonly money = formatKes;
   protected readonly context = signal<SaleDocumentContext | null>(null);
+  protected readonly printRevision = computed(() => {
+    const context = this.context();
+    return context
+      ? `${context.paid}:${context.balance}:${context.customer?.updated_at ?? ''}`
+      : '';
+  });
   protected readonly loading = signal(false);
   protected readonly sending = signal(false);
   protected readonly printing = signal(false);
@@ -326,7 +320,6 @@ export class SaleDocumentModalComponent implements OnDestroy {
   protected readonly lookingUp = signal(false);
   protected readonly correcting = signal(false);
   protected readonly savingNumber = signal(false);
-  protected readonly showSizes = signal(false);
   protected readonly confirmResend = signal(false);
   protected readonly firstName = signal('');
   protected lastName = '';
@@ -338,6 +331,7 @@ export class SaleDocumentModalComponent implements OnDestroy {
   private pollTimer?: ReturnType<typeof setTimeout>;
   private requestKey = crypto.randomUUID();
   private requestAccepted = false;
+  private requestPayload: string | null = null;
   private generation = 0;
   private refreshVersion = 0;
   private lookupVersion = 0;
@@ -391,6 +385,7 @@ export class SaleDocumentModalComponent implements OnDestroy {
       this.lookingUp.set(false);
       this.requestKey = crypto.randomUUID();
       this.requestAccepted = false;
+      this.requestPayload = null;
       void this.refresh(this.generation);
     });
     afterRenderEffect(() => {
@@ -487,6 +482,7 @@ export class SaleDocumentModalComponent implements OnDestroy {
       await this.service.correctPhone(customer, this.correctedPhone);
       this.correcting.set(false);
       this.requestKey = crypto.randomUUID();
+      this.requestPayload = null;
       await this.refresh(this.generation);
     } catch (error) {
       this.error.set(this.message(error));
@@ -509,20 +505,26 @@ export class SaleDocumentModalComponent implements OnDestroy {
     if (confirmed && this.requestAccepted) {
       this.requestKey = crypto.randomUUID();
       this.requestAccepted = false;
+      this.requestPayload = null;
     }
+    const paperFormat = this.print.format();
+    const contact = ctx.has_customer
+      ? undefined
+      : {
+          phone: normalizeKenyanPhone(this.phone())!,
+          first_name: this.matched()?.first_name ?? this.firstName().trim(),
+          last_name: this.matched()?.last_name ?? this.lastName.trim(),
+        };
+    const payload = JSON.stringify({ paperFormat, contact });
+    // Identical retries share a key. An edited document is a new request.
+    if (this.requestPayload !== null && this.requestPayload !== payload) {
+      this.requestKey = crypto.randomUUID();
+      this.requestAccepted = false;
+    }
+    this.requestPayload = payload;
     const generation = this.generation;
     try {
-      const accepted = await this.service.send(
-        ctx.order_id,
-        this.requestKey,
-        ctx.has_customer
-          ? undefined
-          : {
-              phone: normalizeKenyanPhone(this.phone())!,
-              first_name: this.matched()?.first_name ?? this.firstName().trim(),
-              last_name: this.matched()?.last_name ?? this.lastName.trim(),
-            }
-      );
+      const accepted = await this.service.send(ctx.order_id, this.requestKey, contact, paperFormat);
       if (generation !== this.generation) return;
       this.requestAccepted = true;
       this.context.set({
@@ -531,6 +533,7 @@ export class SaleDocumentModalComponent implements OnDestroy {
           id: accepted.outbox_id,
           state: accepted.state,
           recipient: ctx.customer?.phone ?? normalizeKenyanPhone(this.phone())!,
+          paper_format: accepted.paper_format ?? paperFormat,
           sent_at: null,
           error: null,
         },
@@ -559,6 +562,9 @@ export class SaleDocumentModalComponent implements OnDestroy {
     } finally {
       this.printing.set(false);
     }
+  }
+  protected whatsAppSize(): string {
+    return this.print.format() === 'a4' ? 'A4' : 'Mobile size';
   }
   protected setFormat(format: PrintFormat): void {
     this.print.setFormat(format);

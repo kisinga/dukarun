@@ -1,13 +1,16 @@
 import {
-  escapeText,
   renderDocument,
   type DocumentIdentity,
   type PaperFormat,
+  type RenderedDocument,
+  type PrintJob,
 } from '@dukarun/documents';
 import { ReceiptDataService } from './receipt-data.service';
 import { orderDocumentContent, purchaseDocumentContent } from './document-adapters';
 import { Injectable, inject, signal } from '@angular/core';
 import type { OrderData, PrintMeta, PurchaseData } from './print-data';
+import { OpenEscPrintService } from './open-esc-print.service';
+import { printWithSystem } from '../../../../../../packages/documents/browser-print';
 
 export type PrintFormat = PaperFormat;
 
@@ -20,7 +23,7 @@ const FORMAT_KEY = 'dukarun-print-format';
 @Injectable({ providedIn: 'root' })
 export class PrintService {
   private readonly receiptData = inject(ReceiptDataService);
-  private preparingDocument = false;
+  private readonly openEsc = inject(OpenEscPrintService);
 
   readonly format = signal<PrintFormat>(this.loadFormat());
 
@@ -28,7 +31,7 @@ export class PrintService {
     return [
       { id: 'receipt-52mm', name: '52mm Receipt', width: '52mm' },
       { id: 'receipt-80mm', name: '80mm Receipt', width: '80mm' },
-      { id: 'a4', name: 'A4 Invoice', width: '210mm' },
+      { id: 'a4', name: 'A4', width: 'A4' },
     ];
   }
 
@@ -42,14 +45,14 @@ export class PrintService {
   }
 
   /** Print an order-shaped document (receipt / proforma / cashier-slip). */
-  async printOrder(
+  async renderOrder(
     order: OrderData,
     companyName: string | null,
     companyLogo: string | null,
     printMeta?: PrintMeta,
     companyAddress?: string | null,
     templateId?: PrintFormat
-  ): Promise<void> {
+  ): Promise<RenderedDocument> {
     const documentType = printMeta?.documentType ?? 'receipt';
     if (
       documentType === 'receipt' &&
@@ -80,7 +83,29 @@ export class PrintService {
       company.documentDesigns?.[documentType],
       templateId ?? this.format()
     );
-    await this.printDocument(rendered.title, rendered.html, rendered.styles);
+    return rendered;
+  }
+
+  async printOrder(...args: Parameters<PrintService['renderOrder']>): Promise<void> {
+    const rendered = await this.renderOrder(...args);
+    await this.printDocument(rendered.title, rendered.html, rendered.styles, rendered.print);
+  }
+
+  async prepareOrder(
+    orderId: string,
+    kind: 'sale' | 'receipt' | 'proforma' | 'cashier-slip' = 'sale'
+  ): Promise<RenderedDocument> {
+    const [{ order, meta }, company] = await Promise.all([
+      kind === 'proforma'
+        ? this.receiptData.buildProformaData(orderId)
+        : kind === 'cashier-slip'
+          ? this.receiptData.buildCashierSlipData(orderId)
+          : kind === 'receipt'
+            ? this.receiptData.buildReceiptData(orderId)
+            : this.receiptData.buildSaleDocumentData(orderId),
+      this.receiptData.companyPrintInfo(),
+    ]);
+    return this.renderOrder(order, company.name, company.logoUrl, meta, company.address);
   }
 
   /** Print a purchase order (A4-only by design). */
@@ -105,158 +130,37 @@ export class PrintService {
       ),
       company.documentDesigns?.['purchase-order']
     );
-    await this.printDocument(rendered.title, rendered.html, rendered.styles);
+    await this.printRendered(rendered);
   }
 
-  /** Shared hidden-iframe print orchestration for receipts, documents, and labels. */
-  async printDocument(title: string, html: string, styles: string): Promise<void> {
-    if (this.preparingDocument) {
-      throw new Error('Another document is already being prepared for printing.');
-    }
-    this.preparingDocument = true;
-
-    try {
-      await this.prepareAndPrintDocument(title, html, styles);
-    } finally {
-      this.preparingDocument = false;
-    }
-  }
-
-  private async prepareAndPrintDocument(
+  /** Legacy custom sheets stay on the system path unless explicit geometry is supplied. */
+  async printDocument(
     title: string,
     html: string,
-    styles: string
+    styles: string,
+    print?: RenderedDocument['print']
   ): Promise<void> {
-    let printFrame = document.getElementById('print-frame') as HTMLIFrameElement;
-    if (!printFrame) {
-      printFrame = document.createElement('iframe');
-      printFrame.id = 'print-frame';
-      printFrame.setAttribute('aria-hidden', 'true');
-      printFrame.tabIndex = -1;
-      printFrame.style.position = 'absolute';
-      printFrame.style.width = '0';
-      printFrame.style.height = '0';
-      printFrame.style.border = 'none';
-      printFrame.style.left = '-9999px';
-      document.body.appendChild(printFrame);
-    }
-
-    const iframeDoc = printFrame.contentDocument || printFrame.contentWindow?.document;
-    if (!iframeDoc) throw new Error('Failed to access iframe document');
-
-    iframeDoc.open();
-    iframeDoc.write(`
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <title>${escapeText(title)}</title>
-                    <meta charset="utf-8">
-                    <style>
-                        * {
-                            margin: 0;
-                            padding: 0;
-                            box-sizing: border-box;
-                        }
-                        body {
-                            font-family: Arial, sans-serif;
-                        }
-                        ${styles}
-                        @media print {
-                            html,
-                            body {
-                                margin: 0;
-                                padding: 0;
-                                background: #fff;
-                                color: #000;
-                            }
-                            .print-template {
-                                print-color-adjust: exact;
-                                -webkit-print-color-adjust: exact;
-                            }
-                            thead {
-                                display: table-header-group;
-                            }
-                            tfoot {
-                                display: table-footer-group;
-                            }
-                            tr,
-                            img {
-                                break-inside: avoid;
-                                page-break-inside: avoid;
-                            }
-                            .no-print {
-                                display: none !important;
-                            }
-                            .print-only {
-                                display: block !important;
-                            }
-                        }
-                        @media screen {
-                            .print-template {
-                                margin: 20px auto;
-                                box-shadow: 0 0 10px rgba(0,0,0,0.1);
-                            }
-                        }
-                    </style>
-                </head>
-                <body>
-                    ${html}
-                </body>
-                </html>
-            `);
-    iframeDoc.close();
-
-    const printWindow = printFrame.contentWindow;
-    if (!printWindow) throw new Error('Failed to access iframe window');
-
-    await this.waitForDocument(printWindow);
-    await this.waitForAssets(printWindow.document);
-    await new Promise<void>(resolve => printWindow.setTimeout(resolve, 0));
-    printWindow.focus();
-    printWindow.print();
-  }
-
-  private async waitForDocument(printWindow: Window): Promise<void> {
-    if (printWindow.document.readyState === 'complete') return;
-    await this.withTimeout(
-      new Promise<void>(resolve => {
-        printWindow.addEventListener('load', () => resolve(), { once: true });
-      }),
-      2_000
-    );
-  }
-
-  private async waitForAssets(printDocument: Document): Promise<void> {
-    const imagePromises = Array.from(printDocument.images)
-      .filter(image => !image.complete)
-      .map(
-        image =>
-          new Promise<void>(resolve => {
-            image.addEventListener('load', () => resolve(), { once: true });
-            image.addEventListener('error', () => resolve(), { once: true });
-          })
-      );
-    const fontsPromise = printDocument.fonts?.ready.then(() => undefined).catch(() => undefined);
-    await this.withTimeout(
-      Promise.all([fontsPromise ?? Promise.resolve(), ...imagePromises]).then(() => undefined),
-      3_000
-    );
-  }
-
-  private withTimeout(task: Promise<void>, timeoutMs: number): Promise<void> {
-    return new Promise<void>(resolve => {
-      const timeout = setTimeout(resolve, timeoutMs);
-      void task.then(
-        () => {
-          clearTimeout(timeout);
-          resolve();
-        },
-        () => {
-          clearTimeout(timeout);
-          resolve();
-        }
-      );
+    await this.printRendered({
+      title,
+      html,
+      styles,
+      print: print ?? { kind: 'sheet', widthMm: 210, heightMm: 297 },
     });
+  }
+
+  async printRendered(job: PrintJob): Promise<void> {
+    if (
+      this.openEsc.method() === 'open-esc' &&
+      this.openEsc.supported &&
+      job.print &&
+      job.print.kind !== 'sheet'
+    )
+      throw new Error('The document is still preparing. Use its Print button when ready.');
+    await this.systemPrint(job);
+  }
+
+  systemPrint(job: RenderedDocument): Promise<void> {
+    return printWithSystem(job);
   }
 
   private loadFormat(): PrintFormat {

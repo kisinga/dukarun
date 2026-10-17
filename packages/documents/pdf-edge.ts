@@ -2,7 +2,7 @@
 import regular from './fonts/NotoSans-Regular.ttf';
 import bold from './fonts/NotoSans-Bold.ttf';
 import serif from './fonts/NotoSerif-Regular.ttf';
-import { renderDocumentPdf, PDF_RENDERER_VERSION, type PdfAssets } from './pdf';
+import { renderDocumentPdf, type PdfAssets } from './pdf';
 import { externalDocumentContent, type ExternalDocumentInput } from './adapters';
 import type { DocumentIdentity } from './render';
 export { preparePdfLogo } from './logo';
@@ -13,12 +13,20 @@ export async function renderSnapshotPdf(
   identity: DocumentIdentity,
   logo?: PdfAssets['logo']
 ): Promise<Uint8Array> {
-  if (snapshot.pdf_renderer_version !== PDF_RENDERER_VERSION)
-    throw new Error('unsupported_renderer_version');
-  return renderDocumentPdf(externalDocumentContent(snapshot, identity), snapshot.document_design, {
-    regular,
-    bold,
-    serif,
-    logo,
-  });
+  // Older snapshots use the current renderer; missing or unknown sizes remain A4.
+  const paper =
+    snapshot.paper_format === 'receipt-52mm' || snapshot.paper_format === 'receipt-80mm'
+      ? snapshot.paper_format
+      : 'a4';
+  return renderDocumentPdf(
+    externalDocumentContent(snapshot, identity),
+    snapshot.document_design,
+    {
+      regular,
+      bold,
+      serif,
+      logo,
+    },
+    paper
+  );
 }

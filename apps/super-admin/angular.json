@@ -60,6 +60,14 @@
               "optimization": false,
               "extractLicenses": false,
               "sourceMap": true
+            },
+            "tailscale": {
+              "fileReplacements": [
+                {
+                  "replace": "src/environments/environment.ts",
+                  "with": "src/environments/environment.tailscale.generated.ts"
+                }
+              ]
             }
           },
           "defaultConfiguration": "production"
@@ -75,6 +83,12 @@
             },
             "development": {
               "buildTarget": "super-admin:build:development"
+            },
+            "tailscale": {
+              "buildTarget": "super-admin:build:development,tailscale",
+              "host": "127.0.0.1",
+              "port": 4305,
+              "allowedHosts": [".ts.net"]
             }
           },
           "defaultConfiguration": "development"

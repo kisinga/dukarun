@@ -122,3 +122,32 @@ describe('Shared company settings scope', () => {
     expect(store.settings()).toBeNull();
   });
 });
+
+describe('settings query errors', () => {
+  it('keeps database errors readable and supports retry after the schema is repaired', async () => {
+    TestBed.resetTestingModule();
+    const single = vi
+      .fn()
+      .mockResolvedValueOnce({
+        data: null,
+        error: {
+          code: '42703',
+          message: 'column companies.show_company_name_on_documents does not exist',
+        },
+      })
+      .mockResolvedValueOnce({
+        data: { id: 'company', show_company_name_on_documents: true },
+        error: null,
+      });
+    const query = { select: vi.fn().mockReturnThis(), limit: vi.fn().mockReturnThis(), single };
+    TestBed.configureTestingModule({
+      providers: [{ provide: SupabaseService, useValue: { client: { from: vi.fn(() => query) } } }],
+    });
+    const settings = TestBed.inject(SettingsService);
+    await expect(settings.getSettings()).rejects.toThrow('show_company_name_on_documents');
+    await expect(settings.getSettings()).resolves.toMatchObject({
+      id: 'company',
+      show_company_name_on_documents: true,
+    });
+  });
+});
